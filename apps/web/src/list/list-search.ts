@@ -4,4 +4,5 @@ import { ref } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 /** `query` is lower case and trimmed; an empty one matches every item. */
-export const matchesSearch = (item: Item, query: string): boolean => !query || `${item.title} ${ref(item)}`.toLowerCase().includes(query);
+export const matchesSearch = (item: Item, query: string): boolean =>
+    !query || `${item.title} ${ref(item)}`.toLowerCase().includes(query);

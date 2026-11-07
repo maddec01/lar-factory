@@ -40,7 +40,9 @@ function commitMessageProblem(message) {
 async function checkPullRequest({ github, context, core }) {
     const pull = context.payload.pull_request;
     const commits = await github.paginate(github.rest.pulls.listCommits, {
-        ...context.repo, pull_number: pull.number, per_page: 100,
+        ...context.repo,
+        pull_number: pull.number,
+        per_page: 100,
     });
     const problems = findProblems({
         title: pull.title,

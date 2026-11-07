@@ -1,16 +1,16 @@
 /* The board page's own styles. Tokens, base styles and the base components' styles come from the design
    system (@lar-works/design-system), and the board's roles from packages/ui. Each feature folder holds its own
    layout rules; all of them use only the design system's tokens and Tailwind's spacing scale. */
-@import "@lar-works/design-system/styles.css" source(none);
-@import "@lar-factory/ui/styles.css";
-@import "./buttons/button-kinds.css";
-@import "./items/items.css";
-@import "./motion/ambient-motion.css";
-@import "./line/rows.css";
-@import "./loading/loading-screen.css";
-@import "./notices/notices.css";
-@import "./settings/settings.css";
-@import "./title-bar/title-bar.css";
+@import '@lar-works/design-system/styles.css' source(none);
+@import '@lar-factory/ui/styles.css';
+@import './buttons/button-kinds.css';
+@import './items/items.css';
+@import './motion/ambient-motion.css';
+@import './line/rows.css';
+@import './loading/loading-screen.css';
+@import './notices/notices.css';
+@import './settings/settings.css';
+@import './title-bar/title-bar.css';
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item";
@@ -48,28 +48,59 @@
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
 
-code { font: var(--text-xs) var(--font-mono); }
-@layer base {
-  /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
-     button keeps its button's text colour. */
-  a { color: inherit; text-decoration: underline; }
-  a[data-slot="button"] { text-decoration: none; }
-  a:hover { text-decoration-thickness: --spacing(0.5); }
-  /* So a design-system control's outline-none wins and its own focus ring is the only one. */
-  :focus-visible { outline: --spacing(0.5) solid var(--ring); outline-offset: --spacing(0.5); border-radius: var(--radius-sm); }
+code {
+    font: var(--text-xs) var(--font-mono);
 }
-.sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@layer base {
+    /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
+     button keeps its button's text colour. */
+    a {
+        color: inherit;
+        text-decoration: underline;
+    }
+    a[data-slot='button'] {
+        text-decoration: none;
+    }
+    a:hover {
+        text-decoration-thickness: --spacing(0.5);
+    }
+    /* So a design-system control's outline-none wins and its own focus ring is the only one. */
+    :focus-visible {
+        outline: --spacing(0.5) solid var(--ring);
+        outline-offset: --spacing(0.5);
+        border-radius: var(--radius-sm);
+    }
+}
+.sr-only {
+    position: absolute;
+    width: --spacing(0.25);
+    height: --spacing(0.25);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
 /* The design system's Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
-button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
+button:disabled[title] {
+    pointer-events: auto;
+    cursor: not-allowed;
+}
 
 @keyframes activity-sweep {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(300%); }
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(300%);
+    }
 }
 /* 30 updates/s lets the compositor skip unchanged frames on high-refresh displays. */
-.activity-sweep { animation: activity-sweep 1.8s steps(54) infinite; }
+.activity-sweep {
+    animation: activity-sweep 1.8s steps(54) infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .activity-sweep { animation: none; }
+    .activity-sweep {
+        animation: none;
+    }
 }
 
 /* Each loop behind an open blurred overlay stops repainting that blur. Ninna-ui portals every overlay as a child of
@@ -78,5 +109,19 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
    at opacity 0, so pausing it would hide what it enters. The title bar's refreshed ping is the one one-shot here: it
    starts visible at opacity 0.6 and repaints the blur for 1.2 s on each landed read, and it finishes once the modal
    closes. */
-body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) :is(.status-spin, .status-pulse, .activity-sweep, .animate-spin, .motion-safe\:animate-spin, .animate-pulse, [data-ping]) { animation-play-state: paused; }
-body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) .lar-skeleton::before { animation-play-state: paused; }
+body
+    > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open'])
+    :is(
+        .status-spin,
+        .status-pulse,
+        .activity-sweep,
+        .animate-spin,
+        .motion-safe\:animate-spin,
+        .animate-pulse,
+        [data-ping]
+    ) {
+    animation-play-state: paused;
+}
+body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) .lar-skeleton::before {
+    animation-play-state: paused;
+}

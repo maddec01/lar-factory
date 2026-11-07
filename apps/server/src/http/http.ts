@@ -1,104 +1,121 @@
+import {
+    kindLabels,
+    pageWithData,
+    sameRepo,
+    trackerCapabilities,
+    writeAccessProblem,
+    type Item,
+    type ItemCommentsPage,
+    type ItemDetails,
+    type LabelChange,
+    type OnboardingRepository,
+    type ProjectChoice,
+    type RepoConfig,
+    type RepositorySetup,
+    type TrackerLabel,
+    type SetupDetection,
+} from '@lar-factory/shared';
 import { discoverVocabulary } from '@lar-factory/shared/publication-settings';
-import { suggestVocabularyLabels } from '@lar-factory/shared/vocabulary';
 // The board's HTTP side: serves the page and the board data on this machine only,
 // streams changes over /api/events, and routes the page's writes to the item commands.
-
+import { suggestVocabularyLabels } from '@lar-factory/shared/vocabulary';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { kindLabels, pageWithData, sameRepo, trackerCapabilities, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
+
+import type { BoardAutoBuild } from '../auto-build/auto-build-setting.ts';
+import { readAzureReadiness } from '../azure/azure-readiness.ts';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
+import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { Capture } from '../items/capture.ts';
+import type { ItemCommands, Reply } from '../items/item-commands.ts';
+import type { BoardLimitSetting } from '../items/limit-setting.ts';
 import type { BoardRetention } from '../items/retention.ts';
 import type { BoardShapingThreadCleanup } from '../items/shaping-thread-cleanup.ts';
-import type { BoardLimitSetting } from '../items/limit-setting.ts';
-import type { BoardAutoBuild } from '../auto-build/auto-build-setting.ts';
-import type { ItemCommands, Reply } from '../items/item-commands.ts';
-import type { ItemDetailsReader } from '../item-details/item-details.ts';
+import { log } from '../log.ts';
 import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
-import type { ProjectImage } from '../t3/project-icons.ts';
-import { log } from '../log.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
-import { readAzureReadiness } from '../azure/azure-readiness.ts';
-
+import type { ProjectImage } from '../t3/project-icons.ts';
 
 export interface HttpDeps {
-  board: BoardState;
-  commands: ItemCommands;
-  capture: Capture;
-  startAfter: StartAfter;
-  retention: Pick<BoardRetention, 'save'>;
-  shapingThreadCleanup: Pick<BoardShapingThreadCleanup, 'save'>;
-  heavyCommandLimit: Pick<BoardLimitSetting, 'save'>;
-  buildLimit: Pick<BoardLimitSetting, 'save'>;
-  autoBuild: Pick<BoardAutoBuild, 'save'>;
-  /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
-  archive(): Item[];
-  page: BuiltPage;
-  /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
-  appSecret: string | null;
-  /** Sample mode serves a fixed file: it writes nothing and reads no provider. */
-  sample: boolean;
-  /** A sample board that reads T3 also answers with T3's projects for onboarding. */
-  sampleReadsT3: boolean;
-  /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
-  reauthorizeT3?(): Promise<void>;
-  recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
-  /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
-  itemDetails: ItemDetailsReader;
-  /** Shows a label change the tracker took on the item's row, before the next read reports it. */
-  showLabelChange(item: Item, change: LabelChange): void;
-  showTicketType(item: Item, type: string): void;
-  /**
-   * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
-   * repositories' configs again and reads every source.
-   */
-  readSoon(url?: string): void;
-  /** The startup tool check; requests that run tools wait for it. */
-  ready(): Promise<void> | undefined;
-  /** A T3 project's favicon, or undefined when T3 hasn't listed the project or it has none. */
-  projectIcon(projectId: string): Promise<ProjectImage | undefined>;
-  /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
-  projectChoices(): Promise<ProjectChoice[]>;
-  /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
-  keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
-  /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
-  createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
-  /** Onboarding's detection of the body's repository with its T3 project, reading only, or why it can't run. */
-  detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
-  /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
-  saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
-  /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
-  changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
-  changeRepositoryLabels(input: Record<string, unknown>): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
+    board: BoardState;
+    commands: ItemCommands;
+    capture: Capture;
+    startAfter: StartAfter;
+    retention: Pick<BoardRetention, 'save'>;
+    shapingThreadCleanup: Pick<BoardShapingThreadCleanup, 'save'>;
+    heavyCommandLimit: Pick<BoardLimitSetting, 'save'>;
+    buildLimit: Pick<BoardLimitSetting, 'save'>;
+    autoBuild: Pick<BoardAutoBuild, 'save'>;
+    /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
+    archive(): Item[];
+    page: BuiltPage;
+    /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
+    appSecret: string | null;
+    /** Sample mode serves a fixed file: it writes nothing and reads no provider. */
+    sample: boolean;
+    /** A sample board that reads T3 also answers with T3's projects for onboarding. */
+    sampleReadsT3: boolean;
+    /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
+    reauthorizeT3?(): Promise<void>;
+    recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
+    /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
+    itemDetails: ItemDetailsReader;
+    /** Shows a label change the tracker took on the item's row, before the next read reports it. */
+    showLabelChange(item: Item, change: LabelChange): void;
+    showTicketType(item: Item, type: string): void;
+    /**
+     * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
+     * repositories' configs again and reads every source.
+     */
+    readSoon(url?: string): void;
+    /** The startup tool check; requests that run tools wait for it. */
+    ready(): Promise<void> | undefined;
+    /** A T3 project's favicon, or undefined when T3 hasn't listed the project or it has none. */
+    projectIcon(projectId: string): Promise<ProjectImage | undefined>;
+    /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
+    projectChoices(): Promise<ProjectChoice[]>;
+    /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
+    keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
+    /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
+    createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
+    /** Onboarding's detection of the body's repository with its T3 project, reading only, or why it can't run. */
+    detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
+    /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
+    saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
+    /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
+    changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
+    changeRepositoryLabels(
+        input: Record<string, unknown>,
+    ): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
 }
 
 export interface BoardServer {
-  server: Server;
-  /** Ends every page's event stream, so the server can close. */
-  endStreams(): void;
+    server: Server;
+    /** Ends every page's event stream, so the server can close. */
+    endStreams(): void;
 }
 
 /** A write only the board app's page may make. */
 interface Write {
-  /** What the body holds, for the errors about it. */
-  what: string;
-  /** The refusal in sample mode, before the body is read. */
-  disabled?: string;
-  /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
-  restarted?: () => object;
-  run(input: Record<string, unknown>): Promise<Reply>;
+    /** What the body holds, for the errors about it. */
+    what: string;
+    /** The refusal in sample mode, before the body is read. */
+    disabled?: string;
+    /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
+    restarted?: () => object;
+    run(input: Record<string, unknown>): Promise<Reply>;
 }
 
 const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy':
-    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy':
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
 };
 
 /** T3's policy for a project's SVG favicon, which blocks the file's scripts even when opened as a page. */
@@ -109,609 +126,831 @@ const BOARD_VIEWS = new Set(['/', '/api/board', '/api/events']);
 
 /** Whether a request needs no tool: the health check, assets and the board's views answer at once; the rest run tools or act on what the lookup found. */
 const answersAtOnce = (method: string | undefined, path: string) =>
-  path === '/healthz' || path.startsWith('/assets/') || (method === 'GET' || method === 'HEAD') && BOARD_VIEWS.has(path);
+    path === '/healthz' ||
+    path.startsWith('/assets/') ||
+    ((method === 'GET' || method === 'HEAD') && BOARD_VIEWS.has(path));
 
 function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-  loopTrace.span('response write', () => res.end(body));
+    res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+    loopTrace.span('response write', () => res.end(body));
 }
 
 function json(res: ServerResponse, status: number, value: unknown): void {
-  send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
+    send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
 }
 
 /** Whether the request carries the app secret, compared in constant time. Hashing first evens out the lengths. */
 function hasAppSecret(req: IncomingMessage, secret: string): boolean {
-  const given = req.headers['x-board-secret'];
-  if (typeof given !== 'string') return false;
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(given), digest(secret));
+    const given = req.headers['x-board-secret'];
+    if (typeof given !== 'string') return false;
+    const digest = (value: string) => createHash('sha256').update(value).digest();
+    return timingSafeEqual(digest(given), digest(secret));
 }
 
 /** Reads a small JSON object body, or answers the request with the problem and returns null. */
-async function readJson(req: IncomingMessage, res: ServerResponse, what: string): Promise<Record<string, unknown> | null> {
-  if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
-    json(res, 415, { error: `Send ${what} as JSON.` });
-    return null;
-  }
-  try {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      size += (chunk as Buffer).length;
-      if (size > 100_000) {
-        json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
+async function readJson(
+    req: IncomingMessage,
+    res: ServerResponse,
+    what: string,
+): Promise<Record<string, unknown> | null> {
+    if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
+        json(res, 415, { error: `Send ${what} as JSON.` });
         return null;
-      }
-      chunks.push(chunk as Buffer);
     }
-    const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
-    if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
-    return input as Record<string, unknown>;
-  } catch {
-    json(res, 400, { error: `Send valid ${what} as JSON.` });
-    return null;
-  }
+    try {
+        let size = 0;
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+            size += (chunk as Buffer).length;
+            if (size > 100_000) {
+                json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
+                return null;
+            }
+            chunks.push(chunk as Buffer);
+        }
+        const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+        if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
+        return input as Record<string, unknown>;
+    } catch {
+        json(res, 400, { error: `Send valid ${what} as JSON.` });
+        return null;
+    }
 }
 
 /** Runs an item command on the body's itemId, or refuses a body that names none. */
-function forItem(unnamed: string, run: (itemId: string, input: Record<string, unknown>) => Reply | Promise<Reply>): Write['run'] {
-  return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
+function forItem(
+    unnamed: string,
+    run: (itemId: string, input: Record<string, unknown>) => Reply | Promise<Reply>,
+): Write['run'] {
+    return async (input) =>
+        typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
 const RESEND_AFTER_WRITE_MS = 2_000;
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret, sample, sampleReadsT3, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
-  /** Open /api/events responses, one per page, with the event each last received. */
-  const streams = new Map<ServerResponse, string>();
-  let resend: NodeJS.Timeout | undefined;
-  /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
-  let draining = false;
-  /** Guarded writes being answered, and the drain calls waiting for them to finish. */
-  let runningWrites = 0;
-  const drained: Array<() => void> = [];
+export function createBoardServer({
+    board,
+    commands,
+    capture,
+    startAfter,
+    retention,
+    shapingThreadCleanup,
+    heavyCommandLimit,
+    buildLimit,
+    autoBuild,
+    archive,
+    page,
+    appSecret,
+    sample,
+    sampleReadsT3,
+    recheck,
+    reauthorizeT3,
+    itemDetails,
+    showTicketType,
+    showLabelChange,
+    readSoon,
+    ready,
+    projectIcon,
+    projectChoices,
+    keepOnboarding,
+    createProject,
+    detectSetup,
+    saveSetup,
+    changeRepositorySettings,
+    changeRepositoryLabels,
+}: HttpDeps): BoardServer {
+    /** Open /api/events responses, one per page, with the event each last received. */
+    const streams = new Map<ServerResponse, string>();
+    let resend: NodeJS.Timeout | undefined;
+    /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
+    let draining = false;
+    /** Guarded writes being answered, and the drain calls waiting for them to finish. */
+    let runningWrites = 0;
+    const drained: Array<() => void> = [];
 
-  const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
+    const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
 
-  const boardEvent = (data: object) => `data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`;
-  const sendEvent = (res: ServerResponse, event: string) => {
-    streams.set(res, event);
-    loopTrace.span('board stream write', () => res.write(event));
-  };
-  // A page already showing this board gets nothing. Its clock moves on by itself, and a new stream always gets the board.
-  board.subscribe((data) => {
-    if (!streams.size) return;
-    const event = boardEvent(data);
-    for (const [res, last] of streams) if (last !== event) sendEvent(res, event);
-  });
-
-  /**
-   * A write's answer can show a page a board no push sent, or reach it after a newer push, so what a stream last
-   * received may not be what its page shows. Each page gets the board again once the answer has arrived.
-   */
-  function resendAfterWrite(): void {
-    clearTimeout(resend);
-    resend = setTimeout(() => {
-      for (const res of streams.keys()) streams.set(res, '');
-      board.push();
-    }, RESEND_AFTER_WRITE_MS);
-    resend.unref();
-  }
-
-  /** Changes the repository's row on the board at once, before the next read sees it. */
-  function changeRow(repo: string, change: (row: RepoConfig) => RepoConfig): void {
-    board.update({ repos: board.snapshot().repos.map((r) => sameRepo(r.repo, repo) ? change(r) : r) });
-    board.push();
-  }
-
-  /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
-  const WRITES: Record<string, Write> = {
-    '/api/pr-readiness': {
-      what: 'the linked PR to read', disabled: 'Azure readiness is unavailable in sample mode.',
-      async run({ itemId, number }) {
-        const item = board.snapshot().items.find((i) => i.id === itemId);
-        const pr = item?.linkedPrs.find((p) => p.number === number);
-        if (!item || !pr || !item.azure) return { status: 404, body: { error: 'That Azure PR is not on the board.' } };
-        if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo)) return { status: 503, body: { error: 'The Azure source is disconnected.' } };
-        // Resolve arguments from the board's provider link, never arbitrary client arguments.
-        const match = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/i.exec(pr.url);
-        if (!match || Number(match[4]) !== number) return { status: 400, body: { error: 'This Azure PR link is unsupported.' } };
-        const evidence = await readAzureReadiness(match[1]!, decodeURIComponent(match[2]!), decodeURIComponent(match[3]!), Number(number));
-        if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo)) return { status: 503, body: { error: 'The Azure source is disconnected.' } };
-        return { status: 200, body: { evidence: evidence.available ? evidence : { available: false, reason: 'Azure evidence is unavailable. Check the provider connection and refresh.' }, error: null } };
-      },
-    },
-    '/api/items': {
-      what: 'item details', disabled: 'Adding items is disabled in sample mode.',
-      run: (input) => capture.capture(input),
-    },
-    '/api/pick-ticket': {
-      what: 'the Project and the ticket to pick', disabled: 'Picking tickets is disabled in sample mode.',
-      run: (input) => capture.pick(input),
-    },
-    '/api/create-ticket': {
-      what: 'the item to create an issue for', disabled: 'Creating issues is disabled in sample mode.',
-      run: forItem('Name the item to create an issue for.', (itemId, input) => capture.createTicket(itemId, input)),
-    },
-    '/api/attach-ticket': {
-      what: 'the item and the ticket to attach', disabled: 'Attaching tickets is disabled in sample mode.',
-      run: forItem('Name the item to attach a ticket to.', (itemId, input) => capture.attachTicket(itemId, input.number)),
-    },
-    '/api/queue': {
-      what: 'the item to queue', disabled: 'Queuing is disabled in sample mode.',
-      run: forItem('Name the item to queue.', (itemId) => commands.queue(itemId)),
-    },
-    '/api/back-to-list': {
-      what: 'the item to move back to List', disabled: 'Moving items back to List is disabled in sample mode.',
-      run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
-    },
-    '/api/start': {
-      what: 'the item to start', disabled: 'Starting threads is disabled in sample mode.',
-      restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
-      run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
-    },
-    '/api/inspect-owned-cleanup': {
-      what: 'the item to inspect', disabled: 'Cleanup is disabled in sample mode.',
-      run: forItem('Name the item to inspect.', itemId => commands.inspectOwnedCleanup(itemId)),
-    },
-    '/api/execute-owned-cleanup': {
-      what: 'the item to clean up', disabled: 'Cleanup is disabled in sample mode.',
-      run: forItem('Name the item to clean up.', (itemId, input) => commands.executeOwnedCleanup(itemId, input.options)),
-    },
-    '/api/inspect-recovery': {
-      what: 'the item to inspect', disabled: 'Recovery is disabled in sample mode.',
-      run: forItem('Name the item to inspect.', itemId => commands.inspectRecovery(itemId)),
-    },
-    '/api/start-again': {
-      what: 'the item to start again', disabled: 'Recovery is disabled in sample mode.',
-      run: forItem('Name the item to start again.', (itemId, input) => commands.startAgain(itemId, input.model, input.options)),
-    },
-    '/api/start-build': {
-      what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
-      restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
-      run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model, input.drift)),
-    },
-    '/api/dismiss-start-error': {
-      what: 'the start error to dismiss', disabled: 'Starting threads is disabled in sample mode.',
-      run: forItem('Name the item whose start error to dismiss.', async (itemId, input) => commands.dismissStartError(itemId, input.purpose)),
-    },
-    '/api/arm': {
-      what: 'the item to start after its blockers', disabled: 'Start after is disabled in sample mode.',
-      restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),
-      run: forItem('Name the item to start after its blockers.', async (itemId, input) => startAfter.arm(itemId, input.model)),
-    },
-    '/api/disarm': {
-      what: 'the item to disarm', disabled: 'Start after is disabled in sample mode.',
-      run: forItem('Name the item to disarm.', async (itemId) => startAfter.disarm(itemId)),
-    },
-    '/api/abandon': {
-      what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',
-      restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
-      run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
-    },
-    '/api/abandon-and-close': {
-      what: 'the item to abandon and close', disabled: 'Abandoning is disabled in sample mode.',
-      run: forItem('Name the item to abandon.', (itemId) => commands.abandonAndClose(itemId)),
-    },
-    '/api/close-ticket': {
-      what: 'the abandoned item whose ticket to close', disabled: 'Closing tickets is disabled in sample mode.',
-      run: forItem('Name the item whose ticket to close.', (itemId) => commands.closeTicket(itemId)),
-    },
-    '/api/restore': {
-      what: 'the set-aside item to restore', disabled: 'Restoring is disabled in sample mode.',
-      run: forItem('Name the item to restore.', (itemId) => commands.restore(itemId)),
-    },
-    '/api/retention': {
-      what: 'the retention setting', disabled: 'Retention is disabled in sample mode.',
-      async run(input) {
-        const saved = retention.save(input);
-        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
-      },
-    },
-    '/api/shaping-thread-cleanup': {
-      what: 'the shaping thread cleanup setting', disabled: 'Shaping thread cleanup is disabled in sample mode.',
-      async run(input) {
-        const saved = shapingThreadCleanup.save(input);
-        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
-      },
-    },
-    '/api/heavy-command-limit': {
-      what: 'the heavy command limit', disabled: 'The heavy command limit is disabled in sample mode.',
-      async run(input) {
-        const saved = heavyCommandLimit.save(input);
-        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
-      },
-    },
-    '/api/build-limit': {
-      what: 'the build limit', disabled: 'The build limit is disabled in sample mode.',
-      async run(input) {
-        const saved = buildLimit.save(input);
-        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
-      },
-    },
-    '/api/auto-build': {
-      what: 'the Auto-build setting', disabled: 'Auto-build is disabled in sample mode.',
-      async run(input) {
-        const saved = autoBuild.save(input);
-        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
-      },
-    },
-    '/api/needs-you': {
-      what: 'the item that needs you and the choice', disabled: 'Acting on Needs you is disabled in sample mode.',
-      run: forItem('Name the item that needs you.', (itemId, input) => commands.resolveNeedsYou(itemId, input.choice, input.briefChoice)),
-    },
-    '/api/dependency-met': {
-      what: 'the Dependency to mark', disabled: 'Marking a Dependency met is disabled in sample mode.',
-      run: forItem('Name the item the Dependency holds.', async (itemId, input) => {
-        const marked = commands.markDependencyMet(itemId, input.dependencyId, input.revision, input.met);
-        // A met mark can release an armed start at once, with no read to wait for.
-        if (marked.status === 200) await startAfter.startUnblocked();
-        return marked;
-      }),
-    },
-    '/api/item-spec': {
-      what: 'the Spec action and its item', disabled: 'Spec sync is disabled in sample mode.',
-      async run({ itemId, generation, action }) {
-        if (typeof itemId !== 'string' || !Number.isSafeInteger(generation) || !['retry', 'accept', 'reject'].includes(String(action))) return { status: 400, body: { error: 'Name the item, Spec generation and action.' } };
-        const item = board.snapshot().items.find(item => item.id === itemId);
-        if (!item || !itemDetails.specAction) return { status: 404, body: { error: 'That item is not available.' } };
-        const refused = await itemDetails.specAction(item, generation as number, action as 'retry' | 'accept' | 'reject');
-        readSoon();
-        return { status: refused?.status ?? 200, body: { error: refused?.error ?? null } };
-      },
-    },
-    '/api/item-description': {
-      what: 'the description and its item', disabled: 'Saving descriptions is disabled in sample mode.',
-      async run({ itemId, body, bodyField, revision }) {
-        if (typeof itemId !== 'string' || !itemId || typeof body !== 'string') return { status: 400, body: { error: 'Name the item and send its description.' } };
-        if ((bodyField !== undefined && bodyField !== 'System.Description' && bodyField !== 'Microsoft.VSTS.TCM.ReproSteps')
-          || (revision !== undefined && !Number.isSafeInteger(revision))) return { status: 400, body: { error: 'Send the field and revision the work item\'s details gave.' } };
-        const item = board.snapshot().items.find((i) => i.id === itemId);
-        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
-        const problem = writeAccessProblem(item.repo, 'edit-ticket', board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.access ?? {});
-        if (problem) return { status: 403, body: { error: problem } };
-        const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
-        readSoon();
-        return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
-      },
-    },
-    '/api/item-labels': {
-      what: 'the label to change and its item', disabled: 'Changing labels is disabled in sample mode.',
-      async run({ itemId, label, action }) {
-        if (typeof itemId !== 'string' || !itemId || typeof label !== 'string' || !label || (action !== 'add' && action !== 'remove')) return { status: 400, body: { error: 'Name the item, the label and whether to add or remove it.' } };
-        const item = board.snapshot().items.find((i) => i.id === itemId);
-        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
-        const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
-        const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
-        if (problem) return { status: 403, body: { error: problem } };
-        if (trackerCapabilities(item.repo).isManaged(label)) return { status: 422, body: { error: `The factory manages ${label}, so it can't be changed here.` } };
-        if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase())) return { status: 422, body: { error: `${label} follows this item's kind, so it can't be changed here.` } };
-        const change: LabelChange = { label, action };
-        const refused = await itemDetails.changeLabels(item, change);
-        if (refused) return { status: refused.status, body: { error: refused.error } };
-        showLabelChange(item, change);
-        readSoon(item.url ?? undefined);
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    '/api/item-kind': {
-      what: 'the kind and its item', disabled: 'Changing kinds is disabled in sample mode.',
-      async run({ itemId, kind }) {
-        if (typeof itemId !== 'string' || !itemId) return { status: 400, body: { error: 'Name the item and its new kind.' } };
-        const { status, body, labelChanges, ticketType } = await commands.changeKind(itemId, kind);
-        const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
-        if (shown) for (const change of labelChanges) showLabelChange(shown, change);
-        if (shown && ticketType) showTicketType(shown, ticketType);
-        // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
-        if (shown?.url) readSoon(shown.url);
-        return { status, body: withBoard(body) };
-      },
-    },
-    '/api/item-kind-answer': {
-      what: 'the item and the answer', disabled: 'Answering is disabled in sample mode.',
-      run: forItem('Name the item and the answer.', (itemId, { answer, ticketKind }) => commands.answerKind(itemId, answer, ticketKind)),
-    },
-    '/api/item-export': {
-      what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
-      run: forItem('Name the item to export.', async (itemId) => {
-        const item = board.snapshot().items.find((i) => i.id === itemId) ?? archive().find((i) => i.id === itemId);
-        if (!item) return { status: 404, body: { error: 'That item is not on the board or in Archive.' } };
-        const exported = await itemDetails.exportMarkdown(item);
-        return 'error' in exported ? { status: exported.status, body: { error: exported.error } } : { status: 200, body: { ...exported, error: null } };
-      }),
-    },
-    '/api/onboarding/projects': {
-      what: 'the folder to add', disabled: 'Sample mode onboards no Project.',
-      async run(input) {
-        const created = await createProject(input);
-        return 'error' in created ? { status: created.status, body: { error: created.error } } : { status: 200, body: { ...created, error: null } };
-      },
-    },
-    '/api/onboarding/repositories': {
-      what: 'the onboarding to keep', disabled: 'Sample mode onboards no Project.',
-      async run(input) {
-        const kept = await keepOnboarding(input);
-        if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
-        board.update({ onboarding: kept.onboarding });
-        board.push();
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    '/api/onboarding/vocabulary': {
-      what: 'the Project vocabulary to discover', disabled: 'Sample mode onboards no Project.',
-      async run(input) {
-        try {
-          const discovery = await discoverVocabulary(input.repo as string);
-          return { status: 200, body: { discovery, suggestions: suggestVocabularyLabels(discovery.labels) } };
-        } catch (err) { return { status: 400, body: { error: (err as Error).message } }; }
-      },
-    },
-    '/api/onboarding/detect': {
-      what: 'the Project whose setup to detect', disabled: 'Sample mode onboards no Project.',
-      async run(input) {
-        const detected = await detectSetup(input);
-        return 'error' in detected ? { status: detected.status, body: { error: detected.error } } : { status: 200, body: { ...detected, error: null } };
-      },
-    },
-    // The repository goes on the board with its local settings, and the next read loads its items.
-    '/api/onboarding/setup': {
-      what: 'the answers to save', disabled: 'Sample mode onboards no Project.',
-      async run(input) {
-        const saved = await saveSetup(input);
-        if ('error' in saved) return { status: saved.status, body: { error: saved.error } };
-        board.update({ onboarding: saved.onboarding });
-        board.push();
-        readSoon();
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
-    '/api/repositories/settings': {
-      what: 'the Project and the change to its settings', disabled: 'Sample mode changes no Project settings.',
-      async run(input) {
-        const changed = await changeRepositorySettings(input);
-        if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
-        changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
-        readSoon();
-        return { status: 200, body: withBoard({ ...changed, error: null }) };
-      },
-    },
-    // The tracker holds the labels, so a change shows on rows at the read it starts.
-    '/api/repositories/labels': {
-      what: 'the Project and the change to its labels', disabled: 'Sample mode reads and changes no labels.',
-      async run(input) {
-        const changed = await changeRepositoryLabels(input);
-        if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
-        if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
-        for (const setup of changed.setups ?? []) changeRow(setup.repo, (r) => ({ ...r, setup }));
-        readSoon();
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    // Looks the tools up again for the notices' Recheck button and onboarding's detection.
-    '/api/t3/reauthorize': {
-      what: 'the T3 reauthorization request',
-      async run() {
-        if (sample || !reauthorizeT3) return { status: 403, body: { error: 'T3 reauthorization is unavailable here.' } };
-        try {
-          await reauthorizeT3();
-          return { status: 200, body: withBoard({ error: null }) };
-        } catch {
-          return { status: 503, body: withBoard({ error: 'Could not reauthorize T3. Open T3 Code and try again.' }) };
-        }
-      },
-    },
-    '/api/recheck': {
-      what: 'the recheck request',
-      async run(input) {
-        if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
-        await recheck({ gh: input.gh === true, az: input.az === true });
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-  };
-
-  /** Opens a write: refuses it in sample mode, reads its body and checks its session. Answers and returns null on a problem. */
-  async function writeInput(req: IncomingMessage, res: ServerResponse, write: Write): Promise<Record<string, unknown> | null> {
-    if (sample && write.disabled) {
-      json(res, 403, { error: write.disabled });
-      return null;
-    }
-    const input = await readJson(req, res, write.what);
-    if (input && write.restarted && input.session !== board.snapshot().capture?.session) {
-      json(res, 409, write.restarted());
-      return null;
-    }
-    return input;
-  }
-
-  /** Answers a guarded write and counts it as running until then. */
-  async function guardedWrite(req: IncomingMessage, res: ServerResponse, write: Write): Promise<void> {
-    runningWrites++;
-    try {
-      const input = await writeInput(req, res, write);
-      if (!input) return;
-      const { status, body } = await write.run(input);
-      json(res, status, body);
-    } finally {
-      resendAfterWrite();
-      if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
-    }
-  }
-
-  /** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
-  async function drainRequest(res: ServerResponse): Promise<void> {
-    draining = true;
-    if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
-    log('drained writes for an update');
-    json(res, 200, {});
-  }
-
-  /**
-   * Starts a read for status.sh and slice.sh, so a moved item reaches the board before its next timed read: of the
-   * source listing the `url` it sends, else of everything.
-   */
-  async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const body = await readJson(req, res, 'the read request');
-    if (!body) return;
-    if (sample) return json(res, 200, {});
-    readSoon(typeof body.url === 'string' ? body.url : undefined);
-    json(res, 202, {});
-  }
-
-  /** Lists T3's projects and repository origins for onboarding. */
-  async function projectsRequest(res: ServerResponse): Promise<void> {
-    if (sample && !sampleReadsT3) return json(res, 403, { error: 'Sample mode onboards no Project.' });
-    try { json(res, 200, { projects: await projectChoices() }); }
-    catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
-  }
-
-  /** Answers one item's details, which the item dialog reads when it opens. */
-  async function itemDetailsRequest(url: URL, res: ServerResponse): Promise<void> {
-    const itemId = url.searchParams.get('itemId');
-    if (!itemId) return json(res, 400, { error: 'Name the item whose details to read.' });
-    const item = board.snapshot().items.find((i) => i.id === itemId);
-    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
-    try {
-      const checks = url.pathname === '/api/item-checks';
-      const read = checks
-        ? await itemDetails.checks?.(item) ?? { status: 503, error: 'Checks are unavailable.' }
-        : await itemDetails.details(item);
-      if ('error' in read) json(res, read.status, { error: read.error });
-      else json(res, 200, checks ? { checks: read } : { details: read });
-    } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
-  }
-
-  /** Answers the labels the item dialog's picker offers, which it reads each time it opens. */
-  async function itemLabelsRequest(url: URL, res: ServerResponse): Promise<void> {
-    const itemId = url.searchParams.get('itemId');
-    if (!itemId) return json(res, 400, { error: 'Name the item whose labels to read.' });
-    const item = board.snapshot().items.find((i) => i.id === itemId);
-    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
-    const read = await itemDetails.labels(item);
-    if ('error' in read) json(res, read.status, { error: read.error });
-    else json(res, 200, read);
-  }
-
-  /** Answers the next 10 older comments of one item, which the item dialog reads on "Load 10 more". */
-  async function itemCommentsRequest(url: URL, res: ServerResponse): Promise<void> {
-    const itemId = url.searchParams.get('itemId');
-    if (!itemId) return json(res, 400, { error: 'Name the item whose comments to read.' });
-    const before = url.searchParams.get('before');
-    if (!before) return json(res, 400, { error: 'Name where the older comments start.' });
-    const item = board.snapshot().items.find((i) => i.id === itemId);
-    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
-    try {
-      const read = await itemDetails.olderComments(item, before);
-      if ('error' in read) json(res, read.status, { error: read.error });
-      else json(res, 200, { page: read satisfies ItemCommentsPage });
-    } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
-  }
-
-  /** Answers the ticket picker's search of a repository's open tickets. */
-  async function ticketsRequest(url: URL, res: ServerResponse): Promise<void> {
-    if (sample) return json(res, 403, { error: 'Sample mode searches no tickets.' });
-    const { status, body } = await capture.searchTickets({ repo: url.searchParams.get('repo'), query: url.searchParams.get('q') ?? '' });
-    json(res, status, body);
-  }
-
-  /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
-  function openStream(req: IncomingMessage, res: ServerResponse): void {
-    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-    if (req.method === 'HEAD') return void res.end();
-    res.on('close', () => streams.delete(res));
-    sendEvent(res, boardEvent(board.snapshot()));
-  }
-
-  /** The page's image of a project's favicon. Its URL carries the content's revision, so it can stay cached. */
-  async function projectIconRequest(path: string, res: ServerResponse): Promise<void> {
-    let projectId = '';
-    try { projectId = decodeURIComponent(path.slice('/api/project-icon/'.length)); } catch { /* A malformed ID lists no project. */ }
-    const image = await projectIcon(projectId);
-    if (!image) return send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
-    res.writeHead(200, { 'Content-Type': image.type, 'Cache-Control': 'max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff',
-      ...(image.type === 'image/svg+xml' ? { 'Content-Security-Policy': SVG_POLICY } : {}) });
-    res.end(image.body);
-  }
-
-  /** Only answer requests addressed to this machine, to block DNS rebinding. */
-  function allowedHost(req: IncomingMessage): boolean {
-    const host = (req.headers.host ?? '').toLowerCase();
-    const { port } = server.address() as AddressInfo;
-    return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
-  }
-
-  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    const { pathname: path } = url;
-    const startedAt = performance.now();
-    let gateMs = 0;
-    if (path !== '/api/events') res.once('finish', () => loopTrace.request(`${req.method} ${path}`, performance.now() - startedAt, gateMs));
-    if (!answersAtOnce(req.method, path)) {
-      await ready();
-      gateMs = performance.now() - startedAt;
-    }
-    if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
-      return json(res, 403, { error: 'Submit from this board page.' });
-    }
-    const write = req.method === 'POST' && Object.hasOwn(WRITES, path) ? WRITES[path] : undefined;
-    if (write && appSecret && !hasAppSecret(req, appSecret)) {
-      return json(res, 403, { error: 'Submit from the board app.' });
-    }
-    if (req.method === 'POST' && path === '/api/drain') {
-      if (!appSecret || !hasAppSecret(req, appSecret)) return json(res, 403, { error: 'Only the board app can drain the board.' });
-      return drainRequest(res);
-    }
-    if (write) {
-      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Lar Factory restarts.' });
-      return guardedWrite(req, res, write);
-    }
-    if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
-    }
-    if (path === '/') {
-      return send(res, 200, 'text/html; charset=utf-8', loopTrace.span('page request', () => pageWithData(page.template, board.snapshot())));
-    }
-    if (path === '/api/events') return openStream(req, res);
-    if (path === '/api/onboarding/projects') return projectsRequest(res);
-    if (path.startsWith('/api/project-icon/')) return projectIconRequest(path, res);
-    if (path === '/api/item-details' || path === '/api/item-checks') return itemDetailsRequest(url, res);
-    if (path === '/api/item-comments') return itemCommentsRequest(url, res);
-    if (path === '/api/item-labels') return itemLabelsRequest(url, res);
-    if (path === '/api/ticket-preview') {
-      if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
-      const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');
-      return json(res, result.status, result.body);
-    }
-    if (path === '/api/ticket-options') {
-      if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
-      const result = await capture.options(url.searchParams.get('repo'));
-      return json(res, result.status, result.body);
-    }
-    if (path === '/api/tickets') return ticketsRequest(url, res);
-    if (path === '/api/archive') return json(res, 200, { items: archive() });
-    if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', loopTrace.span('board request', () => JSON.stringify(board.snapshot())));
-    if (path === '/healthz') return json(res, 200, {});
-    const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
-    if (asset) return send(res, 200, asset.type, asset.body);
-    send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
-  }
-
-  const server = createServer((req, res) => {
-    handle(req, res).catch((err: unknown) => {
-      log(`request ${req.url} failed: ${err instanceof Error ? err.stack : String(err)}`);
-      if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
+    const boardEvent = (data: object) => `data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`;
+    const sendEvent = (res: ServerResponse, event: string) => {
+        streams.set(res, event);
+        loopTrace.span('board stream write', () => res.write(event));
+    };
+    // A page already showing this board gets nothing. Its clock moves on by itself, and a new stream always gets the board.
+    board.subscribe((data) => {
+        if (!streams.size) return;
+        const event = boardEvent(data);
+        for (const [res, last] of streams) if (last !== event) sendEvent(res, event);
     });
-  });
 
-  return {
-    server,
-    endStreams() {
-      clearTimeout(resend);
-      for (const res of streams.keys()) res.end();
-    },
-  };
+    /**
+     * A write's answer can show a page a board no push sent, or reach it after a newer push, so what a stream last
+     * received may not be what its page shows. Each page gets the board again once the answer has arrived.
+     */
+    function resendAfterWrite(): void {
+        clearTimeout(resend);
+        resend = setTimeout(() => {
+            for (const res of streams.keys()) streams.set(res, '');
+            board.push();
+        }, RESEND_AFTER_WRITE_MS);
+        resend.unref();
+    }
+
+    /** Changes the repository's row on the board at once, before the next read sees it. */
+    function changeRow(repo: string, change: (row: RepoConfig) => RepoConfig): void {
+        board.update({ repos: board.snapshot().repos.map((r) => (sameRepo(r.repo, repo) ? change(r) : r)) });
+        board.push();
+    }
+
+    /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
+    const WRITES: Record<string, Write> = {
+        '/api/pr-readiness': {
+            what: 'the linked PR to read',
+            disabled: 'Azure readiness is unavailable in sample mode.',
+            async run({ itemId, number }) {
+                const item = board.snapshot().items.find((i) => i.id === itemId);
+                const pr = item?.linkedPrs.find((p) => p.number === number);
+                if (!item || !pr || !item.azure)
+                    return { status: 404, body: { error: 'That Azure PR is not on the board.' } };
+                if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo))
+                    return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+                // Resolve arguments from the board's provider link, never arbitrary client arguments.
+                const match = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/i.exec(
+                    pr.url,
+                );
+                if (!match || Number(match[4]) !== number)
+                    return { status: 400, body: { error: 'This Azure PR link is unsupported.' } };
+                const evidence = await readAzureReadiness(
+                    match[1]!,
+                    decodeURIComponent(match[2]!),
+                    decodeURIComponent(match[3]!),
+                    Number(number),
+                );
+                if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo))
+                    return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+                return {
+                    status: 200,
+                    body: {
+                        evidence: evidence.available
+                            ? evidence
+                            : {
+                                  available: false,
+                                  reason: 'Azure evidence is unavailable. Check the provider connection and refresh.',
+                              },
+                        error: null,
+                    },
+                };
+            },
+        },
+        '/api/items': {
+            what: 'item details',
+            disabled: 'Adding items is disabled in sample mode.',
+            run: (input) => capture.capture(input),
+        },
+        '/api/pick-ticket': {
+            what: 'the Project and the ticket to pick',
+            disabled: 'Picking tickets is disabled in sample mode.',
+            run: (input) => capture.pick(input),
+        },
+        '/api/create-ticket': {
+            what: 'the item to create an issue for',
+            disabled: 'Creating issues is disabled in sample mode.',
+            run: forItem('Name the item to create an issue for.', (itemId, input) =>
+                capture.createTicket(itemId, input),
+            ),
+        },
+        '/api/attach-ticket': {
+            what: 'the item and the ticket to attach',
+            disabled: 'Attaching tickets is disabled in sample mode.',
+            run: forItem('Name the item to attach a ticket to.', (itemId, input) =>
+                capture.attachTicket(itemId, input.number),
+            ),
+        },
+        '/api/queue': {
+            what: 'the item to queue',
+            disabled: 'Queuing is disabled in sample mode.',
+            run: forItem('Name the item to queue.', (itemId) => commands.queue(itemId)),
+        },
+        '/api/back-to-list': {
+            what: 'the item to move back to List',
+            disabled: 'Moving items back to List is disabled in sample mode.',
+            run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
+        },
+        '/api/start': {
+            what: 'the item to start',
+            disabled: 'Starting threads is disabled in sample mode.',
+            restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
+            run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
+        },
+        '/api/inspect-owned-cleanup': {
+            what: 'the item to inspect',
+            disabled: 'Cleanup is disabled in sample mode.',
+            run: forItem('Name the item to inspect.', (itemId) => commands.inspectOwnedCleanup(itemId)),
+        },
+        '/api/execute-owned-cleanup': {
+            what: 'the item to clean up',
+            disabled: 'Cleanup is disabled in sample mode.',
+            run: forItem('Name the item to clean up.', (itemId, input) =>
+                commands.executeOwnedCleanup(itemId, input.options),
+            ),
+        },
+        '/api/inspect-recovery': {
+            what: 'the item to inspect',
+            disabled: 'Recovery is disabled in sample mode.',
+            run: forItem('Name the item to inspect.', (itemId) => commands.inspectRecovery(itemId)),
+        },
+        '/api/start-again': {
+            what: 'the item to start again',
+            disabled: 'Recovery is disabled in sample mode.',
+            run: forItem('Name the item to start again.', (itemId, input) =>
+                commands.startAgain(itemId, input.model, input.options),
+            ),
+        },
+        '/api/start-build': {
+            what: 'the build to start',
+            disabled: 'Starting builds is disabled in sample mode.',
+            restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
+            run: forItem('Name the build to start.', (itemId, input) =>
+                commands.startBuild(itemId, input.model, input.drift),
+            ),
+        },
+        '/api/dismiss-start-error': {
+            what: 'the start error to dismiss',
+            disabled: 'Starting threads is disabled in sample mode.',
+            run: forItem('Name the item whose start error to dismiss.', async (itemId, input) =>
+                commands.dismissStartError(itemId, input.purpose),
+            ),
+        },
+        '/api/arm': {
+            what: 'the item to start after its blockers',
+            disabled: 'Start after is disabled in sample mode.',
+            restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),
+            run: forItem('Name the item to start after its blockers.', async (itemId, input) =>
+                startAfter.arm(itemId, input.model),
+            ),
+        },
+        '/api/disarm': {
+            what: 'the item to disarm',
+            disabled: 'Start after is disabled in sample mode.',
+            run: forItem('Name the item to disarm.', async (itemId) => startAfter.disarm(itemId)),
+        },
+        '/api/abandon': {
+            what: 'the item to abandon',
+            disabled: 'Abandoning is disabled in sample mode.',
+            restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
+            run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
+        },
+        '/api/abandon-and-close': {
+            what: 'the item to abandon and close',
+            disabled: 'Abandoning is disabled in sample mode.',
+            run: forItem('Name the item to abandon.', (itemId) => commands.abandonAndClose(itemId)),
+        },
+        '/api/close-ticket': {
+            what: 'the abandoned item whose ticket to close',
+            disabled: 'Closing tickets is disabled in sample mode.',
+            run: forItem('Name the item whose ticket to close.', (itemId) => commands.closeTicket(itemId)),
+        },
+        '/api/restore': {
+            what: 'the set-aside item to restore',
+            disabled: 'Restoring is disabled in sample mode.',
+            run: forItem('Name the item to restore.', (itemId) => commands.restore(itemId)),
+        },
+        '/api/retention': {
+            what: 'the retention setting',
+            disabled: 'Retention is disabled in sample mode.',
+            async run(input) {
+                const saved = retention.save(input);
+                return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+            },
+        },
+        '/api/shaping-thread-cleanup': {
+            what: 'the shaping thread cleanup setting',
+            disabled: 'Shaping thread cleanup is disabled in sample mode.',
+            async run(input) {
+                const saved = shapingThreadCleanup.save(input);
+                return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+            },
+        },
+        '/api/heavy-command-limit': {
+            what: 'the heavy command limit',
+            disabled: 'The heavy command limit is disabled in sample mode.',
+            async run(input) {
+                const saved = heavyCommandLimit.save(input);
+                return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+            },
+        },
+        '/api/build-limit': {
+            what: 'the build limit',
+            disabled: 'The build limit is disabled in sample mode.',
+            async run(input) {
+                const saved = buildLimit.save(input);
+                return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+            },
+        },
+        '/api/auto-build': {
+            what: 'the Auto-build setting',
+            disabled: 'Auto-build is disabled in sample mode.',
+            async run(input) {
+                const saved = autoBuild.save(input);
+                return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+            },
+        },
+        '/api/needs-you': {
+            what: 'the item that needs you and the choice',
+            disabled: 'Acting on Needs you is disabled in sample mode.',
+            run: forItem('Name the item that needs you.', (itemId, input) =>
+                commands.resolveNeedsYou(itemId, input.choice, input.briefChoice),
+            ),
+        },
+        '/api/dependency-met': {
+            what: 'the Dependency to mark',
+            disabled: 'Marking a Dependency met is disabled in sample mode.',
+            run: forItem('Name the item the Dependency holds.', async (itemId, input) => {
+                const marked = commands.markDependencyMet(itemId, input.dependencyId, input.revision, input.met);
+                // A met mark can release an armed start at once, with no read to wait for.
+                if (marked.status === 200) await startAfter.startUnblocked();
+                return marked;
+            }),
+        },
+        '/api/item-spec': {
+            what: 'the Spec action and its item',
+            disabled: 'Spec sync is disabled in sample mode.',
+            async run({ itemId, generation, action }) {
+                if (
+                    typeof itemId !== 'string' ||
+                    !Number.isSafeInteger(generation) ||
+                    !['retry', 'accept', 'reject'].includes(String(action))
+                )
+                    return { status: 400, body: { error: 'Name the item, Spec generation and action.' } };
+                const item = board.snapshot().items.find((item) => item.id === itemId);
+                if (!item || !itemDetails.specAction)
+                    return { status: 404, body: { error: 'That item is not available.' } };
+                const refused = await itemDetails.specAction(
+                    item,
+                    generation as number,
+                    action as 'retry' | 'accept' | 'reject',
+                );
+                readSoon();
+                return { status: refused?.status ?? 200, body: { error: refused?.error ?? null } };
+            },
+        },
+        '/api/item-description': {
+            what: 'the description and its item',
+            disabled: 'Saving descriptions is disabled in sample mode.',
+            async run({ itemId, body, bodyField, revision }) {
+                if (typeof itemId !== 'string' || !itemId || typeof body !== 'string')
+                    return { status: 400, body: { error: 'Name the item and send its description.' } };
+                if (
+                    (bodyField !== undefined &&
+                        bodyField !== 'System.Description' &&
+                        bodyField !== 'Microsoft.VSTS.TCM.ReproSteps') ||
+                    (revision !== undefined && !Number.isSafeInteger(revision))
+                )
+                    return {
+                        status: 400,
+                        body: { error: "Send the field and revision the work item's details gave." },
+                    };
+                const item = board.snapshot().items.find((i) => i.id === itemId);
+                if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+                const problem = writeAccessProblem(
+                    item.repo,
+                    'edit-ticket',
+                    board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.access ?? {},
+                );
+                if (problem) return { status: 403, body: { error: problem } };
+                const refused = await itemDetails.saveDescription(item, {
+                    body,
+                    ...(bodyField !== undefined && { bodyField }),
+                    ...(revision !== undefined && { revision: revision as number }),
+                });
+                readSoon();
+                return refused
+                    ? { status: refused.status, body: { error: refused.error } }
+                    : { status: 200, body: { error: null } };
+            },
+        },
+        '/api/item-labels': {
+            what: 'the label to change and its item',
+            disabled: 'Changing labels is disabled in sample mode.',
+            async run({ itemId, label, action }) {
+                if (
+                    typeof itemId !== 'string' ||
+                    !itemId ||
+                    typeof label !== 'string' ||
+                    !label ||
+                    (action !== 'add' && action !== 'remove')
+                )
+                    return {
+                        status: 400,
+                        body: { error: 'Name the item, the label and whether to add or remove it.' },
+                    };
+                const item = board.snapshot().items.find((i) => i.id === itemId);
+                if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+                const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
+                const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
+                if (problem) return { status: 403, body: { error: problem } };
+                if (trackerCapabilities(item.repo).isManaged(label))
+                    return {
+                        status: 422,
+                        body: { error: `The factory manages ${label}, so it can't be changed here.` },
+                    };
+                if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase()))
+                    return {
+                        status: 422,
+                        body: { error: `${label} follows this item's kind, so it can't be changed here.` },
+                    };
+                const change: LabelChange = { label, action };
+                const refused = await itemDetails.changeLabels(item, change);
+                if (refused) return { status: refused.status, body: { error: refused.error } };
+                showLabelChange(item, change);
+                readSoon(item.url ?? undefined);
+                return { status: 200, body: withBoard({ error: null }) };
+            },
+        },
+        '/api/item-kind': {
+            what: 'the kind and its item',
+            disabled: 'Changing kinds is disabled in sample mode.',
+            async run({ itemId, kind }) {
+                if (typeof itemId !== 'string' || !itemId)
+                    return { status: 400, body: { error: 'Name the item and its new kind.' } };
+                const { status, body, labelChanges, ticketType } = await commands.changeKind(itemId, kind);
+                const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
+                if (shown) for (const change of labelChanges) showLabelChange(shown, change);
+                if (shown && ticketType) showTicketType(shown, ticketType);
+                // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
+                if (shown?.url) readSoon(shown.url);
+                return { status, body: withBoard(body) };
+            },
+        },
+        '/api/item-kind-answer': {
+            what: 'the item and the answer',
+            disabled: 'Answering is disabled in sample mode.',
+            run: forItem('Name the item and the answer.', (itemId, { answer, ticketKind }) =>
+                commands.answerKind(itemId, answer, ticketKind),
+            ),
+        },
+        '/api/item-export': {
+            what: 'the item to export',
+            disabled: 'Exporting is disabled in sample mode.',
+            run: forItem('Name the item to export.', async (itemId) => {
+                const item =
+                    board.snapshot().items.find((i) => i.id === itemId) ?? archive().find((i) => i.id === itemId);
+                if (!item) return { status: 404, body: { error: 'That item is not on the board or in Archive.' } };
+                const exported = await itemDetails.exportMarkdown(item);
+                return 'error' in exported
+                    ? { status: exported.status, body: { error: exported.error } }
+                    : { status: 200, body: { ...exported, error: null } };
+            }),
+        },
+        '/api/onboarding/projects': {
+            what: 'the folder to add',
+            disabled: 'Sample mode onboards no Project.',
+            async run(input) {
+                const created = await createProject(input);
+                return 'error' in created
+                    ? { status: created.status, body: { error: created.error } }
+                    : { status: 200, body: { ...created, error: null } };
+            },
+        },
+        '/api/onboarding/repositories': {
+            what: 'the onboarding to keep',
+            disabled: 'Sample mode onboards no Project.',
+            async run(input) {
+                const kept = await keepOnboarding(input);
+                if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
+                board.update({ onboarding: kept.onboarding });
+                board.push();
+                return { status: 200, body: withBoard({ error: null }) };
+            },
+        },
+        '/api/onboarding/vocabulary': {
+            what: 'the Project vocabulary to discover',
+            disabled: 'Sample mode onboards no Project.',
+            async run(input) {
+                try {
+                    const discovery = await discoverVocabulary(input.repo as string);
+                    return { status: 200, body: { discovery, suggestions: suggestVocabularyLabels(discovery.labels) } };
+                } catch (err) {
+                    return { status: 400, body: { error: (err as Error).message } };
+                }
+            },
+        },
+        '/api/onboarding/detect': {
+            what: 'the Project whose setup to detect',
+            disabled: 'Sample mode onboards no Project.',
+            async run(input) {
+                const detected = await detectSetup(input);
+                return 'error' in detected
+                    ? { status: detected.status, body: { error: detected.error } }
+                    : { status: 200, body: { ...detected, error: null } };
+            },
+        },
+        // The repository goes on the board with its local settings, and the next read loads its items.
+        '/api/onboarding/setup': {
+            what: 'the answers to save',
+            disabled: 'Sample mode onboards no Project.',
+            async run(input) {
+                const saved = await saveSetup(input);
+                if ('error' in saved) return { status: saved.status, body: { error: saved.error } };
+                board.update({ onboarding: saved.onboarding });
+                board.push();
+                readSoon();
+                return { status: 200, body: withBoard({ error: null }) };
+            },
+        },
+        // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
+        '/api/repositories/settings': {
+            what: 'the Project and the change to its settings',
+            disabled: 'Sample mode changes no Project settings.',
+            async run(input) {
+                const changed = await changeRepositorySettings(input);
+                if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+                changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
+                readSoon();
+                return { status: 200, body: withBoard({ ...changed, error: null }) };
+            },
+        },
+        // The tracker holds the labels, so a change shows on rows at the read it starts.
+        '/api/repositories/labels': {
+            what: 'the Project and the change to its labels',
+            disabled: 'Sample mode reads and changes no labels.',
+            async run(input) {
+                const changed = await changeRepositoryLabels(input);
+                if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+                if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
+                for (const setup of changed.setups ?? []) changeRow(setup.repo, (r) => ({ ...r, setup }));
+                readSoon();
+                return { status: 200, body: withBoard({ error: null }) };
+            },
+        },
+        // Looks the tools up again for the notices' Recheck button and onboarding's detection.
+        '/api/t3/reauthorize': {
+            what: 'the T3 reauthorization request',
+            async run() {
+                if (sample || !reauthorizeT3)
+                    return { status: 403, body: { error: 'T3 reauthorization is unavailable here.' } };
+                try {
+                    await reauthorizeT3();
+                    return { status: 200, body: withBoard({ error: null }) };
+                } catch {
+                    return {
+                        status: 503,
+                        body: withBoard({ error: 'Could not reauthorize T3. Open T3 Code and try again.' }),
+                    };
+                }
+            },
+        },
+        '/api/recheck': {
+            what: 'the recheck request',
+            async run(input) {
+                if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
+                await recheck({ gh: input.gh === true, az: input.az === true });
+                return { status: 200, body: withBoard({ error: null }) };
+            },
+        },
+    };
+
+    /** Opens a write: refuses it in sample mode, reads its body and checks its session. Answers and returns null on a problem. */
+    async function writeInput(
+        req: IncomingMessage,
+        res: ServerResponse,
+        write: Write,
+    ): Promise<Record<string, unknown> | null> {
+        if (sample && write.disabled) {
+            json(res, 403, { error: write.disabled });
+            return null;
+        }
+        const input = await readJson(req, res, write.what);
+        if (input && write.restarted && input.session !== board.snapshot().capture?.session) {
+            json(res, 409, write.restarted());
+            return null;
+        }
+        return input;
+    }
+
+    /** Answers a guarded write and counts it as running until then. */
+    async function guardedWrite(req: IncomingMessage, res: ServerResponse, write: Write): Promise<void> {
+        runningWrites++;
+        try {
+            const input = await writeInput(req, res, write);
+            if (!input) return;
+            const { status, body } = await write.run(input);
+            json(res, status, body);
+        } finally {
+            resendAfterWrite();
+            if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
+        }
+    }
+
+    /** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
+    async function drainRequest(res: ServerResponse): Promise<void> {
+        draining = true;
+        if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
+        log('drained writes for an update');
+        json(res, 200, {});
+    }
+
+    /**
+     * Starts a read for status.sh and slice.sh, so a moved item reaches the board before its next timed read: of the
+     * source listing the `url` it sends, else of everything.
+     */
+    async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+        const body = await readJson(req, res, 'the read request');
+        if (!body) return;
+        if (sample) return json(res, 200, {});
+        readSoon(typeof body.url === 'string' ? body.url : undefined);
+        json(res, 202, {});
+    }
+
+    /** Lists T3's projects and repository origins for onboarding. */
+    async function projectsRequest(res: ServerResponse): Promise<void> {
+        if (sample && !sampleReadsT3) return json(res, 403, { error: 'Sample mode onboards no Project.' });
+        try {
+            json(res, 200, { projects: await projectChoices() });
+        } catch (err) {
+            json(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+
+    /** Answers one item's details, which the item dialog reads when it opens. */
+    async function itemDetailsRequest(url: URL, res: ServerResponse): Promise<void> {
+        const itemId = url.searchParams.get('itemId');
+        if (!itemId) return json(res, 400, { error: 'Name the item whose details to read.' });
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+        try {
+            const checks = url.pathname === '/api/item-checks';
+            const read = checks
+                ? ((await itemDetails.checks?.(item)) ?? { status: 503, error: 'Checks are unavailable.' })
+                : await itemDetails.details(item);
+            if ('error' in read) json(res, read.status, { error: read.error });
+            else json(res, 200, checks ? { checks: read } : { details: read });
+        } catch (err) {
+            json(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+
+    /** Answers the labels the item dialog's picker offers, which it reads each time it opens. */
+    async function itemLabelsRequest(url: URL, res: ServerResponse): Promise<void> {
+        const itemId = url.searchParams.get('itemId');
+        if (!itemId) return json(res, 400, { error: 'Name the item whose labels to read.' });
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+        const read = await itemDetails.labels(item);
+        if ('error' in read) json(res, read.status, { error: read.error });
+        else json(res, 200, read);
+    }
+
+    /** Answers the next 10 older comments of one item, which the item dialog reads on "Load 10 more". */
+    async function itemCommentsRequest(url: URL, res: ServerResponse): Promise<void> {
+        const itemId = url.searchParams.get('itemId');
+        if (!itemId) return json(res, 400, { error: 'Name the item whose comments to read.' });
+        const before = url.searchParams.get('before');
+        if (!before) return json(res, 400, { error: 'Name where the older comments start.' });
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+        try {
+            const read = await itemDetails.olderComments(item, before);
+            if ('error' in read) json(res, read.status, { error: read.error });
+            else json(res, 200, { page: read satisfies ItemCommentsPage });
+        } catch (err) {
+            json(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+
+    /** Answers the ticket picker's search of a repository's open tickets. */
+    async function ticketsRequest(url: URL, res: ServerResponse): Promise<void> {
+        if (sample) return json(res, 403, { error: 'Sample mode searches no tickets.' });
+        const { status, body } = await capture.searchTickets({
+            repo: url.searchParams.get('repo'),
+            query: url.searchParams.get('q') ?? '',
+        });
+        json(res, status, body);
+    }
+
+    /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
+    function openStream(req: IncomingMessage, res: ServerResponse): void {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-store',
+            ...SECURITY_HEADERS,
+        });
+        if (req.method === 'HEAD') return void res.end();
+        res.on('close', () => streams.delete(res));
+        sendEvent(res, boardEvent(board.snapshot()));
+    }
+
+    /** The page's image of a project's favicon. Its URL carries the content's revision, so it can stay cached. */
+    async function projectIconRequest(path: string, res: ServerResponse): Promise<void> {
+        let projectId = '';
+        try {
+            projectId = decodeURIComponent(path.slice('/api/project-icon/'.length));
+        } catch {
+            /* A malformed ID lists no project. */
+        }
+        const image = await projectIcon(projectId);
+        if (!image) return send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
+        res.writeHead(200, {
+            'Content-Type': image.type,
+            'Cache-Control': 'max-age=31536000, immutable',
+            'X-Content-Type-Options': 'nosniff',
+            ...(image.type === 'image/svg+xml' ? { 'Content-Security-Policy': SVG_POLICY } : {}),
+        });
+        res.end(image.body);
+    }
+
+    /** Only answer requests addressed to this machine, to block DNS rebinding. */
+    function allowedHost(req: IncomingMessage): boolean {
+        const host = (req.headers.host ?? '').toLowerCase();
+        const { port } = server.address() as AddressInfo;
+        return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
+    }
+
+    async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+        if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
+        const url = new URL(req.url ?? '/', 'http://localhost');
+        const { pathname: path } = url;
+        const startedAt = performance.now();
+        let gateMs = 0;
+        if (path !== '/api/events')
+            res.once('finish', () => loopTrace.request(`${req.method} ${path}`, performance.now() - startedAt, gateMs));
+        if (!answersAtOnce(req.method, path)) {
+            await ready();
+            gateMs = performance.now() - startedAt;
+        }
+        if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
+            return json(res, 403, { error: 'Submit from this board page.' });
+        }
+        const write = req.method === 'POST' && Object.hasOwn(WRITES, path) ? WRITES[path] : undefined;
+        if (write && appSecret && !hasAppSecret(req, appSecret)) {
+            return json(res, 403, { error: 'Submit from the board app.' });
+        }
+        if (req.method === 'POST' && path === '/api/drain') {
+            if (!appSecret || !hasAppSecret(req, appSecret))
+                return json(res, 403, { error: 'Only the board app can drain the board.' });
+            return drainRequest(res);
+        }
+        if (write) {
+            if (draining)
+                return json(res, 503, {
+                    error: 'The board is installing an update. Try again once Lar Factory restarts.',
+                });
+            return guardedWrite(req, res, write);
+        }
+        if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
+        }
+        if (path === '/') {
+            return send(
+                res,
+                200,
+                'text/html; charset=utf-8',
+                loopTrace.span('page request', () => pageWithData(page.template, board.snapshot())),
+            );
+        }
+        if (path === '/api/events') return openStream(req, res);
+        if (path === '/api/onboarding/projects') return projectsRequest(res);
+        if (path.startsWith('/api/project-icon/')) return projectIconRequest(path, res);
+        if (path === '/api/item-details' || path === '/api/item-checks') return itemDetailsRequest(url, res);
+        if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+        if (path === '/api/item-labels') return itemLabelsRequest(url, res);
+        if (path === '/api/ticket-preview') {
+            if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
+            const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');
+            return json(res, result.status, result.body);
+        }
+        if (path === '/api/ticket-options') {
+            if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
+            const result = await capture.options(url.searchParams.get('repo'));
+            return json(res, result.status, result.body);
+        }
+        if (path === '/api/tickets') return ticketsRequest(url, res);
+        if (path === '/api/archive') return json(res, 200, { items: archive() });
+        if (path === '/api/board')
+            return send(
+                res,
+                200,
+                'application/json; charset=utf-8',
+                loopTrace.span('board request', () => JSON.stringify(board.snapshot())),
+            );
+        if (path === '/healthz') return json(res, 200, {});
+        const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
+        if (asset) return send(res, 200, asset.type, asset.body);
+        send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
+    }
+
+    const server = createServer((req, res) => {
+        handle(req, res).catch((err: unknown) => {
+            log(`request ${req.url} failed: ${err instanceof Error ? err.stack : String(err)}`);
+            if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
+        });
+    });
+
+    return {
+        server,
+        endStreams() {
+            clearTimeout(resend);
+            for (const res of streams.keys()) res.end();
+        },
+    };
 }

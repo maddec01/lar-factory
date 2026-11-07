@@ -2,75 +2,179 @@
    kind, title, state and action, and under it RowSecondLine, on the same columns, so every edge lines up down the board
    whatever a row lacks. Unlayered, so these win over the utilities of what a row holds. */
 
-.row-first, .row-second {
-  --row-inset: --spacing(3);
-  --row-gap: --spacing(3);
-  --row-line: --spacing(7);
-  --row-glyph: 1.5rem;
-  --row-source: 7rem;
-  --row-kind: 6.75rem;
-  --row-state: 10rem;
-  --row-side: 9rem;
+.row-first,
+.row-second {
+    --row-inset: --spacing(3);
+    --row-gap: --spacing(3);
+    --row-line: --spacing(7);
+    --row-glyph: 1.5rem;
+    --row-source: 7rem;
+    --row-kind: 6.75rem;
+    --row-state: 10rem;
+    --row-side: 9rem;
 }
 
-.row-first { display: flex; column-gap: var(--row-gap); padding-right: var(--row-inset); }
-.row-cols {
-  display: grid; flex: 1; min-width: 0;
-  grid-template-columns: var(--row-glyph) var(--row-source) var(--row-kind) minmax(0, 1fr) var(--row-state);
-  grid-template-rows: var(--row-line);
-  column-gap: var(--row-gap); align-items: center;
-  padding-left: var(--row-inset);
-  text-align: left; font-size: var(--text-xs); line-height: --spacing(4); color: var(--muted-foreground);
+.row-first {
+    display: flex;
+    column-gap: var(--row-gap);
+    padding-right: var(--row-inset);
 }
-.row-side { flex: none; width: var(--row-side); min-height: var(--row-line); }
+.row-cols {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    grid-template-columns: var(--row-glyph) var(--row-source) var(--row-kind) minmax(0, 1fr) var(--row-state);
+    grid-template-rows: var(--row-line);
+    column-gap: var(--row-gap);
+    align-items: center;
+    padding-left: var(--row-inset);
+    text-align: left;
+    font-size: var(--text-xs);
+    line-height: --spacing(4);
+    color: var(--muted-foreground);
+}
+.row-side {
+    flex: none;
+    width: var(--row-side);
+    min-height: var(--row-line);
+}
 
 .row-second {
-  display: grid;
-  grid-template-columns: var(--row-source) var(--row-kind) minmax(0, 1fr) var(--row-state) var(--row-side);
-  column-gap: var(--row-gap); align-items: center;
-  min-height: --spacing(4); margin-top: --spacing(1);
-  padding: 0 var(--row-inset) 0 calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
-  font-size: var(--text-xs); line-height: --spacing(4); color: var(--muted-foreground);
+    display: grid;
+    grid-template-columns: var(--row-source) var(--row-kind) minmax(0, 1fr) var(--row-state) var(--row-side);
+    column-gap: var(--row-gap);
+    align-items: center;
+    min-height: --spacing(4);
+    margin-top: --spacing(1);
+    padding: 0 var(--row-inset) 0 calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
+    font-size: var(--text-xs);
+    line-height: --spacing(4);
+    color: var(--muted-foreground);
 }
-.row-second [data-blocked] { flex-shrink: 0; max-width: 100%; height: --spacing(4); }
-.row-second [data-activity-badge] { height: --spacing(4); }
+.row-second [data-blocked] {
+    flex-shrink: 0;
+    max-width: 100%;
+    height: --spacing(4);
+}
+.row-second [data-activity-badge] {
+    height: --spacing(4);
+}
 /* Figures keep their whole text, reaching into the PR's cell's spare room when they're long. */
-.row-second > [data-col="figures"] { display: flex; justify-content: flex-end; justify-self: end; white-space: nowrap; }
-:is(.row-cols, .row-second) :is([data-row-identity], [data-kind-marker]) { font-size: inherit; }
+.row-second > [data-col='figures'] {
+    display: flex;
+    justify-content: flex-end;
+    justify-self: end;
+    white-space: nowrap;
+}
+:is(.row-cols, .row-second) :is([data-row-identity], [data-kind-marker]) {
+    font-size: inherit;
+}
 
 /* A part's own title leads its row, so its second line starts where its status does and its list item sets the edge. */
-[data-part] .row-second { padding-inline: --spacing(5) 0; }
+[data-part] .row-second {
+    padding-inline: --spacing(5) 0;
+}
 
 /* Under 880px of row the title would drop below a readable width: source and kind move under it, and it takes their
    columns. With no PR, the second line's text takes the PR's cell too. */
 @container (width < 55rem) {
-  .row-first, .row-second { --row-kind: 5rem; --row-state: 7rem; }
-  .row-first { align-items: flex-start; }
-  .row-cols { grid-template-rows: var(--row-line) --spacing(5); row-gap: --spacing(1); }
-  .row-cols > [data-title-cell] { grid-column: 2 / 5; grid-row: 1; }
-  .row-cols > [data-row-identity] { grid-column: 2; grid-row: 2; }
-  .row-cols > [data-kind] { grid-column: 3 / 5; grid-row: 2; }
-  .row-cols > [data-col="state"] { grid-column: 5; grid-row: 1; }
-  .row-second > [data-col="next"]:has(+ [data-col="pr"]:empty) { grid-column: 3 / 5; }
-  .row-second > [data-col="pr"]:empty { display: none; }
-  .row-second > [data-col="figures"] { grid-column: 5; }
+    .row-first,
+    .row-second {
+        --row-kind: 5rem;
+        --row-state: 7rem;
+    }
+    .row-first {
+        align-items: flex-start;
+    }
+    .row-cols {
+        grid-template-rows: var(--row-line) --spacing(5);
+        row-gap: --spacing(1);
+    }
+    .row-cols > [data-title-cell] {
+        grid-column: 2 / 5;
+        grid-row: 1;
+    }
+    .row-cols > [data-row-identity] {
+        grid-column: 2;
+        grid-row: 2;
+    }
+    .row-cols > [data-kind] {
+        grid-column: 3 / 5;
+        grid-row: 2;
+    }
+    .row-cols > [data-col='state'] {
+        grid-column: 5;
+        grid-row: 1;
+    }
+    .row-second > [data-col='next']:has(+ [data-col='pr']:empty) {
+        grid-column: 3 / 5;
+    }
+    .row-second > [data-col='pr']:empty {
+        display: none;
+    }
+    .row-second > [data-col='figures'] {
+        grid-column: 5;
+    }
 }
 
 /* Under 660px of row the state follows them, the action stays beside the title, and the second line wraps: bar, count
    and PR, then its text and figures. */
 @container (width < 41.25rem) {
-  .row-first, .row-second { --row-kind: 6.75rem; }
-  .row-first { display: block; position: relative; padding-right: 0; }
-  .row-cols { width: 100%; grid-template-columns: var(--row-glyph) var(--row-source) var(--row-kind) minmax(0, 1fr); padding-right: var(--row-inset); }
-  .row-cols > [data-title-cell] { grid-column: 2 / -1; padding-right: calc(var(--row-side) + var(--row-gap)); }
-  .row-cols > [data-kind] { grid-column: 3; }
-  .row-cols > [data-col="state"] { grid-column: 4; grid-row: 2; }
-  .row-side { position: absolute; top: 0; right: var(--row-inset); }
-  .row-second { display: flex; flex-wrap: wrap; row-gap: --spacing(1); }
-  .row-second > :empty { display: none; }
-  .row-second > [data-col="bar"] { flex: 0 0 var(--row-source); }
-  .row-second > [data-col="count"] { flex: 0 0 var(--row-kind); }
-  .row-second > [data-col="pr"] { flex: 1 1 auto; order: 1; }
-  .row-second > [data-col="next"] { flex: 1 1 12rem; order: 2; }
-  .row-second > [data-col="figures"] { flex: 0 0 auto; order: 3; margin-left: auto; }
+    .row-first,
+    .row-second {
+        --row-kind: 6.75rem;
+    }
+    .row-first {
+        display: block;
+        position: relative;
+        padding-right: 0;
+    }
+    .row-cols {
+        width: 100%;
+        grid-template-columns: var(--row-glyph) var(--row-source) var(--row-kind) minmax(0, 1fr);
+        padding-right: var(--row-inset);
+    }
+    .row-cols > [data-title-cell] {
+        grid-column: 2 / -1;
+        padding-right: calc(var(--row-side) + var(--row-gap));
+    }
+    .row-cols > [data-kind] {
+        grid-column: 3;
+    }
+    .row-cols > [data-col='state'] {
+        grid-column: 4;
+        grid-row: 2;
+    }
+    .row-side {
+        position: absolute;
+        top: 0;
+        right: var(--row-inset);
+    }
+    .row-second {
+        display: flex;
+        flex-wrap: wrap;
+        row-gap: --spacing(1);
+    }
+    .row-second > :empty {
+        display: none;
+    }
+    .row-second > [data-col='bar'] {
+        flex: 0 0 var(--row-source);
+    }
+    .row-second > [data-col='count'] {
+        flex: 0 0 var(--row-kind);
+    }
+    .row-second > [data-col='pr'] {
+        flex: 1 1 auto;
+        order: 1;
+    }
+    .row-second > [data-col='next'] {
+        flex: 1 1 12rem;
+        order: 2;
+    }
+    .row-second > [data-col='figures'] {
+        flex: 0 0 auto;
+        order: 3;
+        margin-left: auto;
+    }
 }

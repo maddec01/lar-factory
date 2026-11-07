@@ -1,6 +1,6 @@
 packages:
-  - apps/*
-  - packages/*
+    - apps/*
+    - packages/*
 
 # electron's package.json declares no install script for pnpm to run here, so
 # the repo's scripts/setup-worktree.sh runs node_modules/electron/install.js to fetch the
@@ -9,24 +9,24 @@ packages:
 # electron-builder's Windows installer tool needs no build script for a Mac build;
 # T3 Code also leaves it off.
 allowBuilds:
-  electron: false
-  electron-winstaller: false
-  esbuild: true
+    electron: false
+    electron-winstaller: false
+    esbuild: true
 
 # Vite+ ships its own Vite. Point every dependent at that copy, as T3 Code does,
 # and keep Effect's packages on the version T3 Code pins.
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
-  "@effect/platform-node-shared": 4.0.5
+    vite: npm:@voidzero-dev/vite-plus-core@1.5.0
+    '@effect/platform-node-shared': 4.0.5
 
 # Vite+ ships Vite as @voidzero-dev/vite-plus-core, which plugins don't recognise as vite;
 # T3 Code allows it the same way.
 peerDependencyRules:
-  allowAny:
-    - vite
-  allowedVersions:
-    vite: "*"
+    allowAny:
+        - vite
+    allowedVersions:
+        vite: '*'
 
 # pnpm waits a day before installing a new release; Lar's own packages are trusted as soon as they're out.
 minimumReleaseAgeExclude:
-  - "@lar-works/*"
+    - '@lar-works/*'

@@ -5,19 +5,46 @@
 
 import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
+
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { OpenThread, hasLiveThread } from './open-thread.tsx';
 import { useOnRow } from './row-actions.tsx';
 import { StartOrAfter } from './start-after.tsx';
 
 /** A dossier names it `label`; a row calls it Start. */
-export function StartBuild({ item, data, label: given, linkedBeside, namesBlocker }: { item: Item; data: BoardData; label?: string; linkedBeside?: string | undefined; namesBlocker?: boolean }) {
-  const short = useOnRow();
-  const label = given ?? (short ? 'Start' : 'Start build');
-  // A thread already at work on the item would get a second one.
-  if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-  const setup = data.repos.find(repo => sameRepo(repo.repo, item.repo))?.setup;
-  const problem = setup && buildAccessProblem(setup.access);
-  if (problem) return <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>{label}</Button>;
-  return <StartOrAfter item={item} data={data} label={label} kind="build" linkedBeside={linkedBeside} {...(namesBlocker === undefined ? {} : { namesBlocker })} />;
+export function StartBuild({
+    item,
+    data,
+    label: given,
+    linkedBeside,
+    namesBlocker,
+}: {
+    item: Item;
+    data: BoardData;
+    label?: string;
+    linkedBeside?: string | undefined;
+    namesBlocker?: boolean;
+}) {
+    const short = useOnRow();
+    const label = given ?? (short ? 'Start' : 'Start build');
+    // A thread already at work on the item would get a second one.
+    if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+    const setup = data.repos.find((repo) => sameRepo(repo.repo, item.repo))?.setup;
+    const problem = setup && buildAccessProblem(setup.access);
+    if (problem)
+        return (
+            <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>
+                {label}
+            </Button>
+        );
+    return (
+        <StartOrAfter
+            item={item}
+            data={data}
+            label={label}
+            kind="build"
+            linkedBeside={linkedBeside}
+            {...(namesBlocker === undefined ? {} : { namesBlocker })}
+        />
+    );
 }

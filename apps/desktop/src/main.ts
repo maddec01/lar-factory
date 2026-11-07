@@ -6,118 +6,117 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
-import * as NodePath from "node:path";
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
+import * as NodeRuntime from '@effect/platform-node/NodeRuntime';
+import * as NodeServices from '@effect/platform-node/NodeServices';
+import type { DriftChoice } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
+import * as Duration from 'effect/Duration';
+import * as Effect from 'effect/Effect';
+import { HttpClient } from 'effect/http';
+import * as Electron from 'electron';
+import * as NodeFS from 'node:fs';
+import * as NodeOS from 'node:os';
+import * as NodePath from 'node:path';
 
-import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import { HttpClient } from "effect/http";
-import * as Electron from "electron";
-
-import type { DriftChoice } from "@lar-factory/shared";
-import { boardDataDir } from "@lar-factory/shared/data-dir";
-
-import * as BoardServer from "./board-server/BoardServer.ts";
-import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
-import * as InstallBoard from "./skills/install-board.ts";
-import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
-import * as LarWorkLauncher from "./lar-work/lar-work-launcher.ts";
-import * as SkillInstall from "./skills/skill-install.ts";
-import * as T3Instances from "./skills/t3-instances.ts";
-import * as ExternalLink from "./window/external-link.ts";
-import * as MainWindowBounds from "./window/MainWindowBounds.ts";
-import * as IpcChannels from "./ipc-channels.ts";
-import { openBoardAddress } from "./board-server/board-address.ts";
-import * as LaunchSecret from "./board-server/launch-secret.ts";
-import * as RestartDialog from "./updates/restart-dialog.ts";
-import * as ShellEnvironment from "./shell-environment/ShellEnvironment.ts";
-import * as StartingPage from "./window/starting-page.ts";
-import * as WindowBackground from "./window/window-background.ts";
-import * as AppUpdates from "./updates/AppUpdates.ts";
-import * as ChannelSetting from "./updates/channel-setting.ts";
-import * as ElectronUpdater from "./updates/ElectronUpdater.ts";
-import * as WindowTitleBar from "./window/WindowTitleBar.ts";
+import { openBoardAddress } from './board-server/board-address.ts';
+import * as BoardServer from './board-server/BoardServer.ts';
+import * as BoardSupervisor from './board-server/BoardSupervisor.ts';
+import * as LaunchSecret from './board-server/launch-secret.ts';
+import * as IpcChannels from './ipc-channels.ts';
+import * as LarWorkLauncher from './lar-work/lar-work-launcher.ts';
+import * as LaunchAgentCleanup from './launch-agent/launch-agent-cleanup.ts';
+import * as ShellEnvironment from './shell-environment/ShellEnvironment.ts';
+import * as InstallBoard from './skills/install-board.ts';
+import * as SkillInstall from './skills/skill-install.ts';
+import * as T3Instances from './skills/t3-instances.ts';
+import * as AppUpdates from './updates/AppUpdates.ts';
+import * as ChannelSetting from './updates/channel-setting.ts';
+import * as ElectronUpdater from './updates/ElectronUpdater.ts';
+import * as RestartDialog from './updates/restart-dialog.ts';
+import * as ExternalLink from './window/external-link.ts';
+import * as MainWindowBounds from './window/MainWindowBounds.ts';
+import * as StartingPage from './window/starting-page.ts';
+import * as WindowBackground from './window/window-background.ts';
+import * as WindowTitleBar from './window/WindowTitleBar.ts';
 
 /** Resolves once the user quits the app or closes its last window. */
 const quitRequested = Effect.callback<void>((resume) => {
-  const onBeforeQuit = (event: Electron.Event) => {
-    // Hold the quit until the scope has stopped the server; the program exits after.
-    event.preventDefault();
-    resume(Effect.void);
-  };
-  const onAllClosed = () => resume(Effect.void);
-  Electron.app.on("before-quit", onBeforeQuit);
-  Electron.app.on("window-all-closed", onAllClosed);
-  return Effect.sync(() => {
-    Electron.app.off("before-quit", onBeforeQuit);
-    Electron.app.off("window-all-closed", onAllClosed);
-  });
+    const onBeforeQuit = (event: Electron.Event) => {
+        // Hold the quit until the scope has stopped the server; the program exits after.
+        event.preventDefault();
+        resume(Effect.void);
+    };
+    const onAllClosed = () => resume(Effect.void);
+    Electron.app.on('before-quit', onBeforeQuit);
+    Electron.app.on('window-all-closed', onAllClosed);
+    return Effect.sync(() => {
+        Electron.app.off('before-quit', onBeforeQuit);
+        Electron.app.off('window-all-closed', onAllClosed);
+    });
 });
 
 /** Opens a web link in the browser and a T3 Code link in T3 Code; any other link opens nothing. */
 const openOutside = (target: string) => {
-  const url = ExternalLink.outsideUrl(target);
-  if (url) void Electron.shell.openExternal(url);
+    const url = ExternalLink.outsideUrl(target);
+    if (url) void Electron.shell.openExternal(url);
 };
 
 const createWindow = (boardOrigin: () => string, secret: string) => {
-  const setting = MainWindowBounds.atFile(NodePath.join(Electron.app.getPath("userData"), "window-state.json"));
-  const persisted = Effect.runSync(setting.read);
-  const displays = Electron.screen.getAllDisplays().map((display) => display.bounds);
-  const bounds = MainWindowBounds.resolveInitialMainWindowBounds(persisted.mainWindowBounds, displays);
-  const window = new Electron.BrowserWindow({
-    ...bounds,
-    minWidth: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.width,
-    minHeight: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.height,
-    title: "Lar Factory",
-    // The design system's background, so no white shows before a page paints or between the pages.
-    backgroundColor: WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors),
-    // Shown once the first page paints, already maximized if restoring that, so it doesn't open small and then grow.
-    show: false,
-    ...WindowTitleBar.options(process.platform),
-    webPreferences: {
-      preload: NodePath.join(import.meta.dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  const followTheme = () => window.setBackgroundColor(WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors));
-  Electron.nativeTheme.on("updated", followTheme);
-  window.once("closed", () => Electron.nativeTheme.off("updated", followTheme));
-  window.once("ready-to-show", () => {
-    // A window whose saved bounds no longer fit a display opens as a new one, not maximized.
-    if (persisted.mainWindowMaximized && bounds === persisted.mainWindowBounds) window.maximize();
-    window.show();
-  });
-  // Quitting holds in before-quit and then exits, so the window gets no close event to save on.
-  Electron.app.on("before-quit", MainWindowBounds.persistMainWindowBounds(window, setting));
-  window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
-    event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? "", boardOrigin(), secret);
-  });
-  // While macOS full screen hides the traffic lights, the page moves its top-left controls into their place.
-  window.webContents.ipc.on(IpcChannels.GET_WINDOW_FULLSCREEN_STATE, (event) => {
-    event.returnValue = window.isFullScreen();
-  });
-  if (process.platform === "darwin") {
-    window.on("enter-full-screen", () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, true));
-    window.on("leave-full-screen", () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, false));
-  }
-  // Links to GitHub and elsewhere open in the browser, and thread links in T3 Code; only the board stays in the window.
-  window.webContents.setWindowOpenHandler(({ url: target }) => {
-    openOutside(target);
-    return { action: "deny" };
-  });
-  window.webContents.on("will-navigate", (event, target) => {
-    if (ExternalLink.isOn(target, boardOrigin())) return;
-    event.preventDefault();
-    openOutside(target);
-  });
-  return window;
+    const setting = MainWindowBounds.atFile(NodePath.join(Electron.app.getPath('userData'), 'window-state.json'));
+    const persisted = Effect.runSync(setting.read);
+    const displays = Electron.screen.getAllDisplays().map((display) => display.bounds);
+    const bounds = MainWindowBounds.resolveInitialMainWindowBounds(persisted.mainWindowBounds, displays);
+    const window = new Electron.BrowserWindow({
+        ...bounds,
+        minWidth: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.width,
+        minHeight: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.height,
+        title: 'Lar Factory',
+        // The design system's background, so no white shows before a page paints or between the pages.
+        backgroundColor: WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors),
+        // Shown once the first page paints, already maximized if restoring that, so it doesn't open small and then grow.
+        show: false,
+        ...WindowTitleBar.options(process.platform),
+        webPreferences: {
+            preload: NodePath.join(import.meta.dirname, 'preload.cjs'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+        },
+    });
+    const followTheme = () =>
+        window.setBackgroundColor(WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors));
+    Electron.nativeTheme.on('updated', followTheme);
+    window.once('closed', () => Electron.nativeTheme.off('updated', followTheme));
+    window.once('ready-to-show', () => {
+        // A window whose saved bounds no longer fit a display opens as a new one, not maximized.
+        if (persisted.mainWindowMaximized && bounds === persisted.mainWindowBounds) window.maximize();
+        window.show();
+    });
+    // Quitting holds in before-quit and then exits, so the window gets no close event to save on.
+    Electron.app.on('before-quit', MainWindowBounds.persistMainWindowBounds(window, setting));
+    window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
+        event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? '', boardOrigin(), secret);
+    });
+    // While macOS full screen hides the traffic lights, the page moves its top-left controls into their place.
+    window.webContents.ipc.on(IpcChannels.GET_WINDOW_FULLSCREEN_STATE, (event) => {
+        event.returnValue = window.isFullScreen();
+    });
+    if (process.platform === 'darwin') {
+        window.on('enter-full-screen', () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, true));
+        window.on('leave-full-screen', () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, false));
+    }
+    // Links to GitHub and elsewhere open in the browser, and thread links in T3 Code; only the board stays in the window.
+    window.webContents.setWindowOpenHandler(({ url: target }) => {
+        openOutside(target);
+        return { action: 'deny' };
+    });
+    window.webContents.on('will-navigate', (event, target) => {
+        if (ExternalLink.isOn(target, boardOrigin())) return;
+        event.preventDefault();
+        openOutside(target);
+    });
+    return window;
 };
 
 /**
@@ -126,71 +125,71 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
  * without reloading, so its mark draws once. The board's page opens on the drawn mark.
  */
 const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof openBoardAddress>>) => {
-  let origin = "";
-  let boardShown = false;
-  // Bumped by each ready server and each stop, so a load that waits on the mark's draw is skipped once either comes.
-  let generation = 0;
-  // When the starting page finished loading, which is when its mark starts to draw.
-  let startingShownAt: number | undefined;
-  const window = createWindow(() => origin, secret);
-  const load = (href: string) =>
-    Effect.tryPromise(() => window.loadURL(href)).pipe(
-      Effect.catch((error) => Effect.logError(`could not load ${href.slice(0, 100)}: ${String(error)}`)),
-    );
-  // Runs a message in the starting page, which the board's page replaces: after that nothing is sent.
-  const tell = (script: string) => {
-    if (boardShown || window.isDestroyed()) return;
-    window.webContents.executeJavaScript(script).catch((error: unknown) => {
-      console.error(`could not update the starting page: ${String(error)}`);
-    });
-  };
-  const events: BoardSupervisor.SupervisorEvents = {
-    onReady: (url) =>
-      Effect.suspend(() => {
-        address.connect(url);
-        origin = address.url.origin;
-        if (boardShown) return Effect.void;
-        const mine = ++generation;
-        // The board's page is held for the tool check, so the starting page stays up while it loads.
-        tell(StartingPage.stepScript(StartingPage.STEPS.tools));
-        // The first board page waits until the starting mark has finished drawing.
-        const wait = StartingPage.drawWait(startingShownAt, Date.now());
-        // Forked, so the supervisor watches the server's exit while the load waits.
-        return Effect.sleep(Duration.millis(wait)).pipe(
-          Effect.andThen(
-            Effect.suspend(() => {
-              if (mine !== generation) return Effect.void;
-              origin = address.url.origin;
-              boardShown = true;
-              return load(StartingPage.boardUrl(address.url));
-            }),
-          ),
-          Effect.forkDetach,
-          Effect.asVoid,
+    let origin = '';
+    let boardShown = false;
+    // Bumped by each ready server and each stop, so a load that waits on the mark's draw is skipped once either comes.
+    let generation = 0;
+    // When the starting page finished loading, which is when its mark starts to draw.
+    let startingShownAt: number | undefined;
+    const window = createWindow(() => origin, secret);
+    const load = (href: string) =>
+        Effect.tryPromise(() => window.loadURL(href)).pipe(
+            Effect.catch((error) => Effect.logError(`could not load ${href.slice(0, 100)}: ${String(error)}`)),
         );
-      }),
-    onRestart: (reason) =>
-      Effect.suspend(() => {
-        // The old server is gone: no page gets the secret until the next one is ready.
+    // Runs a message in the starting page, which the board's page replaces: after that nothing is sent.
+    const tell = (script: string) => {
+        if (boardShown || window.isDestroyed()) return;
+        window.webContents.executeJavaScript(script).catch((error: unknown) => {
+            console.error(`could not update the starting page: ${String(error)}`);
+        });
+    };
+    const events: BoardSupervisor.SupervisorEvents = {
+        onReady: (url) =>
+            Effect.suspend(() => {
+                address.connect(url);
+                origin = address.url.origin;
+                if (boardShown) return Effect.void;
+                const mine = ++generation;
+                // The board's page is held for the tool check, so the starting page stays up while it loads.
+                tell(StartingPage.stepScript(StartingPage.STEPS.tools));
+                // The first board page waits until the starting mark has finished drawing.
+                const wait = StartingPage.drawWait(startingShownAt, Date.now());
+                // Forked, so the supervisor watches the server's exit while the load waits.
+                return Effect.sleep(Duration.millis(wait)).pipe(
+                    Effect.andThen(
+                        Effect.suspend(() => {
+                            if (mine !== generation) return Effect.void;
+                            origin = address.url.origin;
+                            boardShown = true;
+                            return load(StartingPage.boardUrl(address.url));
+                        }),
+                    ),
+                    Effect.forkDetach,
+                    Effect.asVoid,
+                );
+            }),
+        onRestart: (reason) =>
+            Effect.suspend(() => {
+                // The old server is gone: no page gets the secret until the next one is ready.
+                generation += 1;
+                origin = '';
+                address.disconnect();
+                tell(StartingPage.errorScript(reason));
+                return Effect.void;
+            }),
+    };
+    const progress = (step: BoardServer.StartStep) =>
+        tell(StartingPage.stepScript(step === 'starting' ? StartingPage.STEPS.server : StartingPage.STEPS.healthz));
+    // A stopped server's page gets no secret, as after a crash.
+    const forgetOrigin = Effect.sync(() => {
         generation += 1;
-        origin = "";
+        origin = '';
         address.disconnect();
-        tell(StartingPage.errorScript(reason));
-        return Effect.void;
-      }),
-  };
-  const progress = (step: BoardServer.StartStep) =>
-    tell(StartingPage.stepScript(step === "starting" ? StartingPage.STEPS.server : StartingPage.STEPS.healthz));
-  // A stopped server's page gets no secret, as after a crash.
-  const forgetOrigin = Effect.sync(() => {
-    generation += 1;
-    origin = "";
-    address.disconnect();
-  });
-  const showStarting = load(StartingPage.url()).pipe(
-    Effect.tap(() => Effect.sync(() => void (startingShownAt = Date.now()))),
-  );
-  return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
+    });
+    const showStarting = load(StartingPage.url()).pipe(
+        Effect.tap(() => Effect.sync(() => void (startingShownAt = Date.now()))),
+    );
+    return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
 };
 
 /** The folder holding the app's bundled skills. */
@@ -201,187 +200,209 @@ const skillBundle = () => SkillInstall.locateBundle(Electron.app.getAppPath(), E
  * the login shell's environment, which finds the `t3` CLI.
  */
 const makeSkillChecks = (env: Record<string, string | undefined>) =>
-  SkillInstall.makeChecks({
-    isPackaged: Electron.app.isPackaged,
-    version: Electron.app.getVersion(),
-    home: NodeOS.homedir(),
-    bundle: skillBundle(),
-    argv: process.argv,
-    env: process.env,
-  }, T3Instances.discover(env, NodeOS.homedir()));
+    SkillInstall.makeChecks(
+        {
+            isPackaged: Electron.app.isPackaged,
+            version: Electron.app.getVersion(),
+            home: NodeOS.homedir(),
+            bundle: skillBundle(),
+            argv: process.argv,
+            env: process.env,
+        },
+        T3Instances.discover(env, NodeOS.homedir()),
+    );
 
 /** Throws for a call from any page but the current board server's, and while no server is ready. */
 const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: Electron.IpcMainInvokeEvent) => {
-  InstallBoard.boardPageOnly(boardOrigin, refusal)(event.senderFrame?.url);
+    InstallBoard.boardPageOnly(boardOrigin, refusal)(event.senderFrame?.url);
 };
 
 /** The page's skill install calls, and each new install state sent to the window. */
-const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string, checks: SkillInstall.Checks | undefined, ready: () => void) => {
-  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the skill install");
-  const board = InstallBoard.makeInstallBoard({
-    home: SkillInstall.installHome(NodeOS.homedir(), process.env),
-    version: Electron.app.getVersion(),
-    bundle: skillBundle(),
-  }, checks);
-  board.subscribe((snapshot) => {
-    if (!window.isDestroyed()) window.webContents.send(IpcChannels.INSTALL_STATE, snapshot);
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_BOARD_READY, (event) => {
-    checkSender(event);
-    ready();
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_GET_STATE, (event) => {
-    checkSender(event);
-    return board.snapshot();
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_CLOSE_OVERVIEW, (event, reason: unknown, revision: unknown) => {
-    checkSender(event);
-    return board.closeOverview(reason, revision);
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_RETRY, (event) => {
-    checkSender(event);
-    return board.retry();
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_REPLACE, (event) => {
-    checkSender(event);
-    return board.replace();
-  });
-  Electron.ipcMain.handle(IpcChannels.INSTALL_SET_TICK, (event, path: unknown, ticked: unknown) => {
-    checkSender(event);
-    return board.setTick(path, ticked);
-  });
+const handleInstall = (
+    window: Electron.BrowserWindow,
+    boardOrigin: () => string,
+    checks: SkillInstall.Checks | undefined,
+    ready: () => void,
+) => {
+    const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the skill install");
+    const board = InstallBoard.makeInstallBoard(
+        {
+            home: SkillInstall.installHome(NodeOS.homedir(), process.env),
+            version: Electron.app.getVersion(),
+            bundle: skillBundle(),
+        },
+        checks,
+    );
+    board.subscribe((snapshot) => {
+        if (!window.isDestroyed()) window.webContents.send(IpcChannels.INSTALL_STATE, snapshot);
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_BOARD_READY, (event) => {
+        checkSender(event);
+        ready();
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_GET_STATE, (event) => {
+        checkSender(event);
+        return board.snapshot();
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_CLOSE_OVERVIEW, (event, reason: unknown, revision: unknown) => {
+        checkSender(event);
+        return board.closeOverview(reason, revision);
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_RETRY, (event) => {
+        checkSender(event);
+        return board.retry();
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_REPLACE, (event) => {
+        checkSender(event);
+        return board.replace();
+    });
+    Electron.ipcMain.handle(IpcChannels.INSTALL_SET_TICK, (event, path: unknown, ticked: unknown) => {
+        checkSender(event);
+        return board.setTick(path, ticked);
+    });
 };
 
 /** The updater's calls, as T3 Code's update IPC handlers, and the dialog that asks before installing. */
-const handleUpdates = (
-  window: Electron.BrowserWindow,
-  boardOrigin: () => string,
-  updates: AppUpdates.AppUpdates,
-) => {
-  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can use the app's updates");
-  const handle = (channel: string, call: (...args: Array<unknown>) => Effect.Effect<unknown, Error>) =>
-    Electron.ipcMain.handle(channel, (event, ...args) => {
-      checkSender(event);
-      return Effect.runPromise(call(...args));
-    });
-  handle(IpcChannels.UPDATE_GET_STATE, () => updates.getState);
-  handle(IpcChannels.UPDATE_CHECK, () => updates.check);
-  handle(IpcChannels.UPDATE_DOWNLOAD, () => updates.download);
-  handle(IpcChannels.UPDATE_INSTALL, () => updates.install);
-  handle(IpcChannels.UPDATE_SET_CHANNEL, (channel) =>
-    channel === "latest" || channel === "nightly"
-      ? updates.setChannel(channel)
-      : Effect.fail(new Error("The update channel must be latest or nightly")),
-  );
-  handle(IpcChannels.CONFIRM_RESTART, (message) =>
-    typeof message === "string"
-      ? Effect.promise(() => Electron.dialog.showMessageBox(window, RestartDialog.options(message))).pipe(
-          Effect.map(RestartDialog.confirmed),
-        )
-      : Effect.fail(new Error("The restart question must be a string")),
-  );
+const handleUpdates = (window: Electron.BrowserWindow, boardOrigin: () => string, updates: AppUpdates.AppUpdates) => {
+    const checkSender = boardPageOnly(boardOrigin, "Only the board's page can use the app's updates");
+    const handle = (channel: string, call: (...args: Array<unknown>) => Effect.Effect<unknown, Error>) =>
+        Electron.ipcMain.handle(channel, (event, ...args) => {
+            checkSender(event);
+            return Effect.runPromise(call(...args));
+        });
+    handle(IpcChannels.UPDATE_GET_STATE, () => updates.getState);
+    handle(IpcChannels.UPDATE_CHECK, () => updates.check);
+    handle(IpcChannels.UPDATE_DOWNLOAD, () => updates.download);
+    handle(IpcChannels.UPDATE_INSTALL, () => updates.install);
+    handle(IpcChannels.UPDATE_SET_CHANNEL, (channel) =>
+        channel === 'latest' || channel === 'nightly'
+            ? updates.setChannel(channel)
+            : Effect.fail(new Error('The update channel must be latest or nightly')),
+    );
+    handle(IpcChannels.CONFIRM_RESTART, (message) =>
+        typeof message === 'string'
+            ? Effect.promise(() => Electron.dialog.showMessageBox(window, RestartDialog.options(message))).pipe(
+                  Effect.map(RestartDialog.confirmed),
+              )
+            : Effect.fail(new Error('The restart question must be a string')),
+    );
 };
 
 /** Checks Releases for updates from now until the scope closes, telling the window each new state. */
 const startUpdates = (window: Electron.BrowserWindow, board: AppUpdates.BoardServerControl) =>
-  Effect.gen(function* () {
-    const isPackaged = Electron.app.isPackaged;
-    return yield* AppUpdates.make({
-      updater: yield* Effect.promise(ElectronUpdater.make),
-      board,
-      version: Electron.app.getVersion(),
-      // electron-builder writes the feed's app-update.yml beside app.asar.
-      disabledReason: AppUpdates.disabledReason({
-        isPackaged,
-        hasFeedConfig: isPackaged && NodeFS.existsSync(NodePath.join(process.resourcesPath, "app-update.yml")),
-      }),
-      channelSetting: ChannelSetting.atFile(NodePath.join(Electron.app.getPath("userData"), "update-channel.json")),
-      publish: (state) => {
-        if (!window.isDestroyed()) window.webContents.send(IpcChannels.UPDATE_STATE, state);
-      },
+    Effect.gen(function* () {
+        const isPackaged = Electron.app.isPackaged;
+        return yield* AppUpdates.make({
+            updater: yield* Effect.promise(ElectronUpdater.make),
+            board,
+            version: Electron.app.getVersion(),
+            // electron-builder writes the feed's app-update.yml beside app.asar.
+            disabledReason: AppUpdates.disabledReason({
+                isPackaged,
+                hasFeedConfig: isPackaged && NodeFS.existsSync(NodePath.join(process.resourcesPath, 'app-update.yml')),
+            }),
+            channelSetting: ChannelSetting.atFile(
+                NodePath.join(Electron.app.getPath('userData'), 'update-channel.json'),
+            ),
+            publish: (state) => {
+                if (!window.isDestroyed()) window.webContents.send(IpcChannels.UPDATE_STATE, state);
+            },
+        });
     });
-  });
 
 const program = Effect.gen(function* () {
-  yield* Effect.promise(() => Electron.app.whenReady());
-  // One secret per launch, shared by the restarted servers and the page.
-  const secret = LaunchSecret.make();
-  const address = yield* Effect.acquireRelease(Effect.promise(openBoardAddress), (address) => Effect.sync(address.close));
-  const board = openBoardWindow(secret, address);
-  // Opening the app again brings this window forward; the second copy has already quit.
-  Electron.app.on("second-instance", () => {
-    if (board.window.isMinimized()) board.window.restore();
-    board.window.focus();
-  });
-  yield* board.showStarting;
-  // Read once: a restarted server keeps the PATH the first one got.
-  const env = yield* ShellEnvironment.childEnvironment(process.env);
-  // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
-  const skillChecks = yield* makeSkillChecks(env);
-  const installReady = skillChecks ? yield* SkillInstall.launchWhenReady(skillChecks) : () => {};
-  handleInstall(board.window, board.origin, skillChecks, installReady);
-  const config = BoardServer.makeStartConfig({
-    ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
-    executablePath: process.execPath,
-    env,
-    secret,
-    checksSkills: skillChecks !== undefined,
-  });
-  const checkSkills = skillChecks && ((drift?: DriftChoice) => Effect.runPromise(skillChecks.beforeBuild(drift).pipe(Effect.match({
-    onFailure: (failed) => SkillInstall.buildAnswer(failed, drift),
-    onSuccess: (outcome) => SkillInstall.buildAnswer(outcome, drift),
-  }))));
-  // Quitting closes the scope, which stops the server or cancels a pending restart.
-  const supervisor = yield* BoardSupervisor.makeControl(
-    BoardSupervisor.supervise(BoardServer.start(config, { checkSkills, progress: board.progress }), board.events),
-  );
-  const http = yield* HttpClient.HttpClient;
-  const stopBoard = Effect.suspend(() => {
-    const origin = board.origin();
-    // With no server ready there is no write to wait for.
-    return origin ? BoardServer.drain(new URL(origin), secret) : Effect.void;
-  }).pipe(
-    Effect.provideService(HttpClient.HttpClient, http),
-    Effect.andThen(supervisor.stop),
-    Effect.andThen(board.forgetOrigin),
-  );
-  // A failed drain leaves the server refusing writes, so the install's failure path restarts it.
-  handleUpdates(board.window, board.origin, yield* startUpdates(board.window, {
-    stop: stopBoard,
-    start: supervisor.stop.pipe(Effect.andThen(supervisor.start)),
-  }));
-  yield* supervisor.start;
-  // The app replaces the launch agent that ran the board before it.
-  yield* Effect.forkScoped(
-    LaunchAgentCleanup.onLaunch({
-      isPackaged: Electron.app.isPackaged,
-      home: NodeOS.homedir(),
-      uid: process.getuid?.() ?? NodeOS.userInfo().uid,
-      launchctl: "/bin/launchctl",
-    }),
-  );
-  // Threads run lar-work through a launcher on the PATH that follows this copy of the app.
-  yield* LarWorkLauncher.onLaunch({
-    isPackaged: Electron.app.isPackaged,
-    installInDevelopment: process.argv.includes(SkillInstall.INSTALL_FLAG),
-    home: SkillInstall.installHome(NodeOS.homedir(), process.env),
-    executablePath: process.execPath,
-    commandFile: LarWorkLauncher.locateCommand(Electron.app.getAppPath(), Electron.app.isPackaged),
-    // The folder the board server, which runs with `env`, keeps the database in.
-    dataDir: boardDataDir(undefined, env),
-  });
-  yield* quitRequested;
+    yield* Effect.promise(() => Electron.app.whenReady());
+    // One secret per launch, shared by the restarted servers and the page.
+    const secret = LaunchSecret.make();
+    const address = yield* Effect.acquireRelease(Effect.promise(openBoardAddress), (address) =>
+        Effect.sync(address.close),
+    );
+    const board = openBoardWindow(secret, address);
+    // Opening the app again brings this window forward; the second copy has already quit.
+    Electron.app.on('second-instance', () => {
+        if (board.window.isMinimized()) board.window.restore();
+        board.window.focus();
+    });
+    yield* board.showStarting;
+    // Read once: a restarted server keeps the PATH the first one got.
+    const env = yield* ShellEnvironment.childEnvironment(process.env);
+    // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
+    const skillChecks = yield* makeSkillChecks(env);
+    const installReady = skillChecks ? yield* SkillInstall.launchWhenReady(skillChecks) : () => {};
+    handleInstall(board.window, board.origin, skillChecks, installReady);
+    const config = BoardServer.makeStartConfig({
+        ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
+        executablePath: process.execPath,
+        env,
+        secret,
+        checksSkills: skillChecks !== undefined,
+    });
+    const checkSkills =
+        skillChecks &&
+        ((drift?: DriftChoice) =>
+            Effect.runPromise(
+                skillChecks.beforeBuild(drift).pipe(
+                    Effect.match({
+                        onFailure: (failed) => SkillInstall.buildAnswer(failed, drift),
+                        onSuccess: (outcome) => SkillInstall.buildAnswer(outcome, drift),
+                    }),
+                ),
+            ));
+    // Quitting closes the scope, which stops the server or cancels a pending restart.
+    const supervisor = yield* BoardSupervisor.makeControl(
+        BoardSupervisor.supervise(BoardServer.start(config, { checkSkills, progress: board.progress }), board.events),
+    );
+    const http = yield* HttpClient.HttpClient;
+    const stopBoard = Effect.suspend(() => {
+        const origin = board.origin();
+        // With no server ready there is no write to wait for.
+        return origin ? BoardServer.drain(new URL(origin), secret) : Effect.void;
+    }).pipe(
+        Effect.provideService(HttpClient.HttpClient, http),
+        Effect.andThen(supervisor.stop),
+        Effect.andThen(board.forgetOrigin),
+    );
+    // A failed drain leaves the server refusing writes, so the install's failure path restarts it.
+    handleUpdates(
+        board.window,
+        board.origin,
+        yield* startUpdates(board.window, {
+            stop: stopBoard,
+            start: supervisor.stop.pipe(Effect.andThen(supervisor.start)),
+        }),
+    );
+    yield* supervisor.start;
+    // The app replaces the launch agent that ran the board before it.
+    yield* Effect.forkScoped(
+        LaunchAgentCleanup.onLaunch({
+            isPackaged: Electron.app.isPackaged,
+            home: NodeOS.homedir(),
+            uid: process.getuid?.() ?? NodeOS.userInfo().uid,
+            launchctl: '/bin/launchctl',
+        }),
+    );
+    // Threads run lar-work through a launcher on the PATH that follows this copy of the app.
+    yield* LarWorkLauncher.onLaunch({
+        isPackaged: Electron.app.isPackaged,
+        installInDevelopment: process.argv.includes(SkillInstall.INSTALL_FLAG),
+        home: SkillInstall.installHome(NodeOS.homedir(), process.env),
+        executablePath: process.execPath,
+        commandFile: LarWorkLauncher.locateCommand(Electron.app.getAppPath(), Electron.app.isPackaged),
+        // The folder the board server, which runs with `env`, keeps the database in.
+        dataDir: boardDataDir(undefined, env),
+    });
+    yield* quitRequested;
 }).pipe(
-  Effect.scoped,
-  Effect.provide([NodeHttpClient.layerUndici, NodeServices.layer]),
-  Effect.ensuring(Effect.sync(() => Electron.app.exit(0))),
+    Effect.scoped,
+    Effect.provide([NodeHttpClient.layerUndici, NodeServices.layer]),
+    Effect.ensuring(Effect.sync(() => Electron.app.exit(0))),
 );
 
 // The app menu's About, Hide and Quit items read app.name. Electron derives userData
 // from the name, so pin it first: update-channel.json, window-state.json, .updaterId and the
 // single-instance lock stay in the package's folder, whatever the shown name.
-Electron.app.setPath("userData", NodePath.join(Electron.app.getPath("appData"), "@lar-factory/desktop"));
-Electron.app.setName("Lar Factory");
+Electron.app.setPath('userData', NodePath.join(Electron.app.getPath('appData'), '@lar-factory/desktop'));
+Electron.app.setName('Lar Factory');
 
 // One app at a time: a second launch hands over to the first (see "second-instance") and quits.
 if (Electron.app.requestSingleInstanceLock()) NodeRuntime.runMain(program);

@@ -48,7 +48,6 @@ _Avoid_: refined ticket.
 The text a ticket had before its first Spec, kept collapsed in the ticket.
 _Avoid_: initial ticket.
 
-
 **Slice**:
 A private part of a build that is completed when its work merges into the build branch. Slices appear within their build and are not separate board items.
 _Avoid_: sub-ticket.

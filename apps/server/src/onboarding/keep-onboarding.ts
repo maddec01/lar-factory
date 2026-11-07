@@ -3,21 +3,36 @@
 
 import { type OnboardingRepository } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { isProgress, isRepo, readRepositoryList, saveOnboarding, stillOnboarding } from '../config/repository-config.ts';
+
+import {
+    isProgress,
+    isRepo,
+    readRepositoryList,
+    saveOnboarding,
+    stillOnboarding,
+} from '../config/repository-config.ts';
 
 /**
  * Stores the body's `progress` for its `repo`, in place of the onboarding saved under `replaces` when it names one, and
  * returns the repositories still onboarding; or the status and problem when the body or the list refuses it. Only the
  * progress's step, done steps and answers are saved.
  */
-export async function keepOnboarding(input: Record<string, unknown>, dir = boardDataDir()): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
-  const { repo, progress, replaces } = input;
-  if (!isRepo(repo) || !isProgress(progress) || replaces !== undefined && typeof replaces !== 'string') {
-    return { status: 400, error: 'Send the Project and where its onboarding stopped.' };
-  }
-  try {
-    const { step, done, answers } = progress;
-    return { onboarding: stillOnboarding(saveOnboarding({ repo, progress: { step, done, answers } }, replaces ?? null, dir)) };
-  }
-  catch (err) { return { status: 409, error: err instanceof Error ? err.message : String(err) }; }
+export async function keepOnboarding(
+    input: Record<string, unknown>,
+    dir = boardDataDir(),
+): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
+    const { repo, progress, replaces } = input;
+    if (!isRepo(repo) || !isProgress(progress) || (replaces !== undefined && typeof replaces !== 'string')) {
+        return { status: 400, error: 'Send the Project and where its onboarding stopped.' };
+    }
+    try {
+        const { step, done, answers } = progress;
+        return {
+            onboarding: stillOnboarding(
+                saveOnboarding({ repo, progress: { step, done, answers } }, replaces ?? null, dir),
+            ),
+        };
+    } catch (err) {
+        return { status: 409, error: err instanceof Error ? err.message : String(err) };
+    }
 }

@@ -5,10 +5,10 @@ commit it matches byte for byte. A Copy is never edited here; an update is a fre
 copy from upstream and a diff, with its row's commit moved on. The build adapts to
 the Copies instead.
 
-| File | Source | Path | Commit |
-| ---- | ------ | ---- | ------ |
+| File                                     | Source           | Path                                                       | Commit         |
+| ---------------------------------------- | ---------------- | ---------------------------------------------------------- | -------------- |
 | `src/search-dialog/useModalAutoFocus.ts` | maddec01/lar-web | `packages/design-system/src/overlays/useModalAutoFocus.ts` | `4a059bd2547a` |
-| `src/search-dialog/useScrollFade.ts` | maddec01/lar-web | `packages/design-system/src/overlays/useScrollFade.ts` | `4a059bd2547a` |
+| `src/search-dialog/useScrollFade.ts`     | maddec01/lar-web | `packages/design-system/src/overlays/useScrollFade.ts`     | `4a059bd2547a` |
 
 Full commit: maddec01/lar-web `4a059bd2547a997b8394acdfbd4406391951d69e`.
 

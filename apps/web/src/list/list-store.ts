@@ -3,11 +3,11 @@
 import { create } from 'zustand';
 
 interface ListState {
-  open: boolean;
-  setOpen: (open: boolean) => void;
+    open: boolean;
+    setOpen: (open: boolean) => void;
 }
 
 export const useListStore = create<ListState>()((set) => ({
-  open: false,
-  setOpen: (open) => set({ open }),
+    open: false,
+    setOpen: (open) => set({ open }),
 }));

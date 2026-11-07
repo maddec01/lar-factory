@@ -3,4 +3,4 @@
 // system's --color-base-50: oklch 99.2% in light mode and #0a0a0a in dark.
 
 /** The background for the system's current theme. */
-export const color = (dark: boolean): string => (dark ? "#0a0a0a" : "#fcfcfc");
+export const color = (dark: boolean): string => (dark ? '#0a0a0a' : '#fcfcfc');

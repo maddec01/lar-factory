@@ -1,44 +1,67 @@
 import { expect, test } from 'vite-plus/test';
+
 import { newLabelProblem, writeAccessProblem } from './write-access.ts';
 
 test('writes require verified access and respect Azure safety', () => {
-  expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('not checked');
-  expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'refused' })).toContain('refused');
-  expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'allowed' })).toBeNull();
-  expect(writeAccessProblem('org/project/repo', 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: true })).toContain('read-only');
+    expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('not checked');
+    expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'refused' })).toContain('refused');
+    expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'allowed' })).toBeNull();
+    expect(
+        writeAccessProblem(
+            'org/project/repo',
+            'publish-ticket',
+            { 'publish-ticket': 'allowed' },
+            { azureReadOnly: true },
+        ),
+    ).toContain('read-only');
 });
 
 test('legacy consent loads without granting access and disappears on resave', async (t) => {
-  const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const { writeListFile, readRepositorySetups, setStructureSync } = await import('./repository-settings.ts');
-  const { REPOSITORY_LIST_FILE } = await import('./data-dir.ts');
-  const dir = mkdtempSync(join(tmpdir(), 'legacy-access-'));
-  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-  writeListFile(dir, { repositories: [{ repo: 'org/repo', settings: { consent: ['publish-ticket'] } }] });
-  expect(readRepositorySetups(dir)[0]).not.toHaveProperty('consent');
-  setStructureSync('org/repo', true, dir);
-  expect(readFileSync(join(dir, REPOSITORY_LIST_FILE), 'utf8')).not.toContain('consent');
+    const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { writeListFile, readRepositorySetups, setStructureSync } = await import('./repository-settings.ts');
+    const { REPOSITORY_LIST_FILE } = await import('./data-dir.ts');
+    const dir = mkdtempSync(join(tmpdir(), 'legacy-access-'));
+    t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+    writeListFile(dir, { repositories: [{ repo: 'org/repo', settings: { consent: ['publish-ticket'] } }] });
+    expect(readRepositorySetups(dir)[0]).not.toHaveProperty('consent');
+    setStructureSync('org/repo', true, dir);
+    expect(readFileSync(join(dir, REPOSITORY_LIST_FILE), 'utf8')).not.toContain('consent');
 });
 
 test('unverified GitHub access explains supported credentials and editing restrictions', () => {
-  expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('classic token or gh OAuth');
-  expect(writeAccessProblem('org/repo', 'edit-ticket', {})).toContain("cannot edit other people's issues");
-  expect(writeAccessProblem('org/repo', 'edit-ticket', { 'edit-ticket': 'allowed' })).toBeNull();
+    expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('classic token or gh OAuth');
+    expect(writeAccessProblem('org/repo', 'edit-ticket', {})).toContain("cannot edit other people's issues");
+    expect(writeAccessProblem('org/repo', 'edit-ticket', { 'edit-ticket': 'allowed' })).toBeNull();
 });
 
 test('repository identities do not change write authorization', () => {
-  for (const repo of ['owner/project', 'other-owner/other-project', 'organization/project/repository', 'another-org/Project%20Name/another-repository']) {
-    expect(writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: false })).toBeNull();
-    expect(writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'refused' }, { azureReadOnly: false })).toContain('refused');
-    expect(writeAccessProblem(repo, 'publish-ticket', {}, { azureReadOnly: false })).not.toBeNull();
-  }
+    for (const repo of [
+        'owner/project',
+        'other-owner/other-project',
+        'organization/project/repository',
+        'another-org/Project%20Name/another-repository',
+    ]) {
+        expect(
+            writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: false }),
+        ).toBeNull();
+        expect(
+            writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'refused' }, { azureReadOnly: false }),
+        ).toContain('refused');
+        expect(writeAccessProblem(repo, 'publish-ticket', {}, { azureReadOnly: false })).not.toBeNull();
+    }
 });
 
 test('a new label needs label management, and on Azure stays unavailable with its reason even then', () => {
-  expect(newLabelProblem('team/app', { 'manage-labels': 'allowed' })).toBeNull();
-  expect(newLabelProblem('team/app', { 'tag-ticket': 'allowed' })).toContain('Access to manage-labels is not checked yet');
-  expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' })).toContain('Azure DevOps has no way to create a tag on its own');
-  expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' }, { azureReadOnly: true })).toBe('Azure DevOps is read-only in this test session.');
+    expect(newLabelProblem('team/app', { 'manage-labels': 'allowed' })).toBeNull();
+    expect(newLabelProblem('team/app', { 'tag-ticket': 'allowed' })).toContain(
+        'Access to manage-labels is not checked yet',
+    );
+    expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' })).toContain(
+        'Azure DevOps has no way to create a tag on its own',
+    );
+    expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' }, { azureReadOnly: true })).toBe(
+        'Azure DevOps is read-only in this test session.',
+    );
 });

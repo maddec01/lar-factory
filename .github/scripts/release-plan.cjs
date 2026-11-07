@@ -38,7 +38,8 @@ function latestNightly(tags) {
 
 // The Release builds the commit's own version, read without running its code.
 function releaseVersion(sha, { isOnMain, versionAt }) {
-    if (!isOnMain(sha)) throw new Error(`Commit ${sha.slice(0, 12)} is not on main; a Release builds only commits on main.`);
+    if (!isOnMain(sha))
+        throw new Error(`Commit ${sha.slice(0, 12)} is not on main; a Release builds only commits on main.`);
     const version = versionAt(sha);
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
         throw new Error(`The app package version "${version}" at ${sha.slice(0, 12)} must be x.y.z.`);
@@ -50,7 +51,8 @@ function releaseVersion(sha, { isOnMain, versionAt }) {
 function planNightly({ headSha: sha, ciRun, runNumber, date, tags, isOnMain, versionAt }) {
     const short = sha.slice(0, 12);
     const existing = tags.find((tag) => tag.sha === sha && NIGHTLY_TAG.test(tag.name));
-    if (existing) return { publish: false, reason: `commit ${short} already has Nightly ${existing.name}; nothing to publish` };
+    if (existing)
+        return { publish: false, reason: `commit ${short} already has Nightly ${existing.name}; nothing to publish` };
     if (ciRun?.status !== 'completed') throw new Error(`CI has not finished on ${short}; try again when it has.`);
     if (ciRun.conclusion !== 'success') throw new Error(`CI failed on ${short}; fix main before a Nightly.`);
     const version = releaseVersion(sha, { isOnMain, versionAt });
@@ -101,16 +103,19 @@ function planRelease(input) {
 function outputLines(plan) {
     const entries = plan.publish
         ? [
-            ['publish', true],
-            ['channel', plan.channel],
-            ['version', plan.version],
-            ['tag', plan.tag],
-            ['sha', plan.sha],
-            ['prerelease', plan.prerelease],
-            ['make_latest', plan.makeLatest],
-            ['feed', plan.feed],
-        ]
-        : [['publish', false], ['reason', plan.reason]];
+              ['publish', true],
+              ['channel', plan.channel],
+              ['version', plan.version],
+              ['tag', plan.tag],
+              ['sha', plan.sha],
+              ['prerelease', plan.prerelease],
+              ['make_latest', plan.makeLatest],
+              ['feed', plan.feed],
+          ]
+        : [
+              ['publish', false],
+              ['reason', plan.reason],
+          ];
     return entries.map(([key, value]) => `${key}=${value}\n`).join('');
 }
 
@@ -141,7 +146,8 @@ if (require.main === module) {
                     return false;
                 }
             },
-            versionAt: (sha) => JSON.parse(execFileSync('git', ['show', `${sha}:${process.argv[2]}`], { encoding: 'utf8' })).version,
+            versionAt: (sha) =>
+                JSON.parse(execFileSync('git', ['show', `${sha}:${process.argv[2]}`], { encoding: 'utf8' })).version,
             tags: parseRemoteTags(fs.readFileSync(0, 'utf8')),
         });
     } catch (error) {

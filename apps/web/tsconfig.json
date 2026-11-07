@@ -1,7 +1,7 @@
 {
-  "extends": "@lar-works/config/tsconfig/app.json",
-  "compilerOptions": {
-    "types": ["node", "vite-plus/client"]
-  },
-  "include": ["src", "test", "vite.config.ts"]
+    "extends": "@lar-works/config/tsconfig/app.json",
+    "compilerOptions": {
+        "types": ["node", "vite-plus/client"]
+    },
+    "include": ["src", "test", "vite.config.ts"]
 }

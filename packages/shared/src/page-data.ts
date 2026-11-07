@@ -5,11 +5,11 @@ import type { BoardData } from './model.ts';
 
 /** JSON that is safe inside a <script> element. */
 function scriptJson(value: unknown): string {
-  return JSON.stringify(value).replaceAll('<', '\\u003c');
+    return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
 /** Puts the board data into index.html's <script id="board-data">. */
 export function pageWithData(template: string, data: BoardData): string {
-  // A function, so a `$` in the board data is never read as a replacement pattern.
-  return template.replace('<!--board-data-->', () => scriptJson(data));
+    // A function, so a `$` in the board data is never read as a replacement pattern.
+    return template.replace('<!--board-data-->', () => scriptJson(data));
 }

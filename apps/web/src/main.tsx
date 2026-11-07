@@ -2,9 +2,11 @@
 // paints the board data the server put in the page and then keeps it live.
 
 import './index.css';
+
 import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
+
 import { App } from './app.tsx';
 import { startLiveData } from './board/live-data.ts';
 
@@ -12,10 +14,10 @@ import { startLiveData } from './board/live-data.ts';
 // frame then shows the board.
 const root = createRoot(document.getElementById('app')!);
 flushSync(() =>
-  root.render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  ),
+    root.render(
+        <StrictMode>
+            <App />
+        </StrictMode>,
+    ),
 );
 startLiveData();

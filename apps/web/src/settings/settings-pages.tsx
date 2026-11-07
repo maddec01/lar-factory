@@ -1,67 +1,155 @@
 // Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
 
-import { useState, type ComponentProps, type ReactNode } from 'react';
-import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
-import { Archive, ExternalLink, FolderGit2, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from '@lar-works/design-system/icons';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
+import {
+    GH_FLOOR,
+    blockedBy,
+    clock,
+    day,
+    itemSource,
+    repoName,
+    shownRepo,
+    type BoardData,
+    type BundledSkill,
+    type Item,
+    type CheckedTool,
+    type TargetSnapshot,
+    type OnboardingProgress,
+    type ToolCheck,
+} from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-works/design-system';
+import {
+    Archive,
+    ExternalLink,
+    FolderGit2,
+    Plug,
+    RefreshCw,
+    Settings2,
+    Sparkles,
+    Stethoscope,
+} from '@lar-works/design-system/icons';
+import { useState, type ComponentProps, type ReactNode } from 'react';
+
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
+import { kind } from '../buttons/button-kinds.tsx';
+import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
-import { useSettingsStore } from './settings-store.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { AutoBuildModelSetting } from './auto-build-model.tsx';
+import { Switch, type Control, ToolState } from './controls.tsx';
 import { LimitSetting } from './limit-setting.tsx';
+import { useSettingsStore } from './settings-store.ts';
 import { ShapingThreadCleanupSetting } from './shaping-thread-cleanup.tsx';
 import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
-import { Switch, type Control, ToolState } from './controls.tsx';
-import { kind } from '../buttons/button-kinds.tsx';
-import { SourceIcon } from '../items/source-icon.tsx';
 
 function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
-  const [on, setOn] = useState(() => dialogPreference(preference));
-  return <Switch label={label} on={on} onChange={(next) => {
-    localStorage.setItem(DIALOG_PREFERENCES[preference], next ? '1' : '0');
-    setOn(next);
-  }} />;
+    const [on, setOn] = useState(() => dialogPreference(preference));
+    return (
+        <Switch
+            label={label}
+            on={on}
+            onChange={(next) => {
+                localStorage.setItem(DIALOG_PREFERENCES[preference], next ? '1' : '0');
+                setOn(next);
+            }}
+        />
+    );
 }
 
 interface Row {
-  id: string;
-  title: string;
-  /** Beside the title, in its line. */
-  icon?: ReactNode;
-  description?: ReactNode;
-  help?: ReactNode;
-  control: Control;
-  /** Shown under the title and the control, across the row's whole width. */
-  below?: ReactNode;
-  /** It only says something, with nothing to set or read, so the board search doesn't offer it as a setting. */
-  noteOnly?: true;
+    id: string;
+    title: string;
+    /** Beside the title, in its line. */
+    icon?: ReactNode;
+    description?: ReactNode;
+    help?: ReactNode;
+    control: Control;
+    /** Shown under the title and the control, across the row's whole width. */
+    below?: ReactNode;
+    /** It only says something, with nothing to set or read, so the board search doesn't offer it as a setting. */
+    noteOnly?: true;
 }
-export interface Group { title: string; help?: ReactNode; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
-export interface Page { id: string; label: string; icon: ReactNode; description: string; groups: Group[] }
+export interface Group {
+    title: string;
+    help?: ReactNode;
+    description?: string;
+    rows: Row[];
+    footer?: ReactNode;
+    note?: ReactNode;
+}
+export interface Page {
+    id: string;
+    label: string;
+    icon: ReactNode;
+    description: string;
+    groups: Group[];
+}
 
 /** The board data Settings shows. Diagnostics says only whether a read has landed, so a new read's time changes nothing here. */
-export type SettingsData = Pick<BoardData, 'repos' | 'onboarding' | 'tools' | 'toolProgress' | 'bundledSkills' | 'retention' | 'refreshSeconds'
-  | 'shapingThreadCleanup' | 'heavyCommandLimit' | 'buildLimit' | 'autoBuild' | 'modelChoices' | 't3Defaults'> & { everRead: boolean };
+export type SettingsData = Pick<
+    BoardData,
+    | 'repos'
+    | 'onboarding'
+    | 'tools'
+    | 'toolProgress'
+    | 'bundledSkills'
+    | 'retention'
+    | 'refreshSeconds'
+    | 'shapingThreadCleanup'
+    | 'heavyCommandLimit'
+    | 'buildLimit'
+    | 'autoBuild'
+    | 'modelChoices'
+    | 't3Defaults'
+> & { everRead: boolean };
 
-export function settingsData({ repos, onboarding, tools, toolProgress, bundledSkills, retention, refreshSeconds, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, modelChoices, t3Defaults, fetchedAt }: BoardData): SettingsData {
-  return { repos, onboarding, tools, toolProgress, bundledSkills, retention, refreshSeconds, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, modelChoices, t3Defaults, everRead: !!fetchedAt };
+export function settingsData({
+    repos,
+    onboarding,
+    tools,
+    toolProgress,
+    bundledSkills,
+    retention,
+    refreshSeconds,
+    shapingThreadCleanup,
+    heavyCommandLimit,
+    buildLimit,
+    autoBuild,
+    modelChoices,
+    t3Defaults,
+    fetchedAt,
+}: BoardData): SettingsData {
+    return {
+        repos,
+        onboarding,
+        tools,
+        toolProgress,
+        bundledSkills,
+        retention,
+        refreshSeconds,
+        shapingThreadCleanup,
+        heavyCommandLimit,
+        buildLimit,
+        autoBuild,
+        modelChoices,
+        t3Defaults,
+        everRead: !!fetchedAt,
+    };
 }
 
 export interface PagesInput {
-  data: SettingsData;
-  /** Whether the board app's bridge is there. */
-  app: boolean;
-  /** The bridge's Skill folders, null while they load. */
-  targets: TargetSnapshot[] | null;
-  /** The running version, once the updater has said. */
-  version: string | null;
-  /** Archive's work as /api/archive answered last, null before Archive first reads it, and why that read failed. */
-  archive: { items: Item[] | null; problem: string | null };
+    data: SettingsData;
+    /** Whether the board app's bridge is there. */
+    app: boolean;
+    /** The bridge's Skill folders, null while they load. */
+    targets: TargetSnapshot[] | null;
+    /** The running version, once the updater has said. */
+    version: string | null;
+    /** Archive's work as /api/archive answered last, null before Archive first reads it, and why that read failed. */
+    archive: { items: Item[] | null; problem: string | null };
 }
 
 const ONLY_APP_TARGETS = 'Only the board app installs skills into agent folders.';
@@ -73,25 +161,31 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself.';
  * A `login` row says Signed in or Signed out instead, and Signed in beside a gh too old.
  */
 function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
-  if (!check) return { text: 'Not checked', tone: 'muted' };
-  const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
-  switch (check.result) {
-    case 'ok': return { text: `${login ? 'Signed in' : check.version || 'OK'}`, tone: 'success' };
-    case 'logged-out': return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
-    case 'outdated': return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}`, tone: 'warning' };
-    case 'no-extension': return { text: 'No azure-devops extension', tone: 'warning' };
-    case 'not-running': return { text: 'Not running', tone: 'warning' };
-    case 'missing': return { text: 'Not found', tone: 'error' };
-  }
+    if (!check) return { text: 'Not checked', tone: 'muted' };
+    const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
+    switch (check.result) {
+        case 'ok':
+            return { text: `${login ? 'Signed in' : check.version || 'OK'}`, tone: 'success' };
+        case 'logged-out':
+            return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
+        case 'outdated':
+            return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}`, tone: 'warning' };
+        case 'no-extension':
+            return { text: 'No azure-devops extension', tone: 'warning' };
+        case 'not-running':
+            return { text: 'Not running', tone: 'warning' };
+        case 'missing':
+            return { text: 'Not found', tone: 'error' };
+    }
 }
 
 /** The commands Diagnostics › Tools lists, with what each does; az follows, as it goes unchecked while no listed repository needs it. */
 const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
-  ['gh', 'Reads GitHub repository issues and linked pull requests.'],
-  ['t3', 'Starts the lar-shape threads in T3 Code.'],
-  ['git', "lar-build's agents branch, commit and push with it."],
-  ['jq', "lar-shape's scripts read gh's answers with it."],
-  ['curl', "lar-shape's scripts tell the board to refresh with it."],
+    ['gh', 'Reads GitHub repository issues and linked pull requests.'],
+    ['t3', 'Starts the lar-shape threads in T3 Code.'],
+    ['git', "lar-build's agents branch, commit and push with it."],
+    ['jq', "lar-shape's scripts read gh's answers with it."],
+    ['curl', "lar-shape's scripts tell the board to refresh with it."],
 ];
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
@@ -101,51 +195,83 @@ const ghSkipped = (data: SettingsData): boolean => !!data.toolProgress?.skipped.
 
 /** Why az isn't checked, once the check leaves it out; else nothing. */
 function azSkipped(data: SettingsData): string {
-  return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed Project uses Azure DevOps.' : '';
+    return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed Project uses Azure DevOps.' : '';
 }
 
 /** `name`'s state in `data`, Checking while its check runs with no result yet. */
 function stateOf(data: SettingsData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
-  const check = data.tools?.[name];
-  if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
-  return toolState(check, login);
+    const check = data.tools?.[name];
+    if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
+    return toolState(check, login);
 }
 
 /** The board's current refresh interval, read-only. */
 function refreshEvery(seconds: number): Control {
-  const minutes = seconds / 60;
-  const value = seconds < 60 || !Number.isInteger(minutes) ? `${seconds} seconds` : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-  return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
+    const minutes = seconds / 60;
+    const value =
+        seconds < 60 || !Number.isInteger(minutes)
+            ? `${seconds} seconds`
+            : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+    return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
 }
 
 const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current sprint' } as const;
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
-  kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
+    kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
 
 /** A repository still onboarding: its provider and the step it stopped at. */
 function onboardingDescription(progress: OnboardingProgress): string {
-  return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
+    return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
 /** Projects with their provider and work source. Read setups open a page, onboarding offers Resume. */
 function repositoryGroup(data: SettingsData): Group {
-  const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), icon: <ProjectIcon repo={r.repo} size="small" />, description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
-    control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useSettingsStore.getState().openProject(r.repo)}>Open Project</Button> : null),
-  }));
-  const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
-    id: `repo-${repo}`, title: shownRepo(repo), icon: <ProjectIcon repo={repo} size="small" />, description: onboardingDescription(progress),
-    control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
-  }));
-  return { title: 'Projects', description: 'Settings stay on this machine. Projects need no factory files.',
-    rows: [...onboarded, ...onboarding],
-    footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add Project</Button> };
+    const onboarded: Row[] = data.repos.map((r) => ({
+        id: `repo-${r.repo}`,
+        title: shownRepo(r.repo),
+        icon: <ProjectIcon repo={r.repo} size="small" />,
+        description: (
+            <>
+                {itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
+            </>
+        ),
+        control: custom(() =>
+            r.setup ? (
+                <Button {...kind('other')} onClick={() => useSettingsStore.getState().openProject(r.repo)}>
+                    Open Project
+                </Button>
+            ) : null,
+        ),
+    }));
+    const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
+        id: `repo-${repo}`,
+        title: shownRepo(repo),
+        icon: <ProjectIcon repo={repo} size="small" />,
+        description: onboardingDescription(progress),
+        control: custom(() => (
+            <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>
+                Resume
+            </Button>
+        )),
+    }));
+    return {
+        title: 'Projects',
+        description: 'Settings stay on this machine. Projects need no factory files.',
+        rows: [...onboarded, ...onboarding],
+        footer: (
+            <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>
+                Add Project
+            </Button>
+        ),
+    };
 }
 
 /** Why a target can't be unticked, or nothing. */
 function lockedReason({ locked, instances }: TargetSnapshot): string | undefined {
-  if (!locked) return undefined;
-  return instances.length > 0 ? "T3 Code's provider instances read it, so it stays ticked." : "Claude's skill links point here, so it stays ticked.";
+    if (!locked) return undefined;
+    return instances.length > 0
+        ? "T3 Code's provider instances read it, so it stays ticked."
+        : "Claude's skill links point here, so it stays ticked.";
 }
 
 /**
@@ -153,32 +279,57 @@ function lockedReason({ locked, instances }: TargetSnapshot): string | undefined
  * the home does, since its switch shows off; otherwise why it can't be unticked, or nothing.
  */
 function targetNote(target: TargetSnapshot): string | undefined {
-  if (!target.homeMissing) return lockedReason(target);
-  const home = target.path.replace(/\/skills$/, '');
-  const why = target.instances.length > 0 ? "T3 Code's provider instances read it; " : '';
-  return `Not installed until ${home} exists. ${why}Lar Factory installs here once it exists.`;
+    if (!target.homeMissing) return lockedReason(target);
+    const home = target.path.replace(/\/skills$/, '');
+    const why = target.instances.length > 0 ? "T3 Code's provider instances read it; " : '';
+    return `Not installed until ${home} exists. ${why}Lar Factory installs here once it exists.`;
 }
 
 function targetGroup({ app, targets }: PagesInput): Group {
-  const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
-  if (!app) return { title: 'Skill folders', rows: [], note: <p className="m-0 text-xs text-(--muted-foreground)">{ONLY_APP_TARGETS}</p> };
-  return {
-    title: 'Skill folders', help: description, note: <TargetsNote />,
-    rows: (targets ?? []).map((target) => ({
-      id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
-      below: <><TargetReaders target={target} /><TargetProgress target={target} /></>,
-    })),
-  };
+    const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
+    if (!app)
+        return {
+            title: 'Skill folders',
+            rows: [],
+            note: <p className="m-0 text-xs text-(--muted-foreground)">{ONLY_APP_TARGETS}</p>,
+        };
+    return {
+        title: 'Skill folders',
+        help: description,
+        note: <TargetsNote />,
+        rows: (targets ?? []).map((target) => ({
+            id: `target-${target.path}`,
+            title: target.path,
+            description: targetNote(target),
+            control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
+            below: (
+                <>
+                    <TargetReaders target={target} />
+                    <TargetProgress target={target} />
+                </>
+            ),
+        })),
+    };
 }
 
 /** A skill's install state, with what it means as its tooltip; nothing before an install records it. */
 function InstallState({ status }: { status: BundledSkill['status'] }) {
-  if (!status) return null;
-  const [text, tone, title]: [string, ComponentProps<typeof ToolState>['tone'], string] =
-    status.state === 'matching' ? ['Installed', 'success', 'Matches this version of Lar Factory.']
-    : status.state === 'restored' ? [`Restored ${day(status.restoredAt, undefined)}, ${clock(status.restoredAt, undefined)}`, 'warning', 'Lar Factory put back its copy, which had changed.']
-    : ['Blocked', 'error', `${capitalise(blockedBy(status.paths).join(''))}. ${moveAway(status.paths)}`];
-  return <span title={title}><ToolState text={text} tone={tone} /></span>;
+    if (!status) return null;
+    const [text, tone, title]: [string, ComponentProps<typeof ToolState>['tone'], string] =
+        status.state === 'matching'
+            ? ['Installed', 'success', 'Matches this version of Lar Factory.']
+            : status.state === 'restored'
+              ? [
+                    `Restored ${day(status.restoredAt, undefined)}, ${clock(status.restoredAt, undefined)}`,
+                    'warning',
+                    'Lar Factory put back its copy, which had changed.',
+                ]
+              : ['Blocked', 'error', `${capitalise(blockedBy(status.paths).join(''))}. ${moveAway(status.paths)}`];
+    return (
+        <span title={title}>
+            <ToolState text={text} tone={tone} />
+        </span>
+    );
 }
 
 /**
@@ -186,20 +337,29 @@ function InstallState({ status }: { status: BundledSkill['status'] }) {
  * one is in ~/.agents/skills, or, when every path is in a Claude profile, unticking the profile.
  */
 function moveAway(paths: readonly BlockingPath[]): string {
-  const move = `Move ${paths.length === 1 ? 'that path' : 'each path'} away`;
-  if (paths.some((blocking) => blocking.place === 'agents')) return `${move} to install this skill.`;
-  const profiles = new Set(paths.flatMap((blocking) => blocking.place === 'profile' ? [blocking.profile] : []));
-  return paths.every((blocking) => blocking.place === 'profile') ? `${move}, or untick the ${profiles.size === 1 ? 'profile' : 'profiles'}.` : `${move}.`;
+    const move = `Move ${paths.length === 1 ? 'that path' : 'each path'} away`;
+    if (paths.some((blocking) => blocking.place === 'agents')) return `${move} to install this skill.`;
+    const profiles = new Set(paths.flatMap((blocking) => (blocking.place === 'profile' ? [blocking.profile] : [])));
+    return paths.every((blocking) => blocking.place === 'profile')
+        ? `${move}, or untick the ${profiles.size === 1 ? 'profile' : 'profiles'}.`
+        : `${move}.`;
 }
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** What blocks a skill, where it leaves the skill missing and what to do, as a line under its credit; nothing for a skill nothing blocks. */
 function BlockedReason({ status }: { status: BundledSkill['status'] }) {
-  if (status?.state !== 'blocked') return null;
-  const [opening, ...rest] = blockedBy(status.paths, (path) => <code key={path} className="break-all">{path}</code>);
-  return <span className="block text-(--destructive-foreground)">
-    {capitalise(opening)}{rest}. {moveAway(status.paths)}
-  </span>;
+    if (status?.state !== 'blocked') return null;
+    const [opening, ...rest] = blockedBy(status.paths, (path) => (
+        <code key={path} className="break-all">
+            {path}
+        </code>
+    ));
+    return (
+        <span className="block text-(--destructive-foreground)">
+            {capitalise(opening)}
+            {rest}. {moveAway(status.paths)}
+        </span>
+    );
 }
 
 /**
@@ -207,111 +367,326 @@ function BlockedReason({ status }: { status: BundledSkill['status'] }) {
  * link to its source. A Copy's last update is its Date in UPSTREAM.md; Lar's own skills update with the app.
  */
 function bundledGroup({ data, version }: PagesInput): Group {
-  const skills = data.bundledSkills ?? [];
-  // A Date is a day with no time zone, so it reads the same everywhere. Neither a date nor a version breaks across lines.
-  const updated = (skill: BundledSkill) => skill.date ? <> · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span></>
-    : skill.author === 'Lar' && version ? <> · <span className="whitespace-nowrap">updated in Lar Factory {version}</span></> : null;
-  const rows: Row[] = skills.length ? skills.map((skill) => ({
-    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}{skill.includedAuthors?.length ? <span className="block">Includes work by {skill.includedAuthors.join(', ')}. <a href={skill.notices} target="_blank" rel="noopener" className="underline">THIRD_PARTY_NOTICES.md</a></span> : null}<BlockedReason status={skill.status} /></>,
-    control: custom(() => <span className="flex items-center gap-2">
-      <InstallState status={skill.status} />
-      <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>
-    </span>),
-  })) : [{ id: 'bundled-unread', title: "Couldn't read the bundled skills", noteOnly: true, description: "The board server couldn't read the app's bundle, so it can't credit them here.", control: custom(() => null) }];
-  return { title: 'Bundled skills', help: 'The skills and checklists the app installs, and who wrote them.', rows };
+    const skills = data.bundledSkills ?? [];
+    // A Date is a day with no time zone, so it reads the same everywhere. Neither a date nor a version breaks across lines.
+    const updated = (skill: BundledSkill) =>
+        skill.date ? (
+            <>
+                {' '}
+                · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span>
+            </>
+        ) : skill.author === 'Lar' && version ? (
+            <>
+                {' '}
+                · <span className="whitespace-nowrap">updated in Lar Factory {version}</span>
+            </>
+        ) : null;
+    const rows: Row[] = skills.length
+        ? skills.map((skill) => ({
+              id: `bundled-${skill.name}`,
+              title: skill.name,
+              description: (
+                  <>
+                      {skill.author} · {skill.licence}
+                      {updated(skill)}
+                      {skill.includedAuthors?.length ? (
+                          <span className="block">
+                              Includes work by {skill.includedAuthors.join(', ')}.{' '}
+                              <a href={skill.notices} target="_blank" rel="noopener" className="underline">
+                                  THIRD_PARTY_NOTICES.md
+                              </a>
+                          </span>
+                      ) : null}
+                      <BlockedReason status={skill.status} />
+                  </>
+              ),
+              control: custom(() => (
+                  <span className="flex items-center gap-2">
+                      <InstallState status={skill.status} />
+                      <a
+                          className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5"
+                          aria-label={`${skill.name} source`}
+                          href={skill.source}
+                          target="_blank"
+                          rel="noopener"
+                      >
+                          <ExternalLink /> Source
+                      </a>
+                  </span>
+              )),
+          }))
+        : [
+              {
+                  id: 'bundled-unread',
+                  title: "Couldn't read the bundled skills",
+                  noteOnly: true,
+                  description: "The board server couldn't read the app's bundle, so it can't credit them here.",
+                  control: custom(() => null),
+              },
+          ];
+    return { title: 'Bundled skills', help: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
 function updateRows({ app, version }: PagesInput): Row[] {
-  const channel = { id: 'channel', title: 'Update channel', description: 'Nightly offers each Nightly Release; Latest only Stable Releases.' };
-  if (!app) return [{ id: 'updates-app-only', title: ONLY_APP_UPDATES, noteOnly: true, control: custom(() => null) }];
-  return [
-    { ...channel, control: custom(() => <ChannelChoice />) },
-    { id: 'version', title: version ? `Lar Factory ${version}` : 'Lar Factory', description: <UpdateStatus />, control: custom(() => <UpdateAction />) },
-  ];
+    const channel = {
+        id: 'channel',
+        title: 'Update channel',
+        description: 'Nightly offers each Nightly Release; Latest only Stable Releases.',
+    };
+    if (!app) return [{ id: 'updates-app-only', title: ONLY_APP_UPDATES, noteOnly: true, control: custom(() => null) }];
+    return [
+        { ...channel, control: custom(() => <ChannelChoice />) },
+        {
+            id: 'version',
+            title: version ? `Lar Factory ${version}` : 'Lar Factory',
+            description: <UpdateStatus />,
+            control: custom(() => <UpdateAction />),
+        },
+    ];
 }
 
 /** This Mac's retention setting, then each piece of work in Archive with what it offers; none in sample mode. */
 function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Group[] {
-  if (!data.retention) return [{ title: 'Archive', description: 'Sample mode keeps no work records.', rows: [] }];
-  const retention = data.retention;
-  const work: Row[] = (archive.items ?? []).map((item) => ({
-    id: `archived-${item.id}`, title: item.title || item.id,
-    description: <span className="inline-flex min-w-0 items-center gap-2"><SourceIcon item={item} /><span className="min-w-0 wrap-anywhere">{[shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(' · ')}</span></span>,
-    control: custom(() => <ArchiveActions item={item} />),
-  }));
-  return [
-    { title: 'Retention', description: 'Finished and set-aside work leaves the board after this many days. Nothing is deleted unless you turn on a timed delete.', rows: [
-      { id: 'retention', title: 'Keep work', control: custom(() => null), below: <RetentionSetting retention={retention} /> },
-    ] },
-    { title: 'Set aside and hidden', rows: work,
-      description: archive.problem ?? (archive.items === null ? 'Reading Archive…' : work.length ? undefined : 'No work is set aside or hidden.') },
-  ];
+    if (!data.retention) return [{ title: 'Archive', description: 'Sample mode keeps no work records.', rows: [] }];
+    const retention = data.retention;
+    const work: Row[] = (archive.items ?? []).map((item) => ({
+        id: `archived-${item.id}`,
+        title: item.title || item.id,
+        description: (
+            <span className="inline-flex min-w-0 items-center gap-2">
+                <SourceIcon item={item} />
+                <span className="min-w-0 wrap-anywhere">
+                    {[shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(
+                        ' · ',
+                    )}
+                </span>
+            </span>
+        ),
+        control: custom(() => <ArchiveActions item={item} />),
+    }));
+    return [
+        {
+            title: 'Retention',
+            description:
+                'Finished and set-aside work leaves the board after this many days. Nothing is deleted unless you turn on a timed delete.',
+            rows: [
+                {
+                    id: 'retention',
+                    title: 'Keep work',
+                    control: custom(() => null),
+                    below: <RetentionSetting retention={retention} />,
+                },
+            ],
+        },
+        {
+            title: 'Set aside and hidden',
+            rows: work,
+            description:
+                archive.problem ??
+                (archive.items === null
+                    ? 'Reading Archive…'
+                    : work.length
+                      ? undefined
+                      : 'No work is set aside or hidden.'),
+        },
+    ];
 }
 
 export function pages(input: PagesInput): Page[] {
-  const { data } = input;
-  return [
-    { id: 'general', label: 'General', icon: <Settings2 />, description: '', groups: [
-      { title: 'Dialogs', rows: [
-        { id: 'match-list-size', title: 'Match list size when opening an item', control: custom(() => <DialogPreference preference="matchList" label="Match list size when opening an item" />) },
-        { id: 'open-list-expanded', title: 'Open list expanded', control: custom(() => <DialogPreference preference="openList" label="Open list expanded" />) },
-      ] },
-      { title: 'Threads', rows: [{
-        id: 'shaping-thread-cleanup', title: 'Shaping threads after Start build', description: 'Choose what happens when a build starts.',
-        help: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
-        control: custom(() => <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />),
-      }] },
-      { title: 'Commands', rows: [{
-        id: 'heavy-command-limit', title: 'Heavy commands at once', description: 'Limit test suites and builds on this Mac.',
-        help: "How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.",
-        control: custom(() => <LimitSetting name="heavy-command-limit" label="Heavy commands at once" field="Heavy command limit" state={data.heavyCommandLimit} />),
-      }, {
-        id: 'build-limit', title: 'Builds at once', description: 'Limit builds on this Mac.',
-        help: 'How many builds may work at once on this Mac, across all Projects. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
-        control: custom(() => <LimitSetting name="build-limit" label="Builds at once" field="Build limit" state={data.buildLimit} />),
-      }] },
-      { title: 'Auto-build', rows: [{
-        id: 'auto-build-model', title: 'Auto-build model', description: 'Used when Auto-build starts a build.',
-        help: "The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its T3 project. Turn Auto-build on in the Ready to build header.",
-        control: custom(() => <AutoBuildModelSetting data={data} />),
-      }] },
-      { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
-    ] },
-    { id: 'projects', label: 'Projects', icon: <FolderGit2 />, description: '', groups: [repositoryGroup(data)] },
-    { id: 'integrations', label: 'Integrations', icon: <Plug />, description: 'Uses your own command line login. Lar Factory never stores a token.', groups: [
-      { title: 'Issue trackers', rows: [
-        { id: 'gh', title: 'GitHub', description: toolDescription('Uses your GitHub CLI login.', data.tools?.gh),
-          control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />) },
-        { id: 'az', title: 'Azure DevOps', description: toolDescription(`Uses your Azure CLI login and Azure DevOps extension.${azSkipped(data)}`, data.tools?.az),
-          control: custom(() => <ToolState {...stateOf(data, 'az', true)} />) },
-      ] },
-    ] },
-    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: '', groups: [
-      targetGroup(input),
-      bundledGroup(input),
-    ] },
-    { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: '', groups: [
-      { title: '', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
-    ] },
-    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Work off the board: set aside, or finished and hidden. This Mac keeps it until a timed delete runs.', groups: archiveGroups(data, input.archive) },
-    { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: '', groups: [
-      { title: 'Tools', rows: [
-        ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({
-          id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...stateOf(data, name)} />),
-        })),
-        { id: 'd-az', title: 'az', description: toolDescription(`Reads repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
-          control: custom(() => <ToolState {...stateOf(data, 'az')} />) },
-        { id: 'd-server', title: 'Board server', description: `${location.origin} · last read ${data.everRead ? 'OK' : 'never'}`, control: custom(() => null) },
-      ] },
-    ] },
-  ];
+    const { data } = input;
+    return [
+        {
+            id: 'general',
+            label: 'General',
+            icon: <Settings2 />,
+            description: '',
+            groups: [
+                {
+                    title: 'Dialogs',
+                    rows: [
+                        {
+                            id: 'match-list-size',
+                            title: 'Match list size when opening an item',
+                            control: custom(() => (
+                                <DialogPreference preference="matchList" label="Match list size when opening an item" />
+                            )),
+                        },
+                        {
+                            id: 'open-list-expanded',
+                            title: 'Open list expanded',
+                            control: custom(() => (
+                                <DialogPreference preference="openList" label="Open list expanded" />
+                            )),
+                        },
+                    ],
+                },
+                {
+                    title: 'Threads',
+                    rows: [
+                        {
+                            id: 'shaping-thread-cleanup',
+                            title: 'Shaping threads after Start build',
+                            description: 'Choose what happens when a build starts.',
+                            help: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
+                            control: custom(() => <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />),
+                        },
+                    ],
+                },
+                {
+                    title: 'Commands',
+                    rows: [
+                        {
+                            id: 'heavy-command-limit',
+                            title: 'Heavy commands at once',
+                            description: 'Limit test suites and builds on this Mac.',
+                            help: 'How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.',
+                            control: custom(() => (
+                                <LimitSetting
+                                    name="heavy-command-limit"
+                                    label="Heavy commands at once"
+                                    field="Heavy command limit"
+                                    state={data.heavyCommandLimit}
+                                />
+                            )),
+                        },
+                        {
+                            id: 'build-limit',
+                            title: 'Builds at once',
+                            description: 'Limit builds on this Mac.',
+                            help: 'How many builds may work at once on this Mac, across all Projects. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
+                            control: custom(() => (
+                                <LimitSetting
+                                    name="build-limit"
+                                    label="Builds at once"
+                                    field="Build limit"
+                                    state={data.buildLimit}
+                                />
+                            )),
+                        },
+                    ],
+                },
+                {
+                    title: 'Auto-build',
+                    rows: [
+                        {
+                            id: 'auto-build-model',
+                            title: 'Auto-build model',
+                            description: 'Used when Auto-build starts a build.',
+                            help: 'The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its T3 project. Turn Auto-build on in the Ready to build header.',
+                            control: custom(() => <AutoBuildModelSetting data={data} />),
+                        },
+                    ],
+                },
+                {
+                    title: 'Refresh',
+                    rows: [
+                        {
+                            id: 'refresh',
+                            title: 'Full refresh',
+                            description: 'Changes also arrive between full refreshes.',
+                            control: refreshEvery(data.refreshSeconds),
+                        },
+                    ],
+                },
+            ],
+        },
+        { id: 'projects', label: 'Projects', icon: <FolderGit2 />, description: '', groups: [repositoryGroup(data)] },
+        {
+            id: 'integrations',
+            label: 'Integrations',
+            icon: <Plug />,
+            description: 'Uses your own command line login. Lar Factory never stores a token.',
+            groups: [
+                {
+                    title: 'Issue trackers',
+                    rows: [
+                        {
+                            id: 'gh',
+                            title: 'GitHub',
+                            description: toolDescription('Uses your GitHub CLI login.', data.tools?.gh),
+                            control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />),
+                        },
+                        {
+                            id: 'az',
+                            title: 'Azure DevOps',
+                            description: toolDescription(
+                                `Uses your Azure CLI login and Azure DevOps extension.${azSkipped(data)}`,
+                                data.tools?.az,
+                            ),
+                            control: custom(() => <ToolState {...stateOf(data, 'az', true)} />),
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'skills',
+            label: 'Skills',
+            icon: <Sparkles />,
+            description: '',
+            groups: [targetGroup(input), bundledGroup(input)],
+        },
+        {
+            id: 'updates',
+            label: 'Updates',
+            icon: <RefreshCw />,
+            description: '',
+            groups: [{ title: '', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) }],
+        },
+        {
+            id: 'archive',
+            label: 'Archive',
+            icon: <Archive />,
+            description:
+                'Work off the board: set aside, or finished and hidden. This Mac keeps it until a timed delete runs.',
+            groups: archiveGroups(data, input.archive),
+        },
+        {
+            id: 'diagnostics',
+            label: 'Diagnostics',
+            icon: <Stethoscope />,
+            description: '',
+            groups: [
+                {
+                    title: 'Tools',
+                    rows: [
+                        ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({
+                            id: `d-${name}`,
+                            title: name,
+                            description: toolDescription(does, data.tools?.[name]),
+                            control: custom(() => <ToolState {...stateOf(data, name)} />),
+                        })),
+                        {
+                            id: 'd-az',
+                            title: 'az',
+                            description: toolDescription(
+                                `Reads repositories on Azure DevOps.${azSkipped(data)}`,
+                                data.tools?.az,
+                            ),
+                            control: custom(() => <ToolState {...stateOf(data, 'az')} />),
+                        },
+                        {
+                            id: 'd-server',
+                            title: 'Board server',
+                            description: `${location.origin} · last read ${data.everRead ? 'OK' : 'never'}`,
+                            control: custom(() => null),
+                        },
+                    ],
+                },
+            ],
+        },
+    ];
 }
 
 /** What the command does, or why its check failed and how to fix it. */
 function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
-  if (!check || check.result === 'ok') return does;
-  if (check.result === 'not-running') return 'Open T3 Code.';
-  const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
-  if (!('fix' in check)) return `${where}Install T3 Code.`;
-  return <>{where}Fix: <code className="whitespace-nowrap">{check.fix}</code></>;
+    if (!check || check.result === 'ok') return does;
+    if (check.result === 'not-running') return 'Open T3 Code.';
+    const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
+    if (!('fix' in check)) return `${where}Install T3 Code.`;
+    return (
+        <>
+            {where}Fix: <code className="whitespace-nowrap">{check.fix}</code>
+        </>
+    );
 }

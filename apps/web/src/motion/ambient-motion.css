@@ -1,2 +1,4 @@
 /* Only repeating indicators opt in. Dialogs, loading entrances and interaction transitions keep their timing. */
-[data-ambient-motion="paused"] { animation-play-state: paused; }
+[data-ambient-motion='paused'] {
+    animation-play-state: paused;
+}

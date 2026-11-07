@@ -3,22 +3,37 @@
 // use it from any folder while the board app is closed. It prints each result as JSON on stdout, a body as its markdown,
 // and each error as one line on stderr.
 
-import { checkCommand } from './check-runner.ts';
-import { heavyCommand } from './heavy-command.ts';
+import { isRecord, sameRepo } from '@lar-factory/shared';
+import type { Status, SwapKind } from '@lar-factory/shared';
+import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
+
 import { changeKind, checkKind } from './change-kind.ts';
+import { checkCommand } from './check-runner.ts';
 import { createRecordTicket } from './create-ticket.ts';
-import { isRecord, sameRepo } from '@lar-factory/shared';
-import type { Status, SwapKind } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
+import { heavyCommand } from './heavy-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import {
-  openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
-  type DependencyChange, type DependencyObservationKind, type NewDependency, type NewObservation, type NewReviewRound, type Observed,
-  type ReviewAxis, type WorkKind, type WorkRecords,
+    openWorkRecords,
+    readRetention,
+    WorkRecordError,
+    workRecordsPath,
+    writeRetention,
+    type Body,
+    type BuildPhase,
+    type FindingDisposition,
+    type DependencyChange,
+    type DependencyObservationKind,
+    type NewDependency,
+    type NewObservation,
+    type NewReviewRound,
+    type Observed,
+    type ReviewAxis,
+    type WorkKind,
+    type WorkRecords,
 } from './work-records.ts';
 
 const HELP = `Usage: lar-work <command> [options]
@@ -354,64 +369,133 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['kind-disagreement', 'change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
-  'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion', 'refinement',
-  'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
-  'set-check-list', 'checks', 'describe-failure', 'resolve-failure', 'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
-  'gate', 'record-gate', 'add-dependency', 'dependencies'];
-const TAKES_DEPENDENCY_ID = ['dependency', 'update-dependency', 'add-dependency-block', 'remove-dependency-block', 'observe-dependency', 'mark-met',
-  'clear-met', 'replace-dependency'];
-const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID, ...TAKES_DEPENDENCY_ID];
+const TAKES_WORK_ID = [
+    'kind-disagreement',
+    'change-kind',
+    'record-kind-answer',
+    'create-ticket',
+    'sync-structure',
+    'read',
+    'context',
+    'update',
+    'attach-ticket',
+    'set-aside',
+    'restore',
+    'set-needs-you',
+    'clear-needs-you',
+    'snapshot-skills',
+    'set-parent',
+    'clear-parent',
+    'add-blocker',
+    'remove-blocker',
+    'children',
+    'blockers',
+    'dependents',
+    'completion',
+    'refinement',
+    'waiting-on',
+    'set-fog',
+    'finish',
+    'set-body',
+    'body',
+    'set-phase',
+    'set-pr',
+    'pr-history',
+    'record-review-round',
+    'set-disposition',
+    'set-check-list',
+    'checks',
+    'describe-failure',
+    'resolve-failure',
+    'review-rounds',
+    'observe',
+    'observe-failure',
+    'observations',
+    'confirm-thread-deleted',
+    'set-build-branch',
+    'invalidate-gate',
+    'reset-build',
+    'add-thread',
+    'threads',
+    'record-intent',
+    'resolve-intent',
+    'export',
+    'gate',
+    'record-gate',
+    'add-dependency',
+    'dependencies',
+];
+const TAKES_DEPENDENCY_ID = [
+    'dependency',
+    'update-dependency',
+    'add-dependency-block',
+    'remove-dependency-block',
+    'observe-dependency',
+    'mark-met',
+    'clear-met',
+    'replace-dependency',
+];
+const COMMANDS = [
+    'create',
+    'import',
+    'list',
+    'intents',
+    'retention',
+    'hidden',
+    'delete-expired',
+    ...TAKES_WORK_ID,
+    ...TAKES_DEPENDENCY_ID,
+];
 
 const OPTIONS = {
-  'confirmed-missing-issue': {type:'string'},
-  plan: { type: 'string' },
-  digest: { type: 'string' },
-  identity: { type: 'string' },
-  evidence: { type: 'string' },
-  operation: { type: 'string' },
-  claim: { type: 'string' },
-  url: { type: 'string' },
-  title: { type: 'string' },
-  repository: { type: 'string' },
-  kind: { type: 'string' },
-  status: { type: 'string' },
-  ticket: { type: 'string' },
-  revision: { type: 'string' },
-  parent: { type: 'string' },
-  blocker: { type: 'string' },
-  build: { type: 'string' },
-  subject: { type: 'string' },
-  detail: { type: 'string' },
-  body: { type: 'string' },
-  file: { type: 'string' },
-  phase: { type: 'string' },
-  pr: { type: 'string' },
-  round: { type: 'string' },
-  axis: { type: 'string' },
-  finding: { type: 'string' },
-  disposition: { type: 'string' },
-  reason: { type: 'string' },
-  skill: { type: 'string', multiple: true },
-  fog: { type: 'string' },
-  of: { type: 'string' },
-  state: { type: 'string' },
-  assignee: { type: 'string' },
-  thread: { type: 'string' },
-  branch: { type: 'string' },
-  purpose: { type: 'string' },
-  intent: { type: 'string' },
-  failure: { type: 'string' },
-  unresolved: { type: 'boolean' },
-  'hide-after': { type: 'string' },
-  'delete-after': { type: 'string' },
-  to: { type: 'string' },
-  'data-dir': { type: 'string' },
-  'request-id': { type: 'string' },
-  retro: { type: 'boolean' },
-  answer: { type: 'string' },
-  'ticket-kind': { type: 'string' },
-  help: { type: 'boolean' },
+    'confirmed-missing-issue': { type: 'string' },
+    plan: { type: 'string' },
+    digest: { type: 'string' },
+    identity: { type: 'string' },
+    evidence: { type: 'string' },
+    operation: { type: 'string' },
+    claim: { type: 'string' },
+    url: { type: 'string' },
+    title: { type: 'string' },
+    repository: { type: 'string' },
+    kind: { type: 'string' },
+    status: { type: 'string' },
+    ticket: { type: 'string' },
+    revision: { type: 'string' },
+    parent: { type: 'string' },
+    blocker: { type: 'string' },
+    build: { type: 'string' },
+    subject: { type: 'string' },
+    detail: { type: 'string' },
+    body: { type: 'string' },
+    file: { type: 'string' },
+    phase: { type: 'string' },
+    pr: { type: 'string' },
+    round: { type: 'string' },
+    axis: { type: 'string' },
+    finding: { type: 'string' },
+    disposition: { type: 'string' },
+    reason: { type: 'string' },
+    skill: { type: 'string', multiple: true },
+    fog: { type: 'string' },
+    of: { type: 'string' },
+    state: { type: 'string' },
+    assignee: { type: 'string' },
+    thread: { type: 'string' },
+    branch: { type: 'string' },
+    purpose: { type: 'string' },
+    intent: { type: 'string' },
+    failure: { type: 'string' },
+    unresolved: { type: 'boolean' },
+    'hide-after': { type: 'string' },
+    'delete-after': { type: 'string' },
+    to: { type: 'string' },
+    'data-dir': { type: 'string' },
+    'request-id': { type: 'string' },
+    retro: { type: 'boolean' },
+    answer: { type: 'string' },
+    'ticket-kind': { type: 'string' },
+    help: { type: 'boolean' },
 } as const;
 
 type Values = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>['values'];
@@ -419,294 +503,398 @@ type Values = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositi
 type StringOption = { [K in keyof Values]-?: Values[K] extends string | undefined ? K : never }[keyof Values];
 
 function need(values: Values, name: StringOption): string {
-  const value = values[name];
-  if (value === undefined) throw new UsageError(`--${name} is required.`);
-  return value;
+    const value = values[name];
+    if (value === undefined) throw new UsageError(`--${name} is required.`);
+    return value;
 }
 
 /** The text in the file `--file` names, or standard input for `-`. */
 function readInput(values: Values): string {
-  const file = need(values, 'file');
-  try {
-    return readFileSync(file === '-' ? 0 : file, 'utf8');
-  } catch (error) {
-    throw new WorkRecordError('invalid', `Can't read ${file === '-' ? 'standard input' : file}: ${(error as Error).message}.`);
-  }
+    const file = need(values, 'file');
+    try {
+        return readFileSync(file === '-' ? 0 : file, 'utf8');
+    } catch (error) {
+        throw new WorkRecordError(
+            'invalid',
+            `Can't read ${file === '-' ? 'standard input' : file}: ${(error as Error).message}.`,
+        );
+    }
 }
 
 /** A publication request or Dependency in JSON, named as `what`, validated by the database writer. */
 function readJson(values: Values, what = 'publication input'): unknown {
-  try {
-    return JSON.parse(readInput(values)) as unknown;
-  } catch (error) {
-    if (error instanceof WorkRecordError) throw error;
-    throw new WorkRecordError('invalid', `The ${what} in ${values.file} isn't JSON.`);
-  }
+    try {
+        return JSON.parse(readInput(values)) as unknown;
+    } catch (error) {
+        if (error instanceof WorkRecordError) throw error;
+        throw new WorkRecordError('invalid', `The ${what} in ${values.file} isn't JSON.`);
+    }
 }
 
 /** The review round in the JSON `--file` holds. */
 function readRound(values: Values): NewReviewRound {
-  try {
-    return JSON.parse(readInput(values)) as NewReviewRound;
-  } catch (error) {
-    if (error instanceof WorkRecordError) throw error;
-    throw new WorkRecordError('invalid', `The review round in ${values.file} isn't JSON: ${(error as Error).message}.`);
-  }
+    try {
+        return JSON.parse(readInput(values)) as NewReviewRound;
+    } catch (error) {
+        if (error instanceof WorkRecordError) throw error;
+        throw new WorkRecordError(
+            'invalid',
+            `The review round in ${values.file} isn't JSON: ${(error as Error).message}.`,
+        );
+    }
 }
 
 /** Saves the retention options given, then returns this machine's setting. */
 function retention(values: Values): unknown {
-  const days = (name: 'hide-after' | 'delete-after') => {
-    const value = values[name]!;
-    if (!/^\d+$/.test(value)) throw new UsageError(`--${name} takes a whole number of days${name === 'delete-after' ? ' or never' : ''}.`);
-    return Number(value);
-  };
-  const current = readRetention(values['data-dir']);
-  if (values['hide-after'] === undefined && values['delete-after'] === undefined) return current;
-  return writeRetention({
-    hideAfterDays: values['hide-after'] === undefined ? current.hideAfterDays : days('hide-after'),
-    deleteAfterDays: values['delete-after'] === undefined ? current.deleteAfterDays : values['delete-after'] === 'never' ? null : days('delete-after'),
-  }, values['data-dir']);
+    const days = (name: 'hide-after' | 'delete-after') => {
+        const value = values[name]!;
+        if (!/^\d+$/.test(value))
+            throw new UsageError(
+                `--${name} takes a whole number of days${name === 'delete-after' ? ' or never' : ''}.`,
+            );
+        return Number(value);
+    };
+    const current = readRetention(values['data-dir']);
+    if (values['hide-after'] === undefined && values['delete-after'] === undefined) return current;
+    return writeRetention(
+        {
+            hideAfterDays: values['hide-after'] === undefined ? current.hideAfterDays : days('hide-after'),
+            deleteAfterDays:
+                values['delete-after'] === undefined
+                    ? current.deleteAfterDays
+                    : values['delete-after'] === 'never'
+                      ? null
+                      : days('delete-after'),
+        },
+        values['data-dir'],
+    );
 }
 
 /** Runs `command`; `workId` is the work ID or Dependency ID for the commands that take one. A string result prints as it is, anything else as JSON. */
-async function run(records: WorkRecords, command: string, workId: string | undefined, values: Values): Promise<unknown> {
-  const revision = () => Number(need(values, 'revision'));
-  const status = values.status as Status | undefined;
-  const kind = values.kind as WorkKind | undefined;
-  const setupOf = (repository: string) => readRepositorySetups(values['data-dir']).find((setup) => sameRepo(setup.repo, repository));
-  const captured = () => ({
-    title: need(values, 'title'), repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, status,
-    context: values.file === undefined ? undefined : readInput(values),
-  });
-  switch (command) {
-    case 'set-check-list': return records.setCheckList(workId!, readJson(values, 'check list') as import('./validation-records.ts').CheckEntry[]);
-    case 'checks': return records.checks(workId!);
-    case 'describe-failure': return records.describeFailure(workId!, readJson(values, 'failure') as { tests: string[]; diagnosis: string });
-    case 'resolve-failure': return records.resolveFailure(workId!, need(values, 'reason'));
+async function run(
+    records: WorkRecords,
+    command: string,
+    workId: string | undefined,
+    values: Values,
+): Promise<unknown> {
+    const revision = () => Number(need(values, 'revision'));
+    const status = values.status as Status | undefined;
+    const kind = values.kind as WorkKind | undefined;
+    const setupOf = (repository: string) =>
+        readRepositorySetups(values['data-dir']).find((setup) => sameRepo(setup.repo, repository));
+    const captured = () => ({
+        title: need(values, 'title'),
+        repository: need(values, 'repository'),
+        kind: need(values, 'kind') as WorkKind,
+        status,
+        context: values.file === undefined ? undefined : readInput(values),
+    });
+    switch (command) {
+        case 'set-check-list':
+            return records.setCheckList(
+                workId!,
+                readJson(values, 'check list') as import('./validation-records.ts').CheckEntry[],
+            );
+        case 'checks':
+            return records.checks(workId!);
+        case 'describe-failure':
+            return records.describeFailure(
+                workId!,
+                readJson(values, 'failure') as { tests: string[]; diagnosis: string },
+            );
+        case 'resolve-failure':
+            return records.resolveFailure(workId!, need(values, 'reason'));
 
-    case 'sync-structure':
-      throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
-    case 'gate': {
-      await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
-      const state = records.specState(workId!);
-      return { ...records.gate(workId!), specSync: { pending: state.pending !== null, error: state.error, warning: state.warning, awaitingApproval: state.held !== null } };
+        case 'sync-structure':
+            throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
+        case 'gate': {
+            await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+            const state = records.specState(workId!);
+            return {
+                ...records.gate(workId!),
+                specSync: {
+                    pending: state.pending !== null,
+                    error: state.error,
+                    warning: state.warning,
+                    awaitingApproval: state.held !== null,
+                },
+            };
+        }
+        case 'record-gate':
+            await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+            if (records.specState(workId!).held)
+                throw new WorkRecordError(
+                    'invalid',
+                    'Accept or reject the held GitHub edit in item details before recording a later gate.',
+                );
+            return records.recordGate(workId!, revision(), {
+                briefDigest: need(values, 'digest'),
+                approvedBy: need(values, 'identity'),
+                evidence: need(values, 'evidence'),
+            });
+        case 'create': {
+            const input = { ...captured(), ticket: values.ticket };
+            if (!values['request-id']) return records.create(input);
+            records.claimCapture(values['request-id'], JSON.stringify(input));
+            return records.completeCapture(values['request-id'], input).record;
+        }
+        case 'create-ticket': {
+            const result = await createRecordTicket(
+                workId!,
+                { revision: revision(), requestId: need(values, 'request-id'), retro: values.retro },
+                {
+                    records,
+                    repos: () =>
+                        readRepositorySetups(values['data-dir']).map((setup) => ({
+                            repo: setup.repo,
+                            setup,
+                            labels: [],
+                            role: setup.role ?? '',
+                            ...(setup.itemSource?.kind === 'azure-board' ? { team: setup.itemSource.team } : {}),
+                        })),
+                },
+            );
+            if (result.body.error) throw new WorkRecordError('invalid', result.body.error);
+            return result.body.record;
+        }
+        case 'import':
+            return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
+        case 'read':
+            return records.read(workId!);
+        case 'context':
+            return records.initialContext(workId!);
+        case 'list':
+            return records.list({ repository: values.repository, status, kind });
+        case 'update':
+            return records.update(workId!, revision(), { status, kind });
+        case 'kind-disagreement': {
+            const record = records.read(workId!);
+            return { disagreement: await checkKind(record, { setup: setupOf(record.repository) }) };
+        }
+        case 'change-kind': {
+            const record = records.read(workId!);
+            const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, {
+                setup: setupOf(record.repository),
+            });
+            if (result.error)
+                throw new WorkRecordError(
+                    'invalid',
+                    result.line ? `${result.error} Changed so far: ${result.line}` : result.error,
+                );
+            return { record: result.record, line: result.line };
+        }
+        case 'record-kind-answer': {
+            const ticketKind = need(values, 'ticket-kind');
+            return records.recordKindAnswer(workId!, revision(), {
+                answer: need(values, 'answer') as 'keep' | 'update',
+                ticketKind: ticketKind === 'none' ? null : (ticketKind as WorkKind),
+            });
+        }
+        case 'attach-ticket':
+            return records.attachTicket(workId!, revision(), need(values, 'ticket'));
+        case 'set-aside':
+            return records.setAside(workId!, revision());
+        case 'restore':
+            return records.restore(workId!, revision());
+        case 'set-needs-you':
+            return records.setNeedsYou(workId!, revision(), need(values, 'reason'));
+        case 'clear-needs-you':
+            return records.clearNeedsYou(workId!, revision());
+        case 'snapshot-skills':
+            return records.snapshotSkills(workId!, revision(), values.skill ?? []);
+        case 'set-parent':
+            return records.setParent(workId!, revision(), need(values, 'parent'));
+        case 'clear-parent':
+            return records.clearParent(workId!, revision());
+        case 'add-blocker':
+            return records.addBlocker(workId!, revision(), need(values, 'blocker'));
+        case 'remove-blocker':
+            return records.removeBlocker(workId!, revision(), need(values, 'blocker'));
+        case 'children':
+            return records.children(workId!);
+        case 'blockers':
+            return [...records.blockers(workId!), ...records.unmetDependencies(workId!)];
+        case 'dependents':
+            return records.dependents(workId!);
+        case 'refinement':
+            return records.refinement(workId!);
+        case 'completion':
+            return records.completion(workId!);
+        case 'waiting-on':
+            return records.waitingOn(workId!);
+        case 'set-fog': {
+            const fog = need(values, 'fog');
+            if (fog !== 'gone' && fog !== 'remaining') throw new UsageError('--fog takes gone or remaining.');
+            return records.setFogGone(workId!, revision(), fog === 'gone');
+        }
+        case 'finish':
+            if (records.read(workId!).kind !== 'slice')
+                throw new WorkRecordError(
+                    'invalid',
+                    'Only a slice is finished by hand; a build finishes when its PR is observed merged.',
+                );
+            return records.recordFinished(workId!, revision());
+        case 'set-body':
+            return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
+        case 'body': {
+            if (values.body === 'brief') await refreshSpecs(records, { workId: workId!, dir: values['data-dir'] });
+            const body = need(values, 'body') as Body;
+            const markdown = records.body(workId!, body);
+            if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
+            return markdown;
+        }
+        case 'set-phase':
+            return records.setBuildPhase(workId!, revision(), need(values, 'phase') as BuildPhase);
+        case 'set-pr':
+            return records.setPullRequest(workId!, revision(), need(values, 'pr'));
+        case 'pr-history':
+            return records.replacedPullRequests(workId!);
+        case 'record-review-round':
+            return records.recordReviewRound(workId!, revision(), readRound(values));
+        case 'set-disposition':
+            return records.setFindingDisposition(
+                workId!,
+                revision(),
+                {
+                    round: Number(need(values, 'round')),
+                    axis: need(values, 'axis') as ReviewAxis,
+                    finding: Number(need(values, 'finding')),
+                },
+                need(values, 'disposition') as FindingDisposition,
+                values.reason,
+            );
+        case 'review-rounds':
+            return records.reviewRounds(workId!);
+        case 'observe':
+            return records.observe(workId!, revision(), {
+                of: need(values, 'of'),
+                state: need(values, 'state'),
+                assignee: values.assignee,
+            } as NewObservation);
+        case 'observe-failure':
+            return records.recordReadFailure(
+                workId!,
+                revision(),
+                need(values, 'of') as Observed,
+                need(values, 'failure'),
+            );
+        case 'observations':
+            return records.observations(workId!);
+        case 'confirm-thread-deleted':
+            return records.confirmThreadDeleted(workId!, revision(), need(values, 'thread'));
+        case 'set-build-branch':
+            return records.setBuildBranch(workId!, revision(), need(values, 'branch'));
+        case 'invalidate-gate':
+            return records.invalidateGate(workId!, revision());
+        case 'reset-build':
+            return records.resetBuild(workId!, revision());
+        case 'add-thread':
+            return records.addThread(workId!, revision(), need(values, 'thread'), need(values, 'purpose'));
+        case 'threads':
+            return records.threads(workId!);
+        case 'record-intent':
+            return records.recordLaunchIntent(workId!, revision(), need(values, 'purpose'));
+        case 'intents':
+            return records.launchIntents({ repository: values.repository, unresolved: values.unresolved });
+        case 'resolve-intent': {
+            if ((values.thread === undefined) === (values.failure === undefined))
+                throw new UsageError('resolve-intent needs --thread or --failure, not both.');
+            const outcome = values.thread !== undefined ? { threadId: values.thread } : { failure: values.failure! };
+            return records.resolveLaunchIntent(workId!, revision(), need(values, 'intent'), outcome);
+        }
+        case 'add-dependency':
+            return records.addDependency(workId!, readJson(values, 'Dependency') as NewDependency);
+        case 'dependencies':
+            return records.dependencies(workId!);
+        case 'dependency':
+            return records.dependency(workId!);
+        case 'update-dependency':
+            return records.updateDependency(
+                workId!,
+                revision(),
+                readJson(values, 'Dependency change') as DependencyChange,
+            );
+        case 'add-dependency-block':
+            return records.addDependencyBlock(workId!, revision(), need(values, 'build'));
+        case 'remove-dependency-block':
+            return records.removeDependencyBlock(workId!, revision(), need(values, 'build'));
+        case 'observe-dependency':
+            return records.observeDependency(workId!, revision(), {
+                subject: need(values, 'subject'),
+                kind: need(values, 'state') as DependencyObservationKind,
+                detail: values.detail,
+            });
+        case 'mark-met':
+            return records.markDependencyMet(workId!, revision(), need(values, 'identity'));
+        case 'clear-met':
+            return records.clearDependencyMet(workId!, revision());
+        case 'replace-dependency':
+            return records.replaceDependencyWithBuild(workId!, revision(), need(values, 'build'));
+        case 'hidden':
+            return records.hidden(readRetention(values['data-dir']));
+        case 'delete-expired':
+            return records.deleteExpired(readRetention(values['data-dir']));
+        case 'export':
+            return exportMarkdown(records, workId!, resolve(need(values, 'to')));
+        default:
+            throw new UsageError(`Unknown command "${command}".`);
     }
-    case 'record-gate':
-      await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
-      if (records.specState(workId!).held) throw new WorkRecordError('invalid', 'Accept or reject the held GitHub edit in item details before recording a later gate.');
-      return records.recordGate(workId!, revision(), { briefDigest: need(values, 'digest'), approvedBy: need(values, 'identity'), evidence: need(values, 'evidence') });
-    case 'create': {
-      const input = { ...captured(), ticket: values.ticket };
-      if (!values['request-id']) return records.create(input);
-      records.claimCapture(values['request-id'], JSON.stringify(input));
-      return records.completeCapture(values['request-id'], input).record;
-    }
-    case 'create-ticket': {
-      const result = await createRecordTicket(workId!, { revision: revision(), requestId: need(values, 'request-id'), retro: values.retro }, {
-        records, repos: () => readRepositorySetups(values['data-dir']).map(setup => ({ repo: setup.repo, setup, labels: [], role: setup.role ?? '',
-          ...(setup.itemSource?.kind === 'azure-board' ? { team: setup.itemSource.team } : {}) })),
-      });
-      if (result.body.error) throw new WorkRecordError('invalid', result.body.error);
-      return result.body.record;
-    }
-    case 'import':
-      return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
-    case 'read':
-      return records.read(workId!);
-    case 'context':
-      return records.initialContext(workId!);
-    case 'list':
-      return records.list({ repository: values.repository, status, kind });
-    case 'update':
-      return records.update(workId!, revision(), { status, kind });
-    case 'kind-disagreement': {
-      const record = records.read(workId!);
-      return { disagreement: await checkKind(record, { setup: setupOf(record.repository) }) };
-    }
-    case 'change-kind': {
-      const record = records.read(workId!);
-      const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, { setup: setupOf(record.repository) });
-      if (result.error) throw new WorkRecordError('invalid', result.line ? `${result.error} Changed so far: ${result.line}` : result.error);
-      return { record: result.record, line: result.line };
-    }
-    case 'record-kind-answer': {
-      const ticketKind = need(values, 'ticket-kind');
-      return records.recordKindAnswer(workId!, revision(), { answer: need(values, 'answer') as 'keep' | 'update', ticketKind: ticketKind === 'none' ? null : ticketKind as WorkKind });
-    }
-    case 'attach-ticket':
-      return records.attachTicket(workId!, revision(), need(values, 'ticket'));
-    case 'set-aside':
-      return records.setAside(workId!, revision());
-    case 'restore':
-      return records.restore(workId!, revision());
-    case 'set-needs-you':
-      return records.setNeedsYou(workId!, revision(), need(values, 'reason'));
-    case 'clear-needs-you':
-      return records.clearNeedsYou(workId!, revision());
-    case 'snapshot-skills':
-      return records.snapshotSkills(workId!, revision(), values.skill ?? []);
-    case 'set-parent':
-      return records.setParent(workId!, revision(), need(values, 'parent'));
-    case 'clear-parent':
-      return records.clearParent(workId!, revision());
-    case 'add-blocker':
-      return records.addBlocker(workId!, revision(), need(values, 'blocker'));
-    case 'remove-blocker':
-      return records.removeBlocker(workId!, revision(), need(values, 'blocker'));
-    case 'children':
-      return records.children(workId!);
-    case 'blockers':
-      return [...records.blockers(workId!), ...records.unmetDependencies(workId!)];
-    case 'dependents':
-      return records.dependents(workId!);
-    case 'refinement':
-      return records.refinement(workId!);
-    case 'completion':
-      return records.completion(workId!);
-    case 'waiting-on':
-      return records.waitingOn(workId!);
-    case 'set-fog': {
-      const fog = need(values, 'fog');
-      if (fog !== 'gone' && fog !== 'remaining') throw new UsageError('--fog takes gone or remaining.');
-      return records.setFogGone(workId!, revision(), fog === 'gone');
-    }
-    case 'finish':
-      if (records.read(workId!).kind !== 'slice') throw new WorkRecordError('invalid', 'Only a slice is finished by hand; a build finishes when its PR is observed merged.');
-      return records.recordFinished(workId!, revision());
-    case 'set-body':
-      return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
-    case 'body': {
-      if (values.body === 'brief') await refreshSpecs(records, { workId: workId!, dir: values['data-dir'] });
-      const body = need(values, 'body') as Body;
-      const markdown = records.body(workId!, body);
-      if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
-      return markdown;
-    }
-    case 'set-phase':
-      return records.setBuildPhase(workId!, revision(), need(values, 'phase') as BuildPhase);
-    case 'set-pr':
-      return records.setPullRequest(workId!, revision(), need(values, 'pr'));
-    case 'pr-history':
-      return records.replacedPullRequests(workId!);
-    case 'record-review-round':
-      return records.recordReviewRound(workId!, revision(), readRound(values));
-    case 'set-disposition':
-      return records.setFindingDisposition(workId!, revision(),
-        { round: Number(need(values, 'round')), axis: need(values, 'axis') as ReviewAxis, finding: Number(need(values, 'finding')) },
-        need(values, 'disposition') as FindingDisposition, values.reason);
-    case 'review-rounds':
-      return records.reviewRounds(workId!);
-    case 'observe':
-      return records.observe(workId!, revision(), { of: need(values, 'of'), state: need(values, 'state'), assignee: values.assignee } as NewObservation);
-    case 'observe-failure':
-      return records.recordReadFailure(workId!, revision(), need(values, 'of') as Observed, need(values, 'failure'));
-    case 'observations':
-      return records.observations(workId!);
-    case 'confirm-thread-deleted':
-      return records.confirmThreadDeleted(workId!, revision(), need(values, 'thread'));
-    case 'set-build-branch':
-      return records.setBuildBranch(workId!, revision(), need(values, 'branch'));
-    case 'invalidate-gate':
-      return records.invalidateGate(workId!, revision());
-    case 'reset-build':
-      return records.resetBuild(workId!, revision());
-    case 'add-thread':
-      return records.addThread(workId!, revision(), need(values, 'thread'), need(values, 'purpose'));
-    case 'threads':
-      return records.threads(workId!);
-    case 'record-intent':
-      return records.recordLaunchIntent(workId!, revision(), need(values, 'purpose'));
-    case 'intents':
-      return records.launchIntents({ repository: values.repository, unresolved: values.unresolved });
-    case 'resolve-intent': {
-      if ((values.thread === undefined) === (values.failure === undefined)) throw new UsageError('resolve-intent needs --thread or --failure, not both.');
-      const outcome = values.thread !== undefined ? { threadId: values.thread } : { failure: values.failure! };
-      return records.resolveLaunchIntent(workId!, revision(), need(values, 'intent'), outcome);
-    }
-    case 'add-dependency':
-      return records.addDependency(workId!, readJson(values, 'Dependency') as NewDependency);
-    case 'dependencies':
-      return records.dependencies(workId!);
-    case 'dependency':
-      return records.dependency(workId!);
-    case 'update-dependency':
-      return records.updateDependency(workId!, revision(), readJson(values, 'Dependency change') as DependencyChange);
-    case 'add-dependency-block':
-      return records.addDependencyBlock(workId!, revision(), need(values, 'build'));
-    case 'remove-dependency-block':
-      return records.removeDependencyBlock(workId!, revision(), need(values, 'build'));
-    case 'observe-dependency':
-      return records.observeDependency(workId!, revision(),
-        { subject: need(values, 'subject'), kind: need(values, 'state') as DependencyObservationKind, detail: values.detail });
-    case 'mark-met':
-      return records.markDependencyMet(workId!, revision(), need(values, 'identity'));
-    case 'clear-met':
-      return records.clearDependencyMet(workId!, revision());
-    case 'replace-dependency':
-      return records.replaceDependencyWithBuild(workId!, revision(), need(values, 'build'));
-    case 'hidden':
-      return records.hidden(readRetention(values['data-dir']));
-    case 'delete-expired':
-      return records.deleteExpired(readRetention(values['data-dir']));
-    case 'export':
-      return exportMarkdown(records, workId!, resolve(need(values, 'to')));
-    default:
-      throw new UsageError(`Unknown command "${command}".`);
-  }
 }
 
 async function main(args: string[]): Promise<number> {
-  if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
-  if (args[0] === 'heavy') return heavyCommand(args);
-  let parsed;
-  try {
-    parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true });
-  } catch (error) {
-    process.stderr.write(`lar-work: ${(error as Error).message}\nRun lar-work --help for usage.\n`);
-    return 2;
-  }
-  const { values, positionals: [command, workId, ...extra] } = parsed;
-  if (values.help || !command) {
-    process.stdout.write(HELP);
-    return values.help ? 0 : 2;
-  }
-  let records: WorkRecords | undefined;
-  try {
-    if (extra.length) throw new UsageError(`Unexpected arguments: ${extra.join(' ')}.`);
-    if (!COMMANDS.includes(command)) throw new UsageError(`Unknown command "${command}".`);
-    const takesId = TAKES_WORK_ID.includes(command) || TAKES_DEPENDENCY_ID.includes(command);
-    if (takesId !== (workId !== undefined)) {
-      const id = TAKES_DEPENDENCY_ID.includes(command) ? 'a Dependency ID' : 'a work ID';
-      throw new UsageError(workId === undefined ? `${command} needs ${id}.` : `${command} takes no work ID.`);
+    if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
+    if (args[0] === 'heavy') return heavyCommand(args);
+    let parsed;
+    try {
+        parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true });
+    } catch (error) {
+        process.stderr.write(`lar-work: ${(error as Error).message}\nRun lar-work --help for usage.\n`);
+        return 2;
     }
-    if (command === 'retention') {
-      process.stdout.write(`${JSON.stringify(retention(values), null, 2)}\n`);
-      return 0;
+    const {
+        values,
+        positionals: [command, workId, ...extra],
+    } = parsed;
+    if (values.help || !command) {
+        process.stdout.write(HELP);
+        return values.help ? 0 : 2;
     }
-    records = await openWorkRecords(workRecordsPath(values['data-dir']));
-    const result = await run(records, command, workId, values);
-    const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
-    if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
-    if (!validationCommand && workId && !TAKES_DEPENDENCY_ID.includes(command)) {
-      const sync = records.specState(workId);
-      if (sync.error || sync.warning) process.stderr.write(`lar-work: ${sync.warning ?? sync.error}\n`);
+    let records: WorkRecords | undefined;
+    try {
+        if (extra.length) throw new UsageError(`Unexpected arguments: ${extra.join(' ')}.`);
+        if (!COMMANDS.includes(command)) throw new UsageError(`Unknown command "${command}".`);
+        const takesId = TAKES_WORK_ID.includes(command) || TAKES_DEPENDENCY_ID.includes(command);
+        if (takesId !== (workId !== undefined)) {
+            const id = TAKES_DEPENDENCY_ID.includes(command) ? 'a Dependency ID' : 'a work ID';
+            throw new UsageError(workId === undefined ? `${command} needs ${id}.` : `${command} takes no work ID.`);
+        }
+        if (command === 'retention') {
+            process.stdout.write(`${JSON.stringify(retention(values), null, 2)}\n`);
+            return 0;
+        }
+        records = await openWorkRecords(workRecordsPath(values['data-dir']));
+        const result = await run(records, command, workId, values);
+        const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
+        if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
+        if (!validationCommand && workId && !TAKES_DEPENDENCY_ID.includes(command)) {
+            const sync = records.specState(workId);
+            if (sync.error || sync.warning) process.stderr.write(`lar-work: ${sync.warning ?? sync.error}\n`);
+        }
+        process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
+        return 0;
+    } catch (error) {
+        if (error instanceof UsageError) {
+            process.stderr.write(`lar-work: ${error.message}\nRun lar-work --help for usage.\n`);
+            return 2;
+        }
+        if (error instanceof WorkRecordError) {
+            process.stderr.write(`lar-work: ${error.message}\n`);
+            return 1;
+        }
+        throw error;
+    } finally {
+        records?.close();
     }
-    process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
-    return 0;
-  } catch (error) {
-    if (error instanceof UsageError) {
-      process.stderr.write(`lar-work: ${error.message}\nRun lar-work --help for usage.\n`);
-      return 2;
-    }
-    if (error instanceof WorkRecordError) {
-      process.stderr.write(`lar-work: ${error.message}\n`);
-      return 1;
-    }
-    throw error;
-  } finally {
-    records?.close();
-  }
 }
 
 process.exitCode = await main(process.argv.slice(2));

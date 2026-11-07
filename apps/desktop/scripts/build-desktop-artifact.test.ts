@@ -1,167 +1,170 @@
-import * as NodeFS from "node:fs";
-import * as NodePath from "node:path";
+import { describe, expect, it } from '@effect/vitest';
+import * as NodeFS from 'node:fs';
+import * as NodePath from 'node:path';
 
-import { describe, expect, it } from "@effect/vitest";
-
-import { locateCommand } from "../src/lar-work/lar-work-launcher.ts";
-import { larWorkPack } from "../vite.config.ts";
+import { locateCommand } from '../src/lar-work/lar-work-launcher.ts';
+import { larWorkPack } from '../vite.config.ts';
 import {
-  buildEnvironment,
-  createBuildConfig,
-  missingSigningVariables,
-  parseBuildArgs,
-  updateFeedFile,
-} from "./build-desktop-artifact.ts";
+    buildEnvironment,
+    createBuildConfig,
+    missingSigningVariables,
+    parseBuildArgs,
+    updateFeedFile,
+} from './build-desktop-artifact.ts';
 
 const signingEnv = {
-  CSC_LINK: "certificate",
-  CSC_KEY_PASSWORD: "password",
-  APPLE_API_KEY: "/tmp/AuthKey_ABC.p8",
-  APPLE_API_KEY_ID: "ABC",
-  APPLE_API_ISSUER: "issuer",
-  APPLE_TEAM_ID: "TEAM123456",
+    CSC_LINK: 'certificate',
+    CSC_KEY_PASSWORD: 'password',
+    APPLE_API_KEY: '/tmp/AuthKey_ABC.p8',
+    APPLE_API_KEY_ID: 'ABC',
+    APPLE_API_ISSUER: 'issuer',
+    APPLE_TEAM_ID: 'TEAM123456',
 };
 
-describe("createBuildConfig", () => {
-  it("builds an Apple Silicon dmg and zip as the given version", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+describe('createBuildConfig', () => {
+    it('builds an Apple Silicon dmg and zip as the given version', () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
 
-    expect(config.mac?.target).toEqual([
-      { target: "dmg", arch: ["arm64"] },
-      { target: "zip", arch: ["arm64"] },
-    ]);
-    expect(config.extraMetadata).toEqual({ version: "0.1.0" });
-    expect(config.directories?.output).toBe("/out");
-    expect(config.artifactName).not.toContain(" ");
-  });
-
-  it("points a Nightly at the nightly channel of lar-factory's prereleases", () => {
-    const config = createBuildConfig({
-      version: "0.1.0-nightly.20261023.57",
-      signed: false,
-      outputDir: "/out",
+        expect(config.mac?.target).toEqual([
+            { target: 'dmg', arch: ['arm64'] },
+            { target: 'zip', arch: ['arm64'] },
+        ]);
+        expect(config.extraMetadata).toEqual({ version: '0.1.0' });
+        expect(config.directories?.output).toBe('/out');
+        expect(config.artifactName).not.toContain(' ');
     });
 
-    expect(config.publish).toEqual([
-      {
-        provider: "github",
-        owner: "maddec01",
-        repo: "lar-factory",
-        releaseType: "prerelease",
-        channel: "nightly",
-      },
-    ]);
-  });
+    it("points a Nightly at the nightly channel of lar-factory's prereleases", () => {
+        const config = createBuildConfig({
+            version: '0.1.0-nightly.20261023.57',
+            signed: false,
+            outputDir: '/out',
+        });
 
-  it("points a Stable Release at lar-factory's latest releases", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
-
-    expect(config.publish).toEqual([
-      { provider: "github", owner: "maddec01", repo: "lar-factory", releaseType: "release" },
-    ]);
-  });
-
-  it("ships the lar-work command built from packages/work-records outside app.asar, where its launcher runs it", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
-
-    expect(larWorkPack.entry).toEqual({ "lar-work": "../../packages/work-records/src/cli.ts" });
-    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "..", larWorkPack.entry["lar-work"]))).toBe(true);
-    expect(config.extraResources).toContainEqual({ from: larWorkPack.outDir, to: "work-records" });
-    expect(config.files).toContain(`!${larWorkPack.outDir}/**/*`);
-    // Packaged, Electron's app path is Resources/app.asar.
-    expect(locateCommand("/App/Contents/Resources/app.asar", true)).toBe("/App/Contents/Resources/work-records/lar-work.mjs");
-  });
-
-  it("ships the bundled server and the built page where the server finds them", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
-
-    expect(config.extraResources).toEqual(expect.arrayContaining([
-      { from: "dist-electron/server", to: "server/dist" },
-      { from: "../web/dist", to: "web/dist" },
-    ]));
-    expect(config.files).toContain("!dist-electron/server/**/*");
-  });
-
-  it("ships THIRD_PARTY_NOTICES.md from the repo root instead of T3's licence", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
-
-    expect(config.extraResources).toContainEqual({
-      from: "../../THIRD_PARTY_NOTICES.md",
-      to: "THIRD_PARTY_NOTICES.md",
+        expect(config.publish).toEqual([
+            {
+                provider: 'github',
+                owner: 'maddec01',
+                repo: 'lar-factory',
+                releaseType: 'prerelease',
+                channel: 'nightly',
+            },
+        ]);
     });
-    expect(config.extraResources).not.toContainEqual(expect.objectContaining({ to: "LICENSE.t3code.txt" }));
-    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "../../../THIRD_PARTY_NOTICES.md"))).toBe(true);
-  });
 
-  it("names the app Lar Factory, keeps its release files and appId ASCII, and uses the Lar Factory icon", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+    it("points a Stable Release at lar-factory's latest releases", () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
 
-    expect(config.productName).toBe("Lar Factory");
-    expect(config.artifactName).toBe("lar-factory-${version}-${arch}.${ext}");
-    expect(config.appId).toBe("com.pedrogomes.lar.factory");
-    expect(config.mac?.icon).toBe("resources/icon.icns");
-    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "..", config.mac!.icon!))).toBe(true);
-  });
-
-  it("signs with hardened runtime and notarizes when signed", () => {
-    const mac = createBuildConfig({ version: "0.1.0", signed: true, outputDir: "/out" }).mac;
-
-    expect(mac).not.toHaveProperty("identity");
-    expect(mac?.hardenedRuntime).toBe(true);
-    expect(mac?.notarize).toBe(true);
-    expect(mac?.sign).toMatch(/scripts\/sign-macos\.ts$/);
-  });
-
-  it("skips signing and notarizing when unsigned", () => {
-    const mac = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" }).mac;
-
-    expect(mac?.identity).toBeNull();
-    expect(mac?.notarize).toBe(false);
-    expect(mac).not.toHaveProperty("sign");
-  });
-});
-
-describe("updateFeedFile", () => {
-  it("names the feed after the version's channel", () => {
-    expect(updateFeedFile("0.1.0-nightly.20261023.57")).toBe("nightly-mac.yml");
-    expect(updateFeedFile("0.1.0")).toBe("latest-mac.yml");
-  });
-});
-
-describe("missingSigningVariables", () => {
-  it("lists every signing variable that is unset or empty", () => {
-    expect(missingSigningVariables({ ...signingEnv, CSC_LINK: "", APPLE_TEAM_ID: undefined })).toEqual([
-      "CSC_LINK",
-      "APPLE_TEAM_ID",
-    ]);
-    expect(missingSigningVariables(signingEnv)).toEqual([]);
-  });
-});
-
-describe("buildEnvironment", () => {
-  it("drops empty variables, which electron-builder reads as set", () => {
-    expect(buildEnvironment({ ...signingEnv, CSC_NAME: "" }, true)).toEqual(signingEnv);
-  });
-
-  it("removes the signing variables and keychain lookup for an unsigned build", () => {
-    expect(buildEnvironment({ ...signingEnv, PATH: "/bin" }, false)).toEqual({
-      APPLE_TEAM_ID: "TEAM123456",
-      PATH: "/bin",
-      CSC_IDENTITY_AUTO_DISCOVERY: "false",
+        expect(config.publish).toEqual([
+            { provider: 'github', owner: 'maddec01', repo: 'lar-factory', releaseType: 'release' },
+        ]);
     });
-  });
+
+    it('ships the lar-work command built from packages/work-records outside app.asar, where its launcher runs it', () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
+
+        expect(larWorkPack.entry).toEqual({ 'lar-work': '../../packages/work-records/src/cli.ts' });
+        expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, '..', larWorkPack.entry['lar-work']))).toBe(true);
+        expect(config.extraResources).toContainEqual({ from: larWorkPack.outDir, to: 'work-records' });
+        expect(config.files).toContain(`!${larWorkPack.outDir}/**/*`);
+        // Packaged, Electron's app path is Resources/app.asar.
+        expect(locateCommand('/App/Contents/Resources/app.asar', true)).toBe(
+            '/App/Contents/Resources/work-records/lar-work.mjs',
+        );
+    });
+
+    it('ships the bundled server and the built page where the server finds them', () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
+
+        expect(config.extraResources).toEqual(
+            expect.arrayContaining([
+                { from: 'dist-electron/server', to: 'server/dist' },
+                { from: '../web/dist', to: 'web/dist' },
+            ]),
+        );
+        expect(config.files).toContain('!dist-electron/server/**/*');
+    });
+
+    it("ships THIRD_PARTY_NOTICES.md from the repo root instead of T3's licence", () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
+
+        expect(config.extraResources).toContainEqual({
+            from: '../../THIRD_PARTY_NOTICES.md',
+            to: 'THIRD_PARTY_NOTICES.md',
+        });
+        expect(config.extraResources).not.toContainEqual(expect.objectContaining({ to: 'LICENSE.t3code.txt' }));
+        expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, '../../../THIRD_PARTY_NOTICES.md'))).toBe(true);
+    });
+
+    it('names the app Lar Factory, keeps its release files and appId ASCII, and uses the Lar Factory icon', () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
+
+        expect(config.productName).toBe('Lar Factory');
+        expect(config.artifactName).toBe('lar-factory-${version}-${arch}.${ext}');
+        expect(config.appId).toBe('com.pedrogomes.lar.factory');
+        expect(config.mac?.icon).toBe('resources/icon.icns');
+        expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, '..', config.mac!.icon!))).toBe(true);
+    });
+
+    it('signs with hardened runtime and notarizes when signed', () => {
+        const mac = createBuildConfig({ version: '0.1.0', signed: true, outputDir: '/out' }).mac;
+
+        expect(mac).not.toHaveProperty('identity');
+        expect(mac?.hardenedRuntime).toBe(true);
+        expect(mac?.notarize).toBe(true);
+        expect(mac?.sign).toMatch(/scripts\/sign-macos\.ts$/);
+    });
+
+    it('skips signing and notarizing when unsigned', () => {
+        const mac = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' }).mac;
+
+        expect(mac?.identity).toBeNull();
+        expect(mac?.notarize).toBe(false);
+        expect(mac).not.toHaveProperty('sign');
+    });
 });
 
-describe("parseBuildArgs", () => {
-  it("signs by default and takes the version and output folder", () => {
-    expect(parseBuildArgs(["--build-version", "0.2.0", "--output-dir", "../release-assets"])).toEqual({
-      version: "0.2.0",
-      signed: true,
-      outputDir: "../release-assets",
+describe('updateFeedFile', () => {
+    it("names the feed after the version's channel", () => {
+        expect(updateFeedFile('0.1.0-nightly.20261023.57')).toBe('nightly-mac.yml');
+        expect(updateFeedFile('0.1.0')).toBe('latest-mac.yml');
     });
-  });
+});
 
-  it("builds unsigned with --unsigned, leaving the version to package.json", () => {
-    expect(parseBuildArgs(["--unsigned"])).toEqual({ version: undefined, signed: false, outputDir: "release" });
-  });
+describe('missingSigningVariables', () => {
+    it('lists every signing variable that is unset or empty', () => {
+        expect(missingSigningVariables({ ...signingEnv, CSC_LINK: '', APPLE_TEAM_ID: undefined })).toEqual([
+            'CSC_LINK',
+            'APPLE_TEAM_ID',
+        ]);
+        expect(missingSigningVariables(signingEnv)).toEqual([]);
+    });
+});
+
+describe('buildEnvironment', () => {
+    it('drops empty variables, which electron-builder reads as set', () => {
+        expect(buildEnvironment({ ...signingEnv, CSC_NAME: '' }, true)).toEqual(signingEnv);
+    });
+
+    it('removes the signing variables and keychain lookup for an unsigned build', () => {
+        expect(buildEnvironment({ ...signingEnv, PATH: '/bin' }, false)).toEqual({
+            APPLE_TEAM_ID: 'TEAM123456',
+            PATH: '/bin',
+            CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        });
+    });
+});
+
+describe('parseBuildArgs', () => {
+    it('signs by default and takes the version and output folder', () => {
+        expect(parseBuildArgs(['--build-version', '0.2.0', '--output-dir', '../release-assets'])).toEqual({
+            version: '0.2.0',
+            signed: true,
+            outputDir: '../release-assets',
+        });
+    });
+
+    it('builds unsigned with --unsigned, leaving the version to package.json', () => {
+        expect(parseBuildArgs(['--unsigned'])).toEqual({ version: undefined, signed: false, outputDir: 'release' });
+    });
 });

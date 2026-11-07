@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite-plus';
 import { test } from '@lar-works/config';
+import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
-  test: {
-    ...test,
-    include: ['src/**/*.test.ts'],
-  },
+    test: {
+        ...test,
+        include: ['src/**/*.test.ts'],
+    },
 });

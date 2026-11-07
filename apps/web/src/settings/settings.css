@@ -1,5 +1,11 @@
 /* The Settings page: the last call's paths. */
 
-#settings-result ul { padding-left: --spacing(4.5); white-space: normal; }
+#settings-result ul {
+    padding-left: --spacing(4.5);
+    white-space: normal;
+}
 
-[data-kind-label-popover] { width: 22rem; max-width: calc(100vw - 2rem); }
+[data-kind-label-popover] {
+    width: 22rem;
+    max-width: calc(100vw - 2rem);
+}

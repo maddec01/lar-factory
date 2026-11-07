@@ -3,7 +3,7 @@
 
 import { itemName, repoKey, shortAgo } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { CounterAge, CounterDash, CounterItem, CounterList, CounterPartial, Spinner } from '@lar-works/design-system';
+import { CounterAge, CounterDash, CounterItem, CounterList, CounterPartial, Loading } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -61,7 +61,7 @@ export function spendFace(figure: string, known: boolean, unavailable: boolean, 
         ) : unavailable ? (
             <CounterDash />
         ) : loading ? (
-            <Spinner title="Usage totals are still loading." />
+            <Loading presentation="inline" title="Usage totals are still loading."  />
         ) : (
             figure
         ),

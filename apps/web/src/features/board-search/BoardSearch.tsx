@@ -12,7 +12,7 @@ import {
     CommandPaletteOption,
     CommandPaletteTrigger,
     Kbd,
-    Spinner,
+    Loading,
 } from '@lar-works/design-system';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -97,7 +97,7 @@ function Dialog({
             listLabel="Search results"
             empty="Nothing matches."
             busy={reading}
-            busyLabel={<Spinner label="Loading Projects…" />}
+            busyLabel={<Loading presentation="inline" label="Loading Projects…"  />}
             footer={
                 <>
                     <span>

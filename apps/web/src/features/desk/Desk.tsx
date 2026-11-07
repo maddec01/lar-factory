@@ -8,7 +8,7 @@
 
 import { deskItems, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { DeskCard as Card, DeskHint, DeskMergeState, DeskSection, Spinner } from '@lar-works/design-system';
+import { DeskCard as Card, DeskHint, DeskMergeState, DeskSection, Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -102,7 +102,7 @@ export function Desk({ items: inScope }: { items: Item[] }) {
                 clientError ? (
                     'Nothing waited on you at the last read.'
                 ) : readingScope(data, scope ?? undefined) ? (
-                    <Spinner label="Loading Projects…" />
+                    <Loading presentation="inline" label="Loading Projects…"  />
                 ) : deskItems(data, unavailable).length ? (
                     'Nothing on your desk matches the filters.'
                 ) : (

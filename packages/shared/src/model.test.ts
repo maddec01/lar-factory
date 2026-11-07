@@ -20,8 +20,6 @@ import {
     canResumeShaping,
     checkState,
     failedCheck,
-    ghBlocksRead,
-    itemSource,
     isBuild,
     itemPr,
     itemTotal,

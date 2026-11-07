@@ -2,7 +2,7 @@
 // pane shows that group's items with search, Add item, Scope board and the sort menu.
 
 import type { KindDisagreement } from '@lar-factory/shared';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test';
+import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
 
 import { $, $$, moved, mountPage, push, sample, settle, text } from '../../test/support.ts';
 

@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const BUNDLE_URL = new URL('../../../../.assembled-skills/', import.meta.url);
 
 /** BOARD_BUNDLE_DIR when set (the board app's bundle), else the checkout's root. */
-export function bundleUrl(env: NodeJS.ProcessEnv = process.env): URL {
+function bundleUrl(env: NodeJS.ProcessEnv = process.env): URL {
     const dir = env.BOARD_BUNDLE_DIR;
 
     return dir ? pathToFileURL(join(dir, '/')) : BUNDLE_URL;

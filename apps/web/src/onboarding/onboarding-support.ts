@@ -1,7 +1,6 @@
 // What the onboarding page tests share: a board with no repository onboarded, and T3's projects for the server to list.
 
 import type { BoardData, ProjectChoice, SetupDetection } from '@lar-factory/shared';
-import { vi } from 'vite-plus/test';
 
 import { $, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 

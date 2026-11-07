@@ -2,7 +2,7 @@
 // keyboard focus in the dialog.
 
 import { abandonsNotice, writeHeaders, remembersChoice } from '@lar-factory/shared';
-import type { BoardData, Item, NeedsYouAction, Status, ModelChoice, StartResult } from '@lar-factory/shared';
+import type { BoardData, Item, NeedsYouAction, ModelChoice, StartResult } from '@lar-factory/shared';
 import { flushSync } from 'react-dom';
 
 import { useBoardStore } from '../board/board-store.ts';

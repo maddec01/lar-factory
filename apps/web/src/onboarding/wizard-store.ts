@@ -93,7 +93,7 @@ export const detectedOf = (detection: Read<SetupDetection> | null): SetupDetecti
     detection?.state === 'read' ? detection.value : null;
 
 /** The steps the run shows, as its detection shapes them. */
-export const runSteps = (run: Run, detection: Read<SetupDetection> | null): StepId[] => stepsOf();
+export const runSteps = (_run: Run, _detection: Read<SetupDetection> | null): StepId[] => stepsOf();
 
 /** Whether the current step has everything needed to continue. */
 export function stepReady(run: Run, projects: Projects, detection: Read<SetupDetection> | null): boolean {

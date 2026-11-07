@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { onTestFinished, test } from 'vite-plus/test';
 
-import { readConnections, saveConnections, saveOnboarded, saveOnboarding } from './repository-list.ts';
+import { readConnections, saveConnections, saveOnboarding } from './repository-list.ts';
 
 const WEB = 'maddec01/lar-web';
 const API = 'maddec01/lar-api';

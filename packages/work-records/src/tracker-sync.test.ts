@@ -170,7 +170,8 @@ async function concept(records: WorkRecords) {
 }
 
 test('GitHub structural commits append comments, preserve interleaved author edits, find older managed comments and reject forks', async () => {
-    const records = await cache();
+    await cache();
+
     const dir = handles.at(-1)!.dir;
     const state = join(dir, 'github.json');
     const fake = join(dir, 'gh.mjs');

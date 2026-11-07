@@ -1,10 +1,10 @@
 import type { BoardData } from '@lar-factory/shared';
-import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
+import { boardIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test, type TestContext } from 'vite-plus/test';
 
-import { startableEnv, startBoard, until } from './server-support.ts';
+import { startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
 const APPLE = 'maddec01/lar-apple';
@@ -265,9 +265,6 @@ async function issuesBoard(
 }
 
 const projectCommands = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'project');
-
-const labelEdits = async (board: Board) =>
-    (await board.calls()).filter((args) => args[0] === 'label' || (args[0] === 'issue' && args[1] === 'edit'));
 
 test('in a repository with no factory labels or config, Add item records work locally and a picked ticket gets one record', async (t) => {
     const board = await startBoard(t, {

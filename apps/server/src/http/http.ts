@@ -6,7 +6,6 @@ import {
     writeAccessProblem,
     type Item,
     type ItemCommentsPage,
-    type ItemDetails,
     type LabelChange,
     type OnboardingRepository,
     type ProjectChoice,

@@ -255,27 +255,6 @@ export async function settleDecisions(board: Board, workId: string, decisions: s
 }
 
 /**
- * Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. Its default branch has no
- * .lar-factory.json yet, as NOT_LANDED tells the fake gh, or the board finishes the onboarding with the file.
- */
-export const NOT_LANDED = { localSetups: { 'maddec01/lar-factory': null } };
-
-export function writeOnboarding(home: string, repo: string): void {
-    const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' } };
-
-    writeRepositoryList(home, TEST_REPOSITORIES);
-
-    const file = join(home, 'Library/Application Support/Lar Factory/repository-settings.json');
-
-    writeFileSync(
-        file,
-        JSON.stringify({
-            repositories: TEST_REPOSITORIES.map((r) => (r === repo ? { repo: r, onboarding: progress } : { repo: r })),
-        }),
-    );
-}
-
-/**
  * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
  * `options.repositories` (null for no list file), unless the home already has a list. `skillCheck`, when given, plays
  * the board app: the board gets an IPC channel, and each skill check it asks for gets `skillCheck`'s answer to its

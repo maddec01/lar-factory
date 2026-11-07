@@ -28,7 +28,7 @@ const read = (content) => ({
     body: undefined,
     ...(content.closedByPullRequestsReferences && {
         closedByPullRequestsReferences: {
-            nodes: content.closedByPullRequestsReferences.nodes.map(({ body, mergedAt, ...pr }) => ({
+            nodes: content.closedByPullRequestsReferences.nodes.map(({ body: _body, mergedAt: _mergedAt, ...pr }) => ({
                 ...pr,
                 id: pr.id ?? pr.url,
             })),

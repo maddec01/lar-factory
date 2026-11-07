@@ -7,13 +7,11 @@ import {
     STRUCTURE_LABEL,
     trackerKind,
     readTrackerStructure,
-    stripTrackerStructure,
     sameRepo,
     trackerReference,
     writeTrackerStructure,
     type Kind,
     type RepositorySetup,
-    type TrackerPart,
     type TrackerStructure,
 } from '@lar-factory/shared';
 import { providerCommand } from '@lar-factory/shared/provider-command';

@@ -1,7 +1,7 @@
 // The board's card for each repository still onboarding, titled with its name, whose Resume reopens the dialog where it stopped.
 
 import type { BoardData, ProjectIcon } from '@lar-factory/shared';
-import { expect, test, vi } from 'vite-plus/test';
+import { expect, test } from 'vite-plus/test';
 
 import { $, $$, mountPage, sample, settle, text, toast } from '../../test/support.ts';
 import { detection, dialog, empty, project, serve } from './onboarding-support.ts';

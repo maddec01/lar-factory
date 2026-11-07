@@ -6,7 +6,6 @@ import {
     clock,
     day,
     itemSource,
-    repoName,
     shownRepo,
     type BoardData,
     type BundledSkill,

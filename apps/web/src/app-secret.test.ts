@@ -1,7 +1,7 @@
 // In the board app the page sends the per-launch secret from the preload bridge with each write;
 // outside it (a browser, `pnpm run sample`) it sends no secret header.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { expect, test } from 'vite-plus/test';
 
 import { $, fetchMock, mountPage, settle, stubApp } from '../test/support.ts';
 

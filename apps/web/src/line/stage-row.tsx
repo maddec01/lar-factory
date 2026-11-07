@@ -9,7 +9,6 @@ import { Badge } from '@lar-works/design-system';
 import { ChevronDown, ChevronRight } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
-import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import {
     ActivityFeedback,
@@ -120,7 +119,6 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const activity = useActivityState(item);
-    const disconnected = useBoardStore((state) => !!state.clientError);
     const unavailable = useActivityUnavailable();
     const [slices, setSlices] = useState(false);
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);

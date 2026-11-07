@@ -3,7 +3,7 @@
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, chooseOption, fetchMock, mountPage, openOptions, sample, settle, text } from '../../test/support.ts';
+import { $, $$, chooseOption, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
 
 const REPO = 'team/app';
 

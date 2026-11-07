@@ -3,7 +3,7 @@
 
 import { parseConceptMap } from './concept-map.ts';
 import { isBuild, labelStatuses, sliceProgress } from './model.ts';
-import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
+import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice } from './model.ts';
 import { readTrackerStructure, trackerKind, trackerReference } from './tracker-structure.ts';
 
 interface RawLabelConn {

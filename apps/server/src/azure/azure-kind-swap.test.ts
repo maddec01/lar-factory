@@ -19,7 +19,6 @@ import { readAzureItemDetails } from './azure-details.ts';
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
-const DESCRIPTION = 'System.Description';
 const REPRO = 'Microsoft.VSTS.TCM.ReproSteps';
 const opened: { records: WorkRecords; dir: string }[] = [];
 
@@ -146,7 +145,7 @@ test('structure stays in the description, in one copy, whichever way the type ch
 });
 
 test('someone changing the work item since the read fails the type change whole', async () => {
-    const { workItem, kinds, az } = on({ type: 'User Story', description: 'Text' });
+    const { workItem, az } = on({ type: 'User Story', description: 'Text' });
     const stale = fakeAz({ items: [workItem] });
     const racing = ticketKinds(REPO, {
         gh: async () => '',

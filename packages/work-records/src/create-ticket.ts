@@ -41,7 +41,7 @@ const isTicketNumber = (value: unknown): value is number => Number.isSafeInteger
 
 export interface TicketCaptureDeps {
     records: WorkRecords;
-    repos(): RepoConfig[];
+    repos: () => RepoConfig[];
     provider?: StructureProvider;
     discoverOptions?: (repo: RepoConfig) => Promise<TicketCreationOptions>;
     labels?: (repo: string) => TrackerLabels;

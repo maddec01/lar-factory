@@ -12,9 +12,9 @@ export type Saved<T> = T & { problem?: string };
 
 export interface MachineSetting<T> {
     /** This machine's setting in `dir`. A missing file is the default; so is one it can't use, with the reason. */
-    read(dir?: string): Saved<T>;
+    read: (dir?: string) => Saved<T>;
     /** Saves `value` as this machine's setting in `dir`, replacing the old file whole. */
-    write(value: T, dir?: string): T;
+    write: (value: T, dir?: string) => T;
 }
 
 export interface SettingShape<T extends object> {
@@ -25,7 +25,7 @@ export interface SettingShape<T extends object> {
     /** What a missing or unusable file reads as. */
     fallback: T;
     /** The setting a file's JSON holds, or null when it holds none. */
-    parse(json: unknown): T | null;
+    parse: (json: unknown) => T | null;
     /** What a valid setting needs, as in "needs a limit of ...". */
     needs: string;
 }

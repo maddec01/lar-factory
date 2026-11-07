@@ -17,7 +17,7 @@ export interface AutoBuildDeps {
     /** The board's data folder, where the setting lives; tests give their own. */
     dir?: string;
     /** Reads the model choices T3 offers now into the board data. */
-    offerModelChoices(): ModelGroup[];
+    offerModelChoices: () => ModelGroup[];
     /** Shows the board as it is after a saved change. */
     changed?: () => void;
 }

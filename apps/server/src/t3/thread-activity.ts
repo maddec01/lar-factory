@@ -243,7 +243,7 @@ export function activityReads(
 
     return {
         /** The thread with its activity when it is at work, as T3 shows it now. A thread seen only through an outage is unavailable. */
-        read(thread: ItemThread): ItemThread {
+        read: (thread: ItemThread): ItemThread => {
             if (!isLiveThread(thread) && !thread.hasRunningChildren) return thread;
 
             if (thread.observedAt) return { ...thread, activity: UNAVAILABLE };

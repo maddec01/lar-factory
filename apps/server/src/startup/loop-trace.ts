@@ -68,11 +68,11 @@ export interface LoopTrace {
     /** Starts the timers once the server listens, and sets where the log's times count from. */
     begin(write: (line: string) => void, listeningAt: number): void;
     /** Looks for a stall since the last tick. */
-    tick(): void;
+    tick: () => void;
     /** Logs the window ending now. */
-    endWindow(): void;
+    endWindow: () => void;
     /** Stops the trace, with a line for the whole of it. */
-    end(): void;
+    end: () => void;
 }
 
 const round = Math.round;

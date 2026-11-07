@@ -19,17 +19,17 @@ export interface TrackerCapabilities {
     /** How far a change to a label reaches. */
     changeScope: 'repository' | 'project';
     /** Whether a change to one of `repo`'s labels is also a change to `other`'s. */
-    sharesLabels(repo: string, other: string): boolean;
+    sharesLabels: (repo: string, other: string) => boolean;
     /** The label structure sync needs, or null when it needs none. */
     syncLabel: string | null;
     /** Why a label can't be created by itself, or null when it can. */
     createUnavailable: string | null;
     /** Why a person can't give a label this name, or null when they can. */
-    nameProblem(name: string): string | null;
+    nameProblem: (name: string) => string | null;
     /** Whether the factory reads this name as meaning on this tracker, so it hides the label from rows and pickers and locks it in settings. */
-    isManaged(name: string): boolean;
+    isManaged: (name: string) => boolean;
     /** Why a ticket can't take this name as one label, whatever the tracker's list holds, or null when it can. */
-    ticketNameProblem(name: string): string | null;
+    ticketNameProblem: (name: string) => string | null;
 }
 
 export interface TrackerLabel {
@@ -56,11 +56,11 @@ export interface TrackerLabels {
 /** What a ticket's kind reads from and writes to, beside its labels. */
 export interface TicketKinds {
     /** The labels and type the ticket has now. */
-    read(ticket: number): Promise<{ labels: string[]; type: string | null }>;
+    read: (ticket: number) => Promise<{ labels: string[]; type: string | null }>;
     /** Changes the ticket's type, with whatever else that type needs in order to show the ticket's text. */
-    setType(ticket: number, type: string): Promise<void>;
+    setType: (ticket: number, type: string) => Promise<void>;
     /** The types `team`'s board shows, or null when a tracker's board shows every type. */
-    boardTypes(team?: string): Promise<string[] | null>;
+    boardTypes: (team?: string) => Promise<string[] | null>;
 }
 
 /** One label to add to a ticket or remove from it. */

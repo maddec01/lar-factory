@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vite-plus/test';
 
 import { newLabelProblem, writeAccessProblem } from './write-access.ts';
@@ -17,9 +20,6 @@ test('writes require verified access and respect Azure safety', () => {
 });
 
 test('legacy consent loads without granting access and disappears on resave', async (t) => {
-    const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { writeListFile, readRepositorySetups, setStructureSync } = await import('./repository-settings.ts');
     const { REPOSITORY_LIST_FILE } = await import('./data-dir.ts');
     const dir = mkdtempSync(join(tmpdir(), 'legacy-access-'));

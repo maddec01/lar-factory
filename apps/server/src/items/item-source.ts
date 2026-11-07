@@ -23,7 +23,7 @@ export interface ReadProgress {
     started(name: string): void;
     finished(name: string): void;
     /** A source's read landed while another still reads: the merged read so far, as a whole read would list it then. */
-    landed?(read: ItemsRead): void;
+    landed?: (read: ItemsRead) => void;
 }
 
 /**
@@ -54,8 +54,8 @@ export class AccessLost extends Error {}
  */
 export interface ReadPace {
     now: number;
-    active(item: Item): boolean;
-    polled(item: Item): boolean;
+    active: (item: Item) => boolean;
+    polled: (item: Item) => boolean;
     waits?(kind: ItemSourceKind): boolean;
     blocked?(kind: ItemSourceKind): boolean;
     activeMs?: number;
@@ -82,7 +82,7 @@ export interface ItemSource {
      * Reads the source's items, reporting to `progress` for each source it reads on its way, if it merges several. A
      * merged source given `pace` reads only the sources due at its pace, and lists the others' items from their last read.
      */
-    read(progress?: ReadProgress, pace?: ReadPace): Promise<ItemsRead>;
+    read: (progress?: ReadProgress, pace?: ReadPace) => Promise<ItemsRead>;
     /**
      * Reads these items alone afresh, as the source lists them, with their slices, PRs and checks; an item the source
      * no longer lists is left out. Absent on a source that reads only whole.

@@ -16,8 +16,8 @@ const at = (records: WorkRecords, workId: string) => records.read(workId).revisi
 /** Each kind of blocker with the local facts that complete it, the last fact left out until `finish`. */
 const BLOCKERS: {
     kind: 'decision' | 'concept' | 'build';
-    start(records: WorkRecords, workId: string): void;
-    finish(records: WorkRecords, workId: string): void;
+    start: (records: WorkRecords, workId: string) => void;
+    finish: (records: WorkRecords, workId: string) => void;
 }[] = [
     {
         kind: 'decision',

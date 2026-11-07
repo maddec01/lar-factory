@@ -23,7 +23,7 @@ import { detectAccess } from './detect-setup.ts';
 /** Access checks never make test writes. */
 export interface SaveReads {
     vocabulary?: VocabularyReads;
-    createLabel?(repo: string, name: string): Promise<string>;
+    createLabel?: (repo: string, name: string) => Promise<string>;
     source?(repo: string, source: RepositoryItemSource): Promise<void>;
     access(repo: string): Promise<Parameters<typeof saveLocalSetup>[2]>;
 }

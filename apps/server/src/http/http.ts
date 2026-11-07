@@ -52,7 +52,7 @@ export interface HttpDeps {
     buildLimit: Pick<BoardLimitSetting, 'save'>;
     autoBuild: Pick<BoardAutoBuild, 'save'>;
     /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
-    archive(): Item[];
+    archive: () => Item[];
     page: BuiltPage;
     /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
     appSecret: string | null;
@@ -61,43 +61,45 @@ export interface HttpDeps {
     /** A sample board that reads T3 also answers with T3's projects for onboarding. */
     sampleReadsT3: boolean;
     /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
-    reauthorizeT3?(): Promise<void>;
-    recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
+    reauthorizeT3?: () => Promise<void>;
+    recheck: (options?: { gh?: boolean; az?: boolean }) => Promise<void>;
     /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
     itemDetails: ItemDetailsReader;
     /** Shows a label change the tracker took on the item's row, before the next read reports it. */
-    showLabelChange(item: Item, change: LabelChange): void;
-    showTicketType(item: Item, type: string): void;
+    showLabelChange: (item: Item, change: LabelChange) => void;
+    showTicketType: (item: Item, type: string) => void;
     /**
      * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
      * repositories' configs again and reads every source.
      */
-    readSoon(url?: string): void;
+    readSoon: (url?: string) => void;
     /** The startup tool check; requests that run tools wait for it. */
-    ready(): Promise<void> | undefined;
+    ready: () => Promise<void> | undefined;
     /** A T3 project's favicon, or undefined when T3 hasn't listed the project or it has none. */
-    projectIcon(projectId: string): Promise<ProjectImage | undefined>;
+    projectIcon: (projectId: string) => Promise<ProjectImage | undefined>;
     /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
-    projectChoices(): Promise<ProjectChoice[]>;
+    projectChoices: () => Promise<ProjectChoice[]>;
     /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
-    keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
+    keepOnboarding: (input: Record<string, unknown>) => Promise<{ onboarding: OnboardingRepository[] } | Refused>;
     /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
-    createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
-    /** Onboarding's detection of the body's repository with its T3 project, reading only, or why it can't run. */
-    detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
-    /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
-    saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
-    /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
-    changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
-    changeRepositoryLabels(
+    createProject: (
         input: Record<string, unknown>,
-    ): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
+    ) => Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
+    /** Onboarding's detection of the body's repository with its T3 project, reading only, or why it can't run. */
+    detectSetup: (input: Record<string, unknown>) => Promise<{ detection: SetupDetection } | Refused>;
+    /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
+    saveSetup: (input: Record<string, unknown>) => Promise<{ onboarding: OnboardingRepository[] } | Refused>;
+    /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
+    changeRepositorySettings: (input: Record<string, unknown>) => Promise<{ setup: RepositorySetup } | Refused>;
+    changeRepositoryLabels: (
+        input: Record<string, unknown>,
+    ) => Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
 }
 
 export interface BoardServer {
     server: Server;
     /** Ends every page's event stream, so the server can close. */
-    endStreams(): void;
+    endStreams: () => void;
 }
 
 /** A write only the board app's page may make. */

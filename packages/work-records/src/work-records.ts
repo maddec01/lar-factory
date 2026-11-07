@@ -339,11 +339,11 @@ export interface WorkRecords
     /** Saves only a definite failure. An uncertain create keeps its reservation. */
     failCapture(requestId: string, failure: string): void;
     /** Imports by ticket, or captures locally, and resolves the request in the same transaction. */
-    completeCapture(
+    completeCapture: (
         requestId: string,
         record: NewWorkRecord,
         target?: { workId: string; revision: number },
-    ): { record: WorkRecord; created: boolean };
+    ) => { record: WorkRecord; created: boolean };
     create(record: NewWorkRecord): WorkRecord;
     /** Throws `not-found` when no record has `workId`. */
     read(workId: string): WorkRecord;

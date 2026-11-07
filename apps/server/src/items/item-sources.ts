@@ -109,7 +109,7 @@ export interface MergedSource extends ItemSource {
      */
     invalidate(url?: string): void;
     /** Whether the last read read the item's source afresh, rather than listing it from an earlier read. */
-    readAfresh(item: Item): boolean;
+    readAfresh: (item: Item) => boolean;
 }
 
 /** Whether the item, one of its slices or one of its linked PRs is at `url`, ignoring case, as GitHub's owner names do. */
@@ -453,7 +453,7 @@ export function mergeSources(
 /** The onboarded repositories' item source, with the repositories it last read. */
 export interface OnboardedSources extends MergedSource {
     /** The repositories as the last read found them, none before it. */
-    repos(): RepoConfig[];
+    repos: () => RepoConfig[];
     /** Makes the next read load the configs again, and read every source. */
     reload(): void;
 }

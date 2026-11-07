@@ -58,9 +58,9 @@ export interface ItemDetailsReader {
     olderComments: ReadOlderComments;
     saveDescription: SaveDescription;
     /** The labels the repository of the item's ticket offers, without the managed ones. */
-    labels(item: Item): Promise<{ labels: TrackerLabel[] } | Refused>;
+    labels: (item: Item) => Promise<{ labels: TrackerLabel[] } | Refused>;
     /** Adds a label to the item's ticket or removes it; null when the tracker took it, else the refusal to show. */
-    changeLabels(item: Item, change: LabelChange): Promise<Refused | null>;
+    changeLabels: (item: Item, change: LabelChange) => Promise<Refused | null>;
     exportMarkdown: ExportItem;
     specAction?(item: Item, generation: number, action: 'retry' | 'accept' | 'reject'): Promise<Refused | null>;
 }

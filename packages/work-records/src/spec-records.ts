@@ -40,7 +40,7 @@ export interface SpecRecords {
     specState(workId: string): SpecState;
     specPending(): string[];
     /** Compare-and-swap the checkpoint, optionally importing/approving exact text in the same transaction. */
-    saveSpecState(workId: string, generation: number, state: SpecState, change?: SpecChange): boolean;
+    saveSpecState: (workId: string, generation: number, state: SpecState, change?: SpecChange) => boolean;
 }
 
 const empty = (ticket: string | null): SpecState => ({

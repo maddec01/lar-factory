@@ -36,7 +36,7 @@ export interface ObserveReads {
     /** The kind the record and its ticket agree on in the last read, or null when they don't. */
     agreedKind?(record: WorkRecord): WorkRecord['kind'] | null;
     /** Hears that an observation alone moved the Dependency from revision `from` to `to`, and whether it `changed` the kind it shows. */
-    observed?(dependencyId: string, from: number, to: number, changed: boolean): void;
+    observed?: (dependencyId: string, from: number, to: number, changed: boolean) => void;
 }
 
 /** How many records' provider reads run at once. */

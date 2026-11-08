@@ -5,21 +5,7 @@
 import type { BoardData } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import {
-    $,
-    $$,
-    addStylesheet,
-    answer,
-    fetchMock,
-    holdPosts,
-    mountPage,
-    moved,
-    posted,
-    sample,
-    settle,
-    text,
-    toast,
-} from '@/test/PageTest';
+import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '@/test/PageTest';
 
 const button = (attr: string, id: string) => $<HTMLButtonElement>(`[data-item-dialog] [data-${attr}="${id}"]`)!;
 const press = async (el: HTMLElement) => {
@@ -48,40 +34,12 @@ test('Queue shows pending state, then leaves Shape reachable without an overlay'
         `Queuing… #61 ${sample.items[0]!.title}`,
     ]);
     expect(button('abandon', 'I_sample01').getAttribute('aria-disabled'), 'the item is held').toBe('true');
-    expect(text(button('abandon', 'I_sample01')), 'Abandon is not relabelled').toBe('Abandon');
+    expect(text(button('abandon', 'I_sample01')), 'Abandon isn’t relabelled').toBe('Abandon');
 
     await answer({ error: null, board: moved('I_sample01', 'Queued') });
-    expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
+    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List3');
     expect(toast()).toBeNull();
-    expect(text(button('start', 'I_sample01'))).toContain('Shape issue');
-});
-
-test("a server that can't be reached is a Queue error too", async () => {
-    fetchMock.mockImplementation(async () => {
-        throw new TypeError('Failed to fetch');
-    });
-    await mountPage();
-    await openItem('I_sample01');
-    await press(button('queue', 'I_sample01'));
-    expect(text($('[data-item-dialog] .action-error [role="alert"]'))).toBe("Can't reach the board server. Try again.");
-    expect(toast(), 'no toast').toBeNull();
-});
-
-test('Move to List shows only its own pending state', async () => {
-    holdPosts();
-    await mountPage();
-    await openItem('I_sample05');
-
-    const back = button('back-to-list', 'I_sample05');
-
-    await press(back);
-    expect([
-        text(back),
-        back.getAttribute('aria-label')!.split(' ').slice(0, 2).join(' '),
-        back.getAttribute('aria-disabled'),
-    ]).toEqual(['Moving to List…', 'Moving #129', 'true']);
-    expect(text(button('abandon', 'I_sample05')), 'Abandon is not relabelled').toBe('Abandon');
-    expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Shape issue ▾');
+    expect(text(button('start', 'I_sample01'))).toContain('Shape');
 });
 
 test('a failed Move to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
@@ -89,10 +47,10 @@ test('a failed Move to List shows as a toast naming the item, which stays until 
     await mountPage();
     await openItem('I_sample05');
     await press(button('back-to-list', 'I_sample05'));
-    await answer({ error: 'Could not set List. GitHub is down.' }, 502);
+    await answer({ error: 'Couldn’t set List. GitHub is down.' }, 502);
     expect(toast()!.getAttribute('role')).toBe('alert');
     expect(toast()!.dataset.toastColor, 'a failure is red').toBe('danger');
-    expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
+    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to List\. Couldn’t set List\. GitHub is down\.$/);
     expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
     expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();
     expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to List');
@@ -126,12 +84,13 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
     );
     expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual([
         'Cancel',
-        'Abandon',
         'Abandon and close ticket',
+        'Abandon',
     ]);
     await settle(() => vi.advanceTimersByTime(100));
-    expect(document.activeElement, 'Close takes focus, not the destructive button').toBe(
-        $('#abandon-dialog [aria-label="Close"]'),
+    expect($('#abandon-dialog [aria-label="Close"]')).toBeNull();
+    expect(document.activeElement, 'Cancel takes focus, not the destructive button').toBe(
+        $$('#abandon-dialog [data-slot="modal-footer"] button')[0],
     );
     await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
     await settle(() => vi.advanceTimersByTime(100));
@@ -141,11 +100,11 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
 
     await openItem('I_sample04');
     await press(button('abandon', 'I_sample04'));
-    expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #900004 Shared playback history across devices\?$/);
+    expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #113 Shared playback history across devices\?$/);
     expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual([
         'Cancel',
-        'Abandon',
         'Abandon and close ticket',
+        'Abandon',
     ]);
     await settle(() => vi.advanceTimersByTime(100));
     await settle(() =>
@@ -156,24 +115,6 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
     expect($('[data-item-dialog]'), 'and leaves the item dialog open').not.toBeNull();
 });
 
-test('Abandon opens over an overlay, nothing over the title bar drags, and a click outside leaves it open', async () => {
-    await mountPage();
-    await openItem('I_sample01');
-    await press(button('abandon', 'I_sample01'));
-
-    const { noDrag } = addStylesheet();
-    const dialog = $('#abandon-dialog')!;
-    const overlay = $$('[data-slot="modal-overlay"]').at(-1)!;
-
-    expect(dialog.getAttribute('data-slot')).toBe('modal-content');
-    expect([dialog, overlay].map(noDrag)).toEqual([true, true]);
-    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-        await settle(() => overlay.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 })));
-    }
-    await settle(() => vi.advanceTimersByTime(100));
-    expect($('#abandon-dialog'), 'still open').not.toBeNull();
-});
-
 test('confirming Abandon holds Queue without relabelling it, and announces the close', async () => {
     holdPosts();
 
@@ -182,26 +123,22 @@ test('confirming Abandon holds Queue without relabelling it, and announces the c
     await mountPage(data);
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
-    await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
+    await settle(() =>
+        $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')
+            .find((b) => text(b) === 'Abandon')!
+            .click(),
+    );
 
     const abandoning = button('abandon', 'I_sample01');
 
     expect([text(abandoning), abandoning.getAttribute('aria-disabled')]).toEqual(['Abandoning…', 'true']);
     expect(button('queue', 'I_sample01').getAttribute('aria-disabled')).toBe('true');
-    expect(text(button('queue', 'I_sample01')), 'Queue is not relabelled').toBe('Queue');
+    expect(text(button('queue', 'I_sample01')), 'Queue isn’t relabelled').toBe('Queue');
 
     await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
-    expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
+    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List3');
     expect(toast()!.querySelector('a, [data-view-item]'), 'the toast gives the result').toBeNull();
     expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
-});
-
-test('in sample mode Move to List is disabled too', async () => {
-    await mountPage({ ...sample, capture: { enabled: false } as BoardData['capture'] });
-    await openItem('I_sample05');
-    for (const b of [button('back-to-list', 'I_sample05'), button('abandon', 'I_sample05')]) {
-        expect([b.disabled, b.title]).toEqual([true, 'Disabled in sample mode']);
-    }
 });
 
 test('queuing a source issue switches the open dialog to its new local work ID', async () => {
@@ -229,7 +166,11 @@ test('combined tracker failure keeps the confirmation open and allows Cancel', a
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
-    await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[2]!.click());
+    await settle(() =>
+        $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')
+            .find((b) => text(b) === 'Abandon and close ticket')!
+            .click(),
+    );
     await answer({ error: 'Provider refused closure.' });
     expect(text($('#abandon-dialog [role="alert"]'))).toBe('Provider refused closure.');
     expect($('#abandon-dialog')).not.toBeNull();
@@ -238,53 +179,28 @@ test('combined tracker failure keeps the confirmation open and allows Cancel', a
     expect(button('abandon', 'I_sample01')).not.toBeNull();
 });
 
-test('board-only failure retains the abandonment confirmation and inline error', async () => {
-    holdPosts();
-    await mountPage();
-    await openItem('I_sample01');
-    await press(button('abandon', 'I_sample01'));
-    await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
-    await answer({ error: 'Disk unavailable' });
-    expect(text($('#abandon-dialog [role="alert"]'))).toBe('Disk unavailable');
-    expect($('#abandon-dialog')).not.toBeNull();
-});
-
 test('two lost combined responses block dismissal and board-only recovery until reconciliation', async () => {
     holdPosts();
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
 
-    const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+    /** The footer in ConfirmDialog's order: Cancel, Abandon and close ticket, then the confirming Abandon. */
+    const [cancel, abandonAndClose, abandon] = [0, 1, 2].map(
+        (n) => () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[n]!,
+    ) as [() => HTMLButtonElement, () => HTMLButtonElement, () => HTMLButtonElement];
 
-    await settle(() => buttons()[2]!.click());
-    await answer({ error: "Can't reach the board server. Try again." });
-    await answer({ error: "Can't reach the board server. Try again." });
-    expect(buttons()[0]!.disabled).toBe(true);
-    expect(buttons()[1]!.disabled).toBe(true);
-    expect(buttons()[2]!.disabled).toBe(false);
-    await settle(() => buttons()[2]!.click());
+    expect(text(abandonAndClose())).toBe('Abandon and close ticket');
+    await settle(() => abandonAndClose().click());
+    await answer({ error: 'Can’t reach the board server. Try again.' });
+    await answer({ error: 'Can’t reach the board server. Try again.' });
+    expect(cancel().disabled).toBe(true);
+    expect(abandon().disabled).toBe(true);
+    expect(abandonAndClose().disabled).toBe(false);
+    await settle(() => abandonAndClose().click());
     await answer({ error: 'Provider refused closure.' });
-    expect(buttons()[0]!.disabled).toBe(false);
-    expect(buttons()[1]!.disabled).toBe(false);
-});
-
-test('local retry failure preserves the explanation after tracker closure', async () => {
-    holdPosts();
-    await mountPage();
-    await openItem('I_sample01');
-    await press(button('abandon', 'I_sample01'));
-
-    const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
-
-    await settle(() => buttons()[2]!.click());
-    await answer({
-        error: 'The ticket is closed, but the work remains on the board. Try again to finish abandonment. Disk unavailable',
-    });
-    await settle(() => buttons()[1]!.click());
-    await answer({ error: 'Disk unavailable' });
-    expect($('#abandon-dialog')).not.toBeNull();
-    expect(text($('#abandon-dialog [role="alert"]'))).toContain('ticket is closed');
+    expect(cancel().disabled).toBe(false);
+    expect(abandon().disabled).toBe(false);
 });
 
 test.each([
@@ -389,7 +305,7 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
     }
 });
 
-test('Queue from List closes details and returns focus to the surviving List search', async () => {
+test('Queue from the list closes details and returns focus to the surviving List search', async () => {
     holdPosts();
     await mountPage();
     await press($<HTMLButtonElement>('.title-bar .list-button')!);

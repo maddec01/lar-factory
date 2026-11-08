@@ -61,13 +61,15 @@ function commandAction(input: string): string {
 
 /** A tool's title with any path shortened to its file name, or its name without the server it came from. */
 function toolAction({ title, toolName }: ActivityItemRow): string | undefined {
+    if (/AskUserQuestion/.test(toolName ?? title ?? '')) return 'Waiting for your answer';
+
     if (title) {
         const path = /^(\w+) ((?:[~/]|\S+\/).*)$/.exec(title);
 
         return path ? `${path[1]} ${lastSegment(path[2]!)}` : title;
     }
 
-    return toolName?.split(/__|\./).pop();
+    return toolName ? 'Using a tool' : undefined;
 }
 
 /** The words for an item; undefined for text that has finished, which is no action. */

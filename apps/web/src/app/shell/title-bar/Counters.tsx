@@ -5,18 +5,15 @@
 // a list that scrolls; picking one opens the item dialog. The row holds its width as values load; the title bar's width
 // decides what shows: Spend goes first, then Shaping and Shipped.
 
-import {
-    activityUnavailable,
-    boardSections,
-    buildsAtWork,
-    formatUsd,
-    limitNumber,
-    plural,
-    readingScope,
-    usageFailed,
-    usageIncomplete,
-} from '@lar-factory/shared';
+import { boardSections, formatUsd, plural, readingScope, usageFailed, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
+import { Loading, StatusIndicator } from '@lar-works/design-system';
+import { CircleDollarSign } from '@lar-works/design-system/icons';
+
+import { List } from './CounterParts';
+import { spendFace } from './SpendFace';
+import { StatusGlyph, useBuilds, useItemStates } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
 import {
     BoardCounter as Counter,
     BoardCounters,
@@ -27,22 +24,16 @@ import {
     CounterGroup,
     CounterGroups,
     CounterOfLimit,
-    LimitBars,
-    Loading,
-} from '@lar-works/design-system';
-import { CircleDollarSign } from '@lar-works/design-system/icons';
-
-import { List, spendFace } from './CounterParts';
-import { StatusGlyph, useStatusActivity } from '@/features/items';
-import { useBoardStore } from '@/services/board/board.hooks';
+} from '@/ui/board';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? (item.stats.costUsd ?? 0) : 0);
 
 export function Counters() {
     const { data, now, clientError } = useBoardStore();
     const s = boardSections(data, now, clientError);
-    const building = buildsAtWork(data, activityUnavailable(data, now, clientError));
-    const limit = data.buildLimit && limitNumber(data.buildLimit);
+    const builds = useBuilds();
+    const { items: building, limit } = builds;
+    const states = useItemStates();
     const costs = data.items
         .map((item) => ({ item, cost: costOf(item) }))
         .filter((x) => x.cost > 0)
@@ -62,17 +53,22 @@ export function Counters() {
         usageStillLoading,
     );
     const free = limit === undefined ? undefined : limit - building.length;
-    const running = useStatusActivity();
     const glyph = (status: Status) => (
-        <StatusGlyph status={status} running={status === 'In progress' && building.some(running)} />
+        <StatusGlyph status={status} running={status === 'In progress' && builds.running > 0} />
     );
+    // Needs you's groups name what each item asks, as its row does, under the counter's own title.
+    const asks = (item: Item) => {
+        const { word } = states(item);
+
+        return word === 'Needs you' ? 'Questions' : word;
+    };
     // Nothing has been read yet, so a zero would be a claim.
     const unknown = (n: number) => reading && !n;
     const countOf = (n: number) => (unknown(n) ? <CounterDash /> : n);
-    const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading Projects' : hint);
+    const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading projects' : hint);
     const subFor = (n: number) => (unknown(n) ? undefined : n);
     const empty = (none: string) => (
-        <Empty>{reading ? <Loading presentation="inline" label="Loading Projects…" /> : none}</Empty>
+        <Empty>{reading ? <Loading presentation="inline" label="Loading projects…" /> : none}</Empty>
     );
     const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
@@ -81,8 +77,8 @@ export function Counters() {
             <Counter
                 label="need you"
                 value={countOf(s.needsYou.length)}
-                icon={glyph('Needs you')}
                 title="Needs you"
+                icon={<StatusIndicator state="waiting" />}
                 sub={subFor(s.needsYou.length)}
                 hint={hintFor(
                     s.needsYou.length,
@@ -93,8 +89,8 @@ export function Counters() {
             >
                 {s.needsYou.length ? (
                     <CounterGroups>
-                        {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
-                            const items = s.needsYou.filter((i) => i.status === status);
+                        {[...new Set(s.needsYou.map(asks))].map((status) => {
+                            const items = s.needsYou.filter((i) => asks(i) === status);
 
                             return (
                                 <CounterGroup key={status} title={status} count={items.length}>
@@ -128,38 +124,22 @@ export function Counters() {
                 icon={glyph('In progress')}
                 width={limit === undefined ? 'count' : 'limit'}
                 title="Building"
+                count={subFor(building.length)}
                 value={
                     limit === undefined ? (
                         countOf(building.length)
                     ) : (
-                        <CounterOfLimit count={countOf(building.length)} limit={limit} />
+                        <CounterOfLimit count={countOf(building.length)} used={building.length} limit={limit} />
                     )
                 }
-                hint={hintFor(
-                    building.length,
-                    free === undefined
-                        ? `${plural(building.length, 'build')} at work`
-                        : free > 0
-                          ? `Room for ${plural(free, 'more build')} under the build limit of ${limit}`
-                          : free === 0
-                            ? 'At the build limit'
-                            : `${-free} over the build limit`,
-                )}
-                sub={
-                    limit === undefined ? (
-                        subFor(building.length)
-                    ) : unknown(building.length) ? (
-                        `–/${limit}`
-                    ) : (
-                        <LimitBars used={building.length} limit={limit} />
-                    )
-                }
+                hint={hintFor(building.length, builds.text)}
+                sub={limit === undefined ? undefined : `Automatic limit ${limit}`}
                 foot={
                     reading || free === undefined
                         ? undefined
                         : free > 0
-                          ? `Room for ${plural(free, 'more build')} under the build limit.`
-                          : 'At the build limit. Start build and Start after still go ahead.'
+                          ? 'Manual starts and Start after may exceed the automatic build limit.'
+                          : 'Manual starts and Start after may exceed the automatic build limit.'
                 }
             >
                 {listOf(building, 'Nothing building right now.')}
@@ -171,6 +151,7 @@ export function Counters() {
                 icon={glyph('Done')}
                 fold="medium"
                 title="Shipped"
+                count={subFor(s.done.length)}
                 sub="last 7 days"
                 hint={hintFor(s.done.length, 'Done in the last 7 days')}
             >

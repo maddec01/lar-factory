@@ -13,9 +13,6 @@ import type {
 } from '@lar-factory/shared';
 import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 
@@ -265,7 +262,7 @@ export const posted = () =>
         });
 
 /** The updater in a `pnpm run dev` app: off, so there is no update pill and Settings gives the reason. */
-export const updatesOff: UpdateState = {
+const updatesOff: UpdateState = {
     enabled: false,
     status: 'disabled',
     channel: 'latest',
@@ -308,91 +305,6 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
     vi.stubGlobal('boardApp', bridge);
 
     return bridge;
-}
-
-/** Bridge parts for `stubApp` whose window starts in macOS full screen if `on`; `set` enters or leaves it. */
-export function fullScreen(on: boolean) {
-    const listeners = new Set<(fullscreen: boolean) => void>();
-    const bridge: Pick<BoardAppBridge, 'getWindowFullscreenState' | 'onWindowFullscreenStateChange'> = {
-        getWindowFullscreenState: () => on,
-        onWindowFullscreenStateChange: (listener) => {
-            listeners.add(listener);
-
-            return () => listeners.delete(listener);
-        },
-    };
-    const set = (next: boolean) =>
-        settle(() => {
-            on = next;
-            listeners.forEach((listener) => listener(next));
-        });
-
-    return { bridge, set };
-}
-
-/** The design system's board entry, which src/index.css imports. */
-const boardCss = fileURLToPath(import.meta.resolve('@lar-works/design-system/board.css'));
-
-/** Drops the Tailwind-only blocks (@theme, @utility, @custom-variant) jsdom's CSS parser doesn't know. */
-function withoutTailwindBlocks(css: string): string {
-    let out = '';
-    let at = 0;
-
-    for (const match of css.matchAll(/@(theme|utility|custom-variant)\b[^{;]*\{/g)) {
-        if (match.index < at) continue;
-
-        out += css.slice(at, match.index);
-
-        let depth = 0;
-        let end = match.index;
-
-        for (; end < css.length; end++) {
-            if (css[end] === '{') depth++;
-            else if (css[end] === '}' && --depth === 0) break;
-        }
-
-        at = end + 1;
-    }
-
-    return out + css.slice(at);
-}
-
-/** A sheet with the relative sheets it imports in their place, and the package imports (Tailwind's, ninna-ui's) left
- *  out; src/index.css's import of the design system's board.css brings the board's sheets in. */
-function inlined(file: string): string {
-    return withoutTailwindBlocks(readFileSync(file, 'utf8')).replace(
-        /@import ['"](.+?)['"][^;]*;/g,
-        (_line, path: string) =>
-            path === '@lar-works/design-system/board.css'
-                ? inlined(boardCss)
-                : path.startsWith('.')
-                  ? inlined(join(dirname(file), path))
-                  : '',
-    );
-}
-
-/** src/index.css with the sheets it imports in their place. */
-const src = join(import.meta.dirname, '..');
-const pageCss = () => inlined(join(src, 'index.css'));
-
-/** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
- *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheets' text and from
- *  Tailwind's arbitrary no-drag class. */
-export function addStylesheet(): { noDrag: (el: Element) => boolean } {
-    const css = pageCss();
-    const style = document.createElement('style');
-
-    style.textContent = css;
-    document.head.append(style);
-
-    const selectors = [...css.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) =>
-        rule[1]!.replace(/\/\*[^]*?\*\//g, ''),
-    );
-
-    return {
-        noDrag: (el) =>
-            el.classList.contains('[-webkit-app-region:no-drag]') || selectors.some((selector) => el.matches(selector)),
-    };
 }
 
 /** A fake `confirmRestart` for `stubApp`: it records each question and answers `answer`, true for Restart. */

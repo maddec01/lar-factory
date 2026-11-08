@@ -1,4 +1,4 @@
-// The board's Scope, Kind and Labels, saved on this machine. The board search and the List modal's Scope board set the
+// The board's Scope, Kind and Labels, saved on this machine. The board search and the list modal's Scope board set the
 // saved Scope; the board reads the shown one, as a saved repository can leave the board and come back.
 
 import { listRepos, sameRepo } from '@lar-factory/shared';

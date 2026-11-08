@@ -6,24 +6,24 @@
 import { boardApp } from '@lar-factory/shared';
 import {
     Button,
-    buttonKind,
+    EmptyState,
     CommandPalette,
     CommandPaletteGroup,
     CommandPaletteOption,
     CommandPaletteTrigger,
-    Kbd,
     Loading,
 } from '@lar-works/design-system';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { useFilterGroups, useFilterTokens } from './BoardFilters';
 import type { FilterToken } from './BoardFilters';
 import { searchResults, settingsOptions } from './SearchResults';
+import { useFilterGroups, useFilterTokens } from './useFilterTokens';
 import { useScopeStore, useShownScope } from '@/features/filters';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
+import { buttonKind } from '@/ui/board';
 
 /** The step the Update pill would run now; none while it does nothing, as when another step is under way. */
 function useUpdateStep() {
@@ -95,27 +95,25 @@ function Dialog({
             onSelect={(value) => options.find((option) => option.value === value)?.select()}
             onClose={onClose}
             listLabel="Search results"
-            empty="Nothing matches."
-            busy={reading}
-            busyLabel={<Loading presentation="inline" label="Loading Projects…" />}
-            footer={
-                <>
-                    <span>
-                        <Kbd>↑↓</Kbd> move
-                    </span>
-                    <span>
-                        <Kbd>↵</Kbd> choose
-                    </span>
-                    {tokens.length > 0 && (
-                        <span>
-                            <Kbd>⌫</Kbd> remove filter
-                        </span>
-                    )}
-                    <span>
-                        <Kbd>esc</Kbd> close
-                    </span>
-                </>
+            empty={
+                <EmptyState
+                    size="compact"
+                    title="Nothing matches"
+                    actions={
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setQuery('');
+                                setWidened(false);
+                            }}
+                        >
+                            Clear search
+                        </Button>
+                    }
+                />
             }
+            busy={reading}
+            busyLabel={<Loading presentation="inline" label="Loading projects…" />}
         >
             {groups.map((group) => (
                 <CommandPaletteGroup key={group.label} label={group.label}>

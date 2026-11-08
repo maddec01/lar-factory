@@ -1,15 +1,13 @@
 // The Shaping, Ready to build and Build sections. Ready to build's header holds the Auto-build switch, and Build's counts the
 // factory's builds at work against the build limit.
 
-import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
-import { BuildLimit as DesignBuildLimit, StageList } from '@lar-works/design-system';
-
 import { AutoBuildSwitch } from './AutoBuildSwitch';
 import { Pane, PaneEmpty } from './Pane';
 import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
-import { STATUS_COLOR, useStatusActivity } from '@/features/items';
+import { useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { BuildLimit as DesignBuildLimit, StageList } from '@/ui/board';
 
 type Shows = (row: Row) => boolean;
 
@@ -57,25 +55,23 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
     );
 }
 
-/** Builds at work against the build limit, one bar per build it allows, more when they're over it. */
-function BuildLimit({ building, limit }: { building: number; limit: number | undefined }) {
+/** Builds at work against the build limit, one bar per build it allows, more when they're over it, counted by the
+ *  words their rows say. */
+function BuildLimit() {
+    const builds = useBuilds();
+
     return (
         <DesignBuildLimit
-            building={building}
-            limit={limit}
-            color={STATUS_COLOR['In progress']}
-            title="Builds at work against the build limit"
+            building={builds.items.length}
+            limit={builds.limit}
+            title={`${builds.text}. ${BUILD_LIMIT_NOTE} Auto-build pauses new starts at this limit. Manual starts and Start after may exceed it.`}
         >
-            {`${building}${limit !== undefined ? `/${limit}` : ''} building`}
+            {builds.items.length} open{builds.limit === undefined ? '' : ` · limit ${builds.limit}`}
         </DesignBuildLimit>
     );
 }
 
 export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
-    const building = useBoardStore(
-        (state) => buildsAtWork(state.data, activityUnavailable(state.data, state.now, state.clientError)).length,
-    );
-    const buildLimit = useBoardStore((state) => state.data.buildLimit);
     const rows = build.filter(shows);
     const running = useStatusActivity();
 
@@ -86,7 +82,7 @@ export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
             status="In progress"
             running={rows.some((row) => running(row.item))}
             count={rows.length}
-            right={<BuildLimit building={building} limit={buildLimit && limitNumber(buildLimit)} />}
+            right={<BuildLimit />}
         >
             {rows.length ? (
                 <Rows rows={rows} />

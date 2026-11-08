@@ -31,14 +31,14 @@ test('reauthorization reports failure and succeeds without exposing credentials'
 
     await mountPage(degraded);
     fetchMock.mockImplementation(
-        async () => new Response(JSON.stringify({ error: 'Could not reauthorize T3.' }), { status: 503 }),
+        async () => new Response(JSON.stringify({ error: 'Couldn’t reauthorize T3.' }), { status: 503 }),
     );
 
     const button = () =>
         $<HTMLButtonElement>('[data-warning="t3-source:renewal-required"] button[data-slot="button"]')!;
 
     await settle(() => button().click());
-    expect($('[data-warning="t3-source:renewal-required"]')!.textContent).toContain('Could not reauthorize T3.');
+    expect($('[data-warning="t3-source:renewal-required"]')!.textContent).toContain('Couldn’t reauthorize T3.');
     fetchMock.mockImplementation(
         async () =>
             new Response(

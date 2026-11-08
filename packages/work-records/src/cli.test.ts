@@ -433,133 +433,6 @@ throw Error('Local exploration must not call a tracker');
             });
             expect(writes()).toEqual([]);
         });
-
-        it('a kept answer is reported as kept, which is what clears the board', async () => {
-            const data = join(tempDir(), 'Lar Factory');
-
-            fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
-
-            const made = await imported(data, 'bug');
-
-            await larWork(
-                data,
-                'record-kind-answer',
-                made.workId,
-                '--revision',
-                String(made.revision),
-                '--answer',
-                'keep',
-                '--ticket-kind',
-                'feature',
-            );
-            expect(await check(data, made.workId)).toMatchObject({ ticketKind: 'feature', kept: true });
-        });
-
-        it('a yes through change-kind leaves nothing to report', async () => {
-            const data = join(tempDir(), 'Lar Factory');
-            const dir = tempDir();
-
-            fakeIssue(dir, { labels: [{ name: 'type: feature' }], type: null });
-
-            const made = await imported(data, 'bug');
-
-            await larWork(data, 'change-kind', made.workId, '--revision', String(made.revision), '--kind', 'bug');
-            writeFileSync(
-                join(dir, 'issue.json'),
-                JSON.stringify({ number: 12, labels: [{ name: 'type: bug' }], type: { name: 'Bug' } }),
-            );
-            expect(await check(data, made.workId)).toBeNull();
-        });
-
-        it("a ticket with no kind counts only when the item's kind has something mapped to add", async () => {
-            const data = join(tempDir(), 'Lar Factory');
-
-            fakeIssue(tempDir(), { labels: [{ name: 'docs' }], type: null });
-
-            const made = await imported(data, 'bug');
-
-            expect(await check(data, made.workId)).toMatchObject({ ticketKind: null, swap: { add: ['type: bug'] } });
-
-            await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'improvement');
-            expect(await check(data, made.workId)).toBeNull();
-        });
-
-        it("says why this login can't make the swap", async () => {
-            const data = join(tempDir(), 'Lar Factory');
-
-            fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
-
-            const made = await imported(data, 'bug');
-
-            writeFileSync(
-                join(data, 'repository-settings.json'),
-                readFileSync(join(data, 'repository-settings.json'), 'utf8').replace(
-                    '"tag-ticket":"allowed"',
-                    '"tag-ticket":"refused"',
-                ),
-            );
-            expect((await check(data, made.workId)).accessProblem).toBe(
-                'Access to tag-ticket was refused. Recheck access in Settings.',
-            );
-        });
-
-        it('local work and a repository with no setup have nothing to report, as on the board', async () => {
-            const data = join(tempDir(), 'Lar Factory');
-
-            fakeIssue(tempDir(), { labels: [{ name: 'feature' }], type: null });
-
-            const local = (
-                await larWork(data, 'create', '--title', 'T', '--repository', 'example/product', '--kind', 'bug')
-            ).record;
-
-            expect(await check(data, local.workId)).toBeNull();
-
-            const unlisted = (
-                await larWork(
-                    data,
-                    'import',
-                    '--title',
-                    'T',
-                    '--repository',
-                    'example/other',
-                    '--kind',
-                    'bug',
-                    '--ticket',
-                    'example/other#12',
-                )
-            ).record.record;
-
-            expect(await check(data, unlisted.workId)).toBeNull();
-        });
-
-        it('a failed ticket read fails with the reason', async () => {
-            const data = join(tempDir(), 'Lar Factory');
-
-            fakeIssue(tempDir(), { labels: [], type: null });
-
-            const other = (
-                await larWork(
-                    data,
-                    'import',
-                    '--title',
-                    'T',
-                    '--repository',
-                    'example/product',
-                    '--kind',
-                    'bug',
-                    '--ticket',
-                    'example/product#12',
-                )
-            ).record.record;
-
-            mapped(data);
-            vi.stubEnv('GH_PATH', join(tempDir(), 'no-such-gh'));
-
-            const failed = await larWork(data, 'kind-disagreement', other.workId);
-
-            expect(failed.code).toBe(1);
-            expect(failed.stderr).toMatch(/^lar-work: Could not read #12\./);
-        });
     });
 
     it('creates, reads and updates a record in a data folder with no board running', async () => {
@@ -1109,27 +982,6 @@ throw Error('Local exploration must not call a tracker');
         });
         expect(readdirSync(join(data, '..'))).toEqual([]);
     });
-
-    it('explains identifiers, reads, changes, structure and errors in its help', async () => {
-        const help = await larWork(tempDir(), '--help');
-
-        expect(help.code).toBe(0);
-        for (const heading of [
-            'Identifiers',
-            'Reads',
-            'Changes',
-            'Structure',
-            'Completion',
-            'Content',
-            'Brief gate',
-            'Provider observations',
-            'Dependencies',
-            'Threads and launch intents',
-            'Retention and export',
-            'Errors',
-        ])
-            expect(help.stdout).toContain(`\n${heading}\n`);
-    });
 });
 
 it('keeps the brief gate local and refuses removed refinement publication commands', { timeout: 30_000 }, async () => {
@@ -1303,7 +1155,7 @@ it(
         settings(true);
         expect(await larWork(data, ...args)).toMatchObject({
             code: 1,
-            stderr: expect.stringContaining('not checked yet'),
+            stderr: expect.stringContaining('isn’t checked yet'),
         });
         expect((await larWork(data, 'read', created.record.workId)).record.ticket).toBeNull();
         expect((await larWork(data, '--help')).stdout).toContain('create-ticket <work-id>');

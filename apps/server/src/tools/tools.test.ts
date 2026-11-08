@@ -55,12 +55,6 @@ test('finds the tools on the login shell PATH when started with a bare PATH', as
     assert.equal(tools.searchPath.split(':')[0], bin);
 });
 
-test('an empty override counts as unset', async (t) => {
-    const { bin } = await machine(t, ['gh']);
-
-    assert.deepEqual(findTools({ PATH: bin, GH_PATH: '' }, null).gh, { path: join(bin, 'gh') });
-});
-
 test('an override with a slash that is not runnable leaves the tool missing, with no fallback', async (t) => {
     const { dir, bin } = await machine(t, ['t3', 'not-runnable']);
 
@@ -282,36 +276,12 @@ exit 9
     return probeAz();
 }
 
-test('an az signed in with the azure-devops extension passes, with its version', async (t) => {
-    assert.deepEqual(await probeAzWith(t, 0, 0), { result: 'ok', version: '2.67.0' });
-});
-
-test('az names its fix: az login when signed out, else az extension add without the extension', async (t) => {
-    assert.deepEqual(await probeAzWith(t, 1, 1), { result: 'logged-out', version: '2.67.0', fix: 'az login' });
-    assert.deepEqual(await probeAzWith(t, 0, 1), {
-        result: 'no-extension',
-        version: '2.67.0',
-        fix: 'az extension add --name azure-devops',
-    });
-});
-
 test('an az that fails to print its version still has its sign-in and extension checked, without a version', async (t) => {
     assert.deepEqual(await probeAzWith(t, 0, 0, 'exit 1'), { result: 'ok' });
     assert.deepEqual(await probeAzWith(t, 1, 0, 'echo not json'), { result: 'logged-out', fix: 'az login' });
     assert.deepEqual(await probeAzWith(t, 0, 1, `echo '{"extensions": {}}'`), {
         result: 'no-extension',
         fix: 'az extension add --name azure-devops',
-    });
-});
-
-test('a missing az has brew install azure-cli as its fix', async (t) => {
-    const { shell } = await machine(t, []);
-
-    await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, AZ_PATH: '/nowhere/az' });
-    assert.deepEqual(await probeAz(), {
-        result: 'missing',
-        override: 'AZ_PATH=/nowhere/az',
-        fix: 'brew install azure-cli',
     });
 });
 

@@ -1,12 +1,13 @@
-// The item dialog's footer actions: the one action the item's status asks for, with Open thread beside it, and Move to
-// List and Abandon at its left.
+// The item dialog's footer actions: the one action the item's state asks for, with Open thread beside it, and Move to
+// List and Abandon at its left. Stopped work the board can't restart asks to be resumed in T3, as its primary action.
 
 import {
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
+    itemActivityThread,
     needsAnswer,
-    openQuestionThread,
+    nextAction,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
@@ -23,21 +24,28 @@ import {
     useShownStatus,
     useStartHolds,
 } from '@/features/items';
+import type { ItemState } from '@/features/items';
 
 /** A status's action: a thread it opens, the latest when `opens` names none, or another control. */
-type StatusAction = { opens: string | undefined; label?: string } | { control: ReactNode };
+type StatusAction = { opens: string | undefined; label?: string; primary?: boolean } | { control: ReactNode };
 
 const LATEST_THREAD: StatusAction = { opens: undefined };
 
 const latestThread = (item: Item) => (Array.isArray(item.threads) ? item.threads[0]?.id : undefined);
 
 /** The one thing the item's status asks of you. A Start leaves the latest thread to the Open thread beside it. */
-function statusAction(item: Item, data: BoardData, working: boolean): StatusAction {
+function statusAction(item: Item, data: BoardData, { working, resume }: ItemState): StatusAction {
     const linkedBeside = latestThread(item);
+
+    if (resume) return { opens: itemActivityThread(item)?.id, label: 'Resume in T3', primary: true };
 
     if (working) return { opens: currentBuildThread(item)?.id };
 
-    if (needsAnswer(item)) return { opens: openQuestionThread(item)?.id, label: 'Answer in T3' };
+    const action = nextAction(item);
+
+    if (action?.kind === 'thread') return { opens: action.threadId, label: action.label };
+
+    if (action?.kind === 'pr') return { control: <PrLink item={item} label={action.label} primary /> };
 
     switch (item.status) {
         case 'List':
@@ -46,7 +54,7 @@ function statusAction(item: Item, data: BoardData, working: boolean): StatusActi
             if (hasLiveThread(item)) return LATEST_THREAD;
 
             return {
-                control: <StartOrAfter item={item} data={data} label="Shape issue" linkedBeside={linkedBeside} />,
+                control: <StartOrAfter item={item} data={data} label="Shape" linkedBeside={linkedBeside} />,
             };
         case 'Ready':
             return hasLiveThread(item)
@@ -66,10 +74,6 @@ function statusAction(item: Item, data: BoardData, working: boolean): StatusActi
                 : LATEST_THREAD;
         case 'Review':
             return LATEST_THREAD;
-        case 'Verify':
-            return { control: <PrLink item={item} label="Verify build" /> };
-        case 'Ready to merge':
-            return { control: <PrLink item={item} label="Merge PR" /> };
         default:
             return { control: null };
     }
@@ -77,8 +81,9 @@ function statusAction(item: Item, data: BoardData, working: boolean): StatusActi
 
 /** The status's action, with Open thread on the latest thread beside it unless the action already opens that thread. */
 export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
-    const { working } = useShownStatus(item);
-    const action = statusAction(item, data, working);
+    const shown = useShownStatus(item);
+
+    const action = statusAction(item, data, shown);
     const latest = latestThread(item);
     const opensThread = 'opens' in action;
     const beside =
@@ -88,12 +93,18 @@ export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
 
     return (
         <>
-            {beside && <OpenThread item={item} data={data} />}
-            {opensThread ? (
-                <OpenThread item={item} data={data} threadId={action.opens} label={action.label} />
-            ) : (
-                action.control
-            )}
+            {item.kind !== 'concept' && beside && <OpenThread item={item} data={data} />}
+            {opensThread
+                ? item.kind !== 'concept' && (
+                      <OpenThread
+                          item={item}
+                          data={data}
+                          threadId={action.opens}
+                          label={action.label}
+                          primary={needsAnswer(item) || Boolean(action.primary)}
+                      />
+                  )
+                : action.control}
         </>
     );
 }

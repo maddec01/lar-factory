@@ -1,16 +1,16 @@
 // A dossier's reading for its line: its parts done and counted, its chips, what's next and its threads.
 
-import { needsAnswer, plural, itemName, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import type { DossierChipTone } from '@lar-works/design-system';
+import { itemName, needsAnswer, plural, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import { Ban, CircleHelp, MessagesSquare } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-import { DECISION_KINDS, isDone, threadAtWork, threadsOf } from './DossierParts';
 import type { Part } from './DossierParts';
-import { startable } from './PartStart';
-import { YOURS } from './StageTrack';
+import { DECISION_KINDS, isDone, threadAtWork, threadsOf } from './DossierParts';
+import { startable } from './PartAvailability';
+import { YOURS } from './StageStatus';
 import { StatusGlyph } from '@/features/items';
+import { type DossierChipTone } from '@/ui/board';
 
 type Slice = Item['slices'][number];
 
@@ -122,12 +122,17 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         n ? [{ words: `${n} ${word}`, tone, icon }] : [];
 
     return [
-        ...count(m.needsYou.length, 'need you', 'warning', <StatusGlyph status="Needs you" presentation="compact" />),
+        ...count(
+            m.needsYou.length,
+            m.needsYou.length === 1 ? 'needs you' : 'need you',
+            'warning',
+            <StatusGlyph status="Needs you" size="sm" />,
+        ),
         ...count(m.decisions.length, m.decisions.length === 1 ? 'decision' : 'decisions', 'accent', <MessagesSquare />),
         ...count(m.blockedSlices.length, 'blocked', 'danger', <Ban />),
         ...(parent.refinement?.complete ? [{ words: 'Refined', tone: 'success' as const, refined: true }] : []),
         ...(noDelivery(parent) ? [{ words: 'no delivery planned', tone: 'neutral' as const }] : []),
-        ...count(m.fog.length, 'fog', 'neutral', <CircleHelp />),
+        ...count(m.fog.length, m.fog.length === 1 ? 'open question' : 'open questions', 'neutral', <CircleHelp />),
     ];
 }
 

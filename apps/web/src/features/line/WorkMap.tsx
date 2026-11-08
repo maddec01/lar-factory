@@ -4,6 +4,14 @@
 
 import { ref } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
+import { useId, useState } from 'react';
+
+import { isDone, isHistory, upstreamOf } from './DossierParts';
+import type { Part } from './DossierParts';
+import { useWidth } from './useWidth';
+import { DECISIONS, GROUP_H, HISTORY, LABEL_W, edgeLine, historyText, keyOf, layout } from './WorkMapLayout';
+import { CheckNode, HistoryRow, PartNode, RepoIdentity } from './WorkMapParts';
+import { StatusGlyph } from '@/features/items';
 import {
     MapBand,
     MapCanvas,
@@ -14,15 +22,7 @@ import {
     MapLaneName,
     MapNode,
     WorkMapFrame,
-} from '@lar-works/design-system';
-import { useId, useState } from 'react';
-
-import { isDone, isHistory, upstreamOf } from './DossierParts';
-import type { Part } from './DossierParts';
-import { useWidth } from './useWidth';
-import { DECISIONS, GROUP_H, HISTORY, LABEL_W, edgeLine, historyText, keyOf, layout } from './WorkMapLayout';
-import { CheckNode, HistoryRow, PartNode, RepoIdentity } from './WorkMapParts';
-import { StatusGlyph } from '@/features/items';
+} from '@/ui/board';
 
 /** The map of `parts`, current work first and finished history folded below, ending in `check` when one is written. `home` is the dossier's own repository, which needs no naming. */
 export function WorkMap({

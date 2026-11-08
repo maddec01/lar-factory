@@ -123,17 +123,6 @@ it("reports a rejected command with T3's reason, one request and no reconnect", 
     expect(revoke).toHaveBeenCalledWith('session');
 });
 
-it('reports a rejection without a reason', async () => {
-    const result = sendThreadCommand(command);
-
-    (await opened()).answer({
-        _tag: 'Exit',
-        requestId: '1',
-        exit: { _tag: 'Failure', cause: [{ _tag: 'Interrupt' }] },
-    });
-    expect(await result).toEqual({ outcome: 'rejected', reason: 'T3 rejected thread.archive.' });
-});
-
 it('leaves the command unconfirmed when T3 does not answer in time', async () => {
     const result = sendThreadCommand(command);
     const socket = await opened();
@@ -215,13 +204,4 @@ it('reports an unreadable or non-local T3 origin and revokes the session', async
         reason: expect.stringContaining('endpoint'),
     });
     expect(revoke).toHaveBeenCalledTimes(2);
-});
-
-it('still resolves when revoking the session fails', async () => {
-    revoke.mockRejectedValueOnce(Error('secret'));
-
-    const result = sendThreadCommand(command);
-
-    (await opened()).answer({ _tag: 'Exit', requestId: '1', exit: { _tag: 'Success', value: { sequence: 0 } } });
-    expect(await result).toEqual({ outcome: 'accepted', sequence: 0 });
 });

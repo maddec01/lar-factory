@@ -4,7 +4,7 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { Button, buttonKind, FormResult, SettingsNote, Text } from '@lar-works/design-system';
+import { Button, FormResult, Text } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
@@ -19,6 +19,7 @@ import {
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
 import { SmallButton, Choice, Switch } from '@/shared/settings/SettingControls';
+import { buttonKind, SettingsNote } from '@/ui/board';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
     { value: 'nightly', label: 'Nightly' },
@@ -50,7 +51,7 @@ function Result({ from }: { from: NonNullable<SettingsResult['from']> }) {
     const stored = useSettingsStore((state) => state.result);
     const error = useInstallStore((state) => state.snapshot?.error);
     const result: SettingsResult =
-        stored.from === from ? stored : from === 'targets' && error ? { text: error, tone: 'error' } : { text: '' };
+        stored.from === from ? stored : from === 'targets' && error ? { text: error, tone: 'danger' } : { text: '' };
 
     return (
         <FormResult
@@ -83,13 +84,13 @@ export function TargetsNote() {
         <SettingsNote busy={targets === null}>
             {!installs && (
                 <Text variant="caption" tone="muted">
-                    This run of Lar Factory doesn't install skills, so you can't tick or untick a folder. Start it with
+                    This run of Lar Factory doesn’t install skills, so you can’t tick or untick a folder. Start it with
                     --install-skills to change them.
                 </Text>
             )}
             {installs && !installed && (
                 <Text variant="caption" tone="muted">
-                    Lar Factory hasn't installed its skills yet, so you can't tick or untick a folder. It installs them
+                    Lar Factory hasn’t installed its skills yet, so you can’t tick or untick a folder. It installs them
                     when it starts. If the install failed, use Retry to try again.
                 </Text>
             )}

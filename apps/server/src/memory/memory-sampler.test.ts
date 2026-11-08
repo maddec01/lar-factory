@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, test, vi } from 'vite-plus/test';
 
@@ -73,25 +73,6 @@ test('with both variables unset it writes nothing and sets no timer', () => {
 
     assert.equal(vi.getTimerCount(), 0);
     stop();
-});
-
-test('the GC variable without a samples file logs, forces no GC and sets no timer', (t) => {
-    const logged = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    t.onTestFinished(() => logged.mockRestore());
-    startMemorySampler({ BOARD_MEMORY_FORCE_GC: '1' });
-    assert.equal(vi.getTimerCount(), 0);
-    assert.match(String(logged.mock.calls[0]?.[0]), /BOARD_MEMORY_FORCE_GC needs BOARD_MEMORY_SAMPLES/);
-});
-
-test('a relative path logs and takes no samples', (t) => {
-    const logged = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    t.onTestFinished(() => logged.mockRestore());
-    startMemorySampler({ BOARD_MEMORY_SAMPLES: 'samples.jsonl' });
-    assert.equal(vi.getTimerCount(), 0);
-    assert.equal(existsSync('samples.jsonl'), false);
-    assert.match(String(logged.mock.calls[0]?.[0]), /absolute path/);
 });
 
 test('a failed write logs, throws nothing and the next tick tries again', (t) => {

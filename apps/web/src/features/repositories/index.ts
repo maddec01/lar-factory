@@ -1,9 +1,11 @@
-export { AccessList, AccessReason, accessExplanation, accessRows, operationNames } from './AccessList';
+export { AccessList, AccessReason } from './AccessList';
 export type { AccessRow } from './AccessList';
+export { accessExplanation, accessRows, operationNames } from './RepositoryAccess';
 export { useEditStore } from './EditStore';
 export { IssueDefaults } from './IssueDefaults';
 export { ProjectChoiceIcon, ProjectIcon } from './ProjectIcon';
-export { ProjectPage, projectSettings } from './ProjectPage';
+export { ProjectPage } from './ProjectPage';
+export { projectSettings } from './ProjectSettings';
 export { useVocabularyDiscovery } from './useVocabularyDiscovery';
 export { VocabularyFields, VocabularyRead } from './VocabularyEditor';
 export { KIND_NAMES } from './VocabularyKinds';

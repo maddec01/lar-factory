@@ -40,7 +40,7 @@ export function sourceOptions(detection: SetupDetection): Option<RepositoryItemS
         title: source.kind === 'issues' ? 'GitHub issues' : source.team,
         cost:
             source.kind === 'issues'
-                ? 'Open issues appear in the list.'
+                ? 'Open issues appear in List.'
                 : 'Backlog and current sprint, with each item once.',
     }));
 }

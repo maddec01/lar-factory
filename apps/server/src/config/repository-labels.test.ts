@@ -94,7 +94,7 @@ test('managed names are refused with the reason, whether typed or already on the
 
     expect(await change({ change: 'create', name: 'linked-work' })).toEqual({
         status: 400,
-        error: "linked-work is reserved for the factory's saved links.",
+        error: 'linked-work is reserved for the factory’s saved links.',
     });
     expect(await change({ change: 'update', name: 'docs', update: { name: 'status-done' } })).toEqual({
         status: 400,
@@ -102,11 +102,11 @@ test('managed names are refused with the reason, whether typed or already on the
     });
     expect(await change({ change: 'update', name: 'bug', update: { name: 'defects' } })).toEqual({
         status: 400,
-        error: "bug is reserved for the item's kind.",
+        error: 'bug is reserved for the item’s kind.',
     });
     expect(await change({ change: 'delete', name: 'Bug' })).toEqual({
         status: 400,
-        error: "Bug is reserved for the item's kind.",
+        error: 'Bug is reserved for the item’s kind.',
     });
     expect(await tracker.labels.list()).toEqual([{ name: 'bug' }, { name: 'docs' }]);
 });
@@ -124,7 +124,7 @@ test("Azure's repo- tags are locked, and GitHub's repo- labels are ordinary", as
         capabilities: trackerCapabilities(AZURE),
     };
     const onAzure = (body: object) => changeRepositoryLabels({ repo: AZURE, ...body }, azureDir, azure);
-    const reserved = "repo-lar-api is reserved for the work item's repository.";
+    const reserved = 'repo-lar-api is reserved for the work item’s repository.';
 
     expect(await onAzure({ change: 'delete', name: 'repo-lar-api' })).toEqual({ status: 400, error: reserved });
     expect(await onAzure({ change: 'update', name: 'repo-lar-api', update: { name: 'docs-two' } })).toEqual({
@@ -133,7 +133,7 @@ test("Azure's repo- tags are locked, and GitHub's repo- labels are ordinary", as
     });
     expect(await onAzure({ change: 'update', name: 'docs', update: { name: 'repo-other' } })).toEqual({
         status: 400,
-        error: "repo-other is reserved for the work item's repository.",
+        error: 'repo-other is reserved for the work item’s repository.',
     });
     expect(az.tags).toEqual(['repo-lar-api', 'docs']);
 

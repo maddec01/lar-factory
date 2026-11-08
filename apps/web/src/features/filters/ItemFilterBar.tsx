@@ -1,34 +1,24 @@
+import type { Item } from '@lar-factory/shared';
 // The List modal's filters: Kind and Labels dropdown checklists, the active choices as chips that remove themselves,
 // and Clear. Labels offers what `rows`, the items the modal holds, show, whatever the filters hide.
-
 import { sameLabel } from '@lar-factory/shared';
-import type { Item } from '@lar-factory/shared';
-import {
-    Badge,
-    Button,
-    buttonKind,
-    FilterBar,
-    FilterChip,
-    FilterChoice,
-    FilterChoices,
-    FilterMenu,
-    LabelChip,
-} from '@lar-works/design-system';
-import { CircleDashed } from '@lar-works/design-system/icons';
+import { Badge, Button, LabelChip } from '@lar-works/design-system';
 import { useRef, type ReactNode } from 'react';
 
-import { KIND_FILTERS, filtering, headingOf, labelChoices, toggled } from './ItemFilters';
 import type { ItemFilters, KindFilter } from './ItemFilters';
-import { KIND_BADGES, KindBadge } from '@/features/items';
+import { filtering, headingOf, KIND_FILTERS, labelChoices, toggled } from './ItemFilters';
+import { kindName } from './KindFilterNames';
+import { KindBadge } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { LabelPicker } from '@/shared/labels/LabelPicker';
+import { buttonKind, conceptIcons, FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from '@/ui/board';
 
-export const kindName = (choice: KindFilter) => (choice === 'no-kind' ? 'No kind' : KIND_BADGES[choice]!.name);
+const NoKindIcon = conceptIcons.noKind;
 
 function KindChoice({ choice, children }: { choice: KindFilter; children?: ReactNode }) {
     return choice === 'no-kind' ? (
         <Badge>
-            <CircleDashed aria-hidden="true" />
+            <NoKindIcon aria-hidden="true" />
             No kind{children}
         </Badge>
     ) : (

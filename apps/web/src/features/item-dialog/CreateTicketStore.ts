@@ -1,16 +1,12 @@
-import { writeHeaders, type BoardData, type Item, type TicketOptions } from '@lar-factory/shared';
+import type { TicketOptions } from '@lar-factory/shared';
 // A persisted submission survives closing details or losing the server response.
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { useBoardStore } from '@/services/board/board.hooks';
 import { receive } from '@/services/board/board.service';
+import { submitTicket, type TicketPreview } from '@/services/tickets/tickets.service';
 
-export interface TicketPreview {
-    title: string;
-    description: string;
-    revision: number;
-}
 interface Attempt {
     requestId: string;
     preview: TicketPreview;
@@ -42,24 +38,14 @@ export const useCreateTicketStore = create<CreateTicketState>()(
                 useBoardStore.getState().beginWrite();
 
                 try {
-                    const response = await fetch('/api/create-ticket', {
-                        method: 'POST',
-                        headers: writeHeaders(),
-                        body: JSON.stringify({
-                            itemId,
-                            requestId: attempt.requestId,
-                            revision: attempt.preview.revision,
-                            preview: attempt.preview,
-                            options: attempt.options,
-                            session: useBoardStore.getState().data.capture?.session,
-                        }),
+                    const { status, result } = await submitTicket({
+                        itemId,
+                        requestId: attempt.requestId,
+                        revision: attempt.preview.revision,
+                        preview: attempt.preview,
+                        options: attempt.options,
+                        session: useBoardStore.getState().data.capture?.session,
                     });
-                    const result = (await response.json()) as {
-                        item?: Item;
-                        board?: BoardData;
-                        error: string | null;
-                        uncertain?: boolean;
-                    };
 
                     if (result.item && result.board) {
                         receive(result);
@@ -73,7 +59,7 @@ export const useCreateTicketStore = create<CreateTicketState>()(
                     } else
                         keep(
                             result.uncertain ? 'uncertain' : 'failed',
-                            result.error ?? `Request failed (HTTP ${response.status}).`,
+                            result.error ?? `Request failed (HTTP ${status}).`,
                         );
                 } catch {
                     keep(

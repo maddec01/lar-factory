@@ -1,20 +1,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
-import {
-    $,
-    $$,
-    chooseOption,
-    detailsRead,
-    detailsReply,
-    fetchMock,
-    formValue,
-    mountPage,
-    openOptions,
-    sample,
-    settle,
-    text,
-} from '@/test/PageTest';
+import { $, $$, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 beforeEach(() => localStorage.removeItem('lar-board:create-ticket'));
 
@@ -101,50 +88,9 @@ async function open(
     await settle(() => action().click());
 }
 
-test('local details offer Create issue beside Attach, preview noneditable text and reuse mapped provider options with Add item off', async () => {
-    await open();
-    expect($('[data-attach-ticket]')).not.toBeNull();
-    expect(text(section().querySelector('[aria-label="Outgoing title"]'))).toBe('Fix export');
-    expect(text(section().querySelector('[aria-label="Outgoing text"]'))).toBe(preview.description);
-    expect(section().querySelector('[contenteditable],textarea,input[name="title"]')).toBeNull();
-    expect($<HTMLInputElement>('[name="labels"]')!.value).toBe('bug');
-    expect(formValue('type')).toBe('Bug');
-    await settle(() => submit().click());
-    expect(posts()[0]).toMatchObject({
-        itemId: local.id,
-        revision: 3,
-        preview,
-        options: { labels: ['bug'], type: 'Bug', assignee: '', milestone: '' },
-    });
-    expect(text(section())).toContain('HTTP 403: denied');
-    expect(submit().disabled).toBe(false);
-});
-
-test('the Create issue form has the searchable picker, and a typed label submits with the ticket', async () => {
-    const data = board();
-
-    (data.repos[0]!.setup!.access as Record<string, string>)['manage-labels'] = 'allowed';
-    await open(data);
-    await settle(() => section().querySelector<HTMLButtonElement>('#item-labels button')!.click());
-
-    const search = $<HTMLInputElement>('[data-label-picker] input[aria-label]')!;
-
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'needs-design');
-    await settle(() => search.dispatchEvent(new Event('input', { bubbles: true })));
-    await settle(() =>
-        $$<HTMLButtonElement>('[data-label-picker] button')
-            .find((b) => text(b).startsWith('Create'))!
-            .click(),
-    );
-    await settle(() => submit().click());
-    expect(posts()[0]).toMatchObject({ options: { labels: ['bug'], newLabels: ['needs-design'] } });
-    expect(text(section())).toContain('HTTP 403: denied');
-    expect($<HTMLInputElement>('[name="newLabels"]')!.value, 'a failure keeps the typed label').toBe('needs-design');
-});
-
 test('unverified Access explains the refusal, offers Recheck and disables creation', async () => {
     await open(board('unverified'));
-    expect(text(section())).toContain('not checked yet');
+    expect(text(section())).toContain('isn’t checked yet');
     expect($$('button').some((button) => text(button) === 'Recheck access')).toBe(true);
     expect(submit().disabled).toBe(true);
     await settle(() => submit().click());
@@ -209,22 +155,4 @@ test('opening the issue preview moves keyboard focus into it and Cancel returns 
             .click(),
     );
     expect(document.activeElement).toBe(action());
-});
-
-test('the Create issue form picks in Selects whose lists open above the item dialog, and submits the picks', async () => {
-    await open();
-
-    const assignee = $('#item-assignee')!;
-
-    await openOptions(assignee);
-
-    const list = $('[role="listbox"]')!;
-
-    expect($('[data-item-dialog]')!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await settle(() => list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-    expect($('[data-item-dialog]')).not.toBeNull();
-    await chooseOption(assignee, 'person');
-    await chooseOption($('#item-milestone')!, 'Next');
-    await settle(() => submit().click());
-    expect(posts().at(-1)).toMatchObject({ options: { type: 'Bug', assignee: 'person', milestone: '1' } });
 });

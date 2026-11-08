@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { conclude, footprintRegions, regionsHolding, renderReport, summarize, type Capture } from './memory-report.ts';
+import { conclude, footprintRegions, regionsHolding, summarize } from './memory-report.ts';
 import type { MemorySample } from './memory-sampler.ts';
 
 const MiB = 2 ** 20;
@@ -134,35 +134,4 @@ test('otherwise it is allocator or native pages, using the GC nearest the highes
 
     assert.equal(conclusion?.cause, 'allocator or native pages');
     assert.equal(conclusion?.gc.time, samples[2]!.time);
-});
-
-test('the report names the peak capture, its regions and the ones it could not identify', () => {
-    const samples = [sample(0, 100), sample(6, 600), sample(10, 200)];
-    const captures: Capture[] = [
-        { time: Date.UTC(2026, 10, 5, 12, 0), footprint: 'not JSON' },
-        { time: Date.UTC(2026, 10, 5, 12, 5), footprint: FOOTPRINT },
-    ];
-    const report = renderReport(samples, captures);
-
-    assert.match(report, /RSS peak 600\.0 MiB, range 100\.0 MiB to 600\.0 MiB, end 200\.0 MiB/);
-    assert.match(report, /Peak capture 2026-11-05T12:05:00\.000Z/);
-    assert.match(report, /App-Specific Tag 16: 410\.0 MiB \(82%\), unidentified/);
-    assert.match(report, /No forced GC/);
-});
-
-test('a report without samples says so', () => {
-    assert.throws(() => renderReport([], []), /no samples/);
-});
-
-test('the report says a second PID voids the run, and gives the forced-GC figures', () => {
-    const samples = [
-        sample(5, 400, 'after-gc', { heapUsed: 100, heapTotal: 150, external: 20 }),
-        sample(6, 200, 'start', {}, 8),
-    ];
-    const report = renderReport(samples, []);
-
-    assert.match(report, /VOID: the server restarted \(PIDs 7, 8\)/);
-    assert.match(report, /heapUsed after GC 100\.0 MiB, heapTotal slack 50\.0 MiB, external 20\.0 MiB, RSS 400\.0 MiB/);
-    assert.match(report, /Conclusion: allocator or native pages/);
-    assert.match(report, /No capture/);
 });

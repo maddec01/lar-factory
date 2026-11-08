@@ -1,25 +1,15 @@
+import type { BoardData, Item } from '@lar-factory/shared';
 // The item dialog's buttons that move an item: Queue on a List item, Move to List on a Queued one and Abandon on
 // both, each with its pending label.
-
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
-import type { BoardData, Item } from '@lar-factory/shared';
-import { ActionError as DesignActionError, Button, buttonKind, Text } from '@lar-works/design-system';
+import { Button, Text } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
 
+import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
-import type { ItemAction } from './ActionStore';
 import { askAbandon, backToList, queueItem } from './CardActions';
 import { DismissButton, closeKeepingFocus } from '@/features/notices';
-
-/** Board writes are off in sample mode, so its buttons are too; an action in flight holds them. */
-export function writeState(
-    data: BoardData,
-    action?: ItemAction,
-): { disabled?: true; title?: string; 'aria-disabled'?: true } {
-    if (data.capture?.enabled === false) return { disabled: true, title: 'Disabled in sample mode' };
-
-    return action?.phase === 'pending' ? { 'aria-disabled': true } : {};
-}
+import { ActionError as DesignActionError, buttonKind } from '@/ui/board';
 
 /** Queue, a List item's primary action. */
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
@@ -28,7 +18,7 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 
     return (
         <Button
-            {...buttonKind('other')}
+            {...buttonKind('main')}
             data-queue={item.id}
             aria-label={`${verb} ${itemName(item)}`}
             {...writeState(data, action)}
@@ -74,7 +64,9 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
     return (
         <>
             <Button
-                {...buttonKind('other')}
+                variant="destructive-quiet"
+                size="sm"
+                data-kind="other"
                 pendingLook
                 data-abandon={item.id}
                 aria-label={`${verb} ${itemName(item)}`}

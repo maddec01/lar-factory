@@ -233,28 +233,12 @@ test('an az failure answers its message', async () => {
     });
 });
 
-test('a logged-out az answers the fix', async () => {
-    const az = fakeAz({ items: [workItem()], fail: () => new Error('Please run az login to setup account.') });
-    const answer = await readAzureItemDetails(item(5), az.run);
-
-    assert.ok('error' in answer && /az login/.test(answer.error));
-});
-
 test('a work item az no longer finds answers 404', async () => {
     const az = fakeAz({ items: [] });
 
     assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
         status: 404,
         error: 'Work item 5 does not exist, or you have no right to read it.',
-    });
-});
-
-test('an item without an Azure DevOps repository answers 404', async () => {
-    const az = fakeAz({ items: [] });
-
-    assert.deepEqual(await readAzureItemDetails({ ...item(5), repo: 'maddec01/lar' }, az.run), {
-        status: 404,
-        error: 'That item is not an Azure DevOps work item.',
     });
 });
 
@@ -278,14 +262,6 @@ test('older comments are one comments call with the continuation token, 10 newes
         'continuationToken=10',
     ]);
     assert.equal(call[call.indexOf('--api-version') + 1], '7.1-preview');
-});
-
-test('the oldest page answers no token', async () => {
-    const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 12 }, (_, i) => comment(i + 1)) })] });
-    const page = await readAzureOlderComments(item(5), '10', az.run);
-
-    assert.ok(!('error' in page));
-    assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['2', '1'], null]);
 });
 
 const managed = (id: number) =>

@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 export interface SearchOption {
     value: string;
     name: string;
+    /** Additional terms, searched without adding them to the visible label. */
+    keywords?: string;
     /** Beside the name, and searched with it. */
     hint?: string;
     /** Beside the name on wider screens, not searched. */
@@ -26,8 +28,8 @@ export const wordsOf = (query: string): string[] => query.toLowerCase().split(/\
 
 export function matchingGroups(groups: readonly SearchGroup[], query: string): SearchGroup[] {
     const words = wordsOf(query);
-    const matches = ({ name, hint = '' }: SearchOption) =>
-        words.every((word) => `${name} ${hint}`.toLowerCase().includes(word));
+    const matches = ({ name, hint = '', keywords = '' }: SearchOption) =>
+        words.every((word) => `${name} ${hint} ${keywords}`.toLowerCase().includes(word));
 
     return groups
         .map(({ label, options }) => ({ label, options: options.filter(matches) }))

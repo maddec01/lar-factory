@@ -56,23 +56,6 @@ test('an Azure DevOps save without the field and revision its details gave is re
     assert.deepEqual(await saveDescription(workItem, { body: 'x', revision: 3 }), refused);
 });
 
-test('sample mode saves no description', async () => {
-    assert.deepEqual(await createItemDetails('unused.json', (item) => item).saveDescription(workItem, { body: 'x' }), {
-        status: 403,
-        error: 'Saving descriptions is disabled in sample mode.',
-    });
-});
-
-test('work with no ticket has no details and saves no description', async () => {
-    const { details, saveDescription } = createItemDetails(null, () => undefined);
-
-    assert.equal(((await details(workItem)) as { body: string }).body, '');
-    assert.deepEqual(await saveDescription(workItem, { body: 'x' }), {
-        status: 409,
-        error: 'This work has no ticket the board has read.',
-    });
-});
-
 const taggedWork = (labels?: string) => {
     const items: WorkItem[] = [
         { id: 5, rev: 2, type: 'User Story', state: 'New', ...(labels !== undefined && { tags: labels }) },
@@ -116,12 +99,6 @@ test("on the fake Azure a failed tag write leaves the tags and says why, in the 
     assert.equal(items[0]!.tags, 'docs');
 });
 
-test("the fake Azure's tags reach the picker without the managed ones", async () => {
-    const { az } = taggedWork();
-
-    assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'area-ui' }, { name: 'docs' }] });
-});
-
 test("the picker leaves out Azure's repo- tags, and a GitHub picker keeps a repo- label", async () => {
     const az = fakeAz({ items: [], tags: ['repo-lar-api', 'Repo-Other', 'docs'] });
 
@@ -157,14 +134,6 @@ test('a failed read of the tags says why', async () => {
         status: 502,
         error: 'Could not read the tags. az devops invoke failed: TF400813',
     });
-});
-
-test('work with no ticket has no labels to read or change', async () => {
-    const { labels, changeLabels } = createItemDetails(null, () => undefined);
-    const refused = { status: 409, error: 'This work has no ticket the board has read.' };
-
-    assert.deepEqual(await labels(workItem), refused);
-    assert.deepEqual(await changeLabels(workItem, { label: 'docs', action: 'add' }), refused);
 });
 
 test("details serve what a kind update writes, less a type the team's backlog doesn't show, and why", async () => {

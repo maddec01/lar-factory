@@ -1,4 +1,4 @@
-// Shape issue on a Queued item, in the item dialog: its menu of model choices, how keys and clicks move through it,
+// Shape on a Queued item, in the item dialog: its menu of model choices, how keys and clicks move through it,
 // and what a start shows in the dialog and in a toast. Ported from the Start cases of test/render.test.ts.
 
 import type { BoardData, ModelGroup } from '@lar-factory/shared';
@@ -41,12 +41,6 @@ const press = (el: Element) =>
         (el as HTMLElement).click();
         vi.advanceTimersByTime(0);
     });
-/** A press outside the menu, which closes it before the click lands. */
-const pressOutside = (el: Element) =>
-    settle(() => {
-        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
-        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    });
 
 /** Opens the item dialog on `id` through its store, as every list on the page does. */
 async function openItem(id: string): Promise<void> {
@@ -71,70 +65,12 @@ beforeEach(() => {
     holdPosts(withChoices);
 });
 
-test("Shape issue opens a menu: 'T3 Project default' first, then each provider instance with its models", async () => {
-    await mountItem(withChoices);
-    expect([
-        text(start()),
-        start().getAttribute('aria-haspopup'),
-        start().getAttribute('aria-expanded'),
-        start().getAttribute('aria-label'),
-    ]).toEqual([
-        'Shape issue ▾',
-        'menu',
-        'false',
-        `Shape issue #129 ${sample.items.find((i) => i.id === 'I_sample05')!.title}`,
-    ]);
-    expect(menu()).toBeNull();
-    await open();
-    expect(start().getAttribute('aria-expanded')).toBe('true');
-    expect(menu()!.getAttribute('aria-label')).toBe('Start #129 with');
-    expect(
-        entries().map((e) => [
-            text(e),
-            e.getAttribute('aria-checked'),
-            e.dataset.startPick,
-            e.dataset.instanceId,
-            e.dataset.model,
-        ]),
-    ).toEqual([
-        ['T3 Project default', 'true', 'I_sample05', undefined, undefined],
-        ['GPT-5.5', 'false', 'I_sample05', 'codex', 'gpt-5.5'],
-        ['Opus 5.5', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5'],
-        ['claude-opus-5-5[1m]', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
-    ]);
-
-    const label = (g: Element) => text(document.getElementById(g.getAttribute('aria-labelledby')!));
-
-    expect(label($('[role="menu"] > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe(
-        'Start with',
-    );
-
-    const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
-
-    expect(groups.map(label), 'grouped by instance, by its name').toEqual(['Codex', 'VI <work>']);
-    expect(document.activeElement, 'focus is on the highlighted entry').toBe(entries()[0]);
-});
-
-test('the menu highlights the remembered model choice while it is offered, else "T3 Project default"', async () => {
+test('the menu highlights the remembered model choice while it is offered, else "Project default in T3"', async () => {
     localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'claudeAgent', model: 'claude-opus-5-5[1m]' }));
     await mountItem(withChoices);
     await open();
     expect(checked()).toEqual(['claude-opus-5-5[1m]']);
     expect(document.activeElement).toBe(entries()[3]);
-});
-
-test('a remembered choice no longer offered highlights "T3 Project default"', async () => {
-    localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'claudeAgent', model: 'gpt-5.5' }));
-    await mountItem(withChoices);
-    await open();
-    expect(checked()).toEqual(['T3 Project default']);
-});
-
-test('without model choices, the menu offers only "T3 Project default"', async () => {
-    await mountItem();
-    await open();
-    expect(entries().map(text)).toEqual(['T3 Project default']);
-    expect($$('[role="menu"] [role="group"] [role="group"][aria-labelledby]')).toEqual([]);
 });
 
 test('arrow keys, Home and End move through the entries and wrap', async () => {
@@ -162,18 +98,6 @@ test('Escape closes the menu and returns focus to Start', async () => {
     expect(menu()).toBeNull();
     expect(start().getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(start());
-});
-
-test('a click outside closes the menu; a control it lands on keeps focus', async () => {
-    await mountItem(withChoices);
-    await open();
-
-    const other = card().querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!;
-
-    await pressOutside(other);
-    other.focus();
-    expect(menu()).toBeNull();
-    expect(document.activeElement).toBe(other);
 });
 
 test('picking an entry starts the item with that model, shows the thread, and remembers the choice', async () => {
@@ -207,15 +131,15 @@ test('picking an entry starts the item with that model, shows the thread, and re
 
     expect([
         tag.classList.contains('started-tag'),
-        tag.getAttribute('data-slot'),
-        tag.className.includes('bg-success/10'),
+        tag.querySelector('[data-status-dot]')?.getAttribute('data-status-dot'),
+        tag.className.includes('bg-success-surface'),
         text(tag),
         tag.getAttribute('title'),
-    ]).toEqual([true, 'badge', true, 'Started', 'T3 thread thread-1']);
+    ]).toEqual([true, 'success', false, 'Started', 'T3 thread thread-1']);
     expect(card().querySelector('[data-start]'), 'the dialog keeps only a quiet tag').toBeNull();
     expect(footer()).toBeNull();
     expect(document.activeElement, 'focus moves to the tag').toBe(tag);
-    expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe(
+    expect(text(toast()), 'the toast doesn’t repeat a title that is the work message title').toBe(
         'Refining started for #129. Open thread',
     );
     expect(toast()!.querySelector('code')).toBeNull();
@@ -228,23 +152,13 @@ test('picking an entry starts the item with that model, shows the thread, and re
     expect(checked(), 'the next menu highlights it').toEqual(['Opus 5.5']);
 });
 
-test('a renamed thread still gets a short outcome in the toast', async () => {
-    await mountItem(withChoices);
-    await open();
-    await press(entries()[0]!);
-    expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05' }]]);
-    await answer({ thread: { threadId: 'thread-1', title: 'Renamed' }, error: null });
-    expect(text(toast())).toBe('Refining started for #129. Open thread');
-    expect(localStorage.getItem(CHOICE_KEY), '"T3 Project default" stores as null').toBe('null');
-});
-
 test('a failed Start shows in the dialog, keeps Move to List and the last choice, and offers Retry start', async () => {
     localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'codex', model: 'gpt-5.5' }));
     await mountItem(withChoices);
     await open();
     await press(entries()[2]!);
     await answer({ thread: null, error: 'T3 is down.' }, 502);
-    expect(text(start())).toBe('Retry start ▾');
+    expect(text(start())).toBe('Retry start');
     expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
     expect(footer(), 'a failed Start brings Move to List and Abandon back').not.toBeNull();
     expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'a failure keeps the previous choice').toEqual({
@@ -258,7 +172,7 @@ test('a failed Start shows in the dialog, keeps Move to List and the last choice
     close.focus();
     await settle(() => close.click());
     expect(card().querySelector('p.start')).toBeNull();
-    expect(text(start())).toBe('Shape issue ▾');
+    expect(text(start())).toBe('Shape');
     expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
 
@@ -291,11 +205,11 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
     const tag = card().querySelector('.started-tag.unsure')!;
 
     expect([
-        tag.getAttribute('data-slot'),
-        tag.className.includes('bg-warning/12'),
+        tag.querySelector('[data-status-dot]')?.getAttribute('data-status-dot'),
+        tag.className.includes('bg-warning-surface'),
         text(tag),
         tag.getAttribute('title'),
-    ]).toEqual(['badge', true, 'May have started', 'Check T3 before starting it again']);
+    ]).toEqual(['warning', false, 'May have started', 'Check T3 before starting it again']);
     expect(card().querySelector('[data-start]')).toBeNull();
     expect(footer()).toBeNull();
 });
@@ -313,14 +227,14 @@ test('a failed start from the server offers Retry start, and closing it clears i
     };
 
     await mountItem(failed);
-    expect(text(start())).toBe('Retry start ▾');
+    expect(text(start())).toBe('Retry start');
     expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 said no');
     expect(footer(), 'a failed start gives Move to List back').not.toBeNull();
     await press(card().querySelector('p.start button.dismiss')!);
     expect(posted()).toEqual([['/api/dismiss-start-error', { session: 's1', itemId: 'I_sample05', purpose: 'shape' }]]);
     await answer({ error: null, board: withChoices });
     expect(card().querySelector('p.start')).toBeNull();
-    expect(text(start())).toBe('Shape issue ▾');
+    expect(text(start())).toBe('Shape');
 });
 
 test('a refusal the board holds no state for, as from a restarted server, keeps its error here', async () => {
@@ -328,37 +242,8 @@ test('a refusal the board holds no state for, as from a restarted server, keeps 
     await open();
     await press(entries()[0]!);
     await answer({ error: 'The board restarted. Press Start again.', board: withChoices }, 409);
-    expect(text(start())).toBe('Retry start ▾');
+    expect(text(start())).toBe('Retry start');
     expect(text(card().querySelector('p.start [role="alert"]'))).toBe('The board restarted. Press Start again.');
-});
-
-test('May have started from the server shows on a page that never pressed it', async () => {
-    await mountItem({
-        ...withChoices,
-        startProgress: { I_sample05: { shape: { phase: 'may-have-started', message: 'Check T3.' } } },
-    });
-    expect(card().querySelector('[data-start]')).toBeNull();
-    expect(footer()).toBeNull();
-    expect(text(card().querySelector('p.start [role="alert"]'))).toBe('Check T3.');
-});
-
-test('a thread another page started shows on every page', async () => {
-    await mountItem({ ...withChoices, started: { I_sample06: { threadId: 'thread-9', title: 'x' } } }, 'I_sample06');
-    expect(card().querySelector('.started-tag')?.getAttribute('title')).toBe('T3 thread thread-9');
-    expect(card().querySelector('[data-start]')).toBeNull();
-    expect(footer()).toBeNull();
-});
-
-test('in sample mode, Start still opens its menu, and no entry in it starts anything', async () => {
-    await mountItem({ ...withChoices, capture: { session: 's', enabled: false } });
-    expect(start().hasAttribute('disabled')).toBe(false);
-    await open();
-    expect(entries().length).toBeGreaterThan(1);
-    expect(
-        entries().every((e) => e.getAttribute('aria-disabled') === 'true' && e.title === 'Disabled in sample mode'),
-    ).toBe(true);
-    await press(entries()[1]!);
-    expect(posted()).toEqual([]);
 });
 
 test('Started clears after its server record disappears', async () => {

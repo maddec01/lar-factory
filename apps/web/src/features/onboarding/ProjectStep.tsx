@@ -2,19 +2,13 @@
 
 import { isOnboarding, type ProjectChoice } from '@lar-factory/shared';
 import {
-    AddFolderLine,
     Alert,
     Button,
-    buttonKind,
-    ChoiceDetails,
     Disclosure,
     FormFieldset,
     Inline,
     Input,
     InsetPanel,
-    ProjectLine as Line,
-    ProjectList,
-    ProjectListItem,
     RadioChoice,
 } from '@lar-works/design-system';
 import { FolderPlus } from '@lar-works/design-system/icons';
@@ -24,21 +18,36 @@ import { unpickable, useWizardStore, type Run } from './WizardStore';
 import { ProjectChoiceIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { FieldRow } from '@/shared/settings/FieldRow';
+import {
+    AddFolderLine,
+    buttonKind,
+    ChoiceDetails,
+    ProjectLine as Line,
+    ProjectList,
+    ProjectListItem,
+} from '@/ui/board';
 
 export function ProjectStep({ run }: { run: Run }) {
     const { projects, creating, pick, chooseNew, loadProjects, setFolder, createProject } = useWizardStore();
     const onboarding = useBoardStore((s) => s.data.onboarding);
 
-    if (projects.state === 'loading') return <Pending>Loading Projects…</Pending>;
+    if (projects.state === 'loading') return <Pending>Loading projects…</Pending>;
+
+    if (projects.state === 'sample')
+        return (
+            <Alert role="status" aria-live="polite" tone="info" title="Sample mode">
+                Projects can’t be added in sample mode. You can explore the sample board.
+            </Alert>
+        );
 
     if (projects.state === 'failed')
         return (
             <Alert
                 tone="danger"
-                title="Could not load Projects"
+                title="Couldn’t load projects"
                 action={
                     <Button {...buttonKind('other')} onClick={() => void loadProjects()}>
-                        Retry
+                        Try again
                     </Button>
                 }
             >
@@ -112,7 +121,14 @@ export function ProjectStep({ run }: { run: Run }) {
                                         </Button>
                                     </Inline>
                                     {creating.error && (
-                                        <Alert tone="danger" title="Could not add folder">
+                                        <Alert
+                                            role={creating.code === 'sample-mode' ? 'status' : 'alert'}
+                                            aria-live={creating.code === 'sample-mode' ? 'polite' : 'assertive'}
+                                            tone={creating.code === 'sample-mode' ? 'info' : 'danger'}
+                                            title={
+                                                creating.code === 'sample-mode' ? 'Sample mode' : 'Couldn’t add folder'
+                                            }
+                                        >
                                             {creating.error}
                                         </Alert>
                                     )}
@@ -132,7 +148,7 @@ export function ProjectStep({ run }: { run: Run }) {
                     </ProjectListItem>
                 ))}
             </ProjectSection>
-            <ProjectSection name="blocked" title="Can't be added" count={blocked.length}>
+            <ProjectSection name="blocked" title="Can’t be added" count={blocked.length}>
                 {blocked.map(({ project, reason }) => (
                     <ProjectListItem key={project.id} reason={reason!}>
                         <ProjectLine project={project} badge={null} />
@@ -147,7 +163,7 @@ export function ProjectStep({ run }: { run: Run }) {
 function ProjectLine({ project, badge }: { project: ProjectChoice; badge: string | null }) {
     return (
         <Line
-            icon={<ProjectChoiceIcon project={project} size="row" />}
+            icon={<ProjectChoiceIcon project={project} size="md" />}
             name={project.name}
             badge={badge}
             path={project.shownFolder}

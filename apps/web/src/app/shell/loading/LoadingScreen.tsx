@@ -11,13 +11,13 @@ import {
     BRAND_MARK_L,
     BRAND_MARK_VIEWBOX,
 } from '@lar-factory/shared';
-import { LoadingScreen as Screen } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { stepText } from './StepText';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
+import { LoadingScreen as Screen } from '@/ui/board';
 
 /** The draw (lar-apple's LarLogoMark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
 const DRAW_MS = 1750;

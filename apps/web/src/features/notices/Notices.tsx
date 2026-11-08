@@ -1,18 +1,17 @@
-import { ref, threadLink, abandonPrompt, closeTicketPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
-import { Button, ButtonLink, buttonKind, useNotificationControls } from '@lar-works/design-system';
-import { useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { abandonPrompt, closeTicketPrompt, ref, threadLink } from '@lar-factory/shared';
+import { ButtonLink } from '@lar-works/design-system';
+
+import { AddedNotice, ViewButton } from './AddedNotice';
+import { SLOT } from './notice-slot';
+import { showToast } from './ToastActions';
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
 // abandoned or its ticket closed, started in T3, or a Queued card's action that failed.
-
-import { clearToast, showToast } from './Toasts';
 import type { Toast } from './Toasts';
-import { useItemDialogStore } from '@/features/item-dialog';
-import { useActionStore, useItemAction, TitleLink } from '@/features/items';
 import type { StartKind } from '@/features/items';
+import { TitleLink } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { postAction, receive } from '@/services/board/board.service';
+import { buttonKind } from '@/ui/board';
 
 export type Notice =
     | { verb: 'Added' | 'Moved'; item: Item; to: Status }
@@ -24,23 +23,8 @@ export type Notice =
     | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; message: string }
     | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
-/** Notices share one toast: a new one replaces the last. */
-const SLOT = 'notice';
-
-/** Opens the item, as it is in the latest data, in the item dialog. Does nothing once it's gone. */
-function viewItem(itemId: string): void {
-    if (!useBoardStore.getState().data.items.some((i) => i.id === itemId)) return;
-
-    // Its toast has done its job.
-    clearToast(SLOT);
-    useItemDialogStore.getState().open(itemId);
-}
-
-const viewButton = (item: Item) => (
-    <Button {...buttonKind('other')} data-view-item onClick={() => viewItem(item.id)}>
-        View item
-    </Button>
-);
+/** The destination uses the board's proper name, including List. */
+const destination = (to: Status) => to;
 
 function toastOf(notice: Notice): Toast {
     const { item } = notice;
@@ -58,14 +42,14 @@ function toastOf(notice: Notice): Toast {
                 what: `error for ${ref(item)}`,
                 body: (
                     <>
-                        Couldn't{' '}
+                        Couldn’t{' '}
                         {notice.startError ? (
                             <>
                                 clear the start error of <TitleLink item={item} />
                             </>
                         ) : notice.to ? (
                             <>
-                                move <TitleLink item={item} /> to {notice.to}
+                                move <TitleLink item={item} /> to {destination(notice.to)}
                             </>
                         ) : notice.ticket ? (
                             <>
@@ -111,7 +95,8 @@ function toastOf(notice: Notice): Toast {
                 what: `${notice.verb} ${ref(item)}`,
                 body: (
                     <>
-                        {notice.verb} <TitleLink item={item} /> to {notice.to}. {viewButton(item)}
+                        {notice.verb} <TitleLink item={item} /> to {destination(notice.to)}.{' '}
+                        {<ViewButton item={item} />}
                     </>
                 ),
             };
@@ -120,84 +105,4 @@ function toastOf(notice: Notice): Toast {
 
 export function notify(notice: Notice): void {
     showToast(toastOf(notice));
-}
-
-/** A mounted notice owns its feedback; late results only update the board after it leaves. */
-function AddedNotice({ item }: { item: Item }) {
-    const current = useBoardStore((state) => state.data.items.find((value) => value.id === item.id));
-    const action = useItemAction(item.id);
-    const { hold, fail } = useNotificationControls();
-    // 'added', 'pending', 'success', or the error that stopped it.
-    const [result, setResult] = useState<string>('added');
-    const mounted = useRef(true);
-    const queue = useRef<HTMLButtonElement>(null);
-    const view = useRef<HTMLSpanElement>(null);
-
-    useEffect(() => {
-        mounted.current = true;
-
-        return () => {
-            mounted.current = false;
-        };
-    }, []);
-    useEffect(() => {
-        hold(result !== 'added' && result !== 'success');
-    }, [hold, result]);
-
-    const failed = !['added', 'pending', 'success'].includes(result);
-
-    useEffect(() => {
-        fail(failed);
-    }, [fail, failed]);
-
-    const eligible = current?.status === 'List';
-    const pending = action?.phase === 'pending';
-    const activate = async () => {
-        const latest = useBoardStore.getState().data.items.find((value) => value.id === item.id);
-
-        if (latest?.status !== 'List' || useActionStore.getState().actions[item.id]?.phase === 'pending') return;
-
-        useActionStore.getState().set(item.id, { phase: 'pending', kind: 'queue' });
-        setResult('pending');
-
-        const answer = await postAction('/api/queue', { itemId: item.id });
-        const focused = document.activeElement === queue.current;
-
-        flushSync(() => {
-            receive(answer);
-            useActionStore
-                .getState()
-                .set(item.id, answer.error ? { phase: 'error', kind: 'queue', message: answer.error } : undefined);
-
-            if (mounted.current) setResult(answer.error ?? 'success');
-        });
-
-        if (mounted.current && focused && !answer.error) view.current?.querySelector('button')?.focus();
-    };
-
-    return (
-        <>
-            <span role={failed ? 'alert' : 'status'}>
-                {result === 'added' ? (
-                    <>
-                        Added <TitleLink item={item} /> to List.
-                    </>
-                ) : result === 'pending' ? (
-                    'Queueing…'
-                ) : result === 'success' ? (
-                    <>
-                        Moved <TitleLink item={item} /> to Queued.
-                    </>
-                ) : (
-                    result
-                )}
-            </span>{' '}
-            <span ref={view}>{viewButton(item)}</span>{' '}
-            {eligible && result !== 'success' && (
-                <Button ref={queue} {...buttonKind('other')} aria-disabled={pending} onClick={() => void activate()}>
-                    {pending ? 'Queueing…' : 'Queue'}
-                </Button>
-            )}
-        </>
-    );
 }

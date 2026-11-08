@@ -1,4 +1,4 @@
-export { ItemFilterBar, kindName } from './ItemFilterBar';
+export { ItemFilterBar } from './ItemFilterBar';
 export {
     KIND_FILTERS,
     filtering,
@@ -11,3 +11,4 @@ export {
 } from './ItemFilters';
 export type { ItemFilters, KindFilter } from './ItemFilters';
 export { useScopeStore, useShownScope } from './ScopeStore';
+export { kindName } from './KindFilterNames';

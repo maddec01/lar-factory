@@ -1,18 +1,7 @@
-// Onboarding's work step: where the Project's work comes from and how it is set up.
+// Onboarding's work step: where the project's work comes from and how it is set up.
 
 import { writeAccessProblem, type SetupDetection } from '@lar-factory/shared';
-import {
-    Button,
-    buttonKind,
-    Checkbox,
-    Disclosure,
-    Inline,
-    Input,
-    InsetPanel,
-    OptionSelect,
-    SetupStep,
-    Text,
-} from '@lar-works/design-system';
+import { Button, Checkbox, Disclosure, Inline, Input, InsetPanel, OptionSelect, Text } from '@lar-works/design-system';
 
 import { KindMapping } from './KindMapping';
 import {
@@ -28,6 +17,7 @@ import { AccessReason, accessExplanation, IssueDefaults } from '@/features/repos
 import { useBoardStore } from '@/services/board/board.hooks';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Switch } from '@/shared/settings/SettingControls';
+import { buttonKind, SetupStep } from '@/ui/board';
 
 export function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
     const { choose, detect } = useWizardStore();
@@ -51,7 +41,7 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
         <SetupStep data-work-step presentation="form">
             <InsetPanel presentation="settings">
                 <FieldRow
-                    label="Show in the list"
+                    label="Show in List"
                     description={
                         !sources.length
                             ? 'refused' in detection.itemSources
@@ -96,17 +86,17 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
             <KindMapping key={run.repo} run={run} detection={detection} />
             <Disclosure presentation="group" label="Optional settings">
                 <InsetPanel presentation="settings">
-                    <FieldRow label="What this Project does" help="Helps agents place work across Projects.">
+                    <FieldRow label="What this project does" help="Helps agents place work across Projects.">
                         <Input
                             presentation="setting"
-                            aria-label="What this Project does"
+                            aria-label="What this project does"
                             placeholder="API used by the mobile app"
                             value={answers.role}
                             onChange={(event) => choose({ role: event.target.value })}
                         />
                     </FieldRow>
                     {connections.length > 0 && (
-                        <FieldRow label="Related Projects">
+                        <FieldRow label="Related projects">
                             {connections.map((option) => (
                                 <Checkbox
                                     key={option.id}

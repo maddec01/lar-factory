@@ -17,6 +17,7 @@ import { STEP_TITLES, answerProblem, answersOf, connectionsOf, isStep, stepsOf, 
 import { showToast } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { readOnboardingProjects } from '@/services/onboarding/onboarding.service';
 
 /** Where a kept onboarding stopped, as a phrase; a step this dialog doesn't have, as an older board's, reads as the first. */
 export const stoppedAt = ({ step }: OnboardingProgress): string =>
@@ -38,19 +39,28 @@ export interface Run {
 export type Projects =
     | { state: 'loading' }
     | { state: 'loaded'; projects: ProjectChoice[] }
-    | { state: 'failed'; error: string };
+    | { state: 'failed'; error: string; code?: 'sample-mode' }
+    | { state: 'sample'; message: string };
 
 /** Create a new T3 project, while it's the T3 project step's choice: the folder to add, and how adding it went. */
 interface Creating {
     folder: string;
     adding: boolean;
     error: string | null;
+    code?: 'sample-mode';
 }
 
 /** A read the board answers: running, answered, or the board's problem. */
-export type Read<T> = { state: 'reading' } | { state: 'read'; value: T } | { state: 'failed'; error: string };
+export type Read<T> =
+    | { state: 'reading' }
+    | { state: 'read'; value: T }
+    | { state: 'failed'; error: string; code?: 'sample-mode' };
 
-type Finish = { state: 'idle' } | { state: 'saving' } | { state: 'failed'; error: string } | { state: 'done' };
+type Finish =
+    | { state: 'idle' }
+    | { state: 'saving' }
+    | { state: 'failed'; error: string; code?: 'sample-mode' }
+    | { state: 'done' };
 
 /**
  * Why a T3 project can't be picked, or null when it can. The repository a resumed run was kept under stays pickable;
@@ -214,12 +224,12 @@ async function keep(
 
     receive(result);
 
-    if (result.error)
+    if (result.error && result.code !== 'sample-mode')
         showToast({
             slot: 'onboarding',
             failed: true,
             what: ` error for onboarding ${run.repo}`,
-            body: `Couldn't keep onboarding ${run.repo} on the board. ${result.error}`,
+            body: `Couldn’t keep onboarding ${run.repo} on the board. ${result.error}`,
         });
 }
 
@@ -310,18 +320,13 @@ export const useWizardStore = create<WizardState>()((set, get) => {
 
             set({ projects: { state: 'loading' } });
 
-            let projects: Projects;
-
-            try {
-                const response = await fetch('/api/onboarding/projects', { cache: 'no-store' });
-                const body = (await response.json()) as { projects?: ProjectChoice[]; error?: string };
-
-                projects = body.projects
-                    ? { state: 'loaded', projects: body.projects }
-                    : { state: 'failed', error: body.error ?? `The board answered ${response.status}.` };
-            } catch {
-                projects = { state: 'failed', error: "Can't reach the board." };
-            }
+            const answer = await readOnboardingProjects();
+            const projects: Projects =
+                'projects' in answer
+                    ? { state: 'loaded', projects: answer.projects }
+                    : answer.code === 'sample-mode'
+                      ? { state: 'sample', message: answer.error }
+                      : { state: 'failed', error: answer.error };
 
             if (read === reads) set({ projects });
         },
@@ -382,21 +387,26 @@ export const useWizardStore = create<WizardState>()((set, get) => {
 
             if (result.error || !result.projects || !result.projectId)
                 return set({
-                    creating: { ...now, adding: false, error: result.error ?? 'The board sent no project.' },
+                    creating: {
+                        ...now,
+                        adding: false,
+                        error: result.error ?? 'The board sent no project.',
+                        code: result.code,
+                    },
                 });
 
             reads++;
             set({ projects: { state: 'loaded', projects: result.projects } });
 
             const added = result.projects.find((p) => p.id === result.projectId);
-            const reason = added ? unpickable(added, run) : "T3 Code doesn't list it.";
+            const reason = added ? unpickable(added, run) : 'T3 Code doesn’t list it.';
 
             if (reason)
                 return set({
                     creating: {
                         ...now,
                         adding: false,
-                        error: `T3 Code added the project, but it can't be picked: ${reason}`,
+                        error: `T3 Code added the project, but it can’t be picked: ${reason}`,
                     },
                 });
 
@@ -421,7 +431,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
             set({
                 detection: answer.detection
                     ? { state: 'read', value: answer.detection }
-                    : { state: 'failed', error: answer.error ?? 'The board sent no detection.' },
+                    : { state: 'failed', error: answer.error ?? 'The board sent no detection.', code: answer.code },
             });
         },
         choose: (change) => {
@@ -470,7 +480,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
 
             if (get().run !== run) return;
 
-            if (result.error) return set({ finish: { state: 'failed', error: result.error } });
+            if (result.error) return set({ finish: { state: 'failed', error: result.error, code: result.code } });
 
             set({ finish: { state: 'done' } });
         },

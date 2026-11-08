@@ -1,6 +1,7 @@
 // The work map's nodes: a part, the end-to-end check, and a finished part's row in the expanded history group, with
 // the kind label and repository identity every map surface shows.
 
+import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import {
     buildActivity,
     itemName,
@@ -12,7 +13,26 @@ import {
     repoKey,
     repoName,
 } from '@lar-factory/shared';
-import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
+import type { ReactNode } from 'react';
+
+import type { Part, PartActivity, PartKind } from './DossierParts';
+import { DECISION_KINDS, isDone, openWaits, partActivity, partLabel, threadsOf, waitText } from './DossierParts';
+import { PartStart } from './PartStart';
+import { lastSeen } from './StageStatus';
+import { NODE_H } from './WorkMapLayout';
+import { useItemDialogStore } from '@/features/item-dialog';
+import {
+    AzureFields,
+    ItemStatusGlyph,
+    ItemTitle,
+    OpenThread,
+    SliceBar,
+    SourceIcon,
+    StatusGlyph,
+    useActivityUnavailable,
+    useShownStatus,
+} from '@/features/items';
+import { ProjectIcon } from '@/features/repositories';
 import {
     HistoryRow as DesignHistoryRow,
     MapCheckNode,
@@ -20,27 +40,7 @@ import {
     PartKindLabel as DesignPartKindLabel,
     PullRequestRef,
     RepoIdentity as DesignRepoIdentity,
-} from '@lar-works/design-system';
-import type { ReactNode } from 'react';
-
-import { DECISION_KINDS, isDone, openWaits, partActivity, partLabel, threadsOf, waitText } from './DossierParts';
-import type { Part, PartActivity, PartKind } from './DossierParts';
-import { PartStart } from './PartStart';
-import { lastSeen } from './StageTrack';
-import { NODE_H } from './WorkMapLayout';
-import { useItemDialogStore } from '@/features/item-dialog';
-import {
-    AzureFields,
-    ItemTitle,
-    SliceBar,
-    useActivityUnavailable,
-    useShownStatus,
-    OpenThread,
-    SourceIcon,
-    ItemStatusGlyph,
-    StatusGlyph,
-} from '@/features/items';
-import { ProjectIcon } from '@/features/repositories';
+} from '@/ui/board';
 
 /** A part's method or kind, in the one place and style every map surface shows it. */
 export function PartKindLabel({ kind }: { kind: PartKind }) {
@@ -54,7 +54,7 @@ export function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) 
             data-part-repo
             presentation="map"
             title={repo}
-            icon={<ProjectIcon repo={repo} size="small" />}
+            icon={<ProjectIcon repo={repo} size="sm" />}
             name={repoName(repo, data.repos)}
         />
     );
@@ -95,7 +95,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const unavailable = useActivityUnavailable();
     const activity = partActivity(part, shown.working, unavailable);
     const asks = needsAnswer(item);
-    const tone = asks ? 'asks' : open.length ? 'waits' : 'default';
+    const attention = asks ? 'asks' : open.length ? 'waits' : 'default';
     let action: ReactNode = null;
 
     if (complete) action = null;
@@ -104,15 +104,20 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     else if (item.status === 'Ready' || item.status === 'Queued')
         action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
 
-    // Open thread joins anything but the card's own Start or answer, as an icon.
+    // Each card has one labelled thread action. Decision threads are where their answers are given.
     const opensThread = threadsOf(item).length > 0 && !action;
-    const status = complete ? 'Complete' : shown.word;
+    // The node says what its thread does beside its status, so the status leaves that out.
+    const status = complete ? 'Complete' : shown.stageWord;
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
-    const word = running?.running
-        ? running.label
-        : activity.kind === 'finished' && !RUNS.includes(item.status)
-          ? null
-          : ACTIVITY_WORD[activity.kind];
+    // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
+    const word =
+        activity.kind === 'working' && (shown.execution === 'working' || shown.execution === 'quiet')
+            ? shown.word
+            : running?.running
+              ? running.label
+              : activity.kind === 'finished' && !RUNS.includes(item.status)
+                ? null
+                : ACTIVITY_WORD[activity.kind];
     const seen = word && activity.thread ? lastSeen(activity.thread) : '';
     // One waiting reason: a question, else what blocks it, else a blocked slice over a waiting child.
     const waits = !asks && open.length ? `Waiting on ${waitText(item, open)}` : null;
@@ -120,7 +125,9 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const heldBySlice = activity.kind === 'child waiting' && item.slices.some((s) => s.progress === 'blocked');
     // One fact once: a run says In progress already, and an activity the status says, or that the wait replaces, is left out.
     const facts = waits
-        ? [status, waits]
+        ? status.startsWith('Blocked')
+            ? [status]
+            : [status, waits]
         : [
               ...(status === 'In progress' && activity.kind === 'working' ? [] : [status]),
               ...(word && word !== status && !heldBySlice ? [`${word}${seen}`] : []),
@@ -133,7 +140,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             id={item.id}
             width={width}
             height={NODE_H}
-            tone={tone}
+            attention={attention}
             picked={isPicked}
             openLabel={`Open ${ref(item)}`}
             title={`${itemName(item)} · ${state}`}
@@ -151,10 +158,21 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             }
             action={
                 action ??
-                (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} iconOnly />)
+                (opensThread && (
+                    <OpenThread
+                        item={item}
+                        data={data}
+                        threadId={activity.thread?.id}
+                        label={
+                            !complete && !open.length && DECISION_KINDS.includes(part.kind)
+                                ? 'Answer in T3'
+                                : 'Open thread'
+                        }
+                    />
+                ))
             }
             name={<ItemTitle item={item} />}
-            glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} presentation="compact" />}
+            glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
             slices={item.slices.length > 0 && <SliceBar item={item} />}
         />
@@ -168,7 +186,7 @@ export function HistoryRow({ part, after, data, home }: { part: Part; after: Par
     return (
         <DesignHistoryRow
             id={item.id}
-            glyph={<StatusGlyph status="Done" presentation="compact" />}
+            glyph={<StatusGlyph status="Done" size="sm" />}
             kind={<PartKindLabel kind={part.kind} />}
             name={itemName(item)}
             onOpen={() => useItemDialogStore.getState().open(item.id)}
@@ -193,9 +211,9 @@ export function CheckNode({ check, width, after }: { check: EndToEndCheck; width
         <MapCheckNode
             width={width}
             height={NODE_H}
-            label="end-to-end check"
+            label="Outcome check"
             title={check.title}
-            glyph={<StatusGlyph status="Queued" presentation="compact" />}
+            glyph={<StatusGlyph status="Queued" size="sm" />}
             steps={`${plural(check.steps.length, 'step')}${after ? ` · after ${after}` : ''}`}
             stepsTitle={after ? `After ${after}` : undefined}
         />

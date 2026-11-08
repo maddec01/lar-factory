@@ -1,51 +1,17 @@
-import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import {
-    Button,
-    buttonKind,
-    FormSection,
-    Input,
-    InsetPanel,
-    OptionSelect,
-    Stack,
-    Text,
-} from '@lar-works/design-system';
+// A Project's editable settings, tracker vocabulary, labels and access, with unsaved changes kept in its draft.
+
+import { onAzure, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
+import { Alert, Button, FormSection, Input, InsetPanel, OptionSelect, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
-import { AccessList, AccessReason, accessRows } from './AccessList';
+import { AccessList, AccessReason } from './AccessList';
 import { shownDrafts, useEditStore, type Drafts, type DraftSetting } from './EditStore';
 import { EditVocabulary } from './EditVocabulary';
 import { IssueDefaults } from './IssueDefaults';
 import { LabelsSection } from './LabelsSection';
+import { accessRows } from './RepositoryAccess';
 import { FieldRow } from '@/shared/settings/FieldRow';
-
-const PROJECT_SETTINGS = [
-    { id: 'role', label: 'What this Project does' },
-    { id: 'itemSource', label: 'Work to read' },
-    { id: 'createIssuesFromAddItem', label: 'Create issues from Add item' },
-    { id: 'createIssuesFromRetro', label: 'Create issues from retro captures' },
-    { id: 'writeRefinedSpec', label: 'Write the refined spec to the issue' },
-    { id: 'vocabulary', label: 'Kinds and labels' },
-    { id: 'labels', label: 'Labels' },
-    { id: 'domainDocs', label: 'Glossary and decisions' },
-    { id: 'glossary', label: 'Glossary path' },
-    { id: 'adrs', label: 'ADR folder' },
-    { id: 'skills', label: 'Project skills' },
-    { id: 'access', label: 'Access' },
-];
-
-export function projectSettings(repo: string) {
-    return PROJECT_SETTINGS.map((setting) => ({
-        ...setting,
-        label:
-            setting.id === 'itemSource' && onAzure(repo)
-                ? 'Team'
-                : setting.id === 'labels'
-                  ? trackerCapabilities(repo).heading
-                  : setting.id === 'vocabulary'
-                    ? `Kinds and ${trackerCapabilities(repo).heading.toLowerCase()}`
-                    : setting.label,
-    }));
-}
+import { buttonKind } from '@/ui/board';
 
 export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     const { repo } = setup;
@@ -112,11 +78,11 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                 <InsetPanel presentation="settings">
                     <FieldRow
                         id="role"
-                        label="What this Project does"
+                        label="What this project does"
                         help="Describe its purpose so agents know where to work."
                         error={errors.role}
                     >
-                        {text('role', 'What this Project does', 'role')}
+                        {text('role', 'What this project does', 'role')}
                         {resetButton('role')}
                     </FieldRow>
                 </InsetPanel>
@@ -135,7 +101,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                             </>
                         ) : (
                             <Text variant="caption" tone="muted">
-                                This repository's GitHub issues.
+                                This repository’s GitHub issues.
                             </Text>
                         )}
                     </FieldRow>
@@ -209,9 +175,9 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
             <FormSection presentation="dense" title="Access">
                 <AccessList rows={accessRows(setup)} checking={running === 'recheck'} onRecheck={recheckAccess} />
                 {errors.recheck && (
-                    <Text variant="caption" tone="danger" role="alert">
+                    <Alert size="sm" tone="danger">
                         {errors.recheck}
-                    </Text>
+                    </Alert>
                 )}
             </FormSection>
         </Stack>

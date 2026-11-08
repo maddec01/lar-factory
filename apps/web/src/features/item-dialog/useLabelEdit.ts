@@ -4,13 +4,12 @@
 // the work item since its read.
 
 import { sameLabel } from '@lar-factory/shared';
-import type { Item, TrackerLabel } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
 import type { LabelChoice } from '@lar-works/design-system';
 import { useCallback, useRef, useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
-
-const NOT_READ = 'Could not reach the board to read the labels.';
+import { readItemLabels } from '@/services/items/items.service';
 
 export function useLabelEdit(item: Pick<Item, 'id' | 'labels'>) {
     const [choices, setChoices] = useState<LabelChoice[] | null>(null);
@@ -23,20 +22,10 @@ export function useLabelEdit(item: Pick<Item, 'id' | 'labels'>) {
         setChoices(null);
         setError(null);
 
-        try {
-            const response = await fetch(`/api/item-labels?itemId=${encodeURIComponent(itemId)}`, {
-                cache: 'no-store',
-            });
-            const body = (await response.json()) as { labels?: TrackerLabel[]; error?: string };
+        const labels = await readItemLabels(itemId);
 
-            if (body.labels)
-                setChoices(
-                    body.labels.map(({ color, ...label }) => ({ ...label, ...(color && { color: `#${color}` }) })),
-                );
-            else setError(body.error ?? NOT_READ);
-        } catch {
-            setError(NOT_READ);
-        }
+        if (typeof labels === 'string') setError(labels);
+        else setChoices(labels.map(({ color, ...label }) => ({ ...label, ...(color && { color: `#${color}` }) })));
     }, [itemId]);
     const toggle = async (label: string) => {
         if (writing.current) return;

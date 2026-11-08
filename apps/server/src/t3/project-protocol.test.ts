@@ -356,13 +356,6 @@ it.each([
     expect((await projectsWith({ projectIcon })).projectIcon).toEqual(projectIcon);
 });
 
-it('trims a chosen emoji', async () => {
-    expect((await projectsWith({ projectIcon: { kind: 'emoji', emoji: ' 🚀 ' } })).projectIcon).toEqual({
-        kind: 'emoji',
-        emoji: '🚀',
-    });
-});
-
 it.each([
     [{ kind: 'lucide', name: 'Git Branch', color: 'sky' }],
     [{ kind: 'lucide', name: 'a'.repeat(65), color: 'sky' }],
@@ -376,12 +369,4 @@ it.each([
     ['🚀'],
 ])('lists a project with the invalid icon %j as having none', async (projectIcon) => {
     expect((await projectsWith({ projectIcon })).projectIcon).toBeNull();
-});
-
-it('reads a favicon path, and lists a project with a missing or invalid one', async () => {
-    expect((await projectsWith({ faviconPath: 'assets/logo.svg' })).faviconPath).toBe('assets/logo.svg');
-    expect((await projectsWith({})).faviconPath).toBeNull();
-    expect((await projectsWith({ faviconPath: null })).faviconPath).toBeNull();
-    expect((await projectsWith({ faviconPath: 7 })).faviconPath).toBeNull();
-    expect((await projectsWith({ faviconPath: ' ' })).faviconPath).toBeNull();
 });

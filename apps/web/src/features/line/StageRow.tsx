@@ -1,10 +1,41 @@
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
-// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures.
+// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures. A row
+// with only figures to add shows them beside its action instead.
 
-import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemName } from '@lar-factory/shared';
-import type { BoardData, Item } from '@lar-factory/shared';
+import type { BoardData, Item, Status } from '@lar-factory/shared';
+import { blockedText, canRetryBuild, currentBuildThread, itemActivityThread, itemName } from '@lar-factory/shared';
+import { useState } from 'react';
+
+import { ActivityLine } from './ActivityLine';
+import { AutoBuildNote } from './AutoBuildNote';
+import { Figures, RowSecondLine } from './Columns';
+import { figuresOf, opensItem } from './RowDetails';
+import { RowKind, RowSource } from './RowIdentity';
+import type { StageRow as Row } from './StageRows';
+import { YOURS, threadText } from './StageStatus';
+import { useActivityState, useActivityStill } from './useActivityState';
+import { useItemDialogStore } from '@/features/item-dialog';
+import {
+    ActivityFeedback,
+    Age,
+    AzureFields,
+    ItemStatusGlyph,
+    ItemTitle,
+    OpenThread,
+    SliceBar,
+    SliceList,
+    StartAfterError,
+    StartBuild,
+    StartMessage,
+    StartOrAfter,
+    hasFigures,
+    hasLiveThread,
+    usageLoading,
+    useActivityFeedback,
+    useShownStatus,
+} from '@/features/items';
 import {
     QueueAge,
     QueuePlace,
@@ -17,53 +48,25 @@ import {
     RowPartOf,
     RowSide,
     RowSliceNote,
-    RowSliceToggle,
     RowSlices,
+    RowSliceToggle,
     RowState,
     RowStateCell,
     RowTitle,
     RowTitleCell,
     StageRowItem,
-} from '@lar-works/design-system';
-import { useState } from 'react';
-
-import { ActivityLine, useActivityState, useActivityStill } from './ActivityLine';
-import { AutoBuildNote } from './AutoBuildNote';
-import { Figures, RowSecondLine, figuresOf, opensItem } from './Columns';
-import { threadAtWork, threadsOf } from './DossierParts';
-import { RowKind, RowSource } from './RowIdentity';
-import type { StageRow as Row } from './StageRows';
-import { OnYourDesk, YOURS, threadText } from './StageTrack';
-import { useItemDialogStore } from '@/features/item-dialog';
-import {
-    ActivityFeedback,
-    Age,
-    AzureFields,
-    ItemTitle,
-    KindMarker,
-    SliceBar,
-    SliceList,
-    hasFigures,
-    usageLoading,
-    useActivityFeedback,
-    useActivityUnavailable,
-    useShownStatus,
-    OpenThread,
-    hasLiveThread,
-    StartAfterError,
-    StartOrAfter,
-    StartBuild,
-    StartMessage,
-    ItemStatusGlyph,
-} from '@/features/items';
+} from '@/ui/board';
 
 /** The one thing a status asks next, or where to act on an item that waits on you. */
 function Side({ item, data }: { item: Item; data: BoardData }) {
-    const { working } = useShownStatus(item);
+    const { working, resume } = useShownStatus(item);
+
+    if (resume)
+        return <OpenThread item={item} data={data} threadId={itemActivityThread(item)?.id} label="Resume in T3" />;
 
     if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
 
-    if (YOURS.includes(item.status)) return <OnYourDesk />;
+    if (YOURS.includes(item.status)) return null;
 
     switch (item.status) {
         case 'Queued':
@@ -99,63 +102,40 @@ const sliceNote = (item: Item) => {
 
 /** Which concept or parent the row's work belongs to. */
 function PartOf({ concept }: { concept: Item }) {
-    const text = `${concept.kind === 'concept' ? 'Concept' : 'Part of'}: ${concept.title}`;
+    const text = `Part of ${concept.title}`;
 
     return <RowPartOf>{text}</RowPartOf>;
 }
 
-/** The row's state, once: Working for a run known to be running, whatever telemetry it lacks; a running build's phase; a start's progress only where nothing else on the row says it. */
-function stateText(
-    item: Item,
-    word: string,
-    { label, running }: { label: string; running: boolean },
-    runKnown: boolean,
-): string {
-    if (label === 'Activity unavailable') return runKnown ? 'Working' : word;
-
-    if (label === word || label === 'Working') return label;
-
-    if (running) return label;
-
-    if (
-        (label === 'Starting' || label === 'May have started') &&
-        ['Queued', 'Ready', 'In progress'].includes(item.status)
-    )
-        return word;
-
-    return `${word} · ${label}`;
-}
+/** The stages a board section is named for: Shaping, Ready to build and Build. */
+const NAMED_BY_SECTION: readonly Status[] = ['Shaping', 'Ready', 'In progress'];
 
 /** `n` is a Queue row's place in the Queue, which it shows in the glyph's place, with its age as its state. */
 export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: BoardData; n?: number }) {
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const activity = useActivityState(item);
-    const unavailable = useActivityUnavailable();
     const [slices, setSlices] = useState(false);
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const implemented = item.slices.length > 0 && done === item.slices.length;
     const note = sliceNote(item);
     const blocked = blockedText(item);
-    const runKnown =
-        (!unavailable || activity === 'working') && activity !== 'unavailable' && threadsOf(item).some(threadAtWork);
+    // A section's heading names its own stage, so a row there says its state only when it says something more.
     const state =
-        (activity && ACTIVITY_WORD[activity]) ??
-        (shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown));
+        item.kind !== 'concept' && shown.word === item.status && NAMED_BY_SECTION.includes(item.status)
+            ? ''
+            : shown.word;
     const still = useActivityStill(item);
-    const working = !still && (feedback.running || state === 'Working');
-    const showsActivity = n === undefined && activity;
+    const working = !still && (feedback.running || shown.running);
+    const showsActivity =
+        n === undefined && activity && activity !== 'unavailable' && activity !== 'stopped' && activity !== 'waiting';
     const figures = figuresOf(item, data);
     const prs = item.linkedPrs.slice(0, 1);
+    const hasFigureCell = Boolean((figures && hasFigures(figures)) || usageLoading(item, data));
+    // A row with nothing but figures to add holds them beside its action, so it keeps a single row's height.
     const hasSecondLine =
-        item.slices.length > 0 ||
-        working ||
-        showsActivity ||
-        prs.length > 0 ||
-        (figures && hasFigures(figures)) ||
-        usageLoading(item, data) ||
-        blocked;
+        item.slices.length > 0 || working || showsActivity || prs.length > 0 || Boolean(blocked) || shown.light;
 
     return (
         <StageRowItem item={item.id} picked={isPicked}>
@@ -180,17 +160,26 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                     </RowTitleCell>
                     <RowStateCell>
                         {n === undefined ? (
-                            <RowState title={threadText(item, shown.working)}>{state}</RowState>
+                            <RowState
+                                title={[
+                                    (shown.light || shown.blocked) && state,
+                                    (shown.light || shown.blocked) && shown.recorded,
+                                    threadText(item, shown.working),
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                            >
+                                {state}
+                            </RowState>
                         ) : (
                             <QueueAge>
                                 <Age at={item.updatedAt} />
                             </QueueAge>
                         )}
-                        <KindMarker item={item} />
                         <AzureFields azure={item.azure} />
                     </RowStateCell>
                 </RowOpen>
-                <RowSide>
+                <RowSide figures={!hasSecondLine && hasFigureCell && <Figures s={figures} item={item} />}>
                     <Side item={item} data={data} />
                 </RowSide>
             </RowFirst>
@@ -218,10 +207,13 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                         )
                     }
                 >
-                    {blocked && <RowBlocked>{blocked}</RowBlocked>}
+                    {/* The section names the recorded stage (and the state's title repeats it); a blocked row's state
+                        already says what it starts after. */}
+                    {blocked && !shown.blocked && <RowBlocked>{blocked}</RowBlocked>}
                     {showsActivity ? (
                         <ActivityLine item={item} />
                     ) : (
+                        !blocked &&
                         (note[0] || implemented) && (
                             <RowSliceNote
                                 title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}

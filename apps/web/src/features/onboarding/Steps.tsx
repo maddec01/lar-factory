@@ -23,7 +23,12 @@ export function StepBody({ run }: { run: Run }) {
     return (
         <Stack space="section">
             {finish.state === 'failed' && (
-                <Alert tone="danger" title="Could not add Project">
+                <Alert
+                    role={finish.code === 'sample-mode' ? 'status' : 'alert'}
+                    aria-live={finish.code === 'sample-mode' ? 'polite' : 'assertive'}
+                    tone={finish.code === 'sample-mode' ? 'info' : 'danger'}
+                    title={finish.code === 'sample-mode' ? 'Sample mode' : 'Couldn’t add project'}
+                >
                     {finish.error}
                 </Alert>
             )}

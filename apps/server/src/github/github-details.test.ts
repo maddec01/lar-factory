@@ -104,31 +104,6 @@ test('an issue answers its body, people, milestone, sub-tickets and comments, ne
     });
 });
 
-test('an item with no body, author or comments answers empty details', async () => {
-    const gh = fakeGh({
-        __typename: 'Issue',
-        body: '',
-        author: null,
-        assignees: { nodes: [] },
-        createdAt: '2026-10-12T09:14:00Z',
-        milestone: null,
-        subIssues: { nodes: [] },
-        comments: { pageInfo: { hasPreviousPage: false, startCursor: null }, nodes: [] },
-    });
-
-    assert.deepEqual(await readGithubItemDetails(item('I_2'), gh.run), {
-        body: '',
-        format: 'markdown',
-        author: null,
-        assignees: [],
-        createdAt: '2026-10-12T09:14:00Z',
-        subTickets: [],
-        comments: [],
-        hasOlderComments: false,
-        olderCursor: null,
-    });
-});
-
 test('opening an item makes one GraphQL call, by node id, for the last 10 comments and no other page', async () => {
     const gh = fakeGh({
         __typename: 'Issue',

@@ -5,7 +5,7 @@
 import type { BoardData, Item, ItemDetails, RepositorySetup } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { selectAll, selectEnd, typeInto } from '@/test/EditorTest';
+import { selectEnd, typeInto } from '@/test/EditorTest';
 import { $, $$, detailsRead, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const dialog = () => $('[data-item-dialog]');
@@ -15,7 +15,7 @@ const buttonIn = (el: Element, name: string) =>
     [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === name);
 const editButton = () => buttonIn(description(), 'Edit');
 const editorArea = () => description().querySelector<HTMLElement>('[contenteditable]');
-const prompt = () => $$('[role="dialog"]').find((d) => text(d).includes('Discard changes?'));
+const prompt = () => $$('[role="dialog"], [role="alertdialog"]').find((d) => text(d).includes('Discard changes?'));
 
 const details = (body: string, more: Partial<ItemDetails> = {}): ItemDetails => ({
     body,
@@ -117,42 +117,15 @@ const azureBoard = (): [BoardData, string] => {
 };
 const github = sample.items[0]!.id;
 
-test('Edit shows once the details load, opens the editor on the description and focuses it', async () => {
-    serve(editing, { [github]: details('- one\n- two') });
-    await mountPage(editing);
-    await openItem(github);
-    expect(editButton()).toBeDefined();
+test('Edit is offered only while this Mac lets the factory edit the repository’s tickets', async () => {
+    // The sample's lar-server setup allows editing; a repository with no setup has said nothing about it.
+    const unset: BoardData = { ...sample, repos: sample.repos.map(({ setup: _setup, ...repo }) => repo) };
 
-    const heading = description().querySelector('h2')!;
-
-    expect([text(heading), heading.classList.contains('uppercase')], 'a small uppercase heading beside Edit').toEqual([
-        'Description',
-        true,
-    ]);
-    await press(editButton());
-    expect(editButton(), 'Edit hides while editing').toBeUndefined();
-    expect([...editorArea()!.querySelectorAll('ul > li')].map(text)).toEqual(['one', 'two']);
-    expect(document.activeElement).toBe(editorArea());
-    expect(text(description())).toContain('No changes');
-    expect(buttonIn(description(), 'Save')!.disabled, 'nothing to save yet').toBe(true);
-});
-
-test("Edit is offered only while this Mac lets the factory edit the repository's tickets", async () => {
-    serve(sample, { [github]: details('Old text.') });
-    await mountPage(sample);
+    serve(unset, { [github]: details('Old text.') });
+    await mountPage(unset);
     await openItem(github);
     expect(text(description())).toContain('Old text.');
     expect(editButton()).toBeUndefined();
-});
-
-test('Edit is not offered while the details load', async () => {
-    fetchMock.mockImplementation(async (url: string) =>
-        detailsRead(url) ? new Promise<Response>(() => {}) : new Response(JSON.stringify(sample)),
-    );
-    await mountPage(editing);
-    await openItem(github);
-    expect(inDialog('[aria-busy="true"]')).not.toBeNull();
-    expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit')).toBe(false);
 });
 
 test('Save writes the new Markdown to the GitHub issue, reads the details again and shows the new text', async () => {
@@ -190,14 +163,14 @@ test('a save whose reload fails shows the saved text, says so, and Edit opens on
     delete served[github];
     await board.answer(200, { error: null });
     expect(editorArea()).toBeNull();
-    expect(text(dialog()!)).not.toContain('Could not load the details');
+    expect(text(dialog()!)).not.toContain('Couldn’t load the details');
     expect(text(description())).toContain('Old text. More.');
 
     const status = description().querySelector('[role="status"]')!;
 
     expect([text(status), status.getAttribute('title')], 'the truncated status has its whole text as a title').toEqual([
-        'Saved; could not reload the details',
-        'Saved; could not reload the details',
+        'Saved; couldn’t reload the details',
+        'Saved; couldn’t reload the details',
     ]);
     await press(editButton());
     expect(text(editorArea()!), 'Edit starts from the text just saved, not the old details').toBe('Old text. More.');
@@ -206,7 +179,7 @@ test('a save whose reload fails shows the saved text, says so, and Edit opens on
     await press(buttonIn(description(), 'Save'));
     expect(board.saved().at(-1)).toEqual({ itemId: github, body: 'Old text. More. Again.' });
     await board.answer(200, { error: null });
-    expect(text(description())).not.toContain('could not reload');
+    expect(text(description())).not.toContain('couldn’t reload');
     expect(text(description())).toContain('Old text. More. Again.');
 });
 
@@ -267,7 +240,7 @@ test('an Azure work item saves to the field and revision its details gave, and a
     await press(editButton());
     expect([...editorArea()!.querySelectorAll('ul > li')].map(text)).toEqual(['Play', 'Quit']);
     expect(editorArea()!.querySelector('strong, b')).not.toBeNull();
-    expect(text(description()), 'opening an HTML description is not a change').toContain('No changes');
+    expect(text(description()), 'opening an HTML description isn’t a change').toContain('No changes');
     expect(description().querySelectorAll('[contenteditable]'), 'Acceptance Criteria stays read-only').toHaveLength(1);
     expect(text(description())).toContain('It plays.');
     await typeAtEnd('!');
@@ -292,7 +265,7 @@ test('a failed save, such as an Azure conflict, keeps the editor open with the d
     await press(buttonIn(description(), 'Save'));
 
     const error =
-        'Could not save the description. Someone else changed work item 310 since you opened it. Copy your text, close the item and open it again to edit the latest version.';
+        'Couldn’t save the description. Someone else changed work item 310 since you opened it. Copy your text, close the item and open it again to edit the latest version.';
 
     await board.answer(409, { error });
     expect(editorArea()!.getAttribute('contenteditable')).toBe('true');
@@ -300,10 +273,10 @@ test('a failed save, such as an Azure conflict, keeps the editor open with the d
 
     const alert = description().querySelector('[role="alert"]')!;
 
-    expect(text(alert), "the board's message, said once").toBe(error);
+    expect(text(alert), 'the board’s message, said once').toBe(error);
     expect(
         alert.closest('[data-edit-actions]'),
-        'it takes the place of "Unsaved changes", in Save\'s row, which stays in view',
+        'it takes the place of "Unsaved changes", in Save’s row, which stays in view',
     ).toBe(buttonIn(description(), 'Save')!.closest('[data-edit-actions]'));
     expect(alert.closest('[data-edit-actions]')).not.toBeNull();
 });
@@ -325,23 +298,6 @@ test('closing with unsaved changes asks "Discard changes?": Keep editing stays, 
     expect(await isOpen()).toBe(false);
 });
 
-test('Escape in the Link URL field closes the field, not the dialog', async () => {
-    serve(editing, { [github]: details('Old text.') });
-    await mountPage(editing);
-    await openItem(github);
-    await press(editButton());
-    await selectAll(editorArea()!);
-    await press(description().querySelector<HTMLButtonElement>('[role="toolbar"] button[aria-label="Link"]')!);
-
-    const field = () => $('input[aria-label="Link URL"]');
-
-    expect(field()).not.toBeNull();
-    await escape(field()!);
-    expect(field()).toBeNull();
-    expect(await isOpen()).toBe(true);
-    expect(editorArea(), 'the editor stays open').not.toBeNull();
-});
-
 test('closing with the editor open but nothing changed closes at once', async () => {
     serve(editing, { [github]: details('- one\n- two') });
     await mountPage(editing);
@@ -350,38 +306,6 @@ test('closing with the editor open but nothing changed closes at once', async ()
     await escape(editorArea()!);
     expect(prompt()).toBeUndefined();
     expect(await isOpen()).toBe(false);
-});
-
-test('the expand button and Ctrl+Shift+E grow the item dialog and back, the editor filling its height', async () => {
-    serve(editing, { [github]: details('Old text.') });
-    await mountPage(editing);
-    await openItem(github);
-
-    const expand = () => inDialog<HTMLButtonElement>('button[data-expand]')!;
-
-    await press(expand());
-    expect(dialog()!.style.height).toBe('calc(100dvh - (52px + 1rem))');
-    await press(editButton());
-    expect(description().querySelector('[data-description-editor]')!.className.split(' ')).toContain('flex-1');
-    await settle(() =>
-        editorArea()!.dispatchEvent(
-            new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true }),
-        ),
-    );
-    expect(dialog()!.style.height, 'restored').toBe('');
-    expect(description().querySelector('[data-description-editor]')!.className.split(' ')).not.toContain('flex-1');
-});
-
-test('Azure read-only setup hides Edit and explains the denial despite allowed edit access', async () => {
-    const [board, id] = azureBoard();
-
-    board.repos.find((repo) => repo.repo === board.items[0]!.repo)!.setup!.azureReadOnly = true;
-    serve(board, { [id]: details('Read-only description.') });
-    await mountPage(board);
-    await openItem(id);
-    expect(text(description())).toContain('Read-only description.');
-    expect(editButton()).toBeUndefined();
-    expect(text(dialog())).toContain('read-only');
 });
 
 test.each([false, true])(

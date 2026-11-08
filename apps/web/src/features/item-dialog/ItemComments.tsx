@@ -3,21 +3,18 @@
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
 import {
+    EmptyState,
     Button,
-    buttonKind,
     Comment as CommentCard,
     CommentList,
-    DetailsHeading,
-    DetailsText,
     Inline,
-    MainSection,
+    PageError,
     RichText,
-    Text,
+    Stack,
 } from '@lar-works/design-system';
 
-import type { DetailsEntry } from './DetailsCache';
-import type { ItemDetailsRead } from './useItemDetails';
-import { useOlderComments } from './useOlderComments';
+import { useOlderComments, type DetailsEntry, type ItemDetailsRead } from '@/services/items/items.hooks';
+import { buttonKind, DetailsHeading, MainSection } from '@/ui/board';
 
 function Comment({ comment, now }: { comment: ItemComment; now: number }) {
     return (
@@ -52,7 +49,7 @@ function Comments({
     return (
         <MainSection
             header={
-                <DetailsHeading presentation="muted">
+                <DetailsHeading presentation="label">
                     {ticketContext ? 'Ticket comments' : 'Comments'}
                     {comments.length > 0 && ` · ${comments.length}`}
                 </DetailsHeading>
@@ -66,7 +63,7 @@ function Comments({
                     ))}
                 </CommentList>
             ) : (
-                !older.hasMore && <DetailsText>No comments.</DetailsText>
+                !older.hasMore && <EmptyState size="inline" title="No comments." />
             )}
             {older.hasMore && (
                 <Inline as="span" wrap align="center" space="group">
@@ -74,9 +71,14 @@ function Comments({
                         Load older comments
                     </Button>
                     {older.error && (
-                        <Text variant="caption" tone="danger" role="alert">
-                            Could not load older comments: {older.error}
-                        </Text>
+                        <Stack role="alert">
+                            <PageError
+                                size="inline"
+                                title="Couldn’t load older comments"
+                                description={older.error}
+                                primaryAction={{ label: 'Try again', onAction: older.loadMore }}
+                            />
+                        </Stack>
                     )}
                 </Inline>
             )}

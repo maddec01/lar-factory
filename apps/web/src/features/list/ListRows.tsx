@@ -2,11 +2,11 @@
 
 import { ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { ListItemRow } from '@lar-works/design-system';
 
 import { AzureFields, ItemKind, LabelChips, StructureSync, SourceIcon } from '@/features/items';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { ListItemRow } from '@/ui/board';
 
 export function ItemRow({
     item,
@@ -29,7 +29,7 @@ export function ItemRow({
             source={<SourceIcon item={item} />}
             {...(item.number ? { reference: ref(item) } : {})}
             title={item.title}
-            repoIcon={showRepo && <ProjectIcon repo={repoKey(item)} size="small" />}
+            repoIcon={showRepo && <ProjectIcon repo={repoKey(item)} size="sm" />}
             meta={`${showRepo ? `${repoName(repoKey(item), repos)} · ` : ''}${shortAgo(item.updatedAt, now)}`}
             chips={
                 <>

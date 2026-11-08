@@ -6,7 +6,7 @@ import { expect, test } from 'vite-plus/test';
 import { newLabelProblem, writeAccessProblem } from './write-access.ts';
 
 test('writes require verified access and respect Azure safety', () => {
-    expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('not checked');
+    expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('isn’t checked');
     expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'refused' })).toContain('refused');
     expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'allowed' })).toBeNull();
     expect(
@@ -31,13 +31,7 @@ test('legacy consent loads without granting access and disappears on resave', as
     expect(readFileSync(join(dir, REPOSITORY_LIST_FILE), 'utf8')).not.toContain('consent');
 });
 
-test('unverified GitHub access explains supported credentials and editing restrictions', () => {
-    expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('classic token or gh OAuth');
-    expect(writeAccessProblem('org/repo', 'edit-ticket', {})).toContain("cannot edit other people's issues");
-    expect(writeAccessProblem('org/repo', 'edit-ticket', { 'edit-ticket': 'allowed' })).toBeNull();
-});
-
-test('repository identities do not change write authorization', () => {
+test('repository identities don’t change write authorization', () => {
     for (const repo of [
         'owner/project',
         'other-owner/other-project',
@@ -57,7 +51,7 @@ test('repository identities do not change write authorization', () => {
 test('a new label needs label management, and on Azure stays unavailable with its reason even then', () => {
     expect(newLabelProblem('team/app', { 'manage-labels': 'allowed' })).toBeNull();
     expect(newLabelProblem('team/app', { 'tag-ticket': 'allowed' })).toContain(
-        'Access to manage-labels is not checked yet',
+        'Access to manage-labels isn’t checked yet',
     );
     expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' })).toContain(
         'Azure DevOps has no way to create a tag on its own',

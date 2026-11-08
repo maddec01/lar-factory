@@ -61,7 +61,7 @@ export function updateStatusText(state: UpdateState): string {
     if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
         const verb = state.errorContext === 'install' ? 'install' : 'download';
 
-        return `Couldn't ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
+        return `Couldn’t ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
     }
 
     switch (state.status) {
@@ -113,5 +113,5 @@ export function getUpdateDisabledReason(
 ): string | null {
     if (!state || (state.enabled && state.status !== 'disabled')) return null;
 
-    return state.message?.trim() || 'Automatic updates are not available in this build.';
+    return state.message?.trim() || 'Automatic updates aren’t available in this build.';
 }

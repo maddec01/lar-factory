@@ -1,22 +1,14 @@
 import { writeAccessProblem, type Item } from '@lar-factory/shared';
-import {
-    AccessNotice,
-    Button,
-    buttonKind,
-    FocusPanel,
-    FormFieldset,
-    Inline,
-    OutgoingTicket,
-    Stack,
-    Text,
-} from '@lar-works/design-system';
+import { Alert, Button, FormFieldset, Inline, Stack, Text } from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react';
 
-import { useCreateTicketStore, type TicketPreview } from './CreateTicketStore';
+import { useCreateTicketStore } from './CreateTicketStore';
 import { TicketOptionFields, ticketOptions } from '@/features/add-item';
 import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { readTicketPreview, type TicketPreview } from '@/services/tickets/tickets.service';
+import { AccessNotice, buttonKind, FocusPanel, OutgoingTicket } from '@/ui/board';
 
 export function CreateTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
@@ -32,8 +24,11 @@ export function CreateTicket({ item }: { item: Item }) {
     const repo = data.repos.find((repo) => repo.repo === item.repo);
     const reason = writeAccessProblem(item.repo, 'publish-ticket', repo?.setup?.access ?? {}, {
         azureReadOnly: repo?.setup?.azureReadOnly,
+        recheckAction: true,
     });
     const locked = !!attempt && attempt.phase !== 'failed';
+
+    const restoreFocus = useEffectEvent(() => trigger.current?.focus());
 
     useEffect(() => {
         if (!open) return;
@@ -43,26 +38,21 @@ export function CreateTicket({ item }: { item: Item }) {
         const itemId = item.id;
         const shown = new AbortController();
 
-        void fetch(`/api/ticket-preview?itemId=${encodeURIComponent(itemId)}`)
-            .then(async (response) => {
-                const result = (await response.json()) as { preview?: TicketPreview; error?: string };
-
-                if (!response.ok || !result.preview)
-                    throw Error(result.error ?? 'Could not read the outgoing issue text.');
-
-                if (!shown.signal.aborted) setRead({ itemId, preview: result.preview });
+        void readTicketPreview(itemId)
+            .then((preview) => {
+                if (!shown.signal.aborted) setRead({ itemId, preview });
             })
             .catch(() => {
                 if (!shown.signal.aborted)
                     setRead({
                         itemId,
-                        error: 'Could not read the outgoing issue text. Close and reopen Create issue to retry.',
+                        error: 'Couldn’t read the outgoing issue text. Close and reopen Create issue to retry.',
                     });
             });
 
         return () => {
             shown.abort();
-            trigger.current?.focus();
+            restoreFocus();
         };
     }, [open, item.id]);
 
@@ -105,11 +95,7 @@ export function CreateTicket({ item }: { item: Item }) {
                     }
                 />
             )}
-            {error && (
-                <Text variant="inherit" role="alert">
-                    {error}
-                </Text>
-            )}
+            {error && <Alert size="sm" tone="danger" message={error} />}
             {!outgoing && !error && (
                 <Text variant="inherit" role="status">
                     Reading outgoing issue text…

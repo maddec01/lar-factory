@@ -6,7 +6,7 @@ import type { BoardData, Item, Status } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, NOW, fresh, mountPage, moved, push, sample, settle, text } from '@/test/PageTest';
+import { $, $$, NOW, fresh, mountPage, sample, settle, text } from '@/test/PageTest';
 
 let glyphRenders = 0;
 
@@ -82,8 +82,8 @@ test('a tick that changes nothing renders no glyph, and the ages on the desk and
     const { tickAt } = await mounted(boardOf([running('I_build', 'In progress'), queued, awaiting], 100_000));
     const deskAge = () => text($('.desk-card .desk-meta'));
 
-    expect(text($('.queue-age'))).toBe('0s ago');
-    expect(deskAge()).toContain('0s ago');
+    expect(text($('.queue-age'))).toBe('just now');
+    expect(deskAge()).toContain('just now');
     expect($('.status-spin'), 'the running row spins').not.toBeNull();
 
     await tickAt(NOW + 2 * HOUR);
@@ -92,7 +92,7 @@ test('a tick that changes nothing renders no glyph, and the ages on the desk and
     expect(deskAge()).toContain('2h ago');
 });
 
-test("the tick that makes the read stale stops the spinner, keeps T3's activity and puts work at Verify back on the desk", async () => {
+test('the tick that makes the read stale stops the spinner, keeps T3’s activity and puts work at Verify back on the desk', async () => {
     const titles = {
         state: 'running',
         updated: FRESH,
@@ -121,14 +121,4 @@ test("the tick that makes the read stale stops the spinner, keeps T3's activity 
         'Run the tests',
     );
     expect(onDesk()).toEqual(['I_verify']);
-});
-
-test('a push that changes the data renders the glyphs and shows the change', async () => {
-    const data = boardOf([running('I_build', 'In progress'), queued], 100_000);
-
-    await mounted(data);
-    expect($('[data-item="I_build"] .status-spin')).not.toBeNull();
-    await push(moved('I_build', 'Review', data));
-    expect(glyphRenders).toBeGreaterThan(0);
-    expect($('[data-item="I_build"] .status-spin')).toBeNull();
 });

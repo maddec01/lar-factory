@@ -1,44 +1,18 @@
-import {
-    REPOSITORY_OPERATIONS,
-    onAzure,
-    trackerCapabilities,
-    type OperationAccess,
-    type RepositoryOperation,
-    type RepositorySetup,
-} from '@lar-factory/shared';
-import { Button, buttonKind, Inline, InlineLink, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
+// A Project's access rows and read-only reasons, with Recheck while the board can ask for access again.
 
+import { type OperationAccess, type RepositoryOperation } from '@lar-factory/shared';
+import { Button, Inline, InlineLink, InsetPanel, Stack } from '@lar-works/design-system';
+
+import { accessExplanation } from './RepositoryAccess';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { ToolState } from '@/shared/settings/SettingControls';
-
-export function operationNames(repo: string): Record<RepositoryOperation, string> {
-    const azure = onAzure(repo);
-    const labels = trackerCapabilities(repo).heading.toLowerCase();
-
-    return {
-        'push-branch': 'Push branches',
-        'open-pr': 'Open PRs',
-        'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
-        'publish-ticket': azure ? 'Create work items' : 'Create issues',
-        'tag-ticket': `Set ${labels}`,
-        'manage-labels': `Manage ${labels}`,
-        'comment-ticket': 'Post comments',
-        'type-ticket': azure ? 'Set work item types' : 'Set issue types',
-        'relate-ticket': 'Set relationships',
-    };
-}
+import { buttonKind, ReasonNote } from '@/ui/board';
 
 export interface AccessRow {
     name: string;
     access: OperationAccess;
     operation?: RepositoryOperation;
 }
-export const accessRows = (setup: Pick<RepositorySetup, 'repo' | 'access'>): AccessRow[] =>
-    REPOSITORY_OPERATIONS.map((operation) => ({
-        name: operationNames(setup.repo)[operation],
-        access: setup.access[operation],
-        operation,
-    }));
 
 export function AccessList({
     rows,
@@ -86,12 +60,6 @@ export function AccessList({
             )}
         </Stack>
     );
-}
-
-export function accessExplanation(repo: string, reason: string): string {
-    const names = operationNames(repo);
-
-    return REPOSITORY_OPERATIONS.reduce((text, operation) => text.replaceAll(operation, names[operation]), reason);
 }
 
 export function AccessReason({

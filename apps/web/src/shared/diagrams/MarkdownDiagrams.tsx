@@ -2,7 +2,7 @@
 
 import { Diagram, RichText } from '@lar-works/design-system';
 
-/** Mermaid runs locally in strict mode. Issue text cannot enable HTML or links. */
+/** Mermaid runs locally in strict mode. Issue text can't enable HTML or links. */
 async function drawMermaid(source: string, id: string): Promise<string> {
     const { default: mermaid } = await import('mermaid');
 
@@ -30,7 +30,7 @@ export function MarkdownDiagrams({ text }: { text: string }) {
                     source={source}
                     draw={drawMermaid}
                     label="Concept map diagram"
-                    failedLabel="The diagram could not be drawn. Its source is available below."
+                    failedLabel="The diagram couldn’t be drawn. Its source is available below."
                     sourceLabel="Diagram source"
                 />
             )}

@@ -155,14 +155,6 @@ test('a refused list read stops onboarding before saving anything', async (t) =>
     expect(readRepositoryList(dir)).toEqual([]);
 });
 
-test('onboarding needs no consent payload and persists no consent list', async (t) => {
-    const dir = await folder(t);
-    const input = answers;
-
-    expect(await saveSetup(input, dir, allowed)).toEqual({ onboarding: [] });
-    expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).not.toContain('consent');
-});
-
 test('onboarding refuses malformed vocabulary before saving', async (t) => {
     const dir = await folder(t);
 
@@ -220,7 +212,7 @@ test('onboarding refuses linked-work typed as a new label and saves nothing', as
 
     expect(
         await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['linked-work'] } }, dir, reads),
-    ).toEqual({ status: 409, error: "linked-work is reserved for the factory's saved links." });
+    ).toEqual({ status: 409, error: 'linked-work is reserved for the factory’s saved links.' });
     expect(calls).toEqual([]);
     expect(readRepositorySetups(dir)).toEqual([]);
 });

@@ -2,7 +2,7 @@
 // when the setting can't be read, as saving one replaces the file.
 
 import type { ShapingThreadCleanup, ShapingThreadCleanupState } from '@lar-factory/shared';
-import { Stack, Text } from '@lar-works/design-system';
+import { Alert, Stack } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -11,12 +11,12 @@ import { Choice } from '@/shared/settings/SettingControls';
 
 const CHOICES: { value: ShapingThreadCleanup; label: string }[] = [
     { value: 'keep', label: 'Keep' },
-    { value: 'settle', label: 'Settle' },
+    { value: 'settle', label: 'Mark as finished' },
     { value: 'archive', label: 'Archive' },
     { value: 'delete', label: 'Delete' },
 ];
 
-/** The four choices, with none picked until the board has read the setting, which it never does in sample mode. */
+/** The saved choice, or an explicit missing/unreadable state; a new choice can replace an unreadable file. */
 export function ShapingThreadCleanupSetting({ state }: { state: ShapingThreadCleanupState | undefined }) {
     const [saving, setSaving] = useState<ShapingThreadCleanup | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -37,21 +37,22 @@ export function ShapingThreadCleanupSetting({ state }: { state: ShapingThreadCle
     return (
         <Stack space="related" data-shaping-thread-cleanup>
             <Choice
-                label="Shaping threads after Start build"
+                label="Shaping threads when a build starts"
                 options={CHOICES}
                 value={saving ?? (state && 'choice' in state ? state.choice : null)}
+                placeholder={state ? 'Not available' : 'Not reported'}
                 busy={saving !== null}
                 onChange={(choice) => void save(choice as ShapingThreadCleanup)}
             />
             {state && 'problem' in state && (
-                <Text variant="caption" tone="danger" role="alert">
+                <Alert size="sm" tone="danger">
                     {state.problem} Saving a choice replaces the file.
-                </Text>
+                </Alert>
             )}
             {error && (
-                <Text variant="caption" tone="danger" role="alert">
+                <Alert size="sm" tone="danger">
                     {error}
-                </Text>
+                </Alert>
             )}
         </Stack>
     );

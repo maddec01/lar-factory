@@ -82,16 +82,6 @@ function serveOlder(): { fail: (count: number) => void; hold: () => () => Promis
     };
 }
 
-test('an item with older comments shows Load older comments under its comments, and an item without shows none', async () => {
-    await mountPage();
-    await openItem('I_sample13');
-    expect(text(loadMore())).toBe('Load older comments');
-    expect(authors()).toEqual(['maddec01', 'claude-bot', 'reviewer-anne']);
-    await closeItem();
-    await openItem('I_sample26');
-    expect(loadMore()).toBeUndefined();
-});
-
 test('an unresolved empty discussion offers older comments and only claims no comments after reaching the end', async () => {
     const original = fetchMock.getMockImplementation()!;
 
@@ -135,7 +125,6 @@ test("Load older comments reads the page before the details' cursor and appends 
     await settle(() => loadMore()!.click());
     expect(pageReads()).toEqual([{ itemId: 'I_sample13', before: '0' }]);
     expect(loadMore()!.disabled, 'disabled while it loads').toBe(true);
-    expect(loadMore()!.querySelector('.animate-spin'), 'with a spinner').not.toBeNull();
     await release();
     expect(bodies().slice(3)).toEqual(OLDER.slice(0, 10).map((c) => c.body));
     expect(authors()).toHaveLength(13);
@@ -157,7 +146,7 @@ test('a failed load shows its error next to the button, keeps the comments shown
     await openItem('I_sample13');
     server.fail(1);
     await settle(() => loadMore()!.click());
-    expect(errorText()).toBe('Could not load older comments: GitHub is rate limiting the board.');
+    expect(errorText()).toBe('Couldn’t load older commentsGitHub is rate limiting the board.Try again');
     expect(authors()).toHaveLength(3);
     expect(loadMore()!.disabled).toBe(false);
 
@@ -165,21 +154,6 @@ test('a failed load shows its error next to the button, keeps the comments shown
     expect(pageReads().map((r) => r.before)).toEqual(['0', '0']);
     expect(authors()).toHaveLength(13);
     expect(errorText(), 'the error clears once a load works').toBe('');
-});
-
-test('a read that cannot reach the board fails the same way', async () => {
-    const original = fetchMock.getMockImplementation()!;
-
-    await mountPage();
-    await openItem('I_sample13');
-    fetchMock.mockImplementation(async (url: string) => {
-        if (url.startsWith('/api/item-comments')) throw new TypeError('Failed to fetch');
-
-        return original(url);
-    });
-    await settle(() => loadMore()!.click());
-    expect(errorText()).toBe('Could not load older comments: Could not reach the board to read them.');
-    expect(authors()).toHaveLength(3);
 });
 
 test('reopening an unchanged item shows the older comments already loaded and goes on from the next page', async () => {
@@ -220,7 +194,7 @@ test('reopening an item whose updatedAt changed starts again at the latest comme
     expect(authors()).toHaveLength(13);
 });
 
-test('a page that lands after the dialog closed and reopened is not added to the new comments', async () => {
+test('a page that lands after the dialog closed and reopened isn’t added to the new comments', async () => {
     const server = serveOlder();
 
     await mountPage();

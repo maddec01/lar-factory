@@ -85,6 +85,8 @@ export function startLiveData(): void {
 }
 
 export interface ActionResult {
+    /** A deliberate sample-server refusal, distinct from a failed operation. */
+    code?: 'sample-mode';
     error: string | null;
     board?: BoardData;
     /** Queueing an issue from the list creates its local work ID. */
@@ -92,6 +94,30 @@ export interface ActionResult {
 }
 
 /** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
+/** What a write on a sample board answers: the sample is a fixed file, so nothing it shows can change. */
+export const SAMPLE_READ_ONLY = 'Sample boards are read-only.';
+
+/** The refusals the server words for its own checks, in words for the person who pressed. */
+const REFUSALS: Record<string, string> = {
+    'Submit from this board page.':
+        'The board only takes changes made on its own page. Reload the board and try again.',
+    'Submit from the board app.': 'Only the board app can make this change. Make it there.',
+};
+
+/**
+ * What a write's refusal says to a reader. The server's own sentence for a person stays as it is; a refusal from one of
+ * its checks, or a bare HTTP failure, says on a sample board that sample boards are read-only, and elsewhere what to do.
+ */
+function refusal(error: string | null, ok: boolean): string | null {
+    if (!error && ok) return null;
+
+    if (error && !REFUSALS[error]) return error;
+
+    if (useBoardStore.getState().data.capture?.enabled === false) return SAMPLE_READ_ONLY;
+
+    return (error && REFUSALS[error]) ?? 'The board couldn’t make this change. Try again.';
+}
+
 export async function postAction<T extends object = object>(
     path: string,
     body: object,
@@ -141,9 +167,9 @@ export async function postAction<T extends object = object>(
 
         const result = (await response.json()) as Partial<ActionResult & T>;
 
-        return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
+        return { ...result, error: refusal(result.error ?? null, response.ok) };
     } catch {
-        return { error: "Can't reach the board server. Try again." } as ActionResult & Partial<T>;
+        return { error: 'Can’t reach the board server. Try again.' } as ActionResult & Partial<T>;
     }
 }
 

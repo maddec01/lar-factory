@@ -3,12 +3,13 @@
 
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
-import { Loading, StagePane, StagePaneEmpty } from '@lar-works/design-system';
+import { Loading } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useShownScope } from '@/features/filters';
 import { StatusGlyph } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { StagePane, StagePaneEmpty } from '@/ui/board';
 
 export function Pane({
     id,
@@ -47,7 +48,7 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
 
     return (
         <StagePaneEmpty>
-            {reading ? <Loading presentation="inline" label="Loading Projects…" /> : filtered ? children : none}
+            {reading ? <Loading presentation="inline" label="Loading projects…" /> : filtered ? children : none}
         </StagePaneEmpty>
     );
 }

@@ -1,16 +1,17 @@
 // What keeps a dossier's work moving, as the labelled rows its Attention lists.
 
-import { needsAnswer, openQuestionThread, itemName, ref, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle, RefButton } from '@lar-works/design-system';
+import { itemName, needsAnswer, openQuestionThread, ref, workingAgain } from '@lar-factory/shared';
 
-import { Refs, PartLink } from './DossierEntries';
-import { open, waitsOn } from './DossierHelpers';
+import { PartLink, Refs } from './DossierEntries';
 import type { FindRef } from './DossierHelpers';
-import { DECISION_KINDS, isDone, openWaits, partLabel } from './DossierParts';
+import { open, waitsOn } from './DossierHelpers';
 import type { Part } from './DossierParts';
-import { PartStart, startable } from './PartStart';
-import { dependenciesOf, shownStatus, useActivityUnavailable, OpenThread } from '@/features/items';
+import { DECISION_KINDS, isDone, openWaits, partLabel } from './DossierParts';
+import { startable } from './PartAvailability';
+import { PartStart } from './PartStart';
+import { dependenciesOf, OpenThread, shownStatus, useActivityUnavailable } from '@/features/items';
+import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle, RefButton } from '@/ui/board';
 
 /** The attention rows with entries: parts in Needs you, parts in Verify or Ready to merge, open decisions, blocked
  *  slices, parts waiting on others, parts ready to start, Dependencies, met or not, and the map's fog; with `only`,
@@ -83,7 +84,9 @@ export function useAttentionRows(
                         (p.item.status === 'Verify' || p.item.status === 'Ready to merge') &&
                         !workingAgain(p.item, unavailable),
                 )
-                .map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />),
+                .map((p) => (
+                    <Entry key={p.item.id} main={<PartLink part={p} />} side={shownStatus(p.item, unavailable).word} />
+                )),
         },
         {
             key: 'decisions',
@@ -188,7 +191,7 @@ export function useAttentionRows(
         },
         {
             key: 'fog',
-            label: 'Fog',
+            label: 'Open questions',
             tone: 'fog' as const,
             entries: (parent.map?.fog ?? []).map((q) => (
                 <Entry

@@ -8,14 +8,15 @@
 // start, Dependencies and fog) or says nothing holds it up, then each part with what it asks next, its stage track, figures,
 // thread and slices, the done parts folded away. The browser remembers which dossiers are expanded and which view each shows.
 
-import { plural, itemName, repoKey } from '@lar-factory/shared';
+import { itemName, repoKey } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle, Text } from '@lar-works/design-system';
+import { Text } from '@lar-works/design-system';
 import type { MouseEvent } from 'react';
 
 import { Attention } from './Attention';
 import type { FindRef } from './DossierHelpers';
 import { DossierLine } from './DossierLine';
+import { unreadParts, unreadPartsText } from './DossierParts';
 import type { DossierItems, Part } from './DossierParts';
 import { NO_DELIVERY, noDelivery } from './DossierSummary';
 import { ViewToggle, LocalPlanning } from './DossierTools';
@@ -26,6 +27,7 @@ import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
 import { StructureSync } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle } from '@/ui/board';
 
 /** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
 const ABOVE_MAP = ['you'];
@@ -35,7 +37,7 @@ const BELOW_MAP = ['dependencies', 'fog'];
 function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[]; data: BoardData; view: View }) {
     const find: FindRef = (repo = parent.repo ?? '', n) =>
         data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
-    const missing = Math.max(parent.subIssues.total, parts.length) - parts.length;
+    const missing = unreadParts(parent, parts);
     // The line's own label says the planning is local; a spec waiting to save still speaks up here.
     const { sync: _, ...unsynced } = parent;
 
@@ -48,7 +50,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
             )}
             {missing > 0 && (
                 <Text variant="caption" tone="muted" data-unread-parts>
-                    {plural(missing, 'part')} the board doesn't read. A Project may no longer be on the board.
+                    {unreadPartsText(missing)}.
                 </Text>
             )}
             <StructureSync item={unsynced} />

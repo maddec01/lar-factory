@@ -2,7 +2,8 @@
 // rows and details.
 
 import { onAzure, type Item } from '@lar-factory/shared';
-import { SourceIcon as DesignSourceIcon } from '@lar-works/design-system';
+
+import { SourceIcon as DesignSourceIcon } from '@/ui/board';
 
 const SOURCE_TEXT = {
     github: 'GitHub issue. Saved on GitHub.',

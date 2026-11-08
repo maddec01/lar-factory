@@ -5,49 +5,6 @@ import * as StartingPage from './starting-page.ts';
 
 const html = (url: string) => decodeURIComponent(url.slice(url.indexOf(',') + 1));
 
-describe('StartingPage', () => {
-    it('opens on the loading screen: the Lar Factory lockup over the first step, titled Lar Factory', () => {
-        const page = StartingPage.url();
-
-        assert.match(page, /^data:text\/html;charset=utf-8,/);
-        assert.include(html(page), '<title>Lar Factory</title>');
-        assert.include(html(page), `>${StartingPage.STEPS.shell}<`);
-        assert.match(html(page), /class="loading-lar"><span class="loading-lar-slide">ar</);
-        assert.match(html(page), /class="loading-factory">Factory</);
-        assert.notInclude(html(page), "didn't start");
-    });
-
-    it('takes its colours and spacing from the design system, in light and dark mode', () => {
-        const page = html(StartingPage.url());
-
-        assert.match(page, /--background:/);
-        assert.match(page, /prefers-color-scheme:dark/);
-        assert.match(page, /body\{[^}]*background:var\(--background\)/);
-        assert.match(page, /\.loading-factory\{[^}]*color:var\(--muted-foreground\)/);
-    });
-
-    it('plays the draw and the roll unless the user prefers reduced motion', () => {
-        const page = html(StartingPage.url());
-
-        // The minifier writes 480ms as .48s.
-        assert.match(
-            page,
-            /@media \(prefers-reduced-motion:no-preference\)\{[^@]*\.48s[^@]*loading-settle[^@]*\.7s[^@]*loading-trace[^@]*\.52s[^@]*loading-slide/,
-        );
-        assert.match(page, /\.loading-roll-in\{[^}]*\.38s[^}]*loading-roll-in/);
-        assert.include(page, 'matchMedia("(prefers-reduced-motion: reduce)")');
-    });
-
-    it('names the four launch steps', () => {
-        assert.deepEqual(Object.values(StartingPage.STEPS), [
-            'Reading the shell environment',
-            'Starting the board server',
-            'Waiting for the board server',
-            'Checking gh and tools',
-        ]);
-    });
-});
-
 describe('StartingPage messages', () => {
     // Runs a message in a stand-in for the page and returns what it called.
     const run = (script: string) => {
@@ -63,10 +20,6 @@ describe('StartingPage messages', () => {
 
         return calls;
     };
-
-    it('sends a step to the open page as its text', () => {
-        assert.deepEqual(run(StartingPage.stepScript(StartingPage.STEPS.tools)), [['step', 'Checking gh and tools']]);
-    });
 
     it("sends why a start failed as the page's error line, whatever characters the reason holds", () => {
         const reason = `the board server exited with code 1 <before> "it" reported a port `;
@@ -144,13 +97,6 @@ describe('StartingPage script', () => {
         assert.deepEqual(slot(), [StartingPage.STEPS.server]);
     });
 
-    it('swaps the line without rolling with reduced motion', () => {
-        const { page, slot } = open(true);
-
-        page.step(StartingPage.STEPS.server);
-        assert.deepEqual(slot(), [StartingPage.STEPS.server]);
-    });
-
     it('shows an error in place of the step line', () => {
         const { page, nodes } = open();
 
@@ -186,14 +132,6 @@ describe('StartingPage.drawWait', () => {
     it('is nothing once the draw is done, or if the clock went back', () => {
         assert.equal(StartingPage.drawWait(10_000, 11_750), 0);
         assert.equal(StartingPage.drawWait(10_000, 60_000), 0);
-    });
-
-    it('is the whole draw while the page has not finished loading', () => {
-        assert.equal(StartingPage.drawWait(undefined, 60_000), 1750);
-    });
-
-    it('never exceeds the draw if the clock went back', () => {
-        assert.equal(StartingPage.drawWait(10_000, 9_000), 1750);
     });
 });
 

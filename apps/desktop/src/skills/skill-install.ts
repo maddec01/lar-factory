@@ -404,25 +404,25 @@ const failures = (outcome: InstallResult) =>
     outcome.targets.flatMap(({ path, error }) => (error ? [`${path}: ${error.message}`] : []));
 
 /**
- * Why Start build can't run after a check: a failed install or replacement, in any target, or a Clash, a path the app
+ * Why Start build can’t run after a check: a failed install or replacement, in any target, or a Clash, a path the app
  * didn't install that blocks a skill. Drift alone doesn't stop it here; buildAnswer asks the User about it.
  */
 export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): string | null => {
-    const couldnt = drift === 'replace' ? "couldn't replace its changed skills" : "couldn't install its skills";
+    const couldnt = drift === 'replace' ? 'couldn’t replace its changed skills' : 'couldn’t install its skills';
 
     if (outcome instanceof SkillInstallError)
-        return `Lar Factory ${couldnt}, so the build can't start: ${outcome.message}`;
+        return `Lar Factory ${couldnt}, so the build can’t start: ${outcome.message}`;
 
     const failed = failures(outcome);
 
-    if (failed.length > 0) return `Lar Factory ${couldnt}, so the build can't start. ${failed.join(' ')}`;
+    if (failed.length > 0) return `Lar Factory ${couldnt}, so the build can’t start. ${failed.join(' ')}`;
 
     if (outcome.blocked.length === 0) return null;
 
     const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join('')}.`);
     const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
 
-    return `The build can't start while a skill is blocked. ${skills.join(' ')} Move ${one ? 'that path' : 'each path'} away, then start the build again.`;
+    return `The build can’t start while a skill is blocked. ${skills.join(' ')} Move ${one ? 'that path' : 'each path'} away, then start the build again.`;
 };
 
 /**
@@ -440,7 +440,7 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
 
     if (drift === 'replace') {
         return {
-            refusal: `Lar Factory couldn't replace ${listed(skills)}, so the build can't start. They still differ from Release ${outcome.version}.`,
+            refusal: `Lar Factory couldn’t replace ${listed(skills)}, so the build can’t start. They still differ from release ${outcome.version}.`,
         };
     }
 

@@ -201,12 +201,12 @@ test('explicit label creation requires verified access and reuses existing label
     };
 
     await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow(
-        'Access to manage-labels is not checked yet. GitHub permissions require a classic token or gh OAuth login to verify. Recheck access in Settings.',
+        'Access to manage-labels isn’t checked yet. Sign in to GitHub with repository write access to confirm permissions. Recheck access in Settings.',
     );
     expect(created).toEqual([]);
     await expect(
         saveVocabularyLabels('org/repo', ['new'], discovery, { 'tag-ticket': 'allowed' }, create),
-    ).rejects.toThrow('Access to manage-labels is not checked yet');
+    ).rejects.toThrow('Access to manage-labels isn’t checked yet');
     expect(created).toEqual([]);
     expect(
         await saveVocabularyLabels('org/repo', ['BACKEND', 'new'], discovery, { 'manage-labels': 'allowed' }, create),

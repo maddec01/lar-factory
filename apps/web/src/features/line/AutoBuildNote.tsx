@@ -2,7 +2,8 @@
 // on it succeeds or a new gate passes, or, with the switch on, that it waits for its concept's Refinement.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ActionError, StartLine } from '@lar-works/design-system';
+
+import { ActionError, StartLine } from '@/ui/board';
 
 export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
     const pass = data.autoBuildPass;

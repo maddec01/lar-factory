@@ -3,8 +3,8 @@
 // the work once. Recorded work closes the dialog and shows the Added toast; so does a picked ticket, unless its record
 // was on the board already, which then opens in the item dialog.
 
-import { validateDraft, writeHeaders } from '@lar-factory/shared';
-import type { CreationResult, ItemDraft, BoardData, TicketMatch, TicketOptions } from '@lar-factory/shared';
+import { validateDraft } from '@lar-factory/shared';
+import type { CreationResult, ItemDraft, TicketMatch, TicketOptions } from '@lar-factory/shared';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -12,6 +12,7 @@ import { useItemDialogStore } from '@/features/item-dialog';
 import { notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { submitItem } from '@/services/items/items.service';
 
 interface Attempt {
     requestId: string;
@@ -122,15 +123,7 @@ export const useAddItemStore = create<AddItemState>()(
                 useBoardStore.getState().beginWrite();
 
                 try {
-                    const response = await fetch('/api/items', {
-                        method: 'POST',
-                        headers: writeHeaders(),
-                        body: JSON.stringify(attempt),
-                    });
-                    const result = (await response.json()) as CreationResult & {
-                        uncertain?: boolean;
-                        board?: BoardData;
-                    };
+                    const { status, result } = await submitItem(attempt);
 
                     if (result.item && result.board) {
                         useBoardStore.getState().beginWrite();
@@ -141,7 +134,7 @@ export const useAddItemStore = create<AddItemState>()(
                     } else {
                         set({
                             submission: result.uncertain ? { phase: 'uncertain', attempt } : { phase: 'editing' },
-                            message: result.error ?? `Request failed (HTTP ${response.status}).`,
+                            message: result.error ?? `Request failed (HTTP ${status}).`,
                         });
                     }
                 } catch {
@@ -158,7 +151,7 @@ export const useAddItemStore = create<AddItemState>()(
                     number: ticket.number,
                 });
 
-                if (!result.item) return result.error ?? 'Could not pick the ticket.';
+                if (!result.item) return result.error ?? 'Couldn’t pick the ticket.';
 
                 receive(result);
                 set({ open: false });

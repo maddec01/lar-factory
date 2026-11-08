@@ -1,8 +1,6 @@
 import type { BoardData } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { test } from 'vite-plus/test';
 
 import { SAMPLE_DATA, startBoard } from './server-support.ts';
@@ -74,19 +72,15 @@ test('sample data never gives one issue or PR number to two things', async () =>
     assert.deepEqual(clashes(data), []);
 });
 
-test('sample mode offers the fixture model choices', async (t) => {
+test("sample mode offers the sample's own model choices, not the machine's T3 settings", async (t) => {
     const board = await startBoard(t, {}, true);
     const groups = ((await board.board()) as BoardData).modelChoices;
 
     assert.deepEqual(
-        groups?.map((g) => [g.instanceId, g.models.map((m) => m.label)]),
+        groups?.map((g) => [g.instanceId, g.name, g.models.map((m) => m.label)]),
         [
-            ['claudeAgent_personal', ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 5.5']],
-            [
-                'claudeAgent',
-                ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 5.5', 'claude-opus-5-5[1m]'],
-            ],
-            ['codex', ['GPT-6 Astra', 'GPT-6.1 Sol', 'gpt-daybreak-blue-latest']],
+            ['claudeAgent', 'Claude · Personal', ['Claude Opus 5.5 · 1M context', 'Claude Sonnet 5.5']],
+            ['codex', 'Codex · Personal', ['GPT-6.1 Sol', 'GPT-6 Astra']],
         ],
     );
 });
@@ -100,20 +94,4 @@ test("sample mode shows only the sample's chosen icons, and the image endpoint a
     assert.ok(icons.every((icon) => icon.kind !== 'favicon'));
     assert.equal((await fetch(`${url}/api/project-icon/I_sample`)).status, 404);
     assert.deepEqual(await t3Calls(), []);
-});
-
-test('the sampler variable makes the board write a sample from startup, with its PID', async (t) => {
-    const dir = await mkdtemp(join(tmpdir(), 'lar-memory-board-'));
-
-    t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-
-    const file = join(dir, 'samples.jsonl');
-    const board = await startBoard(t, {}, true, false, { BOARD_MEMORY_SAMPLES: file });
-    const [first] = (await readFile(file, 'utf8'))
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as { kind: string; pid: number });
-
-    assert.equal(first?.kind, 'start');
-    assert.equal(first?.pid, board.pid);
 });

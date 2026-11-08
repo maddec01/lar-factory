@@ -1,0 +1,29 @@
+/* The board's own roles: what a colour means on the board. Each is a Tailwind colour (bg-board-active,
+   fill-board-done, border-board-idle) for a glyph, a dot, a bar or an edge, never for text: text on the board uses the
+   semantic text tokens (fg-muted, warning-fg…), which the design system holds to 4.5:1 and these roles are not.
+   A status role is its state's colour (the design system's statusStateColors), so a board status reads as the same
+   colour in every app; StatusColors.test.ts holds them to it. Everything else the board draws uses the design
+   system's semantic tokens. */
+@theme static {
+    /* Needs you (waiting): your turn (an answer, a check to verify), the waiting agent, a blocked slice. */
+    --color-board-you: var(--color-warning);
+    /* Work in motion (active): a running thread, an item being shaped, built or reviewed. */
+    --color-board-active: var(--color-info);
+    /* The Review stage's identity on a stage bar, so the bar tells it from building. Never a status: a status light,
+       glyph or word takes a state's colour. */
+    --color-board-review: var(--color-violet-500);
+    /* Finished (ready): built and ready to merge, or done. */
+    --color-board-done: var(--color-success);
+    /* Not started or stopped (off): listed, queued, an idle or stopped agent. */
+    --color-board-idle: var(--color-line-strong);
+    /* A stage the work has already passed, on a stage track. */
+    --color-board-past: color-mix(in srgb, var(--color-fg) 28%, transparent);
+    /* The board's horizontal rhythm: its workspace gives cards more breathing room than an app list's gutter. */
+    --spacing-gutter-board: 1.5rem;
+}
+
+:root {
+    @variant dark {
+        --color-board-review: var(--color-violet-400);
+    }
+}

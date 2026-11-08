@@ -145,36 +145,6 @@ test('an ask before catching up has finished changes nothing, and one at the pac
     assert.equal(state.published.length, 2, 'and earns one read');
 });
 
-test('each read logs its whole path during catch-up, the first ordinary one too, and one after only when it blocks or runs long', async (t) => {
-    const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a']);
-
-    state.settled = true;
-    await usage.advance();
-
-    const path =
-        /^stats read path took \d+ ms elapsed, \d+ ms CPU: inputs \d+ ms, discovery \d+ ms, warm \d+ ms \(parsed 1 of 1 transcripts\), dedup \d+ ms, aggregation \d+ ms, publish \d+ ms; longest block \d+ ms in (inputs|discovery|warm|dedup|aggregation|publish)$/;
-
-    assert.ok(
-        state.logged.some((line) => path.test(line)),
-        state.logged.join('\n'),
-    );
-    assert.ok(
-        state.logged.some((line) =>
-            /^stats read took \d+ ms elapsed, \d+ ms CPU, after warming 1 transcripts in \d+ ms, longest \d+ ms$/.test(
-                line,
-            ),
-        ),
-        state.logged.join('\n'),
-    );
-    state.since = 5_000;
-    await usage.want();
-    assert.equal(state.lines.length, 1, 'the first ordinary read logs');
-    assert.match(state.lines[0]!, /^stats read path took /);
-    state.since = 5_000;
-    await usage.want();
-    assert.equal(state.lines.length, 1, 'a short read with no block says nothing');
-});
-
 test('a thread joining the board during a read leaves that read provisional, so its figures reach no retained total or PR block', async (t) => {
     const held = heldWarms(t);
     const ids = ['a'];

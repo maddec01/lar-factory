@@ -1,16 +1,17 @@
 // An expanded dossier's line controls: its view toggle and where its planning lives.
 
 import type { Item } from '@lar-factory/shared';
-import { PlanningNote, ViewToggle as DesignViewToggle } from '@lar-works/design-system';
+import { ViewToggle as DesignViewToggle } from '@lar-works/design-system';
 import { ListChecks, Map as MapIcon } from '@lar-works/design-system/icons';
 
 import type { View } from './useStored';
+import { PlanningNote } from '@/ui/board';
 
 /** Work map or parts list: one dossier's way of drawing its parts, as two small icon buttons named for assistive technology, in a group as tall as the row's line. */
 export function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void }) {
     return (
         <DesignViewToggle
-            compact
+            size="sm"
             value={view}
             onChange={onView}
             options={[

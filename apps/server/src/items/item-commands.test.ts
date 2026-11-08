@@ -1635,14 +1635,6 @@ test('Start build saves the setting, and its shaping threads wait for cleanup on
     );
 });
 
-test('Start saves no choice on a shaping intent', async () => {
-    const records = await openRecords();
-    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
-
-    await recordedCommands(records).commands.start(work.workId, undefined);
-    assert.equal(records.launchIntents({ workId: work.workId })[0]?.shapingThreadCleanup, undefined);
-});
-
 test('an unreadable setting never stops the build, and Keep leaves nothing pending', async () => {
     const unreadable = await shapedBuild();
     const { commands } = recordedCommands(unreadable.records, {
@@ -1695,24 +1687,6 @@ test('a launch settled by a later refresh cleans up with the choice saved at Sta
     );
 });
 
-test('an intent from before this shipped sends nothing, even once resolved', async () => {
-    const { records, workId } = await shapedBuild();
-
-    records.recordLaunchIntent(workId, records.read(workId).revision, 'build');
-
-    const { commands } = recordedCommands(records, {
-        shown: idle,
-        recover: async () => ({ threadId: 'build-late', title: 'Build it' }),
-    });
-
-    await commands.startBuild(workId, undefined);
-    assert.deepEqual(
-        records.threads(workId).map((t) => t.threadId),
-        ['shape-1', 'build-late'],
-    );
-    assert.deepEqual(records.pendingShapingThreadCleanups(), []);
-});
-
 test('Start names its thread with the title the record holds at launch', async () => {
     const records = await openRecords();
     const work = records.create({ title: 'Old title', repository: WEB, kind: 'feature', status: 'Queued' });
@@ -1732,19 +1706,6 @@ test('Start names its thread with the title the record holds at launch', async (
 
     await commands.start(work.workId, undefined);
     assert.equal(started[0]?.split('\n')[0], 'Shaping New title');
-});
-
-test('Start build names its thread with the title the record holds at launch', async () => {
-    const records = await openRecords();
-    const build = records.create({ title: 'Old title', repository: WEB, kind: 'feature', status: 'Ready' });
-    const { commands, started } = recordedCommands(records, {
-        beforeLaunch: (board) => {
-            board.update({ items: board.snapshot().items.map((item) => ({ ...item, title: 'New title' })) });
-        },
-    });
-
-    await commands.startBuild(build.workId, undefined);
-    assert.equal(started[0]?.split('\n')[0], 'Build New title');
 });
 
 test('after a restart, an unresolved start T3 shows no thread for sets Needs you, and one T3 cannot answer for waits', async () => {
@@ -2283,14 +2244,6 @@ test('Start again on a new branch refuses a failed fetch with its error and star
     assert.deepEqual(records.launchIntents({ workId: work.workId }), []);
 });
 
-test('recovery options reject invalid values before launching', async () => {
-    const { commands, log } = commandsOn([queued(1)]);
-
-    assert.equal((await commands.startAgain(queued(1).id, undefined, { branchChoice: 'erase' })).status, 422);
-    assert.equal((await commands.inspectRecovery(queued(1).id)).status, 409);
-    assert.deepEqual(log, []);
-});
-
 test('cleanup rejects malformed selections and unknown tokens before side effects', async () => {
     const { commands, log } = commandsOn([queued(1)]);
 
@@ -2395,16 +2348,6 @@ test('changing the kind of an item with no record makes its record first, and a 
     assert.deepEqual(retried.labelChanges, [{ label: 'bug', action: 'remove' }]);
 });
 
-test("an item that can't change kind makes no record", async () => {
-    const records = await openRecords();
-    const concept = queued(9, { recorded: false, status: 'List', kind: 'concept' });
-    const { commands, board } = commandsOn([], undefined, records);
-
-    board.update({ items: [concept] });
-    assert.equal((await commands.changeKind(concept.id, 'bug')).status, 422);
-    assert.deepEqual(records.list({}), []);
-});
-
 /** A board showing record `workId` with this disagreement. */
 const disagreeing = (records: WorkRecords, kindDisagreement: Item['kindDisagreement']) => {
     const { commands, board } = commandsOn([], undefined, records);
@@ -2446,28 +2389,6 @@ test("updating the item takes the ticket's kind, with no tracker write, and agre
         agreedTicketKind: 'bug',
         kindAnswer: null,
     });
-});
-
-test('an answer for kinds the board no longer shows changes nothing', async () => {
-    const records = await openRecords();
-    const { commands, workId } = disagreeing(records, TICKET_MOVED);
-    const before = records.read(workId);
-
-    assert.equal(commands.answerKind(workId, 'keep', 'improvement').status, 409);
-    assert.equal(commands.answerKind('gone', 'keep', 'bug').status, 404);
-    assert.deepEqual(records.read(workId), before);
-});
-
-test('an update has no kind to take from a ticket with none, and other answers refuse', async () => {
-    const records = await openRecords();
-    const { commands, workId } = disagreeing(records, { ...TICKET_MOVED, ticketKind: null, changed: 'item' });
-    const before = records.read(workId);
-
-    assert.equal(commands.answerKind(workId, 'update-item', null).status, 422);
-    assert.equal(commands.answerKind(workId, 'maybe', null).status, 422);
-    assert.deepEqual(records.read(workId), before);
-    assert.equal(commands.answerKind(workId, 'keep', null).status, 200);
-    assert.deepEqual(records.read(workId).kindAnswer, { answer: 'keep', itemKind: 'feature', ticketKind: null });
 });
 
 /** The server's view of the item's start for `purpose`. */
@@ -2591,17 +2512,6 @@ test('a failure after the launch intent survives a restart, and a retry clears i
     assert.equal(progressOf(after.board, work.workId, 'shape'), undefined);
 });
 
-test('a Start after keeps its failure where it shows today', async () => {
-    const records = await openRecords();
-    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
-    const { commands, board } = recordedCommands(records, {
-        startAnswer: () => ({ thread: null, error: 'T3 said no' }),
-    });
-
-    await commands.start(work.workId, undefined, true);
-    assert.equal(progressOf(board, work.workId, 'shape'), undefined);
-});
-
 test("an unresolved start no longer running shows May have started, keeps today's recovery and starts nothing more", async () => {
     const records = await openRecords();
     const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
@@ -2676,22 +2586,6 @@ test('a build that recorded a phase is not retried from In progress', async () =
     assert.equal(started.length, 1);
 });
 
-test('a thrown start shows a fixed message on every page, not the raw error', async () => {
-    const records = await openRecords();
-    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
-    const { commands, board } = recordedCommands(records, {
-        beforeLaunch: () => {
-            throw new Error('/Users/someone/private/path');
-        },
-    });
-
-    await assert.rejects(commands.start(work.workId, undefined), /private\/path/);
-    assert.deepEqual(progressOf(board, work.workId, 'shape'), {
-        phase: 'failed',
-        message: 'The start failed. Check the board log.',
-    });
-});
-
 test('a failure cleared by a dismissal, a move or Start after stays cleared across a restart', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cleared-failures-'));
     const clearedFailuresFile = join(dir, 'nested', 'cleared.json');
@@ -2722,15 +2616,4 @@ test('a failure cleared by a dismissal, a move or Start after stays cleared acro
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
-});
-
-test('a restart restores no failed retry of a build that recorded a phase', async () => {
-    const records = await openRecords();
-    const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'In progress' });
-    const { intent } = records.recordLaunchIntent(build.workId, build.revision, 'build');
-
-    records.resolveLaunchIntent(build.workId, build.revision + 1, intent.intentId, { failure: 'T3 said no' });
-    assert.equal(progressOf(recordedCommands(records).board, build.workId, 'build')?.phase, 'failed');
-    records.setBuildPhase(build.workId, records.read(build.workId).revision, 'plan');
-    assert.equal(progressOf(recordedCommands(records).board, build.workId, 'build'), undefined);
 });

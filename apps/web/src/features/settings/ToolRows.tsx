@@ -13,23 +13,23 @@ import { ToolState } from '@/shared/settings/SettingControls';
  * A `login` row says Signed in or Signed out instead, and Signed in beside a gh too old.
  */
 function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
-    if (!check) return { text: 'Not checked', tone: 'muted' };
+    if (!check) return { text: 'Not checked', state: 'off' };
 
     const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
 
     switch (check.result) {
         case 'ok':
-            return { text: `${login ? 'Signed in' : check.version || 'OK'}`, tone: 'success' };
+            return { text: `${login ? 'Signed in' : check.version || 'OK'}`, state: 'ready' };
         case 'logged-out':
-            return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
+            return { text: login ? 'Signed out' : 'Logged out', state: 'waiting' };
         case 'outdated':
-            return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}`, tone: 'warning' };
+            return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}`, state: 'waiting' };
         case 'no-extension':
-            return { text: 'No azure-devops extension', tone: 'warning' };
+            return { text: 'No azure-devops extension', state: 'waiting' };
         case 'not-running':
-            return { text: 'Not running', tone: 'warning' };
+            return { text: 'Not running', state: 'waiting' };
         case 'missing':
-            return { text: 'Not found', tone: 'error' };
+            return { text: 'Not found', state: 'failed' };
     }
 }
 
@@ -37,9 +37,9 @@ function toolState(check: ToolCheck | undefined, login = false): ComponentProps<
 export const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
     ['gh', 'Reads GitHub repository issues and linked pull requests.'],
     ['t3', 'Starts the lar-shape threads in T3 Code.'],
-    ['git', "lar-build's agents branch, commit and push with it."],
-    ['jq', "lar-shape's scripts read gh's answers with it."],
-    ['curl', "lar-shape's scripts tell the board to refresh with it."],
+    ['git', 'lar-build’s agents branch, commit and push with it.'],
+    ['jq', 'lar-shape’s scripts read gh’s answers with it.'],
+    ['curl', 'lar-shape’s scripts tell the board to refresh with it.'],
 ];
 
 /** Whether the check leaves gh out, as no listed repository is on GitHub; Diagnostics then leaves gh out. */
@@ -47,14 +47,14 @@ export const ghSkipped = (data: SettingsData): boolean => !!data.toolProgress?.s
 
 /** Why az isn't checked, once the check leaves it out; else nothing. */
 export function azSkipped(data: SettingsData): string {
-    return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed Project uses Azure DevOps.' : '';
+    return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed project uses Azure DevOps.' : '';
 }
 
 /** `name`'s state in `data`, Checking while its check runs with no result yet. */
 export function stateOf(data: SettingsData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
     const check = data.tools?.[name];
 
-    if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
+    if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', state: 'active' };
 
     return toolState(check, login);
 }

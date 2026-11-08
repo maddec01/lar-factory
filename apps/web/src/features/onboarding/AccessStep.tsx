@@ -1,10 +1,11 @@
 // Onboarding's access step: what the board can do in the repository with your access.
 
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
-import { HelpTip, SetupStep, Text } from '@lar-works/design-system';
+import { HelpTip, Text } from '@lar-works/design-system';
 
 import { useWizardStore, type Run } from './WizardStore';
 import { AccessList, accessRows, operationNames, type AccessRow } from '@/features/repositories';
+import { SetupStep } from '@/ui/board';
 
 export function AccessStep({ detection }: { run: Run; detection: SetupDetection }) {
     const detect = useWizardStore((s) => s.detect);
@@ -33,24 +34,24 @@ export function AccessStep({ detection }: { run: Run; detection: SetupDetection 
                 <Text variant="caption" tone="muted">
                     New {labels} stay off until {names['manage-labels']} is allowed.
                     <HelpTip label="label access">
-                        You can add this Project without it. Until it is allowed, Settings can't create, rename or
+                        You can add this project without it. Until it is allowed, Settings can’t create, rename or
                         delete {labels}.
                     </HelpTip>
                 </Text>
             )}
             {buildsShort && (
                 <Text variant="caption" tone="muted">
-                    Builds and docs need permission to push branches and open PRs.
+                    Builds and docs need permission to push branches and open PRs. You can shape issues while access is
+                    unavailable.
+                    {detection.provider === 'GitHub' && unverified && (
+                        <>
+                            {' '}
+                            This login doesn’t let the board confirm write access. Sign in to GitHub with repository
+                            write access, then choose Recheck access.
+                        </>
+                    )}
                     <HelpTip label="build access">
-                        You can shape issues now. Builds need permission to push branches and open pull requests.
-                        {detection.provider === 'GitHub' && (
-                            <>
-                                {' '}
-                                Builds need Contents and Pull requests: Read and write in your GitHub token or app.
-                                {unverified &&
-                                    ' This read-only check cannot verify fine-grained token permissions. To verify writes, use a classic token or gh OAuth login with repo scope.'}
-                            </>
-                        )}
+                        Builds need permission to change code and open pull requests.
                     </HelpTip>
                 </Text>
             )}

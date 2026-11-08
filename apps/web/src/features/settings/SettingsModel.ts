@@ -8,6 +8,8 @@ import type { Control } from '@/shared/settings/SettingControls';
 export interface Row {
     id: string;
     title: string;
+    /** Search terms retained when a setting gets a clearer name. */
+    keywords?: string;
     /** Beside the title, in its line. */
     icon?: ReactNode;
     description?: ReactNode;
@@ -23,12 +25,15 @@ export interface Group {
     help?: ReactNode;
     description?: string;
     rows: Row[];
+    action?: ReactNode;
     footer?: ReactNode;
     note?: ReactNode;
 }
 export interface Page {
     id: string;
     label: string;
+    /** Search terms retained when a former group is folded into the subtitle. */
+    keywords?: string;
     icon: ReactNode;
     description: string;
     groups: Group[];
@@ -37,6 +42,7 @@ export interface Page {
 /** The board data Settings shows. Diagnostics says only whether a read has landed, so a new read's time changes nothing here. */
 export type SettingsData = Pick<
     BoardData,
+    | 'capture'
     | 'repos'
     | 'onboarding'
     | 'tools'
@@ -53,6 +59,7 @@ export type SettingsData = Pick<
 > & { everRead: boolean };
 
 export function settingsData({
+    capture,
     repos,
     onboarding,
     tools,
@@ -69,6 +76,7 @@ export function settingsData({
     fetchedAt,
 }: BoardData): SettingsData {
     return {
+        capture,
         repos,
         onboarding,
         tools,

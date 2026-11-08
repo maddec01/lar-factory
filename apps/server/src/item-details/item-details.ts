@@ -3,7 +3,14 @@
 // text and progress, and the provider of its ticket reads and writes the ticket's. Its labels go through the tracker's
 // label operations, one name at a time, so no write replaces the ticket's whole set.
 
-import { onAzure, readTicketSpec, sameRepo, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
+import {
+    rebaseSampleTimes,
+    onAzure,
+    readTicketSpec,
+    sameRepo,
+    stripTrackerStructure,
+    trackerCapabilities,
+} from '@lar-factory/shared';
 import type {
     DescriptionSave,
     ItemChecks,
@@ -68,6 +75,8 @@ export interface ItemDetailsReader {
 export interface RecordsDeps {
     /** The work records the board shows; null when they couldn't be opened. */
     records: WorkRecords | null;
+    /** The fixture board and its detail file share one load-time clock offset. */
+    sampleTimeShiftMs?: number;
     /** Where an export writes; the user's Downloads folder by default. */
     exportFolder?: string;
     specSync?: SpecSyncOptions;
@@ -100,14 +109,15 @@ export const detailsFileFor = (fixture: string): string => fixture.replace(/\.js
  * Reads the details file, which maps an item's id to its details; an item it doesn't name has none. Its `$older` key
  * maps an item's id to the comments older than its details' (newest first), which are paged by how many were served.
  */
-function fromFile(file: string): ItemDetailsReader {
+function fromFile(file: string, offsetMs: number): ItemDetailsReader {
     let all:
         | (Record<string, ItemDetails> & {
               $checks?: Record<string, ItemChecks>;
               $older?: Record<string, ItemComment[]>;
           })
         | undefined;
-    const read = () => (all ??= JSON.parse(readFileSync(file, 'utf8')) as NonNullable<typeof all>);
+    const read = () =>
+        (all ??= rebaseSampleTimes(JSON.parse(readFileSync(file, 'utf8')), offsetMs) as NonNullable<typeof all>);
 
     return {
         checks: async (item) => read().$checks?.[item.id] ?? { workId: item.id, list: [], runs: [], reuses: [] },
@@ -176,6 +186,7 @@ export function createItemDetails(
     ticketOf: (item: Item) => Item | undefined,
     {
         records,
+        sampleTimeShiftMs = 0,
         exportFolder = join(homedir(), 'Downloads'),
         specSync,
         labelsOf = trackerLabels,
@@ -183,7 +194,7 @@ export function createItemDetails(
         kindsOf,
     }: RecordsDeps = { records: null },
 ): ItemDetailsReader {
-    if (sampleFile) return fromFile(sampleFile);
+    if (sampleFile) return fromFile(sampleFile, sampleTimeShiftMs);
 
     const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
     /** What an update of the ticket writes, from a fresh read and the team's backlog. A failed read leaves the board's own swap standing. */

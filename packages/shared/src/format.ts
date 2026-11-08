@@ -104,8 +104,13 @@ export function shortAge(ms: number): string {
     return h < 48 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
-/** An age in its largest whole unit, rounded down: `12s ago`, `3m ago`, `2h ago`, `2d ago`. */
-export const shortAgo = (iso: string, now: number): string => `${shortAge(now - Date.parse(iso))} ago`;
+/** An age in its largest whole unit, rounded down: `12s ago`, `3m ago`, `2h ago`, `2d ago`; under a second, or a time
+ *  ahead of `now`, `just now`. */
+export const shortAgo = (iso: string, now: number): string => {
+    const age = shortAge(now - Date.parse(iso));
+
+    return age === '0s' ? 'just now' : `${age} ago`;
+};
 
 export function elapsed(iso: string, now: number): string {
     return duration(now - Date.parse(iso));

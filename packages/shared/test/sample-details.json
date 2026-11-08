@@ -215,5 +215,17 @@
                 "format": "markdown"
             }
         ]
+    },
+    "I_sample22": {
+        "body": "## Direct streaming from away\n\nPlay your library on a phone or laptop outside your home network, straight from your server. Lar opens a port on the router automatically (UPnP or NAT-PMP) and checks the connection from outside; there is no relay in between.\n\n- [x] Direct connection negotiation and authentication\n- [x] Device pairing codes\n- [ ] Reconnect with backoff when the address changes\n- [ ] Bandwidth probe before streaming\n- [ ] Clear guidance when the router can't open a port\n",
+        "format": "markdown",
+        "author": "maddec01",
+        "assignees": ["maddec01"],
+        "createdAt": "2026-10-14T10:20:00Z",
+        "milestone": "Cloud v0.1",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
     }
 }

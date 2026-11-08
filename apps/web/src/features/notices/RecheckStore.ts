@@ -5,7 +5,7 @@ import type { BoardData } from '@lar-factory/shared';
 import { flushSync } from 'react-dom';
 import { create } from 'zustand';
 
-import { refocus } from './Toasts';
+import { refocus } from './ToastActions';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 

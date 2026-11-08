@@ -7,17 +7,16 @@
 
 import { onAzure } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
-import { DetailFact as Fact, Inline, MetaArea, Person } from '@lar-works/design-system';
+import { Inline, Person } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { ConceptState, ConceptWork } from './ConceptParts';
 import { Placeholder, When } from './DetailsParts';
-import { ItemChecksSection } from './ItemChecks';
-import { ItemKindControl } from './ItemKindControl';
+import { ItemKindFeedback } from './ItemKindControl';
 import { ItemLabels } from './ItemLabels';
 import { KindNotice } from './KindNotice';
-import type { ItemDetailsRead } from './useItemDetails';
-import { AgentWork, AgentWorkNote } from '@/features/items';
+import type { ItemDetailsRead } from '@/services/items/items.hooks';
+import { DetailFact as Fact, MetaArea } from '@/ui/board';
 
 /** A fact from the details: a placeholder while they load, nothing once they failed or hold none. */
 function FromDetails({
@@ -45,8 +44,8 @@ function FromDetails({
 
 /**
  * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
- * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
- * there are none. They wrap onto as many lines as the width needs. Labels, update time and checks come from the board.
+ * checks, and a concept’s labelled total with its parts. Facts wrap onto as many lines as the width needs.
+ * Labels, update time and checks come from the board; direct work stays in the header at every width.
  */
 export function ItemMeta({
     item,
@@ -62,7 +61,7 @@ export function ItemMeta({
     const azure = Boolean(item.repo && onAzure(item.repo));
 
     return (
-        <MetaArea data-meta>
+        <MetaArea data-meta notice={<KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />}>
             {item.azure && (
                 <>
                     <Fact label="Azure type">{item.azure.type}</Fact>
@@ -83,8 +82,8 @@ export function ItemMeta({
                     )
                 }
             />
-            <ItemKindControl item={item} />
-            <ItemLabels key={item.id} item={item} />
+            <ItemKindFeedback item={item} />
+            <ItemLabels key={`labels-${item.id}`} item={item} />
             {azure ? (
                 <>
                     <FromDetails read={read} label="Iteration" show={(d) => d.iteration} />
@@ -111,10 +110,7 @@ export function ItemMeta({
                     <ConceptState state={item.completion} />
                 </Fact>
             )}
-            <AgentWorkNote item={item} />
-            {item.kind === 'concept' ? <ConceptWork item={item} /> : <AgentWork item={item} only="narrow" />}
-            {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}
-            <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
+            {item.kind === 'concept' && <ConceptWork item={item} />}
         </MetaArea>
     );
 }

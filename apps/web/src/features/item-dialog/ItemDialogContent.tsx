@@ -1,19 +1,9 @@
-// The item dialog's content: its summary, then in its body the progress, hint, notices, meta area, the work record and
-// the ticket's description and comments with the sidebar beside them, and its footer.
+// The item dialog's content: its summary and progress, then the work record and ticket description with the sidebar,
+// followed by access, metadata, earlier threads and comments. Actions stay in its footer.
 
-import { HINTS, itemName, needsAnswer, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
+import { itemName, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import {
-    AccessNotice,
-    Button,
-    ButtonLink,
-    buttonKind,
-    DialogActions,
-    ItemDialogBody,
-    ItemDialogColumns,
-    Modal,
-    WarningNote,
-} from '@lar-works/design-system';
+import { ButtonLink, Modal, Stack } from '@lar-works/design-system';
 
 import { ConceptParts } from './ConceptParts';
 import { ItemAside } from './ItemAside';
@@ -26,20 +16,20 @@ import { ItemSummary } from './ItemSummary';
 import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
 import type { DescriptionEdit } from './useDescriptionEdit';
-import type { ItemDetailsRead } from './useItemDetails';
 import {
     ActionError,
     AgentWork,
+    AgentWorkNote,
     EarlierThreads,
-    ItemStatusGlyph,
+    ICON,
     NeedsYou,
     StartAfterError,
     StartMessage,
-    useShownStatus,
 } from '@/features/items';
 import { ItemAgents } from '@/features/line';
-import { useEditStore } from '@/features/repositories';
+import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
+import { buttonKind, DialogActions, ItemDialogBody, ItemDialogColumns, MainColumnSlot, WarningNote } from '@/ui/board';
 
 interface ContentProps {
     item: Item;
@@ -68,11 +58,10 @@ export function ItemDialogContent({
     const record = read.state === 'loaded' ? read.details.record : undefined;
     // Work with no ticket has no ticket text to show beside its record's.
     const ticket = !record || item.number > 0;
-    const shown = useShownStatus(item);
-    const hint = needsAnswer(item) ? 'Answer in T3' : shown.working ? undefined : HINTS[item.status];
     const setup = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
     const accessProblem = writeAccessProblem(item.repo, 'edit-ticket', setup?.access ?? {}, {
         azureReadOnly: setup?.azureReadOnly,
+        recheckAction: true,
     });
     const editable = accessProblem === null;
     // The open editor in an expanded dialog takes the height the rest leaves.
@@ -82,45 +71,28 @@ export function ItemDialogContent({
         <Modal.Content
             title={`${itemName(item)}`}
             presentation="workspace"
+            fitsContent={read.state !== 'loading' && !edit.editing}
             data-item-dialog
             expanded={expanded}
             focusFirstField={false}
             headerActions={
                 <>
-                    {item.kind !== 'concept' && <AgentWork item={item} only="wide" />}
+                    <AgentWork item={item} label={item.kind === 'concept' ? 'Direct work' : undefined} />
+                    <AgentWorkNote item={item} />
                     <ExpandButton expanded={expanded} toggle={toggleExpanded} />
                 </>
             }
         >
-            <ItemSummary item={item} data={data} now={now} />
+            <ItemSummary item={item} />
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
                 <ItemDialogBody fill={fill} data-item-body>
                     <ItemProgress item={item} />
-                    <ItemAgents item={item} />
-                    {hint && (
-                        <WarningNote icon={<ItemStatusGlyph item={item} presentation="title" />}>{hint}</WarningNote>
-                    )}
-                    {ticket && accessProblem && (
-                        <AccessNotice
-                            message={accessProblem}
-                            action={
-                                <Button
-                                    {...buttonKind('other')}
-                                    onClick={() => void useEditStore.getState().recheck(item.repo)}
-                                >
-                                    Recheck access
-                                </Button>
-                            }
-                        />
-                    )}
                     {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                     {item.shapingCleanupProblem && (
                         <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
                     <NeedsYou item={item} data={data} />
-                    <ItemMeta item={item} read={read} refresh={refresh} now={now} />
-                    <EarlierThreads item={item} data={data} />
                     {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (
@@ -141,7 +113,14 @@ export function ItemDialogContent({
                                 ticketContext={Boolean(record)}
                             />
                         )}
-                        {aside && <ItemAside item={item} data={data} now={now} read={read} />}
+                        {aside && <ItemAside item={item} data={data} now={now} read={read} refresh={refresh} />}
+                        <MainColumnSlot>
+                            <Stack>
+                                <ItemMeta item={item} read={read} refresh={refresh} now={now} />
+                                <ItemAgents item={item} />
+                                <EarlierThreads item={item} data={data} />
+                            </Stack>
+                        </MainColumnSlot>
                         {ticket && (
                             <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} />
                         )}
@@ -163,7 +142,13 @@ export function ItemDialogContent({
             >
                 <DialogActions>
                     {item.url && (
-                        <ButtonLink {...buttonKind('other')} href={item.url} target="_blank" rel="noopener">
+                        <ButtonLink
+                            {...buttonKind('other')}
+                            icon={item.repo && onAzure(item.repo) ? ICON.azure : ICON.github}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener"
+                        >
                             {item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
                         </ButtonLink>
                     )}

@@ -1,0 +1,75 @@
+/* An item's parts (ItemParts.tsx, StartControls.tsx): the title link, a project icon's colour (ProjectIcon.tsx), the
+   Start control's group and its message line. */
+
+.title {
+    font-weight: 500;
+    text-decoration: none;
+    line-height: 1.35;
+}
+.title:hover {
+    text-decoration: underline;
+}
+.ref {
+    color: var(--color-fg-muted);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The colour behind a project icon's initial. Each repository takes the next colour in the board's list order
+   (ProjectIcon's `place`); unlisted repositories keep the muted colour. */
+.repo-tone-0 {
+    --k: var(--color-sky-500);
+}
+.repo-tone-1 {
+    --k: var(--color-pink-500);
+}
+.repo-tone-2 {
+    --k: var(--color-teal-500);
+}
+.repo-tone-3 {
+    --k: var(--color-amber-500);
+}
+.repo-tone-4 {
+    --k: var(--color-violet-500);
+}
+.repo-tone-5 {
+    --k: var(--color-lime-500);
+}
+.repo-tone-6 {
+    --k: var(--color-orange-500);
+}
+.repo-tone-7 {
+    --k: var(--color-indigo-500);
+}
+.repo-tone-none {
+    --k: var(--color-fg-muted);
+}
+
+/* The Start control's group, and the line under it with Start's message or error. */
+.start {
+    margin: 0;
+    font-size: var(--text-xs);
+}
+p[data-start-result] {
+    padding: --spacing(1) --spacing(1.5);
+    margin-inline: --spacing(-1.5);
+    border-radius: var(--radius-sm);
+}
+.start-group {
+    flex: 0 1 auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: --spacing(1.25);
+    position: relative;
+}
+.action-error {
+    order: 1;
+    flex: 1 1 100%;
+    min-width: 0;
+    color: var(--color-danger-fg);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}

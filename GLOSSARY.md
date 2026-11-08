@@ -16,6 +16,10 @@ _Avoid_: delivery ticket as a synonym for concept.
 The work of settling a concept's open questions and recording the resulting understanding in its map. Completed refinement does not mean the proposed work has shipped.
 _Avoid_: delivery completion.
 
+**List**:
+The place for work that has not been queued, shown in the List modal. Capitalise List in actions and prose, including “Move to List” and “Added to List”.
+_Avoid_: inbox, backlog as a name for this place.
+
 **Your desk**:
 The board's row of items waiting on the user's answer, verification or merge, including shaping work and concepts with an open question.
 _Avoid_: inbox, needs-you list.
@@ -125,7 +129,7 @@ This machine's choice to have the board start eligible Ready builds by itself, u
 _Avoid_: auto-start.
 
 **Model choice**:
-The provider instance and model the board starts a thread on, or T3 Project default. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
+The provider instance and model the board starts a thread on, or Project default in T3. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.
 
 **Scope**:
@@ -139,3 +143,15 @@ _Avoid_: command palette, toolbar filters.
 **Filter token**:
 The mark in the board search for one active Scope, Kind or Labels choice.
 _Avoid_: chip.
+
+**Open questions in a concept map**:
+Unresolved questions recorded by shaping. The stored map calls these `fog`; the board calls them open questions.
+_Avoid_: Fog as a visible label.
+
+**Clarification**:
+A decision explored by asking focused questions. Its stored method remains `grill`.
+_Avoid_: Grill as a visible method name.
+
+**Outcome check**:
+The final check that the concept’s proposed work achieves its intended outcome.
+_Avoid_: end-to-end check as a visible map label.

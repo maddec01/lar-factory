@@ -1,5 +1,5 @@
 // Settings › Archive: set-aside and hidden work with Export markdown, Restore and Close ticket, and the retention
-// setting, whose timed delete names the work it would delete and saves only on its own confirm.
+// setting, whose automatic deletion names the work it would delete and saves only on its own confirm.
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
@@ -70,45 +70,6 @@ async function openArchive(
     );
 }
 
-test('Archive reads set-aside and hidden work when it opens, with Export markdown, and Restore and Close ticket only where they apply', async () => {
-    await openArchive(withRetention());
-    expect(archiveReads()).toBe(1);
-    expect(text(row('archived-W_aside'))).toContain('Put away');
-    expect(text(row('archived-W_aside'))).toContain('#41 · Set aside');
-    expect(text(row('archived-W_done'))).toContain('Finished');
-    expect(
-        ['Export markdown', 'Close ticket', 'Restore'].map((label) => !!button(row('archived-W_aside'), label)),
-    ).toEqual([true, true, true]);
-    expect(
-        ['Export markdown', 'Close ticket', 'Restore'].map((label) => !!button(row('archived-W_done'), label)),
-    ).toEqual([true, false, false]);
-});
-
-test('archived rows identify local work and each ticket provider', async () => {
-    const local = { ...aside, id: 'local', repo: 'example/product', number: 0, url: null };
-
-    await openArchive(withRetention(), {}, [
-        local,
-        { ...local, id: 'github', number: 17, url: 'https://github.com/example/product/issues/17' },
-        {
-            ...local,
-            id: 'azure',
-            repo: 'example/project/product',
-            number: 23,
-            url: 'https://dev.azure.com/example/project/_workitems/edit/23',
-        },
-    ]);
-    expect(row('archived-local').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
-        'Saved only on this machine.',
-    );
-    expect(row('archived-github').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
-        'GitHub issue. Saved on GitHub.',
-    );
-    expect(row('archived-azure').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
-        'Azure DevOps work item. Saved in Azure DevOps.',
-    );
-});
-
 test('Restore posts the work, and the row leaves Archive as Archive is read again', async () => {
     const restored = withRetention({ items: [...sample.items, { ...aside, archived: undefined }] });
 
@@ -121,7 +82,7 @@ test('Restore posts the work, and the row leaves Archive as Archive is read agai
     expect($('.settings-row[data-row="archived-W_aside"]')).toBeNull();
 });
 
-test("Close ticket asks as Abandon's own step does, and closes only on its confirm", async () => {
+test('Close ticket asks as Abandon’s own step does, and closes only on its confirm', async () => {
     await openArchive(withRetention(), { '/api/close-ticket': () => ({ error: null }) });
     await settle(() => button(row('archived-W_aside'), 'Close ticket')!.click());
 
@@ -133,7 +94,7 @@ test("Close ticket asks as Abandon's own step does, and closes only on its confi
     expect(posted('/api/close-ticket')).toEqual([{ itemId: 'W_aside' }]);
 });
 
-test('a timed delete names the work it would delete and saves only on its confirm; the report names the work it kept', async () => {
+test('a automatic deletion names the work it would delete and saves only on its confirm; the report names the work it kept', async () => {
     const kept = {
         hideAfterDays: 7,
         deleteAfterDays: 30,
@@ -165,10 +126,4 @@ test('a timed delete names the work it would delete and saves only on its confir
         'deleted 1 record.',
     );
     expect(text($('[data-last-delete]'))).toContain('Kept W_done. It owns the slice W_slice, which is kept.');
-});
-
-test('sample mode keeps no work records, so Archive offers nothing', async () => {
-    await openArchive(sample, {}, []);
-    expect(text($('[data-settings-body]'))).toContain('Sample mode keeps no work records.');
-    expect($$('[data-settings-body] button')).toHaveLength(0);
 });

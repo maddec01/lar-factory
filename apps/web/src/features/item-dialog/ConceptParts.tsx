@@ -1,13 +1,14 @@
-// What a concept's details add about its parts: its own cost beside its total on the board, and its parts on the board,
-// each with its status, cost and Open thread, and what its refinement and delivery still need, in words. Parts that
-// retention took off the board aren't counted or listed.
+// What a concept's details add about its parts: its own cost beside its total on the board, and every part on the board,
+// each with its status, usage under it and Open thread beside it, and what its refinement and delivery still need, in
+// words. Parts off the board aren't listed; the count above says how many and why.
 
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { DetailsSection, PartName, PartRow, PartsList, Text } from '@lar-works/design-system';
+import { Text } from '@lar-works/design-system';
 
 import {
     AgentWork,
+    hasFigures,
     INCOMPLETE_TOTAL,
     ItemTitle,
     usageUnreadable,
@@ -18,10 +19,11 @@ import {
 } from '@/features/items';
 import { isDone, partsOf } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { DetailFact, DetailsSection, PartName, PartRow, PartsList } from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn't (?:settled|Done)\\.$`);
-const UNMET_DEPENDENCY = new RegExp(`^Its Dependency ${WORK_ID} on (.+) isn't met\\.$`);
+const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn’t (?:settled|Done)\\.$`);
+const UNMET_DEPENDENCY = new RegExp(`^Its Dependency ${WORK_ID} on (.+) isn’t met\\.$`);
 
 /**
  * What a concept's refinement or delivery still needs, in words for a person: unfinished parts counted by kind with
@@ -38,7 +40,7 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
         else
             others.push(
                 reason
-                    .replace(UNMET_DEPENDENCY, "Dependency on $1 isn't met.")
+                    .replace(UNMET_DEPENDENCY, 'Dependency on $1 isn’t met.')
                     .replace(new RegExp(` ?${WORK_ID}`, 'g'), ''),
             );
     }
@@ -61,24 +63,25 @@ export function ConceptState({ state }: { state: { complete: boolean; reasons: s
     return <span title={names || undefined}>{state.complete ? 'Complete' : text}</span>;
 }
 
-/** The concept's own figures and its total, each labelled; a total with no figures says it is incomplete, beside the own figures. */
+/** The concept’s labelled total with its parts; a total with no usable figures explains why it is incomplete. */
 export function ConceptWork({ item }: { item: Item }) {
     const total = itemTotal(
         item,
         useBoardStore((state) => state.data.items),
     );
 
+    if (!total || (total !== 'unavailable' && !hasFigures(total))) return null;
+
     return (
-        <>
-            <AgentWork item={item} label="Own cost" />
+        <DetailFact label="With parts" data-concept-work>
             {total === 'unavailable' ? (
                 <Text variant="caption" tone="muted" data-total-incomplete>
                     {INCOMPLETE_TOTAL}
                 </Text>
             ) : (
-                total && <AgentWork item={item} stats={total} label="Total on the board" />
+                total && <AgentWork item={item} stats={total} />
             )}
-        </>
+        </DetailFact>
     );
 }
 
@@ -86,6 +89,7 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
     const shown = useShownStatus(item);
     const complete = isDone(item);
     const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length);
+    const usage = usageUnreadable(item) ? UNREADABLE : <AgentWork item={item} inline />;
 
     return (
         <PartRow
@@ -102,18 +106,8 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
                 </PartName>
             }
             meta={complete ? 'Complete' : shown.word}
-            action={
-                <>
-                    {usageUnreadable(item) ? (
-                        <Text as="span" variant="caption" tone="muted">
-                            {UNREADABLE}
-                        </Text>
-                    ) : (
-                        <AgentWork item={item} />
-                    )}
-                    {hasThread && <OpenThread item={item} data={data} />}
-                </>
-            }
+            usage={usage}
+            action={hasThread && <OpenThread item={item} data={data} part />}
         />
     );
 }
@@ -132,7 +126,8 @@ export function ConceptParts({
     if (!parts.length) return null;
 
     return (
-        <DetailsSection heading="Parts" data-concept-parts>
+        // The progress above names the parts and counts them, so the list needs no heading of its own.
+        <DetailsSection data-concept-parts>
             <PartsList>
                 {parts.map((part) => (
                     <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />

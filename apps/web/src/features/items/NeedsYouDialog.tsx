@@ -1,18 +1,20 @@
 // A Needs you choice's confirmation: what it will do, the recovery and cleanup choices it needs, and any failure, which
 // stays here to retry or cancel. Opening it only reads; a write waits for a press inside it.
 
-import { needsYouPrompt } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, DropdownMenu, Modal, Stack, Text } from '@lar-works/design-system';
-import { useEffect, useRef, useState } from 'react';
+import { needsYouPrompt } from '@lar-factory/shared';
+import { Alert, Button, DropdownMenu, ConfirmDialog, Modal, Stack, Text } from '@lar-works/design-system';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
-import { inspectRecovery, resolveNeedsYou, startAgain } from './CardActions';
 import type { RecoveryInspection } from './CardActions';
-import { CleanupChoices, executeCleanup, inspectCleanup, offersCleanup, useCleanupChoices } from './CleanupChoices';
-import { writeState } from './ItemActions';
+import { inspectRecovery, resolveNeedsYou, startAgain } from './CardActions';
+import { CleanupChoices } from './CleanupChoices';
 import { StartEntries } from './StartControl';
+import { executeCleanup, inspectCleanup, offersCleanup, useCleanupChoices } from './useCleanupChoices';
 import type { ActionResult } from '@/services/board/board.service';
+import { buttonKind } from '@/ui/board';
 
 interface Props {
     item: Item;
@@ -39,14 +41,14 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
         if (!loading) onClose();
     };
 
-    async function inspect() {
+    const inspect = useCallback(async () => {
         setError(null);
 
         const result = await inspectRecovery(item.id);
 
-        if (result.error || !result.inspection) setError(result.error ?? 'Cannot inspect recovery.');
+        if (result.error || !result.inspection) setError(result.error ?? 'Can’t inspect recovery.');
         else setInspection(result.inspection);
-    }
+    }, [item.id]);
 
     // StrictMode starts an effect twice, and one read answers for both.
     const inspected = useRef(false);
@@ -56,7 +58,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
 
         inspected.current = true;
         void inspect();
-    }, []);
+    }, [inspects, inspect]);
 
     async function finish(
         run: () => Promise<ActionResult | undefined>,
@@ -108,7 +110,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
         setLoading(false);
 
         if (result.error || !result.token || !result.plans) {
-            setError(result.error ?? 'Cannot inspect cleanup.');
+            setError(result.error ?? 'Can’t inspect cleanup.');
 
             return;
         }
@@ -188,6 +190,25 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
 
         return confirmButton(loading ? 'Working…' : error ? 'Try again' : label, confirm);
     };
+
+    if (cleanup && next)
+        return (
+            <ConfirmDialog
+                id="needs-you-dialog"
+                title={prompt.question}
+                consequence={prompt.detail}
+                confirmLabel={cleanupChoices.confirmLoss ? 'Confirm loss and proceed' : 'Proceed'}
+                busy={loading}
+                confirmDisabled={held}
+                onCancel={dismiss}
+                onConfirm={() => {
+                    if (!cleanupChoices.asksLoss()) void finish(next, cleanupChoices.selection());
+                }}
+            >
+                <CleanupChoices choices={cleanupChoices} />
+                {error && <Alert tone="danger">{error}</Alert>}
+            </ConfirmDialog>
+        );
 
     return (
         <Modal onClose={dismiss}>

@@ -1,18 +1,15 @@
+import type { BoardData, DependencyHold, Item } from '@lar-factory/shared';
 // The Dependencies holding a build, in the item dialog: each one's owning team or repository, its need, ticket, latest
 // read and evidence, what the board asks about it, and Mark met or Clear met mark. Only the user's mark releases the
 // build; a read never does.
-
 import { DEPENDENCY_OBSERVATION_WORDS, dependencyNotice, itemName, shortAgo } from '@lar-factory/shared';
-import type { BoardData, DependencyHold, Item } from '@lar-factory/shared';
-import { Button, buttonKind, DependencyItem, DependencyList } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 
+import { writeState } from './ActionAvailability';
 import { useItemAction } from './ActionStore';
 import { markDependencyMet } from './CardActions';
-import { writeState } from './ItemActions';
-
-/** The Dependencies holding the item, met or not. */
-export const dependenciesOf = (item: Item): DependencyHold[] =>
-    item.blockers.flatMap((b) => (b.dependency ? [b.dependency] : []));
+import { dependenciesOf } from './ItemDependencies';
+import { buttonKind, DependencyItem, DependencyList } from '@/ui/board';
 
 /**
  * What the latest read of its ticket or a PR showed, and when, beside the last read that answered after one that

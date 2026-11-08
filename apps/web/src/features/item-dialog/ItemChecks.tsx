@@ -1,6 +1,9 @@
 import type { ItemChecks } from '@lar-factory/shared';
-import { CheckRun, Disclosure, Stack, Text } from '@lar-works/design-system';
+import { EmptyState, Disclosure, Stack, Text, PageError, Loading } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
+
+import { readItemChecks } from '@/services/items/items.service';
+import { CheckRun } from '@/ui/board';
 
 /** One read per mounted section; collapsing and board refreshes keep its result. */
 export function ItemChecksSection({ itemId }: { itemId: string }) {
@@ -13,17 +16,13 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
 
         requested.current = true;
 
+        setError(null);
+
         try {
-            const response = await fetch(`/api/item-checks?itemId=${encodeURIComponent(itemId)}`, {
-                cache: 'no-store',
-            });
-            const body = (await response.json()) as { checks?: ItemChecks; error?: string };
-
-            if (!response.ok || !body.checks) throw new Error(body.error ?? 'The board did not return checks.');
-
-            setRecord(body.checks);
+            setRecord(await readItemChecks(itemId));
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'Could not read checks.');
+            requested.current = false;
+            setError(error instanceof Error ? error.message : 'Couldn’t read checks.');
         }
     }
 
@@ -38,16 +37,19 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
         >
             <Stack space="group">
                 {error ? (
-                    <Text variant="inherit" role="alert">
-                        Could not load checks: {error}
-                    </Text>
+                    <Stack role="alert">
+                        <PageError
+                            size="inline"
+                            title="Couldn’t load checks"
+                            description={error}
+                            primaryAction={{ label: 'Try again', onAction: () => void read() }}
+                        />
+                    </Stack>
                 ) : !record ? (
-                    <Text variant="inherit" role="status">
-                        Loading checks…
-                    </Text>
+                    <Loading presentation="status" label="Loading checks…" />
                 ) : (
                     <>
-                        {record.runs.length === 0 && <Text variant="inherit">No checks are recorded.</Text>}
+                        {record.runs.length === 0 && <EmptyState size="inline" title="No checks are recorded." />}
                         {record.runs.map((run) => (
                             <CheckRun
                                 key={run.checkId}

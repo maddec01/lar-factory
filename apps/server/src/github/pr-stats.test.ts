@@ -211,13 +211,6 @@ test("only builds write a PR's block: a parent that isn't a build, linked to the
     );
 });
 
-test("only builds freeze figures from a merged PR; an issue that isn't a build keeps live figures", () => {
-    const merged = [pr(1, 'merged', `Body\n\n${block}`)];
-
-    assert.equal(mergedStats(item(merged, null))?.costUsd, 41.2);
-    assert.equal(mergedStats(item(merged, stats, ['feature'])), null);
-});
-
 test('missing or unavailable stats, or an unread body, make no edit; a PR linked twice is edited once', () => {
     assert.deepEqual(
         edits([

@@ -1,7 +1,10 @@
 // The settings rows' working controls, on the design system’s Switch, OptionSelect, Button and StatusIndicator.
 
-import { Button, buttonKind, OptionSelect, StatusIndicator, Switch as DesignSwitch } from '@lar-works/design-system';
+import type { StatusState } from '@lar-works/design-system';
+import { Button, OptionSelect, StatusIndicator, Switch as DesignSwitch } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
+
+import { buttonKind } from '@/ui/board';
 
 /** A working row renders its control. Unbuilt settings carry no value. */
 export type Control = { type: 'unavailable' } | { type: 'custom'; render: () => ReactNode };
@@ -43,6 +46,7 @@ export function Choice({
     onChange,
     disabled,
     busy,
+    placeholder = 'Not set',
 }: {
     label: string;
     options: { value: string; label: string }[];
@@ -51,13 +55,14 @@ export function Choice({
     disabled?: boolean;
     /** Busy rather than disabled, so focus stays on the choice just pressed. */
     busy?: boolean;
+    placeholder?: string;
 }) {
     return (
         <OptionSelect
             label={label}
             presentation="setting"
             writesOnPick
-            placeholder="Choose"
+            placeholder={placeholder}
             value={value ?? ''}
             disabled={disabled}
             aria-disabled={busy}
@@ -89,8 +94,8 @@ export function SmallButton({
 /** A state's colour; muted for a check that didn't run. */
 type ToolTone = 'success' | 'warning' | 'error' | 'muted';
 
-const tones = { success: 'success', warning: 'warning', error: 'danger', muted: 'neutral' } as const;
+const states = { success: 'ready', warning: 'waiting', error: 'failed', muted: 'off' } as const;
 
-export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
-    return <StatusIndicator tone={tones[tone]} label={text} />;
+export function ToolState({ text, tone, state }: { text: string; tone?: ToolTone; state?: StatusState }) {
+    return <StatusIndicator state={state ?? states[tone ?? 'muted']} label={text} />;
 }

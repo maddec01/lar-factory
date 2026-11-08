@@ -1,23 +1,15 @@
 // What the stage rows, dock rows and concept parts share: their second line, on the design system's RowSecondLine, and
 // the agent figures on it.
 
-import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
-import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
-import { Loading, PullRequestRef, RowSecondLine as DesignRowSecondLine, UsageFigures } from '@lar-works/design-system';
+import type { Item, ItemStats, LinkedPr } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, itemMembers, prLabel } from '@lar-factory/shared';
+import { Loading } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { useActivityStill } from './ActivityLine';
-import { statsOf } from './StageTrack';
-import { useItemDialogStore } from '@/features/item-dialog';
-import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '@/features/items';
+import { useActivityStill } from './useActivityState';
+import { hasFigures, INCOMPLETE_TOTAL, usageLoading, useLastKnown } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-
-/** A click on a second line beside its controls opens the item, as its first line's button does; letting go of a drag that selected text doesn't. */
-export const opensItem = (item: Item) => (e: MouseEvent<HTMLElement>) => {
-    if ((e.target as Element).closest('button, a') || !window.getSelection()?.isCollapsed) return;
-
-    useItemDialogStore.getState().open(item.id);
-};
+import { PullRequestRef, RowSecondLine as DesignRowSecondLine, UsageFigures } from '@/ui/board';
 
 /** A row's second line: bar and count on the left, `children` in its text slot, then its pull requests and figures. */
 export function RowSecondLine({
@@ -49,13 +41,6 @@ export function RowSecondLine({
         </DesignRowSecondLine>
     );
 }
-
-/** The agent figures: a Dossier's total (parent plus parts), else the item's own; null when there are none. A total with no figures to show is empty and incomplete. */
-export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemStats | null => {
-    const sum = total ? itemTotal(item, data.items) : null;
-
-    return sum === null ? statsOf(item) : sum === 'unavailable' ? { agentMs: 0, tokens: 0, incomplete: true } : sum;
-};
 
 /** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
 export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; total?: boolean }) {

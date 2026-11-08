@@ -1,3 +1,4 @@
+import { isRecord } from '@lar-factory/shared';
 import type { ItemThread, StartedThread } from '@lar-factory/shared';
 
 import { readJsonRecord } from '../json-file.ts';
@@ -54,6 +55,22 @@ const ACTIVITY = new Set([...RUNNING, 'queued']);
 /** A shell's status, where a newer queued or cancelled message can hide an older run that is still at work. */
 const statusOf = (shell: Record<string, unknown>): string =>
     ACTIVITY.has(String(shell.activityRunStatus)) ? String(shell.activityRunStatus) : String(shell.status);
+
+/** Admit only the user-facing question text from a pending request, never its command or tool payload. */
+function questionSummary(value: unknown): string | undefined {
+    if (!isRecord(value)) return undefined;
+
+    const request = isRecord(value.request) ? value.request : value;
+    const questions = Array.isArray(request.questions) ? request.questions : [];
+    const text = questions
+        .flatMap((question) =>
+            isRecord(question) && typeof question.question === 'string' ? [question.question.trim()] : [],
+        )
+        .filter(Boolean)
+        .join(' ');
+
+    return text || (typeof request.question === 'string' ? request.question.trim() || undefined : undefined);
+}
 
 /**
  * Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. One pass checks
@@ -131,6 +148,9 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
             id,
             title: typeof shell.title === 'string' ? shell.title : id,
             state,
+            ...(questionSummary(shell.pendingRuntimeRequest)
+                ? { questionSummary: questionSummary(shell.pendingRuntimeRequest) }
+                : {}),
             ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}),
             ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}),
             ...(shell.archivedAt ? { archived: true as const } : {}),

@@ -1,19 +1,15 @@
-// The title bar's List button and the List modal it opens, on the design system's Modal's paned layout. The left pane picks
-// All Projects or a repository, each with how many of its items match the search and filters;
+// The title bar's List button and the list modal it opens, on the design system's Modal's paned layout. The left pane picks
+// All projects or a repository, each with how many of its items match the search and filters;
 // the right pane shows the chosen group's items with the search, Add item, Scope board, the sort menu and the filters. It starts on
-// the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
-// closing them comes back to the List as it was.
+// the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the list modal, so
+// closing them comes back to the list as it was.
 
-import { boardSections, readingScope } from '@lar-factory/shared';
 import type { ListGroup } from '@lar-factory/shared';
+import { boardSections, readingScope } from '@lar-factory/shared';
 import {
     Button,
-    buttonKind,
+    EmptyState,
     Input,
-    ListButton as TitleBarListButton,
-    ListGroupItem as GroupItem,
-    ListHeader,
-    ListNote,
     Loading,
     Modal,
     SidebarNavigationGroup,
@@ -25,16 +21,24 @@ import { useRef, useState } from 'react';
 
 import { ItemRow } from './ListRows';
 import { matchesSearch } from './ListSearch';
-import { SORT_OPTIONS, SORTS } from './ListSorts';
 import type { Sort } from './ListSorts';
+import { SORT_OPTIONS, SORTS } from './ListSorts';
 import { useListStore } from './ListStore';
 import { useFocusSearchWhenOpenerGoes } from './useFocusSearchWhenOpenerGoes';
 import { useAddItemStore } from '@/features/add-item';
-import { ItemFilterBar, filtering, rowFilter, useItemFilters, useScopeStore, useShownScope } from '@/features/filters';
+import { filtering, ItemFilterBar, rowFilter, useItemFilters, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ExpandButton, useExpand, dialogPreference } from '@/shared/dialogs/ExpandDialog';
+import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
+import { dialogPreference, useExpand } from '@/shared/dialogs/useExpand';
+import {
+    buttonKind,
+    ListButton as TitleBarListButton,
+    ListGroupItem as GroupItem,
+    ListHeader,
+    ListNote,
+} from '@/ui/board';
 
 function ListModal({ onClose }: { onClose: () => void }) {
     const childOpen = useItemDialogStore((state) => state.itemId !== null);
@@ -45,7 +49,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
     const scope = useShownScope();
     const setScope = useScopeStore((state) => state.setScope);
     const [query, setQuery] = useState('');
-    // The chosen group's repository, or `null` for All Projects.
+    // The chosen group's repository, or `null` for All projects.
     const [pick, setPick] = useState<string | null>(scope);
     const [sort, setSort] = useState<Sort | null>(null);
     const searchField = useRef<HTMLInputElement>(null);
@@ -61,14 +65,14 @@ function ListModal({ onClose }: { onClose: () => void }) {
         ...group,
         items: group.items.filter((i) => matchesSearch(i, q) && shows(i)),
     }));
-    // A picked group that's gone shows All Projects.
+    // A picked group that's gone shows All projects.
     const picked = groups.find((group) => group.repo === pick);
     const active = picked?.repo ?? null;
     const unsorted = picked ? [...picked.items] : groups.flatMap((group) => group.items);
     const effectiveSort = sort ?? (unsorted.some((item) => item.azure) ? 'priority' : 'updated');
     const items = unsorted.sort(SORTS[effectiveSort].compare);
     const scoped = picked !== undefined && scope === picked.repo;
-    // A scope the first read may still add to isn't empty, nor its count final: one repository until its items land, All Projects until the read settles.
+    // A scope the first read may still add to isn't empty, nor its count final: one repository until its items land, All projects until the read settles.
     const reading = readingScope(data, picked?.repo);
     const groupItem = ({ repo, name, items: hits }: ListGroup, icon: React.ReactNode) => (
         <GroupItem
@@ -93,7 +97,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                 sidebar={
                     <SidebarPane label="Projects">
                         <GroupItem
-                            label="All Projects"
+                            label="All projects"
                             count={
                                 readingScope(data) ? undefined : groups.reduce((n, group) => n + group.items.length, 0)
                             }
@@ -102,7 +106,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             onPick={() => setPick(null)}
                         />
                         <SidebarNavigationGroup label="Projects">
-                            {groups.map((group) => groupItem(group, <ProjectIcon repo={group.repo} size="medium" />))}
+                            {groups.map((group) => groupItem(group, <ProjectIcon repo={group.repo} size="lg" />))}
                         </SidebarNavigationGroup>
                     </SidebarPane>
                 }
@@ -114,7 +118,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             type="search"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search List"
+                            placeholder="Search the list"
                             aria-label="Search List items"
                         />
                     }
@@ -128,13 +132,12 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             Add item
                         </Button>
                     }
-                    title={picked ? picked.name : 'All Projects'}
+                    title={picked ? picked.name : 'All projects'}
                     {...(!reading && { count: items.length })}
                     scope={
                         picked && (
                             <Button
                                 {...buttonKind('other')}
-                                compact={false}
                                 data-toggle
                                 data-scope-board
                                 aria-pressed={scoped}
@@ -166,17 +169,30 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             onOpen={() => useItemDialogStore.getState().open(item.id, true)}
                         />
                     ))}
-                    {!items.length && (
-                        <ListNote>
-                            {q || filtering(filters) ? (
-                                'Nothing here matches.'
-                            ) : reading ? (
-                                <Loading presentation="inline" label="Loading Projects…" />
-                            ) : (
-                                'Nothing in List.'
-                            )}
-                        </ListNote>
-                    )}
+                    {!items.length &&
+                        (q || filtering(filters) ? (
+                            <EmptyState
+                                size="compact"
+                                title="Nothing matches"
+                                description="Try another search or clear it to see all items."
+                                actions={
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            setQuery('');
+                                            setFilters({ kinds: [], labels: [] });
+                                            searchField.current?.focus();
+                                        }}
+                                    >
+                                        Clear search
+                                    </Button>
+                                }
+                            />
+                        ) : (
+                            <ListNote>
+                                {reading ? <Loading presentation="inline" label="Loading projects…" /> : 'No items yet'}
+                            </ListNote>
+                        ))}
                     {items.length > 0 && reading && (
                         <ListNote reading>
                             <Loading presentation="inline" label="Loading more Projects…" />
@@ -188,7 +204,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
     );
 }
 
-/** "List <count>", the count being the items in List, or a loading cue for none while the first read could add some; it opens the List modal. */
+/** "List <count>", the count being the items in the list, or a loading cue for none while the first read could add some; it opens the list modal. */
 export function ListButton() {
     const count = useBoardStore((state) => state.data.items.filter((item) => item.status === 'List').length);
     const reading = useBoardStore((state) => readingScope(state.data));
@@ -201,7 +217,7 @@ export function ListButton() {
                 label="List"
                 icon={<Inbox />}
                 count={count || !reading ? count : undefined}
-                loadingLabel="Loading Projects…"
+                loadingLabel="Loading projects…"
                 onOpen={() => setOpen(true)}
             />
             {open && <ListModal onClose={() => setOpen(false)} />}

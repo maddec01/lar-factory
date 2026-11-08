@@ -3,23 +3,12 @@
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
 
 import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
-import {
-    Button,
-    buttonKind,
-    DetailFact,
-    DetailsText,
-    Disclosure,
-    FactList,
-    InlineList,
-    MainSection,
-    RichText,
-    SectionHeader,
-    Text,
-} from '@lar-works/design-system';
+import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { postAction } from '@/services/board/board.service';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
+import { buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
 
 const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Map', decision: 'Decision' };
 
@@ -44,7 +33,7 @@ export function ExportMarkdown({
 
         setExported(
             result.error || !result.paths
-                ? { state: 'failed', error: result.error ?? 'The board did not say what it wrote.' }
+                ? { state: 'failed', error: result.error ?? 'The board didn’t say what it wrote.' }
                 : { state: 'done', paths: result.paths },
         );
     };
@@ -67,9 +56,9 @@ export function ExportedLine({ exported }: { exported: Exported }) {
 
     if (exported.state === 'failed')
         return (
-            <Text variant="caption" tone="danger" role="alert">
+            <Alert size="sm" tone="danger">
                 {exported.error}
-            </Text>
+            </Alert>
         );
 
     return null;
@@ -102,7 +91,7 @@ export function RecordText({ item, record, spec = false }: { spec?: boolean; ite
                     ) : body ? (
                         <MarkdownDiagrams text={body} />
                     ) : (
-                        <DetailsText>No {title.toLowerCase()} written yet.</DetailsText>
+                        <EmptyState size="inline" title={`No ${title.toLowerCase()} written yet.`} />
                     )}
                 </div>
             )}

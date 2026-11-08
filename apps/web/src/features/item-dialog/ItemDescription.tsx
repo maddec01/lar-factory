@@ -3,33 +3,35 @@
 
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
 import {
+    EmptyState,
     Button,
-    buttonKind,
-    DetailsText,
     Disclosure,
+    Heading,
+    Inline,
+    MarkdownEditor,
+    PageError,
+    RichText,
+    SkeletonLoader,
+    Stack,
+} from '@lar-works/design-system';
+import { CircleAlert, Pencil } from '@lar-works/design-system/icons';
+import { useState } from 'react';
+
+import type { DescriptionEdit } from './useDescriptionEdit';
+import { postAction } from '@/services/board/board.service';
+import { forgetItemDetails, type ItemDetailsRead } from '@/services/items/items.hooks';
+import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
+import {
+    buttonKind,
     EditActions,
     EditorSlot,
     HeaderStatus,
-    Heading,
-    Inline,
     MainColumnSlot,
     MainSection,
-    MarkdownEditor,
-    RichText,
     SectionHeader,
-    SkeletonLoader,
     SpecSync,
-    Stack,
     TextSection,
-} from '@lar-works/design-system';
-import { Pencil } from '@lar-works/design-system/icons';
-import { useState } from 'react';
-
-import { detailsCache } from './DetailsCache';
-import type { DescriptionEdit } from './useDescriptionEdit';
-import type { ItemDetailsRead } from './useItemDetails';
-import { postAction } from '@/services/board/board.service';
-import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
+} from '@/ui/board';
 
 /** A fixed-width placeholder for the main column while the details load. */
 function Loading() {
@@ -110,9 +112,9 @@ function SpecNotice({
 
         if (result.error) setError(result.error);
         else {
-            detailsCache.drop(itemId);
+            forgetItemDetails(itemId);
 
-            if (!(await refresh())) setError('Could not reload the Spec. Reopen the item to read it.');
+            if (!(await refresh())) setError('Couldn’t reload the Spec. Reopen the item to read it.');
         }
 
         setBusy(false);
@@ -155,7 +157,33 @@ function SpecNotice({
     );
 }
 
-const RELOAD_FAILED = 'Saved; could not reload the details';
+const RELOAD_FAILED = 'Saved; couldn’t reload the details';
+
+/** Retry belongs to the failed region, so the item and its board fields stay on screen. */
+function DetailsLoadError({ error, refresh }: { error: string; refresh: () => Promise<boolean> }) {
+    const [retrying, setRetrying] = useState(false);
+
+    return (
+        <MainColumnSlot>
+            <Stack role="alert" data-details-error>
+                <PageError
+                    size="panel"
+                    icon={<CircleAlert />}
+                    title="Couldn’t load the details"
+                    description={error}
+                    primaryAction={{
+                        label: 'Try again',
+                        busy: retrying,
+                        onAction: () => {
+                            setRetrying(true);
+                            void refresh().finally(() => setRetrying(false));
+                        },
+                    }}
+                />
+            </Stack>
+        </MainColumnSlot>
+    );
+}
 
 /**
  * The description, or the loading state or the error that stands in for it. Edit shows when `editable`, as this Mac
@@ -186,12 +214,7 @@ export function ItemDescription({
             </MainColumnSlot>
         );
 
-    if (read.state === 'failed')
-        return (
-            <DetailsText tone="error" mainColumn>
-                Could not load the details: {read.error}
-            </DetailsText>
-        );
+    if (read.state === 'failed') return <DetailsLoadError error={read.error} refresh={refresh} />;
 
     const { sections } = read.details;
     // A save the details could not be read back after stands for the description until they are.
@@ -236,7 +259,7 @@ export function ItemDescription({
                     )}
                 </>
             ) : (
-                <DetailsText>No description.</DetailsText>
+                <EmptyState size="inline" title="No description." />
             )}
             {read.details.spec?.original && (
                 <Disclosure label="Original" presentation="section">

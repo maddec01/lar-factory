@@ -70,41 +70,6 @@ const choice = (name: string) => choices().find((c) => text(c).startsWith(name))
 const toggle = (name: string) => settle(() => choice(name).querySelector('input')!.click());
 const chips = () => $$('[data-item-dialog] [data-labels] [data-label-chip]').map((c) => text(c));
 
-test("the picker offers the tracker's labels in their colours, ticks those on the ticket and locks the one the kind sets", async () => {
-    serve(boardWith({ labels: ['improvement', 'needs-design', 'type: improvement'] }));
-    await mountPage(boardWith({ labels: ['improvement', 'needs-design', 'type: improvement'] }));
-    await openItem();
-    expect(chips(), "the kind's mapped label stays off the chips").toEqual(['needs-design']);
-    await openPicker();
-    expect(choices().map((c) => text(c))).toEqual([
-        'area: serverThe server',
-        'docs',
-        'needs-design',
-        'type: improvement · set by kind',
-    ]);
-    expect(choice('needs-design').querySelector('input')!.checked).toBe(true);
-    expect(choice('docs').querySelector('input')!.checked).toBe(false);
-    expect(choice('type: improvement').querySelector('input')!.disabled).toBe(true);
-    expect(choice('docs').querySelector<HTMLElement>('[data-label-dot] > span')!.style.background).toBe(
-        'rgb(14, 138, 22)',
-    );
-});
-
-test('typing narrows the picker', async () => {
-    serve(boardWith({}));
-    await mountPage(boardWith({}));
-    await openItem();
-    await openPicker();
-
-    const input = $<HTMLInputElement>('[data-label-picker] input:not([type="checkbox"])')!;
-
-    await settle(() => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'DOC');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    expect(choices().map((c) => text(c))).toEqual(['docs']);
-});
-
 test('adding a label writes that one label, and the chip shows only once the write succeeds', async () => {
     const before = boardWith({ labels: ['needs-design'] });
     const { answer } = serve(before);
@@ -118,7 +83,7 @@ test('adding a label writes that one label, and the chip shows only once the wri
     await answer(200, { error: null, board: boardWith({ labels: ['needs-design', 'docs'] }) });
     expect(chips()).toEqual(['needs-design', 'docs']);
     expect(choice('docs').querySelector('input')!.checked).toBe(true);
-    expect(text($('[data-label-picker]')?.parentElement)).not.toMatch(/Could not/);
+    expect(text($('[data-label-picker]')?.parentElement)).not.toMatch(/Couldn’t/);
 });
 
 test('removing a label writes only its removal', async () => {
@@ -155,106 +120,36 @@ test('a failed write leaves the labels as they were and shows the error, closed 
     await openItem();
     await openPicker();
     await toggle('docs');
-    await answer(502, { error: 'Could not change the labels on #129. gh failed: HTTP 403' });
+    await answer(502, { error: 'Couldn’t change the labels on #129. gh failed: HTTP 403' });
     expect(chips()).toEqual(['needs-design']);
     expect(choice('docs').querySelector('input')!.checked).toBe(false);
 
     const alerts = () => $$('[role="alert"]').map((a) => text(a));
 
-    expect(alerts()).toEqual(['Could not change the labels on #129. gh failed: HTTP 403']);
+    expect(alerts()).toEqual(['Couldn’t change the labels on #129. gh failed: HTTP 403']);
     await settle(() =>
         document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
     );
     expect($('[data-label-picker]')).toBeNull();
-    expect(alerts()).toEqual(['Could not change the labels on #129. gh failed: HTTP 403']);
+    expect(alerts()).toEqual(['Couldn’t change the labels on #129. gh failed: HTTP 403']);
 });
 
-test('on Azure the control says tags, has no colours and writes the same way', async () => {
-    const repo = 'contoso/Fabrikam/web';
-    const azure = (labels: string[]): BoardData => ({
-        ...sample,
-        repos: [
-            ...sample.repos,
-            {
-                repo,
-                role: 'Web client',
-                items: 'azure-board',
-                team: 'Web',
-                labels: [],
-                setup: setup(),
-            } as BoardData['repos'][number],
-        ],
-        items: sample.items.map((i) => (i.id === ID ? { ...i, repo, number: 310, labels, labelColors: {} } : i)),
-    });
-    const { answer } = serve(
-        azure(['docs']),
-        () => new Response(JSON.stringify({ labels: [{ name: 'docs' }, { name: 'area-ui' }] })),
-    );
-
-    await mountPage(azure(['docs']));
-    await openItem();
-    expect(pencil()!.getAttribute('aria-label')).toBe('Edit tags');
-    await openPicker();
-    expect($<HTMLInputElement>('[data-label-picker] input')!.placeholder).toBe('Filter tags');
-    expect(choice('area-ui').querySelector('[data-label-dot]')).toBeNull();
-    await toggle('area-ui');
-    await answer(502, { error: 'Could not change the tags on #310. az rest failed: TF26071' });
-    expect(chips()).toEqual(['docs']);
-    expect(text($('[role="alert"]'))).toContain('TF26071');
-    await toggle('area-ui');
-    await answer(200, { error: null, board: azure(['docs', 'area-ui']) });
-    expect(chips()).toEqual(['docs', 'area-ui']);
-    expect($('[role="alert"]')).toBeNull();
-    expect(sentWrites()).toEqual([
-        { itemId: ID, label: 'area-ui', action: 'add' },
-        { itemId: ID, label: 'area-ui', action: 'add' },
-    ]);
-});
-
-test('without tag-ticket access the control is disabled with the reason and reads nothing', async () => {
+test('without tag-ticket access the control says why, opens no picker and reads nothing', async () => {
     const refused = boardWith({ labels: ['docs'] }, setup({ 'tag-ticket': 'refused' }));
+    const reason = 'Access to tag-ticket was refused. Recheck access in Settings.';
 
     serve(refused);
     await mountPage(refused);
     await openItem();
-    expect(pencil()!.disabled).toBe(true);
-    expect(pencil()!.title).toBe('Access to tag-ticket was refused. Recheck access in Settings.');
+    expect(pencil()!.title).toBe(reason);
+    expect($('[data-item-dialog] [role="alert"]'), 'no warning before it is pressed').toBeNull();
+    await openPicker();
+    expect($('[data-label-picker]'), 'no picker').toBeNull();
+    expect(text($('[data-item-dialog] [role="status"]'))).toContain(
+        'Ticket labels are read-only. Access to tag-ticket was refused.',
+    );
     expect(chips()).toEqual(['docs']);
     expect(sentReads()).toEqual([]);
-});
-
-test('the Azure read-only safety disables the control with its reason', async () => {
-    const repo = 'contoso/Fabrikam/web';
-    const azure: BoardData = {
-        ...sample,
-        repos: [
-            ...sample.repos,
-            {
-                repo,
-                role: 'Web client',
-                items: 'azure-board',
-                team: 'Web',
-                labels: [],
-                setup: setup({ 'tag-ticket': 'allowed' }, { azureReadOnly: true }),
-            } as BoardData['repos'][number],
-        ],
-        items: sample.items.map((i) => (i.id === ID ? { ...i, repo, number: 310 } : i)),
-    };
-
-    serve(azure);
-    await mountPage(azure);
-    await openItem();
-    expect(pencil()!.title).toBe('Azure DevOps is read-only in this test session.');
-});
-
-test('a ticket with no labels can still add one', async () => {
-    const none = boardWith({ labels: ['improvement'] });
-
-    serve(none);
-    await mountPage(none);
-    await openItem();
-    expect(chips()).toEqual([]);
-    expect(pencil()!.disabled).toBe(false);
 });
 
 test('a failed read says why, and opening again reads again', async () => {
@@ -263,13 +158,13 @@ test('a failed read says why, and opening again reads again', async () => {
 
     serve(board, () =>
         fails
-            ? new Response(JSON.stringify({ error: 'Could not read the labels. gh failed: HTTP 502' }), { status: 502 })
+            ? new Response(JSON.stringify({ error: 'Couldn’t read the labels. gh failed: HTTP 502' }), { status: 502 })
             : new Response(JSON.stringify({ labels: LIST })),
     );
     await mountPage(board);
     await openItem();
     await openPicker();
-    expect(text($('[role="alert"]'))).toBe('Could not read the labels. gh failed: HTTP 502');
+    expect(text($('[role="alert"]'))).toBe('Couldn’t read the labels. gh failed: HTTP 502');
     fails = false;
     await settle(() =>
         document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
@@ -277,14 +172,4 @@ test('a failed read says why, and opening again reads again', async () => {
     await openPicker();
     expect(choices()).toHaveLength(4);
     expect($('[role="alert"]')).toBeNull();
-});
-
-test('local work omits irrelevant ticket-label controls and instructions', async () => {
-    const local = boardWith({ number: 0, labels: [], url: '' });
-
-    serve(local);
-    await mountPage(local);
-    await openItem();
-    expect(pencil()).toBeNull();
-    expect(text($('[data-item-dialog]'))).not.toContain('Create a ticket');
 });

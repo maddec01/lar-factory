@@ -49,7 +49,7 @@ test('every open concept, and every open item with a sub-issue on the board, is 
 
     expect(
         dossiersOf(listed, listed).map((d) => d.parent.number),
-        'none in List or Done',
+        'none in the list or Done',
     ).toEqual([200]);
 });
 
@@ -91,7 +91,7 @@ test('each part carries its blocked-by issues and its newest thread', () => {
 
     expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'closed' }]);
     expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual([
-        'Research: hosting cost of the relay',
+        'Research: account and discovery hosting',
         'running',
         'needs you',
         'done',
@@ -160,7 +160,7 @@ test('recorded decisions need no factory labels, and local completion facts over
         kind: 'decision',
         status: 'List',
         labels: [],
-        completion: { complete: false, reasons: ['Its confirmed answer is not recorded.'] },
+        completion: { complete: false, reasons: ['Its confirmed answer isn’t recorded.'] },
     });
     const build = child(0, parent, {
         id: 'W_build',

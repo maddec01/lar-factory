@@ -3,12 +3,13 @@
 
 import { isBuild } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Badge, RowIdentity } from '@lar-works/design-system';
+import { Badge } from '@lar-works/design-system';
 import { memo } from 'react';
 
 import { partKind } from './DossierParts';
 import { PartKindLabel } from './WorkMapParts';
 import { KIND_BADGES, KindBadge, RepoCell, SourceIcon } from '@/features/items';
+import { RowIdentity } from '@/ui/board';
 
 /** A row's kind: its badge, a decision's method or Build, with or without a ticket; a ticket with no recognised kind has none. */
 export const RowKind = memo(function RowKind({ item }: { item: Item }) {

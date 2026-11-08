@@ -10,14 +10,12 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import { boardApp, type UpdateState } from '@lar-factory/shared';
-import { ReleaseNotes, UpdateDownloading, UpdatePill } from '@lar-works/design-system';
+import { boardApp, plural, type UpdateState } from '@lar-factory/shared';
 import { useEffect } from 'react';
 
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './UpdateButtonLogic';
 import { useUpdateStore } from './UpdateStore';
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+import { ReleaseNotes, UpdateDownloading, UpdatePill } from '@/ui/board';
 
 /** Each Release's changes, newest Release first, with what the app left out. */
 function Notes({ state }: { state: UpdateState }) {
@@ -28,13 +26,13 @@ function Notes({ state }: { state: UpdateState }) {
 
                 return {
                     version: note.version,
-                    title: index === 0 ? "What's changed" : `Changes in ${note.version}`,
+                    title: index === 0 ? 'What’s changed' : `Changes in ${note.version}`,
                     items: note.items,
-                    ...(omitted > 0 && { more: `${plural(omitted, 'more change')} in this Release` }),
+                    ...(omitted > 0 && { more: `${plural(omitted, 'more change')} in this release` }),
                 };
             })}
             {...(state.omittedReleaseCount > 0 && {
-                older: `${plural(state.omittedReleaseCount, 'older Release')} not shown`,
+                older: `${plural(state.omittedReleaseCount, 'older release')} not shown`,
             })}
         />
     );

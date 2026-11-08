@@ -2,12 +2,13 @@
 // gives here; a number is a whole number from 1, saved with its own button or Enter.
 
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { Button, buttonKind, Inline, Input, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, Inline, Input, Stack, Text } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
 import { postAction, receive } from '@/services/board/board.service';
 import { Choice } from '@/shared/settings/SettingControls';
+import { buttonKind } from '@/ui/board';
 
 function wholeFromOne(text: string): number | null {
     const n = Number(text);
@@ -16,8 +17,8 @@ function wholeFromOne(text: string): number | null {
 }
 
 /**
- * Automatic or a number, with none picked until the board has read the setting, which it never does in sample mode, or
- * while the setting file is invalid, so picking either replaces the file.
+ * Automatic or a number. An invalid file uses the effective Automatic value; a missing server value is explicitly
+ * Not reported, so the UI never invents a machine-specific limit.
  */
 export function LimitSetting({
     name,
@@ -39,7 +40,8 @@ export function LimitSetting({
     const [error, setError] = useState<string | null>(null);
     const hint = useId();
     const shown =
-        mode ?? (saved === undefined || state?.problem ? null : saved === 'automatic' ? 'automatic' : 'number');
+        mode ??
+        (state?.problem ? 'automatic' : saved === undefined ? null : saved === 'automatic' ? 'automatic' : 'number');
     const text = typed ?? (typeof saved === 'number' ? String(saved) : '');
     const number = wholeFromOne(text);
     const invalid = text.trim() !== '' && number === null;
@@ -81,6 +83,7 @@ export function LimitSetting({
                 label={label}
                 options={options}
                 value={shown}
+                placeholder="Not reported"
                 busy={saving}
                 onChange={(next) => {
                     setError(null);
@@ -118,19 +121,29 @@ export function LimitSetting({
                 </Inline>
             )}
             {shown === 'number' && invalid && (
-                <Text variant="caption" id={hint} tone="danger">
+                <Text variant="caption" id={hint} tone="muted">
                     Enter a whole number from 1.
                 </Text>
             )}
             {state?.problem && (
-                <Text variant="caption" tone="danger" role="alert">
-                    {state.problem} The board uses Automatic until you save a choice.
-                </Text>
+                <Stack space="related">
+                    <Alert size="sm" tone="danger">
+                        {state.problem} The board uses Automatic until you save a choice.
+                    </Alert>
+                    <Button
+                        {...buttonKind('other')}
+                        loading={saving}
+                        data-save-automatic={name}
+                        onClick={() => void save('automatic')}
+                    >
+                        Use Automatic
+                    </Button>
+                </Stack>
             )}
             {error && (
-                <Text variant="caption" tone="danger" role="alert">
+                <Alert size="sm" tone="danger">
                     {error}
-                </Text>
+                </Alert>
             )}
         </Stack>
     );

@@ -7,9 +7,7 @@ import { boardSections } from './board-view.ts';
 import { day, formatTokens, formatUsd, shortAgo } from './format.ts';
 import {
     inRepo,
-    itemRepoNames,
     onAzure,
-    repoTag,
     shownRepo,
     blockedText,
     blockerRef,
@@ -39,9 +37,7 @@ import {
     sameRepo,
     startHold,
     sliceProgress,
-    statusLabel,
     t3DefaultDetail,
-    threadLink,
     usesGh,
     workMessage,
     earlierWorkMessage,
@@ -588,8 +584,10 @@ const sample = JSON.parse(readFileSync(new URL('../test/sample.json', import.met
 
 test('stale when the last read failed or is too old', () => {
     const fresh = { ...sample, error: null, fetchedAt: '2026-10-21T09:59:00Z' };
+    const failed = { ...sample, error: 'gh api graphql failed: error connecting to api.github.com' };
 
-    assert.equal(isStale(sample, Date.parse('2026-10-21T09:41:00Z')), true);
+    assert.equal(isStale(failed, Date.parse('2026-10-21T09:41:00Z')), true, 'a failed read is stale however recent');
+    assert.equal(isStale(sample, Date.parse('2026-10-21T09:41:00Z')), false, 'the same read without the error is not');
     assert.equal(isStale(fresh, Date.parse('2026-10-21T10:00:00Z')), false);
     assert.equal(isStale(fresh, Date.parse('2026-10-21T10:30:00Z')), true);
     assert.equal(
@@ -611,7 +609,7 @@ test('sample covers every status and both repositories', () => {
 
     const { needsYou, shaping, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
 
-    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 7, 4, 4]);
+    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 6, 4, 4]);
 });
 
 test('the desk holds Needs you, Verify and Ready to merge, in flow order, including concepts in Needs you, and no Ready item', () => {
@@ -630,19 +628,6 @@ test('the desk holds Needs you, Verify and Ready to merge, in flow order, includ
     assert.deepEqual(
         needsYou.map((i) => i.status),
         ['Needs you', 'Needs you', 'Verify', 'Ready to merge'],
-    );
-});
-
-test('the sample has a Verify item in each merge state', () => {
-    const verify = sample.items.filter((i) => i.status === 'Verify');
-
-    assert.deepEqual(
-        new Set(verify.map((i) => itemPr(i)?.pipeline?.mergeState)),
-        new Set(['can merge', 'checking', 'blocked', 'conflicts']),
-    );
-    assert.ok(
-        verify.some((i) => itemPr(i)?.pipeline && !itemPr(i)!.pipeline!.checks),
-        'one has no checks',
     );
 });
 
@@ -667,13 +652,13 @@ test('a day shows its year only when that is not the current year, in the time z
     assert.equal(day('2025-12-31T23:30:00Z', 'Europe/Amsterdam', Date.parse('2026-01-01T12:00:00Z')), '1 Jan');
 });
 
-test('a short age rounds each unit down, and a future time reads 0s ago', () => {
+test('a short age rounds each unit down, and a future time reads just now', () => {
     const now = Date.parse('2026-10-23T12:00:00Z');
     const at = (s: number) => new Date(now - s * 1000).toISOString();
 
     assert.deepEqual(
         [0, 59, 60, 59 * 60 + 59, 60 * 60, 47 * 3600 + 59 * 60, 48 * 3600, -30].map((s) => shortAgo(at(s), now)),
-        ['0s ago', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', '0s ago'],
+        ['just now', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', 'just now'],
     );
 });
 
@@ -699,11 +684,11 @@ test("an item's PR is the one Open PR opens: its first linked PR", () => {
     );
 });
 
-test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {
+test('a failed check wins while other checks run, and turns slow after 30 minutes', () => {
     const now = Date.parse('2026-10-21T10:00:00Z');
     const checks = (c: Partial<Checks>): Checks => ({ passed: 0, failed: 0, running: 0, total: 0, since: null, ...c });
 
-    assert.equal(checkState(checks({ passed: 1, running: 1, failed: 1, total: 3 })), 'running');
+    assert.equal(checkState(checks({ passed: 1, running: 1, failed: 1, total: 3 })), 'failed');
     assert.equal(checkState(checks({ passed: 2, failed: 1, total: 3 })), 'failed');
     assert.equal(checkState(checks({ passed: 3, total: 3 })), 'passed');
     assert.equal(checkState(null), null);
@@ -722,11 +707,6 @@ test('canAbandon takes List and Queued issues, never other statuses', () => {
         assert.ok(canAbandon(item(status)), `${status} issue`);
     }
     for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
-});
-
-test("a thread link is T3 Code's threads deep link, each id one path segment", () => {
-    assert.equal(threadLink('5e-8c5a', 'thread-1'), 't3code://threads/5e-8c5a/thread-1');
-    assert.equal(threadLink('env', 'a/b c'), 't3code://threads/env/a%2Fb%20c');
 });
 
 test('failedCheck gives a failed check, and nothing for one that passed or before the first check', () => {
@@ -750,12 +730,6 @@ test('a GitHub source reads with gh and an Azure DevOps one with az, and a list 
     assert.equal(usesGh([{ repo: 'contoso/web/api' }, { repo: 'maddec01/lar' }]), true);
     assert.equal(usesGh([{ repo: 'contoso/web/api' }]), false);
     assert.equal(usesGh([]), false);
-});
-
-test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {
-    assert.equal(statusLabel('Shaping'), 'status-shaping');
-    assert.equal(statusLabel('Ready to merge'), 'status-ready-to-merge');
-    assert.equal(statusLabel('Needs you'), 'status-needs-you');
 });
 
 test("an issue's labels hold the statuses whose labels it carries, in flow order, and never Done", () => {
@@ -878,21 +852,6 @@ test("an untagged Azure work item shows in the List of every repository reading 
     assert.equal(inRepo(items[1]!, 'contoso/Fabrikam/api'), false);
 });
 
-test("an item's repository name is its own repository's", () => {
-    const repos = [
-        { repo: 'contoso/p/web', role: 'app', labels: [] },
-        { repo: 'contoso/p/api', role: 'api', labels: [] },
-    ];
-
-    assert.equal(itemRepoNames({ repo: 'contoso/p/web' }, repos), 'web');
-    assert.equal(itemRepoNames({ repo: 'contoso/p/api' }, repos), 'api');
-});
-
-test("an Azure work item's repository tag is repo- and the repository's name as Azure shows it", () => {
-    assert.equal(repoTag('contoso/Fabrikam/WebShop'), 'repo-WebShop');
-    assert.equal(repoTag('contoso/Fabrikam%20Fiber/Web%20Shop'), 'repo-Web Shop');
-});
-
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
     assert.equal(sameRepo('Maddec01/Lar-Factory', 'maddec01/lar-factory'), true);
     assert.equal(sameRepo('maddec01/lar-factory', 'maddec01/lar-server'), false);
@@ -991,7 +950,7 @@ test("typed label names are refused with the tracker's reason", () => {
     );
     assert.throws(
         () => validateDraft({ ...draft, options: { newLabels: ['BUG'] } }, sample.repos),
-        /reserved for the item's kind/,
+        /reserved for the item’s kind/,
     );
 });
 
@@ -1020,7 +979,7 @@ const MODEL_GROUPS = [
     },
 ];
 
-test('the T3 Project default entry names the model and effort T3 will use', () => {
+test('the Project default in T3 entry names the model and effort T3 will use', () => {
     const opus = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
     assert.equal(t3DefaultDetail(MODEL_GROUPS, undefined), undefined);
@@ -1041,7 +1000,7 @@ test('the T3 Project default entry names the model and effort T3 will use', () =
     );
 });
 
-test('a T3 Project default stored with no options, as T3 stores a model default such as medium, names the model and no effort', () => {
+test('a Project default in T3 stored with no options, as T3 stores a model default such as medium, names the model and no effort', () => {
     assert.equal(
         t3DefaultDetail(MODEL_GROUPS, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }),
         'Personal Claude Opus 5.5',

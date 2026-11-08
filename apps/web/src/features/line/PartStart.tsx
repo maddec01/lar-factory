@@ -4,16 +4,8 @@
 
 import type { BoardData } from '@lar-factory/shared';
 
-import { openWaits } from './DossierParts';
 import type { Part } from './DossierParts';
-import { OpenThread, hasLiveThread, StartOrAfter, StartBuild } from '@/features/items';
-
-/** Whether PartStart offers the part a Start now: it is Ready or Queued, waits on no open issue, has no live thread
- *  and carries one status. The dossier's "Ready to start" row and its header's "what's next" both read it. */
-export const startable = (part: Part): boolean =>
-    (part.item.status === 'Ready' || part.item.status === 'Queued') &&
-    !openWaits(part).length &&
-    !hasLiveThread(part.item);
+import { hasLiveThread, OpenThread, StartBuild, StartOrAfter } from '@/features/items';
 
 /** `label` names the Start, StartBuild's own on a Ready build and Start on a Queued one by default; other statuses get none. The Work map's state line names the blockers, so its Start after leaves them out. */
 export function PartStart({

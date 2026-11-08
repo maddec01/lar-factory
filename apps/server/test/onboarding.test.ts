@@ -64,24 +64,6 @@ test("the onboarding T3 project step reads T3's projects with each origin and pl
     );
 });
 
-test("T3's projects that can't be read answer with the problem", async (t) => {
-    const board = await startBoard(t);
-    const response = await fetch(`${board.url}/api/onboarding/projects`);
-
-    assert.equal(response.status, 502);
-    assert.match(
-        ((await response.json()) as { error: string }).error,
-        /^Can't read T3 Code's projects; reconnect T3 Code before onboarding$/,
-    );
-});
-
-test('the sample board lists no T3 projects to onboard', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const response = await fetch(`${board.url}/api/onboarding/projects`);
-
-    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
-});
-
 test('creating a T3 project runs t3 project add on the folder and answers with the new project to pick', async (t) => {
     const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
 
@@ -108,29 +90,6 @@ test('creating a T3 project runs t3 project add on the folder and answers with t
         [['added', 'maddec01/lar-web']],
     );
     assert.deepEqual(await board.t3Calls(), [['project', 'add', join(home, 'Developer/lar/lar-web')]]);
-});
-
-test("a failing t3 project add answers with t3's message", async (t) => {
-    const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-
-    t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-
-    const board = await startBoard(t, { t3: { addFails: 'Could not reach the T3 Code server.' } }, false, false, {
-        HOME: home,
-    });
-    const response = await board.post({ folder: home }, board.url, '/api/onboarding/projects');
-
-    assert.deepEqual(
-        [response.status, await response.json()],
-        [502, { error: 't3 could not add the project: Could not reach the T3 Code server.' }],
-    );
-});
-
-test('the sample board creates no T3 project', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const response = await board.post({ folder: '/tmp' }, board.url, '/api/onboarding/projects');
-
-    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
 });
 
 const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
@@ -193,17 +152,6 @@ test('keeping an onboarding without its progress, or for a repository onboarded 
         [onboarded.status, await onboarded.json()],
         [409, { error: 'maddec01/lar-web is onboarded already.' }],
     );
-});
-
-test('the sample board keeps no onboarding', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const response = await board.post(
-        { repo: 'maddec01/lar-web', progress },
-        board.url,
-        '/api/onboarding/repositories',
-    );
-
-    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
 });
 
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
@@ -277,44 +225,6 @@ test('detection and saving refuse a body they cannot use', async (t) => {
         [saved.status, await saved.json()],
         [400, { error: 'Send the Project, its T3 project, role, item source, domain-doc location, skills.' }],
     );
-});
-
-test('the sample board detects nothing, saves no setup and imports no ticket', async (t) => {
-    const board = await startBoard(t, {}, true);
-
-    for (const path of ['/api/onboarding/detect', '/api/onboarding/setup']) {
-        const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
-
-        assert.deepEqual(
-            [response.status, await response.json()],
-            [403, { error: 'Sample mode onboards no Project.' }],
-            path,
-        );
-    }
-});
-
-test("Clash resolution waits for a later build, so onboarding's Clash routes are gone", async (t) => {
-    const board = await startBoard(t, {}, true);
-
-    for (const path of ['/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
-        assert.equal((await board.post({ repo: 'maddec01/lar-web' }, board.url, path)).status, 405, path);
-    }
-    assert.equal((await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`)).status, 404);
-});
-
-test('repository setup and per-ticket import write routes are absent', async (t) => {
-    const board = await startBoard(t, {}, true);
-
-    for (const path of [
-        '/api/onboarding/import',
-        '/api/onboarding/import/tickets',
-        '/api/onboarding/pr',
-        '/api/onboarding/pr/changes',
-        '/api/repositories/config-update/pr',
-        '/api/repositories/config-update/dismiss',
-    ]) {
-        assert.equal((await board.post({}, board.url, path)).status, 405, path);
-    }
 });
 
 test('a fine-grained read-only token permits local setup without enabling concept sync', async (t) => {

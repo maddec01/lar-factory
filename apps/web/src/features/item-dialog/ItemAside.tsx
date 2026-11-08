@@ -2,23 +2,27 @@
 // requests.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { DetailsSection, ItemDialogAside, WaitsOnList } from '@lar-works/design-system';
+import { Text } from '@lar-works/design-system';
 
+import { ItemChecksSection } from './ItemChecks';
 import { ItemRelations } from './ItemRelations';
 import { waitsOn } from './Relations';
-import type { ItemDetailsRead } from './useItemDetails';
 import { Dependencies, PrList, dependenciesOf } from '@/features/items';
+import type { ItemDetailsRead } from '@/services/items/items.hooks';
+import { DetailsSection, ItemDialogAside, WaitsOnList } from '@/ui/board';
 
 export function ItemAside({
     item,
     data,
     now,
     read,
+    refresh,
 }: {
     item: Item;
     data: BoardData;
     now: number;
     read: ItemDetailsRead;
+    refresh: () => Promise<boolean>;
 }) {
     return (
         <ItemDialogAside>
@@ -38,10 +42,23 @@ export function ItemAside({
                     <Dependencies item={item} data={data} now={now} />
                 </DetailsSection>
             )}
-            <ItemRelations item={item} read={read} />
-            {item.linkedPrs.length > 0 && (
+            <ItemRelations item={item} read={read} refresh={refresh} />
+            {(item.linkedPrs.length > 0 || item.kind === 'build') && (
                 <DetailsSection heading="Pull requests">
-                    <PrList item={item} />
+                    {item.linkedPrs.length ? (
+                        <PrList
+                            item={item}
+                            checks={
+                                item.kind === 'build' && (
+                                    <ItemChecksSection key={`checks-${item.id}`} itemId={item.id} />
+                                )
+                            }
+                        />
+                    ) : (
+                        <Text variant="caption" tone="muted">
+                            No pull request yet
+                        </Text>
+                    )}
                 </DetailsSection>
             )}
         </ItemDialogAside>

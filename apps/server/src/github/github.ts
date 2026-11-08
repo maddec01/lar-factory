@@ -107,7 +107,7 @@ const RECENT_CLOSED_QUERY = `query($owner: String!, $name: String!, $since: Date
  * One page of an issue search, for the `build` label of the sub-issues off the read, which says whether one is a build
  * or a slice. Labels on every sub-issue in OPEN_ISSUES_QUERY cost 60 points a page, not 10; a search page costs 1.
  */
-export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
+const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
   search(type: ISSUE, first: ${SEARCH_PAGE_SIZE}, after: $after, query: $q) { pageInfo { hasNextPage endCursor } nodes { ... on Issue { number repository { nameWithOwner } } } }
 }`;
 
@@ -116,7 +116,7 @@ export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
  * or of an item with sub-issues on the board is read, for its map, so the board query skips
  * every other issue's body.
  */
-export const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
+const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Issue { id body } }
 }`;
 
@@ -124,7 +124,7 @@ export const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
  * Linked PRs' bodies and merge times, by PR node id, up to PAGE_SIZE ids a call. Only a build's merged stats and its
  * stats write-back read them, so the board query skips them on every other item's linked PRs.
  */
-export const PR_BODIES_QUERY = `query($ids: [ID!]!) {
+const PR_BODIES_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on PullRequest { id body mergedAt } }
 }`;
 

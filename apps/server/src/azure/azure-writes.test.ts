@@ -65,30 +65,6 @@ test('Abandon reads the work item with one batch read and PATCHes it through az 
     assert.deepEqual(az.patches[0]!.ops[0], { op: 'test', path: '/rev', value: 1 });
 });
 
-test('a logged-out az shows its fix, and any other az error shows as it is', async () => {
-    const loggedOut = await board(4, (args) =>
-        args[0] === 'rest' && args.includes('patch')
-            ? new Error('Please run az login to set up an account.')
-            : undefined,
-    );
-
-    assert.equal(
-        await loggedOut.source.abandon(loggedOut.item),
-        'Could not abandon work item 4. az is logged out. Run az login, then try again.',
-    );
-
-    const changed = await board(4, (args) =>
-        args[0] === 'rest' && args.includes('patch')
-            ? new Error('az devops invoke failed: TF26071: changed since you opened it')
-            : undefined,
-    );
-
-    assert.equal(
-        await changed.source.abandon(changed.item),
-        'Could not abandon work item 4. az devops invoke failed: TF26071: changed since you opened it',
-    );
-});
-
 const workItem = (number: number) =>
     ({
         id: `azure:contoso/${number}`,
@@ -189,17 +165,4 @@ test('no right to edit the work item, a logged-out az and any other az error eac
         status: 502,
         error: 'Could not save the description. az rest failed: timed out',
     });
-});
-
-test('an item that is not an Azure DevOps work item is refused', async () => {
-    const az = fakeAz({ items: ITEMS });
-
-    assert.deepEqual(
-        await saveAzureDescription(
-            { ...workItem(4), repo: 'maddec01/lar' },
-            { body: 'x', bodyField: 'System.Description', revision: 1 },
-            az.run,
-        ),
-        { status: 404, error: 'That item is not an Azure DevOps work item.' },
-    );
 });

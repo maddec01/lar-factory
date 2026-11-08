@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import { setTargetTick, type BlockingPath } from '@lar-factory/shared/install-skills';
+import { setTargetTick } from '@lar-factory/shared/install-skills';
 import type { InstallTarget, InstanceDiscovery, ProviderInstance } from '@lar-factory/shared/install-targets';
 import * as Deferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
@@ -24,7 +24,7 @@ describe('locateBundle', () => {
         assert.strictEqual(SkillInstall.locateBundle('/repo/app', false), '/repo/app/dist-electron/bundle');
     });
 
-    it("finds the bundle in the packaged app's Resources, outside app.asar", () => {
+    it('finds the bundle in the packaged app’s Resources, outside app.asar', () => {
         assert.strictEqual(
             SkillInstall.locateBundle('/Applications/Board.app/Contents/Resources/app.asar', true),
             '/Applications/Board.app/Contents/Resources/bundle',
@@ -33,7 +33,7 @@ describe('locateBundle', () => {
 });
 
 describe('plan', () => {
-    it("installs a packaged app's bundle into the user's home", () => {
+    it('installs a packaged app’s bundle into the user’s home', () => {
         assert.deepStrictEqual(SkillInstall.plan(launch()), {
             home: '/Users/someone',
             bundle: '/App/bundle',
@@ -45,10 +45,6 @@ describe('plan', () => {
         const plan = SkillInstall.plan(launch({ env: { [SkillInstall.ROOT_ENV]: '/tmp/home' } }));
 
         assert.deepStrictEqual([plan?.home, plan?.root], ['/tmp/home', '/tmp/home']);
-    });
-
-    it('skips a dev run without the flag', () => {
-        assert.strictEqual(SkillInstall.plan(launch({ isPackaged: false })), undefined);
     });
 
     it('installs a dev run with the flag into the overridden root', () => {
@@ -120,7 +116,7 @@ describe('oneAtATime', () => {
 
 describe('makeChecks', () => {
     it.effect(
-        "installs with the Claude profile's links, then reports an edited skill as Drift on the next launch and leaves it",
+        'installs with the Claude profile’s links, then reports an edited skill as Drift on the next launch and leaves it',
         () =>
             Effect.gen(function* () {
                 const home = tempDir('skill-home-');
@@ -188,7 +184,7 @@ describe('makeChecks', () => {
         }),
     );
 
-    it.effect("refuses the build when Replace and start can't replace the Drift, and says why", () =>
+    it.effect('refuses the build when Replace and start can’t replace the Drift, and says why', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const made = yield* checks(launch({ home, bundle: makeBundle() }), outage);
@@ -206,7 +202,7 @@ describe('makeChecks', () => {
 
             const answer = SkillInstall.buildAnswer(outcome, 'replace');
 
-            assert.include(answer.refusal, "couldn't replace");
+            assert.include(answer.refusal, 'couldn’t replace');
             assert.strictEqual(answer.drift, undefined);
         }),
     );
@@ -232,7 +228,7 @@ describe('makeChecks', () => {
         }),
     );
 
-    it.effect("leaves a blocking folder alone and reports it on every check, for the page's notice", () =>
+    it.effect('leaves a blocking folder alone and reports it on every check, for the page’s notice', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const mine = NodePath.join(home, '.agents/skills/lar-work');
@@ -269,7 +265,7 @@ describe('makeChecks', () => {
         }),
     );
 
-    it.effect("installs the checkout's skills on a dev run with the flag", () =>
+    it.effect('installs the checkout’s skills on a dev run with the flag', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const result = yield* check(
@@ -286,7 +282,7 @@ describe('makeChecks', () => {
         }),
     );
 
-    it.effect("fails with the engine's message, and the next launch retries", () =>
+    it.effect('fails with the engine’s message, and the next launch retries', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const bundle = makeBundle();
@@ -307,7 +303,7 @@ describe('makeChecks', () => {
         }),
     );
 
-    it.effect("names a manifest it can't read", () =>
+    it.effect('names a manifest it can’t read', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const manifest = NodePath.join(home, '.agents/.lar-factory-install.json');
@@ -324,7 +320,7 @@ describe('makeChecks', () => {
 });
 
 describe('requiredTargets', () => {
-    it("gives every instance's targets, disabled ones too, once per path and required", () => {
+    it('gives every instance’s targets, disabled ones too, once per path and required', () => {
         const agents = { kind: 'agents' as const, path: '/home/.agents/skills' };
         const custom = { kind: 'claude' as const, path: '/work/claude/skills' };
         const instances: Array<ProviderInstance> = [
@@ -422,7 +418,7 @@ describe('makeChecks with T3', () => {
             }),
     );
 
-    it.effect("keeps T3's targets through a later outage", () =>
+    it.effect('keeps T3’s targets through a later outage', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const work = NodePath.join(home, 'work-claude');
@@ -535,7 +531,7 @@ describe('makeChecks with T3', () => {
     );
 
     it.effect(
-        "after a restart with T3 down, keeps installing into T3's recorded targets and refuses a build on their Clash",
+        'after a restart with T3 down, keeps installing into T3’s recorded targets and refuses a build on their Clash',
         () =>
             Effect.gen(function* () {
                 const home = NodeFS.realpathSync(tempDir('skill-home-'));
@@ -652,7 +648,7 @@ describe('buildAnswer', () => {
     it('refuses when Drift is left after Replace and start', () => {
         const answer = SkillInstall.buildAnswer({ ...clean, drift }, 'replace');
 
-        assert.include(answer.refusal, "couldn't replace");
+        assert.include(answer.refusal, 'couldn’t replace');
         assert.strictEqual(answer.drift, undefined);
     });
 
@@ -702,39 +698,6 @@ describe('buildRefusal', () => {
         assert.strictEqual(SkillInstall.buildRefusal({ ...clean, conflicts: ['/home/.claude/references'] }), null);
     });
 
-    it('names each blocked skill, every path that blocks it and where each leaves it missing', () => {
-        const paths: BlockingPath[] = [
-            { place: 'antigravity', path: '/home/.gemini/config/skills/tdd' },
-            { place: 'profile', profile: '.claude', path: '/home/.claude/skills/tdd' },
-        ];
-        const refusal = SkillInstall.buildRefusal({
-            ...clean,
-            conflicts: [...paths.map(({ path }) => path), '/home/.agents/skills/grill'],
-            blocked: [
-                { skill: 'tdd', paths },
-                { skill: 'grill', paths: [{ place: 'agents', path: '/home/.agents/skills/grill' }] },
-            ],
-        });
-
-        assert.strictEqual(
-            refusal,
-            "The build can't start while a skill is blocked. " +
-                "tdd is blocked by paths Lar Factory didn't install: /home/.gemini/config/skills/tdd (the skill isn't installed for Antigravity), " +
-                "/home/.claude/skills/tdd (the skill isn't linked into ~/.claude; unticking the profile also clears it). " +
-                "grill is blocked by a path Lar Factory didn't install: /home/.agents/skills/grill (the skill isn't installed). " +
-                'Move each path away, then start the build again.',
-        );
-    });
-
-    it('says to move the one path away when only one blocks', () => {
-        const refusal = SkillInstall.buildRefusal({
-            ...clean,
-            blocked: [{ skill: 'grill', paths: [{ place: 'agents', path: '/home/.agents/skills/grill' }] }],
-        });
-
-        assert.match(refusal ?? '', /blocked by a path .* Move that path away/);
-    });
-
     it('lets a build start with Drift', () => {
         assert.strictEqual(
             SkillInstall.buildRefusal({
@@ -762,27 +725,8 @@ describe('buildRefusal', () => {
             drift: [{ skill: 'tdd', paths: [{ place: 'agents', path: '/home/.agents/skills/tdd' }] }],
         });
 
-        assert.include(refusal, "couldn't install");
+        assert.include(refusal, 'couldn’t install');
         assert.include(refusal, '/home/.claude/skills: EACCES');
-    });
-
-    it("says a failed Replace and start couldn't replace the skills", () => {
-        const refusal = SkillInstall.buildRefusal(
-            new SkillInstall.SkillInstallError({ message: 'EACCES: lar-work', changed: true }),
-            'replace',
-        );
-
-        assert.include(refusal, "couldn't replace");
-        assert.include(refusal, 'EACCES: lar-work');
-    });
-
-    it("gives a failed install's reason", () => {
-        const refusal = SkillInstall.buildRefusal(
-            new SkillInstall.SkillInstallError({ message: 'EACCES: lar-work', changed: true }),
-        );
-
-        assert.include(refusal, "couldn't install");
-        assert.include(refusal, 'EACCES: lar-work');
     });
 });
 

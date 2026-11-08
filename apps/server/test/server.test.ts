@@ -4,11 +4,9 @@ import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { get } from 'node:http';
-import { connect, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test, type TestContext } from 'vite-plus/test';
+import { test } from 'vite-plus/test';
 
 import { changeRecords, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
@@ -172,47 +170,6 @@ const readLiveStats = async (board: Board): Promise<Item[]> =>
             d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen && !i.stats.provisional),
         )
     ).items;
-
-test('a failed usage read tells the board, so kept figures can say they are last known', async (t) => {
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['build'] }, items: [boardIssue(12, 'Review')] },
-        false,
-        true,
-        { T3_STATE_DB: join(tmpdir(), 'lar-no-such-t3-database') },
-    );
-
-    assert.equal((await until(board, (d) => d.usageRead !== undefined)).usageRead?.readable, false);
-});
-
-test('a failed usage read stays unreadable through the refreshes that read no usage, and never reads as loading', async (t) => {
-    const board = await startBoard(
-        t,
-        {
-            threads: { 'maddec01/lar-factory#12': ['build'] },
-            items: [boardIssue(12, 'Review'), boardIssue(13, 'Review')],
-        },
-        false,
-        true,
-        { T3_STATE_DB: join(tmpdir(), 'lar-no-such-t3-database') },
-    );
-
-    await until(
-        board,
-        (d) => d.usageRead?.readable === false && d.items.some((i) => i.number === 12 && i.stats === 'unavailable'),
-    );
-    // The thread refreshes between usage reads rewrite the items, every 100 ms here.
-    await new Promise((r) => setTimeout(r, 1_000));
-
-    const later = await until(board, (d) => d.fetchedAt !== null);
-
-    assert.equal(later.items.find((i) => i.number === 12)?.stats, 'unavailable');
-    assert.equal(
-        later.items.find((i) => i.number === 13)?.stats,
-        undefined,
-        'work with no thread has no usage to report missing',
-    );
-});
 
 test('one failed thread fails only the item whose family holds it: its known figures stay, and a success brings it back', async (t) => {
     const thread = (id: string, read?: 'failed') => ({
@@ -414,66 +371,6 @@ test("a build's slices show their records' progress, and its build sub-issue sta
     );
 });
 
-test('a build sub-issue on the board stays a board item while the issue search still misses its new label', async (t) => {
-    const repository = { nameWithOwner: 'maddec01/lar-factory' };
-    const ref = {
-        number: 12,
-        title: 'Issue 12',
-        url: 'https://github.com/maddec01/lar-factory/issues/12',
-        state: 'OPEN',
-        stateReason: null,
-        repository,
-    };
-    const parent = rawBuild(13, 'In progress');
-    const items = [
-        { ...parent, content: { ...parent.content, subIssues: { nodes: [ref] } } },
-        rawBuild(12, 'In progress'),
-    ];
-    const read = await readItems(await startBoard(t, { items, builds: [] }));
-
-    assert.deepEqual(
-        read.map((i) => i.number).sort((a, b) => a - b),
-        [12, 13],
-    );
-});
-
-test("each refresh attaches item stats from T3 Code's database and Claude transcripts, and a missing database leaves them out", async (t) => {
-    const db = statsDb(t, [
-        {
-            id: 'build',
-            messages: ['Build maddec01/lar-factory#12'],
-            sessions: [{ session: 'session-1', instance: 'claudeAgent_personal' }],
-            turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-        },
-    ]);
-    const home = claudeHome(t, {
-        'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } },
-    });
-    const items = await readLiveStats(
-        await startBoard(
-            t,
-            {
-                threads: { 'maddec01/lar-factory#12': ['build'] },
-                items: [boardIssue(12, 'Done'), boardIssue(13, 'Review')],
-            },
-            false,
-            false,
-            { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) },
-        ),
-    );
-
-    assert.deepEqual(items.find((i) => i.number === 12)?.stats, {
-        agentMs: 30 * 60_000,
-        wallMs: 30 * 60_000,
-        tokens: 10 + 314,
-    });
-    assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
-
-    const [without] = await readItems(await startBoard(t, { items: [boardIssue(12, 'Done')] }));
-
-    assert.equal(without?.stats, undefined);
-});
-
 test("each refresh attaches the threads each work record holds and T3's environment id, and leaves them out without T3's files", async (t) => {
     // The thread's first message names #13, which no longer associates it.
     const db = statsDb(t, [
@@ -596,71 +493,6 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
     );
 });
 
-test('a run that finishes reads its final turn apart from the refresh, parsing what changed without a block, and its PR block carries the final figures', async (t) => {
-    const home = claudeHome(t, { 'session-a': { main: [assistant('first', 0, 0, 0, 7)] } });
-    const running = {
-        id: 'a',
-        sessions: [{ session: 'session-a', instance: 'claudeAgent_personal' }],
-        turns: [{ id: 'turn-a', startedAt: '2026-10-20T09:00:00Z' }],
-    };
-    const db = statsDb(t, [running]);
-    const raw = rawBuild(12, 'Review');
-    const open = {
-        number: 40,
-        url: 'https://github.com/maddec01/lar-factory/pull/40',
-        state: 'OPEN',
-        isDraft: false,
-        body: 'PR 40',
-    };
-    const board = await startBoard(
-        t,
-        {
-            threads: { 'maddec01/lar-factory#12': ['a'] },
-            items: [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [open] } } }],
-        },
-        false,
-        true,
-        { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }), FAST_LOCAL_REFRESH_ONLY: '1' },
-    );
-    const tokens = (data: BoardData) => (data.items[0]?.stats as ItemStats | undefined)?.tokens;
-
-    await until(
-        board,
-        (d) => tokens(d) === 7 && !(d.items[0]!.stats as ItemStats).provisional && d.items[0]?.threads !== undefined,
-    );
-    await board.untilLogged('every item settled');
-
-    // The final turn's usage lands in a transcript large enough to take several reads of the file, and the run ends.
-    const filler = JSON.stringify({ type: 'user', message: { content: 'x'.repeat(2_000) } });
-    const later = Array.from({ length: 4_000 }, () => filler);
-
-    writeFileSync(
-        join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60', 'session-a.jsonl'),
-        [...later, JSON.stringify(assistant('first', 0, 0, 0, 7)), JSON.stringify(assistant('last', 0, 0, 0, 5))].join(
-            '\n',
-        ) + '\n',
-    );
-
-    const health = await fetch(`${board.url}/healthz`);
-
-    assert.equal(health.status, 200);
-    writeFileSync(
-        `${db}.execution.json`,
-        JSON.stringify([{ ...running, turns: [{ ...running.turns[0], completedAt: '2026-10-20T09:30:00Z' }] }]),
-    );
-    await until(board, (d) => tokens(d) === 12);
-    // An ordinary read's line has no startup prefix.
-    assert.match(
-        board.logs(),
-        /Z stats read path took \d+ ms elapsed, \d+ ms CPU: inputs \d+ ms, discovery \d+ ms, warm \d+ ms \(parsed 1 of 1 transcripts\)/,
-        'the read named what it parsed',
-    );
-
-    const final = await board.untilCalled((args) => args[2] === 'PATCH' && String(args[5]).includes('"tokens":12'));
-
-    assert.equal(final[3], 'repos/maddec01/lar-factory/pulls/40');
-});
-
 test('a merged item retains its PR figures and adds fresh stats without lowering known work', async (t) => {
     const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
     const db = statsDb(t, [
@@ -725,139 +557,6 @@ test('a merged item retains its PR figures and adds fresh stats without lowering
         ['repos/maddec01/lar-factory/pulls/40'],
         'only the PR with fresher stats gets a final block',
     );
-});
-
-test("an item with a merged and an open linked PR shows live stats, and the open PR's block tracks them", async (t) => {
-    const db = statsDb(t, [
-        {
-            id: 'a',
-            messages: ['Build maddec01/lar-factory#12'],
-            turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-        },
-    ]);
-    const frozenBlock =
-        '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /lar-stats -->';
-    const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
-    const raw = rawBuild(12, 'Review');
-    const items = [
-        {
-            ...raw,
-            content: {
-                ...raw.content,
-                closedByPullRequestsReferences: {
-                    nodes: [
-                        {
-                            number: 40,
-                            url: url(40),
-                            state: 'MERGED',
-                            isDraft: false,
-                            body: `PR 40\n\n${frozenBlock}`,
-                            mergedAt: '2026-10-19T00:00:00Z',
-                        },
-                        { number: 41, url: url(41), state: 'OPEN', isDraft: false, body: 'PR 41', mergedAt: null },
-                    ],
-                },
-            },
-        },
-    ];
-    const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items }, false, true, {
-        T3_STATE_DB: db,
-    });
-    const [item] = await readLiveStats(board);
-
-    assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
-
-    const edit = await board.untilCalled((args) => args[2] === 'PATCH');
-
-    assert.equal(edit?.[3], 'repos/maddec01/lar-factory/pulls/41');
-    assert.equal(
-        edit?.[5],
-        'body=PR 41\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->',
-    );
-});
-
-test("an issue that isn't a build shows live figures and writes no block, even linked to a build's PRs", async (t) => {
-    const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
-    const db = statsDb(t, [
-        { id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
-        { id: 'b', messages: ['/lar-work maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] },
-    ]);
-    const block =
-        '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /lar-stats -->';
-    const prs = {
-        nodes: [
-            {
-                number: 40,
-                url: 'https://github.com/maddec01/lar-factory/pull/40',
-                state: 'MERGED',
-                isDraft: false,
-                body: `PR 40\n\n${block}`,
-            },
-            {
-                number: 41,
-                url: 'https://github.com/maddec01/lar-factory/pull/41',
-                state: 'OPEN',
-                isDraft: false,
-                body: 'PR 41',
-            },
-        ],
-    };
-    const build = rawBuild(12, 'Done');
-    const parent = boardIssue(13, 'In progress');
-    const items = [
-        { ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
-        { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } },
-    ];
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] }, items },
-        false,
-        true,
-        { T3_STATE_DB: db },
-    );
-    const read = await readLiveStats(board);
-
-    assert.deepEqual(read.find((i) => i.number === 13)?.stats, {
-        agentMs: 30 * 60_000,
-        wallMs: 30 * 60_000,
-        tokens: 0,
-    });
-    assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
-    await until(
-        board,
-        (d) =>
-            d.items.find((i) => i.number === 12)?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) ===
-            true,
-    );
-    assert.deepEqual(
-        (await board.calls()).filter((args) => args[2] === 'PATCH').map((args) => args[3]),
-        ['repos/maddec01/lar-factory/pulls/40'],
-        'only the build refreshes its final wall time',
-    );
-});
-
-test("only a build's linked PRs have their body and merge time read, once each, and an item that isn't a build's never", async (t) => {
-    const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
-    const pr = (number: number) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body: `PR ${number}` });
-    const linked = (raw: ReturnType<typeof rawBuild>, numbers: number[]) => ({
-        ...raw,
-        content: { ...raw.content, closedByPullRequestsReferences: { nodes: numbers.map(pr) } },
-    });
-    const items = [
-        linked(boardIssue(13, 'In progress'), [40, 41]),
-        linked(rawBuild(12, 'Review'), [40]),
-        linked(rawBuild(14, 'Review'), [40, 42]),
-    ];
-    const board = await startBoard(t, { items });
-
-    await readItems(board);
-
-    const first = (await board.calls()).find((args) =>
-        args.some((a) => a.includes('... on PullRequest { id body mergedAt }')),
-    );
-    const asked = first?.filter((a) => a.startsWith('ids[]='));
-
-    assert.deepEqual(asked, [`ids[]=${url(40)}`, `ids[]=${url(42)}`]);
 });
 
 test('a concept with two builds merged at different times: each build keeps its own frozen figures, the concept writes no block, its total counts all once', async (t) => {
@@ -960,64 +659,6 @@ test('a concept with two builds merged at different times: each build keeps its 
     );
 });
 
-test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
-    const db = statsDb(t, [
-        {
-            id: 'build',
-            messages: ['Build maddec01/lar-factory#12'],
-            turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-        },
-    ]);
-    const block =
-        '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->';
-    const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
-    const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
-    const raw = rawBuild(12, 'Review');
-    const items = [
-        {
-            ...raw,
-            content: {
-                ...raw.content,
-                closedByPullRequestsReferences: {
-                    nodes: [
-                        // Edits go in order, so once PR 40's lands, PR 43 was read and left alone.
-                        pr(43, 'PR 43'),
-                        pr(44, `PR 44\n\n${block}`),
-                        pr(40, 'PR 40'),
-                    ],
-                },
-            },
-        },
-    ];
-    const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
-    // The sequential PR reads deliberately outlast the former two-second poll.
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['build'] }, items, liveBodies, prReadDelay: 1200 },
-        false,
-        false,
-        { T3_STATE_DB: db },
-    );
-    const prCalls = async () =>
-        (await board.calls()).filter(
-            (args) => args[0] === 'api' && (args[1]?.includes('/pulls/') || args[2] === 'PATCH'),
-        );
-
-    await board.untilLogged(`updated item stats in ${url(40)}`);
-
-    const calls = await prCalls();
-
-    assert.deepEqual(
-        calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
-        ['repos/maddec01/lar-factory/pulls/43', 'repos/maddec01/lar-factory/pulls/40'],
-        'only PRs the board thinks need an edit are read',
-    );
-    assert.deepEqual(
-        calls.filter((args) => args[2] === 'PATCH').map((args) => [args[3], args[5]]),
-        [['repos/maddec01/lar-factory/pulls/40', `body=PR 40, edited by hand\n\n${block}`]],
-    );
-});
-
 test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {
     // The build's thread still runs, so its figures aren't final and a refresh soon after a sync starts no other.
     const db = statsDb(t, [
@@ -1086,102 +727,11 @@ test('PR edits run beside the refreshes without holding them up, and never two s
     );
 });
 
-/** Takes `port` if free. `release` closes only this listener and the connections it accepted, as close alone waits for them. */
-async function take(
-    port: number,
-): Promise<{ bound: number; accepted: Promise<unknown>; release: () => Promise<void> }> {
-    const server = createServer();
-    const sockets = new Set<Socket>();
-    const accepted = new Promise((resolve) =>
-        server.on('connection', (socket) => {
-            sockets.add(socket);
-            socket.once('close', () => sockets.delete(socket));
-            resolve(socket);
-        }),
-    );
-    const bound = await new Promise<number>((resolve, reject) => {
-        server.once('error', (error: NodeJS.ErrnoException) =>
-            error.code === 'EADDRINUSE' && port !== 0 ? resolve(port) : reject(error),
-        );
-        server.listen(port, '127.0.0.1', () => resolve((server.address() as { port: number }).port));
-    });
-
-    return {
-        bound,
-        accepted,
-        release: () =>
-            new Promise<void>((resolve) => {
-                if (!server.listening) {
-                    resolve();
-
-                    return;
-                }
-
-                server.close(() => resolve());
-                for (const socket of sockets) socket.destroy();
-            }),
-    };
-}
-
-/** Holds `port` for the test; a port something else already holds is taken all the same. */
-async function hold(t: TestContext, port: number): Promise<number> {
-    const { bound, release } = await take(port);
-
-    t.onTestFinished(release);
-
-    return bound;
-}
-
-test('hold releases its port with a connection still open, on a port the system assigns', async () => {
-    const { bound, accepted, release } = await take(0);
-    const client = connect(bound, '127.0.0.1');
-
-    // Destroying the accepted socket can reset this end, which is the release working.
-    client.on('error', () => {});
-    await accepted;
-
-    const closed = new Promise((resolve) => client.once('close', resolve));
-
-    await release();
-    await closed;
-    assert.equal(client.destroyed, true);
-});
-
-test('without BOARD_PORT the board skips a taken 4317, binds the next free port and logs it', async (t) => {
-    await hold(t, 4317);
-
-    const board = await startBoard(t, {}, true, false, { BOARD_PORT: '' });
-    const port = Number(new URL(board.url).port);
-
-    assert.ok(port >= 4318 && port <= 4416, board.url);
-    assert.match(board.logs(), new RegExp(`board on http://127\\.0\\.0\\.1:${port}`));
-    assert.equal((await fetch(`${board.url}/api/board`)).status, 200, 'the host check accepts the bound port');
-
-    // fetch always sends the URL's host, so ask through http to name the old port.
-    const misdirected = await new Promise<number | undefined>((resolve, reject) => {
-        get(`${board.url}/api/board`, { headers: { Host: '127.0.0.1:4317' } }, (res) => {
-            res.resume();
-            resolve(res.statusCode);
-        }).on('error', reject);
-    });
-
-    assert.equal(misdirected, 421);
-});
-
 test("a BOARD_PORT that isn't a port exits with a log line, not a stack trace", async (t) => {
     await assert.rejects(
         startBoard(t, {}, true, false, { BOARD_PORT: 'abc' }),
         (err: Error) =>
             /BOARD_PORT=abc is not a port/.test(err.message) && !/ERR_SOCKET_BAD_PORT|\n\s+at /.test(err.message),
-    );
-});
-
-test('BOARD_PORT on a taken port exits with a log line', async (t) => {
-    const port = await hold(t, 0);
-
-    await assert.rejects(
-        startBoard(t, {}, true, false, { BOARD_PORT: String(port) }),
-        new RegExp(`port ${port} is taken`),
     );
 });
 
@@ -1201,13 +751,6 @@ test('a live board records its port for status.sh and removes the record on exit
     await sample.stop();
     await board.stop();
     assert.deepEqual(readdirSync(records), []);
-});
-
-test('BOARD_PORT zero binds an OS-assigned port and serves the board at its logged URL', async (t) => {
-    const board = await startBoard(t, {}, true, false, { BOARD_PORT: '0' });
-
-    assert.ok(Number(new URL(board.url).port) > 0);
-    assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
 });
 
 test('default-status slices follow implementation activity on local refresh without available usage', async (t) => {

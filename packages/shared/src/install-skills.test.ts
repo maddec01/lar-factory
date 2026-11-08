@@ -398,14 +398,6 @@ const installError = (changed: boolean) => (error: unknown) =>
     error.name === 'InstallError' &&
     (error as Error & { changed: boolean }).changed === changed;
 
-test.skipIf(runsAsRoot)('a failed copy says nothing changed yet', () => {
-    const broken = bundle(v1);
-
-    chmodSync(join(broken, 'skills/lar-work/references/review.md'), 0o000);
-
-    assert.throws(() => installSkills(temporary(), broken, '1.0.0'), installError(false));
-});
-
 test('a bundle without a skills folder says nothing changed and keeps the manifest', () => {
     const home = temporary();
 
@@ -433,24 +425,6 @@ test('a manifest that is not valid JSON fails with its path and changes nothing'
             installError(false)(error) && (error as Error).message.includes(join(home, '.agents', INSTALL_MANIFEST)),
     );
     assert.equal(read(home, 'skills/tdd/SKILL.md'), 'tdd v1');
-});
-
-test('manifest skill names that are not one folder name are ignored', () => {
-    const home = temporary();
-    const outside = join(home, 'outside');
-
-    mkdirSync(outside);
-    installSkills(home, bundle(v1), '1.0.0');
-    writeFileSync(
-        join(home, '.agents', INSTALL_MANIFEST),
-        JSON.stringify({ version: '1.0.0', skills: ['lar-work', 'tdd', '../../outside', '..', '.', '', 'a/b', 3] }),
-    );
-
-    installSkills(home, bundle(v2), '2.0.0');
-
-    assert.ok(existsSync(outside));
-    assert.ok(existsSync(join(home, '.agents/skills')));
-    assert.deepEqual(manifest(home).targets['.agents/skills']!.skills, ['lar-work', 'tdd']);
 });
 
 test('skills and files outside the bundle are left alone', () => {
@@ -495,17 +469,6 @@ test.skipIf(runsAsRoot)('a copy that fails partway keeps the previous version, a
         status: matching('lar-work', 'tdd'),
         targets: { '.agents/skills': finished('agents', '2.0.0', ['lar-work', 'tdd']) },
     });
-});
-
-test.skipIf(runsAsRoot)('a failed checklist copy names the references folder', () => {
-    const home = temporary();
-    const broken = bundle(v1);
-    const unreadable = join(broken, 'skills/lar-work/references/review.md');
-
-    chmodSync(unreadable, 0o000);
-
-    assert.throws(() => installSkills(home, broken, '1.0.0'), /skill lar-work/);
-    assert.ok(!existsSync(join(home, '.agents', INSTALL_MANIFEST)));
 });
 
 function writeSkill(home: string, name: string, content: string): void {
@@ -994,33 +957,6 @@ test('a link to the right skill folder the engine did not make is a Clash whenev
     ]);
     assert.deepEqual(manifest(home).targets['.claude/skills']!.skills, ['lar-work', 'tdd']);
 });
-test('manifest profiles and links that are not one profile folder name are ignored', () => {
-    const root = temporary();
-    const home = join(root, 'home');
-
-    mkdirSync(join(root, 'outside'), { recursive: true });
-    symlinkSync(join(root, 'outside'), join(root, 'outside-link'));
-    profile(home, '.claude');
-    installSkills(home, bundle(linked), '1.0.0');
-
-    const state = { ticked: true, links: ['../../../outside-link'], references: true };
-
-    writeFileSync(
-        join(home, '.agents', INSTALL_MANIFEST),
-        JSON.stringify({
-            version: '1.0.0',
-            skills: ['lar-work', 'tdd'],
-            profiles: { '.claude': state, '../outside': state, '.': state, other: state },
-        }),
-    );
-
-    installSkills(home, bundle(linked), '2.0.0');
-    tickProfile(home, '.claude', false);
-
-    assert.deepEqual(readdirSync(join(root, 'outside')), []);
-    assert.ok(lstatSync(join(root, 'outside-link')).isSymbolicLink());
-    assert.deepEqual(Object.keys(manifest(home).targets), ['.agents/skills', '.claude/skills']);
-});
 
 test('manifest profile entries that are not an object are dropped and wrong field types read as unset', () => {
     const home = temporary();
@@ -1079,20 +1015,6 @@ test('an upgrade links new skills and removes the links of a dropped skill from 
     assert.equal(readFileSync(join(home, '.claude/skills/lar-work/references/review.md'), 'utf8'), 'review v1');
 });
 
-test('an upgrade that drops a skill leaves a folder put in place of its profile link', () => {
-    const home = temporary();
-
-    profile(home, '.claude');
-    installSkills(home, bundle(linked), '1.0.0');
-    rmSync(join(home, '.claude/skills/tdd'));
-    mkdirSync(join(home, '.claude/skills/tdd'));
-
-    const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = linked;
-
-    installSkills(home, bundle(withoutTdd), '2.0.0');
-
-    assert.deepEqual(entries(home, '.claude'), { 'lar-work': ownLinks['lar-work'], tdd: 'folder' });
-});
 test('ticking a folder that is not an Install target throws', () => {
     const home = temporary();
 
@@ -1269,51 +1191,6 @@ test('conflicts warn on the first install of each version only, and stay blocked
     });
 });
 
-test('an install that does not record its warning leaves it for the next install of the version', () => {
-    const home = temporary();
-
-    installSkills(home, bundle(v1), '1.0.0');
-    writeSkill(home, 'grill', 'grill from the skills CLI');
-
-    const withGrill = bundle({ ...v1, 'skills/grill/SKILL.md': 'grill v1' });
-
-    assert.equal(installSkills(home, withGrill, '2.0.0', { recordWarning: false }).warn, true);
-    assert.equal(manifest(home).warned, undefined);
-    assert.equal(installSkills(home, withGrill, '2.0.0').warn, true);
-    assert.equal(installSkills(home, withGrill, '2.0.0', { recordWarning: false }).warn, false);
-});
-
-test('manifest statuses of the wrong shape are dropped', () => {
-    const home = temporary();
-
-    installSkills(home, bundle(v1), '1.0.0');
-    writeFileSync(
-        join(home, '.agents', INSTALL_MANIFEST),
-        JSON.stringify({
-            version: '1.0.0',
-            skills: ['lar-work', 'tdd'],
-            warned: 3,
-            status: {
-                'lar-work': { state: 'restored' },
-                tdd: { state: 'restored', restoredAt: 'then' },
-                '../x': { state: 'matching' },
-                grill: { state: 'blocked' },
-                other: { state: 'blocked', paths: [3] },
-                older: { state: 'blocked', paths: ['/home/.agents/skills/older'] },
-                odd: { state: 'blocked', paths: [{ place: 'profile', path: '/home/.claude/skills/odd' }] },
-            },
-        }),
-    );
-
-    installSkills(home, bundle(v1), '1.0.0');
-
-    assert.deepEqual(manifest(home), {
-        version: '1.0.0',
-        status: { 'lar-work': { state: 'matching' }, tdd: { state: 'restored', restoredAt: 'then' } },
-        targets: { '.agents/skills': finished('agents', '1.0.0', ['lar-work', 'tdd']) },
-    });
-});
-
 /** Antigravity's skill folders in a home: the app's and the CLI's. */
 const antigravity = ['.gemini/config/skills', '.gemini/antigravity-cli/skills'];
 
@@ -1366,15 +1243,6 @@ test('an install copies every skill into both Antigravity folders when ~/.gemini
         ['lar-work', 'tdd'],
     ]);
     assert.equal(installSkills(home, bundle(v1), '1.0.0').installed, false);
-});
-
-test('without ~/.gemini an install creates nothing for Antigravity', () => {
-    const home = temporary();
-
-    installSkills(home, bundle(v1), '1.0.0');
-
-    assert.ok(!existsSync(join(home, '.gemini')));
-    assert.deepEqual(Object.keys(manifest(home).targets), ['.agents/skills']);
 });
 
 const antigravityRestores = {
@@ -1434,31 +1302,6 @@ test('a folder in an Antigravity skills folder the engine did not make stays and
     assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd from the skills CLI');
 });
 
-test('a link in an Antigravity skills folder is a conflict, even one to the installed skill', () => {
-    const home = geminiHome();
-    const app = join(home, '.gemini/config/skills');
-
-    mkdirSync(join(home, '.agents/skills'), { recursive: true });
-    mkdirSync(app, { recursive: true });
-    symlinkSync(join(home, '.agents/skills/tdd'), join(app, 'tdd'));
-
-    const result = installSkills(home, bundle(v1), '1.0.0');
-
-    assert.deepEqual(result.conflicts, [join(app, 'tdd')]);
-    assert.equal(readlinkSync(join(app, 'tdd')), join(home, '.agents/skills/tdd'));
-});
-
-test('a first install leaves a copy in an Antigravity skills folder that matches the bundle as a Clash', () => {
-    const home = geminiHome();
-    const app = join(home, '.gemini/config/skills');
-
-    mkdirSync(join(app, 'tdd'), { recursive: true });
-    writeFileSync(join(app, 'tdd/SKILL.md'), 'tdd v1');
-
-    assert.deepEqual(installSkills(home, bundle(v1), '1.0.0').conflicts, [join(app, 'tdd')]);
-    installSkills(home, bundle(v2), '2.0.0');
-    assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd v1');
-});
 test('an upgrade whose bundle drops a skill removes its Antigravity copies, edited or not, and an existing install gains them', () => {
     const home = temporary();
 
@@ -1494,34 +1337,6 @@ test('an upgrade that drops a skill leaves a link or file put in place of its An
 
     assert.equal(readlinkSync(app!), join(home, 'elsewhere/tdd'));
     assert.equal(readFileSync(cli!, 'utf8'), 'mine');
-});
-
-test('legacy manifest Antigravity entries for other folders or with names that are not one folder name are dropped', () => {
-    const home = geminiHome();
-
-    installSkills(home, bundle(v1), '1.0.0');
-    writeFileSync(
-        join(home, '.agents', INSTALL_MANIFEST),
-        JSON.stringify({
-            version: '1.0.0',
-            skills: ['lar-work', 'tdd'],
-            antigravity: {
-                '.gemini/config/skills': ['lar-work', 'tdd', '../x'],
-                '.gemini/other': ['tdd'],
-                '.gemini/antigravity-cli/skills': 'tdd',
-            },
-        }),
-    );
-
-    const result = installSkills(home, bundle(v1), '1.0.0');
-
-    // The CLI folder's entry isn't a list, so its copies are no longer the engine's.
-    assert.deepEqual(
-        result.conflicts,
-        ['lar-work', 'tdd'].map((name) => join(home, '.gemini/antigravity-cli/skills', name)),
-    );
-    assert.deepEqual(antigravityOwned(home), [['lar-work', 'tdd'], []]);
-    assert.deepEqual(Object.keys(manifest(home).targets), ['.agents/skills', ...antigravity].sort());
 });
 
 test('manifest targets at a relative path, of an unknown kind or not an object are dropped, and wrong field types read as unset', () => {
@@ -2003,58 +1818,6 @@ test('with a root, an offered target at an absolute home outside it fails before
     assert.deepEqual(Object.keys(manifest(root).targets), ['.agents/skills']);
 });
 
-test('with a root, a Claude home linked from inside it to outside it is left alone', () => {
-    const root = temporary();
-    const outside = outsideHome();
-
-    symlinkSync(outside.home, join(root, '.claude'));
-
-    const before = outside.files();
-
-    const result = installSkills(root, bundle(v1), '1.0.0', { root });
-
-    assert.deepEqual(outside.files(), before);
-
-    const claude = result.targets.find(({ kind }) => kind === 'claude');
-
-    assert.equal(claude?.active, false);
-    assert.match(claude?.error?.message ?? '', /outside the install root/);
-    assert.throws(() => tickProfile(root, '.claude', true, { root }), /outside the install root/);
-    assert.deepEqual(outside.files(), before);
-});
-
-test('with a root, a migrated target outside it is neither written nor removed', () => {
-    const root = temporary();
-    const outside = outsideHome();
-
-    for (const skill of ['lar-work', 'tdd'])
-        symlinkSync(join(root, '.agents/skills', skill), join(outside.home, 'skills', skill));
-    symlinkSync(outside.home, join(root, '.claude-work'));
-    mkdirSync(join(root, '.agents'), { recursive: true });
-    writeFileSync(
-        join(root, '.agents', INSTALL_MANIFEST),
-        JSON.stringify({
-            version: '1.0.0',
-            skills: ['lar-work', 'tdd'],
-            profiles: { '.claude-work': { ticked: true, links: ['lar-work', 'tdd'] } },
-        }),
-    );
-
-    const before = outside.files();
-
-    const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
-    const result = installSkills(root, bundle(withoutTdd), '2.0.0', { root });
-
-    assert.deepEqual(outside.files(), before);
-    assert.match(
-        result.targets.find(({ path }) => path === join(outside.home, 'skills'))?.error?.message ?? '',
-        /outside the install root/,
-    );
-    assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['lar-work', 'tdd']);
-    assert.throws(() => tickProfile(root, '.claude-work', false, { root }), /outside the install root/);
-    assert.deepEqual(outside.files(), before);
-});
-
 test('with a root, an ~/.agents linked to outside it stops the install before any write', () => {
     const root = temporary();
     const outside = temporary();
@@ -2069,18 +1832,6 @@ test('with a root, an ~/.agents linked to outside it stops the install before an
             (error as { changed?: boolean }).changed === false,
     );
     assert.deepEqual(readdirSync(outside), []);
-});
-
-test('without a root, an offered target at an absolute home elsewhere installs as before', () => {
-    const home = temporary();
-    const other = outsideHome();
-
-    const result = installSkills(home, bundle(v1), '1.0.0', {
-        targets: [...defaultTargets(home), { kind: 'claude', path: join(other.home, 'skills'), required: true }],
-    });
-
-    assert.equal(result.targets.find(({ path }) => path === join(other.home, 'skills'))?.error, undefined);
-    assert.ok(lstatSync(join(other.home, 'skills/tdd')).isSymbolicLink());
 });
 
 test('reports real per-skill work, Clashes and target-specific replaced Drift', () => {

@@ -1,21 +1,19 @@
-// The item dialog's summary under its title: the item's source, repository, status and age, what blocks it, its parent,
-// its kind, and attaching or creating its ticket.
+// The item dialog's summary under its title: the item's source, repository and what it is doing now, as the one
+// item-state presenter says it on every surface (the stage bar below names the recorded stage), what blocks it, its parent, its
+// kind as its row names it when the dialog's Kind control doesn't, and attaching or creating its ticket. The meta area
+// says when it was updated.
 
-import { blockedText, itemName, openBlockers, repoKey, shortAgo } from '@lar-factory/shared';
-import type { BoardData, Item } from '@lar-factory/shared';
-import {
-    ItemSummary as Summary,
-    SummaryAge,
-    SummaryBlocked,
-    SummaryParent,
-    SummaryStatus,
-} from '@lar-works/design-system';
+import { blockedText, itemName, openBlockers } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
 import { CreateTicket } from './CreateTicket';
-import { ItemKind, ItemStatusGlyph, RepoTag, SourceIcon, StructureSync, useShownStatus } from '@/features/items';
+import { ItemKindControl } from './ItemKindControl';
+import { ItemKind, ItemStatusGlyph, RepoCell, SourceIcon, StructureSync, useShownStatus } from '@/features/items';
+import { RowKind } from '@/features/line';
+import { ItemSummary as Summary, SummaryBlocked, SummaryParent, SummaryStatus } from '@/ui/board';
 
-export function ItemSummary({ item, data, now }: { item: Item; data: BoardData; now: number }) {
+export function ItemSummary({ item }: { item: Item }) {
     const shown = useShownStatus(item);
 
     return (
@@ -24,10 +22,11 @@ export function ItemSummary({ item, data, now }: { item: Item; data: BoardData; 
             line={
                 <>
                     <SourceIcon item={item} />
-                    <RepoTag repo={repoKey(item)} repos={data.repos} />
-                    <ItemStatusGlyph item={item} /> <SummaryStatus>{shown.word}</SummaryStatus>
-                    <SummaryAge>· updated {shortAgo(item.updatedAt, now)}</SummaryAge>
-                    {openBlockers(item).length > 0 && <SummaryBlocked>{blockedText(item)}</SummaryBlocked>}
+                    <RepoCell item={item} />
+                    <ItemStatusGlyph item={item} /> <SummaryStatus title={shown.recorded}>{shown.word}</SummaryStatus>
+                    {openBlockers(item).length > 0 && !shown.blocked && (
+                        <SummaryBlocked>{blockedText(item)}</SummaryBlocked>
+                    )}
                 </>
             }
             parent={
@@ -42,7 +41,10 @@ export function ItemSummary({ item, data, now }: { item: Item; data: BoardData; 
             }
             kind={
                 <>
-                    <ItemKind item={item} />
+                    <ItemKind
+                        item={item}
+                        summaryKind={<ItemKindControl item={item} fallback={<RowKind item={item} />} />}
+                    />
                     <StructureSync item={item} />
                 </>
             }

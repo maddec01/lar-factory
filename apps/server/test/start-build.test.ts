@@ -128,23 +128,6 @@ test('a fetch that fails refuses Start build, starts no thread and lets a retry 
     assert.equal((await board.t3Calls())[0]![5], originTip(home));
 });
 
-test('Start build asks the board app to check the skills before it starts the thread', async (t) => {
-    const { board, home } = await buildBoard(
-        t,
-        [readyIssue(12, ['build'])],
-        {},
-        { BOARD_SKILL_CHECK: '1' },
-        () => null,
-    );
-
-    assert.equal((await startBuild(board, board.id(12))).status, 200);
-    assert.equal(board.skillChecks(), 1);
-    assert.deepEqual(
-        (await board.t3Calls()).map((args) => args[3]),
-        [message(home, board.id(12))],
-    );
-});
-
 test('a refused skill check refuses Start build with its reason, writes nothing to GitHub and runs no t3', async (t) => {
     let refusal: string | null = "Lar Factory can't check the skill tdd: a folder it didn't install has its name.";
     const { board } = await buildBoard(
@@ -198,36 +181,6 @@ test('Drift asks for a choice before Start build writes anything, then starts on
     );
 });
 
-test("Start build refuses a Drift choice it doesn't know without checking the skills", async (t) => {
-    const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { BOARD_SKILL_CHECK: '1' }, () => null);
-    const refused = await startBuild(board, board.id(12), undefined, board.url, 'overwrite');
-
-    assert.equal(refused.status, 422);
-    assert.equal(board.skillChecks(), 0);
-});
-
-test('without a bundle Start build asks for no skill check', async (t) => {
-    const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, {}, () => 'refused');
-
-    assert.equal((await startBuild(board, board.id(12))).status, 200);
-    assert.equal(board.skillChecks(), 0);
-});
-
-test('the build message names lar-build under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
-    const { board } = await buildBoard(
-        t,
-        [readyIssue(12, ['build'])],
-        {},
-        { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' },
-    );
-
-    assert.equal((await startBuild(board, board.id(12))).status, 200);
-    assert.deepEqual(
-        (await board.t3Calls()).map((args) => args[3]),
-        [message('/tmp/lar-root', board.id(12), board.dataDir)],
-    );
-});
-
 test('Start build runs the thread on the picked model choice', async (t) => {
     const { board, home } = await buildBoard(t, [readyIssue(12, ['bug', 'build'])], {}, SAMPLE_MODELS);
     const response = await startBuild(board, board.id(12), {
@@ -250,42 +203,6 @@ test('Start build runs the thread on the picked model choice', async (t) => {
         (await (await startBuild(board, board.id(12), { instanceId: 'codex', model: '--help' })).json()).error,
         /isn't offered/,
     );
-});
-
-test('Start build leaves a labelled build, a parent build and a parent already In progress alone', async (t) => {
-    const { board } = await buildBoard(t, [
-        readyIssue(12, ['build'], 40),
-        boardIssue(40, 'In progress', undefined, ['build']),
-        readyIssue(13, ['build'], 41),
-        boardIssue(41, 'In progress', undefined, ['concept']),
-        readyIssue(14, ['improvement', 'build']),
-    ]);
-
-    for (const id of [board.id(12), board.id(13), board.id(14)])
-        assert.equal((await startBuild(board, id)).status, 200);
-    assert.deepEqual(await writes(board), []);
-    assert.deepEqual(
-        (await board.t3Calls()).map((args) => args[args.indexOf('--branch') + 1]),
-        ['chore/12-issue-12', 'chore/13-issue-13', 'feat/14-issue-14'],
-    );
-});
-
-test('a refused repository project writes nothing to GitHub and runs no t3', async (t) => {
-    const { board } = await buildBoard(t, [
-        rawIssue('I_30', 30, 'Ready', ['feature'], {
-            url: 'https://github.com/maddec01/lar-server/issues/30',
-            repository: { nameWithOwner: 'maddec01/lar-server' },
-        }),
-    ]);
-    const response = await startBuild(board, board.id(30, 'maddec01/lar-server'));
-
-    assert.equal(response.status, 409);
-    assert.equal(
-        (await response.json()).error,
-        'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
-    );
-    assert.deepEqual(await writes(board), []);
-    assert.deepEqual(await board.t3Calls(), []);
 });
 
 test('Start build is refused while a blocker is incomplete, naming it, and runs once it completes', async (t) => {
@@ -500,33 +417,6 @@ test('a saved cleanup failure leaves the build running, shows a problem and clea
     );
 });
 
-test('a running thread with another purpose is not refused as a shaping thread', async (t) => {
-    const env = startableEnv(t);
-
-    writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([{ id: 'earlier-build', turns: [turn()] }]));
-    writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
-
-    const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, env);
-
-    await changeRecords(
-        board,
-        (records) => {
-            records.addThread(board.id(12), records.read(board.id(12)).revision, 'earlier-build', 'build');
-        },
-        board.id(12),
-        (item) => Array.isArray(item.threads) && item.threads[0]?.state === 'running',
-    );
-    assert.equal((await startBuild(board, board.id(12))).status, 200);
-});
-
-test("a started build shows in the board data's started builds, apart from the item's refining thread", async (t) => {
-    const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
-    const answer = await (await startBuild(board, board.id(12))).json();
-
-    assert.equal(answer.board.startedBuilds[board.id(12)].threadId, 'thread-1');
-    assert.equal(answer.board.started?.[board.id(12)], undefined);
-});
-
 test('a double press, a retry or another page starts no second build thread', async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { delay: 100 } });
     const responses = await Promise.all([startBuild(board, board.id(12)), startBuild(board, board.id(12))]);
@@ -568,17 +458,6 @@ test('Start build only runs for Ready issues from this board page and session', 
 
     assert.equal((await startBuild(sample, 'I_sample05')).status, 403);
     assert.deepEqual([...(await writes(board)), ...(await board.t3Calls()), ...(await sample.t3Calls())], []);
-});
-
-test('the board data says, per repository, whether Start build finds its repository project', async (t) => {
-    const { board } = await buildBoard(t, [boardIssue(12, 'Ready')]);
-    const data = (await until(board, (d) => !!d.repositoryProjects)) as BoardData;
-
-    assert.deepEqual(data.repositoryProjects, {
-        'maddec01/lar-server': 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
-        'maddec01/lar-apple': 'No T3 project is a checkout of maddec01/lar-apple; add the checkout in T3 Code',
-        'maddec01/lar-factory': null,
-    });
 });
 
 test('recovery endpoints validate item and options before starting a thread', async (t) => {

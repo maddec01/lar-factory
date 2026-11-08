@@ -5,7 +5,81 @@
             "path": "~/test/lar-server",
             "role": "Backend API server",
             "labels": ["area: server", "area: web"],
-            "items": "issues"
+            "items": "issues",
+            "setup": {
+                "repo": "maddec01/lar-server",
+                "projectId": "sample-project-server",
+                "role": "Backend API server",
+                "itemSource": {
+                    "kind": "issues"
+                },
+                "labels": ["area: server", "area: web"],
+                "domainDocs": {
+                    "kind": "off"
+                },
+                "skills": [],
+                "structureSync": false,
+                "createIssuesFromAddItem": true,
+                "createIssuesFromRetro": true,
+                "writeRefinedSpec": true,
+                "vocabulary": {
+                    "concept": {
+                        "type": null,
+                        "labels": []
+                    },
+                    "build": {
+                        "type": null,
+                        "labels": []
+                    },
+                    "bug": {
+                        "type": null,
+                        "labels": ["bug"]
+                    },
+                    "feature": {
+                        "type": null,
+                        "labels": ["feature"]
+                    },
+                    "improvement": {
+                        "type": null,
+                        "labels": ["improvement"]
+                    },
+                    "concept-kind": {
+                        "type": null,
+                        "labels": []
+                    }
+                },
+                "vocabularySources": {
+                    "concept": "default",
+                    "build": "default",
+                    "bug": "default",
+                    "feature": "default",
+                    "improvement": "default",
+                    "concept-kind": "default"
+                },
+                "access": {
+                    "push-branch": "allowed",
+                    "open-pr": "allowed",
+                    "publish-ticket": "allowed",
+                    "edit-ticket": "allowed",
+                    "tag-ticket": "allowed",
+                    "manage-labels": "allowed",
+                    "comment-ticket": "allowed",
+                    "type-ticket": "allowed",
+                    "relate-ticket": "allowed"
+                },
+                "sources": {
+                    "createIssuesFromAddItem": "default",
+                    "createIssuesFromRetro": "default",
+                    "writeRefinedSpec": "default",
+                    "role": "default",
+                    "itemSource": "default",
+                    "labels": "default",
+                    "domainDocs": "default",
+                    "skills": "default",
+                    "vocabulary": "default"
+                },
+                "connections": []
+            }
         },
         {
             "repo": "maddec01/lar-apple",
@@ -31,19 +105,60 @@
             "color": "sky"
         },
         "maddec01/lar-apple": {
-            "kind": "emoji",
-            "emoji": "🍎"
+            "kind": "lucide",
+            "name": "apple",
+            "color": "gray"
         }
     },
     "refreshSeconds": 45,
-    "fetchedAt": "2026-10-21T09:40:00.000Z",
-    "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
+    "heavyCommandLimit": {
+        "limit": "automatic",
+        "automatic": 2
+    },
+    "buildLimit": {
+        "limit": "automatic",
+        "automatic": 2
+    },
+    "shapingThreadCleanup": {
+        "choice": "settle"
+    },
+    "fetchedAt": "2026-10-21T10:00:00.000Z",
+    "error": null,
     "firstRead": {
         "step": "finishing",
         "running": [],
         "settled": true
     },
-    "modelChoices": [],
+    "modelChoices": [
+        {
+            "instanceId": "claudeAgent",
+            "name": "Claude · Personal",
+            "models": [
+                {
+                    "slug": "claude-opus-5-5[1m]",
+                    "label": "Claude Opus 5.5 · 1M context"
+                },
+                {
+                    "slug": "claude-sonnet-5-5",
+                    "label": "Claude Sonnet 5.5"
+                }
+            ]
+        },
+        {
+            "instanceId": "codex",
+            "name": "Codex · Personal",
+            "models": [
+                {
+                    "slug": "gpt-6.1-sol",
+                    "label": "GPT-6.1 Sol"
+                },
+                {
+                    "slug": "gpt-6-astra",
+                    "label": "GPT-6 Astra"
+                }
+            ]
+        }
+    ],
     "t3EnvironmentId": "sample-environment",
     "items": [
         {
@@ -153,9 +268,9 @@
             "statuses": ["List"],
             "kind": "improvement",
             "content": "ticket",
-            "number": 900004,
+            "number": 113,
             "title": "Shared playback history across devices",
-            "url": "https://github.com/maddec01/lar-server/issues/900004",
+            "url": "https://github.com/maddec01/lar-server/issues/113",
             "repo": "maddec01/lar-server",
             "labels": ["improvement"],
             "state": "open",
@@ -220,7 +335,7 @@
             "kind": "feature",
             "content": "ticket",
             "number": 20,
-            "title": "Player controls stay visible after scrubbing <on tvOS>",
+            "title": "Player controls stay visible after scrubbing on tvOS",
             "url": "https://github.com/maddec01/lar-apple/issues/20",
             "repo": "maddec01/lar-apple",
             "labels": ["bug", "os: ios", "priority: high"],
@@ -249,9 +364,9 @@
             "statuses": ["Queued"],
             "kind": "improvement",
             "content": "ticket",
-            "number": 900021,
+            "number": 127,
             "title": "Offline downloads on watchOS",
-            "url": "https://github.com/maddec01/lar-server/issues/900021",
+            "url": "https://github.com/maddec01/lar-server/issues/127",
             "repo": "maddec01/lar-server",
             "labels": ["improvement"],
             "state": "open",
@@ -304,7 +419,15 @@
                     "id": "sample-thread-130",
                     "title": "Shape: cold bitmap subtitles within 3 s",
                     "state": "running",
-                    "updated": "2026-10-21T09:10:00.000Z"
+                    "updated": "2026-10-21T09:10:00.000Z",
+                    "activity": {
+                        "available": true,
+                        "readAt": "2100-01-01T00:00:00.000Z",
+                        "action": "Read subtitle-preparation.ts",
+                        "actionAt": "2026-10-21T09:58:00.000Z",
+                        "toolRunning": true,
+                        "agents": []
+                    }
                 }
             ]
         },
@@ -350,7 +473,15 @@
                     "id": "sample-thread-22",
                     "title": "Shape: continue watching row",
                     "state": "running",
-                    "updated": "2026-10-21T09:00:00.000Z"
+                    "updated": "2026-10-21T09:00:00.000Z",
+                    "activity": {
+                        "available": true,
+                        "readAt": "2100-01-01T00:00:00.000Z",
+                        "action": "Edit ContinueWatchingRow.swift",
+                        "actionAt": "2026-10-21T09:57:00.000Z",
+                        "toolRunning": true,
+                        "agents": []
+                    }
                 }
             ]
         },
@@ -362,7 +493,7 @@
             "kind": "concept",
             "content": "ticket",
             "number": 200,
-            "title": "lar cloud: website sign-in and relay",
+            "title": "lar cloud: sign-in and direct connections",
             "url": "https://github.com/maddec01/lar-server/issues/200",
             "repo": "maddec01/lar-server",
             "labels": ["concept"],
@@ -380,14 +511,14 @@
             "linkedPrs": [],
             "slices": [],
             "map": {
-                "destination": "Anyone with a lar server signs in on lar.app with an owner account and streams their library away from home through a relay, with no port forwarding. The server registers with the cloud once; clients find it by account.",
+                "destination": "Anyone with a lar server signs in on lar.app and streams directly from their server while away, with automatic port mapping. The cloud handles sign-in and server discovery; media goes directly between server and player.",
                 "decisions": [
                     "Owner accounts live in the cloud, not on each server (#203 research).",
-                    "Hosting the relay costs about $40 a month for the first 500 owners (#203).",
+                    "The cloud handles account and discovery requests; it never carries media (#203).",
                     "Sign-in uses passkeys first, email links as fallback."
                 ],
                 "fog": [
-                    "Does the relay only broker connections, or carry the stream too (full TURN)? (#201)",
+                    "Which automatic port-mapping methods should be tried, and how should an unavailable direct connection be explained? (#201)",
                     "What does the sign-in screen look like on the website and in the apps? (#202)"
                 ],
                 "check": {
@@ -408,7 +539,7 @@
             "kind": "decision",
             "content": "ticket",
             "number": 201,
-            "title": "Relay: broker only or full TURN?",
+            "title": "Direct connections: automatic port mapping and fallback guidance",
             "url": "https://github.com/maddec01/lar-server/issues/201",
             "repo": "maddec01/lar-server",
             "labels": ["decision-grill"],
@@ -416,7 +547,7 @@
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: website sign-in and relay",
+                "title": "lar cloud: sign-in and direct connections",
                 "url": "https://github.com/maddec01/lar-server/issues/200",
                 "repo": "maddec01/lar-server",
                 "state": "open"
@@ -440,13 +571,13 @@
             "threads": [
                 {
                     "id": "sample-thread-201",
-                    "title": "Grill: relay broker only or full TURN",
+                    "title": "Grill: automatic port mapping and connection guidance",
                     "state": "running",
                     "updated": "2026-10-21T09:48:00.000Z",
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Read relay-costs.md",
+                        "action": "Read direct-connection-options.md",
                         "actionAt": "2026-10-21T09:48:00.000Z",
                         "toolRunning": false,
                         "agents": []
@@ -491,6 +622,16 @@
             "closedAt": null,
             "linkedPrs": [],
             "slices": [],
+            "threads": [
+                {
+                    "id": "sample-thread-23",
+                    "questionSummary": "Should library sync prioritise recently changed albums, or scan the whole library first?",
+                    "title": "Shape: faster library sync",
+                    "purpose": "shape",
+                    "state": "needs you",
+                    "updated": "2026-10-21T09:30:00Z"
+                }
+            ],
             "stats": {
                 "agentMs": 3120000,
                 "wallMs": 1860000,
@@ -514,7 +655,7 @@
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: website sign-in and relay",
+                "title": "lar cloud: sign-in and direct connections",
                 "url": "https://github.com/maddec01/lar-server/issues/200",
                 "repo": "maddec01/lar-server",
                 "state": "open"
@@ -575,7 +716,7 @@
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: website sign-in and relay",
+                "title": "lar cloud: sign-in and direct connections",
                 "url": "https://github.com/maddec01/lar-server/issues/200",
                 "repo": "maddec01/lar-server",
                 "state": "open"
@@ -628,7 +769,13 @@
                     "state": "done",
                     "updated": "2026-10-21T08:30:00.000Z"
                 }
-            ]
+            ],
+            "stats": {
+                "agentMs": 1260000,
+                "wallMs": 900000,
+                "tokens": 1180000,
+                "costUsd": 1.85
+            }
         },
         {
             "id": "I_sample22",
@@ -638,7 +785,7 @@
             "kind": "feature",
             "content": "ticket",
             "number": 150,
-            "title": "Relay for streaming away from home",
+            "title": "Direct streaming from away, with automatic port mapping",
             "url": "https://github.com/maddec01/lar-server/issues/150",
             "repo": "maddec01/lar-server",
             "labels": ["feature", "build"],
@@ -657,7 +804,7 @@
             "slices": [
                 {
                     "number": 160,
-                    "title": "Relay protocol framing",
+                    "title": "Direct connection negotiation",
                     "url": "https://github.com/maddec01/lar-server/issues/160",
                     "repo": "maddec01/lar-server",
                     "state": "closed",
@@ -665,7 +812,7 @@
                 },
                 {
                     "number": 161,
-                    "title": "Relay auth handshake",
+                    "title": "Direct connection authentication",
                     "url": "https://github.com/maddec01/lar-server/issues/161",
                     "repo": "maddec01/lar-server",
                     "state": "closed",
@@ -697,7 +844,7 @@
                 },
                 {
                     "number": 165,
-                    "title": "Relay health endpoint",
+                    "title": "Direct connection health endpoint",
                     "url": "https://github.com/maddec01/lar-server/issues/165",
                     "repo": "maddec01/lar-server",
                     "state": "open",
@@ -729,7 +876,7 @@
                 },
                 {
                     "number": 169,
-                    "title": "Relay metrics dashboard",
+                    "title": "Direct connection diagnostics",
                     "url": "https://github.com/maddec01/lar-server/issues/169",
                     "repo": "maddec01/lar-server",
                     "state": "open",
@@ -753,7 +900,7 @@
                 },
                 {
                     "number": 172,
-                    "title": "Relay load test",
+                    "title": "Direct streaming load test",
                     "url": "https://github.com/maddec01/lar-server/issues/172",
                     "repo": "maddec01/lar-server",
                     "state": "open",
@@ -761,7 +908,7 @@
                 },
                 {
                     "number": 173,
-                    "title": "Docs for self-hosting the relay",
+                    "title": "Docs for automatic port mapping",
                     "url": "https://github.com/maddec01/lar-server/issues/173",
                     "repo": "maddec01/lar-server",
                     "state": "open",
@@ -777,18 +924,18 @@
             "threads": [
                 {
                     "id": "sample-thread-150",
-                    "title": "Build: relay for streaming away from home",
+                    "title": "Build: direct streaming from away",
                     "state": "running",
                     "updated": "2026-10-21T09:59:00.000Z",
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Read relay-broker.ts",
+                        "action": "Read direct-connection.ts",
                         "actionAt": "2026-10-21T09:57:00.000Z",
                         "toolRunning": true,
                         "agents": [
                             {
-                                "title": "Slice: relay broker",
+                                "title": "Slice: direct connection negotiation",
                                 "model": "claude-opus-5-5",
                                 "action": "pnpm test",
                                 "actionAt": "2026-10-21T10:00:00.000Z"
@@ -800,7 +947,7 @@
                                 "actionAt": "2026-10-21T09:59:00.000Z"
                             },
                             {
-                                "title": "approver",
+                                "title": "Approver",
                                 "action": "Thinking",
                                 "actionAt": "2026-10-21T09:59:00.000Z"
                             }
@@ -1051,7 +1198,12 @@
                 }
             ],
             "slices": [],
-            "stats": "unavailable"
+            "stats": {
+                "agentMs": 3120000,
+                "wallMs": 2280000,
+                "tokens": 3400000,
+                "costUsd": 5.12
+            }
         },
         {
             "id": "I_sample26",
@@ -1060,9 +1212,9 @@
             "statuses": ["Verify"],
             "kind": "improvement",
             "content": "ticket",
-            "number": 900026,
+            "number": 149,
             "title": "Bump FFmpeg to 7.1",
-            "url": "https://github.com/maddec01/lar-server/issues/900026",
+            "url": "https://github.com/maddec01/lar-server/issues/149",
             "repo": "maddec01/lar-server",
             "labels": ["improvement"],
             "state": "open",
@@ -1213,7 +1365,8 @@
             "stats": {
                 "agentMs": 2820000,
                 "wallMs": 1680000,
-                "tokens": 4089500
+                "tokens": 4089500,
+                "costUsd": 1.48
             }
         },
         {
@@ -1224,7 +1377,7 @@
             "kind": "decision",
             "content": "ticket",
             "number": 203,
-            "title": "Hosting cost of the relay",
+            "title": "Cost of account and discovery hosting",
             "url": "https://github.com/maddec01/lar-server/issues/203",
             "repo": "maddec01/lar-server",
             "labels": ["decision-research"],
@@ -1232,7 +1385,7 @@
             "closedAs": "done",
             "parent": {
                 "number": 200,
-                "title": "lar cloud: website sign-in and relay",
+                "title": "lar cloud: sign-in and direct connections",
                 "url": "https://github.com/maddec01/lar-server/issues/200",
                 "repo": "maddec01/lar-server",
                 "state": "open"
@@ -1250,7 +1403,7 @@
             "threads": [
                 {
                     "id": "sample-thread-203",
-                    "title": "Research: hosting cost of the relay",
+                    "title": "Research: account and discovery hosting",
                     "state": "done",
                     "updated": "2026-10-19T10:00:00.000Z"
                 }

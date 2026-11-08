@@ -2,21 +2,13 @@
 // title says why it can't: the item has no thread yet, T3's database can't be read, T3 hasn't
 // written its environment id, or the thread is archived, whose link T3 opens as New thread.
 
-import { isLiveThread, needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import {
-    Button,
-    ButtonLink,
-    buttonKind,
-    EarlierThread,
-    EarlierThreadList,
-    Tooltip,
-    TooltipPopup,
-    TooltipTrigger,
-} from '@lar-works/design-system';
+import { needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
+import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { useOnRow } from './RowActions';
+import { useOnRow } from './RowContext';
+import { buttonKind, EarlierThread, EarlierThreadList } from '@/ui/board';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
 function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
@@ -51,7 +43,7 @@ function latestThread(
     data: BoardData,
     threadId?: string,
 ): { link: string; conceptQuestion: boolean } | { reason: string } {
-    if (item.threads === 'unavailable') return { reason: 'The T3 Code database could not be read' };
+    if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
     const inherited = !threadId && !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
@@ -61,17 +53,14 @@ function latestThread(
 
     if (latest.archived) return { reason: 'This thread is archived in T3 Code' };
 
-    if (!data.t3EnvironmentId) return { reason: "T3 Code hasn't written its environment id" };
+    if (!data.t3EnvironmentId) return { reason: 'T3 Code hasn’t written its environment id' };
 
     return { link: threadLink(data.t3EnvironmentId, latest.id), conceptQuestion: !own && Boolean(inherited) };
 }
 
-/** Whether a thread on the item is running, queued or waits on you, so starting another would make a second one. */
-export const hasLiveThread = (item: Item): boolean => Array.isArray(item.threads) && item.threads.some(isLiveThread);
-
 /**
  * Opens the latest thread, or the phase's recorded `threadId`, in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
- * it as a square icon button, its label in its title, as a desk card's corner does. On a row, Open thread is always that
+ * it as a square icon button with an accessible label, as a desk card's corner does. Concept `part` shortcuts are quiet icons with tooltips. On a row, Open thread is always that
  * icon, with a tooltip on hover and keyboard focus that says its label or why it can't open; other labels stay as text.
  */
 export function OpenThread({
@@ -80,26 +69,32 @@ export function OpenThread({
     label = 'Open thread',
     iconOnly: given = false,
     threadId,
+    primary = false,
+    part = false,
 }: {
     item: Item;
     data: BoardData;
     label?: string;
     iconOnly?: boolean;
     threadId?: string;
+    /** The item's primary footer action, such as answering its question. */
+    primary?: boolean;
+    /** A concept part's quiet thread shortcut; other board and Desk actions keep their own recipes. */
+    part?: boolean;
 }) {
     const thread = latestThread(item, data, threadId);
     const actionLabel = 'link' in thread && thread.conceptQuestion ? 'Answer in concept thread' : label;
     const onRow = useOnRow();
-    const iconOnly = given || (onRow && actionLabel === 'Open thread');
-    const tooltip = onRow && iconOnly;
-    // A square Open, the thread icon alone, named by its label.
+    const iconOnly = part || given || (onRow && actionLabel === 'Open thread');
+    const tooltip = (part || onRow) && iconOnly;
+    // Concept parts use the board's quiet control recipe, named by their label.
     const named = iconOnly ? { 'aria-label': actionLabel, iconOnly: true } : {};
     const shown = iconOnly ? null : actionLabel;
     // Pointer events stay on while it's disabled, so its title says why; TooltipTrigger gives a disabled one its own focusable hover target.
     const button =
         'link' in thread ? (
             <ButtonLink
-                {...buttonKind('open')}
+                {...buttonKind(primary ? 'main' : part ? 'control' : 'open')}
                 icon={ICON.thread}
                 data-open-thread={item.id}
                 href={thread.link}
@@ -110,7 +105,7 @@ export function OpenThread({
             </ButtonLink>
         ) : (
             <Button
-                {...buttonKind('open')}
+                {...buttonKind(primary ? 'main' : part ? 'control' : 'open')}
                 leftIcon={ICON.thread}
                 data-open-thread={item.id}
                 disabled

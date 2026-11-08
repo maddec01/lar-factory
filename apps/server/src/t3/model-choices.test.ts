@@ -43,7 +43,7 @@ function files(t: TestContext, settings: unknown, manifest: unknown = MANIFEST) 
 
 const CODEX = {
     instanceId: 'codex',
-    name: 'Codex',
+    name: 'Codex · Default',
     models: [
         { slug: 'gpt-b', label: 'GPT B' },
         { slug: 'gpt-a', label: 'GPT A' },
@@ -51,7 +51,7 @@ const CODEX = {
 };
 const CLAUDE_MODELS = [
     { slug: 'claude-opus', label: 'Claude Opus' },
-    { slug: 'claude-new', label: 'claude-new' },
+    { slug: 'claude-new', label: 'Claude New' },
 ];
 
 test("offers each enabled instance's current models in manifest order, named, else by slug", (t) => {
@@ -59,7 +59,7 @@ test("offers each enabled instance's current models in manifest order, named, el
 
     assert.deepEqual(loadModelChoices(settings, manifest), [
         CODEX,
-        { instanceId: 'claudeAgent', name: 'Claude', models: CLAUDE_MODELS },
+        { instanceId: 'claudeAgent', name: 'Claude · Default', models: CLAUDE_MODELS },
     ]);
 });
 
@@ -79,12 +79,12 @@ test("enabled instances follow T3's rules; disabled ones aren't offered", (t) =>
     assert.deepEqual(
         loadModelChoices(settings, manifest).map((g) => [g.instanceId, g.name]),
         [
-            ['claudeAgent_personal', 'Personal'],
-            ['claudeAgent', 'VI'],
-            ['cursor_on', 'Cursor On'],
+            ['claudeAgent_personal', 'Claude · Personal'],
+            ['claudeAgent', 'Claude · VI'],
+            ['cursor_on', 'Cursor · On'],
             // A name equal to the driver's falls back to the id, as T3's picker shows it.
-            ['codex_work', 'Codex Work'],
-            ['codex', 'Codex'],
+            ['codex_work', 'Codex · Work'],
+            ['codex', 'Codex · Default'],
         ],
     );
 });
@@ -105,8 +105,8 @@ test("an instance's custom models follow its current models, by slug", (t) => {
             ...CODEX,
             models: [
                 ...CODEX.models,
-                { slug: 'gpt-custom', label: 'gpt-custom' },
-                { slug: 'gpt-entry', label: 'gpt-entry' },
+                { slug: 'gpt-custom', label: 'GPT Custom' },
+                { slug: 'gpt-entry', label: 'Entry' },
             ],
         },
     ]);
@@ -297,4 +297,39 @@ test("a choice takes the default's options only for the same instance and model"
     assert.deepEqual(launchSelection(choice, { ...choice }), choice);
     assert.deepEqual(launchSelection(choice, GLOBAL), choice);
     assert.deepEqual(launchSelection(choice, null), choice);
+});
+
+test('merges aliases, honours custom display names and labels context variants', (t) => {
+    const manifestData = structuredClone(MANIFEST);
+    const model = manifestData.manifest.providers.claudeAgent.models[0]!;
+
+    Object.assign(model, { slug: 'claude-opus-5-5', name: 'Claude Opus 5.5', aliases: ['opus'] });
+    manifestData.manifest.currentModels.claudeAgent = ['claude-opus-5-5'];
+
+    const { settings, manifest } = files(
+        t,
+        {
+            providerInstances: {
+                codex: { driver: 'codex', enabled: false },
+                claudeAgent: {
+                    driver: 'claudeAgent',
+                    displayName: 'Personal',
+                    config: { customModels: ['opus', 'opus[1m]', { slug: 'custom', name: 'Research model' }] },
+                },
+            },
+        },
+        manifestData,
+    );
+
+    assert.deepEqual(loadModelChoices(settings, manifest), [
+        {
+            instanceId: 'claudeAgent',
+            name: 'Claude · Personal',
+            models: [
+                { slug: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
+                { slug: 'claude-opus-5-5[1m]', label: 'Claude Opus 5.5 · 1M context' },
+                { slug: 'custom', label: 'Research model' },
+            ],
+        },
+    ]);
 });

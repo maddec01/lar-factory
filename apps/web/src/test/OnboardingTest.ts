@@ -1,4 +1,4 @@
-// What the onboarding page tests share: a board with no repository onboarded, and T3's projects for the server to list.
+// What the onboarding page tests share: a board with no repository onboarded, and T3's projects for the server to List.
 
 import type { BoardData, ProjectChoice, SetupDetection } from '@lar-factory/shared';
 

@@ -1,13 +1,13 @@
 // The work map's layout: which lane and column each part takes, the arrows between them with the history group in
 // place of each finished part, and each arrow's line.
 
-import { itemName, needsAnswer, plural, repoKey } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
+import { itemName, needsAnswer, plural, repoKey } from '@lar-factory/shared';
 
-import { DECISION_KINDS, isHistory, partActivity, partWaves, upstreamOf } from './DossierParts';
 import type { Part } from './DossierParts';
-import { startable } from './PartStart';
-import { YOURS } from './StageTrack';
+import { DECISION_KINDS, isHistory, partActivity, partWaves, upstreamOf } from './DossierParts';
+import { startable } from './PartAvailability';
+import { YOURS } from './StageStatus';
 
 const DECISIONS = 'Decisions';
 const CHECK = 'e2e';
@@ -25,7 +25,7 @@ const MAX_COL = 340;
 const GROUP_H = 36;
 const GROUP_PAD = 8;
 
-export { DECISIONS, GROUP_H, HISTORY, LABEL_W, NODE_H, keyOf };
+export { DECISIONS, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H };
 
 export interface Placed {
     key: string;

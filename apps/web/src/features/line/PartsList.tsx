@@ -1,15 +1,35 @@
 // An expanded dossier's parts list: each part with what it asks next, its stage track, figures, thread and slices.
 
-import {
-    ACTIVITY_WORD,
-    UNREADABLE,
-    blockerGroups,
-    canRetryBuild,
-    currentBuildThread,
-    itemName,
-    repoKey,
-} from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
+import { UNREADABLE, blockerGroups, canRetryBuild, currentBuildThread, itemName, repoKey } from '@lar-factory/shared';
+import { useState } from 'react';
+
+import { ActivityLine } from './ActivityLine';
+import { Figures, RowSecondLine } from './Columns';
+import { PartName } from './DossierEntries';
+import { open, usePicked, waitsOn } from './DossierHelpers';
+import type { Part } from './DossierParts';
+import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './DossierParts';
+import { PartStart } from './PartStart';
+import { figuresOf, opensItem } from './RowDetails';
+import { YOURS, lastSeen } from './StageStatus';
+import { OnYourDesk, Track } from './StageTrack';
+import { useActivityState, useActivityStill } from './useActivityState';
+import { PartKindLabel } from './WorkMapParts';
+import {
+    AzureFields,
+    OpenThread,
+    RepoCell,
+    SliceBar,
+    StartAfterError,
+    StartBuild,
+    StartMessage,
+    StatusGlyph,
+    usageLoading,
+    usageUnreadable,
+    useShownStatus,
+    useStatusActivity,
+} from '@/features/items';
 import {
     PartRow as DesignPartRow,
     PartsList as DesignPartsList,
@@ -18,32 +38,7 @@ import {
     RowCount,
     ShowDoneToggle,
     ThreadLine as DesignThreadLine,
-} from '@lar-works/design-system';
-import { useState } from 'react';
-
-import { ActivityLine, useActivityState, useActivityStill } from './ActivityLine';
-import { Figures, RowSecondLine, figuresOf, opensItem } from './Columns';
-import { PartName } from './DossierEntries';
-import { open, usePicked, waitsOn } from './DossierHelpers';
-import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './DossierParts';
-import type { Part } from './DossierParts';
-import { PartStart } from './PartStart';
-import { OnYourDesk, Track, lastSeen, YOURS } from './StageTrack';
-import { PartKindLabel } from './WorkMapParts';
-import {
-    AzureFields,
-    RepoCell,
-    SliceBar,
-    usageLoading,
-    usageUnreadable,
-    useShownStatus,
-    OpenThread,
-    StartAfterError,
-    StartBuild,
-    StartMessage,
-    StatusGlyph,
-    useStatusActivity,
-} from '@/features/items';
+} from '@/ui/board';
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
 function ThreadLine({ part }: { part: Part }) {
@@ -67,7 +62,7 @@ function ThreadLine({ part }: { part: Part }) {
                 <StatusGlyph
                     status={thread.state === 'running' ? part.item.status : THREAD_GLYPH[thread.state]}
                     running={!thread.observedAt && running(part.item)}
-                    presentation="compact"
+                    size="sm"
                 />
             }
             name={`T3 · ${thread.title}`}
@@ -118,7 +113,8 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
     const s = figuresOf(item, data);
     const activity = useActivityState(item);
     const still = useActivityStill(item);
-    const word = (activity && ACTIVITY_WORD[activity]) ?? shown.word;
+    // The one presenter's word, the same a row and the dialog say for this part.
+    const word = shown.word;
     const slices = item.slices.length;
     const hasThreadLine = !!activity || !!shownThread(part, shown.working) || waits.length > 0;
 

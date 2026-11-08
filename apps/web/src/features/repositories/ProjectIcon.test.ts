@@ -2,7 +2,7 @@
 
 import { expect, test } from 'vite-plus/test';
 
-import { repoPlace } from './ProjectIcon';
+import { repoPlace } from './RepositoryPlace';
 
 test('a repository takes its board colour whatever the case of its owner/name, and one off the board the muted colour', () => {
     const repos = [

@@ -1,38 +1,19 @@
+import { plural } from '@lar-factory/shared';
+import { Text } from '@lar-works/design-system';
 // Settings' General page: dialogs, threads, commands, Auto-build and refresh.
 
-import { Text } from '@lar-works/design-system';
-import { useState } from 'react';
-
 import { AutoBuildModelSetting } from './AutoBuildModel';
+import { DialogPreference } from './DialogPreference';
 import { LimitSetting } from './LimitSetting';
 import { custom, type Group, type SettingsData } from './SettingsModel';
 import { ShapingThreadCleanupSetting } from './ShapingThreadCleanup';
-import { DIALOG_PREFERENCES, dialogPreference } from '@/shared/dialogs/ExpandDialog';
+import { BUILD_LIMIT_NOTE } from '@/features/items';
 import type { Control } from '@/shared/settings/SettingControls';
-import { Switch } from '@/shared/settings/SettingControls';
-
-function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
-    const [on, setOn] = useState(() => dialogPreference(preference));
-
-    return (
-        <Switch
-            label={label}
-            on={on}
-            onChange={(next) => {
-                localStorage.setItem(DIALOG_PREFERENCES[preference], next ? '1' : '0');
-                setOn(next);
-            }}
-        />
-    );
-}
 
 /** The board's current refresh interval, read-only. */
 function refreshEvery(seconds: number): Control {
     const minutes = seconds / 60;
-    const value =
-        seconds < 60 || !Number.isInteger(minutes)
-            ? `${seconds} seconds`
-            : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+    const value = seconds < 60 || !Number.isInteger(minutes) ? plural(seconds, 'second') : plural(minutes, 'minute');
 
     return custom(() => (
         <Text variant="caption" tone="muted">
@@ -47,15 +28,18 @@ export const generalGroups = (data: SettingsData): Group[] => [
         rows: [
             {
                 id: 'match-list-size',
-                title: 'Match list size when opening an item',
+                keywords: 'match List size Open items expanded',
+                title: 'Open items full-size with List',
+                description: 'Match the List’s window size when opening an item.',
                 control: custom(() => (
-                    <DialogPreference preference="matchList" label="Match list size when opening an item" />
+                    <DialogPreference preference="matchList" label="Open items full-size with List" />
                 )),
             },
             {
                 id: 'open-list-expanded',
-                title: 'Open list expanded',
-                control: custom(() => <DialogPreference preference="openList" label="Open list expanded" />),
+                title: 'Open List expanded',
+                description: 'Use the full window when opening List.',
+                control: custom(() => <DialogPreference preference="openList" label="Open List expanded" />),
             },
         ],
     },
@@ -64,9 +48,9 @@ export const generalGroups = (data: SettingsData): Group[] => [
         rows: [
             {
                 id: 'shaping-thread-cleanup',
-                title: 'Shaping threads after Start build',
-                description: 'Choose what happens when a build starts.',
-                help: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
+                title: 'Shaping threads when a build starts',
+                description: 'Choose whether to keep, finish, archive or delete the shaping thread.',
+                help: 'Keep, finish, archive or delete the threads. Archived threads reopen from T3 Settings. Deleted threads leave the item’s usage totals; deletion can’t be undone.',
                 control: custom(() => <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />),
             },
         ],
@@ -76,13 +60,13 @@ export const generalGroups = (data: SettingsData): Group[] => [
         rows: [
             {
                 id: 'heavy-command-limit',
-                title: 'Heavy commands at once',
-                description: 'Limit test suites and builds on this Mac.',
-                help: 'How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.',
+                title: 'Parallel tests and builds',
+                description: 'Limit tests and builds running together across all projects on this Mac.',
+                help: 'Automatic allows one per 4 CPUs or 8 GB of memory, whichever is fewer, with a minimum of one. Servers and file watchers don’t count toward this limit.',
                 control: custom(() => (
                     <LimitSetting
                         name="heavy-command-limit"
-                        label="Heavy commands at once"
+                        label="Parallel tests and builds"
                         field="Heavy command limit"
                         state={data.heavyCommandLimit}
                     />
@@ -90,13 +74,13 @@ export const generalGroups = (data: SettingsData): Group[] => [
             },
             {
                 id: 'build-limit',
-                title: 'Builds at once',
-                description: 'Limit builds on this Mac.',
-                help: 'How many builds may work at once on this Mac, across all Projects. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
+                title: 'Automatic build limit',
+                description: 'Pause automatic starts when this many builds are open.',
+                help: `${BUILD_LIMIT_NOTE} Manual starts and Start after can exceed this limit. Automatic uses the parallel tests and builds limit.`,
                 control: custom(() => (
                     <LimitSetting
                         name="build-limit"
-                        label="Builds at once"
+                        label="Automatic build limit"
                         field="Build limit"
                         state={data.buildLimit}
                     />
@@ -110,8 +94,9 @@ export const generalGroups = (data: SettingsData): Group[] => [
             {
                 id: 'auto-build-model',
                 title: 'Auto-build model',
-                description: 'Used when Auto-build starts a build.',
-                help: 'The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its T3 project. Turn Auto-build on in the Ready to build header.',
+                description:
+                    'Used for automatic starts. Project default in T3 uses each project’s saved model and options. Turn Auto-build on in Ready to build.',
+                help: 'Manual starts keep their own model choice.',
                 control: custom(() => <AutoBuildModelSetting data={data} />),
             },
         ],

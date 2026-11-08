@@ -206,3 +206,28 @@ describe('recorded thread lookup', () => {
 it('exposes discovery-owned thread lookup without transport configuration', () => {
     expect(protocolThreadById('missing-thread').availability).toBe('unavailable');
 });
+
+it('keeps the pending user question without exposing the runtime request payload', () => {
+    const lookup = executionItemThreads([
+        {
+            id: 'question',
+            title: 'Shape',
+            updatedAt: '2026-11-01T12:00:00Z',
+            pendingRuntimeRequest: {
+                id: 'request',
+                command: 'private command',
+                request: {
+                    questions: [
+                        { question: 'Which account should own this server?', options: [{ label: 'Personal' }] },
+                    ],
+                },
+            },
+        },
+    ]);
+
+    expect(lookup(['question'])?.[0]).toMatchObject({
+        state: 'needs you',
+        questionSummary: 'Which account should own this server?',
+    });
+    expect(JSON.stringify(lookup(['question']))).not.toContain('private command');
+});

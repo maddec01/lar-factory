@@ -59,7 +59,7 @@ export function loadModelChoices(settingsPath: string, manifestPath: string): Mo
         .flatMap((instance) => {
             const models = uniqueBySlug([
                 ...currentModels(manifest, instance.driver),
-                ...customModels(instance.config),
+                ...customModels(instance.config, manifest, instance.driver),
             ]);
 
             return models.length ? [{ instanceId: instance.id, name: displayName(instance), models }] : [];
@@ -217,40 +217,67 @@ const humanize = (slug: string) =>
         .trim()
         .replace(/\b\w/g, (char) => char.toUpperCase());
 
-/** Its display name unless that's just the driver's; else, off the built-in id, the id made readable. */
+/** Name the provider and its account together; instance ids remain stable launch targets. */
 function displayName(instance: Instance): string {
     const named = typeof instance.displayName === 'string' ? instance.displayName.trim() : '';
-    const driverName = DRIVER_NAMES[instance.driver] ?? humanize(instance.driver);
+    const provider = DRIVER_NAMES[instance.driver] ?? humanize(instance.driver);
+    const suffix =
+        instance.id === instance.driver
+            ? ''
+            : humanize(instance.id.replace(new RegExp(`^${instance.driver}[_-]?`), ''));
+    const account =
+        named && named !== provider ? named.replace(new RegExp(`^${provider}[ ·:-]+`, 'i'), '') : suffix || 'Default';
 
-    if (named && named !== driverName) return named;
+    return `${provider} · ${account}`;
+}
 
-    if (instance.id !== instance.driver && humanize(instance.id)) return humanize(instance.id);
+/** Resolve manifest aliases before deduplication and retain context variants as distinct choices. */
+function modelOption(
+    slug: string,
+    manifest: Record<string, unknown>,
+    driver: string,
+    customName?: unknown,
+): ModelOption {
+    const provider = isRecord(manifest.providers) ? manifest.providers[driver] : undefined;
+    const known = isRecord(provider) && Array.isArray(provider.models) ? provider.models.filter(isRecord) : [];
+    const context = slug.match(/\[(\d+[mk])\]$/i)?.[1];
+    const base = slug.replace(/\[\d+[mk]\]$/i, '');
+    const match = known.find((m) => m.slug === base || (Array.isArray(m.aliases) && m.aliases.includes(base)));
+    const canonical = typeof match?.slug === 'string' ? match.slug : base;
+    const name =
+        typeof customName === 'string' && customName.trim() && customName !== slug
+            ? customName.trim()
+            : typeof match?.name === 'string' && match.name.trim()
+              ? match.name
+              : humanize(base)
+                    .replace(/^Gpt\b/, 'GPT')
+                    .replace(/(\d)[ -](\d)/g, '$1.$2');
 
-    return named || driverName;
+    return {
+        slug: canonical + (context ? `[${context.toLowerCase()}]` : ''),
+        label: name + (context && !/context/i.test(name) ? ` · ${context.toUpperCase()} context` : ''),
+    };
 }
 
 function currentModels(manifest: Record<string, unknown>, driver: string): ModelOption[] {
     const slugs = isRecord(manifest.currentModels) ? manifest.currentModels[driver] : undefined;
-    const provider = isRecord(manifest.providers) ? manifest.providers[driver] : undefined;
-    const known = isRecord(provider) && Array.isArray(provider.models) ? provider.models.filter(isRecord) : [];
 
     return (Array.isArray(slugs) ? slugs : [])
         .filter((slug): slug is string => typeof slug === 'string' && slug.trim() !== '')
-        .map((slug) => {
-            const name = known.find((m) => m.slug === slug)?.name;
-
-            return { slug, label: typeof name === 'string' && name.trim() ? name : slug };
-        });
+        .map((slug) => modelOption(slug, manifest, driver));
 }
 
 /** The instance's custom models, by slug: T3 takes a slug or `{ slug, name }`. */
-function customModels(config: unknown): ModelOption[] {
+function customModels(config: unknown, manifest: Record<string, unknown>, driver: string): ModelOption[] {
     const entries = isRecord(config) && Array.isArray(config.customModels) ? config.customModels : [];
 
-    return entries
-        .map((entry) => (isRecord(entry) ? entry.slug : entry))
-        .filter((slug): slug is string => typeof slug === 'string' && slug.trim() !== '')
-        .map((slug) => ({ slug: slug.trim(), label: slug.trim() }));
+    return entries.flatMap((entry) => {
+        const slug = isRecord(entry) ? entry.slug : entry;
+
+        return typeof slug === 'string' && slug.trim()
+            ? [modelOption(slug.trim(), manifest, driver, isRecord(entry) ? entry.name : undefined)]
+            : [];
+    });
 }
 
 function uniqueBySlug(models: ModelOption[]): ModelOption[] {

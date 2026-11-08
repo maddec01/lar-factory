@@ -4,7 +4,7 @@ import { useItemDialogStore } from '@/features/item-dialog';
 
 /**
  * When the item dialog closes and the design system's Modal had nowhere to return focus, as when its item left List while it
- * was open and took its row along, focus goes to the List's search field.
+ * was open and took its row along, focus goes to the list's search field.
  */
 export function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElement | null>) {
     const itemOpen = useItemDialogStore((state) => state.itemId !== null);

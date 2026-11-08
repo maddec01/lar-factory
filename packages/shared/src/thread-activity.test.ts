@@ -1,13 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { expect, test } from 'vite-plus/test';
 
-import type { BoardData, Item, ItemThread } from './model.ts';
+import type { Item, ItemThread } from './model.ts';
 import {
     ACTIVITY_STALE_MS,
     itemActivityAgents,
     itemActivityLine,
     itemActivityStill,
-    sampleActivityFrom,
     threadActivityLine,
     type ThreadActivity,
 } from './thread-activity.ts';
@@ -118,7 +116,7 @@ test('a thread waiting on the user or stopped says so, and agents still at work 
             }),
             NOW,
         ),
-    ).toEqual({ state: 'waiting', action: 'Waiting on you', ageMs: 180_000, agents: 0 });
+    ).toEqual({ state: 'waiting', action: 'Needs you', ageMs: 180_000, agents: 0 });
     expect(threadActivityLine(thread({ state: 'stopped', updated: ago(3) }), NOW)).toEqual({
         state: 'stopped',
         action: 'Stopped',
@@ -148,7 +146,7 @@ test('an agent waiting on the user makes its thread wait on you', () => {
             }),
             NOW,
         ),
-    ).toEqual({ state: 'waiting', action: 'Waiting on you', ageMs: 180_000, agents: 0 });
+    ).toEqual({ state: 'waiting', action: 'Needs you', ageMs: 180_000, agents: 0 });
 });
 
 test('a failed or stale read says unavailable, never an old action', () => {
@@ -266,32 +264,4 @@ test("only a thread that waits, stopped or can't be read holds a row still", () 
     expect(itemActivityAgents(item([working('t', 'Read a.ts')]), NOW)).toEqual([
         { title: 'Lead thread', action: 'Read a.ts', actionAt: ago(1) },
     ]);
-});
-
-test('the sample has a row for each state, whenever the sample board runs', () => {
-    const sample = JSON.parse(readFileSync(new URL('../test/sample.json', import.meta.url), 'utf8')) as BoardData;
-    const lines = sampleActivityFrom(sample, NOW)
-        .items.flatMap((item) => (Array.isArray(item.threads) ? item.threads : []))
-        .filter((t) => t.activity)
-        .map((t) => threadActivityLine(t, NOW)!);
-
-    expect(lines.map((line) => [line.state, line.action, line.agents])).toEqual(
-        expect.arrayContaining([
-            ['working', 'Edit scrubber.tsx', 0],
-            ['working', 'pnpm test', 3],
-            ['quiet', 'No action for 12m', 0],
-            ['waiting', 'Waiting on you', 1],
-            ['stopped', 'Stopped', 0],
-        ]),
-    );
-
-    const later = NOW + 60 * 60_000;
-
-    expect(
-        sampleActivityFrom(sample, NOW)
-            .items.flatMap((item) => (Array.isArray(item.threads) ? item.threads : []))
-            .filter((t) => t.activity?.available)
-            .map((t) => threadActivityLine(t, later)!.state),
-        'an hour on, the sample has read nothing and its reads still count',
-    ).not.toContain('unavailable');
 });

@@ -171,8 +171,8 @@ importers:
   .:
     devDependencies:
       '@lar-works/config':
-        specifier: ^0.1.2
-        version: 0.1.2(vite-plus@1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1))
+        specifier: ^0.2.0
+        version: 0.2.0(vite-plus@1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1))
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -257,8 +257,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@lar-works/design-system':
-        specifier: ^0.4.0
-        version: 0.4.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
+        specifier: ^0.5.0
+        version: 0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
       mermaid:
         specifier: ^12.2.0
         version: 12.2.0
@@ -557,13 +557,20 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lar-works/config@0.1.2':
-    resolution: {integrity: sha512-tubv1MBunEg83MsgCSfonG5K6K9bUT4/FXpqcnBXAbPg/y/u1dAgLXdCMlbyYN9BAd4bUobA3a3HZgSpOJBvBA==}
+  '@lar-works/config@0.2.0':
+    resolution: {integrity: sha512-y4SRy9pEYHmTmY8ROG1qWv80FbgHm99mzMCZYra8drdacRVlFJGgY4lONOl9Q+ncfA20hMBI9MJH1FPlUq4DQw==}
     peerDependencies:
       vite-plus: ^1.5.0
 
   '@lar-works/design-system@0.4.0':
     resolution: {integrity: sha512-2Q9u3u2SMuFYIZmom0eMEvtVZZ88aV1FYN4OdBUkOLl1e4/AEXaG6qx0JOhJSu87D0CUZffHVEQNIXMU8DBjlA==}
+    peerDependencies:
+      react: ^19.2.0
+      react-dom: ^19.2.0
+      tailwindcss: ^4.3.0
+
+  '@lar-works/design-system@0.5.0':
+    resolution: {integrity: sha512-nfXfYXOsqsLiWoPwxLlj7DcdRyJr95LUZjE/JnfBveqBB5mf7w1p6GzKH8cDsqBENHWrmP89oFcb/LJQcLIuRQ==}
     peerDependencies:
       react: ^19.2.0
       react-dom: ^19.2.0
@@ -4971,11 +4978,49 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@lar-works/config@0.1.2(vite-plus@1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1))':
+  '@lar-works/config@0.2.0(vite-plus@1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1))':
     dependencies:
       vite-plus: 1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1)
 
   '@lar-works/design-system@0.4.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)':
+    dependencies:
+      '@lexical/code': 0.52.0(typescript@7.0.2)
+      '@lexical/html': 0.52.0(typescript@7.0.2)
+      '@lexical/link': 0.52.0(typescript@7.0.2)
+      '@lexical/list': 0.52.0(typescript@7.0.2)
+      '@lexical/markdown': 0.52.0(typescript@7.0.2)
+      '@lexical/react': 0.52.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.0.2)(yjs@13.6.33)
+      '@lexical/rich-text': 0.52.0(typescript@7.0.2)
+      '@lexical/selection': 0.52.0(typescript@7.0.2)
+      '@ninna-ui/core': 0.7.0(tailwindcss@4.3.3)
+      '@ninna-ui/feedback': 0.7.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@ninna-ui/forms': 0.7.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@ninna-ui/layout': 0.7.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@ninna-ui/overlays': 0.7.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@ninna-ui/primitives': 0.7.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@ninna-ui/react-internal': 0.7.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-virtual': 3.14.26(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      hast-util-to-jsx-runtime: 2.3.7(supports-color@7.2.0)
+      lexical: 0.52.0(typescript@7.0.2)
+      lucide-react: 1.70.0(@types/react@19.3.0)(react@19.3.0)
+      qrcode-generator: 2.0.4
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      react-markdown: 10.1.0(@types/react@19.3.0)(react@19.3.0)(supports-color@7.2.0)
+      rehype-parse: 9.0.1
+      rehype-raw: 7.0.0
+      rehype-sanitize: 6.0.0
+      remark-gfm: 4.0.1(supports-color@7.2.0)
+      tailwindcss: 4.3.3
+      unified: 11.0.5
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
+      - supports-color
+      - typescript
+      - yjs
+
+  '@lar-works/design-system@0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)':
     dependencies:
       '@lexical/code': 0.52.0(typescript@7.0.2)
       '@lexical/html': 0.52.0(typescript@7.0.2)

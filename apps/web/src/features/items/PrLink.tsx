@@ -3,18 +3,19 @@
 
 import { itemPr } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Button, ButtonLink, buttonKind } from '@lar-works/design-system';
+import { Button, ButtonLink } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
+import { buttonKind } from '@/ui/board';
 
-export function PrLink({ item, label }: { item: Item; label: string }) {
+export function PrLink({ item, label, primary = false }: { item: Item; label: string; primary?: boolean }) {
     const url = itemPr(item)?.url;
 
     // Pointer events stay on while it's disabled (the board's base styles), so its title says why.
     if (!url)
         return (
             <Button
-                {...buttonKind('open')}
+                {...buttonKind(primary ? 'main' : 'open')}
                 leftIcon={ICON.pr}
                 data-pr-link={item.id}
                 disabled
@@ -26,7 +27,7 @@ export function PrLink({ item, label }: { item: Item; label: string }) {
 
     return (
         <ButtonLink
-            {...buttonKind('open')}
+            {...buttonKind(primary ? 'main' : 'open')}
             icon={ICON.pr}
             data-pr-link={item.id}
             href={url}

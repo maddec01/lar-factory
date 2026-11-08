@@ -1,5 +1,6 @@
 import {
     offers,
+    modelDisplayName,
     storedChoice,
     t3DefaultDetail,
     type ModelChoice,
@@ -7,7 +8,7 @@ import {
     type ModelSelection,
 } from '@lar-factory/shared';
 import { DropdownMenu } from '@lar-works/design-system';
-// The model menu shared by Start, Start after and Settings: T3 Project default first, then models grouped by provider instance.
+// The model menu shared by Start, Start after and Settings: Project default in T3 first, then models grouped by provider instance.
 import { useId } from 'react';
 
 export function ModelEntries({
@@ -54,12 +55,15 @@ export function ModelEntries({
     return (
         <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
             <DropdownMenu.Label id={`${headings}-with`}>{heading}</DropdownMenu.Label>
-            {entry('T3 Project default', undefined, undefined, t3DefaultDetail(groups, t3Default))}
+            {entry('Project default in T3', undefined, undefined, t3DefaultDetail(groups, t3Default))}
             {groups.map((group, i) => (
                 <DropdownMenu.Group key={group.instanceId} aria-labelledby={`${headings}-${i}`}>
                     <DropdownMenu.Label id={`${headings}-${i}`}>{group.name}</DropdownMenu.Label>
                     {group.models.map((model) =>
-                        entry(model.label, { instanceId: group.instanceId, model: model.slug }),
+                        entry(modelDisplayName(groups, model.slug), {
+                            instanceId: group.instanceId,
+                            model: model.slug,
+                        }),
                     )}
                 </DropdownMenu.Group>
             ))}
@@ -68,16 +72,8 @@ export function ModelEntries({
                 entry(
                     `${selected.instanceId} ${selected.model} (not offered)`,
                     selected,
-                    "This model isn't offered now. Choose another model.",
+                    'This model isn’t offered now. Choose another model.',
                 )}
         </DropdownMenu.RadioGroup>
     );
 }
-
-/** Focus the checked model on open. The design system's menu forwards this Radix prop but omits it from its type. */
-export const opensOnChecked = {
-    onOpenAutoFocus: (event: Event): void => {
-        event.preventDefault();
-        (event.target as HTMLElement).querySelector<HTMLElement>('[data-opens-here]')?.focus({ preventScroll: true });
-    },
-};

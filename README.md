@@ -123,14 +123,14 @@ do not establish how a live Azure deployment sanitizes these fields.
 
 ## Concept refinement and delivery
 
-Concept refinement requires a nonempty map, Fog recorded gone and all active
+Concept refinement requires a nonempty map, its open questions recorded as resolved and all active
 decisions settled. `lar-work refinement <work ID>` reports incomplete reasons.
 Proposed builds need neither passing gates nor merged PRs for refinement.
 The board shows refinement separately from delivery. Each child's Start build
 remains an explicit choice when its own gate and blockers permit it.
 
 Delivery still requires completion of the concept's decisions and builds and
-Fog gone. An unfinished concept with zero active builds has no delivery planned.
+resolved open questions. An unfinished concept with zero active builds has no delivery planned.
 Refinement alone neither releases blockers nor starts retention. Previously
 finished concepts keep their finished history.
 

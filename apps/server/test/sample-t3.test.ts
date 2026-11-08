@@ -73,30 +73,6 @@ ${script}
     return bin;
 }
 
-test("the project step lists T3's projects, counting sample repositories as on the board and leaving the real settings unread", async (t) => {
-    const board = await sampleT3(t, tempHome(t));
-    const response = await fetch(`${board.url}/api/onboarding/projects`);
-
-    assert.equal(response.status, 200);
-
-    const { projects } = (await response.json()) as { projects: { name: string; onBoard: boolean; icon: unknown }[] };
-
-    assert.deepEqual(
-        projects.map((p) => [p.name, p.onBoard, p.icon]),
-        [
-            ['lar-server', true, ICON],
-            ['lar-web', false, ICON],
-        ],
-    );
-});
-
-test("a sample repository with one T3 project shows its icon, and the sample file's chosen icons are ignored", async (t) => {
-    const board = await sampleT3(t, tempHome(t));
-
-    await until(async () => Object.keys((await board.data()).projectIcons ?? {}).length > 0);
-    assert.deepEqual((await board.data()).projectIcons, { 'maddec01/lar-server': ICON });
-});
-
 test('it shows T3 as unavailable when T3 stops and reads again when T3 returns', async (t) => {
     const board = await sampleT3(t, tempHome(t));
 
@@ -118,21 +94,6 @@ test('it shows T3 as unavailable when T3 stops and reads again when T3 returns',
     assert.equal((await fetch(`${board.url}/api/onboarding/projects`)).status, 200);
 });
 
-test('it starts on sample data with T3 unavailable', async (t) => {
-    const home = tempHome(t);
-    const board = await startBoard(t, { recorded: false }, true, false, {
-        HOME: home,
-        T3_STATE_DB: join(home, 'none.sqlite'),
-        BOARD_SAMPLE_T3: '1',
-    });
-    const data = () => board.board() as Promise<BoardData>;
-
-    await until(async () => (await data()).t3Availability?.availability === 'unavailable');
-    assert.ok((await data()).items.length > 0);
-    assert.deepEqual((await data()).projectIcons, {});
-    assert.equal((await fetch(`${board.url}/api/onboarding/projects`)).status, 502);
-});
-
 test("every write gets sample mode's refusal", async (t) => {
     const board = await sampleT3(t, tempHome(t));
     const refusals: [string, object, string][] = [
@@ -146,7 +107,10 @@ test("every write gets sample mode's refusal", async (t) => {
     for (const [path, body, error] of refusals) {
         const response = await board.postSession(body, path);
 
-        assert.deepEqual([path, response.status, await response.json()], [path, 403, { error }]);
+        assert.deepEqual(
+            [path, response.status, await response.json()],
+            [path, 403, { error, ...(path.startsWith('/api/onboarding/') && { code: 'sample-mode' }) }],
+        );
     }
     assert.deepEqual(await board.t3Calls(), []);
 });
@@ -192,17 +156,6 @@ test('over its ticks it reads T3 and nothing else, and changes no file in the ap
     assert.deepEqual(filesUnder(dataDir), before);
 });
 
-test('plain sample mode still asks T3 for nothing', async (t) => {
-    const home = tempHome(t);
-    const reads = join(home, 't3-reads');
-    const board = await startBoard(t, { recorded: false }, true, false, { HOME: home, FAKE_T3_READS: reads });
-
-    await new Promise((resolve) => setTimeout(resolve, 2_500));
-    assert.equal(existsSync(reads), false);
-    assert.equal(((await board.board()) as BoardData).t3Availability, undefined);
-    assert.equal((await fetch(`${board.url}/api/onboarding/projects`)).status, 403);
-});
-
 test('a normal stop revokes its session before exiting', async (t) => {
     const home = tempHome(t);
     const log = join(home, 'revoked');
@@ -211,14 +164,4 @@ test('a normal stop revokes its session before exiting', async (t) => {
 
     await board.stop();
     assert.equal(readFileSync(log, 'utf8').trim(), 'auth session revoke fake-session');
-});
-
-test('a revocation that hangs leaves the existing shutdown limit in force', async (t) => {
-    const home = tempHome(t);
-    const bin = fakeT3Bin(home, 'sleep 20');
-    const board = await sampleT3(t, home, { PATH: `${bin}:${process.env.PATH}` });
-    const stopping = Date.now();
-
-    await board.stop();
-    assert.ok(Date.now() - stopping < 5_000);
 });

@@ -1,6 +1,2 @@
-// List is outside the workflow; Done is its outcome. Tracks show the active steps between them.
-
-import { STATUSES } from '@lar-factory/shared';
-import type { Status } from '@lar-factory/shared';
-
-export const WORKFLOW_STEPS: readonly Status[] = STATUSES.filter((status) => status !== 'List' && status !== 'Done');
+// The board section names, in delivery order. The item-state presenter chooses the current section.
+export const WORKFLOW_STEPS = ['Queue', 'Shaping', 'Ready to build', 'Build', 'Review', 'Verify', 'Merge'] as const;

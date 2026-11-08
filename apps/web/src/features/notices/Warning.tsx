@@ -1,21 +1,23 @@
 // Operational warnings are inline details. They never open a toast or dialog.
-import { BoardWarning } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useDismissed, useDismissStore } from './DismissStore';
-import { closeKeepingFocus } from './Toasts';
+import { closeKeepingFocus } from './ToastActions';
+import { BoardWarning } from '@/ui/board';
 
 export function Warning({
     dismissKey,
     title,
     what = title,
     action,
+    tone,
     children,
 }: {
     dismissKey: string;
     what?: string;
     title: string;
     action?: ReactNode;
+    tone?: 'warning' | 'danger';
     children: ReactNode;
 }) {
     const dismissed = useDismissed(dismissKey);
@@ -33,6 +35,7 @@ export function Warning({
                 )
             }
             action={action}
+            tone={tone}
         >
             {children}
         </BoardWarning>

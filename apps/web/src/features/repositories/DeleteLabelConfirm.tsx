@@ -1,9 +1,10 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, Modal, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, Modal, Stack, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useEditStore } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText } from './LabelParts';
+import { buttonKind } from '@/ui/board';
 
 export function DeleteConfirm({
     name,
@@ -46,7 +47,7 @@ export function DeleteConfirm({
                                 {mappings && `This also removes it from ${mappings}. `}
                                 {capabilities.changeScope === 'project' &&
                                     `${capabilities.heading} belong to the project, so this affects the whole project. ${OTHER_MAPPINGS} `}
-                                This can't be undone from the factory.
+                                This can’t be undone from the factory.
                             </Text>
                         </Alert>
                         <ProblemText>{failure}</ProblemText>

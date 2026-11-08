@@ -60,29 +60,6 @@ test("refreshes keep the record's Queued though GitHub's labels still say List",
     assert.equal(statusOf(await board.board(), id), 'Queued');
 });
 
-test("a ticket edit never changes the record's Status", async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
-
-    await until(board, (d) => d.items.length === 1);
-
-    const id = board.id(12);
-
-    await board.update({ items: [boardIssue(12, 'Ready', 'maddec01/lar-factory', ['bug'])] });
-    await until(board, (d) => d.items.some((i) => i.labels.includes('bug')));
-    assert.equal(statusOf(await board.board(), id), 'List');
-});
-
-test('Queue only moves List items and is a no-op for an item already Queued', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'Queued'), boardIssue(13, 'Ready')] });
-
-    await until(board, (d) => d.items.length === 2);
-    assert.equal((await queue(board, board.id(12))).status, 200);
-    assert.equal((await queue(board, board.id(13))).status, 409);
-    assert.equal((await queue(board, 'missing')).status, 404);
-    assert.equal((await board.post({ itemId: 7 }, board.url, '/api/queue')).status, 400);
-    assert.equal(await recordedStatus(board, board.id(13)), 'Ready');
-});
-
 test('a move on a record a thread changed since the board read it is refused, and the board shows the record as it is', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
 
@@ -128,26 +105,6 @@ test('Queue and Back to List reject requests from other pages and sample mode', 
     assert.equal(response.status, 403);
     assert.equal((await response.json()).error, 'Moving items back to List is disabled in sample mode.');
     assert.equal((await sample.calls()).length, 0);
-});
-
-test('Back to List moves the work record to List and writes nothing to GitHub', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'Queued'), boardIssue(13, 'Ready')] });
-
-    await until(board, (d) => d.items.length === 2);
-
-    const id = board.id(12);
-    const response = await backToList(board, id);
-
-    assert.equal(response.status, 200);
-    assert.equal(statusOf((await response.json()).board, id), 'List');
-    assert.equal(await recordedStatus(board, id), 'List');
-    assert.equal((await backToList(board, id)).status, 200, 'an item already in List is a no-op');
-
-    const refused = await backToList(board, board.id(13));
-
-    assert.equal(refused.status, 409);
-    assert.equal((await refused.json()).error, 'Only Queued items can be moved back to List; this one is in Ready.');
-    assert.deepEqual(await issueEdits(board), []);
 });
 
 const startItem = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');

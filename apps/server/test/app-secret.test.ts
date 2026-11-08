@@ -105,25 +105,3 @@ test('without the app secret, guarded writes need no header', async (t) => {
     for (const path of GUARDED) assert.notEqual((await answer(await post(board, path))).error, REFUSED, path);
     assert.equal((await post(board, '/api/read')).status, 202);
 });
-
-test('ordinary refinement publication routes are absent', async (t) => {
-    const board = await startBoard(t, {}, true);
-
-    for (const action of [
-        'open',
-        'prepare',
-        'approve',
-        'inspect',
-        'resume',
-        'reconcile',
-        'fallback',
-        'resolve-url',
-        'attach-url',
-        'reconcile-url',
-        'resolve-outcome',
-        'retry',
-    ]) {
-        assert.equal((await post(board, `/api/publication/${action}`)).status, 405);
-    }
-    assert.equal((await fetch(`${board.url}/api/publication/vocabulary?repo=team/app`)).status, 404);
-});

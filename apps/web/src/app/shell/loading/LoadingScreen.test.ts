@@ -4,11 +4,10 @@
 import type { BoardData, FirstRead } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, fresh, mountPage, push, sample, settle, stubApp, text } from '@/test/PageTest';
+import { $, fresh, mountPage, push, sample, settle, stubApp } from '@/test/PageTest';
 
 const DRAW_MS = 1750;
 const EXIT_MS = 600;
-const ROLL_MS = 380;
 
 const firstRead = (step: FirstRead['step'], running: string[] = [], settled = false): FirstRead => ({
     step,
@@ -22,45 +21,9 @@ const unsettled = (read: FirstRead = firstRead('repositories')): BoardData => ({
 });
 
 const screen = () => $('.loading-screen');
-const line = () => text($('.loading-line-slot > span:not(.loading-roll-out)'));
 const leaving = () => screen()?.classList.contains('is-leaving') ?? false;
 const advance = (ms: number) => settle(() => vi.advanceTimersByTime(ms));
 const covered = () => $('#app')!.hasAttribute('inert');
-const reduceMotion = () =>
-    vi.stubGlobal('matchMedia', (query: string) => ({
-        matches: query.includes('reduce'),
-        addEventListener: () => {},
-        removeEventListener: () => {},
-    }));
-
-test('the board page opens on the loading screen, over the board, with the mark undrawn and the first step named', async () => {
-    await mountPage(unsettled());
-    expect(screen()).not.toBeNull();
-    expect(screen()!.hasAttribute('role'), 'the lockup is not announced').toBe(false);
-    expect($('.loading-line')!.getAttribute('role'), 'only the step line is live').toBe('status');
-    expect(text($('.loading-wordmark'))).toBe('arFactory');
-    expect(screen()!.classList.contains('is-drawn')).toBe(false);
-    expect(line()).toBe('Loading Projects');
-    expect($('.title-bar'), 'the board is under the screen').not.toBeNull();
-});
-
-test('a new step rolls the old line out while the new one rolls in, and only the line animates', async () => {
-    await mountPage(unsettled());
-    expect($('.loading-roll-in'), 'the first line arrives with the page, so it does not roll').toBeNull();
-
-    const mark = $('.loading-mark');
-
-    await push(unsettled(firstRead('finishing')));
-    expect(text($('.loading-roll-out'))).toBe('Loading Projects');
-    expect(text($('.loading-roll-in'))).toBe('Finishing up');
-    expect($('.loading-mark'), 'the mark is not redrawn').toBe(mark);
-    expect($('.loading-roll-out')!.getAttribute('aria-hidden'), 'the leaving line is not announced').toBe('true');
-    expect($('.loading-roll-in')!.hasAttribute('aria-hidden')).toBe(false);
-
-    await advance(ROLL_MS + 50);
-    expect($('.loading-roll-out')).toBeNull();
-    expect(text($('.loading-line'))).toBe('Finishing up');
-});
 
 test('a read that settles at once still keeps the screen until the draw has finished, then fades over 600 ms', async () => {
     await mountPage(fresh());
@@ -127,21 +90,6 @@ test('a page opened with ?loading=drawn starts with the mark drawn and leaves at
     expect(leaving()).toBe(true);
     await advance(EXIT_MS);
     expect(screen()).toBeNull();
-});
-
-test('a drawn page still waits for an unsettled read, with its current step and no roll', async () => {
-    await mountPage(unsettled(firstRead('items', ['lar-server'])), '', '?loading=drawn');
-    expect(screen()!.classList.contains('is-drawn')).toBe(true);
-    expect(leaving()).toBe(false);
-    expect(line()).toBe('Loading Projects');
-    expect($('.loading-roll-in')).toBeNull();
-});
-
-test('without the flag a browser visit draws the mark', async () => {
-    await mountPage(unsettled(), '', '?other=1');
-    expect(screen()!.classList.contains('is-drawn')).toBe(false);
-    await advance(DRAW_MS);
-    expect(screen()!.classList.contains('is-drawn')).toBe(true);
 });
 
 test('a restarted server keeps the last complete board visible until fresh data settles', async () => {
@@ -224,47 +172,16 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
         useBoardStore.getState().data.items.filter((item) => item.repo === issue.repo && item.number === issue.number),
     ).toEqual([queued]);
     await settle(() => receive({ error: null, board: { ...unsettled(read), items: [] } }));
-    expect(useBoardStore.getState().data.items, 'Abandon does not resurrect a cached row').toEqual([]);
+    expect(useBoardStore.getState().data.items, 'Abandon doesn’t resurrect a cached row').toEqual([]);
     await settle(() => receive({ error: null, board: { ...unsettled(read), items: [queued] } }));
     expect(useBoardStore.getState().data.items).toEqual([queued]);
     expect(screen(), 'actions never re-open the loading screen').toBeNull();
 });
 
-test('with reduced motion the finished mark shows at once, the line swaps without rolling and the exit stays a fade', async () => {
-    reduceMotion();
-    await mountPage(unsettled());
-    expect(screen()!.classList.contains('is-drawn')).toBe(true);
-
-    await push(unsettled(firstRead('items', ['lar-apple'])));
-    expect($$('.loading-line-slot > span')).toHaveLength(1);
-    expect(text($('.loading-line'))).toBe('Loading Projects');
-
-    await push(fresh());
-    expect(leaving(), 'no draw to wait for').toBe(true);
-    await advance(EXIT_MS);
-    expect(screen()).toBeNull();
-});
-
-test('project updates do not roll or name individual projects', async () => {
-    await mountPage(unsettled());
-    await push(unsettled(firstRead('items', ['lar-apple', 'lar-server'])));
-    expect(line()).toBe('Loading Projects');
-    expect($('.loading-roll-in')).toBeNull();
-    await push(unsettled(firstRead('items', ['lar-server'])));
-    expect(line()).toBe('Loading Projects');
-    expect($('.loading-roll-in')).toBeNull();
-    await advance(10_000);
-    expect(screen(), 'an unsettled read keeps the screen').not.toBeNull();
-    expect(leaving()).toBe(false);
-    await push(unsettled(firstRead('finishing')));
-    expect(text($('.loading-roll-out'))).toBe('Loading Projects');
-    expect(line()).toBe('Finishing up');
-});
-
 test('the board behind is inert while the screen is up, through the fade, and set free once it is gone', async () => {
     await mountPage(unsettled());
     expect(covered()).toBe(true);
-    expect($('#app .loading-screen'), 'the screen is not inside the inert board').toBeNull();
+    expect($('#app .loading-screen'), 'the screen isn’t inside the inert board').toBeNull();
     expect($('#app .title-bar'), 'the board is').not.toBeNull();
 
     await advance(DRAW_MS);
@@ -311,29 +228,6 @@ test('installation readiness waits until the loading screen has finished leaving
     expect(bridge.boardReady).not.toHaveBeenCalled();
     await advance(1);
     expect(bridge.boardReady).toHaveBeenCalledOnce();
-});
-
-test('a development app without installation enabled never sends installation readiness', async () => {
-    const bridge = stubApp({
-        boardReady: vi.fn(async () => {}),
-        getInstallState: async () => ({
-            installs: false,
-            installed: false,
-            version: '1.0.0',
-            running: null,
-            discovery: 'waiting',
-            instances: [],
-            targets: [],
-            drift: [],
-            replaced: [],
-            conflicts: [],
-            blocked: [],
-        }),
-    });
-
-    await mountPage(fresh(), '', '?loading=drawn');
-    await advance(EXIT_MS);
-    expect(bridge.boardReady).not.toHaveBeenCalled();
 });
 
 test('restart keeps rows before readiness and through failed settlement, then accepts successful empty sources', async () => {

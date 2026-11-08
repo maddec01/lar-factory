@@ -1,6 +1,6 @@
 import { failedCheck } from '@lar-factory/shared';
 // Connection problems stay in a collapsed inline banner, except a lost board server, which every number on the page depends on, so it shows directly. Skill maintenance lives in Settings.
-import { BoardWarnings, Button, buttonKind } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 
 import { CLIENT_ERROR, useDismissStore } from './DismissStore';
 import { ItemSourceWarning } from './ItemSourceWarning';
@@ -9,6 +9,7 @@ import { AzWarning, CommandWarning, GhWarning, T3NotRunningWarning } from './Too
 import { Warning } from './Warning';
 import { useSettingsStore } from '@/features/settings';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { BoardWarnings, buttonKind } from '@/ui/board';
 
 export function Warnings() {
     const data = useBoardStore((state) => state.data);
@@ -42,16 +43,22 @@ export function Warnings() {
                         dismissKey={CLIENT_ERROR}
                         what="board disconnected"
                         title="Board disconnected — showing last received data"
+                        tone="danger"
                     >
                         {clientError}
                     </Warning>
                 )
             }
+            leadTitle="Board disconnected"
             summary={
-                keys.length > 0 &&
-                (localProblem ??
-                    (keys.length === 1 ? 'A connection needs attention' : `${keys.length} connections need attention`))
+                keys.length > 0
+                    ? (localProblem ??
+                      (keys.length === 1
+                          ? 'A connection needs attention'
+                          : `${keys.length} connections need attention`))
+                    : undefined
             }
+            toggleLabel="Show warnings"
             action={
                 <Button
                     {...buttonKind('other')}
@@ -76,7 +83,7 @@ export function Warnings() {
                     key={id}
                     dismissKey={`start-check-${id}`}
                     what="thread check failed"
-                    title={`Could not check whether the thread for ${title} still exists.`}
+                    title={`Couldn’t check whether the thread for ${title} still exists.`}
                 >
                     The item stays Started. The board will retry in 30 seconds.
                 </Warning>

@@ -1,16 +1,17 @@
 // Settings' Projects page: each Project with its provider and work source.
 
 import { itemSource, shownRepo, type OnboardingProgress } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 
 import { custom, type Group, type Row, type SettingsData } from './SettingsModel';
 import { useSettingsStore } from './SettingsStore';
 import { stoppedAt, useWizardStore } from '@/features/onboarding';
 import { ProjectIcon } from '@/features/repositories';
+import { buttonKind } from '@/ui/board';
 
 const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current sprint' } as const;
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
-    kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
+    kind === 'azure-board' && team ? `${team}’s backlog and current sprint` : ITEM_SOURCES[kind];
 
 /** A repository still onboarding: its provider and the step it stopped at. */
 function onboardingDescription(progress: OnboardingProgress): string {
@@ -22,7 +23,7 @@ export function repositoryGroup(data: SettingsData): Group {
     const onboarded: Row[] = data.repos.map((r) => ({
         id: `repo-${r.repo}`,
         title: shownRepo(r.repo),
-        icon: <ProjectIcon repo={r.repo} size="small" />,
+        icon: <ProjectIcon repo={r.repo} size="sm" />,
         description: (
             <>
                 {itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
@@ -31,7 +32,7 @@ export function repositoryGroup(data: SettingsData): Group {
         control: custom(() =>
             r.setup ? (
                 <Button {...buttonKind('other')} onClick={() => useSettingsStore.getState().openProject(r.repo)}>
-                    Open Project
+                    Open project
                 </Button>
             ) : null,
         ),
@@ -39,7 +40,7 @@ export function repositoryGroup(data: SettingsData): Group {
     const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
         id: `repo-${repo}`,
         title: shownRepo(repo),
-        icon: <ProjectIcon repo={repo} size="small" />,
+        icon: <ProjectIcon repo={repo} size="sm" />,
         description: onboardingDescription(progress),
         control: custom(() => (
             <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().resume(repo)}>
@@ -49,12 +50,13 @@ export function repositoryGroup(data: SettingsData): Group {
     }));
 
     return {
+        // Keep the project group title when search opens this section directly.
         title: 'Projects',
         description: 'Settings stay on this machine. Projects need no factory files.',
         rows: [...onboarded, ...onboarding],
-        footer: (
+        action: (
             <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().start()}>
-                Add Project
+                Add project
             </Button>
         ),
     };

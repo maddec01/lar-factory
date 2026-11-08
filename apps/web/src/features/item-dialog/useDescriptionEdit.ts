@@ -9,9 +9,8 @@
 import type { DescriptionSave } from '@lar-factory/shared';
 import { useCallback, useState } from 'react';
 
-import { detailsCache } from './DetailsCache';
-import type { ItemDetailsRead } from './useItemDetails';
 import { postAction } from '@/services/board/board.service';
+import { forgetItemDetails, type ItemDetailsRead } from '@/services/items/items.hooks';
 
 interface Editing {
     /** The editor's Markdown of the description it opened on; null until it reports it. */
@@ -83,7 +82,7 @@ export function useDescriptionEdit(
             if (result.error) return update({ saving: false, error: result.error });
 
             // The cached details predate the save; a reload that works caches the new ones.
-            detailsCache.drop(itemId);
+            forgetItemDetails(itemId);
             setSaved((await refresh()) ? null : save.body);
             setState(null);
         },

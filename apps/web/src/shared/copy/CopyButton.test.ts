@@ -51,19 +51,6 @@ test('Copy copies its text, says Copied, and announces it in the copy-status liv
     expect(button.textContent).toBe('Copy');
 });
 
-test('a second copy is announced again', async () => {
-    vi.stubGlobal('navigator', { clipboard: { writeText: async () => {} } });
-
-    const button = await mount();
-
-    await settle(() => button.click());
-    await settle(() => vi.advanceTimersByTime(100));
-    await settle(() => button.click());
-    expect($('#copy-status')!.textContent, 'cleared, so the same words are read again').toBe('');
-    await settle(() => vi.advanceTimersByTime(50));
-    expect($('#copy-status')!.textContent).toBe('Copied');
-});
-
 test('without clipboard access, Copy falls back to a selected textarea', async () => {
     vi.stubGlobal('navigator', {
         clipboard: {

@@ -1,9 +1,10 @@
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { Warning } from './Warning';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { buttonKind } from '@/ui/board';
 
 const titles = {
     unavailable: 'T3 Code is disconnected.',

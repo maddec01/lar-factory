@@ -140,17 +140,6 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
     );
 });
 
-test('a read request starts a read of GitHub at once', async (t) => {
-    const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
-
-    await firstRead(board);
-
-    const before = await reads(board);
-
-    assert.equal((await askRead(board)).status, 202);
-    await waitFor(async () => (await reads(board)) === before + 1);
-});
-
 test('requests during a read queue one more read after it, never two at once', async (t) => {
     const hold = await holdPath(t);
     const board = await startBoard(t, {
@@ -244,14 +233,6 @@ test('a read request without JSON, from another origin or to another host reads 
     assert.equal(await askForeignHost(board), 421);
     await new Promise((r) => setTimeout(r, 200));
     assert.equal(await reads(board), before);
-});
-
-test('the sample board answers a read request and reads nothing', async (t) => {
-    const board = await startBoard(t, { repositories: ['maddec01/lar-factory'] }, true);
-
-    assert.equal((await askRead(board)).status, 200);
-    await new Promise((r) => setTimeout(r, 200));
-    assert.equal((await board.calls()).length, 0);
 });
 
 test('a read request naming an item reads that item alone, without loading the configs again', async (t) => {

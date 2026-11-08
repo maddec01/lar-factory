@@ -1,73 +1,41 @@
+import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 // Start on a Queued item, or Start build on a Ready one, as a menu button: Start opens a menu on
 // the highlighted entry, arrow keys move, Enter or a click picks and starts, and Escape, Tab or a
 // click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
-
 import {
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
     delegatedWorkRunning,
+    highlightedChoice,
     itemName,
     ref,
-    highlightedChoice,
     repositoryT3Default,
     startProgressOf,
 } from '@lar-factory/shared';
-import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import {
-    ActionError,
-    Button,
-    buttonKind,
-    DropdownMenu,
-    StartGroup,
-    StartLine,
-    StartNote,
-    StartTag,
-} from '@lar-works/design-system';
+import { Button, DropdownMenu } from '@lar-works/design-system';
+import { ChevronDownIcon } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { writeState } from './ActionAvailability';
 import { useItemAction } from './ActionStore';
 import { ICON } from './ButtonIcons';
-import { writeState } from './ItemActions';
-import { ModelEntries, opensOnChecked } from './ModelEntries';
+import { ModelEntries } from './ModelEntries';
+import { opensOnChecked } from './ModelMenuFocus';
 import { OpenThread } from './OpenThread';
+import { useOnRow } from './RowContext';
 import { startItem } from './StartItem';
-import { PURPOSE, useStart, useStartStore } from './StartStore';
 import type { StartKind } from './StartStore';
-import { notify, DismissButton, closeKeepingFocus } from '@/features/notices';
+import { PURPOSE, useStart, useStartStore } from './StartStore';
+import { startedThread, useShownStart } from './useShownStart';
+import { closeKeepingFocus, DismissButton, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { ActionError, buttonKind, StartGroup, StartLine, StartNote, StartTag } from '@/ui/board';
 
-/**
- * The T3 thread Start opened for the item, from this page, another one or the board server's Start after. The
- * board data keeps refining threads and build threads apart, so a refined item's shaping thread is no build.
- */
-function startedThread(item: Item, data: BoardData, kind: StartKind) {
-    return (kind === 'refine' ? data.started : data.startedBuilds)?.[item.id];
-}
-
-/** The item's start as the row shows it: this page's press at once, then what the server says. */
-function useShownStart(item: Item, data: BoardData, kind: StartKind) {
-    const local = useStart(item.id, kind);
-    const server = startProgressOf(data, item.id, PURPOSE[kind]);
-
-    return {
-        pending: local?.phase === 'pending' || server?.phase === 'starting',
-        uncertain: server?.phase === 'may-have-started',
-        error: server?.phase === 'failed' ? server.message : local?.phase === 'error' ? local.message : undefined,
-    };
-}
-
-/** Whether Start is in flight, uncertain or done, which takes Move to List and Abandon away. */
-export function useStartHolds(item: Item, data: BoardData): boolean {
-    const { pending, uncertain } = useShownStart(item, data, 'refine');
-
-    return Boolean(startedThread(item, data, 'refine')) || uncertain || pending;
-}
-
-/** "T3 Project default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
+/** "Project default in T3", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
 export function StartEntries({
     item,
     data,
@@ -112,6 +80,7 @@ export function StartControl({
     kind?: StartKind;
     linkedBeside?: string | undefined;
 }) {
+    const onRow = useOnRow();
     const { pending, uncertain, error } = useShownStart(item, data, kind);
     const closed = useStart(item.id, kind)?.phase === 'closed';
     const action = useItemAction(item.id);
@@ -186,7 +155,6 @@ export function StartControl({
                   )
                 : stopped && (
                       <>
-                          <StartNote>Run stopped.</StartNote>
                           {observed.id !== linkedBeside && (
                               <OpenThread item={item} data={data} threadId={observed.id} />
                           )}
@@ -195,18 +163,24 @@ export function StartControl({
             <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
                 <DropdownMenu.Trigger asChild>
                     <Button
-                        {...buttonKind('start')}
+                        {...buttonKind(onRow ? 'start' : 'main')}
                         busy={pending}
                         leftIcon={!retry && ICON.play}
+                        rightIcon={!pending && <ChevronDownIcon />}
                         data-start={item.id}
                         aria-label={`${verb} ${itemName(item)}`}
                         {...state}
                     >
                         {verb}
-                        {!pending && ' ▾'}
                     </Button>
                 </DropdownMenu.Trigger>
-                <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} with`} {...opensOnChecked}>
+                <DropdownMenu.Content
+                    width="lg"
+                    height="capped"
+                    align="end"
+                    aria-label={`Start ${ref(item)} with`}
+                    {...opensOnChecked}
+                >
                     <StartEntries item={item} data={data} onPick={pick} />
                 </DropdownMenu.Content>
             </DropdownMenu>

@@ -2,14 +2,15 @@
 
 import { kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, KindTicketSwap, SwapKind } from '@lar-factory/shared';
-import { Button, buttonKind, InlineLink, KindQuestion, Text } from '@lar-works/design-system';
+import { Alert, Button, InlineLink, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
-import { detailsCache } from './DetailsCache';
 import { useKindChangeStore } from './KindChangeStore';
-import type { ItemDetailsRead } from './useItemDetails';
 import { KIND_BADGES } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { SAMPLE_READ_ONLY } from '@/services/board/board.service';
+import { forgetItemDetails, type ItemDetailsRead } from '@/services/items/items.hooks';
+import { buttonKind, KindQuestion } from '@/ui/board';
 
 const kindName = (value: SwapKind) => KIND_BADGES[value]!.name;
 
@@ -66,7 +67,7 @@ export function KindNotice({
 
         let current = true;
 
-        detailsCache.drop(item.id);
+        forgetItemDetails(item.id);
         void refresh().then(() => {
             if (current) setReadFor(kinds);
         });
@@ -146,9 +147,9 @@ export function KindNotice({
                       : (problem ?? swapLine(item, swap, note))}
             </Text>
             {answering?.error && (
-                <Text variant="caption" tone="danger" role="alert">
+                <Alert size="sm" tone={answering.error === SAMPLE_READ_ONLY ? 'warning' : 'danger'}>
                     {answering.error}
-                </Text>
+                </Alert>
             )}
         </KindQuestion>
     );

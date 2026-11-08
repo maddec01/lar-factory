@@ -6,9 +6,19 @@
 // disconnected only speaks for the last read, during a first read that may still add items is the loader, and says so
 // when Scope, Kind and Labels hide every card.
 
-import { deskItems, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope } from '@lar-factory/shared';
+import {
+    deskItems,
+    needsAnswer,
+    nextAction,
+    checksPhrase,
+    HINTS,
+    itemPr,
+    itemName,
+    readingScope,
+    prReadiness,
+} from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { DeskCard as Card, DeskHint, DeskMergeState, DeskSection, Loading } from '@lar-works/design-system';
+import { Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -20,9 +30,11 @@ import {
     OpenThread,
     PrLink,
     ItemStatusGlyph,
+    useShownStatus,
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { boardStatusState, DeskCard as Card, DeskHint, DeskSection } from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -31,21 +43,12 @@ import { useBoardStore } from '@/services/board/board.hooks';
 function NextStep({ item }: { item: Item }) {
     if (needsAnswer(item)) return null;
 
+    if (prReadiness(item)) return null;
+
     const pipeline = itemPr(item)?.pipeline;
 
     if (pipeline) {
-        const { checks, mergeState } = pipeline;
-        const counts = checks
-            ? [
-                  `${checks.passed} passed`,
-                  checks.running && `${checks.running} running`,
-                  checks.failed && `${checks.failed} failed`,
-              ]
-                  .filter(Boolean)
-                  .join(' · ')
-            : 'no checks';
-
-        return <DeskMergeState state={mergeState} checks={counts} />;
+        return <DeskHint>{checksPhrase(pipeline.checks)}</DeskHint>;
     }
 
     return <DeskHint>{HINTS[item.status]}</DeskHint>;
@@ -53,17 +56,20 @@ function NextStep({ item }: { item: Item }) {
 
 /** The card's action, and Open thread as a square icon in the right corner unless it is the action. */
 function Actions({ item, data }: { item: Item; data: BoardData }) {
-    return needsAnswer(item) ? (
-        <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />
+    const action = nextAction(item);
+
+    return action?.kind === 'thread' ? (
+        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} />
     ) : (
         <>
-            <PrLink item={item} label="Open PR" />
+            <PrLink item={item} label={action?.label ?? 'Open PR'} />
             <OpenThread item={item} data={data} iconOnly />
         </>
     );
 }
 
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
+    const shown = useShownStatus(item);
     const picked = useItemDialogStore((state) => state.itemId === item.id);
 
     return (
@@ -78,7 +84,8 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             name={itemName(item)}
             details={<AzureFields azure={item.azure} />}
             statusIcon={<ItemStatusGlyph item={item} />}
-            status={item.status}
+            status={shown.word}
+            statusState={shown.state ?? boardStatusState[shown.glyph]}
             next={<NextStep item={item} />}
             actions={<Actions item={item} data={data} />}
         />
@@ -98,11 +105,12 @@ export function Desk({ items: inScope }: { items: Item[] }) {
         <DeskSection
             title="Your desk"
             count={items.length}
+            loading={items.length === 0 && readingScope(data, scope ?? undefined)}
             empty={
                 clientError ? (
                     'Nothing waited on you at the last read.'
                 ) : readingScope(data, scope ?? undefined) ? (
-                    <Loading presentation="inline" label="Loading Projects…" />
+                    <Loading presentation="inline" label="Loading projects…" />
                 ) : deskItems(data, unavailable).length ? (
                     'Nothing on your desk matches the filters.'
                 ) : (

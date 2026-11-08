@@ -57,7 +57,7 @@ test('a typed name is refused for its first problem, and a blank field names not
     assert.equal(typedLabelsProblem('maddec01/lar-factory', ['', '  ', 'triage']), null);
     assert.equal(
         typedLabelsProblem('maddec01/lar-factory', ['triage', 'linked-work']),
-        "linked-work is reserved for the factory's saved links.",
+        'linked-work is reserved for the factory’s saved links.',
     );
     assert.equal(typedLabelsProblem('fabrikam/fiber/one', ['a;b']), 'Use a tag name without commas or semicolons.');
 });
@@ -68,7 +68,7 @@ const GITHUB = 'maddec01/lar-factory';
 test('a repo- tag is managed on Azure DevOps, in any case, and an ordinary label on GitHub', () => {
     for (const name of ['repo-one', 'REPO-One']) {
         assert.equal(trackerCapabilities(AZURE).isManaged(name), true, name);
-        assert.match(trackerCapabilities(AZURE).nameProblem(name)!, /reserved for the work item's repository/);
+        assert.match(trackerCapabilities(AZURE).nameProblem(name)!, /reserved for the work item’s repository/);
         assert.equal(trackerCapabilities(GITHUB).isManaged(name), false, name);
         assert.equal(trackerCapabilities(GITHUB).nameProblem(name), null, name);
     }
@@ -103,7 +103,7 @@ test('a ticket takes a name holding a separator on GitHub, and refuses it on Azu
     }
 });
 
-test('a typed name in Add item cannot carry a managed tag past its separator on Azure DevOps', () => {
+test('a typed name in Add item can’t carry a managed tag past its separator on Azure DevOps', () => {
     assert.equal(typedLabelsProblem(AZURE, ['foo; linked-work']), 'Use a tag name without commas or semicolons.');
     assert.equal(typedLabelsProblem(AZURE, ['foo, repo-other']), 'Use a tag name without commas or semicolons.');
 });

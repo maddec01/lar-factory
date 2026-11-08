@@ -6,12 +6,12 @@
 import { boardApp, shownRepo } from '@lar-factory/shared';
 import {
     Button,
-    buttonKind,
+    EmptyState,
+    SettingsSection,
     FormSection,
     Input,
     InsetPanel,
     Modal,
-    OpenSettingsButton,
     SettingsNav,
     SidebarNavigationGroup,
     SidebarNavigationItem,
@@ -21,12 +21,14 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { type Group, type Page, pages, settingsData, type SettingsData } from './SettingsPages';
+import { filterSettingsPages } from './SettingsSearch';
 import { useSettingsStore } from './SettingsStore';
 import { ProjectPage, projectSettings } from '@/features/repositories';
 import { useUpdateStore } from '@/features/updates';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { FieldRow } from '@/shared/settings/FieldRow';
+import { buttonKind, OpenSettingsButton } from '@/ui/board';
 
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
@@ -42,15 +44,8 @@ export function SettingsButton() {
 
 /** T3's SettingsGroup: a title over a bordered list of rows, label left and control right, and what a row has below them. */
 function GroupView({ group }: { group: Group }) {
-    return (
-        <FormSection
-            presentation="dense"
-            data-settings-group=""
-            title={group.title || undefined}
-            help={group.help}
-            helpLabel={group.title}
-            description={group.description}
-        >
+    const content = (
+        <>
             {(group.rows.length > 0 || group.footer) && (
                 <InsetPanel presentation="settings" footer={group.footer}>
                     {group.rows.map((row) => (
@@ -83,6 +78,25 @@ function GroupView({ group }: { group: Group }) {
                 </InsetPanel>
             )}
             {group.note}
+        </>
+    );
+
+    return group.action ? (
+        <Stack data-settings-group="">
+            <SettingsSection title={group.title} description={group.description} action={group.action}>
+                {content}
+            </SettingsSection>
+        </Stack>
+    ) : (
+        <FormSection
+            presentation="dense"
+            data-settings-group=""
+            title={group.title || undefined}
+            description={group.description}
+            help={group.help}
+            helpLabel={group.title}
+        >
+            {content}
         </FormSection>
     );
 }
@@ -116,6 +130,12 @@ function SettingsModal() {
     });
     const byId = new Map(all.map((p) => [p.id, p]));
     const [query, setQuery] = useState('');
+    const [searchSection, setSearchSection] = useState<string | null>(null);
+    const changeQuery = (value: string) => {
+        setQuery(value);
+
+        if (!value.trim()) setSearchSection(null);
+    };
     const search = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -141,35 +161,28 @@ function SettingsModal() {
     }, []);
 
     const q = query.trim().toLowerCase();
-    const matches = (p: Page) =>
-        !q ||
-        p.label.toLowerCase().includes(q) ||
-        (p.id === 'projects' &&
-            data.repos.some(
-                (r) =>
-                    r.repo.toLowerCase().includes(q) ||
-                    (!!r.setup && projectSettings(r.repo).some((field) => field.label.toLowerCase().includes(q))),
-            )) ||
-        p.groups.some(
-            (g) => g.title.toLowerCase().includes(q) || g.rows.some((r) => r.title.toLowerCase().includes(q)),
-        );
+    const filtered = filterSettingsPages(all, q, data.repos, projectSettings);
+    const filteredById = new Map(filtered.map((p) => [p.id, p]));
     const nav = NAV.map((group) => ({
         label: group.label,
-        pages: group.ids.map((id) => byId.get(id)).filter((p): p is Page => !!p && matches(p)),
+        pages: group.ids.map((id) => filteredById.get(id)).filter((p): p is Page => !!p),
     }));
     const open = byId.get(section) ?? all[0]!;
-    // A search that leaves out the open section shows the first section it keeps, without choosing it, so clearing the
-    // search goes back. One that keeps none leaves the open section on the right, beside "No settings match.".
-    const page = matches(open) ? open : (nav.flatMap((group) => group.pages)[0] ?? open);
-    const setup = page.id === 'projects' && project ? data.repos.find((r) => r.repo === project)?.setup : undefined;
-    const title = setup ? shownRepo(setup.repo) : page.label;
+    const page = filteredById.get(searchSection ?? section) ?? filtered[0];
+    const empty = !page;
+    const shownPage = page ?? open;
+    const setup =
+        !empty && shownPage.id === 'projects' && project
+            ? data.repos.find((r) => r.repo === project)?.setup
+            : undefined;
+    const title = setup ? shownRepo(setup.repo) : empty ? 'Search settings' : shownPage.label;
 
     return (
         <Modal onClose={() => setOpen(false)}>
             <Modal.Content
                 accessibleTitle={`Settings: ${title}`}
                 title={title}
-                description={setup ? undefined : page.description || undefined}
+                description={setup || empty ? undefined : shownPage.description || undefined}
                 sidebar={
                     <SettingsNav
                         data-settings-nav=""
@@ -179,14 +192,14 @@ function SettingsModal() {
                                 ref={search}
                                 type="search"
                                 value={query}
-                                onChange={(e) => setQuery(e.target.value)}
+                                onChange={(e) => changeQuery(e.target.value)}
                                 placeholder="Search settings"
                                 aria-label="Search settings"
                                 aria-keyshortcuts="/"
                                 title="Search settings (/)"
                             />
                         }
-                        empty={nav.every((group) => !group.pages.length) ? 'No settings match.' : undefined}
+                        empty={empty ? 'Nothing matches' : undefined}
                     >
                         {nav.map(
                             (group) =>
@@ -195,8 +208,8 @@ function SettingsModal() {
                                         {group.pages.map((p) => (
                                             <SidebarNavigationItem
                                                 key={p.id}
-                                                active={p.id === page.id}
-                                                onClick={() => setSection(p.id)}
+                                                active={p.id === page?.id}
+                                                onClick={() => (q ? setSearchSection(p.id) : setSection(p.id))}
                                             >
                                                 {p.icon}
                                                 <span>{p.label}</span>
@@ -208,9 +221,26 @@ function SettingsModal() {
                     </SettingsNav>
                 }
             >
-                <Modal.Body key={setup?.repo ?? page.id}>
+                <Modal.Body key={setup?.repo ?? shownPage.id}>
                     <Stack space="page" data-settings-body="">
-                        {setup ? (
+                        {empty ? (
+                            <EmptyState
+                                size="compact"
+                                title="Nothing matches"
+                                description="Try another search or clear it to see all settings."
+                                actions={
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            changeQuery('');
+                                            search.current?.focus();
+                                        }}
+                                    >
+                                        Clear search
+                                    </Button>
+                                }
+                            />
+                        ) : setup ? (
                             <>
                                 <span>
                                     <Button {...buttonKind('other')} onClick={() => setSection('projects')}>
@@ -220,7 +250,7 @@ function SettingsModal() {
                                 <ProjectPage setup={setup} />
                             </>
                         ) : (
-                            page.groups.map((g) => <GroupView group={g} key={g.title} />)
+                            shownPage.groups.map((g) => <GroupView group={g} key={g.title} />)
                         )}
                     </Stack>
                 </Modal.Body>

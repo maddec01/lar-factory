@@ -60,10 +60,10 @@ export function KindMapping({ run, detection }: { run: Run; detection: SetupDete
             defaultOpen={!!run.choices.vocabulary || !!run.choices.newLabels}
         >
             <Text variant="caption" tone="muted">
-                New {labels} wait until you add the Project.{' '}
+                New {labels} wait until you add the project.{' '}
                 <HelpTip label="kind mapping">
                     Skip this if you like. Without a mapping, new tickets get no {labels} from their kind. New {labels}{' '}
-                    are created only when you choose Save and add Project. You can edit these mappings later in
+                    are created only when you choose Save and add project. You can edit these mappings later in
                     Settings.
                 </HelpTip>
             </Text>

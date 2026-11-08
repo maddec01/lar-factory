@@ -2,10 +2,11 @@
 
 import { typedLabelsProblem, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { Button, buttonKind, Inline, LabelPicker, Popover, Stack } from '@lar-works/design-system';
+import { Button, Inline, LabelPicker, Popover, Stack } from '@lar-works/design-system';
 
 import type { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyKind } from './VocabularyKinds';
+import { buttonKind } from '@/ui/board';
 
 const labelPopoverPosition = { collisionPadding: 16 };
 
@@ -51,9 +52,9 @@ export function VocabularyLabelPopover({
                         create={{
                             refused: labelsProblem ?? access.newLabels,
                             problem: (label) => typedLabelsProblem(repo, [label]),
-                            note: onCommit ? '' : `New ${plural} are created when you add the Project.`,
+                            note: onCommit ? '' : `New ${plural} are created when you add the project.`,
                             createLabel: (label) =>
-                                onCommit ? `Create "${label}"` : `Create "${label}" when you add the Project`,
+                                onCommit ? `Create "${label}"` : `Create "${label}" when you add the project`,
                             onCreate: (label) => update(value, [...newLabels, label], !!onCommit),
                         }}
                     />

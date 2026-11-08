@@ -12,10 +12,9 @@
             "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/*.mjs"],
         },
     },
-    // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;
-    // apps/server's server-support test runs `pgrep` to find the board's gh children.
+    // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`.
     // The board app runs the `t3` CLI from the login shell's PATH to ask T3 Code for its provider instances.
-    "ignoreBinaries": ["file", "pgrep", "t3"],
+    "ignoreBinaries": ["file", "t3"],
     // Ports from T3 Code keep T3's exports, so later T3 fixes port line for line.
     "ignoreIssues": {
         "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],

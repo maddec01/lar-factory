@@ -1,12 +1,10 @@
-import { writeHeaders, type Item, type LinkedPr } from '@lar-factory/shared';
-import { Button, buttonKind, PullRequestReadiness, ReadinessDetails } from '@lar-works/design-system';
+import type { Item, LinkedPr } from '@lar-factory/shared';
+import { Button } from '@lar-works/design-system';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { useBoardStore } from '@/services/board/board.hooks';
-
-type Evidence =
-    | { available: true; sourceRevision: string; observedAt: string; blockers: string[] }
-    | { available: false; reason: string };
+import { readPrReadiness, type PrEvidence } from '@/services/items/items.service';
+import { buttonKind, PullRequestReadiness, ReadinessDetails } from '@/ui/board';
 
 function blockerLabel(blocker: string): string {
     const [kind, ...parts] = blocker.split(':');
@@ -19,7 +17,7 @@ function blockerLabel(blocker: string): string {
                 {
                     '-10': 'rejected the pull request',
                     '-5': 'requested changes',
-                    '0': 'has not approved',
+                    '0': 'hasn’t approved',
                     '5': 'approved with suggestions',
                     '10': 'approved',
                 } as Record<string, string>
@@ -39,7 +37,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
     const detailsId = useId();
     const [open, setOpen] = useState(false);
     const [attempt, setAttempt] = useState(0);
-    const [evidence, setEvidence] = useState<Evidence>();
+    const [evidence, setEvidence] = useState<PrEvidence>();
     // The request the evidence on show answers; any other request leaves it stale until its own answer.
     const [answered, setAnswered] = useState<string>();
     const sequence = useRef(0);
@@ -71,32 +69,18 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
 
         const controller = new AbortController();
 
-        void fetch('/api/pr-readiness', {
-            method: 'POST',
-            headers: writeHeaders(),
-            body: JSON.stringify({ itemId: item.id, number: pr.number }),
-            signal: controller.signal,
-        })
-            .then(async (response) => {
-                if (!response.ok) throw new Error('Azure evidence is unavailable. Refresh to try again.');
-
-                return response.json() as Promise<{ evidence: Evidence }>;
-            })
-            .then(({ evidence: next }) => {
-                if (sequence.current === sent) {
+        void readPrReadiness(item.id, pr.number, controller.signal).then(
+            (next) => {
+                if (sequence.current === sent && !controller.signal.aborted) {
                     setEvidence(next);
                     setAnswered(request);
                 }
-            })
-            .catch(() => {
-                if (sequence.current === sent) {
-                    setEvidence({ available: false, reason: 'Azure evidence is unavailable. Refresh to try again.' });
-                    setAnswered(request);
-                }
-            });
+            },
+            // Only an abort rejects, once the request has moved on.
+            () => {},
+        );
 
         return () => {
-            ++sequence.current;
             controller.abort();
         };
     }, [open, item.id, pr.number, disconnected, key, request]);

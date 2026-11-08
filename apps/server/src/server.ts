@@ -125,6 +125,9 @@ if (settings.problem) log(`using the default settings: ${settings.problem}`);
 
 const stopMemorySampler = startMemorySampler();
 const fixture = process.env.BOARD_DATA_FILE;
+const sampleData = fixture ? (JSON.parse(readFileSync(fixture, 'utf8')) as BoardData) : null;
+const sampleLoadedAt = Date.now();
+const sampleTimeShiftMs = sampleData?.fetchedAt ? sampleLoadedAt - Date.parse(sampleData.fetchedAt) : 0;
 /** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
 
@@ -995,7 +998,10 @@ async function syncPrStats(items: Item[]): Promise<void> {
 
 /** Reads the model choices T3 offers now into the board data. */
 function offerModelChoices(): ModelGroup[] {
-    const groups = loadModelChoices(statsSources.settings, modelManifest);
+    const groups =
+        fixture && board.snapshot().modelChoices.length
+            ? board.snapshot().modelChoices
+            : loadModelChoices(statsSources.settings, modelManifest);
 
     modelsUnavailable(!groups.length);
     board.update({ modelChoices: groups });
@@ -1507,7 +1513,7 @@ const { server, endStreams } = createBoardServer({
         if (read.availability !== 'available') throw new Error('T3 unavailable');
     },
     recheck: (options) => recheckTools(true, options),
-    itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }),
+    itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records, sampleTimeShiftMs }),
     showLabelChange,
     showTicketType,
     readSoon,
@@ -1567,7 +1573,7 @@ if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
     board.update({
-        ...sampleActivityFrom(JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, Date.now()),
+        ...sampleActivityFrom(sampleData!, sampleLoadedAt),
         capture,
         firstRead: SETTLED_FIRST_READ,
         ...(sampleT3 ? { projectIcons: {} } : {}),
@@ -1581,7 +1587,12 @@ if (fixture) {
 const stopProjectIcons = projectIcons?.start();
 // Each tick only checks whether a source is due; refresh reads nothing when none is.
 const timer = setInterval(() => {
-    if (!fixture) loopTrace.span('read tick', () => runLocal(() => refresh()));
+    if (fixture) {
+        if (Date.now() - Date.parse(board.snapshot().fetchedAt ?? '') >= 15_000) {
+            board.update({ fetchedAt: new Date().toISOString() });
+            board.push();
+        }
+    } else loopTrace.span('read tick', () => runLocal(() => refresh()));
 }, 1_000);
 const localTimer = setInterval(() => {
     if (sampleT3) showT3Availability();

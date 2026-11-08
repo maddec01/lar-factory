@@ -13,31 +13,31 @@
 // or opening a part with unsaved edits asks "Discard changes?" first.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, buttonKind, Modal } from '@lar-works/design-system';
-import { useEffect, useState } from 'react';
+import { Modal, useModalClose } from '@lar-works/design-system';
+import { type ComponentProps, useEffect } from 'react';
 
 import { ItemDialogContent } from './ItemDialogContent';
 import { useItemDialogStore } from './ItemDialogStore';
 import { useDescriptionEdit } from './useDescriptionEdit';
-import { useItemDetails } from './useItemDetails';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { useExpand } from '@/shared/dialogs/ExpandDialog';
+import { useItemDetails } from '@/services/items/items.hooks';
+import { useExpand } from '@/shared/dialogs/useExpand';
 
-/** Asks before closing the dialog drops unsaved edits to the description. */
-function DiscardPrompt({ keep, discard }: { keep: () => void; discard: () => void }) {
+/** Store dismissal and part navigation share the Modal’s guard and its one discard question. */
+function GuardedContent(props: Omit<ComponentProps<typeof ItemDialogContent>, 'openPart'>) {
+    const requestClose = useModalClose();
+
+    useEffect(() => {
+        useItemDialogStore.setState({ dismiss: () => requestClose() });
+
+        return () => useItemDialogStore.setState({ dismiss: null });
+    }, [requestClose]);
+
     return (
-        <Modal onClose={keep}>
-            <Modal.Content title="Discard changes?" description="Your edits to the description haven't been saved.">
-                <Modal.Footer>
-                    <Button {...buttonKind('other')} onClick={keep}>
-                        Keep editing
-                    </Button>
-                    <Button {...buttonKind('main', 'danger')} onClick={discard}>
-                        Discard
-                    </Button>
-                </Modal.Footer>
-            </Modal.Content>
-        </Modal>
+        <ItemDialogContent
+            {...props}
+            openPart={(itemId) => requestClose(() => useItemDialogStore.getState().open(itemId))}
+        />
     );
 }
 
@@ -45,66 +45,29 @@ function DiscardPrompt({ keep, discard }: { keep: () => void; discard: () => voi
 function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; now: number; close: () => void }) {
     const { read, refresh } = useItemDetails(item.id, item.updatedAt);
     const edit = useDescriptionEdit(item.id, read, refresh);
-    const [asking, setAsking] = useState(false);
-    /** The part to open once unsaved edits are discarded, rather than closing. */
-    const [nextPart, setNextPart] = useState<string | null>(null);
-    const [expanded, toggleExpanded] = useExpand(asking);
-
-    useEffect(() => {
-        useItemDialogStore.setState({
-            dismiss: () => {
-                if (!edit.saving) {
-                    if (edit.dirty) setAsking(true);
-                    else close();
-                }
-            },
-        });
-
-        return () => {
-            useItemDialogStore.setState({ dismiss: null });
-        };
-    }, [edit.saving, edit.dirty, close]);
-
-    const openPart = (itemId: string) => {
-        if (edit.saving) return;
-
-        if (!edit.dirty) useItemDialogStore.getState().open(itemId);
-        else {
-            setNextPart(itemId);
-            setAsking(true);
-        }
-    };
+    const [expanded, toggleExpanded] = useExpand();
 
     return (
-        <>
-            <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
-                <ItemDialogContent
-                    item={item}
-                    data={data}
-                    now={now}
-                    read={read}
-                    edit={edit}
-                    refresh={refresh}
-                    expanded={expanded}
-                    toggleExpanded={toggleExpanded}
-                    openPart={openPart}
-                />
-            </Modal>
-            {asking && (
-                <DiscardPrompt
-                    keep={() => {
-                        setAsking(false);
-                        setNextPart(null);
-                    }}
-                    discard={() => {
-                        setAsking(false);
-
-                        if (nextPart) useItemDialogStore.getState().open(nextPart);
-                        else close();
-                    }}
-                />
-            )}
-        </>
+        <Modal
+            dirty={edit.dirty}
+            discardLabels={{
+                consequence: 'Your edits to the description haven’t been saved.',
+                confirmLabel: 'Discard',
+            }}
+            onClose={close}
+            loading={edit.saving}
+        >
+            <GuardedContent
+                item={item}
+                data={data}
+                now={now}
+                read={read}
+                edit={edit}
+                refresh={refresh}
+                expanded={expanded}
+                toggleExpanded={toggleExpanded}
+            />
+        </Modal>
     );
 }
 

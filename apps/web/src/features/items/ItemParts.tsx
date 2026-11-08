@@ -1,40 +1,30 @@
-// The bits every view draws for an item: its numbered title, title link, kind badge and label chips, and the item
-// dialog's repository tag. The tag is the design system's Badge, with the repository's project icon. Slices, pull
-// requests, agent work and activity have files of their own.
-
-import { decisionMethodName, itemRepoNames, ref, labelsOnRow, repoKey, repoName, shortAgo } from '@lar-factory/shared';
-import type { AzureWorkItem, Item, Kind, RepoConfig } from '@lar-factory/shared';
-import {
-    Badge,
-    Inline,
-    ItemFields,
-    ItemTitle as DesignItemTitle,
-    KindMarker as DesignKindMarker,
-    LabelChip,
-    RepoIdentity,
-    RepoTag as DesignRepoTag,
-    Text,
-    TitleLink as DesignTitleLink,
-} from '@lar-works/design-system';
-import { Bug, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from '@lar-works/design-system/icons';
+import type { AzureWorkItem, Item, Kind } from '@lar-factory/shared';
+// The bits every view draws for an item: its numbered title, title link, repository, kind badge and label chips. Slices,
+// pull requests, agent work and activity have files of their own.
+import { decisionMethodName, itemRepoNames, ref, repoKey, shortAgo } from '@lar-factory/shared';
+import { Badge, Inline, LabelChip, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
+import { KIND_BADGES } from './KindBadges';
+import { type LabelledItem, useShownLabels } from './useShownLabels';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
+import {
+    ItemFields,
+    ItemTitle as DesignItemTitle,
+    KindBadge as HueBadge,
+    RepoIdentity,
+    TitleLink as DesignTitleLink,
+} from '@/ui/board';
 
-/** The control room's repository badge, with a medium label. */
-export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
-    return <DesignRepoTag icon={<ProjectIcon repo={repo} size="small" />} name={repoName(repo, repos)} />;
-}
-
-/** A row's repository: its project icon and name. Where the ticket is saved is SourceIcon's to say, beside it. */
+/** A row's or the item dialog's repository: its project icon and name, alike wherever it shows. Where the ticket is saved is SourceIcon's to say, beside it. */
 export function RepoCell({ item }: { item: Item }) {
     const repos = useBoardStore((state) => state.data.repos);
 
     return (
         <RepoIdentity
             data-repo-cell
-            icon={<ProjectIcon repo={repoKey(item)} size="small" />}
+            icon={<ProjectIcon repo={repoKey(item)} size="sm" />}
             name={itemRepoNames(item, repos)}
         />
     );
@@ -65,13 +55,6 @@ export function AzureFields({ azure }: { azure: AzureWorkItem | undefined }) {
     return <ItemFields data-azure text={text} />;
 }
 
-export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {
-    bug: { name: 'Bug', icon: Bug, hue: 25 },
-    feature: { name: 'Feature', icon: Sparkles, hue: 150 },
-    improvement: { name: 'Improvement', icon: TrendingUp, hue: 245 },
-    concept: { name: 'Concept', icon: Lightbulb, hue: 300 },
-};
-
 /** A kind in its colour with its icon, then `children`; builds, decisions and tickets with no recognised kind have none. */
 export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode }) {
     const badge = KIND_BADGES[kind];
@@ -81,33 +64,11 @@ export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode
     const { name, icon: Icon, hue } = badge;
 
     return (
-        <Badge data-kind-badge hue={hue}>
+        <HueBadge data-kind-badge hue={hue}>
             <Icon aria-hidden="true" />
             {name}
             {children}
-        </Badge>
-    );
-}
-
-/** Beside a row's kind badge, in the row's muted text: what the ticket says instead, until someone answers. */
-export function KindMarker({ item }: { item: Pick<Item, 'kindDisagreement'> }) {
-    const { kindDisagreement: disagreement } = item;
-
-    if (!disagreement || disagreement.kept) return null;
-
-    const said = disagreement.ticketKind ? KIND_BADGES[disagreement.ticketKind]!.name : 'No kind';
-    const sentence = disagreement.ticketKind ? `The ticket says ${said}.` : 'The ticket has no kind.';
-
-    return <DesignKindMarker data-kind-marker said={said} label={sentence} title={`${sentence} Open to choose.`} />;
-}
-
-type LabelledItem = Pick<Item, 'kind' | 'labels' | 'labelColors' | 'repo'>;
-
-/** The labels of `item` that its row shows, under its repository's mappings. */
-export function useShownLabels(item: LabelledItem): string[] {
-    return labelsOnRow(
-        item,
-        useBoardStore((state) => state.data.repos),
+        </HueBadge>
     );
 }
 
@@ -122,13 +83,29 @@ export function LabelChips({ item }: { item: LabelledItem }) {
     );
 }
 
-/** Kind and relationships remain visible before an issue is queued. `onRow` leaves out the word for work with no kind badge. */
-export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean }) {
+/**
+ * Kind and relationships remain visible before an issue is queued. `onRow` leaves out the word for work with no kind badge.
+ * In the item dialog's summary, `summaryKind` names the kind in place of the badge, method and Work word (nothing when the
+ * dialog's Kind control names it), and the summary's own "Part of" link names the parent, so each fact shows once.
+ */
+export function ItemKind({
+    item,
+    onRow = false,
+    summaryKind,
+}: {
+    item: Item;
+    onRow?: boolean;
+    summaryKind?: ReactNode;
+}) {
+    const inSummary = summaryKind !== undefined;
     const words: string[] = [];
     const method = decisionMethodName(item);
 
-    if (method) words.push(method);
-    else if (!onRow && !KIND_BADGES[item.kind]) words.push('Work');
+    // In the summary, its kind names a decision's method and a build.
+    if (!inSummary) {
+        if (method) words.push(method);
+        else if (!onRow && !KIND_BADGES[item.kind]) words.push('Work');
+    }
 
     const parentKind = useBoardStore(
         (state) =>
@@ -141,17 +118,19 @@ export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean 
     );
     const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
 
-    if (parentIsConcept) words.push('Part of a concept');
-    else if (item.parent) words.push('Part of another issue');
+    // The summary's "Part of" link names the parent already.
+    if (!(inSummary && item.parent)) {
+        if (parentIsConcept) words.push('Part of a concept');
+        else if (item.parent) words.push('Part of another issue');
+    }
 
     if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Across Projects');
 
-    const badge = KIND_BADGES[item.kind];
+    const kind = inSummary ? summaryKind : KIND_BADGES[item.kind] && <KindBadge kind={item.kind} />;
 
-    return badge || words.length ? (
+    return kind || words.length ? (
         <Inline as="span" inline wrap space="tight" data-item-kind>
-            <KindBadge kind={item.kind} />
-            {onRow && <KindMarker item={item} />}
+            {kind}
             {words.map((word) => (
                 <Badge key={word}>{word}</Badge>
             ))}

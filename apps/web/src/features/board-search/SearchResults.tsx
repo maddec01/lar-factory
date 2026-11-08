@@ -13,16 +13,7 @@ import {
     shownRepo,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import {
-    Archive,
-    Inbox,
-    ListX,
-    RefreshCw,
-    Search,
-    Settings2,
-    SquarePen,
-    TicketPlus,
-} from '@lar-works/design-system/icons';
+import { Archive, Inbox, ListX, Search, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
 import type { LucideIcon } from '@lar-works/design-system/icons';
 
 import { KindIcon } from './BoardFilters';
@@ -33,11 +24,12 @@ import { kindFilterOf, rowFilter } from '@/features/filters';
 import type { ItemFilters } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { matchesSearch, useListStore } from '@/features/list';
-import { projectSettings } from '@/features/repositories';
+import { ProjectIcon, projectSettings } from '@/features/repositories';
 import { pages, settingsData, useSettingsStore } from '@/features/settings';
 import type { PagesInput } from '@/features/settings';
 import { useUpdateStore } from '@/features/updates';
 import type { UpdateButtonAction } from '@/features/updates';
+import { conceptIcons } from '@/ui/board';
 
 export interface SearchInput {
     data: BoardData;
@@ -94,14 +86,14 @@ function actions({ query, filtering, update }: SearchInput, { leave, clear }: Se
     return [
         leaving('action:add', 'Add item', SquarePen, () => addItem('new')),
         leaving('action:list', 'List', Inbox, () => useListStore.getState().setOpen(true)),
-        leaving('action:settings', 'Settings', Settings2, () => openSettings()),
+        leaving('action:settings', 'Settings', conceptIcons.settings, () => openSettings()),
         ...(update === 'none'
             ? []
             : [
                   leaving(
                       'action:update',
                       update === 'install' ? 'Restart to update' : 'Download the update',
-                      RefreshCw,
+                      conceptIcons.updates,
                       () => void useUpdateStore.getState().run(),
                   ),
               ]),
@@ -134,11 +126,12 @@ export function settingsOptions(
                 { ...entry, value: `section:${page.id}`, name: page.label },
                 ...page.groups
                     .flatMap((group) => group.rows)
-                    .filter((row) => !row.noteOnly)
+                    .filter((row) => !row.noteOnly && page.id !== 'projects')
                     .map((row) => ({
                         ...entry,
                         value: `setting:${page.id}:${row.id}`,
                         name: row.title,
+                        keywords: row.keywords,
                         hint: page.label,
                     })),
             ];
@@ -149,7 +142,7 @@ export function settingsOptions(
         .flatMap(({ repo }) => {
             const name = shownRepo(repo);
             const entry = {
-                icon: icon(Settings2),
+                icon: <ProjectIcon repo={repo} size="md" />,
                 select: () =>
                     leave(() => {
                         useSettingsStore.getState().openProject(repo);
@@ -158,7 +151,7 @@ export function settingsOptions(
             };
 
             return [
-                { ...entry, value: `project:${repo}`, name, hint: 'Projects' },
+                { ...entry, value: `project:${repo}`, name: `Settings for ${name}`, hint: 'Project settings' },
                 ...projectSettings(repo).map((setting) => ({
                     ...entry,
                     value: `project:${repo}:${setting.id}`,

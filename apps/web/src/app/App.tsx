@@ -1,12 +1,12 @@
 // The board shows onboarding in progress, Your desk and the stage lists, scoped to the repository the title
-// bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
+// bar or the list modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
 // of an empty desk and stages. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
 import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
-import { BoardContent, BoardShell, Notifications, ReadingLine } from '@lar-works/design-system';
+import { Notifications } from '@lar-works/design-system';
 
 import { LoadingScreen } from './shell/loading/LoadingScreen';
 import { TitleBar } from './shell/title-bar/TitleBar';
@@ -20,6 +20,7 @@ import { EmptyState, OnboardingCards, WizardDialog } from '@/features/onboarding
 import { SettingsDialog } from '@/features/settings';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { CopyStatus } from '@/shared/copy/CopyButton';
+import { BoardContent, BoardShell, ReadingLine } from '@/ui/board';
 
 function Content() {
     const data = useBoardStore((state) => state.data);
@@ -31,7 +32,7 @@ function Content() {
         <BoardContent>
             <OnboardingCards />
             {scope && !loaded && stillReading(data, scope) ? (
-                <ReadingLine label="Loading Projects…" />
+                <ReadingLine label="Loading projects…" />
             ) : (
                 <StageLayout items={items} desk={<Desk items={items} />} />
             )}

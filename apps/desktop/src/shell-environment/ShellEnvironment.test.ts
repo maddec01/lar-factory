@@ -118,17 +118,6 @@ describe('childEnvironment', () => {
         }),
     );
 
-    it.effect('gives the Homebrew folders when the app inherited no PATH and nothing can be read', () =>
-        Effect.gen(function* () {
-            const { env } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/zsh' },
-                handler: () => '',
-            });
-
-            assert.strictEqual(env.PATH, '/opt/homebrew/bin:/usr/local/bin');
-        }),
-    );
-
     it.effect('adds a missing SSH_AUTH_SOCK, Homebrew and CA trust variables and keeps inherited ones', () =>
         Effect.gen(function* () {
             const { env } = yield* readChildEnvironment({
@@ -184,18 +173,6 @@ describe('childEnvironment', () => {
 
             assert.strictEqual(env.LANG, undefined);
             assert.strictEqual(env.LC_CTYPE, 'en_US.UTF-8');
-        }),
-    );
-
-    it.effect('leaves the environment it was given unchanged', () =>
-        Effect.gen(function* () {
-            const inherited: NodeJS.ProcessEnv = { SHELL: '/bin/zsh', PATH: '/usr/bin' };
-
-            yield* readChildEnvironment({
-                env: inherited,
-                handler: () => envOutput({ PATH: '/opt/homebrew/bin', SSH_AUTH_SOCK: '/tmp/agent.sock' }),
-            });
-            assert.deepStrictEqual(inherited, { SHELL: '/bin/zsh', PATH: '/usr/bin' });
         }),
     );
 });

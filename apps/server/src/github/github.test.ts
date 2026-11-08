@@ -3,14 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import {
-    DOSSIER_BODIES_QUERY,
-    ISSUE_SEARCH_QUERY,
-    OPEN_ISSUES_QUERY,
-    PR_BODIES_QUERY,
-    getIfChanged,
-    repositoryAccess,
-} from './github.ts';
+import { OPEN_ISSUES_QUERY, getIfChanged, repositoryAccess } from './github.ts';
 
 test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
     assert.match(
@@ -36,31 +29,12 @@ test('the board query reads the blocked-by issues, and no issue or linked PR bod
     );
 });
 
-test('the board query reads up to 100 labels of an issue, each with its colour', () => {
-    assert.match(OPEN_ISSUES_QUERY, /labels\(first: 100\) \{ nodes \{ name color \} \}/);
-});
-
-test("the PR bodies query reads only each linked PR's id, body and merge time", () => {
-    assert.match(PR_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on PullRequest \{ id body mergedAt \} \}/);
-});
-
 test("the board query reads each slice's state reason", () => {
     assert.match(
         OPEN_ISSUES_QUERY,
         /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,
         "the board query reads each slice's state reason; labels there would cost 60 points a page, not 10",
     );
-});
-
-test("an issue search page reads only each issue's number and repo", () => {
-    assert.match(
-        ISSUE_SEARCH_QUERY,
-        /search\(type: ISSUE, first: \d+, after: \$after, query: \$q\) \{ pageInfo \{ hasNextPage endCursor \} nodes \{ \.\.\. on Issue \{ number repository \{ nameWithOwner \} \} \} \}/,
-    );
-});
-
-test("the dossier bodies query reads only each issue's id and body", () => {
-    assert.match(DOSSIER_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on Issue \{ id body \} \}/);
 });
 
 test('a change check asks again with the last ETag, and an unchanged answer, a 304, is null', async () => {

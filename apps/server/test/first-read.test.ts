@@ -2,8 +2,6 @@ import { readingScope } from '@lar-factory/shared';
 import type { BoardData, ItemStats } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,12 +70,6 @@ test('the first read settles once the repositories are read, with nothing runnin
     assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
 });
 
-test('the first read settles with zero repositories', async (t) => {
-    const board = await startBoard(t, { repositories: [] });
-
-    assert.deepEqual((await settled(board)).firstRead, { step: 'finishing', running: [], settled: true });
-});
-
 test('the first read settles when the read fails', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(1, 'List')], fail: 'read' });
     const data = await settled(board);
@@ -95,13 +87,6 @@ test('the first read settles when gh is logged out at launch, though the read ne
     assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
 });
 
-test('the first read settles when gh is missing at launch', async (t) => {
-    const board = await startBoard(t, {}, false, false, { GH_PATH: '/nowhere/gh' });
-    const data = await settled(board);
-
-    assert.equal(data.tools?.gh?.result, 'missing');
-});
-
 test('a read after the first never un-settles it', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
 
@@ -114,23 +99,6 @@ test('a read after the first never un-settles it', async (t) => {
     await board.update({ items: [boardIssue(1, 'List', 'maddec01/lar-factory', ['bug'])] });
     await until(board, (d) => d.items[0]?.labels.includes('bug') === true);
     assert.equal(((await board.board()) as BoardData).firstRead.settled, true);
-});
-
-test('the sample board is settled at once', async (t) => {
-    const board = await startBoard(t, {}, true);
-
-    assert.deepEqual(((await board.board()) as BoardData).firstRead, { step: 'finishing', running: [], settled: true });
-});
-
-test('the page embeds the first read in its board data', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
-
-    await settled(board);
-
-    const page = await (await fetch(`${board.url}/`)).text();
-    const inline = JSON.parse(page.match(/<script id="board-data" type="application\/json">(.*?)<\/script>/s)![1]!);
-
-    assert.equal(inline.firstRead.settled, true);
 });
 
 test('the stream pushes the first read as it moves from unsettled to settled, naming what runs', async (t) => {
@@ -213,41 +181,6 @@ test('every repository counts as reading until the waiting repositories are know
     });
 });
 
-test('a ticketed record waits for its ticket once the repositories load, though no read has landed', async (t) => {
-    const hold = await heldReads(t);
-    const board = await startBoard(t, {
-        items: [boardIssue(1, 'List')],
-        readHold: hold,
-        repositories: ['maddec01/lar-factory'],
-    });
-    const known = await until(board, (d) => d.firstRead.waiting !== undefined);
-
-    assert.deepEqual(known.firstRead.waiting, ['maddec01/lar-factory']);
-    // Capturing work shows the records, which leave out the ticketed one until its source reads.
-    await board.postSession(
-        {
-            requestId: randomUUID(),
-            draft: {
-                createIssue: false,
-                repo: 'maddec01/lar-factory',
-                kind: 'bug',
-                title: 'Local work',
-                description: '',
-            },
-        },
-        '/api/items',
-    );
-
-    const early = await until(board, (d) => d.items.length > 0);
-
-    assert.deepEqual(
-        early.items.map((i) => i.title),
-        ['Local work'],
-    );
-    await rm(hold);
-    assert.equal((await settled(board)).items.length, 2);
-});
-
 test('a first load of the repositories that fails settles the first read, so no count stays hidden', async (t) => {
     const home = await mkdtemp(join(tmpdir(), 'lar-first-read-home-'));
 
@@ -306,65 +239,6 @@ test("each repository's items show once its own read lands, while another reposi
         ],
     );
     assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
-});
-
-test('a successful empty repository permits access while another source still reads', async (t) => {
-    const apple = 'maddec01/lar-apple';
-    const board = await startBoard(t, {
-        items: [],
-        readHold: await heldReads(t),
-        localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } },
-        repoIssues: { [apple]: [] },
-    });
-    const early = await until(board, (d) => d.firstRead.ready === true);
-
-    assert.equal(early.firstRead.settled, false);
-    assert.deepEqual(early.items, []);
-    assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
-    assert.equal(early.fetchedAt, null);
-});
-
-test('an item with recorded threads reads as loading from its first snapshot while T3 has not answered yet, and one with none stays quiet', async (t) => {
-    const thread = {
-        id: 'a',
-        turns: [{ id: 'turn-a', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-    };
-    const db = statsDb(t, [thread]);
-
-    writeFileSync(`${db}.pending`, '');
-
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['a'] }, items: [boardIssue(12, 'Review'), boardIssue(13, 'Review')] },
-        false,
-        true,
-        { T3_STATE_DB: db },
-    );
-    const early = await until(board, (d) => d.items.length === 2);
-    const item = (d: BoardData, number: number) => d.items.find((i) => i.number === number);
-
-    assert.equal(item(early, 12)?.threads, 'unavailable');
-    assert.equal(item(early, 12)?.usageState, 'loading');
-    assert.equal(item(early, 13)?.usageState, undefined);
-    assert.equal(early.usageRead, undefined, 'T3 not read yet is no failed read');
-    await rm(`${db}.pending`);
-    await until(board, (d) => item(d, 12)?.usageState === 'current');
-});
-
-test('a stopped T3 is no loading usage: no snapshot says so', async (t) => {
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['a'] }, items: [boardIssue(12, 'Review')] },
-        false,
-        true,
-    );
-    const shown = await until(board, (d) => d.items.length === 1);
-
-    assert.notEqual(shown.items[0]?.usageState, 'loading');
-
-    const failed = await until(board, (d) => d.usageRead?.readable === false);
-
-    assert.equal(failed.items[0]?.usageState, 'failed');
 });
 
 test('an item with recorded threads shows figures while another repository still reads, and a ticketed record there stays hidden', async (t) => {

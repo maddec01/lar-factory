@@ -1,10 +1,11 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Button, buttonKind, Inline, Progress, SettingDetails, Text } from '@lar-works/design-system';
+import { Alert, Button, Inline, Progress, Text } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
+import { buttonKind, SettingDetails } from '@/ui/board';
 
 /** Desktop commands operate across active targets, including recovery after a first install failed. */
 export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boolean }) {
@@ -30,7 +31,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                         disabled={busy}
                         onClick={() => void retry()}
                     >
-                        {retrying ? 'Retrying…' : 'Retry'}
+                        {retrying ? 'Retrying…' : 'Try again'}
                     </Button>
                 )}
                 {drift && (
@@ -45,7 +46,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                     </Button>
                 )}
             </Inline>
-            {(error || retryError) && <span role="alert">{error || retryError}</span>}
+            {(error || retryError) && <Alert size="sm" tone="danger" message={error || retryError} />}
         </SettingDetails>
     );
 }
@@ -111,7 +112,7 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
     return (
         <SettingDetails breaks>
             <Text variant="inherit" role={showProgress ? 'status' : undefined}>
-                {target.release ? `Release ${target.release}` : 'No Release installed'} · {status}
+                {target.release ? `Version ${target.release}` : 'No release installed'} · {status}
             </Text>
             {showProgress && target.operation && target.operation !== 'check' && (
                 <Progress
@@ -132,13 +133,15 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
             )}
             {!!target.replaced?.length && <Text variant="inherit">Restored skills: {target.replaced.join(', ')}</Text>}
             {target.error && (
-                <Text variant="inherit">
-                    {target.path}: {target.error}. Check access to the reported paths, then Retry.
-                </Text>
+                <Alert
+                    size="sm"
+                    tone="danger"
+                    message={`${target.path}: ${target.error}. Check access to the reported paths, then Retry.`}
+                />
             )}
             {clashes.map((path) => (
                 <Text variant="inherit" key={path}>
-                    Existing skill at {path}. Lar Factory does not own this path. Rename or remove it, then Retry.
+                    Existing skill at {path}. Lar Factory doesn’t own this path. Rename or remove it, then Retry.
                 </Text>
             ))}
             <InstallRecovery failed={failed || blocked.length > 0} drift={drift} />

@@ -1,8 +1,7 @@
 // The window's top-left corner, from T3 Code: the traffic lights, with the title bar starting past them. In the Mac
 // app the lights are macOS's own (apps/desktop/src/window/WindowTitleBar.ts puts them 16 px in, centred in the 52 px
-// bar) and the brand sits 90 px in, past them; in a browser, the design system's BoardTitleBar draws grey stand-ins in
-// their place so the layout reads like the app. In the Mac app's full screen macOS hides the lights, so the brand
-// moves to the title bar's own padding.
+// bar) and the brand sits 90 px in, past them; a browser window has no traffic lights, so the bar draws none and keeps
+// its own padding. In the Mac app's full screen macOS hides the lights, so the brand moves to that padding too.
 
 import { boardApp, inMacApp } from '@lar-factory/shared';
 import { useSyncExternalStore } from 'react';

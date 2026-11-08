@@ -3,35 +3,20 @@
 // keeps the rules. The line alone follows the second's clock, so a tick renders nothing around it. Its tooltip and the
 // item dialog list the agents at work with one component.
 
-import { itemActivityAgents, itemActivityLine, itemActivityStill, plural, shortAge } from '@lar-factory/shared';
-import type { Item, ThreadActivityState, ThreadAgent } from '@lar-factory/shared';
+import type { Item, ThreadAgent } from '@lar-factory/shared';
+import { itemActivityAgents, itemActivityLine, plural, shortAge, modelDisplayName } from '@lar-factory/shared';
+import { Alert } from '@lar-works/design-system';
+
+import { useShownStatus } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
+import { useClock } from '@/shared/time/useClock';
 import {
     ActivityLine as DesignActivityLine,
     AgentAge,
     AgentList as DesignAgentList,
     AgentRow,
     WorkingAgents,
-} from '@lar-works/design-system';
-
-import { useActivityFeedback } from '@/features/items';
-import { useBoardStore } from '@/services/board/board.hooks';
-import { useClock } from '@/shared/time/useClock';
-
-/** The state of `item`'s line, if it shows one: a start in flight says its own progress. Its caller renders only when the state changes, not on every second. */
-export function useActivityState(item: Item): ThreadActivityState | undefined {
-    const disconnected = useBoardStore((state) => !!state.clientError);
-    const { label } = useActivityFeedback(item);
-    const state = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
-
-    return label === 'Starting' || label === 'May have started' ? undefined : state;
-}
-
-/** Whether `item`'s row stops animating, which a read going old changes with no new data. */
-export function useActivityStill(item: Item): boolean {
-    const disconnected = useBoardStore((state) => !!state.clientError);
-
-    return useClock((now) => itemActivityStill(item, now, disconnected));
-}
+} from '@/ui/board';
 
 /** An action's age on the second's clock, so a tick renders nothing around it. */
 function LiveAge({ at }: { at: string }) {
@@ -40,23 +25,27 @@ function LiveAge({ at }: { at: string }) {
 
 /** The agents at work and what each does. `details` adds each one's model and action age. */
 function AgentList({ agents, details = false }: { agents: ThreadAgent[]; details?: boolean }) {
+    const groups = useBoardStore((state) => state.data.modelChoices);
+
     return (
         <DesignAgentList>
             {agents.map(({ title, model, action, actionAt }, index) => (
                 <AgentRow
                     key={index}
                     title={title}
-                    model={details ? model : undefined}
+                    model={details && model ? modelDisplayName(groups, model) : undefined}
                     age={details && actionAt ? <LiveAge at={actionAt} /> : undefined}
                     action={action}
+                    state={action === 'Waiting for your answer' ? 'waiting' : 'working'}
                 />
             ))}
         </DesignAgentList>
     );
 }
 
-/** `item`'s agents at work in its details; nothing with none to list. */
+/** `item`'s agents at work in its details; nothing with none to List. */
 export function ItemAgents({ item }: { item: Item }) {
+    const shown = useShownStatus(item);
     const disconnected = useBoardStore((state) => !!state.clientError);
 
     // Renders when the list goes unavailable; the ages in it move with their own clock.
@@ -68,11 +57,17 @@ export function ItemAgents({ item }: { item: Item }) {
     if (!agents) return null;
 
     return (
-        <WorkingAgents
-            heading="Working agents"
-            unavailable={agents === 'unavailable' ? 'Activity unavailable' : undefined}
-        >
-            {agents !== 'unavailable' && <AgentList agents={agents} details />}
+        <WorkingAgents heading={shown.execution === 'working' ? 'Working agents' : 'Last activity'}>
+            {agents === 'unavailable' ? (
+                <Alert
+                    size="sm"
+                    tone="info"
+                    title="Activity unavailable"
+                    message="The board couldn’t read the latest thread activity from T3. Check that T3 is connected, or open the thread there. The board tries again automatically."
+                />
+            ) : (
+                <AgentList agents={agents} details />
+            )}
         </WorkingAgents>
     );
 }
@@ -100,7 +95,7 @@ export function ActivityLine({ item }: { item: Item }) {
     const now = Date.now();
     const line = itemActivityLine(item, now, disconnected);
 
-    if (!line) return null;
+    if (!line || line.state === 'unavailable') return null;
 
     const agents = itemActivityAgents(item, now, disconnected);
     const listed = Array.isArray(agents) ? agents : undefined;

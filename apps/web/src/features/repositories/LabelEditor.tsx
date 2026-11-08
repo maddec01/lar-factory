@@ -1,22 +1,13 @@
 // The editor a label row opens: its name, colour and description, saving only what changed.
 
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import {
-    Alert,
-    Button,
-    buttonKind,
-    ColorSwatches,
-    Inline,
-    Input,
-    InsetPanel,
-    Text,
-    TrackerLabelEditor,
-} from '@lar-works/design-system';
+import { Alert, Button, ColorSwatches, Inline, Input, InsetPanel, Text } from '@lar-works/design-system';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore, type LabelChange } from './EditStore';
-import { OTHER_MAPPINGS, ProblemText, capitalized } from './LabelParts';
+import { OTHER_MAPPINGS, ProblemText } from './LabelParts';
 import { FieldRow } from '@/shared/settings/FieldRow';
+import { buttonKind, TrackerLabelEditor } from '@/ui/board';
 
 const SWATCHES = [
     'D73A4A',
@@ -153,3 +144,6 @@ export function LabelEditor({
         </TrackerLabelEditor>
     );
 }
+
+/** The tracker's label noun at the start of a field name. */
+const capitalized = (word: string) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`;

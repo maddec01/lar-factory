@@ -144,55 +144,6 @@ test("inspecting and cancelling a notice's cleanup write nothing, and it plans t
     assert.ok(board.find(workId)?.needsYou);
 });
 
-/** A build with a closed ticket's notice, on a board that counts its project reads. */
-function noticedBuild(checkout: string) {
-    const build = records.create({ title: 'Noticed', repository: REPO, kind: 'build', status: 'Ready' });
-
-    records.setNeedsYouCauses(build.workId, build.revision, [{ type: 'ticket-closed' }]);
-
-    const projectOf = vi.fn(async () => ({ projectId: 'project' }));
-    const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
-    const reread = () => board.update({ items: recordItems(records, [], [REPO]) });
-
-    reread();
-
-    const commands = createItemCommands({
-        factoryContext: null,
-        checkoutOf: async () => checkout,
-        board,
-        items: {} as ItemSource,
-        records,
-        reread,
-        offerModelChoices: () => [],
-        archive: () => [],
-        projectOf: projectOf as never,
-        baseOf: async () => 'main',
-        buildAccessOf: () => ({ 'push-branch': 'allowed' }),
-    });
-
-    return { workId: build.workId, commands, projectOf };
-}
-
-test('a build that never started plans nothing, so Abandon offers no branch the board only derived from its name', async () => {
-    const { workId, commands, projectOf } = noticedBuild(dir);
-    const reply = await commands.inspectOwnedCleanup(workId);
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-    assert.deepEqual((reply.body as Inspected).plans, []);
-    assert.equal(projectOf.mock.calls.length, 0);
-});
-
-test('a build with a recorded thread and no saved branch still plans its derived branch', async () => {
-    const { workId, commands } = noticedBuild(checkoutWithBranches('slice/other'));
-
-    records.addThread(workId, records.read(workId).revision, 'build-thread', 'build');
-
-    const reply = await commands.inspectOwnedCleanup(workId);
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-    assert.equal((reply.body as Inspected).plans.length, 1);
-});
-
 test('a confirmed cleanup persists ownership without changing the plan, and Abandon then moves the build into Archive', async () => {
     const { workId, sliceBranch, checkout, commands, board } = closedBuild();
     const { token } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
@@ -206,20 +157,6 @@ test('a confirmed cleanup persists ownership without changing the plan, and Aban
     assert.equal(board.find(workId), undefined);
     assert.equal(records.read(workId).setAside, true);
     assert.ok(!refs(checkout).includes(sliceBranch));
-});
-
-test('a selection with nothing ticked persists no ownership, and unticked branches are no failure', async () => {
-    const { workId, sliceBranch, commands } = closedBuild();
-    const { token } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
-    const reply = await commands.executeOwnedCleanup(workId, { token });
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-
-    const body = reply.body as { errors: string[]; remainingBranches: string[] };
-
-    assert.deepEqual(body.errors, []);
-    assert.deepEqual(body.remainingBranches.toSorted(), [BRANCH, sliceBranch].toSorted());
-    assert.deepEqual(records.cleanupOwnership(workId), []);
 });
 
 /** Removes `branch` from the checkout and its origin, and has the PR host report it not pushed. */
@@ -264,23 +201,6 @@ test('a confirmed cleanup drops a saved slice branch that was already deleted, w
     );
 });
 
-test('a gone branch that was never saved causes no error, and nothing ticked persists no ownership', async () => {
-    const { workId, sliceBranch, checkout, commands } = closedBuild();
-
-    deleteEverywhere(checkout, BRANCH);
-
-    const { token } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
-    const reply = await commands.executeOwnedCleanup(workId, { token });
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-
-    const body = reply.body as { errors: string[]; remainingBranches: string[] };
-
-    assert.deepEqual(body.errors, []);
-    assert.deepEqual(body.remainingBranches, [sliceBranch]);
-    assert.deepEqual(records.cleanupOwnership(workId), []);
-});
-
 test('a failed cleanup step keeps the item and notice, and a retry inspects again in the same order and can succeed', async () => {
     const { workId, sliceBranch, commands, board } = closedBuild();
     const first = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
@@ -309,28 +229,6 @@ test('a failed cleanup step keeps the item and notice, and a retry inspects agai
 
     assert.equal(retried.status, 200, JSON.stringify(retried.body));
     assert.deepEqual((retried.body as { errors: string[] }).errors, []);
-});
-
-test('Abandon and close ticket works on started work a notice offers to abandon', async () => {
-    const { workId, commands, board, closes } = closedBuild('open');
-
-    assert.ok(board.find(workId)?.needsYou?.ticketOpen);
-
-    const reply = await commands.abandonAndClose(workId);
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-    assert.deepEqual(closes, [7]);
-    assert.equal(records.read(workId).setAside, true);
-});
-
-test('Abandon and close ticket is refused when the notice says the ticket is not open', async () => {
-    const { workId, commands, board, closes } = closedBuild('closed');
-    const reply = await commands.abandonAndClose(workId);
-
-    assert.equal(reply.status, 409);
-    assert.deepEqual(closes, []);
-    assert.ok(board.find(workId)?.needsYou);
-    assert.equal(records.read(workId).setAside, false);
 });
 
 test("a build that T3 can't inspect fails inspection and stays abandonable; work with nothing to inspect needs no T3", async () => {

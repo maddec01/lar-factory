@@ -8,7 +8,7 @@ import { test, type TestContext } from 'vite-plus/test';
 
 import type { ParentMessage } from '../src/port/port.ts';
 import { testEnv } from './repo-support.ts';
-import { freePort, SAMPLE_DATA, SAMPLE_MODELS } from './server-support.ts';
+import { SAMPLE_DATA, SAMPLE_MODELS } from './server-support.ts';
 
 /** Starts a sample board with an IPC channel and returns the messages it sends before /healthz answers. */
 async function reportedPorts(t: TestContext, env: Record<string, string>): Promise<ParentMessage[]> {
@@ -51,10 +51,4 @@ test('a board with an IPC channel reports the port it took from its range once i
     assert.equal(messages.length, 1);
     assert.equal(messages[0]?.type, 'listening');
     assert.ok(messages[0]!.port >= 4317 && messages[0]!.port <= 4416);
-});
-
-test('a board with an IPC channel reports its pinned BOARD_PORT once it listens', async (t) => {
-    const port = await freePort();
-
-    assert.deepEqual(await reportedPorts(t, { BOARD_PORT: String(port) }), [{ type: 'listening', port }]);
 });

@@ -3,12 +3,12 @@
 import type { FirstRead } from '@lar-factory/shared';
 
 const STEP_TEXT: Record<FirstRead['step'], string> = {
-    repositories: 'Loading Projects',
-    items: 'Loading Projects',
-    finishing: 'Finishing up',
+    repositories: 'Loading projects…',
+    items: 'Loading projects…',
+    finishing: 'Finishing up…',
 };
 
 /** Keep loading copy stable as individual projects finish. */
 export function stepText(read: FirstRead): string {
-    return read.running.length ? 'Loading Projects' : STEP_TEXT[read.step];
+    return read.running.length ? 'Loading projects…' : STEP_TEXT[read.step];
 }

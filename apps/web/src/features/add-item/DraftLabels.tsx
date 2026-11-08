@@ -3,12 +3,13 @@
 
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Button, buttonKind, HiddenField, Inline, LabelChip, PanelField, Popover } from '@lar-works/design-system';
+import { Button, HiddenField, Inline, LabelChip, Popover } from '@lar-works/design-system';
 import { ChevronDown } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { LabelPicker } from '@/shared/labels/LabelPicker';
+import { buttonKind, PanelField } from '@/ui/board';
 
 const has = (labels: readonly string[], name: string) => labels.some((label) => sameLabel(label, name));
 const without = (labels: readonly string[], gone: readonly string[]) => labels.filter((label) => !has(gone, label));

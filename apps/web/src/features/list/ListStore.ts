@@ -1,4 +1,4 @@
-// Whether the List modal is open. The title bar's List button and the board search both open it.
+// Whether the list modal is open. The title bar's List button and the board search both open it.
 
 import { create } from 'zustand';
 

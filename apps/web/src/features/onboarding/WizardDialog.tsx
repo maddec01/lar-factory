@@ -3,7 +3,7 @@
 // is picked, or an offered run until Next or a change, then keeps it to resume. Once Finish saves, it says so, with Go to the board.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Button, buttonKind, Modal, Progress, SetupHeader, Text } from '@lar-works/design-system';
+import { Button, Modal, Progress, Text } from '@lar-works/design-system';
 import { ArrowRight, Check } from '@lar-works/design-system/icons';
 import { useEffect, useRef } from 'react';
 
@@ -12,6 +12,7 @@ import { STEP_TITLES } from './WizardChoices';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './WizardStore';
 import { ProjectChoiceIcon, ProjectIcon } from '@/features/repositories';
 import { useSettingsStore } from '@/features/settings';
+import { buttonKind, SetupHeader } from '@/ui/board';
 
 /**
  * Where focus goes when the dialog closes and the design system's Modal found nowhere to return it: the button that opened it;
@@ -23,21 +24,27 @@ function closedFocus(opener: HTMLElement | null): HTMLElement | null {
     return document.querySelector<HTMLElement>('.title-bar h1');
 }
 
-/** Back, then Next, or on the last step Finish; once Finish saved, Go to the board. */
+/** Back, then Next, or on the last step Finish; once Finish saved, Go to the board; on a sample board, back to it. */
 function Nav({ run }: { run: Run }) {
     const { projects, detection, finish, next, back, save, close } = useWizardStore();
 
+    const toBoard = () => {
+        close();
+        useSettingsStore.getState().setOpen(false);
+    };
+
     if (finish.state === 'done')
         return (
-            <Button
-                {...buttonKind('main')}
-                leftIcon={<Check />}
-                onClick={() => {
-                    close();
-                    useSettingsStore.getState().setOpen(false);
-                }}
-            >
+            <Button {...buttonKind('main')} leftIcon={<Check />} onClick={toBoard}>
                 Go to the board
+            </Button>
+        );
+
+    // A sample board adds no Project, so the way on is back to it, not a Next that can never enable.
+    if (projects.state === 'sample')
+        return (
+            <Button {...buttonKind('main')} onClick={toBoard}>
+                Explore the sample board
             </Button>
         );
 
@@ -61,7 +68,7 @@ function Nav({ run }: { run: Run }) {
                     leftIcon={<Check />}
                     onClick={() => void save()}
                 >
-                    {savingLabels ? 'Save and add Project' : 'Add Project'}
+                    {savingLabels ? 'Save and add project' : 'Add project'}
                 </Button>
             ) : (
                 <Button
@@ -114,7 +121,7 @@ function WizardModal({ run }: { run: Run }) {
 
     const steps = runSteps(run, detection);
     const at = steps.indexOf(run.step);
-    const doneCount = finished ? steps.length : at;
+    const doneCount = finished ? steps.length : at + 1;
     const done = finished ? 'Ready' : `Step ${at + 1} of ${steps.length}`;
     const picked = pickedProject(run, projects);
 
@@ -124,21 +131,23 @@ function WizardModal({ run }: { run: Run }) {
             <Modal.Content
                 ref={dialog}
                 data-onboarding-dialog
-                title={finished ? 'Project added' : STEP_TITLES[run.step]}
+                title={finished ? 'Project added' : run.step === 'project' ? 'Add a project' : STEP_TITLES[run.step]}
                 aria-describedby={undefined}
                 focusFirstField={false}
             >
                 <SetupHeader
                     icon={
                         picked ? (
-                            <ProjectChoiceIcon project={picked} size="row" />
+                            <ProjectChoiceIcon project={picked} size="md" />
                         ) : (
-                            run.repo && <ProjectIcon repo={run.repo} size="row" />
+                            run.repo && <ProjectIcon repo={run.repo} size="md" />
                         )
                     }
                     place={
                         <Text id="onboarding-place" tone="muted">
-                            Set up {picked?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a Project'}.
+                            {picked?.name || run.repo
+                                ? `Set up ${picked?.name ?? shownRepo(run.repo!).split('/').at(-1)}.`
+                                : 'Choose a repository to work on.'}
                         </Text>
                     }
                     progress={<Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />}

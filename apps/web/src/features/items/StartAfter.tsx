@@ -3,28 +3,31 @@
 // again disarms it. Only an armed one says it starts by itself. A start the server ran by itself and that failed leaves its error on the item. StartOrAfter is
 // the item's Start wherever a start can be blocked: Start after alone while it's blocked.
 
+import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import {
     blockerGroups,
+    itemName,
     openBlockerRefs,
     openBlockers,
-    itemName,
     ref,
     startHold,
     startRequest,
 } from '@lar-factory/shared';
-import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { ActionError, Button, buttonKind, DropdownMenu, StartLine } from '@lar-works/design-system';
+import { Button, DropdownMenu } from '@lar-works/design-system';
+import { ChevronDownIcon } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { writeState } from './ActionAvailability';
 import { ICON } from './ButtonIcons';
-import { writeState } from './ItemActions';
-import { opensOnChecked } from './ModelEntries';
+import { opensOnChecked } from './ModelMenuFocus';
+import { useOnRow } from './RowContext';
 import { StartControl, StartEntries } from './StartControl';
 import type { StartKind } from './StartStore';
-import { notify, DismissButton, closeKeepingFocus } from '@/features/notices';
+import { closeKeepingFocus, DismissButton, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { ActionError, buttonKind, StartLine } from '@/ui/board';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
@@ -56,6 +59,7 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
 
 /** Start after #n, or Starts after #n ✓ while armed, a Start. */
 function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData; namesBlocker: boolean }) {
+    const onRow = useOnRow();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const after = startsAfter(item);
@@ -79,7 +83,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
     if (armed) {
         return (
             <Button
-                {...buttonKind('start')}
+                {...buttonKind(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 shrinks
                 mark="✓"
@@ -105,10 +109,10 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
         <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
             <DropdownMenu.Trigger asChild>
                 <Button
-                    {...buttonKind('start')}
+                    {...buttonKind(onRow ? 'start' : 'main')}
                     leftIcon={ICON.play}
                     shrinks
-                    mark="▾"
+                    rightIcon={<ChevronDownIcon />}
                     data-start-after={item.id}
                     aria-label={`Start ${itemName(item)} after ${after}`}
                     title={`Pick a model to start it once ${waitsFor(item)}`}
@@ -117,7 +121,13 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                     Start after{namesBlocker && ` ${label}`}
                 </Button>
             </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
+            <DropdownMenu.Content
+                width="lg"
+                height="capped"
+                align="end"
+                aria-label={`Start ${ref(item)} after ${after} with`}
+                {...opensOnChecked}
+            >
                 <StartEntries item={item} data={data} onPick={pick} />
             </DropdownMenu.Content>
         </DropdownMenu>
@@ -151,6 +161,8 @@ export function StartOrAfter({
     linkedBeside?: string | undefined;
     namesBlocker?: boolean;
 }) {
+    const onRow = useOnRow();
+
     if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
 
     const hold = startHold(data, item.repo);
@@ -159,7 +171,13 @@ export function StartOrAfter({
 
     // Pointer events stay on while it's disabled, so its title says why.
     return (
-        <Button {...buttonKind('start')} leftIcon={ICON.play} data-start={item.id} disabled title={hold}>
+        <Button
+            {...buttonKind(onRow ? 'start' : 'main')}
+            leftIcon={ICON.play}
+            data-start={item.id}
+            disabled
+            title={hold}
+        >
             {label}
         </Button>
     );

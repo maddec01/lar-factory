@@ -23,7 +23,7 @@ export function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onR
                 options={data.repos.map((r) => ({
                     value: r.repo,
                     label: repoName(r.repo, data.repos),
-                    icon: <ProjectIcon repo={r.repo} size="small" />,
+                    icon: <ProjectIcon repo={r.repo} size="sm" />,
                 }))}
             />
             {hint && (

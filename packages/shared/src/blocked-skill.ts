@@ -7,11 +7,11 @@ import type { BlockingPath } from './install-skills.ts';
 export function blockedPathNote(blocking: BlockingPath): string {
     switch (blocking.place) {
         case 'agents':
-            return "the skill isn't installed";
+            return 'the skill isn’t installed';
         case 'antigravity':
-            return "the skill isn't installed for Antigravity";
+            return 'the skill isn’t installed for Antigravity';
         case 'profile':
-            return `the skill isn't linked into ~/${blocking.profile}; unticking the profile also clears it`;
+            return `the skill isn’t linked into ~/${blocking.profile}; unticking the profile also clears it`;
     }
 }
 
@@ -25,7 +25,7 @@ export function blockedBy<Path = string>(
     render: (path: string) => Path = (path) => path as Path,
 ): [string, ...(string | Path)[]] {
     return [
-        `blocked by ${paths.length === 1 ? 'a path' : 'paths'} Lar Factory didn't install: `,
+        `blocked by ${paths.length === 1 ? 'a path' : 'paths'} Lar Factory didn’t install: `,
         ...paths.flatMap((blocking, index) => [
             ...(index > 0 ? [', '] : []),
             render(blocking.path),

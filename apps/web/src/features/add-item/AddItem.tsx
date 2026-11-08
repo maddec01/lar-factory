@@ -1,25 +1,19 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 
 import { repoName } from '@lar-factory/shared';
-import {
-    AddItemButton,
-    Button,
-    buttonKind,
-    Modal,
-    PanelField,
-    Text,
-    TicketSearchPane,
-    ViewToggle,
-} from '@lar-works/design-system';
+import { Button, Modal, Text, ViewToggle } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { AddItemForm } from './AddItemForm';
-import { useAddItemStore } from './AddItemStore';
 import type { AddItemPane } from './AddItemStore';
+import { useAddItemStore } from './AddItemStore';
 import { RepoSelect } from './RepoSelect';
 import { TicketPicker } from './TicketPicker';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ExpandButton, useExpand } from '@/shared/dialogs/ExpandDialog';
+import { sampleCapability } from '@/shared/capabilities/sampleCapability';
+import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
+import { useExpand } from '@/shared/dialogs/useExpand';
+import { AddItemButton, buttonKind, PanelField, TicketSearchPane } from '@/ui/board';
 
 /** Find a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
 function PickTicketPane() {
@@ -33,9 +27,6 @@ function PickTicketPane() {
     return (
         <>
             <TicketSearchPane id="pick-ticket">
-                <Text variant="caption" tone="muted">
-                    Find tickets outside your list, or open one you’ve already added.
-                </Text>
                 <PanelField heading="Project" htmlFor="pick-repo">
                     <RepoSelect id="pick-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
                 </PanelField>
@@ -46,13 +37,16 @@ function PickTicketPane() {
                     key={selected?.repo}
                     onPick={(ticket) => pick(selected!.repo, ticket)}
                 />
-                {data.capture?.enabled === false && (
-                    <Text variant="caption" tone="muted">
-                        Picking tickets is disabled in sample mode.
-                    </Text>
-                )}
             </TicketSearchPane>
-            <Modal.Footer>
+            <Modal.Footer
+                leading={
+                    data.capture?.enabled === false && (
+                        <Text variant="caption" tone="muted" id="pick-ticket-reason">
+                            {sampleCapability(data, 'createIssue')}
+                        </Text>
+                    )
+                }
+            >
                 <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
@@ -80,7 +74,7 @@ function useDescription(): string {
     const selected = repos.find((r) => r.repo === values?.repo) ?? repos[0];
     const where = selected ? ` in ${repoName(selected.repo, repos)}` : '';
 
-    return pane === 'pick' ? `Find an open ticket${where}.` : `Record work${where} and add it to List.`;
+    return pane === 'pick' ? 'Find a ticket to add or open in List.' : `Record work${where} and add it to List.`;
 }
 
 /** The open dialog; each opening starts at the normal size. */
@@ -99,9 +93,7 @@ function AddItemDialog() {
                 aria-describedby="add-item-description"
                 presentation="paned"
                 expanded={expanded}
-                // Find a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result
-                // list scrolls inside it.
-                fitsContent={pane === 'pick'}
+                fitsContent={false}
                 headerActions={
                     <>
                         <PaneSwitch />

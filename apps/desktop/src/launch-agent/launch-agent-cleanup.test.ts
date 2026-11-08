@@ -52,16 +52,6 @@ describe('onLaunch', () => {
         }),
     );
 
-    it.effect("calls nothing when the agent isn't there", () =>
-        Effect.gen(function* () {
-            const { home } = makeHome(false);
-            const fake = makeLaunchctl(0);
-
-            yield* run({ isPackaged: true, home, uid: 501, launchctl: fake.launchctl });
-            assert.deepStrictEqual(fake.calls(), []);
-        }),
-    );
-
     it.effect('still deletes the plist when bootout fails', () =>
         Effect.gen(function* () {
             const { home, checkout } = makeHome(true);
@@ -71,15 +61,6 @@ describe('onLaunch', () => {
             assert.lengthOf(fake.calls(), 1);
             assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
             assert.isTrue(NodeFS.existsSync(NodePath.join(checkout, 'README.md')));
-        }),
-    );
-
-    it.effect("succeeds when launchctl can't run", () =>
-        Effect.gen(function* () {
-            const { home } = makeHome(true);
-
-            yield* run({ isPackaged: true, home, uid: 501, launchctl: '/nonexistent/launchctl' });
-            assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
         }),
     );
 

@@ -6,8 +6,10 @@ export function writeAccessProblem(
     repo: string,
     operation: RepositoryOperation,
     access: Partial<Record<RepositoryOperation, OperationAccess>>,
-    options: { azureReadOnly?: boolean; fineGrainedToken?: boolean } = {},
+    options: { azureReadOnly?: boolean; fineGrainedToken?: boolean; recheckAction?: boolean } = {},
 ): string | null {
+    const recheck = options.recheckAction ? '' : ' Recheck access in Settings.';
+
     if (onAzure(repo)) {
         if (
             options.azureReadOnly ??
@@ -16,17 +18,17 @@ export function writeAccessProblem(
             return 'Azure DevOps is read-only in this test session.';
     }
 
-    if (access[operation] === 'refused') return `Access to ${operation} was refused. Recheck access in Settings.`;
+    if (access[operation] === 'refused') return `Access to ${operation} was refused.${recheck}`;
 
     if (access[operation] === 'allowed') return null;
 
     if (!onAzure(repo) && options.fineGrainedToken)
-        return 'Fine-grained GitHub token permissions cannot be verified. Sign in with a classic token or gh OAuth login and recheck access.';
+        return 'This GitHub login doesn’t let the board confirm write access. Sign in with repository write access, then recheck access.';
 
     if (!onAzure(repo) && operation === 'edit-ticket' && access['push-branch'] !== 'allowed')
-        return "This login cannot edit other people's issues without verified push access. Recheck access in Settings.";
+        return `This login can’t edit other people’s issues without verified push access.${recheck}`;
 
-    return `Access to ${operation} is not checked yet. ${!onAzure(repo) ? 'GitHub permissions require a classic token or gh OAuth login to verify. ' : ''}Recheck access in Settings.`;
+    return `Access to ${operation} isn’t checked yet.${!onAzure(repo) ? ' Sign in to GitHub with repository write access to confirm permissions.' : ''}${recheck}`;
 }
 
 /** Returns the reason the factory can't create a new label by itself, or null when it can. */

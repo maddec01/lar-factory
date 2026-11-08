@@ -10,12 +10,13 @@ import {
     type GhCheck,
     type T3Check,
 } from '@lar-factory/shared';
-import { Button, buttonKind, ToolMissing } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useRecheckStore } from './RecheckStore';
 import { Warning } from './Warning';
 import { CopyButton } from '@/shared/copy/CopyButton';
+import { buttonKind, ToolMissing } from '@/ui/board';
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 
@@ -77,8 +78,8 @@ export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
     return (
         <ToolMissing title="T3 Code not found" action={<Recheck check={check} />}>
             <Fix check={check} tool="t3" what="the T3 Code CLI">
-                The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the login
-                shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.
+                The board starts threads through T3 Code’s <code>t3</code> command and didn’t find it on the login
+                shell’s PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.
             </Fix>{' '}
             {LOOKS_AGAIN}
         </ToolMissing>
@@ -88,7 +89,7 @@ export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
 /** The warning while T3 Code isn't running, which stops starts but not the read. */
 export function T3NotRunningWarning({ check }: { check: FailedCheck<T3Check> }) {
     return (
-        <Warning dismissKey="t3" title="T3 Code is not running.">
+        <Warning dismissKey="t3" title="T3 Code isn’t running.">
             The board starts threads through T3 Code, which has to be open. Open T3 Code, then press Recheck.{' '}
             {LOOKS_AGAIN} <Recheck check={check} />
         </Warning>
@@ -125,7 +126,7 @@ function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode
                 title: `GitHub CLI is older than ${GH_FLOOR}.`,
                 body: (
                     <>
-                        lar-shape's scripts need the <code>--parent</code>, <code>--add-sub-issue</code> and{' '}
+                        lar-shape’s scripts need the <code>--parent</code>, <code>--add-sub-issue</code> and{' '}
                         <code>--blocked-by</code> flags that gh {GH_FLOOR} added, and this gh is {check.version}. Run{' '}
                         <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.
                     </>
@@ -175,9 +176,9 @@ export function AzWarning({ check }: { check: FailedCheck<AzCheck> }) {
 
 /** What lar-shape does with each command whose check is a warning of its own. */
 const COMMAND_USES = {
-    git: "lar-build's agents branch, commit and push with",
-    jq: "lar-shape's scripts read gh's answers with",
-    curl: "lar-shape's scripts tell the board to refresh with",
+    git: 'lar-build’s agents branch, commit and push with',
+    jq: 'lar-shape’s scripts read gh’s answers with',
+    curl: 'lar-shape’s scripts tell the board to refresh with',
 } as const;
 
 export type Command = keyof typeof COMMAND_USES;

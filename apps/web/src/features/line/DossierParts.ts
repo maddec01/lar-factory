@@ -11,6 +11,7 @@ import {
     methodName,
     openBlockers,
     openQuestionThread,
+    plural,
     refKey,
 } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
@@ -173,3 +174,11 @@ export function dossiersOf(items: readonly Item[], all: readonly Item[]): Dossie
         .map((parent) => ({ parent, parts: partsOf(parent, all) }))
         .filter(({ parent, parts }) => shown.has(parent.id) || parts.some((p) => shown.has(p.item.id)));
 }
+
+/** How many of `parent`'s parts its records count that the board doesn't list: archived, or in a removed project. */
+export const unreadParts = (parent: Item, parts: readonly Part[]): number =>
+    Math.max(parent.subIssues.total, parts.length) - parts.length;
+
+/** Why a count holds parts no list shows, in the same words wherever the count is. */
+export const unreadPartsText = (missing: number): string =>
+    `${plural(missing, 'part')} ${missing === 1 ? 'isn’t' : 'aren’t'} on the board: archived, or in a project removed from the board`;

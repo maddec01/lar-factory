@@ -31,7 +31,7 @@ export const useArchiveStore = create<ArchiveState>()((set) => ({
             if (read === reads) set({ items, problem: null });
         } catch (err) {
             if (read === reads)
-                set({ problem: `Can't read Archive: ${err instanceof Error ? err.message : String(err)}.` });
+                set({ problem: `Can’t read Archive: ${err instanceof Error ? err.message : String(err)}.` });
         }
     },
 }));

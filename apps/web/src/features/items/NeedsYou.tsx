@@ -1,14 +1,15 @@
-import { itemName } from '@lar-factory/shared';
+import { itemName, needsAnswer, openQuestionThread } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
-import { Button, buttonKind, NeedsYouNotice, NeedsYouResult } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 import { useState } from 'react';
 
+import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
 import { askAbandon } from './CardActions';
-import { writeState } from './ItemActions';
 import { NeedsYouDialog } from './NeedsYouDialog';
+import { buttonKind, NeedsYouNotice, NeedsYouResult } from '@/ui/board';
 
 const LABELS: Record<NeedsYouOffer, string> = {
     'start-again': 'Start again',
@@ -24,7 +25,22 @@ const LABELS: Record<NeedsYouOffer, string> = {
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
 
-    if (!item.needsYou) return cleanupResult ? <NeedsYouResult>{cleanupResult}</NeedsYouResult> : null;
+    if (!item.needsYou) {
+        const thread = openQuestionThread(item);
+        const summary = thread?.questionSummary;
+
+        return needsAnswer(item) ? (
+            <NeedsYouNotice
+                reason={
+                    summary || 'This work is waiting for your answer or decision. Open the thread in T3 to continue.'
+                }
+            >
+                {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
+            </NeedsYouNotice>
+        ) : cleanupResult ? (
+            <NeedsYouResult>{cleanupResult}</NeedsYouResult>
+        ) : null;
+    }
 
     return <Notice item={item} notice={item.needsYou} data={data} cleanupResult={cleanupResult} />;
 }
@@ -45,10 +61,10 @@ function Notice({
 
     return (
         <NeedsYouNotice
-            reason={`Needs you: ${notice.reason}`}
+            reason={notice.reason}
             actions={notice.offers.map((offer) => (
                 <Button
-                    {...buttonKind('other')}
+                    {...buttonKind('other', offer === 'set-aside' ? 'danger' : undefined)}
                     key={offer}
                     {...state}
                     aria-label={`${LABELS[offer]}: ${itemName(item)}`}

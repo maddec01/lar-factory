@@ -1,9 +1,24 @@
 // A dossier's one line in the dock: its identity, first chip and Start, then its parts bar, what's next and figures.
 
-import { itemActivityStill, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { itemActivityStill, itemName } from '@lar-factory/shared';
+import { Badge } from '@lar-works/design-system';
+import type { MouseEvent, ReactNode } from 'react';
+
+import { Figures, RowSecondLine } from './Columns';
+import { open, usePicked } from './DossierHelpers';
+import type { Part } from './DossierParts';
+import { isDone, threadsOf } from './DossierParts';
+import type { Chip, Moving } from './DossierSummary';
+import { chipsOf, moving, nextOf, otherRepos, rowTooltip } from './DossierSummary';
+import { PartStart } from './PartStart';
+import { figuresOf } from './RowDetails';
+import { RowKind, RowSource } from './RowIdentity';
+import { stageOf } from './StageStatus';
+import { AzureFields, ItemTitle, shownStatus, STATUS_COLOR, useActivityUnavailable } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
 import {
-    Badge,
+    boardColor,
     DossierChips,
     DossierFields,
     DossierLine as Line,
@@ -20,20 +35,7 @@ import {
     RowKindCell,
     RowSide,
     RowStateCell,
-} from '@lar-works/design-system';
-import type { MouseEvent, ReactNode } from 'react';
-
-import { Figures, RowSecondLine, figuresOf } from './Columns';
-import { open, usePicked } from './DossierHelpers';
-import { isDone, threadsOf } from './DossierParts';
-import type { Part } from './DossierParts';
-import { moving, otherRepos, nextOf, chipsOf, rowTooltip } from './DossierSummary';
-import type { Moving, Chip } from './DossierSummary';
-import { PartStart } from './PartStart';
-import { RowKind, RowSource } from './RowIdentity';
-import { stageOf } from './StageTrack';
-import { AzureFields, ItemTitle, shownStatus, useActivityUnavailable, STATUS_COLOR } from '@/features/items';
-import { useBoardStore } from '@/services/board/board.hooks';
+} from '@/ui/board';
 
 /** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
 function PartsBar({ m }: { m: Moving }) {
@@ -57,9 +59,9 @@ function PartsBar({ m }: { m: Moving }) {
                     // oxlint-disable-next-line react/purity -- the pulse reads the time as of this render; board updates render the bar again
                     pulse: glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected),
                     color: isDone(p.item)
-                        ? 'var(--st-done)'
+                        ? boardColor.done
                         : glyph === 'Queued' || glyph === 'List'
-                          ? 'var(--soft)'
+                          ? boardColor.empty
                           : STATUS_COLOR[glyph],
                 };
             })}

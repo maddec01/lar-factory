@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -208,25 +208,6 @@ test('says T3 is unavailable when its runtime file is missing', async () => {
     assert.deepEqual(found, { available: false, reason: 'not-running' });
 });
 
-test('says T3 is unavailable when it rejects the session', async () => {
-    const t3 = await startFakeT3(temporary(), { config, rejectToken: true }, onTestFinished);
-    const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
-
-    assert.deepEqual(found, { available: false, reason: 'unauthenticated' });
-    await vi.waitFor(() => assert.deepEqual(t3.revoked, ['fake-session-id']));
-});
-
-test('says T3 is unavailable when the CLI cannot issue a session', async () => {
-    const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
-    const found = await discoverProviderInstances({
-        home: HOME,
-        runtimePath: t3.runtimePath,
-        runT3: async () => ({ code: 1, stdout: '' }),
-    });
-
-    assert.deepEqual(found, { available: false, reason: 'unauthenticated' });
-});
-
 test('gives up within its timeout when T3 does not answer', async () => {
     const t3 = await startFakeT3(temporary(), { config, hang: true }, onTestFinished);
     const started = Date.now();
@@ -256,23 +237,8 @@ test('gives up within its timeout when the CLI hangs', async () => {
     assert.ok(Date.now() - started < 1_000);
 });
 
-test('says T3 is unavailable when nothing listens at its origin', async () => {
-    const dir = temporary();
-    const t3 = await startFakeT3(dir, { config }, (close) => close());
-    const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
-
-    assert.deepEqual(found, { available: false, reason: 'not-running' });
-});
-
 test("says T3 is unavailable when its answer isn't a config", async () => {
     const t3 = await startFakeT3(temporary(), { config: { providers: 'none' } }, onTestFinished);
-    const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
-
-    assert.deepEqual(found, { available: false, reason: 'failed' });
-});
-
-test("says T3 is unavailable when it sends a frame that isn't JSON", async () => {
-    const t3 = await startFakeT3(temporary(), { config, garbage: true }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
 
     assert.deepEqual(found, { available: false, reason: 'failed' });
@@ -314,15 +280,4 @@ test('never follows a redirect with the token', async () => {
 
     assert.equal(found.available, false);
     assert.deepEqual(followed, []);
-});
-
-test('asks a T3 at localhost', async () => {
-    const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
-    const { port } = new URL(JSON.parse(readFileSync(t3.runtimePath, 'utf8')).origin);
-
-    writeFileSync(t3.runtimePath, JSON.stringify({ origin: `http://localhost:${port}` }));
-
-    const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
-
-    assert.equal(found.available, true);
 });

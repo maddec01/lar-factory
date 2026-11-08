@@ -1,7 +1,8 @@
 import { effectiveIssueSettings } from '@lar-factory/shared';
 import { InsetPanel } from '@lar-works/design-system';
 
-import { AccessReason, accessExplanation } from './AccessList';
+import { AccessReason } from './AccessList';
+import { accessExplanation } from './RepositoryAccess';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Switch } from '@/shared/settings/SettingControls';
 

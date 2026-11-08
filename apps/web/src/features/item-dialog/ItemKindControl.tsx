@@ -2,17 +2,19 @@
 
 import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
-import { Button, buttonKind, ChangeFailed, DetailFact as Fact, OptionSelect, Text } from '@lar-works/design-system';
-import { useEffect, useRef } from 'react';
+import { Alert, Button, OptionSelect, Text } from '@lar-works/design-system';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import { OPEN_ITEM_DIALOG } from './ItemDialogStore';
 import { useKindChangeStore } from './KindChangeStore';
 import { KIND_BADGES } from '@/features/items';
+import { SAMPLE_READ_ONLY } from '@/services/board/board.service';
+import { buttonKind, ChangeFailed } from '@/ui/board';
 
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
-    const { name, icon: Icon } = KIND_BADGES[value]!;
+    const { name, icon: Icon, hue } = KIND_BADGES[value]!;
 
-    return { value, label: name, icon: <Icon aria-hidden="true" /> };
+    return { value, label: name, hue, icon: <Icon aria-hidden="true" /> };
 });
 
 /**
@@ -21,7 +23,7 @@ const KIND_CHOICES = SWAP_KINDS.map((value) => {
  * A write disables this control and takes away the button that answered, which drops focus to the page or the dialog, so it comes
  * back here when the write ends. A control the user has moved to since keeps it.
  */
-export function ItemKindControl({ item }: { item: Item }) {
+export function ItemKindControl({ item, fallback }: { item: Item; fallback: ReactNode }) {
     const change = useKindChangeStore((state) => state.changes[item.id]);
     const saving = useKindChangeStore((state) =>
         Boolean(state.changes[item.id]?.saving || state.answers[item.id]?.saving),
@@ -42,24 +44,34 @@ export function ItemKindControl({ item }: { item: Item }) {
 
     const { start } = useKindChangeStore.getState();
 
-    if (!kindCanChange(item.kind)) return null;
+    if (!kindCanChange(item.kind)) return fallback;
+
+    return (
+        <span data-kind-control>
+            <OptionSelect
+                presentation="badge"
+                ref={control}
+                writesOnPick
+                label="Kind"
+                placeholder="No kind"
+                value={item.kind === 'issue' ? '' : item.kind}
+                options={KIND_CHOICES}
+                disabled={change?.saving}
+                onChange={(kind) => void start(item.id, kind as SwapKind)}
+            />
+        </span>
+    );
+}
+
+export function ItemKindFeedback({ item }: { item: Item }) {
+    const change = useKindChangeStore((state) => state.changes[item.id]);
+    const { start } = useKindChangeStore.getState();
 
     return (
         <>
-            <Fact label="Kind">
-                <OptionSelect
-                    presentation="setting"
-                    ref={control}
-                    writesOnPick
-                    label="Kind"
-                    placeholder="No kind"
-                    value={item.kind === 'issue' ? '' : item.kind}
-                    options={KIND_CHOICES}
-                    disabled={change?.saving}
-                    onChange={(kind) => void start(item.id, kind as SwapKind)}
-                />
-            </Fact>
-            {change?.error ? (
+            {change?.error === SAMPLE_READ_ONLY ? (
+                <Alert size="sm" tone="warning" message={SAMPLE_READ_ONLY} />
+            ) : change?.error ? (
                 <ChangeFailed
                     data-kind-change-failed
                     lines={[
@@ -67,13 +79,16 @@ export function ItemKindControl({ item }: { item: Item }) {
                         change.line ? `Changed on the ticket so far: ${change.line}` : 'Nothing changed on the ticket.',
                     ]}
                     action={
-                        <Button
-                            {...buttonKind('other')}
-                            loading={change.saving}
-                            onClick={() => void start(item.id, change.kind)}
-                        >
-                            Retry
-                        </Button>
+                        // A sample board refuses every write, so trying again would only refuse again.
+                        change.error !== SAMPLE_READ_ONLY && (
+                            <Button
+                                {...buttonKind('other')}
+                                loading={change.saving}
+                                onClick={() => void start(item.id, change.kind)}
+                            >
+                                Try again
+                            </Button>
+                        )
                     }
                 />
             ) : (

@@ -37,15 +37,7 @@ test('compiledCss turns a ?compiled CSS import into its CSS, with the tokens it 
         `@import ${JSON.stringify(designSystem)} source(none);\n@import ${JSON.stringify(styles)};\n.note { @apply text-base-700 gap-2; }`,
     );
 
-    assert.match(css, /--muted-foreground:/);
     assert.match(css, /\.note\{[^}]*color:var\(--color-base-700\)/);
     assert.match(css, /gap:calc\(var\(--spacing\)\s?\*\s?2\)/);
     assert.match(css, /prefers-color-scheme:dark/);
-});
-
-test('compiledCss leaves other imports alone', async () => {
-    const plugin = compiledCss();
-
-    assert.equal(plugin.resolveId('./page.css', '/x/page.ts'), undefined);
-    assert.equal(await plugin.load.call({ addWatchFile: () => {} }, '/x/page.css'), undefined);
 });

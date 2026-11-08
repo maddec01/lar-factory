@@ -4,12 +4,14 @@
 // onboarding or T3 has no project for its repository.
 
 import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { OpenThread, hasLiveThread } from './OpenThread';
-import { useOnRow } from './RowActions';
+import { hasLiveThread } from './ItemThreads';
+import { OpenThread } from './OpenThread';
+import { useOnRow } from './RowContext';
 import { StartOrAfter } from './StartAfter';
+import { buttonKind } from '@/ui/board';
 
 /** A dossier names it `label`; a row calls it Start. */
 export function StartBuild({
@@ -26,6 +28,7 @@ export function StartBuild({
     namesBlocker?: boolean;
 }) {
     const short = useOnRow();
+    const onRow = short;
     const label = given ?? (short ? 'Start' : 'Start build');
 
     // A thread already at work on the item would get a second one.
@@ -37,7 +40,7 @@ export function StartBuild({
     if (problem)
         return (
             <Button
-                {...buttonKind('start')}
+                {...buttonKind(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 disabled
                 title={problem}

@@ -3,7 +3,6 @@
 // switch shows off and disabled there.
 
 import type { AutoBuildPass } from '@lar-factory/shared';
-import { HeaderSwitch } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -11,6 +10,7 @@ import { showToast } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { Switch } from '@/shared/settings/SettingControls';
+import { HeaderSwitch } from '@/ui/board';
 
 /** How many builds a pass would start now. */
 function wouldStart(pass: AutoBuildPass | undefined): string {

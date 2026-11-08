@@ -1,19 +1,13 @@
 // The item dialog's sidebar relations: children, named attachments, blockers and Related work.
 
 import type { IssueRef, Item } from '@lar-factory/shared';
-import {
-    AttachmentLink,
-    DetailsSection,
-    DetailsText,
-    Disclosure,
-    SprintCount,
-    TicketLink,
-    TicketLinkList,
-} from '@lar-works/design-system';
+import { Disclosure, PageError, Stack } from '@lar-works/design-system';
 
 import { Placeholder } from './DetailsParts';
-import type { ItemDetailsRead } from './useItemDetails';
+import { sidebarSubTickets } from './Relations';
 import { AzureFields } from '@/features/items';
+import type { ItemDetailsRead } from '@/services/items/items.hooks';
+import { AttachmentLink, DetailsSection, SprintCount, TicketLink, TicketLinkList } from '@/ui/board';
 
 /** Named work item links share the child list's native fields and completion marks. */
 function TicketLinks({ tickets }: { tickets: IssueRef[] }) {
@@ -34,18 +28,30 @@ function TicketLinks({ tickets }: { tickets: IssueRef[] }) {
     );
 }
 
-/** Children, named attachments, blockers and Related work; a failed relation read leaves the description intact. */
-export function ItemRelations({ item, read }: { item: Item; read: ItemDetailsRead }) {
+/**
+ * Children the slice chips don't already show, named attachments, blockers and Related work; a failed relation read leaves
+ * the description intact.
+ */
+export function ItemRelations({
+    item,
+    read,
+    refresh,
+}: {
+    item: Item;
+    read: ItemDetailsRead;
+    refresh: () => Promise<boolean>;
+}) {
     if (read.state === 'failed') return null;
 
     if (read.state === 'loading')
-        return (
+        return item.subIssues.total > item.slices.length ? (
             <DetailsSection heading="Sub-tickets">
                 <Placeholder />
             </DetailsSection>
-        );
+        ) : null;
 
-    const { subTickets, attachments, blockers, related, relationsError } = read.details;
+    const { attachments, blockers, related, relationsError } = read.details;
+    const subTickets = sidebarSubTickets(item, read.details.subTickets);
     const sprint = item.currentSprint;
     const current = sprint ? subTickets.filter((s) => sprint.childNumbers.includes(s.number)) : subTickets;
     const other = sprint ? subTickets.filter((s) => !sprint.childNumbers.includes(s.number)) : [];
@@ -53,7 +59,14 @@ export function ItemRelations({ item, read }: { item: Item; read: ItemDetailsRea
     return (
         <>
             {relationsError && (
-                <DetailsText tone="error">Could not load linked work items: {relationsError}</DetailsText>
+                <Stack role="alert">
+                    <PageError
+                        size="inline"
+                        title="Couldn’t load linked work items"
+                        description={relationsError}
+                        primaryAction={{ label: 'Try again', onAction: () => void refresh() }}
+                    />
+                </Stack>
             )}
             {subTickets.length > 0 && (
                 <DetailsSection heading={sprint ? 'Children' : 'Sub-tickets'}>

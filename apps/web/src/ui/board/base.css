@@ -1,0 +1,101 @@
+/* The board app's base styles: a bare border takes the line colour, links keep their underline and inline code is
+   small mono. Focus takes the design system's one ring (foundations/theme.css). */
+@layer base {
+    * {
+        @apply border-line;
+    }
+
+    /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
+       button keeps its button's text colour. */
+    a {
+        color: inherit;
+        text-decoration: underline;
+    }
+    a[data-slot='button'] {
+        text-decoration: none;
+    }
+    a:hover {
+        text-decoration-thickness: --spacing(0.5);
+    }
+}
+
+code {
+    font: var(--text-xs) var(--font-mono);
+}
+
+.sr-only {
+    position: absolute;
+    width: --spacing(0.25);
+    height: --spacing(0.25);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* The design system's Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so
+   its title shows. */
+button:disabled[title] {
+    pointer-events: auto;
+    cursor: not-allowed;
+}
+
+/* The board app's window drags by its title bar; the design system's Modal, its overlay and its content, which cover
+   the bar, must not, so a click over the bar while a modal is open reaches the page. */
+[data-slot='modal-overlay'],
+[data-slot='modal-content'] {
+    -webkit-app-region: no-drag;
+}
+
+/* Status icons animate during agent work: a running build's glyph spins, and the glyphs, slices and part bars of work
+   at a pace of its own pulse. 24 steps per half-cycle: 30 updates/s for these tiny indicators, independent of display
+   refresh rate. */
+@keyframes status-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.status-spin {
+    animation: status-spin var(--motion-loop-spin) steps(72) infinite;
+}
+@keyframes status-pulse {
+    50% {
+        opacity: 0.35;
+    }
+}
+.status-pulse {
+    animation: status-pulse var(--motion-loop-pulse) steps(24) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .status-spin,
+    .status-pulse {
+        animation: none;
+    }
+}
+
+/* An activity's sweep across its track. 30 updates/s lets the compositor skip unchanged frames on high-refresh
+   displays. */
+@keyframes activity-sweep {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(300%);
+    }
+}
+.activity-sweep {
+    animation: activity-sweep var(--motion-loop-sweep) steps(54) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .activity-sweep {
+        animation: none;
+    }
+}
+
+/* The board's own loops pause behind an open blurred overlay, as the design system's do (foundations/theme.css): each
+   would otherwise keep repainting the blur. The title bar's refreshed ping is the one one-shot here: it starts visible
+   at opacity 0.6 and repaints the blur for 1.2 s on each landed read, and it finishes once the modal closes. */
+body
+    > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open'])
+    :is(.status-spin, .status-pulse, .activity-sweep, [data-ping]) {
+    animation-play-state: paused;
+}

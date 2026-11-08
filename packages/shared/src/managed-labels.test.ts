@@ -52,12 +52,12 @@ test('customLabelProblem and customTagProblem refuse every managed name', () => 
         assert.match(customLabelProblem(name)!, /is reserved for/, name);
         assert.match(customTagProblem(name)!, /is reserved for/, name);
     }
-    assert.equal(customLabelProblem('Defect'), "Defect is reserved for the item's kind.");
+    assert.equal(customLabelProblem('Defect'), 'Defect is reserved for the item’s kind.');
     assert.equal(customLabelProblem('status-queued'), 'status-queued is reserved for board status.');
-    assert.equal(customLabelProblem('Linked-Work'), "Linked-Work is reserved for the factory's saved links.");
+    assert.equal(customLabelProblem('Linked-Work'), 'Linked-Work is reserved for the factory’s saved links.');
 });
 
-test("a row hides managed labels and keeps every other label in the ticket's order", () => {
+test('a row hides managed labels and keeps every other label in the ticket’s order', () => {
     const labels = [
         'needs-triage',
         'status-queued',
@@ -134,7 +134,7 @@ const swapVocabulary = effectiveVocabulary({
     build: { type: null, labels: ['shipping'] },
 }).vocabulary;
 
-test("a kind swap removes the mapped labels of the other kinds and every kind name, and adds the new kind's own", () => {
+test('a kind swap removes the mapped labels of the other kinds and every kind name, and adds the new kind’s own', () => {
     assert.deepEqual(
         kindLabelSwap(
             [

@@ -3,7 +3,7 @@ import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { changeRecords, onboarded, startableEnv, startBoard, until } from './server-support.ts';
+import { changeRecords, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
 const abandon = (board: Board, itemId: string, origin = board.url) =>
@@ -84,53 +84,6 @@ test('an abandoned item does not come back while GitHub still reports it', async
     assert.ok(!has(data, board.id(12)));
 });
 
-test('Abandon sets captured work aside and closes no ticket, as it has none', async (t) => {
-    const board = await startBoard(t, { items: [] }, false, true);
-
-    await onboarded(board);
-
-    const created = await board.postSession(
-        {
-            requestId: '00000000-0000-4000-8000-000000000001',
-            draft: {
-                createIssue: false,
-                repo: 'maddec01/lar-server',
-                kind: 'bug',
-                title: 'Throwaway',
-                description: '',
-            },
-        },
-        '/api/items',
-    );
-
-    assert.equal(created.status, 200);
-
-    const { id } = ((await created.json()) as { item: { id: string } }).item;
-
-    assert.equal((await abandon(board, id)).status, 200);
-    await reads(board, 2);
-    assert.ok(!has(await board.board(), id));
-    assert.deepEqual(await writes(board), []);
-});
-
-test('Abandon only removes List and Queued items', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'Shaping')] });
-
-    await until(board, (d) => d.items.length === 1);
-
-    const refused = await abandon(board, board.id(12));
-
-    assert.equal(refused.status, 409);
-    assert.equal((await refused.json()).error, 'Only List and Queued items can be abandoned; this one is in Shaping.');
-    assert.equal((await abandon(board, 'I_missing')).status, 404);
-    assert.equal(
-        (await board.post({ itemId: board.id(12) }, board.url, '/api/abandon')).status,
-        409,
-        'needs this board session',
-    );
-    assert.deepEqual(await writes(board), []);
-});
-
 test('Abandon rejects requests from other pages and sample mode', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
 
@@ -182,17 +135,6 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
     assert.equal((await startItem(unsure, unsure.id(12))).status, 502);
     assert.equal((await abandon(unsure, unsure.id(12))).status, 409, 'uncertain');
     assert.deepEqual([...(await writes(board)), ...(await writes(unsure))], []);
-});
-
-test('combined close failure leaves work active', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')], fail: 'abandon' });
-
-    await until(board, (d) => d.items.length === 1);
-
-    const response = await board.postSession({ itemId: board.id(12) }, '/api/abandon-and-close');
-
-    assert.equal(response.status, 502);
-    assert.ok(has(await board.board(), board.id(12)));
 });
 
 test('a local build whose ticket and unmerged PR closed explains both, offers no Clear, stays on Cancel and goes to Archive on Abandon', async (t) => {

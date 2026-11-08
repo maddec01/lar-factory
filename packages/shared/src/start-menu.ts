@@ -3,7 +3,7 @@
 import { offers } from './model.ts';
 import type { ModelChoice, ModelGroup, StartResult } from './model.ts';
 
-/** The model choice an entry names by its data attributes; "T3 Project default" names none. */
+/** The model choice an entry names by its data attributes; "Project default in T3" names none. */
 export function choiceOf(entry: { instanceId?: string; model?: string }): ModelChoice | undefined {
     return entry.instanceId && entry.model ? { instanceId: entry.instanceId, model: entry.model } : undefined;
 }
@@ -34,12 +34,12 @@ export function remembersChoice(result: Partial<StartResult>): boolean {
     return Boolean(result.thread || result.uncertain);
 }
 
-/** A choice as the browser stores it; "T3 Project default" stores as null. */
+/** A choice as the browser stores it; "Project default in T3" stores as null. */
 export function storedChoice(choice: ModelChoice | undefined): string {
     return JSON.stringify(choice ?? null);
 }
 
-/** The choice the browser stored; none for "T3 Project default", nothing stored, or anything unreadable. */
+/** The choice the browser stored; none for "Project default in T3", nothing stored, or anything unreadable. */
 export function readChoice(raw: string | null): ModelChoice | undefined {
     try {
         const value = JSON.parse(raw ?? 'null') as Partial<ModelChoice> | null;
@@ -52,7 +52,7 @@ export function readChoice(raw: string | null): ModelChoice | undefined {
     }
 }
 
-/** The entry the menu highlights: the remembered choice while it is still offered, else none ("T3 Project default"). */
+/** The entry the menu highlights: the remembered choice while it is still offered, else none ("Project default in T3"). */
 export function highlightedChoice(groups: ModelGroup[], remembered: ModelChoice | undefined): ModelChoice | undefined {
     return remembered && offers(groups, remembered) ? remembered : undefined;
 }

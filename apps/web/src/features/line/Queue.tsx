@@ -2,12 +2,11 @@
 // item blocked by an open issue waits, with Start after. A filter only hides rows: the rest keep their numbers.
 // Reordering isn't built yet.
 
-import { StageList } from '@lar-works/design-system';
-
 import { Pane, PaneEmpty } from './Pane';
 import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { StageList } from '@/ui/board';
 
 /** `rows` are the Queue's items in the main area's scope, `shows` says which the filters leave. */
 export function Queue({ rows, shows }: { rows: Row[]; shows: (row: Row) => boolean }) {
@@ -23,7 +22,7 @@ export function Queue({ rows, shows }: { rows: Row[]; shows: (row: Row) => boole
                     ))}
                 </StageList>
             ) : (
-                <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from the List.">
+                <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from List.">
                     Nothing queued matches.
                 </PaneEmpty>
             )}

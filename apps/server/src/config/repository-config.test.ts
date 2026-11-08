@@ -4,15 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, type TestContext } from 'vite-plus/test';
 
-import {
-    isItemSource,
-    isRepo,
-    readBoardSettings,
-    readRepositoryList,
-    saveOnboarded,
-    saveOnboarding,
-    stillOnboarding,
-} from './repository-config.ts';
+import { isRepo, readBoardSettings, readRepositoryList, saveOnboarded, saveOnboarding } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -141,19 +133,6 @@ test('the list starts empty in its own file, leaving the old repositories.json a
     assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple' }]);
 });
 
-test('saving an onboarding makes the list file and its folder when there are none', async (t) => {
-    const dir = join(await dataDir(t), 'Lar Factory');
-
-    saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, dir);
-    assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple', onboarding: progress() }]);
-});
-
-test('the repositories still onboarding are those with progress', () => {
-    const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-docs', onboarding: progress() }];
-
-    assert.deepEqual(stillOnboarding(list), [{ repo: 'maddec01/lar-docs', progress: progress() }]);
-});
-
 test('finishing an onboarding leaves its entry with the repository alone, in place of the entry it was saved under', async (t) => {
     const dir = await dataDir(t, {
         'repository-settings.json': JSON.stringify({
@@ -279,13 +258,6 @@ test("a list file that isn't JSON, or whose refresh interval isn't a positive nu
             text,
         );
     }
-});
-
-test('only issues and a combined Azure board are item sources', () => {
-    assert.equal(isItemSource({ kind: 'issues' }), true);
-    assert.equal(isItemSource({ kind: 'azure-board', team: 'Team' }), true);
-    for (const source of [null, {}, { kind: 'azure-board' }, { kind: 'azure-board', team: '' }, { kind: 'unknown' }])
-        assert.equal(isItemSource(source), false);
 });
 
 test('removed-source onboarding entries do not break healthy repositories or later saves', async (t) => {

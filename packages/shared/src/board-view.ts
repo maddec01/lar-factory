@@ -10,6 +10,7 @@ import {
     onAzure,
     itemName,
     openQuestionThread,
+    prReadiness,
     repoKey,
     repoName,
     sameRepo,
@@ -114,7 +115,8 @@ const onDesk = (item: Item, unavailable: boolean) =>
     needsAnswer(item) ||
     (item.kind !== 'concept' &&
         (item.status === 'Verify' || item.status === 'Ready to merge') &&
-        !workingAgain(item, unavailable));
+        !workingAgain(item, unavailable) &&
+        (!!item.needsYou || !!openQuestionThread(item) || prReadiness(item)?.state !== 'active'));
 
 /** The one stage section an item's row belongs in. A concept builds nothing itself, so it only ever queues or refines. */
 function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
@@ -246,7 +248,7 @@ export function prLabel(pr: LinkedPr): string {
     return `PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'open' ? '' : ` (${pr.state})`}`;
 }
 
-export const UNREADABLE = 'Usage details are unavailable.';
+export const UNREADABLE = 'Agent work unavailable.';
 
 /** Whether Abandon answers the item's notice, whatever its Status, rather than taking it off List or Queued. */
 export function abandonsNotice(item: Item): boolean {
@@ -292,10 +294,10 @@ export const ABANDON_CLEANUP = {
     remoteWarning:
         'Deleting the remote branch of a closed PR can stop it being reopened, including after a restore from Archive.',
     failed: (item: Item) =>
-        `Cleanup didn't finish. The item stays on the desk with its notice${item.number ? ", and its ticket hasn't changed" : ''}.`,
+        `Cleanup didn’t finish. The item stays on the desk with its notice${item.number ? ', and its ticket hasn’t changed' : ''}.`,
     nothing: 'The board has no branch or worktree it can remove for this work, so anything there stays.',
     uninspected: (reason: string) =>
-        `The board can't inspect this work's branch or worktree. ${reason} You can abandon without cleanup, and anything there stays.`,
+        `The board can’t inspect this work’s branch or worktree. ${reason} You can abandon without cleanup, and anything there stays.`,
 };
 
 /** Confirms ticket closure for work set aside in Archive. */
@@ -342,7 +344,7 @@ function ticketCauses(item: Item): string[] {
 export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: string; detail: string } {
     const name = itemName(item);
     const told = ticketCauses(item);
-    const ticket = told.length ? told.join(' ') : item.number ? "Its ticket doesn't change." : 'It has no ticket.';
+    const ticket = told.length ? told.join(' ') : item.number ? 'Its ticket doesn’t change.' : 'It has no ticket.';
     const noThread = item.needsYou?.causes.some((cause) => cause.type === 'no-thread')
         ? 'No thread starts, so T3 still shows none for this work.'
         : '';
@@ -356,7 +358,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
             return {
                 question: `Reopen the PR of ${name}?`,
                 detail: sentences(
-                    `This reopens its PR in its provider. The item stays at ${item.status}, and its branch and worktree don't change.`,
+                    `This reopens its PR in its provider. The item stays at ${item.status}, and its branch and worktree don’t change.`,
                     ticket,
                     noThread,
                     outcome,
@@ -378,7 +380,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
                 detail: sentences(
                     `The item stays on the desk at ${item.status}.`,
                     ticket,
-                    "Its PR, branch and worktree don't change.",
+                    'Its PR, branch and worktree don’t change.',
                     noThread,
                     outcome,
                 ),
@@ -398,7 +400,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
                     ticket,
                     build
                         ? 'The board checks its PR, branch and worktree, then says what happens to them.'
-                        : "Its PR, branch and worktree don't change.",
+                        : 'Its PR, branch and worktree don’t change.',
                     'Once T3 shows the thread, the notice goes away. If the start fails, the notice stays.',
                 ),
             };
@@ -413,8 +415,8 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
                     `This moves the item to ${queue ? 'Queued' : 'List'}.`,
                     item.kind === 'build' ? 'Its slices and build progress reset.' : '',
                     told.length || !item.number
-                        ? `${ticket} Its PR doesn't change.`
-                        : "Its ticket and PR don't change.",
+                        ? `${ticket} Its PR doesn’t change.`
+                        : 'Its ticket and PR don’t change.',
                     'Its old branches and worktrees stay unless you choose to remove them next.',
                     noThread,
                     outcome,

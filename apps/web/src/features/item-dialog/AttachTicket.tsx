@@ -2,12 +2,13 @@
 // The work keeps its work ID, and its ticket then adds the ticket's link and context.
 
 import type { Item } from '@lar-factory/shared';
-import { Button, buttonKind, SummaryPanel } from '@lar-works/design-system';
+import { Button } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { TicketPicker } from '@/features/add-item';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { buttonKind, SummaryPanel } from '@/ui/board';
 
 export function AttachTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);

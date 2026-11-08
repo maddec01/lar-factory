@@ -1,7 +1,6 @@
 // Local repository list and settings. No repository file is factory configuration.
 export {
     isRepo,
-    isItemSource,
     isProgress,
     readRepositoryList,
     saveConnections,

@@ -6,24 +6,16 @@ import {
     type ModelChoice,
     type ModelGroup,
 } from '@lar-factory/shared';
-import {
-    Button,
-    buttonKind,
-    DropdownMenu,
-    ProjectValueList,
-    SettingControl,
-    Stack,
-    Text,
-} from '@lar-works/design-system';
-// Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on T3 Project default.
+import { Alert, OptionSelect, Stack } from '@lar-works/design-system';
+// Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on Project default in T3.
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { ModelEntries, opensOnChecked } from '@/features/items';
 import { postAction, receive } from '@/services/board/board.service';
+import { ProjectValueList, SettingControl } from '@/ui/board';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {
-    if (!selected) return 'T3 Project default';
+    if (!selected) return 'Project default in T3';
 
     const group = groups.find((g) => g.instanceId === selected.instanceId);
     const model = group?.models.find((m) => m.slug === selected.model);
@@ -52,12 +44,10 @@ function RepositoryDefaults({ data }: { data: AutoBuildData }) {
 /** Disabled until the board has read the setting, which it never does in sample mode. */
 export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
     const { autoBuild: state, modelChoices: groups } = data;
-    const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const save = async (model: ModelChoice | undefined) => {
         flushSync(() => {
-            setOpen(false);
             setSaving(true);
             setError(null);
         });
@@ -74,33 +64,52 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
     return (
         <Stack space="group" data-auto-build-model>
             <SettingControl>
-                <DropdownMenu open={open && !saving} onOpenChange={(next) => setOpen(next && !saving)} modal={false}>
-                    <DropdownMenu.Trigger asChild>
-                        <Button
-                            {...buttonKind('other')}
-                            aria-label="Auto-build model"
-                            disabled={!state}
-                            aria-busy={saving || undefined}
-                            aria-disabled={saving || undefined}
-                            shrinks
-                            mark="▾"
-                        >
-                            {saving ? 'Saving…' : modelLabel(groups, state?.model)}
-                        </Button>
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end" aria-label="Auto-build model" {...opensOnChecked}>
-                        <ModelEntries
-                            groups={groups}
-                            selected={state?.model}
-                            heading="Build with"
-                            onPick={(model) => void save(model)}
-                        />
-                    </DropdownMenu.Content>
-                </DropdownMenu>
+                <OptionSelect
+                    label="Auto-build model"
+                    presentation="setting"
+                    writesOnPick
+                    disabled={!state}
+                    busy={saving}
+                    aria-busy={saving || undefined}
+                    value={
+                        state?.model
+                            ? JSON.stringify({ instanceId: state.model.instanceId, model: state.model.model })
+                            : 'default'
+                    }
+                    options={[
+                        { value: 'default', label: 'Project default in T3' },
+                        ...groups.flatMap((group) =>
+                            group.models.map((model) => ({
+                                value: JSON.stringify({ instanceId: group.instanceId, model: model.slug }),
+                                label: `${group.name} ${model.label}`,
+                            })),
+                        ),
+                        ...(state?.model &&
+                        !groups.some(
+                            (group) =>
+                                group.instanceId === state.model?.instanceId &&
+                                group.models.some((model) => model.slug === state.model?.model),
+                        )
+                            ? [
+                                  {
+                                      value: JSON.stringify({
+                                          instanceId: state.model.instanceId,
+                                          model: state.model.model,
+                                      }),
+                                      label: modelLabel(groups, state.model),
+                                      disabled: true,
+                                  },
+                              ]
+                            : []),
+                    ]}
+                    onChange={(value) =>
+                        void save(value === 'default' ? undefined : (JSON.parse(value) as ModelChoice))
+                    }
+                />
                 {error && (
-                    <Text variant="caption" tone="danger" role="alert">
+                    <Alert size="sm" tone="danger">
                         {error}
-                    </Text>
+                    </Alert>
                 )}
             </SettingControl>
             <RepositoryDefaults data={data} />

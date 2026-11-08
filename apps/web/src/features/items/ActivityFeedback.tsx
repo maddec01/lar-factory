@@ -1,69 +1,9 @@
-// An item's activity as the board reads it from T3: whether it is at work, the Status the board names it by, and the
-// track that sweeps while it runs.
+// The item's activity track, named by its current feedback and sweeping while that feedback says it is running.
 
-import {
-    activityLost,
-    activityUnavailable,
-    buildActivity,
-    itemActivityLine,
-    itemActivityThread,
-    startProgressOf,
-    workingAgain,
-} from '@lar-factory/shared';
-import type { Item, Status } from '@lar-factory/shared';
-import { ActivityLabel, ActivityTrack } from '@lar-works/design-system';
+import { buildActivity } from '@lar-factory/shared';
 
-import { PURPOSE, useStart } from './StartStore';
-import { useBoardStore } from '@/services/board/board.hooks';
-import { useClock } from '@/shared/time/useClock';
+import { ActivityTrack } from '@/ui/board';
 
-export const useActivityUnavailable = () =>
-    useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
-
-/** Whether T3's answer for `item`'s thread is lost, which a read going old changes with no new data. */
-const useActivityLost = (item: Item) => useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
-
-export function useActivityFeedback(item: Item) {
-    const data = useBoardStore((state) => state.data);
-    // Shaping work has an activity only while a start runs; Start build's holds every other status.
-    const kind = item.status === 'Shaping' || item.status === 'Queued' ? 'refine' : 'build';
-    const pressed = useStart(item.id, kind)?.phase === 'pending';
-    const unavailable = useActivityUnavailable();
-    const disconnected = useBoardStore((state) => !!state.clientError);
-    const lineState = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
-    // An error from another read, such as GitHub's, leaves T3's activity readable, and the row's phase with it.
-    const readable = !!lineState && lineState !== 'unavailable';
-    const lost = useActivityLost(item);
-
-    return buildActivity(
-        item,
-        (unavailable && !readable) || lost,
-        pressed ? { phase: 'starting' } : startProgressOf(data, item.id, PURPOSE[kind]),
-    );
-}
-
-/** How the board names an item now: its recorded Status, or Working while it is at work again. */
-export function shownStatus(item: Item, unavailable: boolean): { working: boolean; word: string; glyph: Status } {
-    return workingAgain(item, unavailable)
-        ? { working: true, word: 'Working', glyph: 'In progress' }
-        : { working: false, word: item.status, glyph: item.status };
-}
-
-export const useShownStatus = (item: Item) => {
-    const unavailable = useActivityUnavailable();
-    const lost = useActivityLost(item);
-
-    return shownStatus(item, unavailable || lost);
-};
-
-export function ActivityFeedback({
-    feedback,
-    labelOnly = false,
-}: {
-    feedback: ReturnType<typeof buildActivity>;
-    labelOnly?: boolean;
-}) {
-    if (labelOnly) return <ActivityLabel>{feedback.label}</ActivityLabel>;
-
+export function ActivityFeedback({ feedback }: { feedback: ReturnType<typeof buildActivity> }) {
     return <ActivityTrack label={feedback.label} running={feedback.running} />;
 }

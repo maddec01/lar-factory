@@ -1,9 +1,10 @@
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Button, buttonKind, LabelChip, TrackerLabelRow } from '@lar-works/design-system';
+import { Button, LabelChip } from '@lar-works/design-system';
 import { Pencil, Trash2 } from '@lar-works/design-system/icons';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { LabelEditor } from './LabelEditor';
+import { buttonKind, TrackerLabelRow } from '@/ui/board';
 
 export function LabelRow({
     label,

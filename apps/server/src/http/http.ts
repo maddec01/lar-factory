@@ -107,6 +107,7 @@ interface Write {
     what: string;
     /** The refusal in sample mode, before the body is read. */
     disabled?: string;
+    disabledCode?: 'sample-mode';
     /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
     restarted?: () => object;
     run(input: Record<string, unknown>): Promise<Reply>;
@@ -666,6 +667,7 @@ export function createBoardServer({
         '/api/onboarding/projects': {
             what: 'the folder to add',
             disabled: 'Sample mode onboards no Project.',
+            disabledCode: 'sample-mode',
             async run(input) {
                 const created = await createProject(input);
 
@@ -677,6 +679,7 @@ export function createBoardServer({
         '/api/onboarding/repositories': {
             what: 'the onboarding to keep',
             disabled: 'Sample mode onboards no Project.',
+            disabledCode: 'sample-mode',
             async run(input) {
                 const kept = await keepOnboarding(input);
 
@@ -691,6 +694,7 @@ export function createBoardServer({
         '/api/onboarding/vocabulary': {
             what: 'the Project vocabulary to discover',
             disabled: 'Sample mode onboards no Project.',
+            disabledCode: 'sample-mode',
             async run(input) {
                 try {
                     const discovery = await discoverVocabulary(input.repo as string);
@@ -704,6 +708,7 @@ export function createBoardServer({
         '/api/onboarding/detect': {
             what: 'the Project whose setup to detect',
             disabled: 'Sample mode onboards no Project.',
+            disabledCode: 'sample-mode',
             async run(input) {
                 const detected = await detectSetup(input);
 
@@ -716,6 +721,7 @@ export function createBoardServer({
         '/api/onboarding/setup': {
             what: 'the answers to save',
             disabled: 'Sample mode onboards no Project.',
+            disabledCode: 'sample-mode',
             async run(input) {
                 const saved = await saveSetup(input);
 
@@ -798,7 +804,7 @@ export function createBoardServer({
         write: Write,
     ): Promise<Record<string, unknown> | null> {
         if (sample && write.disabled) {
-            json(res, 403, { error: write.disabled });
+            json(res, 403, { error: write.disabled, ...(write.disabledCode && { code: write.disabledCode }) });
 
             return null;
         }
@@ -860,7 +866,8 @@ export function createBoardServer({
 
     /** Lists T3's projects and repository origins for onboarding. */
     async function projectsRequest(res: ServerResponse): Promise<void> {
-        if (sample && !sampleReadsT3) return json(res, 403, { error: 'Sample mode onboards no Project.' });
+        if (sample && !sampleReadsT3)
+            return json(res, 403, { error: 'Sample mode onboards no Project.', code: 'sample-mode' });
 
         try {
             json(res, 200, { projects: await projectChoices() });

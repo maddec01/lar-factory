@@ -9,14 +9,16 @@ import {
     closesTicketOnAbandon,
     hasClosedPr,
 } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, Modal, Stack, Text } from '@lar-works/design-system';
-import { useEffect, useState, useRef } from 'react';
+import { Alert, Button, ConfirmDialog, Stack, Text } from '@lar-works/design-system';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { useAbandonStore } from './AbandonStore';
 import { abandonItem, closeTicket } from './CardActions';
-import { CleanupChoices, executeCleanup, inspectCleanup, useCleanupChoices } from './CleanupChoices';
+import { CleanupChoices } from './CleanupChoices';
+import { executeCleanup, inspectCleanup, useCleanupChoices } from './useCleanupChoices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
+import { buttonKind } from '@/ui/board';
 
 /** The cleanup of the notice's work `itemId` names while its confirmation is open: null for any other Abandon. */
 function useNoticeCleanup(itemId: string | null) {
@@ -46,7 +48,7 @@ function useNoticeCleanup(itemId: string | null) {
     // StrictMode starts an effect twice, and one read answers for both.
     const opened = useRef<string | null>(null);
 
-    useEffect(() => {
+    const inspectOpened = useEffectEvent(() => {
         if (opened.current === itemId) return;
 
         opened.current = itemId;
@@ -58,6 +60,11 @@ function useNoticeCleanup(itemId: string | null) {
 
         // oxlint-disable-next-line react/set-state-in-effect -- a new item's inspection clears the last one's answer as it starts
         if (itemId) void inspect(itemId);
+    });
+
+    useEffect(() => {
+        // oxlint-disable-next-line react/set-state-in-effect -- a new item resets its cleanup inspection before the read starts
+        inspectOpened();
     }, [itemId]);
 
     return {
@@ -170,10 +177,10 @@ export function AbandonDialog() {
 
         let result = await postAction('/api/abandon-and-close', { itemId: item.id });
 
-        if (result.error === "Can't reach the board server. Try again.") {
+        if (result.error === 'Can’t reach the board server. Try again.') {
             result = await postAction('/api/abandon-and-close', { itemId: item.id });
 
-            if (result.error === "Can't reach the board server. Try again.")
+            if (result.error === 'Can’t reach the board server. Try again.')
                 result.error =
                     'The outcome is unknown. Restore the connection and try again to reconcile the work and ticket.';
         }
@@ -199,96 +206,67 @@ export function AbandonDialog() {
     const loss = notice.choices.confirmLoss;
     const failedCombined = !!notice.failure?.combined && closesTicketOnAbandon(item);
 
+    const confirmLabel = notice.failure
+        ? failedCombined
+            ? 'Abandon and close ticket without further cleanup'
+            : 'Abandon without further cleanup'
+        : loss
+          ? 'Confirm loss and abandon'
+          : notice.uninspected
+            ? 'Abandon without cleanup'
+            : prompt.confirm;
+
     return (
-        <Modal onClose={dismiss}>
-            {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
-            <Modal.Content
-                id="abandon-dialog"
-                role="alertdialog"
-                title={prompt.question}
-                description={closing ? 'Close its ticket.' : 'Set this item aside.'}
-                aria-describedby="abandon-detail"
-                closeOnOverlayClick={false}
-                data-abandon-step={step}
-            >
-                <Modal.Body>
-                    <Stack space="related">
-                        <Text id="abandon-detail" tone="muted">
-                            {prompt.detail}
-                        </Text>
-                        {item.abandonRefusal && <Text>{item.abandonRefusal}</Text>}
-                        {notice.checking && <Text role="status">Checking the branch and worktree...</Text>}
-                        {notice.uninspected && (
-                            <Alert tone="warning">{ABANDON_CLEANUP.uninspected(notice.uninspected)}</Alert>
-                        )}
-                        <CleanupChoices
-                            choices={notice.choices}
-                            remoteNote={hasClosedPr(item) && <Text>{ABANDON_CLEANUP.remoteWarning}</Text>}
-                        />
-                        {notice.failure && (
-                            <Alert tone="danger">
-                                {ABANDON_CLEANUP.failed(item)} {notice.failure.message}
-                            </Alert>
-                        )}
-                        {error && <Alert tone="danger">{error}</Alert>}
-                    </Stack>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button {...buttonKind('other')} disabled={pending || unknown} onClick={dismiss}>
-                        {closing ? closeTicketPrompt(item).keep : 'Cancel'}
+        <ConfirmDialog
+            id="abandon-dialog"
+            data-abandon-step={step}
+            title={prompt.question}
+            consequence={prompt.detail}
+            confirmLabel={confirmLabel}
+            cancelLabel={closing ? closeTicketPrompt(item).keep : 'Cancel'}
+            busy={pending}
+            confirmDisabled={unknown || notice.checking}
+            cancelDisabled={unknown}
+            onCancel={dismiss}
+            onConfirm={() => void confirm(notice.failure ? failedCombined : false, !!notice.failure)}
+            secondaryAction={
+                notice.failure ? (
+                    <Button {...buttonKind('other')} disabled={pending} onClick={notice.retry}>
+                        Try cleanup again
                     </Button>
-                    {notice.failure ? (
-                        <>
-                            <Button {...buttonKind('other')} disabled={pending} onClick={notice.retry}>
-                                Try cleanup again
-                            </Button>
-                            <Button
-                                {...buttonKind('main', 'danger')}
-                                wrap
-                                disabled={pending}
-                                onClick={() => void confirm(failedCombined, true)}
-                            >
-                                {failedCombined
-                                    ? 'Abandon and close ticket without further cleanup'
-                                    : 'Abandon without further cleanup'}
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button
-                                {...buttonKind('main', 'danger')}
-                                wrap
-                                disabled={pending || unknown || notice.checking}
-                                onClick={() => void confirm()}
-                            >
-                                {loss
-                                    ? 'Confirm loss and abandon'
-                                    : notice.uninspected
-                                      ? 'Abandon without cleanup'
-                                      : prompt.confirm}
-                            </Button>
-                            {!closing && closesTicketOnAbandon(item) && (
-                                <Button
-                                    {...buttonKind('main', 'danger')}
-                                    wrap
-                                    disabled={pending || notice.checking}
-                                    onClick={() => void confirm(true)}
-                                >
-                                    {pending
-                                        ? 'Working…'
-                                        : error
-                                          ? 'Try again'
-                                          : loss
-                                            ? 'Confirm loss, abandon and close ticket'
-                                            : notice.uninspected
-                                              ? 'Abandon and close ticket without cleanup'
-                                              : 'Abandon and close ticket'}
-                                </Button>
-                            )}
-                        </>
-                    )}
-                </Modal.Footer>
-            </Modal.Content>
-        </Modal>
+                ) : !closing && closesTicketOnAbandon(item) ? (
+                    <Button
+                        {...buttonKind('other')}
+                        wrap
+                        disabled={pending || notice.checking}
+                        onClick={() => void confirm(true)}
+                    >
+                        {error
+                            ? 'Try again'
+                            : loss
+                              ? 'Confirm loss, abandon and close ticket'
+                              : notice.uninspected
+                                ? 'Abandon and close ticket without cleanup'
+                                : 'Abandon and close ticket'}
+                    </Button>
+                ) : undefined
+            }
+        >
+            <Stack space="related">
+                {item.abandonRefusal && <Text>{item.abandonRefusal}</Text>}
+                {notice.checking && <Text role="status">Checking the branch and worktree…</Text>}
+                {notice.uninspected && <Alert tone="warning">{ABANDON_CLEANUP.uninspected(notice.uninspected)}</Alert>}
+                <CleanupChoices
+                    choices={notice.choices}
+                    remoteNote={hasClosedPr(item) && <Text>{ABANDON_CLEANUP.remoteWarning}</Text>}
+                />
+                {notice.failure && (
+                    <Alert tone="danger">
+                        {ABANDON_CLEANUP.failed(item)} {notice.failure.message}
+                    </Alert>
+                )}
+                {error && <Alert tone="danger">{error}</Alert>}
+            </Stack>
+        </ConfirmDialog>
     );
 }

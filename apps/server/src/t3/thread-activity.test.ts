@@ -67,8 +67,9 @@ test('a tool reads as its title with a path shortened, or its name without its s
         'Read brief.md',
     );
     expect(action({ type: 'dynamic_tool', title: 'Search for todo items' })).toBe('Search for todo items');
-    expect(action({ type: 'dynamic_tool', toolName: 'mcp__t3-code__preview_act' })).toBe('preview_act');
-    expect(action({ type: 'dynamic_tool', toolName: 't3-code.link_pull_request' })).toBe('link_pull_request');
+    expect(action({ type: 'dynamic_tool', toolName: 'mcp__t3-code__preview_act' })).toBe('Using a tool');
+    expect(action({ type: 'dynamic_tool', toolName: 't3-code.link_pull_request' })).toBe('Using a tool');
+    expect(action({ type: 'dynamic_tool', toolName: 'AskUserQuestion' })).toBe('Waiting for your answer');
     expect(action({ type: 'file_change', fileName: '/tmp/scratch/brief.md' })).toBe('Edit brief.md');
     expect(action({ type: 'web_search' })).toBe('Search the web');
 });
@@ -235,7 +236,7 @@ test('a pass reads the agents under a build, its child tasks and their native su
     expect(reads.read(atWork).activity).toEqual({
         available: true,
         readAt: expect.any(String),
-        action: 'delegate_task',
+        action: 'Using a tool',
         actionAt: AT,
         toolRunning: true,
         agents: [

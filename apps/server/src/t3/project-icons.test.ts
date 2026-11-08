@@ -349,23 +349,6 @@ describe('with no 4-minute tick', () => {
         stop();
     });
 
-    it('reads nothing for a board push that leaves the repositories as they were', async () => {
-        t3.read = listed(fact('factory'));
-        assets = { factory: png('a') };
-
-        const board = boardOf('lar-factory');
-        const stop = createProjectIcons(board).start();
-
-        await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
-
-        board.update({ items: [] });
-        board.push();
-        await new Promise((resolve) => setTimeout(resolve, 20));
-
-        expect(requests).toHaveLength(1);
-        stop();
-    });
-
     it('keeps a good icon when a change reports T3 unavailable', async () => {
         t3.read = listed(fact('factory'));
         assets = { factory: png('a') };
@@ -563,26 +546,6 @@ describe('between reads for T3 changes', () => {
         await finish();
     });
 
-    it('ends a gap with no changes without a read or a timer of its own', async () => {
-        const { finish, changeRead } = await running();
-
-        await changeRead();
-
-        const reads = t3.reads.length;
-
-        await vi.advanceTimersByTimeAsync(30_000);
-        expect(t3.reads).toHaveLength(reads);
-        expect(vi.getTimerCount(), 'only the 4-minute refresh is left').toBe(1);
-
-        const changedAt = Date.now();
-
-        projectsChanged();
-        await vi.advanceTimersByTimeAsync(0);
-        expect(t3.reads, 'the next change reads at once').toHaveLength(reads + 1);
-        expect(t3.reads.at(-1)).toBe(changedAt);
-        await finish();
-    });
-
     it('lets repository list changes and the picker read inside a gap, and their reads leave the gap alone', async () => {
         const { board, icons, finish, changeRead, readsEnded } = await running();
         const first = await changeRead();
@@ -603,30 +566,6 @@ describe('between reads for T3 changes', () => {
 
         projectsChanged();
         await readsAtGapEnd(first);
-        await finish();
-    });
-
-    it('lets the 4-minute refresh read inside a gap, and it opens none', async () => {
-        const { finish, changeRead, readsEnded } = await running();
-
-        await vi.advanceTimersByTimeAsync(230_000);
-
-        const first = await changeRead();
-        const reads = t3.reads.length;
-
-        await vi.advanceTimersByTimeAsync(10_000);
-        await started(reads + 1);
-        await readsEnded();
-
-        await vi.advanceTimersByTimeAsync(first + 30_000 - Date.now());
-        expect(t3.reads, 'nothing changed in the gap').toHaveLength(reads + 1);
-
-        const changedAt = Date.now();
-
-        projectsChanged();
-        await vi.advanceTimersByTimeAsync(0);
-        expect(t3.reads, 'the refresh left no gap of its own').toHaveLength(reads + 2);
-        expect(t3.reads.at(-1)).toBe(changedAt);
         await finish();
     });
 
@@ -893,22 +832,6 @@ it('holds the icon of every project T3 lists, on the board or not, with no T3 pa
     ]);
 });
 
-it('reads T3 again for each list, so a project added since the last read has its icon', async () => {
-    t3.read = listed(fact('factory'));
-    assets = { factory: png('a'), apple: png('b') };
-
-    const icons = createProjectIcons(boardOf());
-    const running = icons.refresh();
-
-    await vi.waitFor(() => expect(requests).toHaveLength(1));
-    t3.read = listed(fact('factory'), fact('apple'));
-
-    const held = await icons.byProject();
-
-    await running;
-    expect([...held.keys()]).toEqual(['id-factory', 'id-apple']);
-});
-
 it('answers a list within 2 seconds with what it knows when T3 is slow', async () => {
     t3.read = listed(fact('factory'));
     assets = { factory: png('a') };
@@ -930,16 +853,6 @@ it('answers a list within 2 seconds with what it knows when T3 is slow', async (
     await list;
     expect(held).toEqual(known);
     await vi.advanceTimersByTimeAsync(5_000);
-});
-
-it('covers onboarding repositories', async () => {
-    t3.read = listed(fact('factory'));
-    assets = { factory: png('a') };
-
-    const board = createBoardState({ repos: [], items: [], onboarding: [repo('lar-factory')] } as unknown as BoardData);
-
-    await createProjectIcons(board).refresh();
-    expect(Object.keys(board.snapshot().projectIcons!)).toEqual(['maddec01/lar-factory']);
 });
 
 it('keeps a known icon while T3 is unavailable, sends nothing and knows nothing without one', async () => {

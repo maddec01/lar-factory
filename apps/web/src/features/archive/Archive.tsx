@@ -1,21 +1,10 @@
 // Settings › Archive: each piece of work off the board, set aside or finished and hidden by retention, with Export
 // markdown, Restore for set-aside work and Close ticket while its ticket is open, and this Mac's retention setting. A
-// new timed delete names the work it would delete now and saves only on its own confirm. Restore and a saved setting
+// new automatic deletion names the work it would delete now and saves only on its own confirm. Restore and a saved setting
 // read Archive again.
 
-import { clock, day, type Item, type RetentionState } from '@lar-factory/shared';
-import {
-    ActionStack,
-    Button,
-    buttonKind,
-    FormUnit,
-    Input,
-    InsetPanel,
-    SettingConfirm,
-    SettingLastRun,
-    Stack,
-    Text,
-} from '@lar-works/design-system';
+import { clock, day, plural, type Item, type RetentionState } from '@lar-factory/shared';
+import { Alert, Button, FormUnit, Input, InsetPanel, Stack, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -25,13 +14,7 @@ import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Choice } from '@/shared/settings/SettingControls';
-
-/** Where the work stands in Archive: set aside, or finished on its day. */
-export function archivedAs(item: Item): string {
-    if (item.archived?.setAside) return 'Set aside';
-
-    return item.closedAt ? `Finished ${day(item.closedAt, undefined)}` : 'Finished';
-}
+import { ActionStack, buttonKind, SettingConfirm, SettingLastRun } from '@/ui/board';
 
 /** Export markdown, Restore for set-aside work, and Close ticket while the board sees its ticket open. */
 export function ArchiveActions({ item }: { item: Item }) {
@@ -81,7 +64,7 @@ export function ArchiveActions({ item }: { item: Item }) {
     );
 }
 
-/** What saving a timed delete asks before it saves: the work it would delete now. */
+/** What saving a automatic deletion asks before it saves: the work it would delete now. */
 type Due = { workId: string; title: string }[];
 
 const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
@@ -93,18 +76,18 @@ function wholeDays(text: string): number | null {
     return text.trim() !== '' && Number.isSafeInteger(n) && n >= 0 ? n : null;
 }
 
-/** What the last timed delete did, naming each piece of work it kept and why. */
+/** What the last automatic deletion did, naming each piece of work it kept and why. */
 function LastDelete({ lastDelete }: { lastDelete: NonNullable<RetentionState['lastDelete']> }) {
     return (
         <SettingLastRun
-            summary={`The last timed delete, ${day(lastDelete.at, undefined)} at ${clock(lastDelete.at, undefined)}, deleted ${lastDelete.deleted.length} ${lastDelete.deleted.length === 1 ? 'record' : 'records'}.`}
+            summary={`The last automatic deletion, ${day(lastDelete.at, undefined)} at ${clock(lastDelete.at, undefined)}, deleted ${plural(lastDelete.deleted.length, 'record')}.`}
             kept={lastDelete.kept.map((k) => `Kept ${k.workId}. ${k.reason}`)}
         />
     );
 }
 
 /**
- * When finished and set-aside work leaves the board, and whether the board deletes it later. Saving a new timed delete
+ * When finished and set-aside work leaves the board, and whether the board deletes it later. Saving a new automatic deletion
  * asks first, naming the work it would delete now, so Export markdown and Restore are still there for it.
  */
 export function RetentionSetting({ retention }: { retention: RetentionState }) {
@@ -146,9 +129,9 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
 
     if (retention.problem)
         return (
-            <Text variant="caption" tone="danger" role="alert">
+            <Alert size="sm" tone="danger">
                 {retention.problem} The board keeps and shows all work until the setting can be read.
-            </Text>
+            </Alert>
         );
 
     return (
@@ -197,11 +180,11 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
             </InsetPanel>
             {due ? (
                 <SettingConfirm
-                    label="Turn on timed delete"
+                    label="Turn on automatic deletion"
                     message={
                         due.length
-                            ? `Turning on timed delete deletes this work now, with its brief, threads and reviews. Export or restore it below first.`
-                            : `Nothing is old enough to delete now. Work will be deleted ${days(deleteDays ?? 0)} after it's finished or set aside.`
+                            ? `Turning on automatic deletion deletes this work now, with its brief, threads and reviews. Export or restore it below first.`
+                            : `Nothing is old enough to delete now. Work will be deleted ${days(deleteDays ?? 0)} after it’s finished or set aside.`
                     }
                     items={due.map((d) => d.title || d.workId)}
                     actions={
@@ -215,7 +198,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                                 data-confirm-delete
                                 onClick={() => void save(true)}
                             >
-                                {due.length ? `Delete ${due.length} now` : 'Turn on timed delete'}
+                                {due.length ? `Delete ${due.length} now` : 'Turn on automatic deletion'}
                             </Button>
                         </>
                     }
@@ -234,19 +217,18 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                 </span>
             )}
             {invalid && (
-                <Text variant="caption" tone="danger">
+                <Text variant="caption" tone="muted">
                     Enter whole days from 0.
                 </Text>
             )}
-            {message && (
-                <Text
-                    variant="caption"
-                    tone={message.error ? 'danger' : 'muted'}
-                    role={message.error ? 'alert' : 'status'}
-                >
-                    {message.text}
-                </Text>
-            )}
+            {message &&
+                (message.error ? (
+                    <Alert size="sm" tone="danger" message={message.text} />
+                ) : (
+                    <Text variant="caption" tone="muted" role="status">
+                        {message.text}
+                    </Text>
+                ))}
             {retention.lastDelete && <LastDelete lastDelete={retention.lastDelete} />}
         </Stack>
     );

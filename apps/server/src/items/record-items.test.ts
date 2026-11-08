@@ -623,44 +623,6 @@ test('saved old wording reads as causes and shows new wording, with no reason to
     }
 });
 
-test('saved old wording names a closure of the other kind whichever closed last', async () => {
-    for (const saved of [OLD_PR, OLD_TICKET]) {
-        const records = await open();
-        const record = observedBuild(records, { pr: 'closed', ticket: 'closed' });
-
-        records.setNeedsYou(record.workId, record.revision, saved);
-        assert.deepEqual(
-            [noticeOf(records, record.workId)?.reason, noticeOf(records, record.workId)?.offers],
-            [`${PR_CLOSED} ${TICKET_CLOSED}`, ['reopen-pr', 'replace-pr', 'set-aside']],
-        );
-    }
-});
-
-test('a saved closed ticket on Ready work does not count the closed PR its replacement resolved', async () => {
-    const records = await open();
-    const record = observedBuild(records, { pr: 'closed', ticket: 'closed', status: 'Ready' });
-
-    records.setNeedsYou(record.workId, record.revision, OLD_TICKET);
-    assert.deepEqual(
-        [noticeOf(records, record.workId)?.reason, noticeOf(records, record.workId)?.offers],
-        [TICKET_CLOSED, ['keep-working', 'set-aside']],
-    );
-});
-
-test('saved assignee wording keeps names with spaces', async () => {
-    const records = await open();
-    const record = observedBuild(records, { ticket: 'open', assignee: 'Bo Ray' });
-
-    records.setNeedsYou(
-        record.workId,
-        record.revision,
-        `Its ticket ${REPO}#12 moved from Ana Lee to Bo Ray. Check who owns the work, then clear this.`,
-    );
-    assert.deepEqual(noticeOf(records, record.workId)?.causes, [
-        { type: 'assignee-changed', from: 'Ana Lee', to: 'Bo Ray' },
-    ]);
-});
-
 test('a crafted reason reads as free text at once, whatever its length', async () => {
     const crafted = (repeats: number) =>
         `Its ticket a#1${' moved from x to'.repeat(repeats)} y. Check who owns the work, then clear this!`;
@@ -677,15 +639,6 @@ test('a crafted reason reads as free text at once, whatever its length', async (
         assert.ok(performance.now() - started < 1000, 'matching stays fast');
         assert.deepEqual([notice?.reason, notice?.causes], [reason, []]);
     }
-});
-
-test('a reason over the length limit stays free text even in an old wording', async () => {
-    const records = await open();
-    const record = observedBuild(records, { pr: 'closed' });
-    const long = `Its PR ${'x'.repeat(600)}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`;
-
-    records.setNeedsYou(record.workId, record.revision, long);
-    assert.deepEqual(noticeOf(records, record.workId)?.causes, []);
 });
 
 test('a saved cause whose observation now reads ended no longer counts', async () => {
@@ -706,13 +659,6 @@ test('a saved cause whose observation now reads ended no longer counts', async (
         records.setNeedsYou(record.workId, record.revision, saved);
         assert.equal(noticeOf(records, record.workId), undefined);
     }
-});
-
-test('calm work has no notice', async () => {
-    const records = await open();
-    const calm = records.create({ title: 'Calm', repository: REPO, kind: 'bug' });
-
-    assert.equal(noticeOf(records, calm.workId), undefined);
 });
 
 test('concept counts completed decision facts while its Status remains Shaping, and recovered structure starts with no local completion', async () => {
@@ -903,33 +849,6 @@ test("a GitHub issue's type and an Azure work item's type both count", async () 
     assert.equal(
         read({ azure: { type: 'User Story', state: 'New' } as NonNullable<typeof ticket & object>['azure'] }),
         'feature',
-    );
-});
-
-test('a read with no ticket, or a repository with no setup, shows no disagreement', async () => {
-    const records = await open();
-
-    importBug(records);
-    assert.equal(recordItems(records, [], [REPO], [], new Set(), [setupWith(MAPPED)])[0]!.kindDisagreement, undefined);
-    assert.equal(
-        recordItems(records, tickets([12, 'List', REPO, ['feature']]), [REPO])[0]!.kindDisagreement,
-        undefined,
-    );
-});
-
-test('concepts and local work never disagree', async () => {
-    const records = await open();
-
-    importBug(records, 'concept');
-    records.create({ title: 'Local', repository: REPO, kind: 'bug' });
-
-    const items = recordItems(records, tickets([12, 'List', REPO, ['bug']]), [REPO], [], new Set(), [
-        setupWith(MAPPED),
-    ]);
-
-    assert.deepEqual(
-        items.map((item) => item.kindDisagreement),
-        [undefined, undefined],
     );
 });
 

@@ -6,12 +6,12 @@ import { repoName, type ItemSourceProblem, type RepoConfig } from '@lar-factory/
 import { CopyableCommand } from './ToolNotices';
 import { Warning } from './Warning';
 
-/** The warning names the repository as the title bar and the List modal do, among `repos`. */
+/** The warning names the repository as the title bar and the list modal do, among `repos`. */
 export function ItemSourceWarning({ repo, problem, fix, repos }: ItemSourceProblem & { repos: readonly RepoConfig[] }) {
     return (
         <Warning
             dismissKey={`item-source:${repo.toLowerCase()}`}
-            title={`${repoName(repo, repos)}'s items could not be refreshed.`}
+            title={`${repoName(repo, repos)}’s items couldn’t be refreshed.`}
         >
             {problem}{' '}
             {fix && (

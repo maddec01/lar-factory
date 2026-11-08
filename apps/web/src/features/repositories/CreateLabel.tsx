@@ -1,11 +1,12 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Button, buttonKind, CreateLabelForm, Input, InsetPanel, Text } from '@lar-works/design-system';
+import { Button, Input, InsetPanel, Text } from '@lar-works/design-system';
 import { Plus } from '@lar-works/design-system/icons';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore } from './EditStore';
 import { ProblemText } from './LabelParts';
 import { FieldRow } from '@/shared/settings/FieldRow';
+import { buttonKind, CreateLabelForm } from '@/ui/board';
 
 /** The field that creates a label. Its typing stays here, so a keystroke re-renders no row. */
 export function CreateLabel({

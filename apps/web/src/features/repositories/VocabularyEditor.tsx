@@ -1,32 +1,21 @@
 import { trackerCapabilities, type VocabularyTerm } from '@lar-factory/shared';
 import type { VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
-import {
-    Alert,
-    Button,
-    buttonKind,
-    Inline,
-    InlineLink,
-    LabelChip,
-    OptionSelect,
-    Text,
-    VocabularyMore,
-    VocabularyRow,
-    VocabularySuggestion,
-} from '@lar-works/design-system';
+import { Alert, Button, Inline, InlineLink, LabelChip, OptionSelect, Text } from '@lar-works/design-system';
 
 import { AccessReason } from './AccessList';
 import { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyAccess, VocabularyKind } from './VocabularyKinds';
 import { VocabularyLabelPopover } from './VocabularyLabelPopover';
+import { buttonKind, VocabularyMore, VocabularyRow, VocabularySuggestion } from '@/ui/board';
 
 export function VocabularyRead({ repo, error, retry }: { repo: string; error: string | null; retry: () => void }) {
     return error ? (
         <Alert
             tone="danger"
-            title="Could not read vocabulary"
+            title="Couldn’t read vocabulary"
             action={
                 <Button {...buttonKind('other')} onClick={retry}>
-                    Retry
+                    Try again
                 </Button>
             }
         >
@@ -176,9 +165,9 @@ export function VocabularyFields({
                 </Inline>
             )}
             {error && (
-                <Text variant="caption" tone="danger" role="alert">
-                    {error} <InlineLink onClick={retryCommit}>Retry</InlineLink>
-                </Text>
+                <Alert size="sm" tone="danger">
+                    {error} <InlineLink onClick={retryCommit}>Try again</InlineLink>
+                </Alert>
             )}
         </VocabularyRow>
     );

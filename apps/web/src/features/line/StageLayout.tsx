@@ -3,7 +3,6 @@
 // change their placement. A dossier expands in place, under its row.
 
 import type { Item } from '@lar-factory/shared';
-import { StageSections } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { Dossiers } from './Dossiers';
@@ -13,6 +12,7 @@ import { stageRows } from './StageRows';
 import { rowFilter, useScopeStore } from '@/features/filters';
 import { useActivityUnavailable, RowActions } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { StageSections } from '@/ui/board';
 
 /** `items` are the items in the main area's scope; `desk` sits above the stages. */
 export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode }) {

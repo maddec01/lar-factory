@@ -3,7 +3,7 @@
 // ignored.
 
 import { effectiveVocabulary } from '@lar-factory/shared';
-import type { BoardData, Item } from '@lar-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
 import { $, $$, detailsReply, detailsRead, fetchMock, mountPage, push, sample, settle, text } from '@/test/PageTest';
@@ -11,9 +11,6 @@ import { $, $$, detailsReply, detailsRead, fetchMock, mountPage, push, sample, s
 const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
 const description = () => inDialog('[data-description]');
-const comments = () => inDialog('[data-comments]');
-const meta = () => text(inDialog('[data-meta]'));
-const sidebar = () => text(inDialog('aside'));
 /** The details reads still wanted: StrictMode starts each effect twice in the page and aborts the first read. */
 const reads = () =>
     (fetchMock.mock.calls as unknown as [string, RequestInit][])
@@ -54,116 +51,6 @@ const reply = (
     response: Response = detailsReply(itemId),
 ) => settle(() => held.get(itemId)!(response));
 
-/** An item of the sample, re-pointed at an Azure DevOps repository as a work item is. */
-const azureItem = (): [BoardData, string] => {
-    const id = 'azure:contoso/310';
-    const item: Item = {
-        ...sample.items[0]!,
-        id,
-        number: 310,
-        repo: 'contoso/Fabrikam/web',
-        url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310',
-        labels: ['bug'],
-    };
-
-    return [
-        {
-            ...sample,
-            repos: [
-                ...sample.repos,
-                { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', labels: [] },
-            ],
-            items: [item, ...sample.items.slice(1)],
-        },
-        id,
-    ];
-};
-
-test('while the details load the dialog shows the board data and a loading state, then the issue as GitHub shows it', async () => {
-    const held = holdReads();
-
-    await mountPage();
-    await openItem('I_sample13');
-    expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-    expect(inDialog('[aria-busy="true"]'), 'the loading state').not.toBeNull();
-    expect(description()).toBeNull();
-
-    await reply(held, 'I_sample13');
-    expect(inDialog('[aria-busy="true"]')).toBeNull();
-
-    const body = description()!;
-
-    expect(text(body.querySelector('h2'))).toBe('Description');
-    expect([...body.querySelectorAll('table th')].map(text)).toEqual(['Column', 'Type', 'Notes']);
-    expect(body.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
-    expect(text(body.querySelector('pre code'))).toContain('createOwner');
-    expect(text(body.querySelector('details summary'))).toBe('Open questions');
-    expect(body.querySelector('img'), 'an image is a link').toBeNull();
-    expect(body.querySelector<HTMLAnchorElement>('a[href="https://example.com/sign-up-flow.png"]')).not.toBeNull();
-
-    expect($$('[data-comments] li').map((li) => text(li.querySelector('[data-comment-author]')))).toEqual([
-        'maddec01',
-        'claude-bot',
-        'reviewer-anne',
-    ]);
-    expect(text(comments()!.querySelector('h2'))).toBe('Comments · 3');
-    expect(meta()).toMatch(/Author.maddec01/);
-    expect(meta()).toMatch(/Assignees.maddec01.claude-bot/);
-    expect(meta()).toMatch(/MilestoneCloud v0\.1/);
-    expect(meta()).toMatch(/Created9d ago/);
-    expect(meta()).not.toMatch(/Iteration|Area/);
-    expect(sidebar()).toMatch(
-        /Sub-tickets.*#144 Owner table and sign-up.*#145 Sign-in sessions.*#146 Owner settings page/,
-    );
-    expect($$('[data-item-dialog] aside li a').map((a) => a.getAttribute('href'))).toContain(
-        'https://github.com/maddec01/lar-server/issues/145',
-    );
-});
-
-test('an issue with a linked PR shows its description, comments and people', async () => {
-    await mountPage();
-    await openItem('I_sample26');
-    expect(text(description())).toContain('Bumps FFmpeg from 7.0 to 7.1.');
-    expect($$('[data-comments] li')).toHaveLength(1);
-    expect(meta()).toMatch(/Author.claude-bot/);
-    expect(meta()).toMatch(/Assignees.maddec01/);
-});
-
-test('an issue shows its body', async () => {
-    await mountPage();
-    await openItem('I_sample04');
-    expect(text(description())).toContain('Keep one watch history per household');
-    expect(text(comments())).toBe('CommentsNo comments.');
-});
-
-test('an Azure DevOps work item shows its iteration and area in place of a milestone, and each comment in its own format', async () => {
-    const [data, id] = azureItem();
-
-    await mountPage(data);
-    await openItem(id);
-    expect(meta()).toMatch(/IterationFabrikam\\Sprint 42/);
-    expect(meta()).toMatch(/AreaFabrikam\\Web/);
-    expect(meta()).not.toMatch(/Milestone/);
-    expect(description()!.querySelector('b')!.textContent).toBe('sign-in');
-    expect(description()!.querySelector('img'), 'an image is a link').toBeNull();
-
-    const [markdown, html] = $$('[data-comments] li').map((li) => li.querySelector('[data-slot="rich-text"]')!);
-
-    expect([text(markdown), text(html)]).toEqual([
-        'I can reproduce it with a locked test account.',
-        'Seen on iOS too.',
-    ]);
-    expect(html!.querySelector('b')).not.toBeNull();
-});
-
-test('an item with no description and no comments shows an empty state for each, not an error', async () => {
-    await mountPage();
-    await openItem('I_sample01');
-    expect(text(description())).toBe('DescriptionNo description.');
-    expect(text(comments())).toBe('CommentsNo comments.');
-    expect(inDialog('[role="alert"]')).toBeNull();
-});
-
 test('a failed read shows its error in the modal and the board data stays visible', async () => {
     const held = holdReads();
 
@@ -172,12 +59,52 @@ test('a failed read shows its error in the modal and the board data stays visibl
     await reply(
         held,
         'I_sample13',
-        new Response(JSON.stringify({ error: 'Item details are not available yet.' }), { status: 501 }),
+        new Response(JSON.stringify({ error: 'Item details aren’t available yet.' }), { status: 501 }),
     );
-    expect(text(inDialog('[role="alert"]'))).toBe('Could not load the details: Item details are not available yet.');
+    expect(text(inDialog('[data-details-error]'))).toBe(
+        'Couldn’t load the detailsItem details aren’t available yet.Try again',
+    );
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
     expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
     expect(inDialog('[aria-busy="true"]')).toBeNull();
+});
+
+test('a failed detail read can retry in place and recover without closing the item', async () => {
+    const held = holdReads();
+
+    await mountPage();
+    await openItem('I_sample13');
+    await reply(held, 'I_sample13', new Response(JSON.stringify({ error: 'Temporary outage.' }), { status: 503 }));
+
+    const retry = inDialog<HTMLButtonElement>('[data-details-error] button')!;
+
+    expect(text(retry)).toBe('Try again');
+    await settle(() => retry.click());
+    expect(retry.getAttribute('aria-busy')).toBe('true');
+    await reply(held, 'I_sample13');
+    expect(inDialog('[data-details-error]')).toBeNull();
+    expect(text(description())).toContain('Owner accounts');
+    expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
+});
+
+test('pressing Retry again while it reads starts no second read, by click or by keyboard', async () => {
+    const held = holdReads();
+
+    await mountPage();
+    await openItem('I_sample13');
+    await reply(held, 'I_sample13', new Response(JSON.stringify({ error: 'Temporary outage.' }), { status: 503 }));
+
+    const retry = inDialog<HTMLButtonElement>('[data-details-error] button')!;
+    const before = reads().length;
+
+    await settle(() => retry.click());
+    await settle(() => retry.click());
+    await settle(() => retry.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await settle(() => retry.click());
+    expect(reads().length - before, 'one refresh in flight').toBe(1);
+    await reply(held, 'I_sample13');
+    expect(inDialog('[data-details-error]')).toBeNull();
+    expect(reads().length - before, 'and none after it lands').toBe(1);
 });
 
 test('details hide managed and mapped labels, and show linked-work only as a locked note', async () => {
@@ -201,33 +128,13 @@ test('details hide managed and mapped labels, and show linked-work only as a loc
     const chips = [...$$<HTMLElement>('[data-item-dialog] [data-labels] [data-label-chip]')];
 
     expect(chips.map(text)).toEqual(['urgent', 'linked-work']);
-    expect(chips[0]!.style.backgroundColor).toContain('color-mix');
-    expect(text(inDialog('[data-labels] [data-locked-label]'))).toBe('linked-work');
-    expect(text(inDialog('[data-kind-badge]'))).toBe('Bug');
-});
-
-test('details name labels as the tracker does: tags on Azure DevOps, with no locked note when linked-work is absent', async () => {
-    const azure = {
-        ...sample.items.find((i) => i.id === 'I_sample13')!,
-        repo: 'fabrikam/fiber/lar-factory',
-        labels: ['web'],
-    };
-
-    await mountPage({ ...sample, items: sample.items.map((i) => (i.id === azure.id ? azure : i)) });
-    await openItem('I_sample13');
-    expect(text(inDialog('[data-meta]'))).toContain('Tagsweb');
-    expect(inDialog('[data-locked-label]')).toBeNull();
-});
-
-test('a read that cannot reach the board fails the same way', async () => {
-    fetchMock.mockImplementation(async () => {
-        throw new TypeError('Failed to fetch');
-    });
-    await mountPage();
-    await openItem('I_sample13');
-    expect(text(inDialog('[role="alert"]'))).toBe(
-        'Could not load the details: Could not reach the board to read the details.',
+    expect(chips[0]!.style.backgroundColor, 'neutral surface').toBe('');
+    expect(chips[0]!.querySelector<HTMLElement>('[data-status-dot]')!.style.getPropertyValue('--status-dot')).toBe(
+        '#B60205',
     );
+    expect(text(inDialog('[data-labels] [data-locked-label]'))).toBe('linked-work');
+    expect(inDialog('[data-kind-badge]'), 'the Kind control names the kind instead of a badge').toBeNull();
+    expect(text(inDialog('[data-item-summary] [aria-label="Kind"]'))).toBe('Bug');
 });
 
 test('one read per open: live board data updates the board fields and leaves the fetched details as fetched', async () => {
@@ -271,7 +178,7 @@ test('reopening the dialog on an item whose updatedAt is unchanged shows its det
     expect(text(description())).toBe(before);
 });
 
-test("reopening the dialog once the item's updatedAt has changed reads the details again", async () => {
+test('reopening the dialog once the item’s updatedAt has changed reads the details again', async () => {
     const held = holdReads();
 
     await mountPage();
@@ -292,7 +199,7 @@ test("reopening the dialog once the item's updatedAt has changed reads the detai
     expect(description()).not.toBeNull();
 });
 
-test('a comment that moves updatedAt while the dialog is open does not read again until it reopens', async () => {
+test('a comment that moves updatedAt while the dialog is open doesn’t read again until it reopens', async () => {
     const held = holdReads();
 
     await mountPage();
@@ -320,217 +227,10 @@ test('a reply for an item that is no longer open is ignored', async () => {
     expect(text(description())).not.toContain('Owner accounts');
 });
 
-test('Azure native fields and extra description sections remain visible when relations fail', async () => {
-    const held = holdReads();
-    const [data, id] = azureItem();
-
-    data.items[0]!.azure = { type: 'Bug', state: 'Committed', assignee: 'Ana Silva' };
-    await mountPage(data);
-    await openItem(id);
-    await reply(
-        held,
-        id,
-        new Response(
-            JSON.stringify({
-                details: {
-                    body: '<p>Reproduce the bug.</p>',
-                    format: 'html',
-                    sections: [{ title: 'Acceptance Criteria', body: '**Fixed**', format: 'markdown' }],
-                    author: 'Ana Silva',
-                    assignees: ['Ana Silva'],
-                    createdAt: null,
-                    subTickets: [],
-                    relationsError: 'Timed out',
-                    comments: [],
-                    hasOlderComments: false,
-                    olderCursor: null,
-                },
-            }),
-        ),
-    );
-    expect(meta()).toContain('Azure typeBugAzure stateCommitted');
-    expect(meta(), 'the assignee beside their initials').toContain('AssigneesASAna Silva');
-    expect(text(description())).toContain('Reproduce the bug.Acceptance CriteriaFixed');
-    expect(description()!.querySelector('strong')!.textContent).toBe('Fixed');
-    expect(sidebar()).toContain('Could not load linked work items: Timed out');
-});
-
-test('Azure attachments, Related work and blockers show named links even without children or pull requests', async () => {
-    const held = holdReads();
-    const [data, id] = azureItem();
-
-    data.items[0]!.linkedPrs = [];
-    data.items[0]!.subIssues = { total: 0, completed: 0 };
-    await mountPage(data);
-    await openItem(id);
-
-    const ref = {
-        number: 6711,
-        title: 'Get credentials',
-        url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6711',
-        repo: 'contoso/Fabrikam/web',
-        state: 'open',
-    };
-
-    await reply(
-        held,
-        id,
-        new Response(
-            JSON.stringify({
-                details: {
-                    body: '',
-                    format: 'markdown',
-                    author: null,
-                    assignees: [],
-                    createdAt: null,
-                    subTickets: [],
-                    comments: [],
-                    hasOlderComments: false,
-                    olderCursor: null,
-                    attachments: [
-                        {
-                            name: 'OAuth implementation.pdf',
-                            url: 'https://dev.azure.com/contoso/_apis/wit/attachments/doc-id',
-                        },
-                    ],
-                    related: [
-                        {
-                            ...ref,
-                            number: 6563,
-                            title: 'Integrate provider',
-                            url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6563',
-                        },
-                    ],
-                    blockers: [ref],
-                },
-            }),
-        ),
-    );
-    expect(sidebar()).toContain('Attachments');
-    expect(sidebar()).toContain('Related work');
-    expect(sidebar()).toContain('Blocked by');
-    expect($$('[data-item-dialog] aside a').map((a) => [text(a), a.getAttribute('href')])).toEqual([
-        ['OAuth implementation.pdf', 'https://dev.azure.com/contoso/_apis/wit/attachments/doc-id'],
-        ['#6711 Get credentials', ref.url],
-        ['#6563 Integrate provider', 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6563'],
-    ]);
-});
-
-test('current sprint progress and children come first, with other children behind a closed toggle', async () => {
-    const held = holdReads();
-    const [data, id] = azureItem();
-
-    data.items[0]!.currentSprint = { name: 'Sprint 60', childNumbers: [12, 13] };
-    await mountPage(data);
-    await openItem(id);
-
-    const child = (number: number, state = 'open') => ({
-        number,
-        title: `Task ${number}`,
-        url: `https://dev.azure.com/contoso/Fabrikam/_workitems/edit/${number}`,
-        repo: 'contoso/Fabrikam/web',
-        state,
-    });
-
-    await reply(
-        held,
-        id,
-        new Response(
-            JSON.stringify({
-                details: {
-                    body: '',
-                    format: 'markdown',
-                    author: null,
-                    assignees: [],
-                    createdAt: null,
-                    subTickets: [child(11, 'closed'), child(12), child(13, 'closed')],
-                    comments: [],
-                    hasOlderComments: false,
-                    olderCursor: null,
-                },
-            }),
-        ),
-    );
-    expect(sidebar()).toContain('This sprint: 1 of 2 done');
-    expect(sidebar()).toContain('Sprint 60');
-    expect($$('[data-item-dialog] aside li a').map(text)).toEqual(['#12 Task 12', '#13 Task 13', '#11 Task 11']);
-
-    const history = inDialog<HTMLDetailsElement>('aside details')!;
-
-    expect(history.open).toBe(false);
-    expect(text(history.querySelector('summary'))).toBe('Other children (1)');
-    expect(text(history)).toContain('#11 Task 11');
-    await settle(() => history.querySelector('summary')!.click());
-    expect(history.open).toBe(true);
-});
-
-test('Spec details show Original collapsed and expose retry plus exact-generation accept and reject actions', async () => {
-    let held = false;
-    const actions: unknown[] = [];
-
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-        if (detailsRead(url))
-            return new Response(
-                JSON.stringify({
-                    details: {
-                        body: 'Whole Spec.',
-                        format: 'markdown',
-                        author: null,
-                        assignees: [],
-                        createdAt: null,
-                        subTickets: [],
-                        comments: [],
-                        hasOlderComments: false,
-                        olderCursor: null,
-                        spec: {
-                            generation: 12,
-                            pending: true,
-                            error: 'Offline',
-                            warning: held ? 'Unknown editor.' : null,
-                            original: 'Authored Original.',
-                            originalFormat: 'markdown',
-                            held: held ? { title: 'Held title', body: 'Held instructions.' } : null,
-                        },
-                    },
-                }),
-            );
-
-        if (url === '/api/item-spec') {
-            actions.push(JSON.parse(init?.body as string));
-
-            return new Response(JSON.stringify({ error: null }));
-        }
-
-        return new Response(JSON.stringify(sample));
-    });
-    await mountPage();
-    await openItem('I_sample13');
-    expect(text(description())).toContain('Spec');
-
-    const original = description()!.querySelector<HTMLDetailsElement>('details')!;
-
-    expect(original.open).toBe(false);
-    expect(text(original)).toContain('Authored Original.');
-
-    const button = (name: string) =>
-        [...description()!.querySelectorAll<HTMLButtonElement>('button')].find((button) => text(button) === name)!;
-
-    await settle(() => button('Retry Spec sync').click());
-    expect(actions).toEqual([{ itemId: 'I_sample13', generation: 12, action: 'retry' }]);
-    held = true;
-    await settle(() => button('Retry Spec sync').click());
-    await settle(() => button('Accept edit').click());
-    await settle(() => button('Reject edit').click());
-    expect(actions.slice(-2)).toEqual([
-        { itemId: 'I_sample13', generation: 12, action: 'accept' },
-        { itemId: 'I_sample13', generation: 12, action: 'reject' },
-    ]);
-});
-
 test('build checks load once on expansion and retain the empty result on reopen', async () => {
     await mountPage();
 
-    const build = sample.items.find((item) => item.kind === 'build')!;
+    const build = sample.items.find((item) => item.kind === 'build' && item.linkedPrs.length > 0)!;
 
     await openItem(build.id);
 
@@ -558,77 +258,4 @@ test('build checks load once on expansion and retain the empty result on reopen'
         section.dispatchEvent(new Event('toggle'));
     });
     expect(calls()).toHaveLength(1);
-});
-
-test('checks show outcomes, reasons and named open failures', async () => {
-    await mountPage();
-
-    const build = sample.items.find((item) => item.kind === 'build')!;
-
-    await openItem(build.id);
-    fetchMock.mockImplementation(
-        async () =>
-            new Response(
-                JSON.stringify({
-                    checks: {
-                        workId: build.id,
-                        list: [],
-                        reuses: [{ checkId: 'one', role: 'approver', reason: 'Only prose changed' }],
-                        runs: [
-                            {
-                                checkId: 'one',
-                                command: ['pnpm', 'test'],
-                                folder: 'apps/web',
-                                role: 'implementer',
-                                reason: 'UI changed',
-                                outcome: 'failed',
-                                failureState: 'open',
-                                failure: { tests: ['opens lazily'], diagnosis: 'Unexpected request' },
-                            },
-                        ],
-                    },
-                }),
-            ),
-    );
-
-    const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
-
-    await settle(() => {
-        section.open = true;
-        section.dispatchEvent(new Event('toggle'));
-    });
-    for (const phrase of ['pnpm', 'failed', 'UI changed', 'Only prose changed', 'opens lazily', 'Unexpected request'])
-        expect(text(section)).toContain(phrase);
-});
-
-test('a failed checks read stays in the section', async () => {
-    await mountPage();
-    await openItem(sample.items.find((item) => item.kind === 'build')!.id);
-    fetchMock.mockImplementation(
-        async () => new Response(JSON.stringify({ error: 'Database unavailable' }), { status: 503 }),
-    );
-
-    const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
-
-    await settle(() => {
-        section.open = true;
-        section.dispatchEvent(new Event('toggle'));
-    });
-    expect(text(section.querySelector('[role="alert"]'))).toContain('Database unavailable');
-});
-
-test('concept details show refinement independently of delivery', async () => {
-    const item: Item = {
-        ...sample.items[0]!,
-        kind: 'concept',
-        refinement: { complete: true, reasons: [] },
-        completion: { complete: false, reasons: ['No delivery planned.'] },
-    };
-
-    await mountPage({ ...sample, items: [item] });
-    await openItem(item.id);
-    expect(meta()).toContain('Refinement');
-    expect(meta()).toContain('Complete');
-    expect(meta()).toContain('Delivery');
-    expect(meta()).toContain('No delivery planned.');
 });

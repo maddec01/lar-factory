@@ -1,7 +1,7 @@
-// A settings row as the board's settings, onboarding and project pages write it: the design system's FormRow in its
+// A settings row as the board's settings, onboarding and project pages write it: the design system's SettingsRow in its
 // flow layout, which the board's rows use, marked with the setting's id.
 
-import { FormRow } from '@lar-works/design-system';
+import { SettingsRow } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 export function FieldRow({
@@ -23,8 +23,7 @@ export function FieldRow({
     id?: string;
 }) {
     return (
-        <FormRow
-            layout="flow"
+        <SettingsRow
             label={label}
             help={help}
             helpLabel={typeof label === 'string' ? label : 'this setting'}
@@ -36,6 +35,6 @@ export function FieldRow({
             data-setting={id}
         >
             {children}
-        </FormRow>
+        </SettingsRow>
     );
 }

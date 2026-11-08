@@ -7,21 +7,16 @@ import {
     type TicketOptions,
 } from '@lar-factory/shared';
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
-import {
-    Checkbox,
-    CreateIssueChoice,
-    DraftTicketPart,
-    InlineLink,
-    OptionSelect,
-    PanelField,
-    Stack,
-    Text,
-} from '@lar-works/design-system';
+import { Alert, Button, Checkbox, InlineLink, Loading, OptionSelect, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import type { DraftValues } from './AddItemStore';
 import { DraftLabels } from './DraftLabels';
 import { useEditStore } from '@/features/repositories';
+import { useBoardStore } from '@/services/board/board.hooks';
+import { readTicketOptions } from '@/services/tickets/tickets.service';
+import { sampleCapability } from '@/shared/capabilities/sampleCapability';
+import { CreateIssueChoice, DraftTicketPart, PanelField } from '@/ui/board';
 
 /** An optional ticket field, for a form to read; a value no longer among its choices starts at None. */
 function OptionField({
@@ -56,40 +51,48 @@ function OptionField({
 export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
     const [read, setRead] = useState<TicketCreationOptions | null>(null);
     const [error, setError] = useState('');
+    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
         let current = true;
 
-        void fetch(`/api/ticket-options?repo=${encodeURIComponent(repo.repo)}`)
-            .then(async (response) => {
-                const result = (await response.json()) as { options?: TicketCreationOptions; error?: string };
-
-                if (!response.ok || !result.options) throw Error(result.error ?? 'Could not read issue options.');
-
-                if (current) setRead(result.options);
+        void readTicketOptions(repo.repo)
+            .then((options) => {
+                if (current) setRead(options);
             })
             .catch(() => {
-                if (current) setError('Could not read issue options. You can still submit the title and description.');
+                if (current) setError('Couldn’t read issue options. You can still submit the title and description.');
             });
 
         return () => {
             current = false;
         };
-    }, [repo.repo]);
+    }, [repo.repo, attempt]);
 
     if (error)
         return (
-            <Text variant="caption" tone="muted" role="status">
-                {error}
-            </Text>
+            <Alert
+                size="sm"
+                tone="warning"
+                title="Couldn’t read issue options"
+                description="You can still submit the title and description."
+                action={
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                            setError('');
+                            setRead(null);
+                            setAttempt((n) => n + 1);
+                        }}
+                    >
+                        Try again
+                    </Button>
+                }
+            />
         );
 
-    if (!read)
-        return (
-            <Text variant="caption" tone="muted" role="status">
-                Reading issue options… You can submit while they load.
-            </Text>
-        );
+    if (!read) return <Loading presentation="status" label="Reading issue options… You can submit while they load." />;
 
     const setup = repo.setup;
     const access = setup?.access ?? {};
@@ -105,7 +108,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
         <Stack>
             {read.problems.length > 0 && (
                 <Text variant="caption" tone="muted" role="status">
-                    Some issue options could not be read. You can still submit the title and description.
+                    Some issue options couldn’t be read. You can still submit the title and description.
                 </Text>
             )}
             {labelsShown && <DraftLabels repo={repo} kind={kind} read={read} kept={kept} />}
@@ -142,8 +145,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
 /** Whether Add item creates a ticket in `repo` under this item's `choice`, null until changed, and why it can't. */
 function createIssueState(repo: RepoConfig, choice: boolean | null): { checked: boolean; reason: string | null } {
     const effective = repo.setup ? effectiveIssueSettings(repo.setup) : null;
-    const reason =
-        effective?.createReason ?? (effective ? null : 'Issue access is not checked yet. Recheck access in Settings.');
+    const reason = effective?.createReason ?? (effective ? null : 'Issue access isn’t checked yet.');
 
     return { checked: !reason && (choice ?? effective?.createIssuesFromAddItem ?? false), reason };
 }
@@ -160,9 +162,13 @@ export function CreateIssueBox({
     onChoice: (checked: boolean) => void;
     disabled: boolean;
 }) {
+    const sampleReason = useBoardStore((state) => sampleCapability(state.data, 'createIssue'));
+    const sample = !!sampleReason;
     const running = useEditStore((state) => state.running);
     const error = useEditStore((state) => state.errors[repo.repo]);
-    const { checked, reason } = createIssueState(repo, choice);
+    const creation = createIssueState(repo, choice);
+    const reason = sampleReason ?? creation.reason;
+    const checked = !reason && creation.checked;
 
     return (
         <CreateIssueChoice
@@ -180,17 +186,24 @@ export function CreateIssueBox({
             reason={
                 reason && (
                     <Text variant="caption" tone="muted" id="item-create-reason">
-                        {reason}{' '}
-                        <InlineLink
-                            disabled={disabled || running !== null}
-                            onClick={() => void useEditStore.getState().recheck(repo.repo)}
-                        >
-                            Recheck access
-                        </InlineLink>
+                        {/* Recheck access sits right here, so the reason doesn't send the reader to Settings for it. */}
+                        {reason.replace(/\s*Recheck access in Settings\.$/, '')}
+                        {!sample && (
+                            <>
+                                {' '}
+                                <InlineLink
+                                    disabled={sample || disabled || running !== null}
+                                    onClick={() => void useEditStore.getState().recheck(repo.repo)}
+                                >
+                                    Recheck access
+                                </InlineLink>
+                            </>
+                        )}
                     </Text>
                 )
             }
             error={
+                !sample &&
                 error && (
                     <Text variant="caption" tone="muted" role="status">
                         {error}
@@ -213,7 +226,10 @@ export function IssueFields({
     kept?: DraftValues | null;
     choice: boolean | null;
 }) {
-    const { checked, reason } = createIssueState(repo, choice);
+    const sampleReason = useBoardStore((state) => sampleCapability(state.data, 'createIssue'));
+    const creation = createIssueState(repo, choice);
+    const reason = sampleReason ?? creation.reason;
+    const checked = !reason && creation.checked;
 
     return (
         <DraftTicketPart>
@@ -221,7 +237,7 @@ export function IssueFields({
                 <TicketOptionFields repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />
             ) : (
                 <Text variant="caption" tone="muted">
-                    Local work has its kind alone.
+                    Local items have a kind.
                     {reason
                         ? ''
                         : ` Tick Create issue to add ${trackerCapabilities(repo.repo).heading.toLowerCase()}.`}{' '}
@@ -230,23 +246,4 @@ export function IssueFields({
             )}
         </DraftTicketPart>
     );
-}
-
-/** Both forms submit exactly the optional fields currently visible. */
-export function ticketOptions(form: HTMLFormElement): TicketOptions {
-    const values = new FormData(form);
-
-    return {
-        ...(form.querySelector('#item-labels') ? { labels: values.getAll('labels').map(String) } : {}),
-        ...(values.has('newLabels') ? { newLabels: values.getAll('newLabels').map(String) } : {}),
-        ...Object.fromEntries(
-            ['type', 'assignee', 'milestone', 'iteration']
-                .filter((name) => values.has(name))
-                .map((name) => {
-                    const entry = values.get(name);
-
-                    return [name, typeof entry === 'string' ? entry : ''];
-                }),
-        ),
-    };
 }

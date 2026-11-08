@@ -2,15 +2,6 @@ import { expect, test } from 'vite-plus/test';
 
 import { $, fetchMock, mountPage, sample, settle } from '@/test/PageTest';
 
-test('Added to List offers Queue beside View item', async () => {
-    await mountPage(sample);
-
-    const { notify } = await import('./Notices');
-
-    await settle(() => notify({ verb: 'Added', item: sample.items[0]!, to: 'List' }));
-    expect($('[data-toast="notice"]')?.textContent).toContain('Queue');
-});
-
 test('Queue holds feedback, coordinates requests and hands focus to View item', async () => {
     await mountPage(sample);
 
@@ -62,7 +53,7 @@ test('a dismissed pending notice stays gone when its request settles', async () 
     await mountPage(sample);
 
     const { notify } = await import('./Notices');
-    const { clearToast } = await import('./Toasts');
+    const { clearToast } = await import('./ToastActions');
     const item = sample.items.find((value) => value.status === 'List')!;
 
     await settle(() => notify({ verb: 'Added', item, to: 'List' }));

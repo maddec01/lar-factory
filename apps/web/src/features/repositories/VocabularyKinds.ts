@@ -1,4 +1,4 @@
-// The kinds a Project's vocabulary maps to its tracker's labels and types, and the access their fields read.
+// The kinds a project's vocabulary maps to its tracker's labels and types, and the access their fields read.
 
 import type { RepositorySetup } from '@lar-factory/shared';
 

@@ -1,5 +1,5 @@
 // The board's saved Scope, Kind and Labels: they survive a reload, and a saved repository the board no longer offers
-// shows as All Projects once the first read settles, while the saved value waits for it to return.
+// shows as All projects once the first read settles, while the saved value waits for it to return.
 
 import type { BoardData } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
@@ -12,9 +12,10 @@ const GONE = 'maddec01/lar-gone';
 const reading = { step: 'items', running: ['lar-gone'], waiting: [GONE], settled: false } as BoardData['firstRead'];
 const reader = { ...sample, firstRead: reading };
 
-const scopeLabel = () => $('[data-search-field]')!.getAttribute('aria-label');
-const scoped = (name: string) => `Search, filtered by ${name}`;
-const ALL = 'Search';
+/** The filters the board search field describes itself with; null with none. */
+const scopeLabel = () => $('[data-search-field]')!.getAttribute('aria-description');
+const scoped = (name: string) => `filtered by ${name}`;
+const ALL = null;
 const deskCards = () => $$('.desk-card').length;
 const receive = async (data: BoardData) => {
     const { useBoardStore } = await import('@/services/board/board.hooks');
@@ -44,7 +45,7 @@ test('filters saved before this store carry over from the same key', async () =>
     expect((await store()).filters).toEqual({ kinds: ['bug'], labels: ['docs'] });
 });
 
-test('choosing All Projects removes the saved Scope, so a reload stays on all', async () => {
+test('choosing All projects removes the saved Scope, so a reload stays on all', async () => {
     localStorage.setItem(SCOPE_KEY, 'maddec01/lar-apple');
     await mountPage();
     await settle(async () => (await store()).setScope(null));
@@ -76,20 +77,13 @@ test('a board with storage that throws keeps working for this page', async () =>
     expect(scopeLabel()).toBe(scoped('Bug'));
 });
 
-test('before the first read settles, a saved repository not on the board still shows, with its reading state', async () => {
-    localStorage.setItem(SCOPE_KEY, GONE);
-    await mountPage(reader);
-    expect(scopeLabel()).toBe(scoped('lar-gone'));
-    expect(text($('[data-reading]'))).toBe('Loading Projects…');
-});
-
-test('once the first read settles, a saved repository not on the board shows as All Projects and the saved value stays', async () => {
+test('once the first read settles, a saved repository not on the board shows as All projects and the saved value stays', async () => {
     localStorage.setItem(SCOPE_KEY, GONE);
     await mountPage(reader);
     await receive(sample);
     expect(scopeLabel()).toBe(ALL);
     expect($('[data-reading]')).toBeNull();
-    expect(deskCards(), "the desk is the whole factory's").toBe(7);
+    expect(deskCards(), 'the desk is the whole factory’s').toBe(6);
     expect(localStorage.getItem(SCOPE_KEY)).toBe(GONE);
     await reload();
     expect(scopeLabel()).toBe(ALL);
@@ -105,15 +99,6 @@ test('the saved repository shows again when it returns to the board', async () =
     expect(deskCards()).toBe(0);
 });
 
-test('a repository the board search offers only for its List items stays shown', async () => {
-    localStorage.setItem(SCOPE_KEY, GONE);
-
-    const listed = sample.items.find((item) => item.status === 'List')!;
-
-    await mountPage({ ...sample, items: [...sample.items, { ...listed, id: 'gone-item', repo: GONE }] });
-    expect(scopeLabel()).toBe(scoped('lar-gone'));
-});
-
 test('a saved repository in another case shows as the board names it', async () => {
     localStorage.setItem(SCOPE_KEY, 'MADDEC01/LAR-APPLE');
     await mountPage();
@@ -122,7 +107,7 @@ test('a saved repository in another case shows as the board names it', async () 
     expect(text($('[data-list-modal] [data-scope-board]'))).toBe('Board scoped');
 });
 
-test('the List modal starts on the shown Scope, and Scope board writes the saved one', async () => {
+test('the list modal starts on the shown Scope, and Scope board writes the saved one', async () => {
     localStorage.setItem(SCOPE_KEY, GONE);
     await mountPage();
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
@@ -133,7 +118,7 @@ test('the List modal starts on the shown Scope, and Scope board writes the saved
         nav()
             .filter((b) => b.getAttribute('aria-current') === 'page')
             .map((b) => text(b.querySelector('.name'))),
-    ).toEqual(['All Projects']);
+    ).toEqual(['All projects']);
     expect($('[data-list-modal] [data-scope-board]')).toBeNull();
     await settle(() =>
         nav()

@@ -247,7 +247,7 @@ test('Settings refuses a typed managed name with the reason, even when the track
 
     expect(await save(' Linked-Work ')).toEqual({
         status: 400,
-        error: "Linked-Work is reserved for the factory's saved links.",
+        error: 'Linked-Work is reserved for the factory’s saved links.',
     });
     expect(await save('status-done')).toEqual({ status: 400, error: 'status-done is reserved for board status.' });
     expect(created).toEqual([]);

@@ -70,12 +70,12 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
 
             if (!result.checked) {
                 toastUpdateError(
-                    'Could not check for updates',
-                    result.state.message ?? 'Automatic updates are not available in this build.',
+                    'Couldn’t check for updates',
+                    result.state.message ?? 'Automatic updates aren’t available in this build.',
                 );
             }
         } catch (error) {
-            toastUpdateError('Could not check for updates', errorMessage(error, 'Update check failed.'));
+            toastUpdateError('Couldn’t check for updates', errorMessage(error, 'Update check failed.'));
         }
     },
     download: async () => {
@@ -88,9 +88,9 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
 
             const actionError = getUpdateActionError(result);
 
-            if (actionError) toastUpdateError('Could not download update', actionError);
+            if (actionError) toastUpdateError('Couldn’t download update', actionError);
         } catch (error) {
-            toastUpdateError('Could not start update download', errorMessage(error, 'An unexpected error occurred.'));
+            toastUpdateError('Couldn’t start update download', errorMessage(error, 'An unexpected error occurred.'));
         }
     },
     install: async () => {
@@ -101,7 +101,7 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
         try {
             if (!(await boardApp()!.confirmRestart(getUpdateInstallConfirmationMessage(state)))) return;
         } catch (error) {
-            toastUpdateError('Could not confirm update', errorMessage(error, 'Update confirmation failed.'));
+            toastUpdateError('Couldn’t confirm update', errorMessage(error, 'Update confirmation failed.'));
 
             return;
         }
@@ -125,10 +125,10 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
 
             const actionError = getUpdateActionError(result);
 
-            if (actionError) toastUpdateError('Could not install update', actionError);
+            if (actionError) toastUpdateError('Couldn’t install update', actionError);
         } catch (error) {
             set({ installing: false });
-            toastUpdateError('Could not install update', errorMessage(error, 'An unexpected error occurred.'));
+            toastUpdateError('Couldn’t install update', errorMessage(error, 'An unexpected error occurred.'));
         }
     },
     run: async () => {

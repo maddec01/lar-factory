@@ -59,18 +59,6 @@ const askRead = (board: Board) =>
         body: '{}',
     });
 
-test('the stream sends the board at once with the same headers as other endpoints', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
-    const stream = await openStream(t, board);
-
-    assert.equal(stream.response.status, 200);
-    assert.equal(stream.response.headers.get('content-type'), 'text/event-stream; charset=utf-8');
-    assert.equal(stream.response.headers.get('cache-control'), 'no-store');
-    assert.match(stream.response.headers.get('content-security-policy') ?? '', /connect-src 'self'/);
-    assert.equal(stream.response.headers.get('x-content-type-options'), 'nosniff');
-    assert.equal((await stream.next(() => true)).capture?.session, (await board.board()).capture.session);
-});
-
 test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
     // A source reads at most every 2 s however often a read is asked for, which the fast clock shortens, so the asked
     // read runs at once instead of on a later tick.

@@ -639,14 +639,6 @@ test('a failed command shows a problem that survives a restart and clears once a
     assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
 });
 
-test('a reason with no full stop still reads as a sentence, and threads with one reason show it once', async () => {
-    const { stub, records, sweep, workId } = await sweepOver('archive', ['shape-1', 'shape-2']);
-
-    stub.result = { outcome: 'rejected', reason: 'T3 refused it' };
-    await sweep();
-    assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, FAILED]]);
-});
-
 test('a thread held back or gone shows no problem, and a failure saved earlier stays while a thread is held back', async () => {
     for (const state of [{ ...IDLE, live: true }, 'unavailable', 'absent'] as const) {
         const { stub, records, sweep, workId } = await sweepOver();

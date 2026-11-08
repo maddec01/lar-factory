@@ -1,4 +1,8 @@
-/* The board page's styles, all from the design system: its board entry brings Tailwind, the tokens, the board's
-   roles and base styles, and every component's styles. The page styles nothing itself, so Tailwind scans none of its
-   files (`source(none)`): words in its code and tests would otherwise turn on utilities of the same name. */
-@import '@lar-works/design-system/board.css' source(none);
+/* The board page's styles: the design system's (Tailwind, the tokens and every component's styles), then the board's
+   own UI layer (src/ui/board). Tailwind scans only src/ui (`source(none)`, then `@source`): words in feature code and
+   tests would otherwise turn on utilities of the same name. */
+@import '@lar-works/design-system/styles.css' source(none);
+@import './ui/board/board.css';
+
+@source './ui';
+@source not './ui/**/*.test.ts';

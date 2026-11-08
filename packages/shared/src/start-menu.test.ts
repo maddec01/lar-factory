@@ -12,7 +12,7 @@ import {
     storedChoice,
 } from './start-menu.ts';
 
-test('picking "T3 Project default" posts no model choice; picking a model posts its instance id and slug', () => {
+test('picking "Project default in T3" posts no model choice; picking a model posts its instance id and slug', () => {
     assert.deepEqual(startRequest('s1', 'I_1', choiceOf({})), { session: 's1', itemId: 'I_1' });
     assert.deepEqual(
         startRequest('s1', 'I_1', choiceOf({ instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' })),
@@ -20,7 +20,7 @@ test('picking "T3 Project default" posts no model choice; picking a model posts 
     );
 });
 
-test('an entry missing its instance or its model is "T3 Project default"', () => {
+test('an entry missing its instance or its model is "Project default in T3"', () => {
     assert.equal(choiceOf({ instanceId: 'codex' }), undefined);
     assert.equal(choiceOf({ model: 'gpt-5.5' }), undefined);
 });
@@ -43,7 +43,7 @@ test('Start remembers the picked choice once it reports "Started" or "May have s
     assert.equal(remembersChoice({ thread: null, error: 'The board could not be reached.' }), false);
 });
 
-test('a stored choice reads back as it was stored; "T3 Project default" or anything unreadable reads as none', () => {
+test('a stored choice reads back as it was stored; "Project default in T3" or anything unreadable reads as none', () => {
     const choice = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' };
 
     assert.deepEqual(readChoice(storedChoice(choice)), choice);
@@ -52,7 +52,7 @@ test('a stored choice reads back as it was stored; "T3 Project default" or anyth
         assert.equal(readChoice(raw), undefined, String(raw));
 });
 
-test('the menu highlights the remembered choice while it is offered, else "T3 Project default"', () => {
+test('the menu highlights the remembered choice while it is offered, else "Project default in T3"', () => {
     const groups: ModelGroup[] = [
         { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
     ];

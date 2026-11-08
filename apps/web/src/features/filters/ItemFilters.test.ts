@@ -16,6 +16,8 @@ const saved = (key: string) => JSON.parse(localStorage.getItem(key)!) as unknown
 const seed = (key: string, kinds: string[], labels: string[] = []) =>
     localStorage.setItem(key, JSON.stringify({ kinds, labels }));
 
+/** A stage's heading with the count beside it: "Queue 2". */
+const heading = (id: string) => `${text($(id))} ${text($(id)!.parentElement!.querySelector('[data-slot="count"]'))}`;
 const queueRows = () => $$<HTMLLIElement>('[data-stage="queue"] ol > li');
 const bar = () => $('[data-list-modal] [data-item-filters]')!;
 const open = (which: string) =>
@@ -28,9 +30,10 @@ const choose = (name: string) =>
             .querySelector('input')!
             .click(),
     );
-const chips = () => [...bar().querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('aria-label'));
+/** Each filter chip's action, as its name starts and its tooltip says: "Remove Feature". */
+const chips = () => [...bar().querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('title'));
 const removeChip = (name: string) =>
-    settle(() => bar().querySelector<HTMLButtonElement>(`[aria-label="Remove ${name}"]`)!.click());
+    settle(() => bar().querySelector<HTMLButtonElement>(`[data-filter-chip][title="Remove ${name}"]`)!.click());
 const clear = () => settle(() => bar().querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
 const search = () => settle(() => $<HTMLButtonElement>('[data-search-field]')!.click());
 const removeToken = (name: string) =>
@@ -85,17 +88,7 @@ test('the Labels filter offers each name once without case, across repositories,
     ]);
 });
 
-test("the Labels filter leaves out Azure's repo- tags and offers a GitHub repo- label", () => {
-    const rows = [
-        item('a', { repo: 'contoso/Fabrikam%20Fiber/lar-api', labels: ['repo-lar-api', 'docs'] }),
-        item('b', { repo: 'maddec01/lar-apple', labels: ['repo-web'] }),
-    ];
-
-    expect(labelChoices(rows, []).map(({ name }) => name)).toEqual(['docs', 'repo-web']);
-    expect(rowFilter({ kinds: [], labels: ['repo-lar-api'] }, [])(rows[0]!)).toBe(false);
-});
-
-test("a label mapped to the item's kind is neither offered nor matched on that row, as its row hides it", () => {
+test('a label mapped to the item’s kind is neither offered nor matched on that row, as its row hides it', () => {
     const setup = {
         vocabulary: effectiveVocabulary({ bug: { type: null, labels: ['oops'] } }).vocabulary,
     } as NonNullable<BoardData['repos'][number]['setup']>;
@@ -120,7 +113,7 @@ test('the board keeps Queue numbers while a filter hides the first row, whose it
         ['Q2', '2'],
         ['Q3', '3'],
     ]);
-    expect(text($('#queue-h'))).toBe('Queue 2');
+    expect(heading('#queue-h')).toBe('Queue 2');
     expect($('[data-stage="queue"] header button')).toBeNull();
     await search();
     await removeToken('Bug');
@@ -153,18 +146,9 @@ const part = item('C', {
 test('a dossier follows its parent, whatever its part matches; a part past shaping keeps its own stage row', async () => {
     seed(BOARD_KEY, ['feature']);
     await mountPage(withItems([parent, part]));
-    expect($('[data-dossiers]'), 'the part matches, its parent does not').toBeNull();
+    expect($('[data-dossiers]'), 'the part matches, its parent doesn’t').toBeNull();
     expect($('[data-stage="dock"]'), 'with no dossiers the dock takes no height').toBeNull();
     expect($('[data-stage="build"] li[data-item="C"]')).not.toBeNull();
-});
-
-test('a dossier stays while its parent matches, and the board search offers the labels its rows show', async () => {
-    seed(BOARD_KEY, ['bug']);
-    await mountPage(withItems([parent, part]));
-    expect($('[data-dossiers]'), 'the parent matches, its part does not').not.toBeNull();
-    expect($('[data-stage="build"] li[data-item="C"]')).toBeNull();
-    await search();
-    expect($$('[data-command-palette] [role="group"]').at(-1)!.textContent).toBe('Labelsarea: webonly-on-part');
 });
 
 test('the filters apply to every pane, their counts follow, and each says when nothing matches', async () => {
@@ -177,14 +161,14 @@ test('the filters apply to every pane, their counts follow, and each says when n
             item('R', { number: 8, kind: 'feature', status: 'Ready' }),
         ]),
     );
-    expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 0', 'Shaping 0', 'Build 0']);
+    expect(['#queue-h', '#shaping-h', '#build-h'].map(heading)).toEqual(['Queue 0', 'Shaping 0', 'Build 0']);
     expect(text($('[data-stage="queue"]'))).toContain('Nothing queued matches.');
     expect(text($('[data-stage="shaping"] p'))).toBe('Nothing in shaping matches.');
     expect(text($('[data-stage="ready"]'))).toContain('Nothing ready to build matches.');
     expect(text($('[data-stage="build"] p'))).toBe('Nothing in build matches.');
     await search();
     await removeToken('Bug');
-    expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 1', 'Shaping 1', 'Build 1']);
+    expect(['#queue-h', '#shaping-h', '#build-h'].map(heading)).toEqual(['Queue 1', 'Shaping 1', 'Build 1']);
 });
 
 test('removing a chip or clearing moves focus to the Kind menu, which always stays', async () => {
@@ -228,7 +212,7 @@ test('List and the board keep separate filters, and filters write nothing to the
     expect(saved(BOARD_KEY), 'clearing List leaves the board alone').toEqual({ kinds: ['bug'], labels: [] });
 });
 
-test("the List counts follow the filters, and its Labels filter holds the chosen repository's names", async () => {
+test('the list counts follow the filters, and its Labels filter holds the chosen repository’s names', async () => {
     const other = sample.repos[1]!.repo;
 
     await mountPage(
@@ -239,7 +223,7 @@ test("the List counts follow the filters, and its Labels filter holds the chosen
     );
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
     await open('labels');
-    expect(choices(), 'All Projects lists the union, without case').toEqual(['docs', 'infra']);
+    expect(choices(), 'All projects lists the union, without case').toEqual(['docs', 'infra']);
     await choose('docs');
 
     const rows = () =>

@@ -1,27 +1,30 @@
 // The entries of a dossier's rows: text whose references open their items, and a part's name and link.
 
 import { itemName } from '@lar-factory/shared';
-import { PartLink as DesignPartLink, PartName as DesignPartName, RefButton } from '@lar-works/design-system';
 
 import { open } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import type { Part } from './DossierParts';
 import { ItemTitle, SourceIcon, ItemStatusGlyph } from '@/features/items';
+import { PartLink as DesignPartLink, PartName as DesignPartName, RefButton } from '@/ui/board';
 
 /** Text with its `#n` and `owner/repo#n` references as buttons that open the item. */
 export function Refs({ text, find }: { text: string; find: FindRef }) {
-    return text.split(/((?:[\w.-]+\/[\w.-]+)?#\d+)/).map((bit, n) => {
-        const ref = /^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/.exec(bit);
-        const item = ref ? find(ref[1], Number(ref[2])) : undefined;
+    return text
+        .replace(/(#\d+)\s+\)/g, '$1)')
+        .split(/((?:[\w.-]+\/[\w.-]+)?#\d+)/)
+        .map((bit, n) => {
+            const ref = /^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/.exec(bit);
+            const item = ref ? find(ref[1], Number(ref[2])) : undefined;
 
-        return item ? (
-            <RefButton key={n} title={item.title} onOpen={() => open(item)}>
-                {bit}
-            </RefButton>
-        ) : (
-            bit
-        );
-    });
+            return item ? (
+                <RefButton key={n} title={item.title} onOpen={() => open(item)}>
+                    {bit}
+                </RefButton>
+            ) : (
+                bit
+            );
+        });
 }
 
 /** A part's source, status and title, up to two lines. */

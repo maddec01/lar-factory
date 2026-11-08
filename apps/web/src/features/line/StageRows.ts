@@ -1,12 +1,12 @@
 // Which rows each section of the stage layout holds, read from the placement rule in the shared package: the items in
 // the main area's scope, whatever a filter hides.
 
-import { placementOf } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { placementOf } from '@lar-factory/shared';
 
-import { dossiersOf } from './DossierParts';
 import type { DossierItems } from './DossierParts';
-import { stageOf } from './StageTrack';
+import { dossiersOf } from './DossierParts';
+import { stageOf } from './StageStatus';
 
 export interface StageRow {
     item: Item;

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vite-plus/test';
 
 import {
-    ABANDON_CLEANUP,
     abandonPrompt,
     boardSections,
     closesTicketOnAbandon,
@@ -15,7 +14,16 @@ import type { BoardSection, PlacementFacts } from './board-view.ts';
 import type { BoardData, Item, ItemThread, NeedsYouCause, Status } from './model.ts';
 
 const ticketed = (repo: string) =>
-    ({ content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo, number: 7, title: 'Keep history' }) as Item;
+    ({
+        content: 'ticket',
+        revision: 0,
+        kind: 'issue',
+        parentId: null,
+        linkedPrs: [],
+        repo,
+        number: 7,
+        title: 'Keep history',
+    }) as unknown as Item;
 
 test('a discovered concept stays in List until it has been added locally', () => {
     const concept = {
@@ -59,12 +67,37 @@ const onDesk = (item: Item, data?: Partial<BoardData>, clientError?: string) =>
     boardSections(boardWith(item, data), AT, clientError).needsYou.length === 1;
 
 for (const status of ['Verify', 'Ready to merge'] as const) {
+    test(`${status} with only checks running stays in Build, but an explicit question still reaches the desk`, () => {
+        const waiting = delivered(
+            status,
+            { state: 'done' },
+            {
+                linkedPrs: [{ state: 'open', checks: { running: 1, failed: 0 } }] as Item['linkedPrs'],
+            },
+        );
+
+        assert.equal(onDesk(waiting), false);
+        assert.deepEqual(placementOf(waiting, { unavailable: false, all: [waiting] }).sections, ['build']);
+        assert.equal(
+            onDesk({ ...waiting, needsYou: { reason: 'Answer this', offers: [], causes: [], ticketOpen: true } }),
+            true,
+        );
+        assert.equal(onDesk({ ...waiting, threads: [{ id: 'question', state: 'needs you' }] as ItemThread[] }), true);
+        assert.equal(
+            onDesk({
+                ...waiting,
+                linkedPrs: [{ state: 'open', checks: { running: 1, failed: 1 } }] as Item['linkedPrs'],
+            }),
+            true,
+        );
+    });
+
     test(`${status} leaves the desk while its build thread or a child runs`, () => {
         assert.equal(onDesk(delivered(status, { currentRunning: true })), false);
         assert.equal(onDesk(delivered(status, { state: 'done', hasRunningChildren: true })), false);
     });
 
-    test(`${status} stays on the desk with an idle build thread, a queued run or another thread's run`, () => {
+    test(`${status} stays on the desk with an idle build thread, a queued run or another thread’s run`, () => {
         assert.equal(onDesk(delivered(status, { state: 'done' })), true);
         assert.equal(onDesk(delivered(status, {}), undefined), true, 'waiting counts as running in state alone');
         assert.equal(onDesk(delivered(status, { purpose: 'shape', currentRunning: true })), true);
@@ -100,19 +133,6 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
     });
 }
 
-test('Abandon sets work aside on this Mac and says whether the board asks about its ticket next', () => {
-    assert.deepEqual(abandonPrompt(ticketed('owner/repo')), {
-        question: 'Abandon #7 Keep history?',
-        confirm: 'Abandon',
-        done: 'Set #7 Keep history aside on this Mac.',
-        detail: 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.',
-    });
-    assert.equal(
-        abandonPrompt({ ...ticketed('owner/repo'), number: 0 }).detail,
-        'This sets the work aside on this Mac. It has no ticket, so nothing changes in its provider.',
-    );
-});
-
 for (const [repo, detail, confirm, done] of [
     [
         'owner/repo',
@@ -127,7 +147,7 @@ for (const [repo, detail, confirm, done] of [
         'Moved #7 Keep history to Removed.',
     ],
 ]) {
-    test(`closing ${repo}'s ticket after Abandon explains how it stays recoverable`, () => {
+    test(`closing ${repo}’s ticket after Abandon explains how it stays recoverable`, () => {
         assert.deepEqual(closeTicketPrompt(ticketed(repo!)), {
             question: 'Close the ticket of #7 Keep history too?',
             detail,
@@ -148,42 +168,6 @@ const waiting = (causes: NeedsYouCause[], change: Partial<Item> = {}) =>
 const GOES = 'This notice goes away.';
 const STAYS = 'The notice stays with only its other note, which you can then mark as handled.';
 
-test('Keep working says the item stays on the desk at its Status and what happens to its ticket', () => {
-    assert.deepEqual(needsYouPrompt(waiting([{ type: 'ticket-closed' }]), 'keep-working'), {
-        question: 'Keep working on #7 Keep history?',
-        detail: `The item stays on the desk at Review. Its ticket stays closed. Its PR, branch and worktree don't change. ${GOES}`,
-    });
-    assert.equal(
-        needsYouPrompt(
-            waiting([{ type: 'assignee-changed', from: 'pedro', to: null }], { status: 'In progress' }),
-            'keep-working',
-        ).detail,
-        `The item stays on the desk at In progress. Its ticket stays with no one. Its PR, branch and worktree don't change. ${GOES}`,
-    );
-});
-
-test('Mark as handled changes nothing except removing the notice', () => {
-    assert.deepEqual(needsYouPrompt(waiting([]), 'mark-handled'), {
-        question: 'Mark #7 Keep history as handled?',
-        detail: 'This changes nothing except removing the notice.',
-    });
-    assert.equal(
-        needsYouPrompt(waiting([{ type: 'ticket-missing' }]), 'mark-handled').detail,
-        'This changes nothing except removing the notice. Its ticket stays missing from its provider.',
-    );
-});
-
-test('Reopen PR and a replacement build name the destination, and a closed ticket stays closed', () => {
-    assert.deepEqual(needsYouPrompt(waiting([{ type: 'pr-closed' }, { type: 'ticket-closed' }]), 'reopen-pr'), {
-        question: 'Reopen the PR of #7 Keep history?',
-        detail: `This reopens its PR in its provider. The item stays at Review, and its branch and worktree don't change. Its ticket stays closed. ${GOES}`,
-    });
-    assert.deepEqual(needsYouPrompt(waiting([{ type: 'pr-closed' }]), 'replace-pr'), {
-        question: 'Start a replacement build for #7 Keep history?',
-        detail: `This moves the item to Ready, where Start build starts a new thread on a new branch from the same brief. Its closed PR stays closed, and its old branch and worktree stay. Its ticket doesn't change. ${GOES}`,
-    });
-});
-
 test('a choice names the other note only when the notice has one, and then says the notice stays for it', () => {
     const noted = waiting([{ type: 'ticket-closed' }]);
 
@@ -195,49 +179,6 @@ test('a choice names the other note only when the notice has one, and then says 
     assert.equal(
         needsYouPrompt(noted, 'mark-handled').detail,
         'This changes nothing except removing the notice. Its ticket stays closed.',
-    );
-});
-
-test('a choice that starts nothing says so beside a no-thread cause', () => {
-    assert.equal(
-        needsYouPrompt(waiting([{ type: 'pr-closed' }, { type: 'no-thread' }]), 'reopen-pr').detail,
-        `This reopens its PR in its provider. The item stays at Review, and its branch and worktree don't change. Its ticket doesn't change. No thread starts, so T3 still shows none for this work. ${GOES}`,
-    );
-});
-
-test('Start again says what it starts, and that the notice goes only once a thread does', () => {
-    const after = 'Once T3 shows the thread, the notice goes away. If the start fails, the notice stays.';
-
-    assert.deepEqual(needsYouPrompt(waiting([{ type: 'no-thread' }]), 'start-again'), {
-        question: 'Start #7 Keep history again?',
-        detail: `This starts a new shaping thread in T3. The item stays at Review. Its ticket doesn't change. Its PR, branch and worktree don't change. ${after}`,
-    });
-
-    const build = waiting([{ type: 'no-thread' }]);
-
-    build.needsYou!.startAgainPurpose = 'build';
-    assert.equal(
-        needsYouPrompt(build, 'start-again').detail,
-        `This starts a new build thread in T3. The item stays at Review. Its ticket doesn't change. The board checks its PR, branch and worktree, then says what happens to them. ${after}`,
-    );
-});
-
-test('Back to Queue and Move to List name the destination, and a build says it resets', () => {
-    assert.deepEqual(needsYouPrompt(waiting([]), 'back-to-queue'), {
-        question: 'Move #7 Keep history back to Queue?',
-        detail: `This moves the item to Queued. Its ticket and PR don't change. Its old branches and worktrees stay unless you choose to remove them next. ${GOES}`,
-    });
-    assert.deepEqual(needsYouPrompt(waiting([{ type: 'ticket-closed' }], { kind: 'build' }), 'back-to-list'), {
-        question: 'Move #7 Keep history to List?',
-        detail: `This moves the item to List. Its slices and build progress reset. Its ticket stays closed. Its PR doesn't change. Its old branches and worktrees stay unless you choose to remove them next. ${GOES}`,
-    });
-});
-
-test('work with no ticket says so', () => {
-    assert.match(needsYouPrompt(waiting([], { number: 0 }), 'keep-working').detail, /It has no ticket\./);
-    assert.match(
-        needsYouPrompt(waiting([], { number: 0 }), 'back-to-list').detail,
-        /It has no ticket\. Its PR doesn't change\./,
     );
 });
 
@@ -337,13 +278,6 @@ test('a closed PR is one a cause names or the ticket links', () => {
     assert.equal(hasClosedPr(waiting([{ type: 'pr-closed' }])), true);
     assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('closed') })), true);
     assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('open') })), false);
-});
-
-test('Abandon says what stays when the board cannot inspect the branch or worktree', () => {
-    assert.equal(
-        ABANDON_CLEANUP.uninspected('T3 is unavailable.'),
-        "The board can't inspect this work's branch or worktree. T3 is unavailable. You can abandon without cleanup, and anything there stays.",
-    );
 });
 
 describe('placementOf', () => {

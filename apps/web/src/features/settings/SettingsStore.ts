@@ -2,22 +2,17 @@
 // being changed, the update channel being switched to, and what the last call did. Opening in the board app reads
 // the install state and follows each change until Settings closes.
 
-import {
-    boardApp,
-    type InstallOperationResult,
-    type InstallSnapshot,
-    type TargetSnapshot,
-    type UpdateChannel,
-} from '@lar-factory/shared';
+import { boardApp, type InstallSnapshot, type TargetSnapshot, type UpdateChannel } from '@lar-factory/shared';
 import { create } from 'zustand';
 
+import { targetFailure, targetResult, channelFailure } from './SettingsPresentation';
 import { useUpdateStore } from '@/features/updates';
 import { useInstallStore } from '@/services/install/install.hooks';
 
 /** What the last call did, and the group it came from: the Skill folders or the updates. */
 export interface SettingsResult {
     text: string;
-    tone?: 'success' | 'warning' | 'error';
+    tone?: 'success' | 'warning' | 'danger';
     paths?: string[];
     from?: 'targets' | 'updates';
 }
@@ -43,28 +38,6 @@ interface SettingsState {
     /** The channel the app is switching to. */
     switchingTo: UpdateChannel | null;
     setChannel: (channel: UpdateChannel) => Promise<void>;
-}
-
-const failure = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-/** What an untick removed, in words. */
-function untickText(
-    target: TargetSnapshot | undefined,
-    where: string,
-    removed: InstallOperationResult['removed'],
-): string {
-    if (target?.kind !== 'claude') return `Lar Factory no longer installs into ${where}, and left its copies there.`;
-
-    const links = (removed?.links.length ?? 0) > 0;
-    const checklists = removed?.checklists ?? false;
-
-    if (links && checklists) return `Removed the skill links and checklists from ${where}.`;
-
-    if (links) return `Removed the skill links from ${where}.`;
-
-    if (checklists) return `Removed the checklists from ${where}.`;
-
-    return `Lar Factory had no skill links or checklists in ${where} to remove.`;
 }
 
 /** The store's part of a snapshot. */
@@ -118,11 +91,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
                 latest() &&
                 set({
                     targets: [],
-                    result: {
-                        text: `Couldn't read the Skill folders: ${failure(error)}`,
-                        tone: 'error',
-                        from: 'targets',
-                    },
+                    result: targetFailure('read the Skill folders', error),
                 }),
         );
     },
@@ -139,26 +108,9 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
             useInstallStore.getState().accept(snapshot);
 
-            if (error) set({ result: { text: `Couldn't change ${path}: ${error}`, tone: 'error', from: 'targets' } });
-            else if (conflicts.length)
-                set({
-                    result: {
-                        text: `${ticked ? `Installed into ${path}, but` : `${untickText(target, path, removed)} It`} left these alone because Lar Factory didn't make them:`,
-                        tone: 'warning',
-                        paths: conflicts,
-                        from: 'targets',
-                    },
-                });
-            else
-                set({
-                    result: {
-                        text: ticked ? `Installed the skills into ${path}.` : untickText(target, path, removed),
-                        tone: 'success',
-                        from: 'targets',
-                    },
-                });
+            set({ result: targetResult({ target, path, ticked, conflicts, removed, error }) });
         } catch (error) {
-            set({ result: { text: `Couldn't change ${path}: ${failure(error)}`, tone: 'error', from: 'targets' } });
+            set({ result: targetFailure(`change ${path}`, error) });
         } finally {
             set({ pending: null });
         }
@@ -172,7 +124,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
             useUpdateStore.setState({ state: await boardApp()!.setUpdateChannel(channel) });
         } catch (error) {
             set({
-                result: { text: `Couldn't switch to ${channel}: ${failure(error)}`, tone: 'error', from: 'updates' },
+                result: channelFailure(channel, error),
             });
         } finally {
             set({ switchingTo: null });

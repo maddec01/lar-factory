@@ -14,13 +14,13 @@ export function customLabelProblem(name: string): string | null {
 
     if (typed.length > LONGEST_LABEL) return `Use at most ${LONGEST_LABEL} characters. This name has ${typed.length}.`;
 
-    if (typed.startsWith('-')) return 'Do not start the label name with a hyphen.';
+    if (typed.startsWith('-')) return 'Don’t start the label name with a hyphen.';
 
     if (!isManagedLabel(typed)) return null;
 
-    if (typed === STRUCTURE_LABEL) return `${name.trim()} is reserved for the factory's saved links.`;
+    if (typed === STRUCTURE_LABEL) return `${name.trim()} is reserved for the factory’s saved links.`;
 
-    return `${name.trim()} is reserved for ${typed.startsWith(STATUS_LABEL_PREFIX) ? 'board status' : "the item's kind"}.`;
+    return `${name.trim()} is reserved for ${typed.startsWith(STATUS_LABEL_PREFIX) ? 'board status' : 'the item’s kind'}.`;
 }
 
 /** Why `name` can't be one tag on a work item, or null when it can: System.Tags separates its tags with these. */
@@ -30,4 +30,4 @@ export const tagSeparatorProblem = (name: string): string | null =>
 /** Why `name` can't be a custom tag on Azure DevOps, or null when it can: a custom label's problems, the tag that places a work item, and separators. */
 export const customTagProblem = (name: string): string | null =>
     customLabelProblem(name) ??
-    (isRepoTag(name) ? `${name.trim()} is reserved for the work item's repository.` : tagSeparatorProblem(name));
+    (isRepoTag(name) ? `${name.trim()} is reserved for the work item’s repository.` : tagSeparatorProblem(name));

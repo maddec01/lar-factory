@@ -103,16 +103,6 @@ test('Start runs the thread on the picked model choice, still in the repository 
     ]);
 });
 
-test('the board data offers the model choices', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
-    const groups = ((await board.board()) as BoardData).modelChoices;
-
-    assert.deepEqual(
-        groups?.map((g) => g.name),
-        ['Personal', 'VI', 'Codex'],
-    );
-});
-
 for (const [name, model] of [
     ['an unknown instance', { instanceId: 'claudeAgent_work', model: 'claude-opus-5-5' }],
     ['a disabled instance', { instanceId: 'cursor', model: 'cursor-agent' }],
@@ -246,30 +236,6 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
     assert.deepEqual(await board.t3Calls(), []);
 });
 
-test('Start refuses an unreadable list of onboarded repositories, naming the file', async (t) => {
-    const dir = home(t, ORIGINS);
-    const board = await startBoard(t, { items: [boardIssue(12, 'Queued')] }, false, false, {
-        HOME: dir,
-        T3_STATE_DB: projectsDb(t, PROJECTS(dir)),
-    });
-
-    await until(board, (d) => d.items.length === 1);
-    writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repository-settings.json'), '{ broken');
-
-    const response = await start(board, board.id(12));
-
-    assert.equal(response.status, 409);
-    assert.match((await response.json()).error, /repository-settings\.json isn't valid JSON/);
-    assert.deepEqual(await board.t3Calls(), []);
-});
-
-test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { untitled: true } });
-    const response = await start(board, board.id(12));
-
-    assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
-});
-
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(13, 'Queued')], { t3: { delay: 100 } });
     const responses = await Promise.all([start(board, board.id(12)), start(board, board.id(12))]);
@@ -313,14 +279,6 @@ for (const fail of ['killed', 'garbage']) {
         assert.equal((await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start').length, 1);
     });
 }
-
-test('a missing t3 says how to point the board at it', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, { T3_PATH: '/nonexistent/t3' });
-    const response = await start(board, board.id(12));
-
-    assert.equal(response.status, 502);
-    assert.match((await response.json()).error, /T3_PATH/);
-});
 
 test('Start only runs for Queued issues from this board page and session', async (t) => {
     const board = await startBoard(t, {

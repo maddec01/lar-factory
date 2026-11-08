@@ -1,27 +1,19 @@
 // Add item's New item pane: the draft's repository, kind, title and description, and whether to create its ticket.
 
 import { ITEM_KINDS } from '@lar-factory/shared';
-import {
-    Button,
-    buttonKind,
-    DraftFields,
-    FormResult,
-    Input,
-    MarkdownEditor,
-    Modal,
-    OptionSelect,
-    PanelField,
-    Text,
-} from '@lar-works/design-system';
-import { useEffect, useRef, useState } from 'react';
+import { Button, FormResult, Input, MarkdownEditor, Modal, OptionSelect, Text } from '@lar-works/design-system';
 import type { FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useAddItemStore } from './AddItemStore';
 import type { DraftValues } from './AddItemStore';
-import { CreateIssueBox, IssueFields, ticketOptions } from './IssueFields';
+import { useAddItemStore } from './AddItemStore';
+import { CreateIssueBox, IssueFields } from './IssueFields';
 import { RepoSelect } from './RepoSelect';
+import { ticketOptions } from './TicketOptions';
 import { KIND_BADGES } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { sampleCapability } from '@/shared/capabilities/sampleCapability';
+import { buttonKind, DraftFields, PanelField } from '@/ui/board';
 
 const KIND_CHOICES = ITEM_KINDS.map((value) => {
     const { name, icon: Icon, hue } = KIND_BADGES[value]!;
@@ -66,12 +58,15 @@ export function AddItemForm() {
     const description = useRef(kept?.description ?? '');
     const { phase } = submission;
     const locked = phase !== 'editing';
-    const keepForm = () => keep(valuesOf(form.current!, description.current, createChoice));
+    const keepForm = useCallback(
+        () => keep(valuesOf(form.current!, description.current, createChoice)),
+        [keep, createChoice],
+    );
 
     // The checkbox's input event comes before this render, so the choice is kept once it has rendered.
     useEffect(() => {
         if (createChoice !== null) keepForm();
-    }, [createChoice]);
+    }, [createChoice, keepForm]);
 
     // An edit in the editor counts as one in the form.
     const onDescription = (markdown: string) => {
@@ -136,7 +131,7 @@ export function AddItemForm() {
                         <Text variant="caption" tone="muted">
                             Formats as you type · saved as Markdown
                         </Text>
-                        <FormResult id="item-result" text={message} />
+                        {data.capture?.enabled !== false && <FormResult id="item-result" text={message} />}
                     </>
                 }
                 details={
@@ -155,7 +150,7 @@ export function AddItemForm() {
                                 options={KIND_CHOICES}
                             />
                         </PanelField>
-                        {selected && (
+                        {selected && data.capture?.enabled !== false && (
                             <IssueFields
                                 key={selected.repo}
                                 repo={selected}
@@ -169,13 +164,19 @@ export function AddItemForm() {
             />
             <Modal.Footer
                 leading={
-                    selected && (
+                    selected ? (
                         <CreateIssueBox
                             repo={selected}
                             choice={createChoice}
                             onChoice={setCreateChoice}
                             disabled={locked}
                         />
+                    ) : (
+                        data.capture?.enabled === false && (
+                            <Text variant="caption" tone="muted" id="item-create-reason">
+                                {sampleCapability(data, 'createIssue')}
+                            </Text>
+                        )
                     )
                 }
             >
@@ -189,6 +190,7 @@ export function AddItemForm() {
                     {...buttonKind('main')}
                     type="submit"
                     id="item-submit"
+                    aria-describedby={data.capture?.enabled === false ? 'item-create-reason' : undefined}
                     disabled={
                         phase === 'pending' ||
                         phase === 'uncertain' ||

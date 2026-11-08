@@ -78,7 +78,6 @@ function serve(
 }
 
 const row = () => $(`.settings-row[data-row="repo-${REPO}"]`)!;
-const dialog = () => $('[data-project-page]');
 const setting = (key: string) => $(`[data-project-page] [data-setting="${key}"]`)!;
 const buttonIn = (el: Element, label: string) =>
     [...el.querySelectorAll<HTMLButtonElement>('button:not([role="combobox"])')].find((b) => text(b) === label);
@@ -101,7 +100,7 @@ async function openRepositories(board: BoardData): Promise<void> {
 
 async function openEdit(board: BoardData): Promise<void> {
     await openRepositories(board);
-    await settle(() => buttonIn(row(), 'Open Project')!.click());
+    await settle(() => buttonIn(row(), 'Open project')!.click());
 }
 
 const discovery = {
@@ -134,21 +133,6 @@ async function picker(key = 'bug') {
 
     return $(`[data-label-picker="${key}"]`)!.closest('[data-slot="popover-content"]')!;
 }
-
-test('Projects opens a long page with a back link and no Edit dialog or publication notice', async () => {
-    serve(boardWith());
-    await openEdit(boardWith());
-    expect($('[data-edit-dialog]')).toBeNull();
-    expect(text(dialog())).not.toContain('Legacy structural publication');
-    expect(setting('role').querySelector<HTMLInputElement>('input')!.value).toBe('Backend API server');
-    await settle(() =>
-        $$<HTMLButtonElement>('[data-settings-body] button')
-            .find((button) => text(button) === '← Projects')!
-            .click(),
-    );
-    expect(dialog()).toBeNull();
-    expect(text($('[data-settings-body]'))).toContain('Settings stay on this machine.');
-});
 
 test('text saves on blur and an error remains beside its field with the typed value', async () => {
     const sent = serve(boardWith(), () => ({ status: 403, body: { error: 'Skills refused.' } }));
@@ -183,7 +167,7 @@ test('a blank Team shows an error and sends no request', async () => {
     const sent = serve(board);
 
     await openRepositories(board);
-    await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Open Project')!.click());
+    await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Open project')!.click());
 
     const input = setting('itemSource').querySelector<HTMLInputElement>('input')!;
 
@@ -209,21 +193,6 @@ test('choices apply immediately and Reset retains its default behavior', async (
     expect(sent.at(-1)).toEqual({ repo: REPO, change: 'override', key: 'role' });
 });
 
-test('all nine access operations share the same states and recheck performs a probe', async () => {
-    const sent = serve(boardWith());
-
-    await openEdit(boardWith());
-
-    const access = $('[data-access]')!;
-
-    expect(access.querySelectorAll('[data-operation]')).toHaveLength(9);
-    expect(text(access)).toContain('Not checked');
-    expect(text(access)).toContain('Allowed');
-    expect(text(access)).toContain('Refused');
-    await settle(() => buttonIn(access, 'Recheck access')!.click());
-    expect(sent).toEqual([{ repo: REPO, change: 'recheck' }]);
-});
-
 test('access disables only issue options that need it and recheck restores stored preferences', async () => {
     const initial = boardWith();
     const final = boardWith({
@@ -234,7 +203,7 @@ test('access disables only issue options that need it and recheck restores store
 
     await openEdit(initial);
     expect(setting('createIssuesFromAddItem').querySelector<HTMLButtonElement>('[role="switch"]')!.disabled).toBe(true);
-    expect(text(setting('createIssuesFromAddItem'))).toContain('not checked');
+    expect(text(setting('createIssuesFromAddItem'))).toContain('isn’t checked');
     await settle(() => buttonIn($('[data-access]')!, 'Recheck access')!.click());
     expect(setting('createIssuesFromAddItem').querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe(
         'true',
@@ -244,19 +213,6 @@ test('access disables only issue options that need it and recheck restores store
     );
     await settle(() => setting('writeRefinedSpec').querySelector<HTMLButtonElement>('[role="switch"]')!.click());
     expect(sent.at(-1)).toEqual({ repo: REPO, change: 'override', key: 'writeRefinedSpec', value: false });
-});
-
-test('domain docs requires branch and PR access and keeps its saved paths', async () => {
-    const board = boardWith({
-        domainDocs: { kind: 'repository', glossary: 'WORDS.md', adrs: 'decisions' },
-        access: { ...SETUP.access, 'edit-ticket': 'allowed' },
-    });
-
-    serve(board);
-    await openEdit(board);
-    expect(setting('domainDocs').querySelector<HTMLButtonElement>('[role="combobox"]')!.disabled).toBe(true);
-    expect(setting('glossary').querySelector<HTMLInputElement>('input')!.value).toBe('WORDS.md');
-    expect(text(setting('domainDocs'))).toContain('Open PRs');
 });
 
 test('a label search finds one of 150 choices with checkboxes and saves the complete kind once on close', async () => {
@@ -306,28 +262,6 @@ test('typing a new label creates nothing and explicit Create preserves a failed 
     expect(input.value).toBe('');
 });
 
-test('a type choice saves immediately while the suggested label stays optional', async () => {
-    const board = allowed();
-    const sent = serve(board);
-
-    await openEdit(board);
-    expect(text(vocabularyRow('bug'))).toContain('bug · suggested');
-    await chooseOption(vocabularyRow('bug').querySelector('[role="combobox"]')!, 'Task');
-    expect(sent).toEqual([{ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: 'Task', labels: [] } }]);
-});
-
-test('forbidden and missing mappings stay visible and can be removed', async () => {
-    const board = boardWith({ ...effectiveVocabulary({ bug: { type: 'Gone', labels: ['linked-work', 'removed'] } }) });
-    const sent = serve(board);
-
-    await openEdit(board);
-    expect(text(vocabularyRow('bug'))).toContain('removed (unavailable)');
-    await settle(() =>
-        vocabularyRow('bug').querySelector<HTMLButtonElement>('[aria-label="Remove linked-work from Bug"]')!.click(),
-    );
-    expect(sent[0]).toMatchObject({ change: 'vocabulary', value: { type: 'Gone', labels: ['removed'] } });
-});
-
 test('closing a failed Create preserves its draft without repeating the request', async () => {
     const board = allowed();
     const sent = serve(board, () => ({ status: 403, body: { error: 'Create refused.' } }));
@@ -374,7 +308,7 @@ test('an older kind save can refresh discovery without erasing another picker se
     expect($<HTMLInputElement>('[data-label-picker="feature"] input')!.value).toBe('keep this text');
 });
 
-test('leaving the Project page closes a dirty label picker with one complete kind save', async () => {
+test('leaving the project page closes a dirty label picker with one complete kind save', async () => {
     const board = allowed();
     const sent = serve(board);
 

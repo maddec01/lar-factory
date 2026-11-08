@@ -1,8 +1,8 @@
-/* The starting page's styles, compiled with the design system's tokens and the board's base styles at build time
+/* The starting page's styles, compiled with the design system's tokens and base styles at build time
    (scripts/compiled-css.ts), since the page is a data: URL that loads nothing. The lockup, the draw and the roll copy
-   the design system's board loading screen (src/board/loading-screen.css), so the board page's loading screen carries
-   on from this one. */
-@import '@lar-works/design-system/board.css' source(none);
+   the design system's app splash (src/feedback/app-splash.css), which the board page's loading screen draws, so that
+   screen carries on from this one. */
+@import '@lar-works/design-system/styles.css' source(none);
 
 html,
 body {
@@ -11,8 +11,8 @@ body {
 body {
     @apply grid place-items-center select-none;
     padding: --spacing(13) --spacing(6) --spacing(6); /* the title bar's height on top */
-    background: var(--background);
-    color: var(--foreground);
+    background: var(--color-surface-page);
+    color: var(--color-fg);
     -webkit-app-region: drag; /* nothing here is a control, so the window moves by it */
 }
 
@@ -50,7 +50,7 @@ body {
 .loading-factory {
     margin-left: 0.26em;
     font-weight: 500;
-    color: var(--muted-foreground);
+    color: var(--color-fg-muted);
 }
 
 /* The step line hangs below the baseline by half the lockup's size, clear of the "y", under the lockup's middle,
@@ -66,7 +66,7 @@ body {
     max-width: min(36rem, calc(100vw - --spacing(12)));
     text-align: center;
     overflow-wrap: anywhere;
-    color: var(--muted-foreground);
+    color: var(--color-fg-muted);
 }
 .loading-line-slot {
     display: grid;

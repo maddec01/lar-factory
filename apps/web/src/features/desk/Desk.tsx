@@ -98,7 +98,9 @@ export function Desk({ items: inScope }: { items: Item[] }) {
     const clientError = useBoardStore((state) => state.clientError);
     const unavailable = useActivityUnavailable();
     const filters = useScopeStore((state) => state.filters);
-    const items = deskItems({ ...data, items: inScope }, unavailable).filter(rowFilter(filters, data.repos));
+    const scoped = new Set(inScope.map((item) => item.id));
+    const shows = rowFilter(filters, data.repos);
+    const items = deskItems(data, unavailable).filter((item) => scoped.has(item.id) && shows(item));
     const scope = useShownScope();
 
     // A card that lands on the desk pulses once, whatever the scope and filters show.

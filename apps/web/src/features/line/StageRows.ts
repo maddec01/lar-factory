@@ -10,8 +10,6 @@ import { stageOf } from './StageStatus';
 
 export interface StageRow {
     item: Item;
-    /** The dossier a part's row names. */
-    concept: Item | undefined;
 }
 
 export interface StageRows {
@@ -34,10 +32,9 @@ export function stageRows(items: readonly Item[], data: BoardData, unavailable: 
     };
 
     for (const item of items) {
-        const { sections, concept } = placed(item);
+        const { sections } = placed(item);
 
-        for (const section of sections)
-            if (section !== 'desk' && section !== 'dock') rows[section].push({ item, concept });
+        for (const section of sections) if (section !== 'desk' && section !== 'dock') rows[section].push({ item });
     }
 
     return {

@@ -43,7 +43,7 @@ test('a Verify card reads the PR Open PR opens, its first linked one', async () 
 });
 
 test('clicks on a card’s buttons open no item dialog', async () => {
-    await mountPage();
+    await mountPage(withItem('I_sample12', { parentId: null }));
     await settle(() => card('I_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
     await settle(() => card('I_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());
     expect(dialog()).toBeNull();
@@ -71,7 +71,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
         expect(text($('#desk-h')!.parentElement)).toBe('Your desk1');
-        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 6');
+        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 5');
     });
 
     test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {
@@ -97,6 +97,14 @@ describe('narrowed by Scope, Kind and Labels', () => {
         expect(text($('.desk'))).toBe('Your desk0Nothing waited on you at the last read.');
     });
 });
+
+/** Opens a grouped part through the item dialog, where its answer action remains available. */
+const openPart = async () =>
+    settle(async () => (await import('@/features/item-dialog')).useItemDialogStore.getState().open('I_sample12'));
+const answerAction = () =>
+    dialog()!.querySelector<HTMLAnchorElement | HTMLButtonElement>(
+        '[data-slot="modal-footer"] [data-open-thread]:last-child',
+    )!;
 
 const questionBoard = (child: Partial<Item> = {}, concept: Partial<Item> = {}): BoardData => ({
     ...sample,
@@ -126,21 +134,22 @@ test('a decision with no thread answers in its concept thread without inheriting
 
     await mountPage(data);
 
-    const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+    await openPart();
+
+    const action = answerAction() as HTMLAnchorElement;
 
     expect([text(action), action.href]).toEqual([
         'Answer in concept thread',
         't3code://threads/sample-environment/concept-question',
     ]);
-    expect(nextLine('I_sample12'), 'its action says it').toBe('');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
     const child = useBoardStore.getState().data.items.find((item) => item.id === 'I_sample12')!;
 
     expect(child.threads).toEqual([]);
     expect(child.stats).toBeUndefined();
-    expect(card('I_sample09')).not.toBeNull();
-    await settle(() => open('I_sample12'));
+    expect(card('I_sample09')).toBeNull();
+    expect(card('I_sample12')).toBeNull();
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
 
@@ -151,7 +160,9 @@ test('a decision keeps its own thread even when its concept has a waiting thread
         }),
     );
 
-    const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+    await openPart();
+
+    const action = answerAction() as HTMLAnchorElement;
 
     expect(action.href).toBe('t3code://threads/sample-environment/own-decision');
     expect(text(action)).toBe('Open thread');
@@ -188,7 +199,9 @@ test.each([
     async (_name, child, concept) => {
         await mountPage(questionBoard(child, concept));
 
-        const action = card('I_sample12').querySelector<HTMLButtonElement>('[data-open-thread]')!;
+        await openPart();
+
+        const action = answerAction() as HTMLButtonElement;
 
         expect(text(action)).toBe('Open thread');
         expect(action.tagName).toBe('BUTTON');
@@ -197,10 +210,10 @@ test.each([
     },
 );
 
-test('a Ready part has no desk card, shows in Ready to build and stays in its dossier', async () => {
+test('a Ready part stays in its dossier without a desk card or Ready to build row', async () => {
     await mountPage();
     expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
-    expect($('[data-stage="ready"] [data-item="I_sample13"]')).not.toBeNull();
+    expect($('[data-stage="ready"] [data-item="I_sample13"]')).toBeNull();
     await settle(() => $<HTMLButtonElement>('[data-dossier="I_sample09"] [data-dossier-open]')!.click());
     expect(
         $(
@@ -211,6 +224,7 @@ test('a Ready part has no desk card, shows in Ready to build and stays in its do
 
 test('shaping questions target the older question and leave the desk on a board update', async () => {
     const data = withItem('I_sample12', {
+        parentId: null,
         status: 'Shaping',
         threads: [
             { id: 'newer', title: 'Newer', state: 'done', updated: '2026-11-02' },
@@ -251,13 +265,15 @@ test('a child opens a running concept thread and answers only a later question i
 
     await mountPage(data);
 
-    const action = () => card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+    await openPart();
+
+    const action = () => answerAction() as HTMLAnchorElement;
 
     expect([text(action()), action().href]).toEqual([
         'Open thread',
         't3code://threads/sample-environment/concept-running',
     ]);
-    await settle(() => open('I_sample12'));
+    expect(card('I_sample12')).toBeNull();
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
@@ -277,6 +293,7 @@ test.each(['running', 'stopped', 'done', 'retained'] as const)(
     'Needs you cards and dialogs open their own %s thread without answer wording',
     async (state) => {
         const data = questionBoard({
+            parentId: null,
             threads: [
                 {
                     id: 'own-thread',
@@ -316,26 +333,20 @@ test.each(['own', 'concept'] as const)(
                   });
 
         await mountPage(data);
-        await settle(() => open('I_sample12'));
+        await openPart();
 
-        const actions = () => [
-            card('I_sample12').querySelector('[data-open-thread]')!,
-            dialog()!.querySelector('[data-open-thread]')!,
-        ];
+        const action = () => dialog()!.querySelector('[data-open-thread]')!;
         const { useBoardStore } = await import('@/services/board/board.hooks');
         const answer = owner === 'concept' ? 'Answer in concept thread' : 'Answer in T3';
 
-        expect(actions().map(text)).toEqual([answer, answer]);
+        expect(text(action())).toBe(answer);
         await settle(() => useBoardStore.getState().fail('Connection lost'));
-        expect(actions().map(text)).toEqual(['Open thread', 'Open thread']);
-        expect(actions().map((action) => action.getAttribute('href'))).toEqual([
+        expect(text(action())).toBe('Open thread');
+        expect(action().getAttribute('href')).toBe(
             owner === 'concept'
                 ? 't3code://threads/sample-environment/concept-question'
                 : 't3code://threads/sample-environment/own-question',
-            owner === 'concept'
-                ? 't3code://threads/sample-environment/concept-question'
-                : 't3code://threads/sample-environment/own-question',
-        ]);
+        );
         await settle(() =>
             useBoardStore.getState().receive({
                 ...data,
@@ -346,8 +357,8 @@ test.each(['own', 'concept'] as const)(
                 ),
             }),
         );
-        expect(actions().map(text)).toEqual(['Open thread', 'Open thread']);
+        expect(text(action())).toBe('Open thread');
         await settle(() => useBoardStore.getState().receive(data));
-        expect(actions().map(text)).toEqual([answer, answer]);
+        expect(text(action())).toBe(answer);
     },
 );

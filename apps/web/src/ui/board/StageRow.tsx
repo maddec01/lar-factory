@@ -181,24 +181,6 @@ export function RowTitle({
     );
 }
 
-/** After the title: which concept or parent the row's work belongs to, giving its room up first. */
-export function RowPartOf({
-    children,
-}: {
-    /** What the work belongs to, in words. */
-    children: string;
-}) {
-    return (
-        <span
-            data-concept
-            title={children}
-            className="bg-surface-sunken text-fg-muted max-w-44 min-w-16 shrink-[100] truncate rounded-xs px-1.5"
-        >
-            {children}
-        </span>
-    );
-}
-
 /** The state cell, which `clips` what overflows it unless what it holds keeps its own width. What follows the state,
  *  such as a kind marker, wraps under it rather than being cut off. */
 export function RowStateCell({
@@ -281,16 +263,6 @@ export function RowSide({
             </span>
         </span>
     );
-}
-
-/** Where to act on an item that waits on you, in its action slot. */
-export function OnYourDesk({
-    children,
-}: {
-    /** Where to act on the item. */
-    children: ReactNode;
-}) {
-    return <span className="text-warning-fg">{children}</span>;
 }
 
 /** A row's second line: `bar` and `count` on the left, `children` in its text slot, then its pull requests and

@@ -40,7 +40,7 @@ export interface ListGroup {
 }
 
 export interface BoardSections {
-    /** Your desk: items waiting on the user's answer, verification or merge, including shaping and concept questions. */
+    /** Your desk: standalone items waiting on the user's answer, verification or merge. */
     needsYou: Item[];
     concepts: Item[];
     /** What the board's Shaping section holds, across every repository. */
@@ -83,8 +83,6 @@ export type BoardSection = 'desk' | 'queue' | 'shaping' | 'ready' | 'dock' | 'bu
 export interface Placement {
     /** Every section the item shows in, in reading order. */
     sections: BoardSection[];
-    /** The dossier a part's Queue, Shaping or Build row names; absent when it has no such row. */
-    concept?: Item;
 }
 
 export interface PlacementFacts {
@@ -156,24 +154,19 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
     }
 }
 
-/** Every section the item shows in, and the concept its stage row names when it is a dossier's part. */
+/** Grouped parents and parts stay in the dock; other work keeps its ordinary stage and desk placement. */
 export function placementOf(item: Item, { starts, unavailable, all }: PlacementFacts): Placement {
     const parent = item.parentId == null ? undefined : all.find((other) => other.id === item.parentId);
-    const part = !!parent && stillOpen(parent);
-    // A part still being refined lives in its dossier; from Ready on it also shows where its stage is.
-    const dossierOnly =
-        part &&
-        (['List', 'Queued', 'Shaping'].includes(item.status) || (item.status === 'Needs you' && !hasBuildThread(item)));
-    const stage = dossierOnly ? null : stageSection(item, starts);
+    const part = !!parent && isDossierParent(parent, all);
+    const stage = stageSection(item, starts);
     const dock =
         part || (stillOpen(item) && (hasChildren(item, all) || (item.kind === 'concept' && stage !== 'queue')));
-    const sections: BoardSection[] = [
-        ...(onDesk(item, unavailable) ? ['desk' as const] : []),
-        ...(stage ? [stage] : []),
-        ...(dock ? ['dock' as const] : []),
-    ];
 
-    return part && stage ? { sections, concept: parent } : { sections };
+    if (dock) return { sections: ['dock'] };
+
+    return {
+        sections: [...(onDesk(item, unavailable) ? ['desk' as const] : []), ...(stage ? [stage] : [])],
+    };
 }
 
 /** `items` in their order, keeping those placed in `section`. */

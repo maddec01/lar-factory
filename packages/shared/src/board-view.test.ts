@@ -217,17 +217,12 @@ for (const kind of ['issue', 'concept'] as const) {
             } as Item;
             const data = { items: [item], repos: [], firstRead: { settled: true } } as unknown as BoardData;
             const expected =
-                kind === 'concept'
-                    ? !['List', 'Queued', 'Done'].includes(status)
-                    : ['Shaping', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
+                kind !== 'concept' && ['Shaping', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
 
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(expected));
             item.threads = 'unavailable';
 
-            const ordinary =
-                kind === 'concept'
-                    ? status === 'Needs you'
-                    : ['Needs you', 'Verify', 'Ready to merge'].includes(status);
+            const ordinary = kind !== 'concept' && ['Needs you', 'Verify', 'Ready to merge'].includes(status);
 
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
             item.threads = [{ id: 'q', state: 'needs you', observedAt: '2026-11-02' }] as Item['threads'];
@@ -301,6 +296,37 @@ describe('placementOf', () => {
         placementOf(item, { unavailable: false, all: [item], ...facts });
     const sections = (item: Item, facts?: Partial<PlacementFacts>) => place(item, facts).sections;
 
+    test.each(['concept', 'issue'] as const)(
+        '%s groups keep parents and children only in the dock across statuses',
+        (kind) => {
+            const parent = concept({ kind });
+
+            for (const status of [
+                'List',
+                'Queued',
+                'Shaping',
+                'Ready',
+                'In progress',
+                'Review',
+                'Verify',
+                'Ready to merge',
+                'Needs you',
+                'Done',
+            ] as const) {
+                const child = part({ status, repo: 'owner/other', threads: [buildThread] });
+                const all = [parent, child];
+
+                assert.deepEqual(sections(child, { all }), ['dock'], status);
+
+                if (status !== 'List' && status !== 'Done') {
+                    const changed = { ...parent, status };
+
+                    assert.deepEqual(sections(changed, { all: [changed, child] }), ['dock'], `parent ${status}`);
+                }
+            }
+        },
+    );
+
     describe('Your desk', () => {
         test.each<[string, Item, boolean]>([
             ['Needs you', work({ status: 'Needs you' }), true],
@@ -312,7 +338,7 @@ describe('placementOf', () => {
             [
                 'an open question on a concept',
                 concept({ threads: [{ id: 'q', state: 'needs you' }] as ItemThread[] }),
-                true,
+                false,
             ],
             ['Verify', work({ status: 'Verify' }), true],
             ['Ready to merge', work({ status: 'Ready to merge' }), true],
@@ -351,25 +377,22 @@ describe('placementOf', () => {
         test('lets go of a Queued item once its start is in flight', () => {
             assert.deepEqual(sections(work({ status: 'Queued' }), { starts: { shape: starting } }), ['shaping']);
             assert.deepEqual(sections(work({ status: 'Queued' }), { starts: { shape: uncertain } }), ['shaping']);
-            assert.deepEqual(sections(concept({ status: 'Queued' }), { starts: { shape: starting } }), [
-                'shaping',
-                'dock',
-            ]);
+            assert.deepEqual(sections(concept({ status: 'Queued' }), { starts: { shape: starting } }), ['dock']);
         });
     });
 
     describe('Shaping', () => {
-        test('holds Shaping items and concepts whose Refinement is incomplete', () => {
+        test('holds standalone Shaping items while concepts stay in the dock', () => {
             assert.deepEqual(sections(work()), ['shaping']);
-            assert.deepEqual(sections(concept()), ['shaping', 'dock']);
-            assert.deepEqual(sections(concept({ refinement: undefined })), ['shaping', 'dock']);
+            assert.deepEqual(sections(concept()), ['dock']);
+            assert.deepEqual(sections(concept({ refinement: undefined })), ['dock']);
         });
 
         test('leaves out a concept with Refinement complete, even with a question or a start', () => {
             const refined = { refinement: { complete: true, reasons: [] } };
 
             assert.deepEqual(sections(concept(refined)), ['dock']);
-            assert.deepEqual(sections(concept({ ...refined, status: 'Needs you' })), ['desk', 'dock']);
+            assert.deepEqual(sections(concept({ ...refined, status: 'Needs you' })), ['dock']);
             assert.deepEqual(sections(concept({ ...refined, status: 'Queued' }), { starts: { shape: starting } }), [
                 'dock',
             ]);
@@ -397,7 +420,7 @@ describe('placementOf', () => {
         });
 
         test('leaves out concepts, which hold no build of their own', () => {
-            assert.deepEqual(sections(concept({ status: 'Review' })), ['shaping', 'dock']);
+            assert.deepEqual(sections(concept({ status: 'Review' })), ['dock']);
         });
 
         test('lets go of merged work, whatever a start left behind', () => {
@@ -433,13 +456,13 @@ describe('placementOf', () => {
 
             assert.ok(sections(concept()).includes('dock'));
             assert.ok(!sections(concept({ status: 'Queued' })).includes('dock'));
-            assert.deepEqual(sections(parent, { all: [parent, child] }), ['build', 'dock']);
+            assert.deepEqual(sections(parent, { all: [parent, child] }), ['dock']);
 
             const queued = concept({ status: 'Queued' });
 
             assert.deepEqual(
                 sections(queued, { all: [queued, child] }),
-                ['queue', 'dock'],
+                ['dock'],
                 'a sub-issue makes it linked work before it starts',
             );
         });
@@ -479,32 +502,23 @@ describe('placementOf', () => {
             assert.deepEqual(inDossier(change, facts), { sections: ['dock'] });
         });
 
-        test('Needs you with no recorded build thread appears only in its dossier, and stays on the desk', () => {
-            assert.deepEqual(inDossier({ status: 'Needs you' }), { sections: ['desk', 'dock'] });
+        test('Needs you with no recorded build thread appears only in its dossier', () => {
+            assert.deepEqual(inDossier({ status: 'Needs you' }), { sections: ['dock'] });
             assert.deepEqual(inDossier({ status: 'Needs you' }, { starts: { build: starting } }), {
-                sections: ['desk', 'dock'],
+                sections: ['dock'],
             });
         });
 
         test.each<[string, Partial<Item>, BoardSection[], Partial<PlacementFacts>?]>([
-            ['Ready', { status: 'Ready' }, ['ready', 'dock']],
-            [
-                'Ready with a build start in flight',
-                { status: 'Ready' },
-                ['build', 'dock'],
-                { starts: { build: starting } },
-            ],
-            ['In progress', { status: 'In progress' }, ['build', 'dock']],
-            ['Review', { status: 'Review' }, ['build', 'dock']],
-            ['Verify', { status: 'Verify' }, ['desk', 'build', 'dock']],
-            ['Ready to merge', { status: 'Ready to merge' }, ['desk', 'build', 'dock']],
-            [
-                'Needs you with a recorded build thread',
-                { status: 'Needs you', threads: [buildThread] },
-                ['desk', 'build', 'dock'],
-            ],
-        ])('%s also appears in its stage section and names its concept there', (_name, change, expected, facts) => {
-            assert.deepEqual(inDossier(change, facts), { sections: expected, concept: parent });
+            ['Ready', { status: 'Ready' }, ['dock']],
+            ['Ready with a build start in flight', { status: 'Ready' }, ['dock'], { starts: { build: starting } }],
+            ['In progress', { status: 'In progress' }, ['dock']],
+            ['Review', { status: 'Review' }, ['dock']],
+            ['Verify', { status: 'Verify' }, ['dock']],
+            ['Ready to merge', { status: 'Ready to merge' }, ['dock']],
+            ['Needs you with a recorded build thread', { status: 'Needs you', threads: [buildThread] }, ['dock']],
+        ])('%s appears only in its dossier', (_name, change, expected, facts) => {
+            assert.deepEqual(inDossier(change, facts), { sections: expected });
         });
 
         test('a merged part stays in its dossier only', () => {

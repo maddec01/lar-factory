@@ -45,7 +45,6 @@ import {
     RowGlyph,
     RowKindCell,
     RowOpen,
-    RowPartOf,
     RowSide,
     RowSliceNote,
     RowSlices,
@@ -101,18 +100,11 @@ const sliceNote = (item: Item) => {
     ];
 };
 
-/** Which concept or parent the row's work belongs to. */
-function PartOf({ concept }: { concept: Item }) {
-    const text = `Part of ${concept.title}`;
-
-    return <RowPartOf>{text}</RowPartOf>;
-}
-
 /** The stages a board section is named for: Shaping, Ready to build and Build. */
 const NAMED_BY_SECTION: readonly Status[] = ['Shaping', 'Ready', 'In progress'];
 
 /** `n` is a Queue row's place in the Queue, which it shows in the glyph's place, with its age as its state. */
-export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: BoardData; n?: number }) {
+export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData; n?: number }) {
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const activity = useActivityState(item);
@@ -165,7 +157,6 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                         <RowTitle name={itemName(item)}>
                             <ItemTitle item={item} />
                         </RowTitle>
-                        {concept && <PartOf concept={concept} />}
                     </RowTitleCell>
                     <RowStateCell>
                         {n === undefined ? (

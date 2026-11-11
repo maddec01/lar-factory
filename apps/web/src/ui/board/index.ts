@@ -81,7 +81,6 @@ export { SliceBar, SliceList, SliceRow } from './Slices';
 export { SourceIcon } from './SourceIcon';
 export { BuildLimit, HeaderSwitch, StageList, StagePane, StagePaneEmpty, StageSections } from './StagePane';
 export {
-    OnYourDesk,
     QueueAge,
     QueuePlace,
     RowBlocked,
@@ -93,7 +92,6 @@ export {
     RowIdentity,
     RowKindCell,
     RowOpen,
-    RowPartOf,
     RowSecondLine,
     RowSide,
     RowSliceNote,

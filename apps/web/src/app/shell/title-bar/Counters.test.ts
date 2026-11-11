@@ -75,6 +75,7 @@ test('need you leaves out a Verify item while its build thread runs, and counts 
             i.id === 'I_sample10'
                 ? {
                       ...i,
+                      parentId: null,
                       status: 'Verify' as const,
                       threads: [
                           {

@@ -26,8 +26,8 @@ import {
 import { conceptIcons } from '@/ui/board';
 
 const PANES = ['shaping', 'ready', 'build'];
-const SHAPING = [130, 22, 200, 23];
-const BUILD = [31, 149, 34, 147, 142, 141, 150, 30, 180];
+const SHAPING = [130, 22, 23];
+const BUILD = [31, 149, 34, 147, 142, 141, 150, 30];
 const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
 const row = (id: string) =>
     $(`:is([data-stage="shaping"], [data-stage="ready"], [data-stage="build"]) li[data-item="${id}"]`)!;
@@ -120,19 +120,24 @@ const readyRows = () => $$('[data-stage="ready"] li[data-item]').map((r) => numb
 test('each pane holds the rows the placement rule gives it, and Build lists the furthest along first', async () => {
     await mountPage();
     expect(shapingRows()).toEqual(SHAPING);
-    expect(readyRows()).toEqual([140]);
+    expect(readyRows()).toEqual([]);
     expect(inPane('build')).toEqual(BUILD);
     expect(heading('shaping-h')).toEqual(['Shaping', String(SHAPING.length)]);
     expect(heading('build-h')).toEqual(['Build', String(BUILD.length)]);
 });
 
 test('a live board push moves a row between sections with no reload', async () => {
-    await mountPage(withItem('I_sample13', { blockers: [] }));
+    await mountPage(withItem('I_sample13', { blockers: [], parentId: null }));
     expect(readyRows()).toContain(140);
     await settle(async () =>
-        (await import('@/services/board/board.hooks')).useBoardStore
-            .getState()
-            .receive(withItem('I_sample13', { blockers: [], status: 'In progress', statuses: ['In progress'] })),
+        (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(
+            withItem('I_sample13', {
+                blockers: [],
+                parentId: null,
+                status: 'In progress',
+                statuses: ['In progress'],
+            }),
+        ),
     );
     expect(readyRows()).not.toContain(140);
     expect(inPane('build')).toContain(140);

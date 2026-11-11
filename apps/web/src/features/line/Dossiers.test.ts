@@ -113,6 +113,49 @@ const openInstead = (id: string) => press(opener(id));
 const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
 const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
 
+test('a grouped child stays out of the desk when Projects shows its repository without its parent', async () => {
+    localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
+
+    const data = withItem('I_sample13', {
+        repo: 'maddec01/lar-apple',
+        status: 'Verify',
+        linkedPrs: cleanPrs,
+        threads: [],
+        slices: [],
+    });
+
+    await mountOpen(data);
+    expect(step('I_sample13')).not.toBeNull();
+    expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+    expect(text(step('I_sample13'))).toContain('Open item details');
+});
+
+test('live status changes keep linked work in its group with details, thread and PR links', async () => {
+    const data = withItem('I_sample13', { blockers: [], threads: [], slices: [], linkedPrs: cleanPrs });
+
+    await mountOpen(data);
+    for (const status of [
+        'Queued',
+        'Shaping',
+        'Ready',
+        'In progress',
+        'Review',
+        'Verify',
+        'Ready to merge',
+        'Needs you',
+    ] as const) {
+        await receive(withItem('I_sample13', { status }, data));
+        expect(step('I_sample13')).not.toBeNull();
+        expect($(`[data-stage]:not([data-stage="dock"]) [data-item="I_sample13"]`)).toBeNull();
+        expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+        expect($('[data-stage="shaping"] [data-item="I_sample09"]')).toBeNull();
+    }
+    await press(button(step('I_sample13'), 'Open item details'));
+    expect(dialogTitle()).toContain('Owner accounts');
+    expect($('[data-item-dialog] [data-open-thread]')).not.toBeNull();
+    expect($('[data-item-dialog] a[href="https://github.com/maddec01/lar-server/pull/150"]')).not.toBeNull();
+});
+
 test('the chevron is a real button that says whether the row is expanded, and focus stays on it as the row collapses', async () => {
     await mountPage();
 
@@ -304,7 +347,7 @@ test('the blocked chip counts the blocked slices of unfinished parts', async () 
 
 const col = (name: string, id = C200) => header(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
 
-test('a part at Verify or Ready to merge counts as moving while its build thread runs, and back on your desk when it stops', async () => {
+test('a part at Verify or Ready to merge counts as moving while its build thread runs, and asks for action in its group when it stops', async () => {
     const build = {
         id: 'build',
         title: 'Build',

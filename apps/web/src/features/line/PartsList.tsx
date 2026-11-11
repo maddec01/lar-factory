@@ -13,7 +13,7 @@ import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './Dossi
 import { PartStart } from './PartStart';
 import { figuresOf, opensItem } from './RowDetails';
 import { YOURS, lastSeen } from './StageStatus';
-import { OnYourDesk, Track } from './StageTrack';
+import { Track } from './StageTrack';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { PartKindLabel } from './WorkMapParts';
 import {
@@ -35,6 +35,7 @@ import {
     PartsList as DesignPartsList,
     PartTrack,
     PartWaits,
+    RefButton,
     RowCount,
     ShowDoneToggle,
     ThreadLine as DesignThreadLine,
@@ -71,7 +72,7 @@ function ThreadLine({ part }: { part: Part }) {
     );
 }
 
-/** The one thing a part asks next: on your desk, or its Start (or Start after while it waits). Otherwise its thread,
+/** The one thing a part asks next: its item details, or its Start (or Start after while it waits). Otherwise its thread,
  *  when it has one, or while its status says one works on it, and what it waits on beside that. */
 function Action({ part, data }: { part: Part; data: BoardData }) {
     const { status } = part.item;
@@ -81,7 +82,12 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
     if (!done && working)
         return <OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} />;
 
-    if (!done && YOURS.includes(status)) return <OnYourDesk />;
+    if (!done && YOURS.includes(status))
+        return (
+            <RefButton title={itemName(part.item)} onOpen={() => open(part.item)}>
+                Open item details
+            </RefButton>
+        );
 
     if (!done && (status === 'Ready' || status === 'Queued'))
         return <PartStart part={part} data={data} label="Start" />;

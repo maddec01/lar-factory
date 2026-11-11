@@ -143,12 +143,12 @@ const part = item('C', {
     parentId: 'P',
 });
 
-test('a dossier follows its parent, whatever its part matches; a part past shaping keeps its own stage row', async () => {
+test('a dossier follows its parent, whatever its part matches; its part stays out of other stages', async () => {
     seed(BOARD_KEY, ['feature']);
     await mountPage(withItems([parent, part]));
     expect($('[data-dossiers]'), 'the part matches, its parent doesn’t').toBeNull();
     expect($('[data-stage="dock"]'), 'with no dossiers the dock takes no height').toBeNull();
-    expect($('[data-stage="build"] li[data-item="C"]')).not.toBeNull();
+    expect($('[data-stage="build"] li[data-item="C"]')).toBeNull();
 });
 
 test('the filters apply to every pane, their counts follow, and each says when nothing matches', async () => {

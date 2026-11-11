@@ -21,7 +21,7 @@ The place for work that has not been queued, shown in the List modal. Capitalise
 _Avoid_: inbox, backlog as a name for this place.
 
 **Your desk**:
-The board's row of items waiting on the user's answer, verification or merge, including shaping work and concepts with an open question.
+The board's row of standalone work waiting on the user's answer, verification or merge. Concepts, parents with linked work and their children stay in their group.
 _Avoid_: inbox, needs-you list.
 
 **Open question**:

@@ -100,12 +100,16 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
 
     if (complete) action = null;
     else if (asks)
-        action = <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
+        action = (
+            <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" next />
+        );
     else if (item.status === 'Ready' || item.status === 'Queued')
         action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
 
-    // Each card has one labelled thread action. Decision threads are where their answers are given.
+    // Each card has one labelled thread action. Decision threads are where their answers are given, and answering is
+    // the thing you can do now, tinted as on the desk.
     const opensThread = threadsOf(item).length > 0 && !action;
+    const answers = !complete && !open.length && DECISION_KINDS.includes(part.kind);
     // The node says what its thread does beside its status, so the status leaves that out.
     const status = complete ? 'Complete' : shown.stageWord;
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
@@ -163,11 +167,8 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                         item={item}
                         data={data}
                         threadId={activity.thread?.id}
-                        label={
-                            !complete && !open.length && DECISION_KINDS.includes(part.kind)
-                                ? 'Answer in T3'
-                                : 'Open thread'
-                        }
+                        label={answers ? 'Answer in T3' : 'Open thread'}
+                        next={answers}
                     />
                 ))
             }

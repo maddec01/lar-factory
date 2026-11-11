@@ -156,7 +156,7 @@ export function VocabularyFields({
             {value.type && (typesProblem || !types.includes(value.type)) && (
                 <Inline as="span">
                     <Button
-                        {...buttonKind('other')}
+                        {...buttonKind('other', { size: 'md' })}
                         wrap
                         onClick={() => update({ ...value, type: null }, newLabels, true)}
                     >

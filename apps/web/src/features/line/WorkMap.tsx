@@ -9,7 +9,7 @@ import { useId, useState } from 'react';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
 import type { Part } from './DossierParts';
 import { useWidth } from './useWidth';
-import { DECISIONS, GROUP_H, HISTORY, LABEL_W, edgeLine, historyText, keyOf, layout } from './WorkMapLayout';
+import { DECISIONS, GAP, GROUP_H, HISTORY, LABEL_W, edgeLine, historyText, keyOf, layout } from './WorkMapLayout';
 import { CheckNode, HistoryRow, PartNode, RepoIdentity } from './WorkMapParts';
 import { StatusGlyph } from '@/features/items';
 import {
@@ -101,7 +101,8 @@ export function WorkMap({
                     const to = at.get(e.to),
                         from = at.get(e.from);
                     const place = to
-                        ? { left: to.x, top: to.y - 15, width: m.nodeW }
+                        ? // In the gap over the node it leads to, 8px from each node.
+                          { left: to.x, top: to.y - GAP + 8, width: m.nodeW }
                         : from
                           ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 }
                           : null;

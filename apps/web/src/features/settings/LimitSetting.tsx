@@ -1,8 +1,8 @@
 // Settings › General: how many heavy commands, or builds, may run at once on this Mac. Automatic shows the number it
-// gives here; a number is a whole number from 1, saved with its own button or Enter.
+// gives here and applies at once; a number is a whole number from 1, a draft that Settings' footer saves (or Enter).
 
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { Alert, Button, Inline, Input, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, Input, Stack, Text, useSettingsDraft } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -44,9 +44,8 @@ export function LimitSetting({
         (state?.problem ? 'automatic' : saved === undefined ? null : saved === 'automatic' ? 'automatic' : 'number');
     const text = typed ?? (typeof saved === 'number' ? String(saved) : '');
     const number = wholeFromOne(text);
-    const invalid = text.trim() !== '' && number === null;
-    // Busy or unchanged rather than disabled, so focus stays on the button just pressed.
-    const held = saving || (number === saved && !state?.problem);
+    const invalid = number === null;
+    const dirty = shown === 'number' && (number !== saved || !!state?.problem);
 
     const save = async (limit: HeavyCommandLimit) => {
         setSaving(true);
@@ -64,12 +63,25 @@ export function LimitSetting({
                 setTyped(null);
             }
         });
+
+        // The footer keeps the draft and says the save failed; the reason shows beside the field.
+        if (result.error) throw new Error(result.error);
     };
-
-    const submit = (event: FormEvent) => {
+    const reset = () => {
+        setMode(null);
+        setTyped(null);
+        setError(null);
+    };
+    const { submit } = useSettingsDraft({
+        dirty,
+        invalid,
+        save: () => save(number!),
+        reset,
+        error,
+    });
+    const onSubmit = (event: FormEvent) => {
         event.preventDefault();
-
-        if (number !== null && !held) void save(number);
+        submit();
     };
 
     const options = [
@@ -88,8 +100,10 @@ export function LimitSetting({
                 onChange={(next) => {
                     setError(null);
 
-                    if (next === 'automatic') void save('automatic');
-                    else {
+                    if (next === 'automatic') {
+                        setTyped(null);
+                        void save('automatic').catch(() => {});
+                    } else {
                         setMode('number');
 
                         if (typeof saved !== 'number' && state) setTyped(String(state.automatic));
@@ -97,7 +111,7 @@ export function LimitSetting({
                 }}
             />
             {shown === 'number' && (
-                <Inline as="form" space="related" align="center" onSubmit={submit}>
+                <form onSubmit={onSubmit}>
                     <Input
                         presentation="count"
                         inputMode="numeric"
@@ -105,20 +119,10 @@ export function LimitSetting({
                         value={text}
                         readOnly={saving}
                         onChange={(e) => setTyped(e.target.value)}
-                        aria-invalid={invalid || undefined}
-                        aria-describedby={invalid ? hint : undefined}
+                        aria-invalid={(dirty && invalid) || undefined}
+                        aria-describedby={dirty && invalid ? hint : undefined}
                     />
-                    <Button
-                        {...buttonKind('other')}
-                        type="submit"
-                        disabled={number === null}
-                        aria-disabled={held || undefined}
-                        pendingLook="disabled"
-                        data-save-limit={name}
-                    >
-                        Save
-                    </Button>
-                </Inline>
+                </form>
             )}
             {shown === 'number' && invalid && (
                 <Text variant="caption" id={hint} tone="muted">
@@ -126,19 +130,21 @@ export function LimitSetting({
                 </Text>
             )}
             {state?.problem && (
-                <Stack space="related">
+                <>
                     <Alert size="sm" tone="danger">
                         {state.problem} The board uses Automatic until you save a choice.
                     </Alert>
-                    <Button
-                        {...buttonKind('other')}
-                        loading={saving}
-                        data-save-automatic={name}
-                        onClick={() => void save('automatic')}
-                    >
-                        Use Automatic
-                    </Button>
-                </Stack>
+                    <span>
+                        <Button
+                            {...buttonKind('other', { size: 'md' })}
+                            loading={saving}
+                            data-save-automatic={name}
+                            onClick={() => void save('automatic').catch(() => {})}
+                        >
+                            Use Automatic
+                        </Button>
+                    </span>
+                </>
             )}
             {error && (
                 <Alert size="sm" tone="danger">

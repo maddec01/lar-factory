@@ -17,12 +17,13 @@ interface BoardWarningsProps {
     action: ReactNode;
 }
 
-/** The board's warnings, above the desk: the design system's AttentionList, as lar-server's "Needs attention", folded
- *  under its header until opened (inline details that never open a notification or a dialog). A lead warning, such as
- *  a lost board server, opens it in the danger tone. */
+/** The board's warnings, above the desk on the board's 16px gutter: the design system's AttentionList, as
+ *  lar-server's "Needs attention", folded under its header until opened (inline details that never open a
+ *  notification or a dialog). Its title, which can be a whole sentence, wraps (as every AttentionList's does). A lead
+ *  warning, such as a lost board server, opens it in the danger tone. */
 export function BoardWarnings({ lead, leadTitle, summary, toggleLabel, children, action }: BoardWarningsProps) {
     return (
-        <aside data-board-notices className="shrink-0 px-6 pt-4">
+        <aside data-board-notices className="px-gutter-app shrink-0 pt-3">
             <AttentionList
                 title={summary ?? leadTitle ?? ''}
                 tone={lead ? 'danger' : 'warning'}
@@ -95,11 +96,11 @@ export function ToolMissing({
     return (
         <div className="tool-missing grid flex-1 place-items-center p-5">
             <div
-                className="tool-missing-box bg-surface-raised [&_code]:text-fg max-w-130 rounded-lg border px-6 py-5 [&_code]:wrap-anywhere"
+                className="tool-missing-box surface-card [&_code]:text-fg max-w-130 rounded-xl border px-6 py-5 [&_code]:wrap-anywhere"
                 role="alert"
             >
                 <BrandMark label="Lar" />
-                <h1 className="tracking-heading mt-3 mb-0 text-(length:--text-base) font-semibold">{title}</h1>
+                <h1 className="tracking-heading mt-3 mb-0 text-base font-semibold">{title}</h1>
                 <p className="text-fg-muted mt-3 mb-0">{children}</p>
                 <p className="text-fg-muted mt-3 mb-0">{action}</p>
             </div>

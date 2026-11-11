@@ -76,7 +76,7 @@ export function DraftLabels({
                 ))}
                 <Popover>
                     <Popover.Trigger asChild>
-                        <Button {...buttonKind('other')} rightIcon={<ChevronDown />}>
+                        <Button {...buttonKind('other', { size: 'md' })} rightIcon={<ChevronDown />}>
                             {picked.length ? 'Edit' : `Add ${noun}`}
                         </Button>
                     </Popover.Trigger>

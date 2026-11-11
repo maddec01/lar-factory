@@ -1,7 +1,8 @@
-// One glyph per status of Lar Factory's work, the way T3 marks a thread working, waiting or done, in the status's
-// state's colour (StatusColors' boardStatusState, through the one state map).
+// One glyph per status of Lar Factory's work, the way T3 marks a thread working, waiting or done: the design system's
+// StatusIndicator with the status's glyph, in its state's colour (StatusColors' boardStatusState, through the one state
+// map), turning or breathing on the design system's motion while the work runs.
 
-import { ambientMotion, StatusIndicator, type StatusState, statusStateColors } from '@lar-works/design-system';
+import { StatusIndicator, type StatusState } from '@lar-works/design-system';
 import {
     CheckIcon,
     CircleArrowRightIcon,
@@ -13,18 +14,17 @@ import {
     GitMergeIcon,
     ListIcon,
 } from '@lar-works/design-system/icons';
-import { SpinnerIcon } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
 import { conceptIcons } from './ConceptIcons';
-import { type BoardStatus, boardStatusState, statusColor } from './StatusColors';
+import { type BoardStatus, boardStatusState } from './StatusColors';
 
 const { stopped: StoppedIcon } = conceptIcons;
 
-/** A glyph's size, and its slot's fixed box: `sm` 12px, `md` 14px or `lg` 16px square. */
-const sizes = { sm: 'size-3', md: 'size-3.5', lg: 'size-4' } as const;
+/** A slot's fixed box: `sm` 14px (the StatusIndicator's `sm` glyph box), `md` and `lg` 16px (its `md` box). */
+const sizes = { sm: 'size-3.5', md: 'size-4', lg: 'size-4' } as const;
 
-/** The statuses whose glyph pulses while their work runs; In progress spins instead. */
+/** The statuses whose glyph breathes while their work runs; In progress turns instead. */
 const pulses: BoardStatus[] = ['Shaping', 'Review', 'Verify', 'Ready to merge'];
 
 /**
@@ -36,8 +36,7 @@ export function StatusGlyphSlot({
     size = 'md',
     children,
 }: {
-    /** The slot's size, as the glyph's beside it: `sm` 12px beside small text, `md` 14px (the default), `lg` 16px
-     *  beside a title. */
+    /** The slot's size, as the glyph's beside it: `sm` 14px beside small text, `md` 16px (the default) and `lg`. */
     size?: keyof typeof sizes;
     /** The mark: a StatusGlyph's icon or a StatusIndicator. */
     children: ReactNode;
@@ -52,13 +51,32 @@ export function StatusGlyphSlot({
     );
 }
 
+/** Whether `state` says the work stopped: `off` on a status whose own state is not off. */
+const stopped = (status: BoardStatus, state: StatusState | undefined) =>
+    state === 'off' && boardStatusState[status] !== 'off';
+
+/** Each status's glyph, drawn at the StatusIndicator's stroke. */
+const glyphs: Record<BoardStatus, ReactNode> = {
+    List: <ListIcon strokeWidth={2.25} />,
+    Queued: <Clock3Icon strokeWidth={2.25} />,
+    Shaping: <CircleDashedIcon strokeWidth={2.25} />,
+    'Needs you': null,
+    Ready: <CircleArrowRightIcon strokeWidth={2.25} />,
+    'In progress': <CircleIcon strokeWidth={2.25} />,
+    Review: <EyeIcon strokeWidth={2.25} />,
+    Verify: <CircleDotIcon strokeWidth={2.25} />,
+    'Ready to merge': <GitMergeIcon strokeWidth={2.25} />,
+    Done: <CheckIcon strokeWidth={2.25} />,
+};
+
 /**
- * A status's glyph in its colour, in its fixed box (StatusGlyphSlot). `running` animates it while its work is known to
- * run: In progress spins, and Shaping, Review, Verify and Ready to merge pulse. `size` sizes it: `sm` 12px beside
- * small text, `md` 14px (the default), `lg` 16px beside a title. Its colour is its status's state (boardStatusState), or `state`
- * when the work's state differs from its stage's: `waiting` (amber) for blocked work, and `off` for stopped work,
- * which also takes the Stopped glyph (conceptIcons.stopped), so stopped work never wears its stage's glyph, such as
- * Review's eye.
+ * A status's glyph in its colour, in its fixed box (StatusGlyphSlot): the design system's StatusIndicator with the
+ * status's `glyph`. `running` sets it to work while its work is known to run: In progress turns (the spinner), and
+ * Shaping, Review, Verify and Ready to merge breathe. `size` sizes it: `sm` beside small text, `md` (the default) and
+ * `lg`. Its colour is its status's state (boardStatusState), or `state` when the work's state differs from its stage's:
+ * `waiting` (amber) for blocked work, and `off` for stopped work, which also takes the Stopped glyph
+ * (conceptIcons.stopped), so stopped work never wears its stage's glyph, such as Review's eye. Needs you is the
+ * waiting light itself.
  */
 export function StatusGlyph({
     status,
@@ -71,65 +89,33 @@ export function StatusGlyph({
     /** The work's state when it isn't its status's: `waiting` for blocked work, `off` for stopped work (the Stopped
      *  glyph); it colours the glyph. */
     state?: StatusState | undefined;
-    /** Its work is known to run: the glyph spins or pulses. */
+    /** Its work is known to run: the glyph turns or breathes. */
     running?: boolean;
     /** The glyph's size by where it sits: `sm`, `md` (the default) or `lg`. */
     size?: keyof typeof sizes;
 }) {
-    return (
-        <StatusGlyphSlot size={size}>
-            <GlyphIcon status={status} state={state} running={running} size={size} />
-        </StatusGlyphSlot>
-    );
-}
+    const shownState = state ?? boardStatusState[status];
+    const halt = stopped(status, state);
+    const motion =
+        halt || !running
+            ? undefined
+            : status === 'In progress'
+              ? 'spin'
+              : pulses.includes(status)
+                ? 'pulse'
+                : undefined;
+    const mark =
+        status === 'Needs you' && !halt ? (
+            <StatusIndicator state={shownState} />
+        ) : (
+            <StatusIndicator
+                state={shownState}
+                size={size === 'sm' ? 'sm' : 'md'}
+                // A running build's mark is the design system's spinner.
+                glyph={halt ? <StoppedIcon strokeWidth={2.25} /> : motion === 'spin' ? undefined : glyphs[status]}
+                motion={motion}
+            />
+        );
 
-/** Whether `state` says the work stopped: `off` on a status whose own state is not off. */
-const stopped = (status: BoardStatus, state: StatusState | undefined) =>
-    state === 'off' && boardStatusState[status] !== 'off';
-
-function GlyphIcon({
-    status,
-    state,
-    running,
-    size,
-}: {
-    status: BoardStatus;
-    state?: StatusState | undefined;
-    running: boolean;
-    size: keyof typeof sizes;
-}) {
-    const pulse = running && pulses.includes(status);
-    const props = {
-        ref: pulse ? ambientMotion : undefined,
-        className: `shrink-0 ${sizes[size]}${pulse ? ' status-pulse' : ''}`,
-        style: { color: state ? statusStateColors[state] : statusColor[status] },
-        strokeWidth: 2.25,
-    };
-
-    if (stopped(status, state)) return <StoppedIcon {...props} />;
-
-    switch (status) {
-        case 'List':
-            return <ListIcon {...props} />;
-        case 'Needs you':
-            return <StatusIndicator state={state ?? 'waiting'} />;
-        case 'Verify':
-            return <CircleDotIcon {...props} />;
-        case 'In progress':
-            return running ? <SpinnerIcon motion="status" {...props} /> : <CircleIcon {...props} />;
-        case 'Ready':
-            return <CircleArrowRightIcon {...props} />;
-        case 'Shaping':
-            return <CircleDashedIcon {...props} />;
-        case 'Review':
-            return <EyeIcon {...props} />;
-        case 'Ready to merge':
-            return <GitMergeIcon {...props} />;
-        case 'Done':
-            return <CheckIcon {...props} />;
-        case 'Queued':
-            return <Clock3Icon {...props} />;
-        default:
-            return <CircleIcon {...props} />;
-    }
+    return <StatusGlyphSlot size={size}>{mark}</StatusGlyphSlot>;
 }

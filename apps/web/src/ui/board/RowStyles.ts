@@ -9,5 +9,6 @@ export const ROW_OPENS = 'focus-ring-inset';
 export const ROW_ACTION =
     'flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-xs text-fg-muted';
 
-/** A row the item dialog shows now: tinted and ringed. */
-export const pickedRow = (picked: boolean) => (picked ? 'bg-fill-hover ring-2 ring-inset ring-primary' : '');
+/** A row the item dialog shows now: the design system's current recipe, its navy wash under a navy hairline. */
+export const pickedRow = (picked: boolean) =>
+    picked ? 'bg-current-surface hover:bg-current-surface ring-1 ring-inset ring-primary-edge' : '';

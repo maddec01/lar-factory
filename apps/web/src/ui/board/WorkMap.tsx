@@ -198,7 +198,7 @@ export function MapEdgeLabel({
                     aria-label={`${label}: ${names}`}
                     onClick={onOpen}
                     data-edge-label={edge}
-                    className="text-2xs text-fg-muted hover:text-fg focus-ring absolute z-10 flex min-h-6 items-start truncate rounded-xs text-left leading-3.5 hover:underline"
+                    className="text-fg-muted hover:text-fg focus-ring absolute z-10 flex min-h-6 items-start truncate rounded-xs text-left text-xs leading-4 hover:underline"
                     style={{ left, top, maxWidth }}
                 >
                     {label}

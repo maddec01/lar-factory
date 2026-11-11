@@ -36,7 +36,12 @@ function Recheck({ check }: { check: FailedCheck }) {
 
     return (
         <>
-            <Button {...buttonKind('other')} data-recheck disabled={checking} onClick={() => void recheck()}>
+            <Button
+                {...buttonKind('other', { size: 'md' })}
+                data-recheck
+                disabled={checking}
+                onClick={() => void recheck()}
+            >
                 {checking ? 'Checking…' : 'Recheck'}
             </Button>
             {note && (

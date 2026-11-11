@@ -472,7 +472,7 @@ const slices = (id = 'I_59') => {
     const bar = col(id, 'bar').querySelector('ol')!;
 
     return {
-        segments: [...bar.children].map((li) => (li as HTMLElement).style.background),
+        segments: [...bar.children].map((li) => li.getAttribute('data-state')),
         count: countShown(count(id)),
         next: text(col(id, 'next')),
     };
@@ -500,13 +500,7 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
 
     await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
     expect(slices()).toEqual({
-        segments: [
-            'var(--color-success)',
-            'var(--color-info)',
-            'var(--color-warning)',
-            'var(--color-line-strong)',
-            'var(--color-warning)',
-        ],
+        segments: ['ready', 'active', 'waiting', 'off', 'waiting'],
         count: '1/5 slices',
         next: 'blocked Issue 67 +2 more',
     });
@@ -517,7 +511,7 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
     expect(sliceNote.getAttribute('title'), 'the rest are named on hover').toBe(
         'blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66',
     );
-    expect(col('I_59', 'bar').querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
+    expect(col('I_59', 'bar').querySelector('ol > li .lar-status-pulse'), 'the active slice pulses').not.toBeNull();
     expect(
         rows().map((r) => r.dataset.item),
         'slices are no rows of their own',
@@ -544,7 +538,7 @@ test('a build’s count leaves out slices closed as not planned, and names none 
 
     await mountPage(boardOf([raw]));
     expect(slices()).toEqual({
-        segments: ['var(--color-success)', 'var(--color-line-strong)', 'var(--color-line-strong)'],
+        segments: ['ready', 'off', 'off'],
         count: '1/3 slices',
         next: '',
     });
@@ -702,14 +696,38 @@ test('live slice transitions update the bar, expanded list and count without a r
 
         const segment = col('I_59', 'bar').querySelectorAll('ol > li')[1]!;
 
-        expect(segment.classList.contains('status-pulse')).toBe(progress === 'active');
+        expect(segment.querySelector('.lar-status-pulse') !== null).toBe(progress === 'active');
 
         if (progress === 'unknown') {
-            expect((segment as HTMLElement).style.background).toBe('var(--color-line-strong)');
+            expect(segment.getAttribute('data-state')).toBe('off');
             expect(text(list())).toContain('?');
             expect(text(col('I_59', 'next'))).toBe('');
         }
     }
+});
+
+test('usage with none known yet says it’s still trying after three seconds, keeps known figures, and says when T3 couldn’t read it', async () => {
+    const id = 'I_sample13';
+    const at = (change: Partial<Item>) =>
+        withItem(
+            id,
+            { stats: undefined, usageState: undefined, threads: [thread('t1', 'done')], ...change },
+            fresh(loose),
+        );
+    const receive = async (data: BoardData) =>
+        settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
+
+    await mountPage(at({}));
+    expect(text(row(id))).toContain('Loading usage');
+    await settle(() => vi.advanceTimersByTime(3_000));
+    expect(text(row(id))).toContain('Still trying…');
+    expect(row(id).querySelector('[data-loader]')!.getAttribute('title')).toBe('Loading usage');
+    await receive(at({ usageState: 'loading', stats: { agentMs: 120_000, tokens: 34_000 } }));
+    expect(text(row(id)), 'known figures stay while usage loads').toContain('2m');
+    expect(text(row(id))).not.toContain('Still trying…');
+    await receive(at({ usageState: 'failed' }));
+    expect(text(row(id))).toContain('Usage unavailable');
+    expect(text(row(id))).not.toMatch(/Loading usage|Still trying/);
 });
 
 describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running', (status) => {
@@ -780,7 +798,8 @@ describe('the activity line', () => {
         );
     const line = () => row('I_sample13').querySelector<HTMLElement>('[data-activity]');
     const lineText = () => text(line()).replace(/\s+/g, ' ');
-    const moving = () => row('I_sample13').querySelector('.status-pulse, .animate-spin, .activity-sweep');
+    const moving = () =>
+        row('I_sample13').querySelector('.lar-status-pulse, .animate-spin, .lar-progress-indeterminate');
     const store = async () => (await import('@/services/board/board.hooks')).useBoardStore.getState();
 
     test('five minutes with no action reads Quiet, unless a tool still runs', async () => {
@@ -849,7 +868,7 @@ describe('the activity line', () => {
         expect((await store()).data.error).toBeNull();
         expect(text(state('I_sample13')), 'no phase reads as current').toBe('Activity unavailable');
         expect(moving()).toBeNull();
-        expect(row('I_sample13').querySelector('.status-spin'), 'its glyph stops too').toBeNull();
+        expect(row('I_sample13').querySelector('.lar-status-spin'), 'its glyph stops too').toBeNull();
         await settle(async () =>
             (await store()).receive(
                 at({
@@ -871,7 +890,7 @@ test('Build and its row animate for current execution, stop together, and shapin
 
     await mountPage(data);
     expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
-    expect(rowGlyph().closest('.status-spin')).not.toBeNull();
+    expect(rowGlyph().closest('.lar-status-spin')).not.toBeNull();
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
     const stopped = withItem(
@@ -889,8 +908,8 @@ test('Build and its row animate for current execution, stop together, and shapin
             .receive(withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, stopped)),
     );
     expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
-    expect(row('I_sample02').querySelector('[data-glyph] .status-pulse')).not.toBeNull();
-    expect($('[data-stage="shaping"] header .status-pulse')).toBeNull();
+    expect(row('I_sample02').querySelector('[data-glyph] .lar-status-pulse')).not.toBeNull();
+    expect($('[data-stage="shaping"] header .lar-status-pulse')).toBeNull();
     expect($('[data-stage="ready"] header svg.lucide-circle-arrow-right')).not.toBeNull();
 });
 
@@ -906,7 +925,7 @@ test('status icons require current execution and suppress unavailable, cached, h
     await mountPage(data);
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
-    const motion = () => $$('[data-stage] [data-glyph] .status-spin, [data-stage] [data-glyph] svg.status-pulse');
+    const motion = () => $$('[data-stage] [data-glyph] .lar-status-spin, [data-stage] [data-glyph] .lar-status-pulse');
 
     expect(motion()).toHaveLength(2);
 
@@ -955,8 +974,13 @@ test('status icons require current execution and suppress unavailable, cached, h
     for (const [label, next] of cases) {
         await settle(() => useBoardStore.getState().receive(next));
         expect(motion(), `after ${label}`).toHaveLength(0);
-        expect($('[data-stage="build"] header .status-spin'), `after ${label}`).toBeNull();
-        expect($('.counters button[aria-label^="building:"] .status-spin'), `after ${label}`).toBeNull();
+        expect($('[data-stage="build"] header .lar-status-spin'), `after ${label}`).toBeNull();
+        expect(
+            $$('[data-slot=toolbar-counter]')
+                .find((counter) => counter.textContent!.startsWith('building:'))!
+                .querySelector('.lar-status-spin'),
+            `after ${label}`,
+        ).toBeNull();
     }
     await settle(() => useBoardStore.getState().receive(data));
     await settle(() => useBoardStore.getState().fail('Disconnected'));

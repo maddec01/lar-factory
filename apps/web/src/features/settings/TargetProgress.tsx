@@ -1,11 +1,11 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Alert, Button, Inline, Progress, Text } from '@lar-works/design-system';
+import { Alert, Button, Inline, Progress, SettingsDetails, Text } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { buttonKind, SettingDetails } from '@/ui/board';
+import { buttonKind } from '@/ui/board';
 
 /** Desktop commands operate across active targets, including recovery after a first install failed. */
 export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boolean }) {
@@ -18,14 +18,14 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
     const busy = !!snapshot.running || pending !== null || replacing || retrying;
 
     return (
-        <SettingDetails>
+        <SettingsDetails>
             <Text variant="caption" tone="muted">
                 Retry and Replace apply to all active targets.
             </Text>
             <Inline as="span" wrap>
                 {failed && (
                     <Button
-                        {...buttonKind('other')}
+                        {...buttonKind('other', { size: 'md' })}
                         data-retry-install
                         aria-label="Retry installation in all active targets"
                         disabled={busy}
@@ -36,7 +36,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                 )}
                 {drift && (
                     <Button
-                        {...buttonKind('other')}
+                        {...buttonKind('other', { size: 'md' })}
                         data-replace-drift
                         aria-label="Restore bundled skills in all active targets"
                         disabled={busy}
@@ -47,7 +47,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                 )}
             </Inline>
             {(error || retryError) && <Alert size="sm" tone="danger" message={error || retryError} />}
-        </SettingDetails>
+        </SettingsDetails>
     );
 }
 
@@ -110,7 +110,7 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
                   : 'Not installed';
 
     return (
-        <SettingDetails breaks>
+        <SettingsDetails breaks>
             <Text variant="inherit" role={showProgress ? 'status' : undefined}>
                 {target.release ? `Version ${target.release}` : 'No release installed'} · {status}
             </Text>
@@ -145,6 +145,6 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
                 </Text>
             ))}
             <InstallRecovery failed={failed || blocked.length > 0} drift={drift} />
-        </SettingDetails>
+        </SettingsDetails>
     );
 }

@@ -27,14 +27,20 @@ export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
     const rows = shaping.filter(shows);
 
     return (
-        <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length}>
-            {rows.length ? (
-                <Rows rows={rows} />
-            ) : (
-                <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">
-                    Nothing in shaping matches.
-                </PaneEmpty>
-            )}
+        <Pane
+            id="shaping"
+            title="Shaping"
+            status="Shaping"
+            count={rows.length}
+            empty={
+                !rows.length && (
+                    <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">
+                        Nothing in shaping matches.
+                    </PaneEmpty>
+                )
+            }
+        >
+            <Rows rows={rows} />
         </Pane>
     );
 }
@@ -43,14 +49,21 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
     const rows = ready.filter(shows);
 
     return (
-        <Pane id="ready" title="Ready to build" status="Ready" count={rows.length} right={<AutoBuildSwitch />}>
-            {rows.length ? (
-                <Rows rows={rows} />
-            ) : (
-                <PaneEmpty filtered={ready.length > 0} none="Nothing ready to build.">
-                    Nothing ready to build matches.
-                </PaneEmpty>
-            )}
+        <Pane
+            id="ready"
+            title="Ready to build"
+            status="Ready"
+            count={rows.length}
+            right={<AutoBuildSwitch />}
+            empty={
+                !rows.length && (
+                    <PaneEmpty filtered={ready.length > 0} none="Nothing ready to build.">
+                        Nothing ready to build matches.
+                    </PaneEmpty>
+                )
+            }
+        >
+            <Rows rows={rows} />
         </Pane>
     );
 }
@@ -83,14 +96,15 @@ export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
             running={rows.some((row) => running(row.item))}
             count={rows.length}
             right={<BuildLimit />}
+            empty={
+                !rows.length && (
+                    <PaneEmpty filtered={build.length > 0} none="Nothing in build.">
+                        Nothing in build matches.
+                    </PaneEmpty>
+                )
+            }
         >
-            {rows.length ? (
-                <Rows rows={rows} />
-            ) : (
-                <PaneEmpty filtered={build.length > 0} none="Nothing in build.">
-                    Nothing in build matches.
-                </PaneEmpty>
-            )}
+            <Rows rows={rows} />
         </Pane>
     );
 }

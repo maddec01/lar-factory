@@ -1,12 +1,13 @@
 import { plural } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
-// Settings' General page: dialogs, threads, commands, Auto-build and refresh.
+// Settings' General page: preferences (the theme), dialogs, threads, commands, Auto-build and refresh.
 
 import { AutoBuildModelSetting } from './AutoBuildModel';
 import { DialogPreference } from './DialogPreference';
 import { LimitSetting } from './LimitSetting';
 import { custom, type Group, type SettingsData } from './SettingsModel';
 import { ShapingThreadCleanupSetting } from './ShapingThreadCleanup';
+import { ThemeSetting } from './ThemeSetting';
 import { BUILD_LIMIT_NOTE } from '@/features/items';
 import type { Control } from '@/shared/settings/SettingControls';
 
@@ -23,6 +24,18 @@ function refreshEvery(seconds: number): Control {
 }
 
 export const generalGroups = (data: SettingsData): Group[] => [
+    // The theme where lar-server keeps it: General › Preferences, the design system's Appearance row.
+    {
+        title: 'Preferences',
+        rows: [
+            {
+                id: 'theme',
+                title: 'Appearance',
+                keywords: 'theme dark light mode follow system colour scheme',
+                control: { type: 'row', render: () => <ThemeSetting id="theme" /> },
+            },
+        ],
+    },
     {
         title: 'Dialogs',
         rows: [

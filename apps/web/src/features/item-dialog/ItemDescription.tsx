@@ -3,7 +3,6 @@
 
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
 import {
-    EmptyState,
     Button,
     Disclosure,
     Heading,
@@ -77,11 +76,11 @@ function EditDescription({
             </EditorSlot>
             {/* A save error takes the status's place and wraps under it, so Cancel and Save stay where they were. */}
             <EditActions status={edit.dirty ? 'Unsaved changes' : 'No changes'} error={edit.error} data-edit-actions>
-                <Button {...buttonKind('other')} disabled={edit.saving} onClick={edit.cancel}>
+                <Button {...buttonKind('other', { size: 'md' })} disabled={edit.saving} onClick={edit.cancel}>
                     Cancel
                 </Button>
                 <Button
-                    {...buttonKind('main')}
+                    {...buttonKind('main', { size: 'md' })}
                     disabled={!edit.dirty}
                     loading={edit.saving}
                     onClick={() => void edit.save()}
@@ -227,6 +226,7 @@ export function ItemDescription({
             header={
                 <SectionHeader
                     heading={read.details.spec ? 'Spec' : ticketContext ? 'Ticket description' : 'Description'}
+                    empty={!edit.editing && !body && 'No description.'}
                 >
                     {!edit.editing && (
                         <>
@@ -250,16 +250,9 @@ export function ItemDescription({
                     edit={edit}
                     fill={fill}
                 />
-            ) : body ? (
-                <>
-                    {format === 'markdown' ? (
-                        <MarkdownDiagrams text={body} />
-                    ) : (
-                        <RichText text={body} format={format} />
-                    )}
-                </>
             ) : (
-                <EmptyState size="inline" title="No description." />
+                body &&
+                (format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />)
             )}
             {read.details.spec?.original && (
                 <Disclosure label="Original" presentation="section">

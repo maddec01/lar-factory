@@ -12,7 +12,7 @@ export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
     if (paused)
         return (
             <StartLine data-auto-build-paused={item.id}>
-                <ActionError role="alert">Auto-build paused: {paused}</ActionError>
+                <ActionError>Auto-build paused: {paused}</ActionError>
             </StartLine>
         );
 

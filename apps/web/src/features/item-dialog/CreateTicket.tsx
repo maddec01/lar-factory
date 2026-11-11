@@ -103,7 +103,7 @@ export function CreateTicket({ item }: { item: Item }) {
             )}
             {!outgoing && (
                 <Inline as="span">
-                    <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
+                    <Button {...buttonKind('other', { size: 'md' })} onClick={() => setOpen(false)}>
                         Cancel
                     </Button>
                 </Inline>
@@ -133,11 +133,11 @@ export function CreateTicket({ item }: { item: Item }) {
                         </Text>
                     )}
                     <Inline as="span">
-                        <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
+                        <Button {...buttonKind('other', { size: 'md' })} onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
                         <Button
-                            {...buttonKind('main')}
+                            {...buttonKind('main', { size: 'md' })}
                             type="submit"
                             disabled={!!reason || attempt?.phase === 'pending' || attempt?.phase === 'uncertain'}
                         >

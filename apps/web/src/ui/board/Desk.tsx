@@ -1,12 +1,22 @@
-import { ScrollRowArrows, SectionTitle, StatusIndicator, useScrollRow } from '@lar-works/design-system';
+import {
+    CardHeader,
+    EmptyState,
+    ScrollRow,
+    ScrollRowArrows,
+    SectionTitle,
+    StatusIndicator,
+    useScrollRow,
+} from '@lar-works/design-system';
 import type { StatusState } from '@lar-works/design-system';
-import { useScrollFade } from '@lar-works/design-system/primitives';
-import { type ReactNode, useCallback } from 'react';
+import { CardBase } from '@lar-works/design-system/primitives';
+import type { ReactNode } from 'react';
+
+import { useArrival } from './BoardLife';
 
 interface DeskSectionProps {
     /** The section's heading, such as "Your desk". */
     title: string;
-    /** How many cards show; with none, `empty` says why in one small line. */
+    /** How many cards show; with none, `empty` says why in one muted line. */
     count: number;
     /** The first read may still add cards; hide its provisional zero. */
     loading?: boolean;
@@ -20,9 +30,9 @@ interface DeskSectionProps {
     forwardLabel?: string;
 }
 
-/** "Your desk": the items awaiting your action as small cards in one row that scrolls sideways under the page's padding
- *  to the window's edges. When they overflow, the row fades out at the edges with more beyond them and arrows beside
- *  the title scroll it. An empty desk is one small line. */
+/** "Your desk": the items awaiting your action as cards in one row (the design system's ScrollRow, under a section
+ *  title as Section draws it) that scrolls sideways, fading at the edges with more beyond them, with arrows beside the
+ *  title that scroll it. An empty desk is one muted line under its title. Its heading is `#desk-h`. */
 export function DeskSection({
     title,
     count,
@@ -32,30 +42,18 @@ export function DeskSection({
     backLabel = 'Previous cards',
     forwardLabel = 'Next cards',
 }: DeskSectionProps) {
-    const { setRow, scroll, canScrollBack, canScrollForward } = useScrollRow<HTMLDivElement>(count);
-    const { setViewport, className: fade } = useScrollFade({ axis: 'horizontal', row: true });
-    const setFadingRow = useCallback(
-        (element: HTMLDivElement | null) => {
-            setRow(element);
-            setViewport(element);
-        },
-        [setRow, setViewport],
-    );
-
-    if (!count)
-        return (
-            <section className="desk text-fg-muted flex shrink-0 items-baseline gap-2 text-xs" aria-labelledby="desk-h">
-                <SectionTitle id="desk-h" title={title} count={count} countLoading={loading} />
-                <p className="m-0">{empty}</p>
-            </section>
-        );
+    const { setRow, scroll, canScrollBack, canScrollForward } = useScrollRow<HTMLUListElement>(count);
 
     return (
-        <section className="desk grid shrink-0 gap-2" aria-labelledby="desk-h">
-            <div className="flex h-7 items-center gap-2">
-                <SectionTitle id="desk-h" title={title} count={count} countLoading={loading} />
-                {canScrollBack || canScrollForward ? (
-                    <div className="ml-auto">
+        <section className="desk grid shrink-0 gap-3" aria-labelledby="desk-h">
+            <SectionTitle
+                id="desk-h"
+                level="h2"
+                title={title}
+                count={count}
+                countLoading={loading}
+                actions={
+                    canScrollBack || canScrollForward ? (
                         <ScrollRowArrows
                             size="sm"
                             onScroll={scroll}
@@ -64,15 +62,16 @@ export function DeskSection({
                             backLabel={backLabel}
                             forwardLabel={forwardLabel}
                         />
-                    </div>
-                ) : null}
-            </div>
-            <div
-                ref={setFadingRow}
-                className={`-mx-6 flex snap-x scroll-px-6 [scrollbar-width:none] items-start gap-3 overflow-x-auto px-6 py-1 [--scroll-fade-row:4.5rem] [&::-webkit-scrollbar]:hidden [&>*]:snap-start ${fade}`}
-            >
-                {children}
-            </div>
+                    ) : undefined
+                }
+            />
+            {count ? (
+                <ScrollRow ref={setRow} label={title}>
+                    {children}
+                </ScrollRow>
+            ) : (
+                <EmptyState size="inline" title={empty} />
+            )}
         </section>
     );
 }
@@ -84,7 +83,7 @@ interface DeskCardProps {
     picked: boolean;
     /** Called as the reader opens the item dialog. */
     onOpen: () => void;
-    /** The first row: where the item comes from, its kind and its age. */
+    /** The first row: where the item comes from. */
     source: ReactNode;
     /** The item's kind, a badge. */
     kind: ReactNode;
@@ -92,28 +91,29 @@ interface DeskCardProps {
     age: ReactNode;
     /** The item's title. */
     title: ReactNode;
-    /** The title's full text, for its tooltip. */
+    /** The title's full text, which names the card. */
     name: string;
     /** More about the item under its title, such as a work item's fields. */
     details?: ReactNode;
-    /** The status's glyph, only where there is no `statusState` (whose dot is drawn instead). */
+    /** The status's glyph, only where there is no `statusState` (whose light is drawn instead). */
     statusIcon: ReactNode;
     /** The next step, in words. */
     status: string;
-    /** The status's state: its dot's colour, beside the neutral word (the shared semantic tone contract). */
+    /** The status's state: its light's colour, beside the neutral word (the shared semantic tone contract). */
     statusState?: StatusState;
     /** Beside the status: the next step, such as a DeskHint. */
     next?: ReactNode;
-    /** The card's actions, in its right corner, the board's button kinds drawn 32px tall there. A click beside them
-     *  opens the item, as anywhere else on the card. */
+    /** The card's actions, at its foot's end: `sm` buttons, the next step tinted. */
     actions: ReactNode;
 }
 
 /**
- * An item on your desk, opening the item dialog. Every card has the same four rows at the same heights, so they line
- * up across cards: source, kind and age; the title; the status and next step; and the card's actions. Its summary is a
- * button too, so the keyboard can open it. The card itself stays neutral, and so does its status word: the status's
- * dot (StatusIndicator) carries the colour, as on every row in every app.
+ * An item on your desk, the design system's card in the attention recipe (an amber edge, a 3px amber bar down its
+ * leading edge and a faint wash from it), opening the item dialog from anywhere on it but its actions. Every card has
+ * the same rows, and every card in the row its tallest's height, so they line up across cards: source, kind and age;
+ * the title, up to two lines; any tracker fields; then, at the card's foot, the status and next step and the card's
+ * actions. The card whose dialog shows takes the current edge. A card that lands on the desk after the board has
+ * shown pulses its edge once (BoardLife).
  */
 export function DeskCard({
     item,
@@ -131,48 +131,51 @@ export function DeskCard({
     next,
     actions,
 }: DeskCardProps) {
+    const arrived = useArrival('desk', item);
+
     return (
-        <div
-            onClick={onOpen}
+        <CardBase
+            as="li"
+            className="desk-card w-[min(22rem,calc(100vw-4.5rem))] shrink-0 snap-start"
             data-item={item}
-            className={`desk-card surface-card hover:bg-fill-hover relative grid w-88 shrink-0 cursor-pointer content-start gap-2 rounded-xl border px-3.5 py-3 ${picked ? 'ring-primary ring-offset-surface-page ring-2 ring-offset-1' : ''}`}
-        >
-            <button type="button" className="focus-ring-inset grid min-w-0 gap-2 rounded-xs text-left">
-                <span className="desk-meta text-2xs flex h-6 min-w-0 items-center gap-2">
-                    {source}
-                    {kind}
-                    <span className="text-fg-muted ml-auto shrink-0">{age}</span>
-                </span>
-                <span className="desk-title text-ui/5 h-5 truncate font-medium" title={name}>
-                    {title}
-                </span>
-                {details}
-            </button>
-            <span className="flex min-w-0 items-center gap-2">
-                <span className="text-2xs flex shrink-0 items-center gap-1.5 [&_svg]:size-3">
+            data-arrived={arrived ? '' : undefined}
+            label={name}
+            onOpen={onOpen}
+            attention="warning"
+            selected={picked}
+            padding="sm"
+            header={
+                <CardHeader
+                    eyebrow={
+                        <span className="desk-meta contents">
+                            {source}
+                            {kind}
+                            <span className="ml-auto shrink-0">{age}</span>
+                        </span>
+                    }
+                    title={<span title={name}>{title}</span>}
+                    titleLines={2}
+                />
+            }
+            footer={
+                <>
                     {statusState ? (
-                        <StatusIndicator state={statusState} label={status} size="sm" />
+                        <StatusIndicator state={statusState} label={status} />
                     ) : (
-                        <>
+                        <span className="text-fg inline-flex shrink-0 items-center gap-1.5 text-xs font-medium">
                             {statusIcon}
-                            <span className="text-fg font-medium">{status}</span>
-                        </>
+                            {status}
+                        </span>
                     )}
-                </span>
-                <span className="desk-next text-2xs text-fg-muted flex h-5 min-w-0 flex-1 items-center gap-1.5 tabular-nums">
-                    {next}
-                </span>
-            </span>
-            <div
-                className="desk-actions flex h-8 shrink-0 items-center justify-end gap-1.5 [&_[data-kind]:not([data-toggle])]:h-8 [&_[data-kind][data-icon-only]]:w-8!"
-                // The actions keep their clicks from the card; a click on the row's own empty space still opens it.
-                onClick={(event) => {
-                    if (event.target !== event.currentTarget) event.stopPropagation();
-                }}
-            >
-                {actions}
-            </div>
-        </div>
+                    <span className="desk-next text-fg-muted flex min-w-0 flex-1 items-center text-xs tabular-nums">
+                        {next}
+                    </span>
+                </>
+            }
+            actions={<span className="desk-actions contents">{actions}</span>}
+        >
+            {details}
+        </CardBase>
     );
 }
 

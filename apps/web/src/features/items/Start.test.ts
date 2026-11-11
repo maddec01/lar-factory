@@ -159,19 +159,19 @@ test('a failed Start shows in the dialog, keeps Move to List and the last choice
     await press(entries()[2]!);
     await answer({ thread: null, error: 'T3 is down.' }, 502);
     expect(text(start())).toBe('Retry start');
-    expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
+    expect(text(card().querySelector('.start [role="alert"]'))).toBe('T3 is down.');
     expect(footer(), 'a failed Start brings Move to List and Abandon back').not.toBeNull();
     expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'a failure keeps the previous choice').toEqual({
         instanceId: 'codex',
         model: 'gpt-5.5',
     });
 
-    const close = card().querySelector<HTMLButtonElement>('p.start button.dismiss')!;
+    const close = card().querySelector<HTMLButtonElement>('.start button.dismiss')!;
 
     expect(close.getAttribute('aria-label')).toBe('Dismiss error for #129');
     close.focus();
     await settle(() => close.click());
-    expect(card().querySelector('p.start')).toBeNull();
+    expect(card().querySelector('.start')).toBeNull();
     expect(text(start())).toBe('Shape');
     expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
@@ -192,7 +192,7 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
     expect(card().querySelector('[data-start]')).toBeNull();
     expect(footer()).toBeNull();
 
-    const message = card().querySelector<HTMLElement>('p.start[data-start-result]')!;
+    const message = card().querySelector<HTMLElement>('.start[data-start-result]')!;
 
     expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
     expect(document.activeElement, 'focus moves to the message').toBe(message);
@@ -228,12 +228,12 @@ test('a failed start from the server offers Retry start, and closing it clears i
 
     await mountItem(failed);
     expect(text(start())).toBe('Retry start');
-    expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 said no');
+    expect(text(card().querySelector('.start [role="alert"]'))).toBe('T3 said no');
     expect(footer(), 'a failed start gives Move to List back').not.toBeNull();
-    await press(card().querySelector('p.start button.dismiss')!);
+    await press(card().querySelector('.start button.dismiss')!);
     expect(posted()).toEqual([['/api/dismiss-start-error', { session: 's1', itemId: 'I_sample05', purpose: 'shape' }]]);
     await answer({ error: null, board: withChoices });
-    expect(card().querySelector('p.start')).toBeNull();
+    expect(card().querySelector('.start')).toBeNull();
     expect(text(start())).toBe('Shape');
 });
 
@@ -243,7 +243,7 @@ test('a refusal the board holds no state for, as from a restarted server, keeps 
     await press(entries()[0]!);
     await answer({ error: 'The board restarted. Press Start again.', board: withChoices }, 409);
     expect(text(start())).toBe('Retry start');
-    expect(text(card().querySelector('p.start [role="alert"]'))).toBe('The board restarted. Press Start again.');
+    expect(text(card().querySelector('.start [role="alert"]'))).toBe('The board restarted. Press Start again.');
 });
 
 test('Started clears after its server record disappears', async () => {

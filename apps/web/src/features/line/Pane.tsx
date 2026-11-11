@@ -1,5 +1,5 @@
-// A section of the board's work by stage, on the design system's StagePane: a titled list that takes the height of its
-// rows, so a section with none stays small and the page scrolls past them all.
+// A section of the board's work by stage, on the board's StagePane: a titled list that takes the height of its rows,
+// and a section with none collapses to its header line, so the page scrolls past them all.
 
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
@@ -18,6 +18,7 @@ export function Pane({
     running,
     count,
     right,
+    empty,
     children,
 }: {
     id: string;
@@ -26,7 +27,9 @@ export function Pane({
     running?: boolean;
     count: number;
     right?: ReactNode;
-    children: ReactNode;
+    /** What the lane says with no rows, a PaneEmpty: it collapses to its header line. */
+    empty?: ReactNode;
+    children?: ReactNode;
 }) {
     return (
         <StagePane
@@ -35,6 +38,7 @@ export function Pane({
             glyph={status && <StatusGlyph status={status} running={running} />}
             count={count}
             right={right}
+            empty={empty || undefined}
         >
             {children}
         </StagePane>

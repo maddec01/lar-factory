@@ -1,5 +1,5 @@
 import { trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Alert, Button, FormSection, Text } from '@lar-works/design-system';
+import { Alert, Button, SettingsGroup, Text } from '@lar-works/design-system';
 // Settings' Labels section. The tracker holds the only copy, so the section reads it each time and keeps no list. It reads
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useState } from 'react';
@@ -41,8 +41,8 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
     };
 
     return (
-        <FormSection
-            presentation="dense"
+        <SettingsGroup
+            panel={false}
             data-labels
             title={heading}
             description={
@@ -117,6 +117,6 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                     onClose={() => setDeleting(null)}
                 />
             )}
-        </FormSection>
+        </SettingsGroup>
     );
 }

@@ -17,7 +17,7 @@ const completeSample = {
     })),
 };
 
-const counters = () => $$<HTMLButtonElement>('.counters button[aria-haspopup]');
+const counters = () => $$<HTMLButtonElement>('[data-slot="title-bar-status"] [data-slot="toolbar-counter"]');
 /** A counter's label, as its name starts: "building:". */
 const labelOf = (b: Element) => /^[^:]*:/.exec(text(b))?.[0] ?? '';
 /** What a screen reader says for a counter: its label, then what its number means: "building: 4 builds open: 2 working, 1 waiting to close, 1 stopped". */
@@ -25,11 +25,12 @@ const nameOf = (b: Element) => `${labelOf(b)} ${b.getAttribute('aria-description
 /** The number a counter shows. */
 const value = (b: Element) => text(b).slice(labelOf(b).length).trim();
 const counter = (label: string) => counters().find((b) => labelOf(b) === `${label}:`)!;
-const popup = () => $('[data-state="open"] .counter-popup');
+/** The open counter's popover: its header, its list (`data-counter-list`) and its footer. */
+const popup = () => $('[data-counter-list]')?.closest<HTMLElement>('[data-state="open"]') ?? null;
 const rows = () => [...popup()!.querySelectorAll('li')].map(textBesideIcon);
 /** The popover's head, its title and count, and its foot. */
-const head = (pop: HTMLElement) => text(pop.querySelector('[data-counter-head]'));
-const foot = (pop: HTMLElement) => text(pop.querySelector('[data-counter-foot]'));
+const head = (pop: HTMLElement) => text(pop.querySelector('[data-slot="popover-header"]'));
+const foot = (pop: HTMLElement) => text(pop.querySelector('[data-slot="status-popover-footer"]'));
 const close = () =>
     settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
 /** A first read that hasn't settled, with one repository still to land. */
@@ -172,7 +173,7 @@ test('shipped lists this week’s done items, newest first', async () => {
 
     const pop = await openCounter('shipped');
 
-    expect(head(pop)).toBe('Shipped4last 7 days');
+    expect(head(pop)).toBe('Shipped4Last 7 days');
     expect(rows().map((r) => r.split(' ')[0])).toEqual(['#5', '#40', '#203', '#181']);
 });
 
@@ -208,14 +209,14 @@ test('while the first read could add items, a count with none is a dash, one wit
 
         expect(text(pop.querySelector('p')), `${label} pop-up`).toBe('Loading projects…');
         expect(pop.querySelector('[data-loader]'), `${label} pop-up`).not.toBeNull();
-        expect(pop.querySelector('[data-counter-foot]'), `${label} has no foot yet`).toBeNull();
+        expect(pop.querySelector('[data-slot="status-popover-footer"]'), `${label} has no foot yet`).toBeNull();
         await close();
     }
 
     const building = await openCounter('building');
 
     expect(head(building), 'no zero claimed in the panel either').toBe('BuildingAutomatic limit 2');
-    expect(building.querySelector('[data-counter-head] [style]'), 'no empty limit bars').toBeNull();
+    expect(building.querySelector('[data-slot="popover-header"] [style]'), 'no empty limit bars').toBeNull();
     await close();
     await push({ ...data, items: [], firstRead });
     expect(value(counter('shipped'))).toBe('–');
@@ -248,7 +249,9 @@ test('spend shows the known figures with a plus while some usage is unavailable,
     expect(text(pop)).toContain('$200.00');
     expect(foot(pop)).toBe('Partial figures. Some usage is unavailable.');
     expect(
-        pop.querySelector('[data-counter-list]')!.compareDocumentPosition(pop.querySelector('[data-counter-foot]')!) &
+        pop
+            .querySelector('[data-counter-list]')!
+            .compareDocumentPosition(pop.querySelector('[data-slot="status-popover-footer"]')!) &
             Node.DOCUMENT_POSITION_FOLLOWING,
         'the notice comes after the list',
     ).toBeTruthy();

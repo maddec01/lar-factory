@@ -1,7 +1,7 @@
 // A dossier in Lar Factory's board's dock (Concepts and linked work): its one line, on the stage rows' columns, which
 // expands in place to its body, and what the line holds: its toggle, title, chips, what's next and the bar of its parts.
 
-import { ambientMotion, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import { SegmentedProgress, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { ChevronRightIcon } from '@lar-works/design-system/icons';
 import { BadgeBase as Badge } from '@lar-works/design-system/primitives';
 import type { MouseEvent, ReactNode } from 'react';
@@ -291,38 +291,35 @@ export interface PartSegment {
     pulse?: boolean;
 }
 
-/** Every part as a segment in its colour, so the bar fills left to right, then a dashed one per part the board
- *  doesn't read. */
+/** Every part as a segment in its colour (the design system's segmented track), so the bar fills left to right, then an
+ *  outlined one per part the board doesn't read. */
 export function PartsBar({
     title,
     parts,
     unread,
 }: {
-    /** What the bar shows, as its tooltip. */
+    /** What the bar shows, as its tooltip and its name for screen readers. */
     title: string;
     /** Every part, each a segment in its colour. */
     parts: PartSegment[];
-    /** How many parts the board doesn't read, each a dashed segment. */
+    /** How many parts the board doesn't read, each an outlined segment. */
     unread: number;
 }) {
     return (
-        <ol className="m-0 flex min-w-0 list-none gap-0.5 overflow-hidden p-0" title={title} data-part-bar>
-            {parts.map((p) => (
-                <li
-                    key={p.key}
-                    ref={p.pulse ? ambientMotion : undefined}
-                    title={p.title}
-                    className={`h-1.5 min-w-0.75 flex-1 rounded-full ${p.pulse ? 'status-pulse' : ''}`}
-                    style={{ background: p.color }}
-                />
-            ))}
-            {Array.from({ length: Math.max(0, unread) }, (_, n) => (
-                <li
-                    key={`u${n}`}
-                    className="border-line-strong h-1.5 min-w-0.75 flex-1 rounded-full border border-dashed"
-                />
-            ))}
-        </ol>
+        <div className="min-w-0" title={title} data-part-bar>
+            <SegmentedProgress
+                label={title}
+                size="sm"
+                segments={[
+                    ...parts.map((p) => ({ label: p.title, color: p.color, pulse: p.pulse })),
+                    ...Array.from({ length: Math.max(0, unread) }, () => ({
+                        label: 'Not read by the board',
+                        color: 'var(--color-line-strong)',
+                        waiting: true,
+                    })),
+                ]}
+            />
+        </div>
     );
 }
 

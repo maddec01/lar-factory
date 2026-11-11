@@ -12,6 +12,7 @@ import {
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
+import { useMovesItem } from './useMovesItem';
 import {
     AbandonButton,
     BackToListButton,
@@ -22,7 +23,6 @@ import {
     StartOrAfter,
     hasLiveThread,
     useShownStatus,
-    useStartHolds,
 } from '@/features/items';
 import type { ItemState } from '@/features/items';
 
@@ -111,11 +111,11 @@ export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
 
 /** Move to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
 export function MoveActions({ item, data }: { item: Item; data: BoardData }) {
-    const startHolds = useStartHolds(item, data);
+    const moves = useMovesItem(item, data);
+
+    if (!moves) return null;
 
     if (item.status === 'List') return <AbandonButton item={item} data={data} />;
-
-    if (item.status !== 'Queued' || startHolds || hasLiveThread(item)) return null;
 
     return (
         <>

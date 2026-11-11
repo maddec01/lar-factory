@@ -1,14 +1,13 @@
 // The progress at the top of Lar Factory's item dialog: the workflow's steps as a bar, a concept's parts done, and a
 // piece of work's slices as chips under their count.
 
+import { SegmentedProgress } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
 import type { SliceProgress } from './Slices';
 import { SliceMark } from './Slices';
 import { sliceProgressLabel } from './StatusColors';
-
-const PAST = 'var(--color-board-past)';
 
 /** The dialog's progress block: the steps, the parts, the activity and the slices, stacked. */
 export function ItemProgressPanel({
@@ -43,10 +42,10 @@ export function ProgressCount({
 }
 
 /**
- * The workflow’s equal-width steps: past stages darker, upcoming stages faint, and the current one in `color`,
- * or its slice `bar`. Its `name` and ordinal sit above the track.
- * A step that hasn't begun (`waiting`, such as a queued item's) is an empty track outlined in `color`, never a filled
- * one. Each step's `label` is what assistive technology reads and its `title` its tooltip.
+ * The workflow's equal-width steps (the design system's segmented track) with each step's name under it: past stages
+ * done, upcoming stages the bare track, and the current one in `color`, filled to `value` (such as its slices done) or
+ * outlined while it `waiting`s (a queued item's, never a filled one). The ordinal sits above the track and the current
+ * step's name under it, in the text colour, so the name shows once; `name` labels the track for assistive technology.
  */
 export function WorkflowSteps({
     steps,
@@ -54,48 +53,60 @@ export function WorkflowSteps({
     name,
     ordinal,
     color,
-    bar,
+    value,
+    pulse = false,
     waiting = false,
 }: {
-    /** The workflow's active steps, each with its label and title. */
+    /** The workflow's active steps, each with its label (for assistive technology) and title (its name under it). */
     steps: readonly { title: string; label: string }[];
     /** The current step's index. */
     at: number;
-    /** The current step's name. */
+    /** The current step's name, which labels the track (its name under the track is drawn from `steps`). */
     name: string;
     /** Explicit stage position, such as "Stage 5 of 8"; omitted when the caller needs only the name. */
     ordinal?: string;
     /** The current step's colour, a board role colour. */
     color: string;
-    /** What fills the current step in place of the gradient, such as its slices. */
-    bar?: ReactNode;
+    /** How much of the current step is done, from 0 to 1, such as its slices; all of it by default. */
+    value?: number | undefined;
+    /** The current step's work runs: its fill breathes. */
+    pulse?: boolean;
     /** The current step hasn't begun, so nothing of it is drawn as done. */
     waiting?: boolean;
 }) {
     return (
-        <div className="grid min-w-0 gap-1">
-            <div className="flex items-baseline justify-between gap-2 text-xs leading-4">
-                <span className="truncate font-medium">{name}</span>
-                {ordinal && <span className="text-fg-muted shrink-0 tabular-nums">{ordinal}</span>}
-            </div>
-            <ol className="m-0 flex list-none items-end gap-0.75 p-0" data-steps>
+        <div className="grid min-w-0 gap-1.5" data-steps>
+            {ordinal && <p className="text-fg-muted m-0 text-xs tabular-nums">{ordinal}</p>}
+            <SegmentedProgress
+                label={ordinal ? `${ordinal}: ${name}` : name}
+                current={at}
+                segments={steps.map((step, i) =>
+                    i < at
+                        ? { label: step.label, state: 'ready' as const }
+                        : i === at
+                          ? { label: step.label, color, value, pulse, waiting }
+                          : { label: step.label },
+                )}
+            />
+            {/* Each step's name under its segment, on the track's columns; on a phone, where the names don't fit, the
+                current step's alone. */}
+            <ol
+                aria-hidden="true"
+                className="text-fg-muted m-0 grid list-none gap-0.75 p-0 text-xs"
+                style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+                data-step-names
+            >
                 {steps.map((step, i) => (
                     <li
                         key={i}
                         title={step.title}
-                        aria-label={step.label}
-                        aria-current={i === at ? 'step' : undefined}
-                        className="h-1.5 min-w-1.5 flex-1 overflow-hidden rounded-full"
-                        data-step-waiting={i === at && waiting ? '' : undefined}
-                        style={
-                            i !== at
-                                ? { background: i < at ? PAST : 'var(--color-track)' }
-                                : waiting
-                                  ? { background: 'var(--color-track)', boxShadow: `inset 0 0 0 1px ${color}` }
-                                  : { background: color }
+                        className={
+                            i === at
+                                ? 'text-fg truncate font-medium max-sm:overflow-visible max-sm:text-clip'
+                                : 'truncate max-sm:invisible'
                         }
                     >
-                        {i === at && bar && <div aria-hidden>{bar}</div>}
+                        {step.title}
                     </li>
                 ))}
             </ol>
@@ -123,17 +134,21 @@ export function PartsProgress({
     note?: string | undefined;
 }) {
     return (
-        <div className="grid gap-1" data-parts-progress>
+        <div className="grid gap-1.5" data-parts-progress>
             <ProgressCount label={label}>
                 {children}
                 {note && <span data-parts-note> · {note}</span>}
             </ProgressCount>
-            <div aria-hidden className="bg-track h-1.5 overflow-hidden rounded-full">
-                <div
-                    className="bg-board-done h-full rounded-full"
-                    style={{ width: `${total > 0 ? (completed / total) * 100 : 0}%` }}
-                />
-            </div>
+            <SegmentedProgress
+                label={`${label}: ${completed} of ${total} done`}
+                segments={[
+                    {
+                        label: `${completed} of ${total} done`,
+                        state: 'ready',
+                        value: total > 0 ? completed / total : 0,
+                    },
+                ]}
+            />
         </div>
     );
 }
@@ -148,7 +163,8 @@ export function ProgressActivity({
     return <div className="grid gap-1">{children}</div>;
 }
 
-/** The slices under the steps: their `count` line, a slice `bar` when the steps don't hold it, and a SliceChip each. */
+/** The slices under the steps, 24px below their names: their `count` line, with a slice `bar` 12px after it at a fixed
+ *  112px when the steps don't hold it, then a SliceChip each. */
 export function SliceChips({
     count,
     bar,
@@ -162,9 +178,15 @@ export function SliceChips({
     children: ReactNode;
 }) {
     return (
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-slices>
-            {count}
-            {bar && <div aria-hidden>{bar}</div>}
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 not-first:mt-4" data-slices>
+            <div className="flex min-w-0 items-center">
+                {count}
+                {bar && (
+                    <div aria-hidden className="ms-3 w-28 shrink-0">
+                        {bar}
+                    </div>
+                )}
+            </div>
             <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">{children}</ul>
         </div>
     );
@@ -206,7 +228,7 @@ export function SliceChip({
             >
                 {name}
             </span>
-            <span className="text-2xs text-fg-muted shrink-0">{sliceProgressLabel[progress]}</span>
+            <span className="text-fg-muted shrink-0">{sliceProgressLabel[progress]}</span>
         </>
     );
 

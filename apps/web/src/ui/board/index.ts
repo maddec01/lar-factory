@@ -9,24 +9,24 @@ export {
     TicketSearchPane,
 } from './AddItem';
 export { ActionStack, SettingConfirm, SettingLastRun } from './Archive';
+export { scrollBoardToTop } from './BoardScroll';
 export { BoardContent, BoardShell, ReadingLine } from './BoardShell';
-export { BoardBrand, BoardTitleBar, type RefreshHealth, RefreshIndicator } from './BoardTitleBar';
+export { BoardTitleBar, type RefreshHealth, RefreshIndicator } from './BoardTitleBar';
 export { buttonKind } from './ButtonKinds';
+export { useButtonKind } from './useButtonKind';
 export {
     BoardCounter,
-    BoardCounters,
     CounterAge,
     CounterDash,
-    CounterDivider,
     CounterEmpty,
     CounterFigure,
     CounterGroup,
     CounterGroups,
     CounterItem,
     CounterList,
-    CounterOfLimit,
     CounterPartial,
 } from './Counters';
+export { noteBoardPlaces } from './BoardLife';
 export { DeskCard, DeskHint, DeskSection } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote } from './List';
@@ -144,7 +144,6 @@ export {
     CheckRun,
     ChipGroup,
     DetailFact,
-    DetailsHeading,
     DetailsSection,
     EditActions,
     EditorSlot,
@@ -176,14 +175,7 @@ export {
     WorkflowSteps,
 } from './ItemProgress';
 export { ProjectIcon, type ProjectIconSize, type ProjectIconSource } from './ProjectIcon';
-export {
-    OpenSettingsButton,
-    ProjectValueList,
-    ReasonNote,
-    SettingControl,
-    SettingDetails,
-    SettingsNote,
-} from './Settings';
+export { OpenSettingsButton } from './Settings';
 export { CreateLabelForm, TrackerLabelEditor, TrackerLabelList, TrackerLabelRow } from './TrackerLabels';
 export { VocabularyMore, VocabularyRow, VocabularySuggestion } from './Vocabulary';
 export {
@@ -195,6 +187,7 @@ export {
     ProjectListItem,
     SetupCardList,
     SetupHeader,
+    SetupPane,
     SetupStep,
 } from './Onboarding';
 export { conceptIcons } from './ConceptIcons';

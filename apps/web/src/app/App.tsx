@@ -3,13 +3,14 @@
 // of an empty desk and stages. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
-// settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
+// settled. Later reads keep the loaded board visible. Every screen shares the design system's notifications.
 
-import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
+import { failedCheck, inMacApp, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
 import { Notifications } from '@lar-works/design-system';
 
 import { LoadingScreen } from './shell/loading/LoadingScreen';
 import { TitleBar } from './shell/title-bar/TitleBar';
+import { useLightsHidden } from './shell/title-bar/WindowControls';
 import { Desk } from '@/features/desk';
 import { useShownScope } from '@/features/filters';
 import { ItemDialog } from '@/features/item-dialog';
@@ -45,15 +46,20 @@ export function App() {
     // T3 Code not running is a warning; only a missing t3 replaces the main area.
     const missing = t3?.result === 'missing' ? t3 : undefined;
     const empty = useBoardStore((state) => noneOnboarded(state.data));
+    const lightsHidden = useLightsHidden();
 
     return (
         <BoardShell
+            header={<TitleBar />}
+            // The missing-t3 notice has its own heading.
+            heading={missing ? undefined : 'Lar Factory'}
+            trafficLights={inMacApp() && !lightsHidden}
             overlays={
                 <>
                     <CopyStatus />
-                    {/* One stack on every screen, above every dialog. It portals outside the board, which is inert
-                        while the loading screen covers it. */}
-                    <Notifications presentation="stack" />
+                    {/* The design system's one toast system on every screen, above every dialog. It portals outside
+                        the board, which is inert while the loading screen covers it. */}
+                    <Notifications />
                     <ItemDialog />
                     <SettingsDialog />
                     <AbandonDialog />
@@ -62,7 +68,6 @@ export function App() {
                 </>
             }
         >
-            <TitleBar />
             <Warnings />
             {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
         </BoardShell>

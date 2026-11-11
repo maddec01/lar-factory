@@ -54,7 +54,7 @@ export function CreateLabel({
                             }}
                         />
                         <Button
-                            {...buttonKind('other')}
+                            {...buttonKind('other', { size: 'md' })}
                             type="submit"
                             leftIcon={<Plus />}
                             disabled={!!cannotCreate || !!problem || !fresh.trim() || running !== null}

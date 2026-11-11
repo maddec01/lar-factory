@@ -1,10 +1,12 @@
+// Asks before a label leaves the tracker: the design system's ConfirmDialog, its confirm in the danger colour, saying
+// what it removes and keeping the tracker's reason when the delete fails.
+
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Alert, Button, Modal, Stack, Text } from '@lar-works/design-system';
+import { ConfirmDialog } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useEditStore } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText } from './LabelParts';
-import { buttonKind } from '@/ui/board';
 
 export function DeleteConfirm({
     name,
@@ -28,44 +30,28 @@ export function DeleteConfirm({
 
         if (!failed) onClose();
     };
+    const consequence = [
+        capabilities.deleteWarning,
+        mappings && `This also removes it from ${mappings}.`,
+        capabilities.changeScope === 'project' &&
+            `${capabilities.heading} belong to the project, so this affects the whole project. ${OTHER_MAPPINGS}`,
+        'This can’t be undone from the factory.',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
     return (
-        <Modal loading={running !== null} onClose={onClose}>
-            {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
-            <Modal.Content
-                data-delete-label
-                role="alertdialog"
-                title={`Delete ${capabilities.noun} "${name}"?`}
-                description={capabilities.deleteWarning}
-                aria-describedby="delete-label-detail"
-                closeOnOverlayClick={false}
-            >
-                <Modal.Body>
-                    <Stack space="group">
-                        <Alert tone="danger" title={capabilities.deleteWarning}>
-                            <Text id="delete-label-detail" tone="muted">
-                                {mappings && `This also removes it from ${mappings}. `}
-                                {capabilities.changeScope === 'project' &&
-                                    `${capabilities.heading} belong to the project, so this affects the whole project. ${OTHER_MAPPINGS} `}
-                                This can’t be undone from the factory.
-                            </Text>
-                        </Alert>
-                        <ProblemText>{failure}</ProblemText>
-                    </Stack>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button {...buttonKind('other')} disabled={running !== null} onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        {...buttonKind('main', 'danger')}
-                        loading={running === 'labels'}
-                        onClick={() => void confirm()}
-                    >
-                        Delete {capabilities.noun}
-                    </Button>
-                </Modal.Footer>
-            </Modal.Content>
-        </Modal>
+        <ConfirmDialog
+            data-delete-label
+            title={`Delete ${capabilities.noun} "${name}"?`}
+            consequence={consequence}
+            confirmLabel={`Delete ${capabilities.noun}`}
+            busy={running === 'labels'}
+            cancelDisabled={running !== null}
+            onConfirm={() => void confirm()}
+            onCancel={onClose}
+        >
+            {failure ? <ProblemText>{failure}</ProblemText> : null}
+        </ConfirmDialog>
     );
 }

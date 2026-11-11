@@ -1,12 +1,12 @@
 // A Project's access rows and read-only reasons, with Recheck while the board can ask for access again.
 
 import { type OperationAccess, type RepositoryOperation } from '@lar-factory/shared';
-import { Button, Inline, InlineLink, InsetPanel, Stack } from '@lar-works/design-system';
+import { Button, Inline, InlineLink, InsetPanel, SettingsReason, Stack } from '@lar-works/design-system';
 
 import { accessExplanation } from './RepositoryAccess';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { ToolState } from '@/shared/settings/SettingControls';
-import { buttonKind, ReasonNote } from '@/ui/board';
+import { buttonKind } from '@/ui/board';
 
 export interface AccessRow {
     name: string;
@@ -53,7 +53,7 @@ export function AccessList({
             </InsetPanel>
             {onRecheck && (
                 <Inline as="span">
-                    <Button {...buttonKind('other')} loading={checking} onClick={onRecheck}>
+                    <Button {...buttonKind('other', { size: 'md' })} loading={checking} onClick={onRecheck}>
                         Recheck access
                     </Button>
                 </Inline>
@@ -77,7 +77,7 @@ export function AccessReason({
     const short = explanation.split('. ')[0]!.replace(/\.$/, '');
 
     return (
-        <ReasonNote
+        <SettingsReason
             reason={`${short}.`}
             explanation={explanation}
             helpLabel="access"

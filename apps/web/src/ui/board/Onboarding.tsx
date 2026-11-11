@@ -17,8 +17,14 @@ export function EmptyBoard({
     children: ReactNode;
 } & DataAttributes) {
     return (
-        // An empty board's main area: the page itself, no fade.
-        <div {...data} data-scroll-fade="exempt" className="min-h-0 flex-1 overflow-y-auto">
+        // An empty board's main area: the page itself, no fade. What it says sits a little above the middle, its text
+        // centred at about 40% of the window (3:7 of the room around the message, whose own padding is even), and it
+        // scrolls when it is taller than the area.
+        <div
+            {...data}
+            data-scroll-fade="exempt"
+            className="grid min-h-0 flex-1 grid-rows-[minmax(0,3fr)_auto_minmax(0,7fr)] overflow-y-auto before:content-[''] after:content-['']"
+        >
             {children}
         </div>
     );
@@ -34,11 +40,12 @@ export function SetupCardList({
     return <ScrollFadeRegion className="grid max-h-[35%] shrink-0 gap-2">{children}</ScrollFadeRegion>;
 }
 
-/** The setup dialog's place under its title: the Project's `icon` beside the `place` line, over the `progress` bar. */
+/** The setup's place under its title: the Project's `icon` beside the `place` line, over the `progress` bar. */
 export function SetupHeader({
     icon,
     place,
     progress,
+    presentation = 'dialog',
 }: {
     /** The Project's icon. */
     icon?: ReactNode;
@@ -46,14 +53,51 @@ export function SetupHeader({
     place: ReactNode;
     /** The setup's progress bar. */
     progress: ReactNode;
+    /** `dialog` sits under the dialog's title, on its gutters; `pane` under a SetupPane's title, which places it. */
+    presentation?: 'dialog' | 'pane';
 }) {
     return (
-        <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
+        <div className={`grid shrink-0 gap-2 ${presentation === 'dialog' ? 'px-5 pb-4 sm:px-6' : ''}`}>
             <div className="flex min-w-0 items-center gap-2">
                 {icon}
                 {place}
             </div>
             {progress}
+        </div>
+    );
+}
+
+/**
+ * The setup as a child pane of Settings › Projects, inside the design system's SettingsChildPane (which puts its way
+ * back 16px above): the step's `title`, which takes focus as a step opens without being a Tab stop, and its `header`
+ * (a SetupHeader), both on the settings groups' heading inset; then the step, as wide as the groups.
+ */
+export function SetupPane({
+    title,
+    header,
+    children,
+    ...data
+}: {
+    /** The step's title, the pane's heading. */
+    title: string;
+    /** The Project and the progress, a SetupHeader with `presentation="pane"`. */
+    header: ReactNode;
+    /** The step. */
+    children: ReactNode;
+} & DataAttributes) {
+    return (
+        <div {...data} className="grid min-w-0 gap-6">
+            <div className="grid min-w-0 gap-3 px-4">
+                <h3
+                    tabIndex={-1}
+                    data-setup-title
+                    className="text-fg m-0 text-base leading-6 font-semibold wrap-anywhere outline-none"
+                >
+                    {title}
+                </h3>
+                {header}
+            </div>
+            {children}
         </div>
     );
 }

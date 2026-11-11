@@ -6,13 +6,12 @@ import {
     type ModelChoice,
     type ModelGroup,
 } from '@lar-factory/shared';
-import { Alert, OptionSelect, Stack } from '@lar-works/design-system';
+import { Alert, OptionSelect, SettingsControl, SettingsValueList, Stack } from '@lar-works/design-system';
 // Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on Project default in T3.
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { postAction, receive } from '@/services/board/board.service';
-import { ProjectValueList, SettingControl } from '@/ui/board';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {
     if (!selected) return 'Project default in T3';
@@ -30,7 +29,7 @@ function RepositoryDefaults({ data }: { data: AutoBuildData }) {
     if (!data.autoBuild || data.autoBuild.model || !data.t3Defaults || !data.repos.length) return null;
 
     return (
-        <ProjectValueList
+        <SettingsValueList
             label="Default model by Project"
             rows={data.repos.map(({ repo }) => ({
                 key: repo,
@@ -63,7 +62,7 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
 
     return (
         <Stack space="group" data-auto-build-model>
-            <SettingControl>
+            <SettingsControl>
                 <OptionSelect
                     label="Auto-build model"
                     presentation="setting"
@@ -111,7 +110,7 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
                         {error}
                     </Alert>
                 )}
-            </SettingControl>
+            </SettingsControl>
             <RepositoryDefaults data={data} />
         </Stack>
     );

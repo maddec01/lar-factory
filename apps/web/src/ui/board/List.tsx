@@ -1,4 +1,13 @@
-import { Badge, Loading, SectionTitle, SidebarNavigationItem } from '@lar-works/design-system';
+import {
+    Badge,
+    Loading,
+    SectionTitle,
+    SidebarNavigationItem,
+    TitleBarLabel,
+    Tooltip,
+    TooltipPopup,
+    TooltipTrigger,
+} from '@lar-works/design-system';
 import { ButtonBase as Button } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
@@ -18,13 +27,22 @@ interface ListButtonProps {
 }
 
 /** The title bar's List button, "List <count>": an App control whose label folds away, for screen readers only, on a
- *  title bar under 70rem. */
+ *  title bar under 72rem, where its glass tooltip names it. */
 export function ListButton({ label, icon, count, loadingLabel, onOpen }: ListButtonProps) {
     return (
-        <Button {...buttonKind('control')} className="list-button px-2" leftIcon={icon} title={label} onClick={onOpen}>
-            <span className="@max-6xl:sr-only">{label}</span>
-            {count === undefined ? <Loading presentation="inline" title={loadingLabel} /> : <Badge>{count}</Badge>}
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button {...buttonKind('control')} className="list-button" leftIcon={icon} onClick={onOpen}>
+                    <TitleBarLabel>{label}</TitleBarLabel>
+                    {count === undefined ? (
+                        <Loading presentation="inline" title={loadingLabel} />
+                    ) : (
+                        <Badge>{count}</Badge>
+                    )}
+                </Button>
+            </TooltipTrigger>
+            <TooltipPopup side="bottom">{label}</TooltipPopup>
+        </Tooltip>
     );
 }
 
@@ -60,7 +78,7 @@ export function ListGroupItem({
 interface ListHeaderProps {
     /** The search field, and beside it Add item. */
     search: ReactNode;
-    /** The search with Add item. */
+    /** Add item, at the search field's 32px (`md`). */
     add: ReactNode;
     /** The chosen group's name and how many of its items show; no count while it's still reading. */
     title: string;
@@ -74,11 +92,12 @@ interface ListHeaderProps {
     filters: ReactNode;
 }
 
-/** The List's right pane's head: the search with Add item, then the chosen group with its count, scope toggle and sort,
- *  then the filters. */
+/** The List's right pane's head, the top of its scrolling body (under the dialog's 52px header and its hairline, on
+ *  the body's own inset): the search with Add item, then the chosen group with its count, scope toggle and sort, then
+ *  the filters. */
 export function ListHeader({ search, add, title, count, scope, sort, filters }: ListHeaderProps) {
     return (
-        <div className="flex shrink-0 flex-col gap-2 px-5 sm:px-6">
+        <div className="flex shrink-0 flex-col gap-2 pb-2">
             <div className="flex items-center gap-2 [&>[data-slot=button]]:shrink-0">
                 {search}
                 {add}
@@ -135,16 +154,16 @@ export function ListItemRow({
             onClick={onOpen}
             data-item={item}
             title={name}
-            className="hover:bg-fill-hover focus-ring-inset flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left"
+            className="hover:bg-fill-hover focus-ring-inset flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left"
         >
             {source}
             <span className="min-w-0 flex-1">
-                <span className="text-fg text-ui block truncate leading-5 font-medium">
+                <span className="text-fg block truncate text-sm font-medium">
                     {reference ? <span className="text-fg-muted font-normal">{reference} </span> : null}
                     {title}
                 </span>
                 <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-                    <span className="text-fg-muted text-2xs me-1 flex min-w-0 items-center gap-1 leading-4">
+                    <span className="text-fg-muted me-1 flex min-w-0 items-center gap-1 text-xs">
                         {repoIcon}
                         <span className="min-w-0 truncate tabular-nums">{meta}</span>
                     </span>

@@ -1,8 +1,10 @@
-// A project's icon, in a fixed square. An emoji or monogram chosen in T3 takes the square. Otherwise it holds the
-// toned initial, with the favicon or lucide icon laid over it once that has loaded, so the square keeps its size either
-// way and a missing or broken one leaves the initial. Decorative, as a name sits beside it. An SVG favicon only ever
-// renders through this <img>, which runs none of its scripts.
+// A project's icon, in a fixed square, in the project's hue on the design system's categorical palette. An emoji or
+// monogram chosen in T3 takes the square. Otherwise it holds the tinted initial, with the favicon or lucide icon laid
+// over it once that has loaded, so the square keeps its size either way and a missing or broken one leaves the initial.
+// Decorative, as a name sits beside it. An SVG favicon only ever renders through this <img>, which runs none of its
+// scripts.
 
+import { type CategoricalHue, categoricalHues } from '@lar-works/design-system';
 import type { DynamicIcon } from '@lar-works/design-system/icons/dynamic';
 import { lazy, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
 
@@ -37,38 +39,51 @@ export type ProjectIconSource =
     | { kind: 'monogram'; text: string; color: ProjectIconColor }
     | { kind: 'favicon'; src: string };
 
-/** The board's palette of repository colours, which the repositories take in their list order. */
-const REPO_TONES = 8;
+/** The palette's hues in the order the repositories take them (by their place in the board's list). */
+const PLACE_HUES = Object.keys(categoricalHues) as CategoricalHue[];
 
-/** An emoji's glyph fills about as much of its square as a lucide icon's strokes do, so a row's icons line up. */
+/** The square and its type on the board's icon scale: `sm` 14px (a chip's), `md` 16px (a row's) and `lg` 20px. Its
+ *  initial or monogram is 12px (the meta size), so a small square shows one character and only `lg` two; an emoji
+ *  fills about as much of its square as a lucide icon's strokes do, so a row's icons line up. */
 const SIZES = {
-    sm: { square: 'size-3.5 text-[8px]', emoji: 'text-xs', monogram: 'text-[7px]' },
-    md: { square: 'size-4 text-[9px]', emoji: 'text-sm', monogram: 'text-[8px]' },
-    lg: { square: 'size-5 text-3xs', emoji: 'text-base', monogram: 'text-3xs' },
+    sm: { square: 'size-3.5 text-xs', emoji: 'text-xs', graphemes: 1 },
+    md: { square: 'size-4 text-xs', emoji: 'text-sm', graphemes: 1 },
+    lg: { square: 'size-5 text-xs', emoji: 'text-base', graphemes: 2 },
 };
 
 export type ProjectIconSize = keyof typeof SIZES;
 
-/** Whole class names, as Tailwind only finds those. */
-const COLORS: Record<ProjectIconColor, string> = {
-    gray: 'text-gray-500',
-    red: 'text-red-500',
-    orange: 'text-orange-500',
-    amber: 'text-amber-500',
-    yellow: 'text-yellow-500',
-    lime: 'text-lime-500',
-    green: 'text-green-500',
-    emerald: 'text-emerald-500',
-    teal: 'text-teal-500',
-    cyan: 'text-cyan-500',
-    sky: 'text-sky-500',
-    blue: 'text-blue-500',
-    indigo: 'text-indigo-500',
-    violet: 'text-violet-500',
-    purple: 'text-purple-500',
-    fuchsia: 'text-fuchsia-500',
-    pink: 'text-pink-500',
-    rose: 'text-rose-500',
+/** Each categorical hue as whole class names, as Tailwind only finds those. */
+const HUES: Record<CategoricalHue, string> = {
+    lime: 'category-lime',
+    teal: 'category-teal',
+    cyan: 'category-cyan',
+    violet: 'category-violet',
+    magenta: 'category-magenta',
+    rose: 'category-rose',
+};
+
+/** T3's project icon colours on the categorical palette: each to its nearest hue there, so a project keeps the colour
+ *  family it was given in T3 without drawing in a status's hue. Gray takes the project's own hue. */
+const T3_HUES: Record<ProjectIconColor, CategoricalHue | null> = {
+    gray: null,
+    red: 'rose',
+    orange: 'rose',
+    amber: 'lime',
+    yellow: 'lime',
+    lime: 'lime',
+    green: 'teal',
+    emerald: 'teal',
+    teal: 'teal',
+    cyan: 'cyan',
+    sky: 'cyan',
+    blue: 'cyan',
+    indigo: 'violet',
+    violet: 'violet',
+    purple: 'violet',
+    fuchsia: 'magenta',
+    pink: 'magenta',
+    rose: 'rose',
 };
 
 const OVERLAY = 'absolute inset-0 size-full bg-surface-raised';
@@ -115,9 +130,9 @@ const firstGraphemes = (text: string, count: number) => {
 };
 
 /**
- * A project's icon in a square of its `size`: `icon`, or its `name`'s initial on the colour of its `place` among the
- * board's repositories (muted for a project the board doesn't list), with a favicon or lucide icon laid over the
- * initial once it has loaded.
+ * A project's icon in a square of its `size`: `icon`, or its `name`'s initial in the categorical hue of its `place` among
+ * the board's repositories (muted for a project the board doesn't list), with a favicon or lucide icon laid over the
+ * initial once it has loaded. A lucide icon or monogram from T3 keeps T3's colour, on the palette.
  */
 export function ProjectIcon({
     icon,
@@ -130,13 +145,16 @@ export function ProjectIcon({
     icon?: ProjectIconSource | null | undefined;
     /** The project's name, whose initial stands in for a missing icon. */
     name: string;
-    /** The project's place among the board's repositories, which picks the initial's colour; none mutes it. */
+    /** The project's place among the board's repositories, which picks its hue; none mutes it. */
     place?: number | undefined;
     /** The square's size on the board's icon scale: `sm` 14px, `md` 16px (a row's) or `lg` 20px. */
     size: ProjectIconSize;
 } & DataAttributes) {
-    const { square, emoji, monogram } = SIZES[size];
-    const shared = `${square} relative grid shrink-0 place-items-center overflow-hidden rounded-md font-bold`;
+    const { square, emoji, graphemes: shown } = SIZES[size];
+    const own = place === undefined ? null : PLACE_HUES[place % PLACE_HUES.length]!;
+    const hue = (color: ProjectIconColor) => T3_HUES[color] ?? own;
+    const tinted = (h: CategoricalHue | null, recipe: string) => (h ? `${HUES[h]} ${recipe}` : 'text-fg-muted');
+    const shared = `${square} relative grid shrink-0 place-items-center overflow-hidden rounded-md leading-none font-semibold`;
 
     if (icon?.kind === 'emoji')
         return (
@@ -147,27 +165,31 @@ export function ProjectIcon({
 
     if (icon?.kind === 'monogram')
         return (
-            <span {...data} data-project-icon className={`${shared} ${COLORS[icon.color]}`} aria-hidden="true">
-                <span className={`${monogram} leading-none whitespace-nowrap`}>{firstGraphemes(icon.text, 2)}</span>
+            <span
+                {...data}
+                data-project-icon
+                className={`${shared} ${tinted(hue(icon.color), 'categorical-text')}`}
+                aria-hidden="true"
+            >
+                <span className="whitespace-nowrap">{firstGraphemes(icon.text, shown)}</span>
             </span>
         );
-
-    const tone = place === undefined ? 'repo-tone-none' : `repo-tone-${place % REPO_TONES}`;
 
     return (
         <span
             {...data}
             data-project-icon
-            className={`${tone} ${shared} bg-[var(--k,var(--color-fg-muted))] text-white`}
+            // An image laid over the initial covers the square edge to edge, so only the initial wears the fill's edge.
+            className={`${shared} ${icon?.kind === 'lucide' || icon?.kind === 'favicon' ? '' : 'border'} ${own ? `${HUES[own]} categorical-fill` : 'bg-fill-muted text-fg-muted border-line'}`}
             aria-hidden="true"
         >
             {firstGraphemes(name, 1).toUpperCase()}
             {icon?.kind === 'favicon' && <Favicon key={icon.src} src={icon.src} />}
             {icon?.kind === 'lucide' && (
                 // The colour is the wrapper's and the icon draws in currentColor, so a container that recolours every
-                // svg in it (a palette row's icon box) can't turn it white on white. The wrapper draws nothing of its
-                // own, so the initial shows until the icon has loaded, the same in either theme.
-                <span className={`absolute inset-0 ${COLORS[icon.color]}`}>
+                // svg in it (a palette row's icon box) can't turn it into its own colour. The wrapper draws nothing of
+                // its own, so the initial shows until the icon has loaded, the same in either theme.
+                <span className={`absolute inset-0 ${tinted(hue(icon.color), 'categorical-icon')}`}>
                     <Suspense fallback={null}>
                         <LucideIcon
                             key={icon.name}

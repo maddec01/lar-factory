@@ -1,0 +1,17 @@
+/* The title bar's Refreshed dot (RefreshIndicator in BoardTitleBar.tsx) pings once when a newer read lands: a ring
+   growing from the dot and fading, on the motion tokens' easing. It starts visible at opacity 0.6, so behind an open
+   blurred overlay it pauses (as the design system's loops do) without hiding, and finishes once the overlay closes. */
+@keyframes refreshed-ping {
+    from {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    to {
+        transform: scale(3);
+        opacity: 0;
+    }
+}
+
+body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) [data-ping] {
+    animation-play-state: paused;
+}

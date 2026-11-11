@@ -110,6 +110,8 @@ interface EditState {
     /** Successful writes and access checks that require fresh vocabulary discovery. */
     labelChanges: number;
     type: (repo: string, field: keyof Drafts, text: string) => void;
+    /** Throws away the typed text of `fields`, back to what is saved, with their errors: Settings' Cancel. */
+    discard: (repo: string, fields: (keyof Drafts)[]) => void;
     save: (repo: string, key: DraftSetting, setup: RepositorySetup) => Promise<void>;
     reset: (repo: string, key: DraftSetting) => Promise<void>;
     recheck: (repo: string) => Promise<void>;
@@ -212,6 +214,21 @@ export const useEditStore = create<EditState>()((set, get) => {
             revisions[repo] = { ...revisions[repo], [field]: (revisions[repo]?.[field] ?? 0) + 1 };
             set({ drafts: { ...get().drafts, [repo]: { ...get().drafts[repo], [field]: text } } });
             fieldError(repo, field, null);
+        },
+        discard: (repo, fields) => {
+            const typed = { ...get().drafts[repo] };
+            const errors = { ...get().fieldErrors[repo] };
+
+            for (const field of fields) {
+                delete typed[field];
+                delete errors[field];
+                revisions[repo] = { ...revisions[repo], [field]: (revisions[repo]?.[field] ?? 0) + 1 };
+            }
+
+            set({
+                drafts: { ...get().drafts, [repo]: typed },
+                fieldErrors: { ...get().fieldErrors, [repo]: errors },
+            });
         },
         save: async (repo, key, setup) => {
             const typed = get().drafts[repo] ?? {};

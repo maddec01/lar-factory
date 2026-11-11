@@ -8,6 +8,8 @@ import { $, $$, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const cards = () => $$('.desk-card');
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
+/** Opens a card as a click anywhere on it does: on its open button, stretched over the whole card. */
+const open = (id: string) => card(id).querySelector<HTMLButtonElement>('[data-slot="action-overlay"]')!.click();
 /** The card's next-step line. */
 const nextLine = (id: string) => text(card(id).querySelector('.desk-next'));
 const dialog = () => $('[data-item-dialog]');
@@ -69,7 +71,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
         expect(text($('#desk-h')!.parentElement)).toBe('Your desk1');
-        expect(text($('.counters button[aria-haspopup]')), 'need you counts the whole factory').toBe('need you: 6');
+        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 6');
     });
 
     test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {
@@ -138,7 +140,7 @@ test('a decision with no thread answers in its concept thread without inheriting
     expect(child.threads).toEqual([]);
     expect(child.stats).toBeUndefined();
     expect(card('I_sample09')).not.toBeNull();
-    await settle(() => card('I_sample12').click());
+    await settle(() => open('I_sample12'));
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
 
@@ -220,7 +222,7 @@ test('shaping questions target the older question and leave the desk on a board 
     expect(card('I_sample12').querySelector('a')?.getAttribute('href')).toBe(
         't3code://threads/sample-environment/question',
     );
-    await settle(() => card('I_sample12').click());
+    await settle(() => open('I_sample12'));
     expect(
         [...dialog()!.querySelectorAll('[data-slot="modal-footer"] [data-open-thread]')].map((a) => [
             text(a),

@@ -121,7 +121,7 @@ export function HistoryRow({
 }) {
     return (
         <li
-            className="text-ui hover:bg-fill-hover flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3"
+            className="hover:bg-fill-hover flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3 text-sm"
             data-history-part={id}
         >
             {glyph}
@@ -135,11 +135,11 @@ export function HistoryRow({
                 {title}
             </button>
             {after && (
-                <span className="text-2xs text-fg-muted min-w-0 shrink-[1000] truncate" title={afterTitle}>
+                <span className="text-fg-muted min-w-0 shrink-[1000] truncate text-xs" title={afterTitle}>
                     {after}
                 </span>
             )}
-            <span className="text-2xs text-fg-muted ml-auto flex shrink-0 items-center gap-2">{side}</span>
+            <span className="text-fg-muted ml-auto flex shrink-0 items-center gap-2 text-xs">{side}</span>
         </li>
     );
 }

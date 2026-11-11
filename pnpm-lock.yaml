@@ -208,8 +208,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@lar-works/design-system':
-        specifier: ^0.5.0
-        version: 0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
+        specifier: ^0.6.0
+        version: 0.6.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
       '@tailwindcss/node':
         specifier: 4.3.3
         version: 4.3.3
@@ -257,8 +257,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@lar-works/design-system':
-        specifier: ^0.5.0
-        version: 0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
+        specifier: ^0.6.0
+        version: 0.6.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)
       mermaid:
         specifier: ^12.2.0
         version: 12.2.0
@@ -562,8 +562,8 @@ packages:
     peerDependencies:
       vite-plus: ^1.5.0
 
-  '@lar-works/design-system@0.5.0':
-    resolution: {integrity: sha512-nfXfYXOsqsLiWoPwxLlj7DcdRyJr95LUZjE/JnfBveqBB5mf7w1p6GzKH8cDsqBENHWrmP89oFcb/LJQcLIuRQ==}
+  '@lar-works/design-system@0.6.0':
+    resolution: {integrity: sha512-IUOWXzms54dCOKg/LEiEve3wLi+zcd/XsjRE4NsvazKdH92/Qzzcoyp0dpO5k+wYbuEuoIwVZ/afWtSqshzzIQ==}
     peerDependencies:
       react: ^19.2.0
       react-dom: ^19.2.0
@@ -4975,7 +4975,7 @@ snapshots:
     dependencies:
       vite-plus: 1.5.0(@types/node@24.19.2)(@vitest/ui@5.1.0)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)(yaml@2.9.1)
 
-  '@lar-works/design-system@0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)':
+  '@lar-works/design-system@0.6.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@7.0.2)(yjs@13.6.33)':
     dependencies:
       '@lexical/code': 0.52.0(typescript@7.0.2)
       '@lexical/html': 0.52.0(typescript@7.0.2)

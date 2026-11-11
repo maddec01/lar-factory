@@ -1,13 +1,14 @@
-// The editor a label row opens: its name, colour and description, saving only what changed.
+// The editor a label row opens: its name, colour and description, a draft that Settings' footer saves (or Enter),
+// sending only what changed; Cancel there, or Edit again, closes it.
 
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Alert, Button, ColorSwatches, Inline, Input, InsetPanel, Text } from '@lar-works/design-system';
+import { Alert, ColorSwatches, Input, InsetPanel, Text, useSettingsDraft } from '@lar-works/design-system';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText } from './LabelParts';
 import { FieldRow } from '@/shared/settings/FieldRow';
-import { buttonKind, TrackerLabelEditor } from '@/ui/board';
+import { TrackerLabelEditor } from '@/ui/board';
 
 const SWATCHES = [
     'D73A4A',
@@ -61,20 +62,28 @@ export function LabelEditor({
     const problem = draft.name.trim() === label.name ? null : capabilities.nameProblem(draft.name);
     const badColor =
         update.color !== undefined && !/^[0-9a-f]{6}$/i.test(update.color) ? 'Use a colour of six hex digits.' : null;
-    const save = async (event: FormEvent) => {
+    const { submit } = useSettingsDraft({
+        dirty: Object.keys(update).length > 0,
+        invalid: !!problem || !!badColor,
+        save: async () => {
+            const failed = await onSave({ change: 'update', name: label.name, update });
+
+            setFailure(failed);
+
+            if (failed) throw new Error(failed);
+
+            onDone();
+        },
+        reset: onDone,
+        error: failure,
+    });
+    const save = (event: FormEvent) => {
         event.preventDefault();
-
-        if (problem || badColor || !Object.keys(update).length) return;
-
-        const failed = await onSave({ change: 'update', name: label.name, update });
-
-        setFailure(failed);
-
-        if (!failed) onDone();
+        submit();
     };
 
     return (
-        <TrackerLabelEditor onSubmit={(event) => void save(event)}>
+        <TrackerLabelEditor onSubmit={save}>
             {capabilities.changeScope === 'project' && (
                 <Alert tone="warning" title="Renaming affects the whole project">
                     {capabilities.heading} belong to the project, not to this repository. Everything with this{' '}
@@ -128,19 +137,6 @@ export function LabelEditor({
                 )}
             </InsetPanel>
             <ProblemText>{failure}</ProblemText>
-            <Inline as="span">
-                <Button {...buttonKind('other')} type="button" disabled={running !== null} onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button
-                    {...buttonKind('other')}
-                    type="submit"
-                    disabled={running !== null || !!problem || !!badColor || !Object.keys(update).length}
-                    loading={running === 'labels'}
-                >
-                    Save
-                </Button>
-            </Inline>
         </TrackerLabelEditor>
     );
 }

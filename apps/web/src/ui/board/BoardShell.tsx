@@ -1,46 +1,55 @@
-import { Loading } from '@lar-works/design-system';
-import { useScrolled } from '@lar-works/design-system/primitives';
-import { type ReactNode, useRef } from 'react';
+import { AppShell, Loading } from '@lar-works/design-system';
+import type { ReactNode } from 'react';
 
-/** Lar Factory's window: the board's main area filling the window, and beside it, outside `main`, what sits over the
- *  board (its dialogs, live regions and notifications), so their announcements sit apart from the page. The main area
- *  is what scrolls, so the board passes under the title bar's glass, which shows its hairline once scrolled. */
+/**
+ * Lar Factory's window: the design system's desktop AppShell (`scroll="contained"`). The window holds the title bar
+ * and the board's main area in one scroller, so the board passes under the bar's glass, which shows its hairline once
+ * scrolled; in the Mac app the bar drags the window and starts past the traffic lights. Beside the scroller, outside
+ * `main`, sits what goes over the board (its dialogs, live regions and notifications), so their announcements sit
+ * apart from the page. `main` opens with the page's heading for screen readers, which a closing dialog whose opener
+ * went away can focus.
+ */
 export function BoardShell({
+    header,
+    heading,
+    trafficLights,
     children,
     overlays,
 }: {
-    /** The board's title bar and content. */
+    /** The board's title bar, a BoardTitleBar. */
+    header: ReactNode;
+    /** The page's heading, for screen readers only, as the lockup is a link; none where the content has its own. */
+    heading?: string;
+    /** In the Mac app with its traffic lights showing: the bar starts past them. */
+    trafficLights: boolean;
+    /** The board's content, under the title bar. */
     children: ReactNode;
     /** What sits over the board, outside `main`: its dialogs, live regions and notifications. */
     overlays?: ReactNode;
 }) {
-    const main = useRef<HTMLElement>(null);
-    const scrolled = useScrolled(main);
-
     return (
-        <div className="bg-surface-page text-fg fixed inset-0 flex flex-col">
-            <main
-                ref={main}
-                data-scrolled={scrolled || undefined}
-                // The page itself, which scrolls under the title bar's glass: no fade.
-                data-scroll-fade="exempt"
-                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain"
-            >
+        <AppShell scroll="contained" header={header} overlays={overlays} trafficLights={trafficLights}>
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {heading ? (
+                    <h1 className="sr-only" tabIndex={-1}>
+                        {heading}
+                    </h1>
+                ) : null}
                 {children}
             </main>
-            {overlays}
-        </div>
+        </AppShell>
     );
 }
 
-/** Everything under the title bar, which scrolls with the main area as one page; nothing in it shrinks to fit. */
+/** Everything under the title bar, which scrolls with the main area as one page, on the bar's 16px gutter; nothing in
+ *  it shrinks to fit. */
 export function BoardContent({
     children,
 }: {
     /** Everything under the title bar. */
     children: ReactNode;
 }) {
-    return <div className="px-gutter-board flex flex-1 flex-col gap-3 pt-3 pb-4 *:shrink-0">{children}</div>;
+    return <div className="px-gutter-app flex flex-1 flex-col gap-3 pt-3 pb-4 *:shrink-0">{children}</div>;
 }
 
 /** A line that stands in for content the board is still reading, centred in its area. */

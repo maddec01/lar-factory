@@ -1,7 +1,7 @@
 // Lar Factory's Add item: the title bar's button that opens it, the New work pane's fields beside their details panel,
 // the panel's labelled fields and ticket part, the Create issue choice, and the Find a ticket pane with its search.
 
-import { FormResult, tabbable } from '@lar-works/design-system';
+import { FormResult, TitleBarLabel, Tooltip, TooltipPopup, TooltipTrigger, tabbable } from '@lar-works/design-system';
 import { SquarePenIcon } from '@lar-works/design-system/icons';
 import {
     ButtonBase as Button,
@@ -16,11 +16,13 @@ import { buttonKind } from './ButtonKinds';
 import { DetailsHeading } from './ItemDetailSections';
 
 /** The title bar's Add item button, a Main action named by its `label`, which folds away, for screen readers only, on a
- *  title bar under 70rem; `title` gives it whole with its shortcut, which `keyShortcuts` names. */
+ *  title bar under 72rem; `title` gives it whole with its shortcut in a glass tooltip, which `keyShortcuts` names.
+ *  Before the first project it `waits`, an Other, so adding a project is the board's one Main action. */
 export function AddItemButton({
     label,
     title,
     keyShortcuts,
+    waits = false,
     onOpen,
 }: {
     /** The button's text, such as "Add item". */
@@ -29,20 +31,26 @@ export function AddItemButton({
     title: string;
     /** The shortcut, for `aria-keyshortcuts`. */
     keyShortcuts?: string;
+    /** No project is added yet, so adding an item can't come first. */
+    waits?: boolean;
     /** Called as the reader opens the add-item dialog. */
     onOpen: () => void;
 }) {
     return (
-        <Button
-            {...buttonKind('main')}
-            className="add-item px-2"
-            leftIcon={<SquarePenIcon />}
-            title={title}
-            aria-keyshortcuts={keyShortcuts}
-            onClick={onOpen}
-        >
-            <span className="@max-6xl:sr-only">{label}</span>
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    {...buttonKind(waits ? 'other' : 'main')}
+                    className="add-item"
+                    leftIcon={<SquarePenIcon />}
+                    aria-keyshortcuts={keyShortcuts}
+                    onClick={onOpen}
+                >
+                    <TitleBarLabel>{label}</TitleBarLabel>
+                </Button>
+            </TooltipTrigger>
+            <TooltipPopup side="bottom">{title}</TooltipPopup>
+        </Tooltip>
     );
 }
 
@@ -97,7 +105,7 @@ export function DraftFields({
                     <aside
                         ref={detailsFadeRef}
                         aria-label={detailsLabel}
-                        className={`border-line bg-surface-page/60 @max-pane:overflow-visible @max-pane:border-t @max-pane:border-l-0 grid content-start gap-5 overflow-y-auto border-l px-6 py-4 ${scrollFadeClassName}`}
+                        className={`border-line bg-surface-page/60 @max-pane:overflow-visible @max-pane:border-t @max-pane:border-l-0 grid grid-cols-[minmax(0,1fr)] content-start gap-5 overflow-y-auto border-l px-6 py-4 ${scrollFadeClassName}`}
                     >
                         {details}
                     </aside>
@@ -132,8 +140,8 @@ export function PanelField({
 }) {
     if (htmlFor)
         return (
-            <div className="grid gap-1.5">
-                <DetailsHeading presentation="label" as="label" htmlFor={htmlFor}>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5">
+                <DetailsHeading presentation="field" as="label" htmlFor={htmlFor}>
                     {heading}
                 </DetailsHeading>
                 {children}
@@ -141,8 +149,14 @@ export function PanelField({
         );
 
     return (
-        <div ref={ref} id={id} role="group" aria-label={heading} className="grid gap-1.5">
-            <DetailsHeading presentation="label" as="span">
+        <div
+            ref={ref}
+            id={id}
+            role="group"
+            aria-label={heading}
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5"
+        >
+            <DetailsHeading presentation="field" as="span">
                 {heading}
             </DetailsHeading>
             {children}

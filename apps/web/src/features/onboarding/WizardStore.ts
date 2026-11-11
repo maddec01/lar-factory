@@ -137,6 +137,9 @@ export function stepReady(run: Run, projects: Projects, detection: Read<SetupDet
     return true;
 }
 
+/** Where a run shows: its own dialog, or a pane in Settings › Projects. */
+type WizardPlace = 'dialog' | 'settings';
+
 interface WizardState {
     /** The run the dialog shows; null while it's closed. */
     run: Run | null;
@@ -148,10 +151,13 @@ interface WizardState {
     finish: Finish;
     /** The button that opened the dialog, which gets focus back when it closes. */
     opener: HTMLElement | null;
-    /** Opens a new run. */
-    start: () => void;
+    /** Where the run shows: its own `dialog` over the board, or, opened from Settings › Projects, a `settings` pane in
+     *  place of the Projects section, with Back, so no second dialog stacks over Settings. */
+    where: WizardPlace;
+    /** Opens a new run, in its own dialog unless Settings opened it. */
+    start: (where?: WizardPlace) => void;
     /** Reopens the onboarding the board keeps for `repo`, on its step with its choices. */
-    resume: (repo: string) => void;
+    resume: (repo: string, where?: WizardPlace) => void;
     close: () => void;
     /** Reads T3's projects again. */
     loadProjects: () => Promise<void>;
@@ -268,7 +274,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         creating: null,
         ...FRESH,
         opener: null,
-        start: () => {
+        where: 'dialog',
+        start: (where = 'dialog') => {
             forget();
 
             const run: Run = {
@@ -280,10 +287,10 @@ export const useWizardStore = create<WizardState>()((set, get) => {
                 choices: {},
             };
 
-            set({ run, creating: null, ...FRESH, opener: focused() });
+            set({ run, creating: null, ...FRESH, opener: focused(), where });
             void get().loadProjects();
         },
-        resume: (repo) => {
+        resume: (repo, where = 'dialog') => {
             const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
 
             if (!kept) return;
@@ -292,7 +299,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
 
             const run = resumed(kept.repo, kept.progress);
 
-            set({ run, creating: null, ...FRESH, opener: focused() });
+            set({ run, creating: null, ...FRESH, opener: focused(), where });
             void get().loadProjects();
 
             if (run.step !== 'project')

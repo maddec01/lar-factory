@@ -24,10 +24,10 @@ import { opensOnChecked } from './ModelMenuFocus';
 import { useOnRow } from './RowContext';
 import { StartControl, StartEntries } from './StartControl';
 import type { StartKind } from './StartStore';
-import { closeKeepingFocus, DismissButton, notify } from '@/features/notices';
+import { closeKeepingFocus, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ActionError, buttonKind, StartLine } from '@/ui/board';
+import { ActionError, StartLine, useButtonKind } from '@/ui/board';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
@@ -59,6 +59,7 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
 
 /** Start after #n, or Starts after #n ✓ while armed, a Start. */
 function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData; namesBlocker: boolean }) {
+    const kindOf = useButtonKind();
     const onRow = useOnRow();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
@@ -83,7 +84,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
     if (armed) {
         return (
             <Button
-                {...buttonKind(onRow ? 'start' : 'main')}
+                {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 shrinks
                 mark="✓"
@@ -109,7 +110,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
         <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
             <DropdownMenu.Trigger asChild>
                 <Button
-                    {...buttonKind(onRow ? 'start' : 'main')}
+                    {...kindOf(onRow ? 'start' : 'main')}
                     leftIcon={ICON.play}
                     shrinks
                     rightIcon={<ChevronDownIcon />}
@@ -122,7 +123,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                 </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content
-                width="lg"
+                width="md"
                 height="capped"
                 align="end"
                 aria-label={`Start ${ref(item)} after ${after} with`}
@@ -161,6 +162,7 @@ export function StartOrAfter({
     linkedBeside?: string | undefined;
     namesBlocker?: boolean;
 }) {
+    const kindOf = useButtonKind();
     const onRow = useOnRow();
 
     if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
@@ -171,13 +173,7 @@ export function StartOrAfter({
 
     // Pointer events stay on while it's disabled, so its title says why.
     return (
-        <Button
-            {...buttonKind(onRow ? 'start' : 'main')}
-            leftIcon={ICON.play}
-            data-start={item.id}
-            disabled
-            title={hold}
-        >
+        <Button {...kindOf(onRow ? 'start' : 'main')} leftIcon={ICON.play} data-start={item.id} disabled title={hold}>
             {label}
         </Button>
     );
@@ -185,7 +181,7 @@ export function StartOrAfter({
 
 /** Why the start the board ran by itself failed; dismissing it clears it on the server. */
 export function StartAfterError({ item, data }: { item: Item; data: BoardData }) {
-    const el = useRef<HTMLParagraphElement>(null);
+    const el = useRef<HTMLDivElement>(null);
     const error = data.armedErrors?.[item.id];
 
     if (!error) return null;
@@ -199,9 +195,8 @@ export function StartAfterError({ item, data }: { item: Item; data: BoardData })
 
     return (
         <StartLine ref={el} data-start-after-error={item.id}>
-            <ActionError>
-                <span role="alert">Start after failed: {error}</span>{' '}
-                <DismissButton inline what={` Start after error for ${ref(item)}`} onClick={close} />
+            <ActionError dismissLabel={`Dismiss Start after error for ${ref(item)}`} onDismiss={close}>
+                Start after failed: {error}
             </ActionError>
         </StartLine>
     );

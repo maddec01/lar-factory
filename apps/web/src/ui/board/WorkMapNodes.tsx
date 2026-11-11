@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 const NODE_ATTENTION = {
     default: 'border-line',
-    asks: 'border-warning-edge shadow-[inset_3px_0_0_var(--color-warning)]',
+    asks: 'attention attention-warning',
     waits: 'border-dashed border-line-strong',
 } as const;
 
@@ -11,7 +11,7 @@ const NODE_ATTENTION = {
  * A part on the map, `width` by `height`: a card that opens it (`openLabel` names the button, `title` says it all),
  * with its `source` in the corner, a `head` line (kind, repository, fields) with its `action` at the right, its title,
  * its `glyph` and `facts`, and its `slices` along the bottom. It `asks` (an answer from you) or `waits` (on other work)
- * in its border, and is ringed while `picked`.
+ * in its border (the attention recipe, as a desk card), and takes the current edge while `picked`.
  */
 export function MapPartNode({
     id,
@@ -65,24 +65,24 @@ export function MapPartNode({
         <div
             style={{ width, height }}
             data-map-part={id}
-            className={`bg-surface-raised relative flex flex-col gap-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left shadow-(--shadow-raised) ${NODE_ATTENTION[attention]} ${picked ? 'ring-primary ring-offset-surface-raised ring-2 ring-offset-1' : ''}`}
+            className={`relative flex flex-col gap-1 overflow-hidden rounded-xl border px-2.5 py-2 text-left ${picked ? `current-edge ${attention === 'asks' ? NODE_ATTENTION.asks : ''}` : attention === 'asks' ? `bg-surface-card ${NODE_ATTENTION.asks}` : `surface-card ${NODE_ATTENTION[attention]}`}`}
         >
             <button
                 type="button"
                 aria-label={openLabel}
                 title={title}
                 onClick={onOpen}
-                className="focus-ring hover:bg-fill-hover/60 absolute inset-0 rounded-lg"
+                className="focus-ring-inset hover:bg-fill-hover absolute inset-0 rounded-[inherit]"
             />
             {source}
             <span
-                className="text-2xs text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 items-center gap-1.5 pr-5"
+                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 items-center gap-1.5 pr-5 text-xs"
                 data-map-head
             >
                 {head}
                 {action && <span className="pointer-events-auto ml-auto shrink-0">{action}</span>}
             </span>
-            <span className="text-ui pointer-events-none relative line-clamp-2 leading-snug font-medium">{name}</span>
+            <span className="pointer-events-none relative line-clamp-2 text-sm leading-5 font-medium">{name}</span>
             <span
                 className={`pointer-events-none relative mt-auto flex min-w-0 items-center gap-1.5 text-xs ${slices ? 'mb-3' : ''}`}
             >
@@ -126,13 +126,13 @@ export function MapCheckNode({
         <div
             style={{ width, height }}
             data-map-check
-            className="border-line-strong bg-surface-raised flex flex-col gap-1 rounded-lg border-2 border-dashed px-2.5 py-2 shadow-(--shadow-raised)"
+            className="border-line-strong flex flex-col gap-1 rounded-xl border border-dashed px-2.5 py-2"
         >
-            <span className="text-2xs text-fg-muted flex items-center gap-1.5">
+            <span className="text-fg-muted flex items-center gap-1.5 text-xs">
                 <FlaskConicalIcon className="size-3.5" />
                 {label}
             </span>
-            <span className="text-ui line-clamp-2 leading-snug font-medium">{title}</span>
+            <span className="line-clamp-2 text-sm leading-5 font-medium">{title}</span>
             <span className="mt-auto flex min-w-0 items-center gap-1.5 text-xs">
                 {glyph}
                 <span className="min-w-0 truncate" title={stepsTitle}>

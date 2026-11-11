@@ -6,16 +6,30 @@ import type { Item } from '@lar-factory/shared';
 import { Button, ButtonLink } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { buttonKind } from '@/ui/board';
+import { useButtonKind } from '@/ui/board';
 
-export function PrLink({ item, label, primary = false }: { item: Item; label: string; primary?: boolean }) {
+/** `next` draws it as a desk card's next step, tinted. */
+export function PrLink({
+    item,
+    label,
+    primary = false,
+    next = false,
+}: {
+    item: Item;
+    label: string;
+    primary?: boolean;
+    next?: boolean;
+}) {
+    const kindOf = useButtonKind();
+    const kind = primary ? 'main' : next ? 'next' : 'open';
+
     const url = itemPr(item)?.url;
 
     // Pointer events stay on while it's disabled (the board's base styles), so its title says why.
     if (!url)
         return (
             <Button
-                {...buttonKind(primary ? 'main' : 'open')}
+                {...kindOf(kind)}
                 leftIcon={ICON.pr}
                 data-pr-link={item.id}
                 disabled
@@ -27,7 +41,8 @@ export function PrLink({ item, label, primary = false }: { item: Item; label: st
 
     return (
         <ButtonLink
-            {...buttonKind(primary ? 'main' : 'open')}
+            look="app"
+            {...kindOf(kind)}
             icon={ICON.pr}
             data-pr-link={item.id}
             href={url}

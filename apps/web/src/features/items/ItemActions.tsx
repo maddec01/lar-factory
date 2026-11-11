@@ -8,17 +8,18 @@ import { useId, useRef } from 'react';
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
 import { askAbandon, backToList, queueItem } from './CardActions';
-import { DismissButton, closeKeepingFocus } from '@/features/notices';
-import { ActionError as DesignActionError, buttonKind } from '@/ui/board';
+import { closeKeepingFocus } from '@/features/notices';
+import { ActionError as DesignActionError, useButtonKind } from '@/ui/board';
 
 /** Queue, a List item's primary action. */
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
+    const kindOf = useButtonKind();
     const action = useItemAction(item.id);
     const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
 
     return (
         <Button
-            {...buttonKind('main')}
+            {...kindOf('main')}
             data-queue={item.id}
             aria-label={`${verb} ${itemName(item)}`}
             {...writeState(data, action)}
@@ -31,12 +32,13 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 
 /** The muted link-style button in a Queued item's footer that moves it back to List. */
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
+    const kindOf = useButtonKind();
     const action = useItemAction(item.id);
     const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
 
     return (
         <Button
-            {...buttonKind('other')}
+            {...kindOf('other')}
             pendingLook
             data-back-to-list={item.id}
             aria-label={`${moving ? 'Moving' : 'Move to List'} ${itemName(item)}`}
@@ -50,6 +52,7 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
 
 /** Abandon, a link in the footer; greyed out, with a line saying why, on an item whose provider can't abandon it. */
 export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
+    const kindOf = useButtonKind();
     const action = useItemAction(item.id);
     const reason = useId();
 
@@ -64,9 +67,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
     return (
         <>
             <Button
-                variant="destructive-quiet"
-                size="sm"
-                data-kind="other"
+                {...kindOf('other', 'danger')}
                 pendingLook
                 data-abandon={item.id}
                 aria-label={`${verb} ${itemName(item)}`}
@@ -87,7 +88,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
 /** A failed Queue or Keep, until it's closed. */
 export function ActionError({ item }: { item: Item }) {
     const action = useItemAction(item.id);
-    const el = useRef<HTMLSpanElement>(null);
+    const el = useRef<HTMLDivElement>(null);
 
     if (action?.phase !== 'error' || !action.message) return null;
 
@@ -97,9 +98,8 @@ export function ActionError({ item }: { item: Item }) {
         ]);
 
     return (
-        <DesignActionError ref={el}>
-            <span role="alert">{action.message}</span>{' '}
-            <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
+        <DesignActionError ref={el} dismissLabel={`Dismiss error for ${ref(item)}`} onDismiss={close}>
+            {action.message}
         </DesignActionError>
     );
 }

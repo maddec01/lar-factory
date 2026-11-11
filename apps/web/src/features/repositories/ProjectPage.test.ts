@@ -123,6 +123,10 @@ const pickButton = (key: string) =>
         `[aria-label="Choose ${key[0]!.toUpperCase() + key.slice(1)} labels"]`,
     )!;
 
+/** A button in Settings' footer, such as Save changes. */
+const footerButton = (label: string) =>
+    $$<HTMLButtonElement>('[data-settings-footer] button').find((b) => text(b) === label);
+
 async function blur(input: HTMLInputElement) {
     await settle(() => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
 }
@@ -134,7 +138,7 @@ async function picker(key = 'bug') {
     return $(`[data-label-picker="${key}"]`)!.closest('[data-slot="popover-content"]')!;
 }
 
-test('text saves on blur and an error remains beside its field with the typed value', async () => {
+test('typed text is a draft the footer saves, and an error remains beside its field with the typed value', async () => {
     const sent = serve(boardWith(), () => ({ status: 403, body: { error: 'Skills refused.' } }));
 
     await openEdit(boardWith());
@@ -142,23 +146,31 @@ test('text saves on blur and an error remains beside its field with the typed va
     const input = setting('skills').querySelector<HTMLInputElement>('input')!;
 
     await type(input, 'testing, typing');
-    expect(sent).toHaveLength(0);
     await blur(input);
+    expect(sent, 'leaving the field saves nothing').toHaveLength(0);
+    expect(buttonIn(setting('skills'), 'Save'), 'no Save of its own').toBeUndefined();
+    await settle(() => footerButton('Save changes')!.click());
     expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'skills', value: ['testing', 'typing'] }]);
     expect(text(setting('skills'))).toContain('Skills refused.');
     expect(text(setting('role'))).not.toContain('Skills refused.');
     expect(input.value).toBe('testing, typing');
-    expect(buttonIn(setting('skills'), 'Save')).toBeUndefined();
+    expect(footerButton('Save changes'), 'the draft stays').toBeDefined();
 });
 
-test('closing Settings saves a text field even when no browser blur fires', async () => {
+test('closing Settings with typed text asks first, and discarding sends nothing', async () => {
     const sent = serve(boardWith());
 
     await openEdit(boardWith());
     await type(setting('role').querySelector('input')!, 'New role');
     await settle(() => $<HTMLButtonElement>('[data-slot="modal-content"] [aria-label="Close"]')!.click());
     await settle(() => vi.advanceTimersByTime(100));
-    expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'role', value: 'New role' }]);
+    expect(text($('[role="alertdialog"]'))).toContain('Discard changes?');
+    await settle(() =>
+        [...$('[role="alertdialog"]')!.querySelectorAll('button')].find((b) => text(b) === 'Discard changes')!.click(),
+    );
+    await settle(() => vi.advanceTimersByTime(100));
+    expect(sent).toEqual([]);
+    expect($('[data-project-page]')).toBeNull();
 });
 
 test('a blank Team shows an error and sends no request', async () => {
@@ -172,7 +184,7 @@ test('a blank Team shows an error and sends no request', async () => {
     const input = setting('itemSource').querySelector<HTMLInputElement>('input')!;
 
     await type(input, ' ');
-    await blur(input);
+    await settle(() => footerButton('Save changes')!.click());
     expect(sent).toHaveLength(0);
     expect(text(setting('itemSource'))).toContain('Enter a Team.');
 });
@@ -204,7 +216,7 @@ test('access disables only issue options that need it and recheck restores store
     await openEdit(initial);
     expect(setting('createIssuesFromAddItem').querySelector<HTMLButtonElement>('[role="switch"]')!.disabled).toBe(true);
     expect(text(setting('createIssuesFromAddItem'))).toContain('isn’t checked');
-    await settle(() => buttonIn($('[data-access]')!, 'Recheck access')!.click());
+    await settle(() => buttonIn($('[data-access-settings]')!, 'Recheck access')!.click());
     expect(setting('createIssuesFromAddItem').querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe(
         'true',
     );

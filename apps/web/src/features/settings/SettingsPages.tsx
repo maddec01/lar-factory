@@ -1,7 +1,7 @@
 // Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
 
 import { writeAccessProblem, shownRepo } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, EmptyState } from '@lar-works/design-system';
 import { Archive, FolderGit2, Plug, Sparkles } from '@lar-works/design-system/icons';
 
 import { ChannelChoice, UpdateAction, UpdateStatus, UpdatesNote } from './AppRows';
@@ -48,7 +48,7 @@ export function pages(input: PagesInput): Page[] {
             id: 'general',
             label: 'General',
             icon: <conceptIcons.settings />,
-            description: 'Manage dialogs, threads, command limits and Auto-build on this Mac.',
+            description: 'Manage the appearance, dialogs, threads, command limits and Auto-build on this Mac.',
             groups: generalGroups(data),
         },
         {
@@ -102,7 +102,6 @@ export function pages(input: PagesInput): Page[] {
                             control: custom(() => (
                                 <Button
                                     variant="secondary"
-                                    size="sm"
                                     disabled={!!unavailable}
                                     title={unavailable ?? undefined}
                                     aria-description={unavailable ?? undefined}
@@ -130,10 +129,33 @@ export function pages(input: PagesInput): Page[] {
             id: 'updates',
             label: 'Updates',
             icon: <conceptIcons.updates />,
-            description: input.app
-                ? 'Choose your release channel and check for app updates.'
-                : 'Open Lar Factory on your Mac to check for updates.',
-            groups: input.app ? [{ title: '', rows: updateRows(input), note: <UpdatesNote /> }] : [],
+            description: 'Choose your release channel and check for app updates.',
+            // In a browser there is nothing to set here: the inline empty state says where updates are, rather than a
+            // lone sentence in an empty pane.
+            groups: input.app
+                ? [{ title: '', rows: updateRows(input), note: <UpdatesNote /> }]
+                : [
+                      {
+                          title: '',
+                          rows: [
+                              {
+                                  id: 'updates-in-app',
+                                  title: 'Updates',
+                                  control: {
+                                      type: 'row',
+                                      render: () => (
+                                          <EmptyState
+                                              size="compact"
+                                              icon={<conceptIcons.updates />}
+                                              title="Updates are in the Mac app"
+                                              description="Open Lar Factory on your Mac to check for updates."
+                                          />
+                                      ),
+                                  },
+                              },
+                          ],
+                      },
+                  ],
         },
         {
             id: 'archive',

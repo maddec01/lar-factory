@@ -111,7 +111,7 @@ export function ProjectStep({ run }: { run: Run }) {
                                     </FieldRow>
                                     <Inline as="span">
                                         <Button
-                                            {...buttonKind('other')}
+                                            {...buttonKind('other', { size: 'md' })}
                                             leftIcon={<FolderPlus />}
                                             disabled={!creating.folder.trim()}
                                             loading={creating.adding}

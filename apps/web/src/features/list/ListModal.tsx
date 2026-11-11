@@ -111,55 +111,55 @@ function ListModal({ onClose }: { onClose: () => void }) {
                     </SidebarPane>
                 }
             >
-                <ListHeader
-                    search={
-                        <Input
-                            ref={searchField}
-                            type="search"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search the list"
-                            aria-label="Search List items"
-                        />
-                    }
-                    add={
-                        <Button
-                            {...buttonKind('main')}
-                            leftIcon={<SquarePen />}
-                            data-add-item
-                            onClick={() => useAddItemStore.getState().setOpen(true)}
-                        >
-                            Add item
-                        </Button>
-                    }
-                    title={picked ? picked.name : 'All projects'}
-                    {...(!reading && { count: items.length })}
-                    scope={
-                        picked && (
-                            <Button
-                                {...buttonKind('other')}
-                                data-toggle
-                                data-scope-board
-                                aria-pressed={scoped}
-                                selected={scoped}
-                                onClick={() => setScope(scoped ? null : picked.repo)}
-                            >
-                                {scoped ? 'Board scoped' : 'Scope board'}
-                            </Button>
-                        )
-                    }
-                    sort={<SortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
-                    filters={
-                        <ItemFilterBar
-                            filters={filters}
-                            onChange={setFilters}
-                            rows={held
-                                .filter((group) => !picked || group.repo === picked.repo)
-                                .flatMap((group) => group.items)}
-                        />
-                    }
-                />
                 <Modal.Body>
+                    <ListHeader
+                        search={
+                            <Input
+                                ref={searchField}
+                                type="search"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search the list"
+                                aria-label="Search List items"
+                            />
+                        }
+                        add={
+                            <Button
+                                {...buttonKind('main', { size: 'md' })}
+                                leftIcon={<SquarePen />}
+                                data-add-item
+                                onClick={() => useAddItemStore.getState().setOpen(true)}
+                            >
+                                Add item
+                            </Button>
+                        }
+                        title={picked ? picked.name : 'All projects'}
+                        {...(!reading && { count: items.length })}
+                        scope={
+                            picked && (
+                                <Button
+                                    {...buttonKind('other')}
+                                    data-toggle
+                                    data-scope-board
+                                    aria-pressed={scoped}
+                                    selected={scoped}
+                                    onClick={() => setScope(scoped ? null : picked.repo)}
+                                >
+                                    {scoped ? 'Board scoped' : 'Scope board'}
+                                </Button>
+                            )
+                        }
+                        sort={<SortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
+                        filters={
+                            <ItemFilterBar
+                                filters={filters}
+                                onChange={setFilters}
+                                rows={held
+                                    .filter((group) => !picked || group.repo === picked.repo)
+                                    .flatMap((group) => group.items)}
+                            />
+                        }
+                    />
                     {items.map((item) => (
                         <ItemRow
                             key={item.id}

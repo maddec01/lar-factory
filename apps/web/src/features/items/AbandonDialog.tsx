@@ -231,12 +231,12 @@ export function AbandonDialog() {
             onConfirm={() => void confirm(notice.failure ? failedCombined : false, !!notice.failure)}
             secondaryAction={
                 notice.failure ? (
-                    <Button {...buttonKind('other')} disabled={pending} onClick={notice.retry}>
+                    <Button {...buttonKind('other', { size: 'md' })} disabled={pending} onClick={notice.retry}>
                         Try cleanup again
                     </Button>
                 ) : !closing && closesTicketOnAbandon(item) ? (
                     <Button
-                        {...buttonKind('other')}
+                        {...buttonKind('other', { size: 'md' })}
                         wrap
                         disabled={pending || notice.checking}
                         onClick={() => void confirm(true)}

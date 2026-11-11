@@ -11,7 +11,7 @@ import { hasLiveThread } from './ItemThreads';
 import { OpenThread } from './OpenThread';
 import { useOnRow } from './RowContext';
 import { StartOrAfter } from './StartAfter';
-import { buttonKind } from '@/ui/board';
+import { useButtonKind } from '@/ui/board';
 
 /** A dossier names it `label`; a row calls it Start. */
 export function StartBuild({
@@ -27,6 +27,7 @@ export function StartBuild({
     linkedBeside?: string | undefined;
     namesBlocker?: boolean;
 }) {
+    const kindOf = useButtonKind();
     const short = useOnRow();
     const onRow = short;
     const label = given ?? (short ? 'Start' : 'Start build');
@@ -40,7 +41,7 @@ export function StartBuild({
     if (problem)
         return (
             <Button
-                {...buttonKind(onRow ? 'start' : 'main')}
+                {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 disabled
                 title={problem}

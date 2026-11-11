@@ -14,18 +14,24 @@ export function Queue({ rows, shows }: { rows: Row[]; shows: (row: Row) => boole
     const shown = rows.map((row, n) => ({ row, n })).filter(({ row }) => shows(row));
 
     return (
-        <Pane id="queue" title="Queue" status="Queued" count={shown.length}>
-            {shown.length ? (
-                <StageList>
-                    {shown.map(({ row, n }) => (
-                        <StageRow key={row.item.id} row={row} data={data} n={n} />
-                    ))}
-                </StageList>
-            ) : (
-                <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from List.">
-                    Nothing queued matches.
-                </PaneEmpty>
-            )}
+        <Pane
+            id="queue"
+            title="Queue"
+            status="Queued"
+            count={shown.length}
+            empty={
+                !shown.length && (
+                    <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from List.">
+                        Nothing queued matches.
+                    </PaneEmpty>
+                )
+            }
+        >
+            <StageList>
+                {shown.map(({ row, n }) => (
+                    <StageRow key={row.item.id} row={row} data={data} n={n} />
+                ))}
+            </StageList>
         </Pane>
     );
 }

@@ -16,8 +16,9 @@ const HISTORY = 'history';
 const keyOf = (p: Part) => p.item.id;
 
 const LABEL_W = 116;
-const NODE_H = 104;
-const GAP = 20;
+const NODE_H = 112;
+/** The room between two nodes in a column: room for an arrow's 16px label with 8px on each side. */
+const GAP = 32;
 const PAD = 18;
 const MIN_COL = 268;
 const MAX_COL = 340;
@@ -25,7 +26,7 @@ const MAX_COL = 340;
 const GROUP_H = 36;
 const GROUP_PAD = 8;
 
-export { DECISIONS, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H };
+export { DECISIONS, GAP, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H };
 
 export interface Placed {
     key: string;

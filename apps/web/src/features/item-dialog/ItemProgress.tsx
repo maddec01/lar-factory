@@ -1,7 +1,8 @@
-// The item dialog's progress at the top of its panel: active steps as a bar, the past slim, the upcoming faint, and the
-// current one widest, named by the recorded stage with its step number (the header above says what the item is doing
-// now, so the two never repeat each other), drawn empty while the stage hasn't begun. An item with slices divides that segment into one mini segment per
-// slice, so the dialog draws one bar, never a second track of its own for the slices. A chip for each slice follows, so what the bar shows is also readable; each opens its ticket, so the sidebar doesn't list them again. A
+// The item dialog's progress at the top of its panel: active steps as a bar with each step's name under it, the past
+// done, the upcoming faint and the current one in its colour, named by the recorded stage with its step number (the
+// header above says what the item is doing now, so the two never repeat each other), drawn empty while the stage
+// hasn't begun. An item with slices fills its current step by the slices done, so the dialog draws one bar, never a
+// second track of its own for the slices. A chip for each slice follows, so what the bar shows is also readable; each opens its ticket, so the sidebar doesn't list them again. A
 // concept has no step of its own to show: it shows its parts done, and why the count holds parts its list doesn't.
 
 import { itemName } from '@lar-factory/shared';
@@ -77,7 +78,9 @@ export function ItemProgress({ item }: { item: Item }) {
                               ? statusStateColors[shown.glyphState]
                               : STATUS_COLOR[item.status]
                     }
-                    bar={split ? <SliceBar item={item} thick /> : undefined}
+                    // An item with slices fills its current step by the slices done.
+                    value={split ? Math.max(done, 0.5) / item.slices.length : undefined}
+                    pulse={feedback.running}
                     waiting={WAITING.includes(item.status) && !shown.execution}
                 />
             )}

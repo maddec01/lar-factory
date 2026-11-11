@@ -4,12 +4,16 @@
 
 import { Loading } from '@lar-works/design-system';
 import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
-import type { MouseEvent, ReactNode } from 'react';
+import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
-import { pickedRow, ROW_ACTION, ROW_OPENS, ROW_RULE } from './RowStyles';
+import { useArrival } from './BoardLife';
+import { pickedRow, ROW_ACTION, ROW_OPENS } from './RowStyles';
 import { StateWord } from './StateWord';
 
-/** A stage row: `item` names it as `data-item`, and `picked` marks the item the dialog shows. */
+/** A stage row: `item` names it as `data-item`, and `picked` marks the item the dialog shows. A row a read just moved
+ *  here from another lane slides in from that side and flashes the navy wash (BoardLife). A row is 40px with one line
+ *  and 60 with two: 6px above its 28px first line and 6 below, the panel's hairline taking the last pixel. Its hover
+ *  eases in as a card's does. */
 export function StageRowItem({
     item,
     picked,
@@ -22,21 +26,49 @@ export function StageRowItem({
     /** The row's lines. */
     children: ReactNode;
 }) {
+    const arrival = useArrival('lane', item);
+
     return (
-        <li data-item={item} className={`@container py-2 ${ROW_RULE} hover:bg-fill-hover ${pickedRow(picked)}`}>
+        <li
+            data-item={item}
+            data-arrived={arrival?.from}
+            className={`hover:bg-fill-hover @container pt-1.5 pb-1.25 transition-colors last:pb-1.5 ${pickedRow(picked)}`}
+        >
             {children}
         </li>
     );
 }
 
-/** A row's first line: its cells, then its side. */
+/** A row's first line: its cells, then its side. It keeps its side's width as `--row-side-width`, so on a phone the
+ *  title beside the action leaves it its natural width (rows.css). */
 export function RowFirst({
     children,
 }: {
     /** The cells, then the side. */
     children: ReactNode;
 }) {
-    return <div className="row-first">{children}</div>;
+    const ref = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        const row = ref.current;
+        const side = row?.querySelector<HTMLElement>(':scope > [data-col="side"]');
+
+        if (!row || !side || typeof ResizeObserver === 'undefined') return;
+
+        const measure = () => row.style.setProperty('--row-side-width', `${side.offsetWidth}px`);
+        const observer = new ResizeObserver(measure);
+
+        observer.observe(side);
+        measure();
+
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={ref} className="row-first">
+            {children}
+        </div>
+    );
 }
 
 /** A row's first line's cells as the one button that opens its item. */
@@ -98,7 +130,7 @@ export function RowIdentity({
     children: ReactNode;
 }) {
     return (
-        <span data-row-identity className="text-2xs text-fg-muted flex min-w-0 items-center gap-1.5">
+        <span data-row-identity className="text-fg-muted flex min-w-0 items-center gap-1.5">
             {children}
         </span>
     );

@@ -30,10 +30,10 @@ import { startItem } from './StartItem';
 import type { StartKind } from './StartStore';
 import { PURPOSE, useStart, useStartStore } from './StartStore';
 import { startedThread, useShownStart } from './useShownStart';
-import { closeKeepingFocus, DismissButton, notify } from '@/features/notices';
+import { closeKeepingFocus, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ActionError, buttonKind, StartGroup, StartLine, StartNote, StartTag } from '@/ui/board';
+import { ActionError, StartGroup, StartLine, StartNote, StartTag, useButtonKind } from '@/ui/board';
 
 /** "Project default in T3", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
 export function StartEntries({
@@ -80,6 +80,7 @@ export function StartControl({
     kind?: StartKind;
     linkedBeside?: string | undefined;
 }) {
+    const kindOf = useButtonKind();
     const onRow = useOnRow();
     const { pending, uncertain, error } = useShownStart(item, data, kind);
     const closed = useStart(item.id, kind)?.phase === 'closed';
@@ -163,7 +164,7 @@ export function StartControl({
             <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
                 <DropdownMenu.Trigger asChild>
                     <Button
-                        {...buttonKind(onRow ? 'start' : 'main')}
+                        {...kindOf(onRow ? 'start' : 'main')}
                         busy={pending}
                         leftIcon={!retry && ICON.play}
                         rightIcon={!pending && <ChevronDownIcon />}
@@ -175,7 +176,7 @@ export function StartControl({
                     </Button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content
-                    width="lg"
+                    width="md"
                     height="capped"
                     align="end"
                     aria-label={`Start ${ref(item)} with`}
@@ -207,7 +208,7 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
     const data = useBoardStore((state) => state.data);
     const local = useStart(item.id, kind);
     const server = startProgressOf(data, item.id, PURPOSE[kind]);
-    const el = useRef<HTMLParagraphElement>(null);
+    const el = useRef<HTMLDivElement>(null);
     const uncertain = server?.phase === 'may-have-started';
     const message =
         server?.phase === 'failed' || uncertain
@@ -233,9 +234,8 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
 
     return (
         <StartLine ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
-            <ActionError>
-                <span role="alert">{message}</span>{' '}
-                <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
+            <ActionError dismissLabel={`Dismiss error for ${ref(item)}`} onDismiss={close}>
+                {message}
             </ActionError>
         </StartLine>
     );

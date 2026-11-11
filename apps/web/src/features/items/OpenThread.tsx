@@ -8,7 +8,7 @@ import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-
 
 import { ICON } from './ButtonIcons';
 import { useOnRow } from './RowContext';
-import { buttonKind, EarlierThread, EarlierThreadList } from '@/ui/board';
+import { EarlierThread, EarlierThreadList, useButtonKind } from '@/ui/board';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
 function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
@@ -70,6 +70,7 @@ export function OpenThread({
     iconOnly: given = false,
     threadId,
     primary = false,
+    next = false,
     part = false,
 }: {
     item: Item;
@@ -79,9 +80,12 @@ export function OpenThread({
     threadId?: string;
     /** The item's primary footer action, such as answering its question. */
     primary?: boolean;
+    /** A desk card's next step, such as Answer in T3: tinted, as the thing you can do now. */
+    next?: boolean;
     /** A concept part's quiet thread shortcut; other board and Desk actions keep their own recipes. */
     part?: boolean;
 }) {
+    const kindOf = useButtonKind();
     const thread = latestThread(item, data, threadId);
     const actionLabel = 'link' in thread && thread.conceptQuestion ? 'Answer in concept thread' : label;
     const onRow = useOnRow();
@@ -94,7 +98,8 @@ export function OpenThread({
     const button =
         'link' in thread ? (
             <ButtonLink
-                {...buttonKind(primary ? 'main' : part ? 'control' : 'open')}
+                look="app"
+                {...kindOf(primary ? 'main' : next && !iconOnly ? 'next' : part ? 'control' : 'open')}
                 icon={ICON.thread}
                 data-open-thread={item.id}
                 href={thread.link}
@@ -105,7 +110,7 @@ export function OpenThread({
             </ButtonLink>
         ) : (
             <Button
-                {...buttonKind(primary ? 'main' : part ? 'control' : 'open')}
+                {...kindOf(primary ? 'main' : next && !iconOnly ? 'next' : part ? 'control' : 'open')}
                 leftIcon={ICON.thread}
                 data-open-thread={item.id}
                 disabled

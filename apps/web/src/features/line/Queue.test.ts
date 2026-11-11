@@ -158,9 +158,9 @@ test('a failed Start shows on its row with Retry start; closing the error doesnâ
     await press(entries()[0]!);
     await answer({ thread: null, error: 'T3 is down.' }, 502);
     expect(text(start())).toBe('Retry start');
-    expect(text(row('I_sample05').querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
-    await press(row('I_sample05').querySelector<HTMLButtonElement>('p.start button.dismiss')!);
-    expect(row('I_sample05').querySelector('p.start')).toBeNull();
+    expect(text(row('I_sample05').querySelector('.start [role="alert"]'))).toBe('T3 is down.');
+    await press(row('I_sample05').querySelector<HTMLButtonElement>('.start button.dismiss')!);
+    expect(row('I_sample05').querySelector('.start')).toBeNull();
     expect(dialog()).toBeNull();
     expect(text(start())).toBe('Shape');
 });
@@ -187,7 +187,7 @@ test('a Start that may have run hides Shape; closing its message leaves a tag', 
         'a start in flight moves the row to Shaping',
     ).toEqual([null, null]);
 
-    const message = moved().querySelector<HTMLElement>('p.start[data-start-result]')!;
+    const message = moved().querySelector<HTMLElement>('.start[data-start-result]')!;
 
     expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
     await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());

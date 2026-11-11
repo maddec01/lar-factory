@@ -78,6 +78,7 @@ import { importPickedTicket } from './import-ticket.ts';
 import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
+import { createPrMerge } from './pr-merge.ts';
 import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 
@@ -88,6 +89,8 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    inspectMerge(itemId: string): Promise<Reply>;
+    mergePr(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     /**
      * Settles each unresolved launch intent through T3, and checks each started or recorded thread missing from an
      * available thread read. A thread's state never moves Status.
@@ -355,6 +358,15 @@ export function createItemCommands({
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
+    const merging = createPrMerge({
+        board,
+        records,
+        reread,
+        busy: (id) =>
+            abandoning.has(id) || combined.has(id) || running.shape.has(id) || running.build.has(id)
+                ? 'Another action is running. Wait for it to finish.'
+                : null,
+    });
     const retryBuilds = new Set<string>();
     /** The starts running now, from the press until T3 answers or a check refuses them. */
     const running: Record<StartPurpose, Set<string>> = { shape: new Set(), build: new Set() };
@@ -507,6 +519,8 @@ export function createItemCommands({
 
     /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
     function busyReason(itemId: string, action: Action): string | null {
+        if (merging.mergePending(itemId)) return 'A merge is pending. Wait for provider confirmation.';
+
         if (abandoning.has(itemId)) return 'Abandon is running. Wait for it to finish.';
 
         if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
@@ -1164,6 +1178,8 @@ export function createItemCommands({
     }
 
     return {
+        inspectMerge: merging.inspectMerge,
+        mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
             pushStarts();
 

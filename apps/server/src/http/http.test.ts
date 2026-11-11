@@ -194,3 +194,35 @@ it("sends the board again after a write, as the write's answer may have shown th
         vi.useRealTimers();
     }
 });
+
+it.each([false, true])(
+    'sample mode refuses merge writes before commands, including T3 reads %s',
+    async (sampleReadsT3) => {
+        const mergePr = vi.fn();
+        const { server } = createBoardServer({
+            board: createBoardState({ repos: [], items: [] } as unknown as BoardData),
+            commands: { mergePr },
+            sample: true,
+            sampleReadsT3,
+            page: { template: '<html></html>', assets: new Map() },
+            ready: () => undefined,
+        } as unknown as HttpDeps);
+
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        close = () => new Promise((resolve) => server.close(resolve));
+
+        const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+        for (const repo of ['owner/repo', 'o/p/r']) {
+            const response = await fetch(`${origin}/api/merge-pr`, {
+                method: 'POST',
+                headers: { origin, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemId: 'item', repo, number: 8, token: 'anything', method: 'squash' }),
+            });
+
+            expect(response.status).toBe(403);
+            expect(await response.json()).toMatchObject({ error: 'Merging is disabled in sample mode.' });
+        }
+        expect(mergePr).not.toHaveBeenCalled();
+    },
+);

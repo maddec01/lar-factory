@@ -17,7 +17,7 @@ import {
     AbandonButton,
     BackToListButton,
     OpenThread,
-    PrLink,
+    PrAction,
     QueueButton,
     StartBuild,
     StartOrAfter,
@@ -45,7 +45,7 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
 
     if (action?.kind === 'thread') return { opens: action.threadId, label: action.label };
 
-    if (action?.kind === 'pr') return { control: <PrLink item={item} label={action.label} primary /> };
+    if (action?.kind === 'pr') return { control: <PrAction item={item} label={action.label} primary /> };
 
     switch (item.status) {
         case 'List':

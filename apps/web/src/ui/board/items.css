@@ -34,6 +34,28 @@
     position: relative;
 }
 
+/* Keep the status readable when a desk card's PR actions need a second line. */
+.desk-card [data-slot='card-footer'] {
+    flex-wrap: wrap;
+}
+.desk-card [data-slot='card-footer'] > :first-child {
+    flex: 1 0 8rem;
+    max-width: 100%;
+}
+.desk-card [data-slot='status-indicator'] {
+    flex-shrink: 0;
+}
+.desk-card [data-slot='card-footer'] > :last-child {
+    flex-wrap: wrap;
+    max-width: 100%;
+    margin-left: auto;
+}
+
+/* The confirmation includes the full provider URL and source revision. */
+#merge-pr-dialog {
+    overflow-wrap: anywhere;
+}
+
 /* The board's life (BoardLife.ts), on a read that moves things, never on the first paint. A row that changed lane slides
    the last few pixels into place from the side it came from and flashes the current navy wash, which fades over
    1.2 s; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced motion keeps the

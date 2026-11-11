@@ -1,15 +1,16 @@
-// An Open that opens an item's pull request on GitHub, where it's verified and merged: the PR its issue links first,
-// or the item itself when it is a pull request. Disabled, its title saying why, while there is none.
+// The provider link stays separate from the in-board merge confirmation. Shared item presentation selects the
+// delivery PR; a missing link stays disabled with an explanation.
 
-import { itemPr } from '@lar-factory/shared';
+import { itemPr, mergeStageProblem } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { Button, ButtonLink } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
+import { MergePr } from './MergePr';
 import { useButtonKind } from '@/ui/board';
 
 /** `next` draws it as a desk card's next step, tinted. */
-export function PrLink({
+function PrLink({
     item,
     label,
     primary = false,
@@ -51,5 +52,30 @@ export function PrLink({
         >
             {label}
         </ButtonLink>
+    );
+}
+
+/** Ready to merge opens an in-board confirmation; Open PR remains a separate link. */
+export function PrAction({
+    item,
+    label,
+    primary = false,
+    next = false,
+}: {
+    item: Item;
+    label: string;
+    primary?: boolean;
+    next?: boolean;
+}) {
+    if (mergeStageProblem(item))
+        return <PrLink item={item} label={label === 'Merge PR' ? 'Open PR' : label} primary={primary} next={next} />;
+
+    const openPr = <PrLink item={item} label="Open PR" />;
+
+    return (
+        <>
+            <MergePr item={item} label={label} primary={primary} next={next} openPr={openPr} />
+            {openPr}
+        </>
     );
 }

@@ -28,7 +28,7 @@ import {
     ItemTitle,
     useActivityUnavailable,
     OpenThread,
-    PrLink,
+    PrAction,
     ItemStatusGlyph,
     useShownStatus,
 } from '@/features/items';
@@ -106,7 +106,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
         <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next />
     ) : (
         <>
-            <PrLink item={item} label={action?.label ?? 'Open PR'} next />
+            <PrAction item={item} label={action?.label ?? 'Open PR'} next />
             <OpenThread item={item} data={data} iconOnly />
         </>
     );

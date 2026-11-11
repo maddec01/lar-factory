@@ -86,8 +86,6 @@ export interface BoardAppBridge {
     downloadUpdate: () => Promise<UpdateActionResult>;
     installUpdate: () => Promise<UpdateActionResult>;
     setUpdateChannel: (channel: UpdateChannel) => Promise<UpdateState>;
-    /** Asks `message` in a native dialog with Restart and Cancel; true if the user chose Restart. */
-    confirmRestart: (message: string) => Promise<boolean>;
 }
 
 declare global {

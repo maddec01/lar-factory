@@ -19,6 +19,7 @@ import { StageLayout } from '@/features/line';
 import { T3Missing, Warnings } from '@/features/notices';
 import { EmptyState, OnboardingCards, WizardDialog } from '@/features/onboarding';
 import { SettingsDialog } from '@/features/settings';
+import { RestartConfirmation } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { CopyStatus } from '@/shared/copy/CopyButton';
 import { BoardContent, BoardShell, ReadingLine } from '@/ui/board';
@@ -62,6 +63,7 @@ export function App() {
                     <Notifications />
                     <ItemDialog />
                     <SettingsDialog />
+                    <RestartConfirmation />
                     <AbandonDialog />
                     <WizardDialog />
                     <LoadingScreen />

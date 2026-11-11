@@ -127,10 +127,11 @@ export function UpdatesNote() {
 }
 
 export function ChannelChoice() {
-    const { state, installing } = useUpdateStore();
+    const { state, installing, pending, confirming } = useUpdateStore();
     const { switchingTo, setChannel } = useSettingsStore();
     // Busy while the app switches, as the target ticks, and while it downloads or installs, when it would refuse a switch.
-    const busy = !state || switchingTo !== null || installing || state.status === 'downloading';
+    const busy =
+        !state || switchingTo !== null || installing || pending || confirming || state.status === 'downloading';
 
     return (
         <Choice
@@ -154,14 +155,18 @@ export function UpdateStatus() {
 }
 
 function CheckNow() {
-    const { state, check } = useUpdateStore();
+    const { state, check, installing, pending, confirming } = useUpdateStore();
     // While it checks or downloads, the reason is what it's doing.
     const reason = canCheckForUpdate(state)
         ? undefined
         : (getUpdateDisabledReason(state) ?? (state ? updateStatusText(state) : 'Reading the updater…'));
 
     return (
-        <SmallButton data-check-now reason={reason} onClick={() => void check()}>
+        <SmallButton
+            data-check-now
+            reason={pending || installing || confirming ? 'An update action is in progress.' : reason}
+            onClick={() => void check()}
+        >
             Check now
         </SmallButton>
     );
@@ -169,12 +174,12 @@ function CheckNow() {
 
 /** The update pill's step while it has one, run as the pill runs it; otherwise Check now. */
 export function UpdateAction() {
-    const { state, installing, pending, run } = useUpdateStore();
+    const { state, installing, pending, confirming, run } = useUpdateStore();
     const pill = resolveUpdatePill(state);
 
     if (!state || (pill !== 'available' && pill !== 'ready')) return <CheckNow />;
 
-    const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
+    const busy = installing || pending || confirming || resolveUpdateButtonAction(state) === 'none';
 
     return (
         <Button {...buttonKind('other', { size: 'md' })} data-update-action disabled={busy} onClick={() => void run()}>

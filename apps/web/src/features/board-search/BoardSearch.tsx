@@ -13,7 +13,7 @@ import {
     CommandPaletteTrigger,
     Loading,
 } from '@lar-works/design-system';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import type { FilterToken } from './BoardFilters';
@@ -27,8 +27,8 @@ import { buttonKind } from '@/ui/board';
 
 /** The step the Update pill would run now; none while it does nothing, as when another step is under way. */
 function useUpdateStep() {
-    return useUpdateStore(({ state, installing, pending }) =>
-        !boardApp() || !state || installing || pending ? 'none' : resolveUpdateButtonAction(state),
+    return useUpdateStore(({ state, installing, pending, confirming }) =>
+        !boardApp() || !state || installing || pending || confirming ? 'none' : resolveUpdateButtonAction(state),
     );
 }
 
@@ -139,11 +139,31 @@ export function BoardSearch() {
     const { tokens, clear } = useFilterTokens();
     const button = useRef<HTMLButtonElement>(null);
     const show = useCallback(() => setOpen(true), []);
+    const restartFromSearch = useRef(false);
+    const focusFrame = useRef<number | undefined>(undefined);
+
+    useEffect(() => {
+        const stop = useUpdateStore.subscribe((state, before) => {
+            if (!before.confirming || state.confirming || !restartFromSearch.current) return;
+
+            restartFromSearch.current = false;
+            // Wait until the dialog releases the board's inert state and finishes its focus return.
+            focusFrame.current = requestAnimationFrame(() => button.current?.focus({ preventScroll: true }));
+        });
+
+        return () => {
+            stop();
+
+            if (focusFrame.current !== undefined) cancelAnimationFrame(focusFrame.current);
+        };
+    }, []);
+
     // The dialog goes first and the field takes the focus, so a dialog `run` opens has somewhere to return it.
     const leave = useCallback((run: () => void) => {
         flushSync(() => setOpen(false));
         button.current?.focus({ preventScroll: true });
         run();
+        restartFromSearch.current = useUpdateStore.getState().confirming;
     }, []);
 
     return (

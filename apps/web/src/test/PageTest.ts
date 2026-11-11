@@ -298,7 +298,6 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
         downloadUpdate: unused,
         installUpdate: unused,
         setUpdateChannel: unused,
-        confirmRestart: unused,
         ...parts,
     };
 
@@ -306,6 +305,3 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
 
     return bridge;
 }
-
-/** A fake `confirmRestart` for `stubApp`: it records each question and answers `answer`, true for Restart. */
-export const answerRestart = (answer: boolean) => vi.fn(async (_message: string) => answer);

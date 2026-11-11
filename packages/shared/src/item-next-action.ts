@@ -3,7 +3,11 @@ import { openQuestionThread, prReadiness, type Item } from './model.ts';
 
 /** The next step shared by the desk and item dialog, derived from current PR evidence. */
 export function nextAction(item: Item): { kind: 'thread' | 'pr'; label: string; threadId?: string | undefined } | null {
-    if (needsAnswer(item)) return { kind: 'thread', label: 'Answer in T3', threadId: openQuestionThread(item)?.id };
+    if (needsAnswer(item)) {
+        const question = openQuestionThread(item);
+
+        return { kind: 'thread', label: question ? 'Answer in T3' : 'Open thread', threadId: question?.id };
+    }
 
     const readiness = prReadiness(item);
 

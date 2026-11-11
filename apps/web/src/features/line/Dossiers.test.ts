@@ -746,3 +746,33 @@ test('a Dossier total marks a sum with a failed part partial with a + after its 
     ).toEqual(['+ partial', true]);
     expect(dossierTotal().title).toContain('This total is incomplete');
 });
+
+test('decision map and attention actions use answer wording only for a current question', async () => {
+    const decision = workPart('W_question', {
+        kind: 'decision',
+        decisionMethod: 'grill',
+        status: 'Shaping',
+        threads: [thread('decision-thread', 'running')],
+    });
+    const data = conceptOf([decision]);
+    const map = await mapOpen(data);
+    const action = () => map.querySelector('[data-map-part="W_question"] [data-open-thread]')!;
+
+    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    await receive(conceptOf([{ ...decision, status: 'Needs you' }]));
+    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
+    expect([text(action()), action().getAttribute('href')]).toEqual([
+        'Answer in T3',
+        't3code://threads/sample-environment/question-thread',
+    ]);
+    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'done')] }]));
+    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    await press(button(dossier(), 'Parts list'));
+
+    const attentionAction = () => dossier().querySelector('[data-attention-row="you"] [data-open-thread]')!;
+
+    expect(attentionAction().getAttribute('aria-label')).toBe('Open thread');
+    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
+    expect(text(attentionAction())).toBe('Answer in T3');
+});

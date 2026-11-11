@@ -154,7 +154,7 @@ test('a decision keeps its own thread even when its concept has a waiting thread
     const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
 
     expect(action.href).toBe('t3code://threads/sample-environment/own-decision');
-    expect(text(action)).toBe('Answer in T3');
+    expect(text(action)).toBe('Open thread');
 });
 
 test.each([
@@ -190,6 +190,7 @@ test.each([
 
         const action = card('I_sample12').querySelector<HTMLButtonElement>('[data-open-thread]')!;
 
+        expect(text(action)).toBe('Open thread');
         expect(action.tagName).toBe('BUTTON');
         expect(action.disabled).toBe(true);
         expect(action.getAttribute('href')).toBeNull();
@@ -243,3 +244,110 @@ test('shaping questions target the older question and leave the desk on a board 
     );
     expect(card('I_sample12')).toBeNull();
 });
+
+test('a child opens a running concept thread and answers only a later question in that concept', async () => {
+    const running = { id: 'concept-running', title: 'Running', state: 'running' as const, updated: '2026-11-11' };
+    const data = questionBoard({}, { threads: [running] });
+
+    await mountPage(data);
+
+    const action = () => card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+
+    expect([text(action()), action().href]).toEqual([
+        'Open thread',
+        't3code://threads/sample-environment/concept-running',
+    ]);
+    await settle(() => open('I_sample12'));
+    expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+    const waiting = questionBoard({}, { threads: [running, { ...running, id: 'later-question', state: 'needs you' }] });
+
+    await settle(() => useBoardStore.getState().receive(waiting));
+    expect([text(action()), action().href]).toEqual([
+        'Answer in concept thread',
+        't3code://threads/sample-environment/later-question',
+    ]);
+    await settle(() => useBoardStore.getState().receive(data));
+    expect(text(action())).toBe('Open thread');
+    expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
+});
+
+test.each(['running', 'stopped', 'done', 'retained'] as const)(
+    'Needs you cards and dialogs open their own %s thread without answer wording',
+    async (state) => {
+        const data = questionBoard({
+            threads: [
+                {
+                    id: 'own-thread',
+                    title: 'Own thread',
+                    state: state === 'retained' ? 'needs you' : state,
+                    updated: '2026-11-11',
+                    observedAt: state === 'retained' ? '2026-11-11' : undefined,
+                },
+            ],
+        });
+
+        await mountPage(data);
+
+        const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+
+        expect([text(action), action.href]).toEqual(['Open thread', 't3code://threads/sample-environment/own-thread']);
+        await settle(() => open('I_sample12'));
+        expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
+    },
+);
+
+test.each(['own', 'concept'] as const)(
+    '%s answer wording clears while disconnected and returns only for a newly observed question',
+    async (owner) => {
+        const data =
+            owner === 'concept'
+                ? questionBoard()
+                : questionBoard({
+                      threads: [
+                          {
+                              id: 'own-question',
+                              title: 'Question',
+                              state: 'needs you',
+                              updated: '2026-11-11',
+                          },
+                      ],
+                  });
+
+        await mountPage(data);
+        await settle(() => open('I_sample12'));
+
+        const actions = () => [
+            card('I_sample12').querySelector('[data-open-thread]')!,
+            dialog()!.querySelector('[data-open-thread]')!,
+        ];
+        const { useBoardStore } = await import('@/services/board/board.hooks');
+        const answer = owner === 'concept' ? 'Answer in concept thread' : 'Answer in T3';
+
+        expect(actions().map(text)).toEqual([answer, answer]);
+        await settle(() => useBoardStore.getState().fail('Connection lost'));
+        expect(actions().map(text)).toEqual(['Open thread', 'Open thread']);
+        expect(actions().map((action) => action.getAttribute('href'))).toEqual([
+            owner === 'concept'
+                ? 't3code://threads/sample-environment/concept-question'
+                : 't3code://threads/sample-environment/own-question',
+            owner === 'concept'
+                ? 't3code://threads/sample-environment/concept-question'
+                : 't3code://threads/sample-environment/own-question',
+        ]);
+        await settle(() =>
+            useBoardStore.getState().receive({
+                ...data,
+                items: data.items.map((item) =>
+                    item.id === (owner === 'concept' ? 'I_sample09' : 'I_sample12') && Array.isArray(item.threads)
+                        ? { ...item, threads: item.threads.map((thread) => ({ ...thread, state: 'done' as const })) }
+                        : item,
+                ),
+            }),
+        );
+        expect(actions().map(text)).toEqual(['Open thread', 'Open thread']);
+        await settle(() => useBoardStore.getState().receive(data));
+        expect(actions().map(text)).toEqual([answer, answer]);
+    },
+);

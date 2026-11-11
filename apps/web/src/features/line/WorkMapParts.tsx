@@ -106,10 +106,8 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     else if (item.status === 'Ready' || item.status === 'Queued')
         action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
 
-    // Each card has one labelled thread action. Decision threads are where their answers are given, and answering is
-    // the thing you can do now, tinted as on the desk.
+    // Each card has one labelled thread action. Only a current question asks for an answer.
     const opensThread = threadsOf(item).length > 0 && !action;
-    const answers = !complete && !open.length && DECISION_KINDS.includes(part.kind);
     // The node says what its thread does beside its status, so the status leaves that out.
     const status = complete ? 'Complete' : shown.stageWord;
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
@@ -160,18 +158,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                     <AzureFields azure={item.azure} />
                 </>
             }
-            action={
-                action ??
-                (opensThread && (
-                    <OpenThread
-                        item={item}
-                        data={data}
-                        threadId={activity.thread?.id}
-                        label={answers ? 'Answer in T3' : 'Open thread'}
-                        next={answers}
-                    />
-                ))
-            }
+            action={action ?? (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} />)}
             name={<ItemTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}

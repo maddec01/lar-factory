@@ -126,12 +126,12 @@ test('a failed Queue stays in the dialog with a close button, which hands focus 
     await openItem('I_sample02');
     await press(button('queue', 'I_sample02'));
     await answer({ error: 'Couldn’t set Queued.' }, 502);
-    expect(text(inDialog('.action-error [role="alert"]'))).toBe('Couldn’t set Queued.');
+    expect(text(inDialog('[data-action-error] [role="alert"]'))).toBe('Couldn’t set Queued.');
 
-    const close = inDialog<HTMLButtonElement>('.action-error button.dismiss')!;
+    const close = inDialog<HTMLButtonElement>('[data-action-error] button.dismiss')!;
 
     await press(close);
-    expect(inDialog('.action-error')).toBeNull();
+    expect(inDialog('[data-action-error]')).toBeNull();
     expect(document.activeElement).toBe(button('queue', 'I_sample02'));
 });
 
@@ -174,7 +174,7 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
     await settle(() => vi.advanceTimersByTime(20));
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
     await answer({ error: 'T3 isn’t running.' }, 502);
-    expect(text(inDialog('p.start [role="alert"]'))).toBe('T3 isn’t running.');
+    expect(text(inDialog('.start [role="alert"]'))).toBe('T3 isn’t running.');
     expect(text(button('start', 'I_sample05'))).toBe('Retry start');
 });
 
@@ -214,7 +214,7 @@ test('a failed Start build shows in the dialog and offers Retry start', async ()
         { thread: null, error: 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code' },
         409,
     );
-    expect(text(inDialog('p.start [role="alert"]'))).toBe(
+    expect(text(inDialog('.start [role="alert"]'))).toBe(
         'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
     );
     expect(text(button('start', 'I_sample13'))).toBe('Retry start');
@@ -269,7 +269,7 @@ test('a failed Abandon retains its confirmation, inline error and focus', async 
     await abandonPress('Abandon');
     await answer({ error: 'Couldn’t abandon #61.' }, 502);
     expect(text(toast())).toMatch(/^Couldn’t abandon #61 .*\. Couldn’t abandon #61\.$/);
-    expect(inDialog('.action-error'), 'no inline error').toBeNull();
+    expect(inDialog('[data-action-error]'), 'no inline error').toBeNull();
     await settle(() => vi.advanceTimersByTime(20));
     expect($('#abandon-dialog')?.getAttribute('role')).toBe('alertdialog');
     expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe('Couldn’t abandon #61.');
@@ -531,7 +531,7 @@ test('work that needs you shows why, confirms each choice before posting it, off
     expect(text($('#needs-you-dialog [data-slot="alert"]')), 'the failure stays in the confirmation').toBe(
         'Couldn’t reopen the PR.',
     );
-    expect(inDialog('.action-error [role="alert"]')).toBeNull();
+    expect(inDialog('[data-action-error] [role="alert"]')).toBeNull();
     expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
     await confirmPress('Try again');
     expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]);
@@ -667,7 +667,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
         ['/api/dependency-met', { itemId: 'I_sample13', dependencyId: 'dep-1', revision: 3, met: true }],
     ]);
     await answer({ error: 'The Dependency dep-1 is at revision 4, not 3; read it again and retry.' }, 409);
-    expect(text(inDialog('.action-error [role="alert"]'))).toBe(
+    expect(text(inDialog('[data-action-error] [role="alert"]'))).toBe(
         'The Dependency dep-1 is at revision 4, not 3; read it again and retry.',
     );
 });

@@ -1,9 +1,10 @@
-// The title bar's five counters, in its status strip after the Refreshed time: need you, shaping, building, shipped and
-// spend, in the board's order, as lar-server's summary buttons, always for the whole factory whatever repository or
-// filters the board shows. Each shows only its glyph, in the status's own colour, and its number; its label is its
-// accessible name and its tooltip says more. Each opens a popover, padded as a menu, of every item behind the number in
-// a list that scrolls; picking one opens the item dialog. The row holds its width as values load; the title bar's width
-// decides what shows: Spend goes first, then Shaping and Shipped.
+// The title bar's five counters, in its status group after the Refreshed time: need you, shaping, building, shipped and
+// spend, in the board's order, as the design system's ToolbarCounters, always for the whole factory whatever repository
+// or filters the board shows. Each shows only its glyph, in the status's own colour, and its number (Building with its
+// track against the automatic limit); its label is its accessible name and its tooltip says more. Each opens a wide
+// status popover of every item behind the number in a list that scrolls; picking one opens the item dialog. The row
+// holds its width as values load; the title bar's width decides what shows: Spend goes first, then Shaping and
+// Shipped, and under 40rem they all fold into the bar's status popover.
 
 import { boardSections, formatUsd, plural, readingScope, usageFailed, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
@@ -16,14 +17,11 @@ import { StatusGlyph, useBuilds, useItemStates } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     BoardCounter as Counter,
-    BoardCounters,
     CounterDash,
-    CounterDivider,
     CounterEmpty as Empty,
     CounterFigure,
     CounterGroup,
     CounterGroups,
-    CounterOfLimit,
 } from '@/ui/board';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? (item.stats.costUsd ?? 0) : 0);
@@ -66,20 +64,20 @@ export function Counters() {
     const unknown = (n: number) => reading && !n;
     const countOf = (n: number) => (unknown(n) ? <CounterDash /> : n);
     const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading projects' : hint);
-    const subFor = (n: number) => (unknown(n) ? undefined : n);
+    const countFor = (n: number) => (unknown(n) ? undefined : n);
     const empty = (none: string) => (
         <Empty>{reading ? <Loading presentation="inline" label="Loading projects…" /> : none}</Empty>
     );
     const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
     return (
-        <BoardCounters>
+        <>
             <Counter
                 label="need you"
                 value={countOf(s.needsYou.length)}
                 title="Needs you"
                 icon={<StatusIndicator state="waiting" />}
-                sub={subFor(s.needsYou.length)}
+                count={countFor(s.needsYou.length)}
                 hint={hintFor(
                     s.needsYou.length,
                     s.needsYou.length
@@ -110,7 +108,7 @@ export function Counters() {
                 icon={glyph('Shaping')}
                 fold="medium"
                 title="Shaping"
-                sub={subFor(s.shaping.length)}
+                count={countFor(s.shaping.length)}
                 hint={hintFor(
                     s.shaping.length,
                     s.shaping.length ? `${plural(s.shaping.length, 'item')} being shaped` : 'Nothing shaping right now',
@@ -122,18 +120,12 @@ export function Counters() {
             <Counter
                 label="building"
                 icon={glyph('In progress')}
-                width={limit === undefined ? 'count' : 'limit'}
                 title="Building"
-                count={subFor(building.length)}
-                value={
-                    limit === undefined ? (
-                        countOf(building.length)
-                    ) : (
-                        <CounterOfLimit count={countOf(building.length)} used={building.length} limit={limit} />
-                    )
-                }
+                count={countFor(building.length)}
+                value={countOf(building.length)}
+                {...(limit !== undefined && { track: { used: building.length, limit } })}
                 hint={hintFor(building.length, builds.text)}
-                sub={limit === undefined ? undefined : `Automatic limit ${limit}`}
+                detail={limit === undefined ? undefined : `Automatic limit ${limit}`}
                 foot={
                     reading || free === undefined
                         ? undefined
@@ -151,22 +143,20 @@ export function Counters() {
                 icon={glyph('Done')}
                 fold="medium"
                 title="Shipped"
-                count={subFor(s.done.length)}
-                sub="last 7 days"
+                count={countFor(s.done.length)}
+                detail="Last 7 days"
                 hint={hintFor(s.done.length, 'Done in the last 7 days')}
             >
                 {listOf(s.done, 'Nothing shipped this week.')}
             </Counter>
 
-            <CounterDivider />
-
             <Counter
                 label="spend"
                 value={spend.value}
-                width="spend"
+                width="figure"
                 fold="wide"
                 title="Agent spend"
-                sub={spend.sub}
+                detail={spend.sub}
                 icon={<CircleDollarSign strokeWidth={2.25} />}
                 hint={spend.notice ?? 'Agent cost on open and recent items, an API estimate'}
                 foot={
@@ -195,6 +185,6 @@ export function Counters() {
                     </Empty>
                 )}
             </Counter>
-        </BoardCounters>
+        </>
     );
 }

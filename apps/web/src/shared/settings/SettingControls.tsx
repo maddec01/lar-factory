@@ -6,8 +6,12 @@ import type { ReactNode } from 'react';
 
 import { buttonKind } from '@/ui/board';
 
-/** A working row renders its control. Unbuilt settings carry no value. */
-export type Control = { type: 'unavailable' } | { type: 'custom'; render: () => ReactNode };
+/** A working row renders its control; a `row` draws the whole settings row itself, such as the design system's
+ *  AppearanceSetting. Unbuilt settings carry no value. */
+export type Control =
+    | { type: 'unavailable' }
+    | { type: 'custom'; render: () => ReactNode }
+    | { type: 'row'; render: () => ReactNode };
 
 export function Switch({
     on,
@@ -85,7 +89,7 @@ export function SmallButton({
     onClick?: () => void;
 } & { [key: `data-${string}`]: string | boolean | undefined }) {
     return (
-        <Button {...buttonKind('other')} {...data} disabled={!!reason} title={reason} onClick={onClick}>
+        <Button {...buttonKind('other', { size: 'md' })} {...data} disabled={!!reason} title={reason} onClick={onClick}>
             {children}
         </Button>
     );

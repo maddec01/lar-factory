@@ -1,10 +1,8 @@
-/* An item's parts (ItemParts.tsx, StartControls.tsx): the title link, a project icon's colour (ProjectIcon.tsx), the
-   Start control's group and its message line. */
+/* An item's parts (ItemParts.tsx, StartControls.tsx): the title link, the Start control's group and its message line. */
 
 .title {
     font-weight: 500;
     text-decoration: none;
-    line-height: 1.35;
 }
 .title:hover {
     text-decoration: underline;
@@ -15,42 +13,12 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* The colour behind a project icon's initial. Each repository takes the next colour in the board's list order
-   (ProjectIcon's `place`); unlisted repositories keep the muted colour. */
-.repo-tone-0 {
-    --k: var(--color-sky-500);
-}
-.repo-tone-1 {
-    --k: var(--color-pink-500);
-}
-.repo-tone-2 {
-    --k: var(--color-teal-500);
-}
-.repo-tone-3 {
-    --k: var(--color-amber-500);
-}
-.repo-tone-4 {
-    --k: var(--color-violet-500);
-}
-.repo-tone-5 {
-    --k: var(--color-lime-500);
-}
-.repo-tone-6 {
-    --k: var(--color-orange-500);
-}
-.repo-tone-7 {
-    --k: var(--color-indigo-500);
-}
-.repo-tone-none {
-    --k: var(--color-fg-muted);
-}
-
 /* The Start control's group, and the line under it with Start's message or error. */
 .start {
     margin: 0;
     font-size: var(--text-xs);
 }
-p[data-start-result] {
+[data-start-result] {
     padding: --spacing(1) --spacing(1.5);
     margin-inline: --spacing(-1.5);
     border-radius: var(--radius-sm);
@@ -65,11 +33,59 @@ p[data-start-result] {
     gap: --spacing(1.25);
     position: relative;
 }
-.action-error {
-    order: 1;
-    flex: 1 1 100%;
-    min-width: 0;
-    color: var(--color-danger-fg);
-    font-weight: 600;
-    overflow-wrap: anywhere;
+
+/* The board's life (BoardLife.ts), on a read that moves things, never on the first paint. A row that changed lane slides
+   the last few pixels into place from the side it came from and flashes the current navy wash, which fades over
+   1.2 s; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced motion keeps the
+   wash and the ring's colour, without the travel. Both pause behind an open overlay, as the design system's loops do. */
+@keyframes board-row-arrive {
+    from {
+        transform: translateY(var(--board-arrive-from, 0));
+        opacity: 0.4;
+    }
+}
+@keyframes board-row-flash {
+    from,
+    25% {
+        background-color: var(--color-current-surface);
+    }
+    to {
+        background-color: transparent;
+    }
+}
+@keyframes board-card-pulse {
+    from {
+        outline: 1px solid var(--color-warning);
+        outline-offset: 0;
+    }
+    to {
+        outline: 1px solid transparent;
+        outline-offset: var(--board-pulse-offset, 0.375rem);
+    }
+}
+[data-arrived='above'] {
+    --board-arrive-from: --spacing(-2);
+}
+[data-arrived='below'] {
+    --board-arrive-from: --spacing(2);
+}
+li[data-arrived]:not([data-slot='card']) {
+    animation:
+        board-row-arrive var(--motion-duration-slow) var(--ease-emphasized),
+        board-row-flash 1.2s var(--ease-standard);
+}
+[data-slot='card'][data-arrived] {
+    animation: board-card-pulse 0.9s var(--ease-standard) 1;
+}
+@media (prefers-reduced-motion: reduce) {
+    li[data-arrived]:not([data-slot='card']) {
+        animation: board-row-flash 1.2s var(--ease-standard);
+    }
+    [data-slot='card'][data-arrived] {
+        --board-pulse-offset: 0;
+        animation: board-card-pulse 0.9s var(--ease-standard) 1;
+    }
+}
+body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) [data-arrived] {
+    animation-play-state: paused;
 }

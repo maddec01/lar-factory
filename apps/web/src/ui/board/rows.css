@@ -71,6 +71,15 @@
     font-size: inherit;
 }
 
+/* The state keeps its word, such as "Needs you" or "Ready to merge"; a tracker's fields after it give up their room
+   first. With no state, the fields start at the column's edge. */
+.row-cols > [data-col='state'] > [data-state] {
+    flex-shrink: 0;
+}
+.row-cols > [data-col='state'] > [data-state]:empty {
+    display: none;
+}
+
 /* A part's own title leads its row, so its second line starts where its status does and its list item sets the edge. */
 [data-part] .row-second {
     padding-inline: --spacing(5) 0;
@@ -131,8 +140,10 @@
     }
 }
 
-/* Under 660px of row the state follows them, the action stays beside the title, and the second line wraps: bar, count
-   and PR, then its text and figures. */
+/* Under 660px of row (a phone) the action keeps its natural width at the line's top end (RowFirst measures it as
+   --row-side-width) and the title beside it takes up to two lines; source and kind run under them at the row's full
+   width, then the state after them, or on a line of its own when there's no room, its tracker fields giving up their
+   room before its word does. The second line wraps: bar, count and PR, then its text and figures. */
 @container (width < 41.25rem) {
     .row-first,
     .row-second,
@@ -142,28 +153,88 @@
     .row-first {
         display: block;
         position: relative;
-        padding-right: 0;
     }
     .row-cols {
+        position: relative;
         width: 100%;
-        grid-template-columns: var(--row-glyph) var(--row-source) var(--row-kind) minmax(0, 1fr);
-        padding-right: var(--row-inset);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: --spacing(2);
+        row-gap: --spacing(1);
+        padding-left: calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
+    }
+    .row-cols > :first-child {
+        position: absolute;
+        top: 0;
+        left: var(--row-inset);
+        display: grid;
+        place-items: center;
+        width: var(--row-glyph);
+        height: var(--row-line);
     }
     .row-cols > [data-title-cell] {
-        grid-column: 2 / -1;
-        padding-right: calc(var(--row-side) + var(--row-gap));
+        order: -1;
+        flex: 1 0 100%;
+        min-height: var(--row-line);
+        padding-right: calc(var(--row-side-width, var(--row-side)) + var(--row-gap));
+        flex-wrap: wrap;
+        row-gap: --spacing(1);
+    }
+    .row-cols > [data-title-cell] > [data-title] {
+        display: -webkit-box;
+        padding-block: --spacing(1);
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-height: --spacing(5);
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
     .row-cols > [data-kind] {
-        grid-column: 3;
+        flex: none;
+    }
+    /* A long repository name gives up its room first, ending in an ellipsis, rather than pushing the line wider. */
+    .row-cols > [data-row-identity] {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
     }
     .row-cols > [data-col='state'] {
-        grid-column: 4;
-        grid-row: 2;
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .row-cols > [data-col='state']:not(:has(> :not(:empty))) {
+        display: none;
     }
     .row-side {
         position: absolute;
         top: 0;
         right: var(--row-inset);
+        width: auto;
+        max-width: 55%;
+    }
+    .row-side > [data-col='figures'] {
+        overflow: hidden;
+    }
+    /* A side with figures and no button (a row that waits on you, its usage on the first line at a desk's width)
+       leaves the top end to the title and puts its figures at the row's bottom right, where every other row's are. */
+    .row-side:not(:has(button, a)) {
+        position: static;
+        display: flex;
+        justify-content: flex-end;
+        width: auto;
+        max-width: none;
+        min-height: 0;
+        margin-top: --spacing(1);
+        padding-right: var(--row-inset);
+    }
+    .row-first:not(:has(> .row-side :is(button, a))) > .row-cols > [data-title-cell] {
+        padding-right: 0;
+    }
+    .row-side:empty {
+        display: none;
     }
     .row-second {
         display: flex;

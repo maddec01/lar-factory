@@ -1,18 +1,21 @@
-// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): a
-// titled list that takes the height of its rows, so a section with none stays small and the page scrolls past them all.
+// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): the
+// design system's Panel, bordered on black with no fill, a titled list that takes the height of its rows. A lane with
+// no rows collapses to its header line, which says why it's empty, so the page scrolls past it in one line.
 
-import { EmptyState, SectionTitle } from '@lar-works/design-system';
+import { PanelBase } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
 import { LimitBars } from './Counters';
 
-/** A stage's section: its status glyph, title and count, anything at the header's `right`, then its rows. */
+/** A stage's section: its status glyph, title and count, anything at the header's `right`, then its rows; with no rows,
+ *  its header line alone, ending in what `empty` says. */
 export function StagePane({
     id,
     title,
     glyph,
     count,
     right,
+    empty,
     children,
 }: {
     /** Names the section, as `data-stage`, and its heading's id. */
@@ -25,25 +28,39 @@ export function StagePane({
     count: number;
     /** What sits at the header's end, such as a BuildLimit. */
     right?: ReactNode;
-    /** The stage's StageList or StagePaneEmpty. */
-    children: ReactNode;
+    /** What the lane says with no rows, a StagePaneEmpty: given, the lane collapses to its header line. */
+    empty?: ReactNode;
+    /** The stage's StageList. */
+    children?: ReactNode;
 }) {
+    const collapsed = Boolean(empty);
+
     return (
-        <section
+        <PanelBase
             data-stage={id}
-            aria-labelledby={`${id}-h`}
-            className="surface-card min-w-0 overflow-hidden rounded-xl border"
+            data-empty={collapsed || undefined}
+            headingId={`${id}-h`}
+            title={title}
+            icon={glyph}
+            count={count}
+            action={
+                collapsed ? (
+                    <span className="flex min-w-0 items-center gap-3">
+                        {empty}
+                        {right}
+                    </span>
+                ) : (
+                    right
+                )
+            }
+            collapsed={collapsed}
         >
-            <header className="border-line flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1">
-                <SectionTitle id={`${id}-h`} level="h3" title={title} count={count} icon={glyph} />
-                {right && <span className="ml-auto flex max-w-full min-w-0 items-center">{right}</span>}
-            </header>
-            <div className="@container">{children}</div>
-        </section>
+            {collapsed ? null : children}
+        </PanelBase>
     );
 }
 
-/** The rows of a stage's section. */
+/** The rows of a stage's section, divided by the panel's hairlines. */
 export function StageList({
     children,
 }: {
@@ -53,17 +70,18 @@ export function StageList({
     return <ol className="m-0 grid list-none p-0">{children}</ol>;
 }
 
-/** What a section says with no row: that it's loading, that nothing is in it, or that the filters hide every row. */
+/** What a collapsed lane's header line says: that it's loading, that nothing is in it, or that the filters hide every
+ *  row, muted at its end. On a phone the line keeps the room for the lane's name and says it to screen readers only. */
 export function StagePaneEmpty({
     children,
 }: {
-    /** What the section says, such as "Nothing here". */
+    /** What the lane says, such as "Nothing here". */
     children: ReactNode;
 }) {
     return (
-        <div data-pane-empty>
-            <EmptyState size="inline" title={children} />
-        </div>
+        <p data-pane-empty className="text-fg-muted m-0 min-w-0 truncate text-xs max-sm:sr-only">
+            {children}
+        </p>
     );
 }
 
@@ -86,7 +104,7 @@ export function BuildLimit({
 }) {
     return (
         <span
-            className="build-limit text-2xs text-fg-muted inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums"
+            className="build-limit text-fg-muted inline-flex items-center gap-1.5 text-xs whitespace-nowrap tabular-nums"
             title={title}
         >
             {limit !== undefined ? (
@@ -119,7 +137,7 @@ export function HeaderSwitch({
 }) {
     return (
         <span
-            className="auto-build text-2xs text-fg-muted inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap"
+            className="auto-build text-fg-muted inline-flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap"
             title={title}
         >
             {hold && (

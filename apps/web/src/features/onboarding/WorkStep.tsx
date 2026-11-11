@@ -134,7 +134,7 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
                 </InsetPanel>
             </Disclosure>
             <Inline as="span">
-                <Button {...buttonKind('other')} onClick={recheck}>
+                <Button {...buttonKind('other', { size: 'md' })} onClick={recheck}>
                     Recheck access
                 </Button>
             </Inline>

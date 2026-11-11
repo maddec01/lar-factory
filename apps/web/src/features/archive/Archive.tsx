@@ -4,7 +4,18 @@
 // read Archive again.
 
 import { clock, day, plural, type Item, type RetentionState } from '@lar-factory/shared';
-import { Alert, Button, FormUnit, Input, InsetPanel, Stack, Text } from '@lar-works/design-system';
+import {
+    Alert,
+    Button,
+    FormUnit,
+    Input,
+    InsetPanel,
+    SettingsFooter,
+    showNotification,
+    Stack,
+    Text,
+    useSettingsDraft,
+} from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -87,8 +98,10 @@ function LastDelete({ lastDelete }: { lastDelete: NonNullable<RetentionState['la
 }
 
 /**
- * When finished and set-aside work leaves the board, and whether the board deletes it later. Saving a new automatic deletion
- * asks first, naming the work it would delete now, so Export markdown and Restore are still there for it.
+ * When finished and set-aside work leaves the board, and whether the board deletes it later: a draft of its days and
+ * choice, which Settings' footer saves or cancels, and which leaving asks about first. Saving a new automatic deletion
+ * asks first, in place of the footer, naming the work it would delete now, so Export markdown and Restore are still
+ * there for it.
  */
 export function RetentionSetting({ retention }: { retention: RetentionState }) {
     const [hide, setHide] = useState(String(retention.hideAfterDays));
@@ -96,14 +109,28 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
     const [deleteAfter, setDeleteAfter] = useState(String(retention.deleteAfterDays ?? 30));
     const [due, setDue] = useState<Due | null>(null);
     const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const hideDays = wholeDays(hide);
     const deleteDays = deleting ? wholeDays(deleteAfter) : null;
     const invalid = hideDays === null || (deleting && deleteDays === null);
+    const dirty =
+        hide !== String(retention.hideAfterDays) ||
+        deleting !== (retention.deleteAfterDays !== null) ||
+        (deleting && deleteAfter !== String(retention.deleteAfterDays ?? 30));
+    const reset = () => {
+        setHide(String(retention.hideAfterDays));
+        setDeleting(retention.deleteAfterDays !== null);
+        setDeleteAfter(String(retention.deleteAfterDays ?? 30));
+        setDue(null);
+        setError(null);
+    };
+
+    // Its own footer saves it, as saving may stop to confirm; the draft only guards against losing it.
+    useSettingsDraft(dirty);
 
     const save = async (confirmed = false) => {
         setSaving(true);
-        setMessage(null);
+        setError(null);
 
         const result = await postAction<{ saved: boolean; due: Due }>('/api/retention', {
             hideAfterDays: hideDays,
@@ -118,11 +145,11 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
             receive(result);
             setSaving(false);
 
-            if (result.error) setMessage({ text: result.error, error: true });
+            if (result.error) setError(result.error);
             else if (result.saved === false) setDue(result.due ?? []);
             else {
                 setDue(null);
-                setMessage({ text: 'Saved the retention setting on this Mac.', error: false });
+                showNotification({ slot: 'retention', title: 'Saved the retention setting on this Mac.' });
             }
         });
     };
@@ -178,7 +205,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                     )}
                 </FieldRow>
             </InsetPanel>
-            {due ? (
+            {due && (
                 <SettingConfirm
                     label="Turn on automatic deletion"
                     message={
@@ -189,11 +216,11 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                     items={due.map((d) => d.title || d.workId)}
                     actions={
                         <>
-                            <Button {...buttonKind('other')} onClick={() => setDue(null)}>
+                            <Button {...buttonKind('other', { size: 'md' })} onClick={() => setDue(null)}>
                                 Cancel
                             </Button>
                             <Button
-                                {...buttonKind('main', 'danger')}
+                                {...buttonKind('main', { tone: 'danger', size: 'md' })}
                                 loading={saving}
                                 data-confirm-delete
                                 onClick={() => void save(true)}
@@ -203,32 +230,39 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                         </>
                     }
                 />
-            ) : (
-                <span>
-                    <Button
-                        {...buttonKind('other')}
-                        disabled={invalid}
-                        loading={saving}
-                        data-save-retention
-                        onClick={() => void save()}
-                    >
-                        Save
-                    </Button>
-                </span>
             )}
             {invalid && (
                 <Text variant="caption" tone="muted">
                     Enter whole days from 0.
                 </Text>
             )}
-            {message &&
-                (message.error ? (
-                    <Alert size="sm" tone="danger" message={message.text} />
-                ) : (
-                    <Text variant="caption" tone="muted" role="status">
-                        {message.text}
-                    </Text>
-                ))}
+            {dirty && !due && (
+                <SettingsFooter
+                    leading={
+                        error ? (
+                            <Alert size="sm" tone="danger" message={error} />
+                        ) : (
+                            <Text as="span" variant="caption" tone="muted">
+                                Unsaved changes
+                            </Text>
+                        )
+                    }
+                >
+                    <Button {...buttonKind('other', { size: 'md' })} disabled={saving} onClick={reset}>
+                        Cancel
+                    </Button>
+                    <Button
+                        {...buttonKind('main', { size: 'md' })}
+                        disabled={invalid}
+                        loading={saving}
+                        data-save-retention
+                        onClick={() => void save()}
+                    >
+                        Save changes
+                    </Button>
+                </SettingsFooter>
+            )}
+            {error && due && <Alert size="sm" tone="danger" message={error} />}
             {retention.lastDelete && <LastDelete lastDelete={retention.lastDelete} />}
         </Stack>
     );

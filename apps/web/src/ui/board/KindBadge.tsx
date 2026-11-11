@@ -1,9 +1,9 @@
-import { BadgeBase } from '@lar-works/design-system/primitives';
+import { Badge } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 export interface KindBadgeProps {
-    /** The kind's lar-brand app hue (an oklch hue angle, such as 25 for a bug), drawn as a soft tint with text and a
-     *  hairline in the hue; without one the badge is neutral. */
+    /** The kind's hue on the design system's categorical palette (an oklch angle, `categoricalHues`, such as rose for
+     *  a bug), drawn as the design system's kind badge; without one the badge is neutral. */
     hue?: number | undefined;
     /** The kind's name, after its icon if it has one. */
     children: ReactNode;
@@ -15,8 +15,8 @@ export interface KindBadgeProps {
     muted?: boolean;
 }
 
-/** What kind a thing is, as a badge in that kind's own hue: an item's bug or feature, a catalog's music or video. The
- *  same pill as Badge, coloured by a lar-brand hue instead of a status tone; KindIcon draws the same hue on an icon. */
-export function KindBadge(props: KindBadgeProps) {
-    return <BadgeBase {...props} />;
+/** What kind a thing is, as the design system's one kind badge (Badge `hue`) at its full strength: an item's bug or
+ *  feature, in its categorical hue, the same badge every Lar app draws for a kind. */
+export function KindBadge({ hue, ...props }: KindBadgeProps) {
+    return <Badge {...props} hue={hue} />;
 }

@@ -1,28 +1,24 @@
-// The board's title bar, laid out as lar-server's AppTitleBar on the design system's TitleBar. On the left, the brand, then how
-// the board is doing: a strip with the Refreshed time and the counters. Beside the actions, the board search's field,
-// up to 26rem wide. On the right is what you can do, at the bar's right edge, one evenly spaced group: List, Add item
-// (the bar's Main action), Update while there's an update, and Settings, the design system's title-bar Settings button
-// that lar-server shows too. Every other control is an App control from the button kinds, 28 px tall and 24 px inside
-// the strip. The bar starts past the traffic lights and drags the window, except on its
-// controls. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the brand and
-// Settings.
-// Every control keeps its own width, and the bar folds by its own width (the design system's TitleBar is the container
-// queried) instead: the list and Add item labels (kept for screen readers) go first, then Spend, Shaping and Shipped,
-// then the Refreshed text, and on a narrow page the Refreshed dot. The field fits itself in what's left.
+// The board's title bar, the design system's TitleBar as every Lar app's: the "Lar Factory" lockup, a link that takes
+// the board back to its top and clears the scope; then, at the end, the board search, how the board is doing (the
+// Refreshed time and the counters, one status group that folds into a "Board status" popover on a narrow bar), what
+// you can do (List, Add item, Update while there's an update) and Settings. Every control is the bar's 28px one with a
+// glass tooltip. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the lockup
+// and Settings.
 
-import { clock, failedCheck, inMacApp, isStale, shortAgo } from '@lar-factory/shared';
+import { clock, failedCheck, isStale, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
+import { ToolbarStatusGroup } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 
 import { Counters } from './Counters';
-import { useLightsHidden } from './WindowControls';
 import { AddItem } from '@/features/add-item';
 import { BoardSearch } from '@/features/board-search';
+import { useScopeStore } from '@/features/filters';
 import { ListButton } from '@/features/list';
 import { SettingsButton } from '@/features/settings';
 import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { BoardBrand, BoardTitleBar, type RefreshHealth, RefreshIndicator } from '@/ui/board';
+import { BoardTitleBar, type RefreshHealth, RefreshIndicator, scrollBoardToTop } from '@/ui/board';
 
 /** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
 function useLandedReads(fetchedAt: string | null) {
@@ -115,30 +111,36 @@ function Refreshed({ data }: { data: BoardData }) {
 export function TitleBar() {
     const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
     const data = useBoardStore((state) => state.data);
-    const lightsHidden = useLightsHidden();
 
     return (
         <BoardTitleBar
-            nativeWindow={inMacApp()}
-            pastLights={!lightsHidden}
-            brand={<BoardBrand product="Factory" />}
-            // The missing-t3 notice has its own heading.
-            heading={board ? 'Lar Factory' : undefined}
-            refreshed={board && <Refreshed data={data} />}
-            counters={board && <Counters />}
+            home={{
+                href: '/',
+                label: 'Lar Factory, home',
+                onNavigate: () => {
+                    useScopeStore.getState().setScope(null);
+                    scrollBoardToTop();
+                },
+            }}
             search={board && <BoardSearch />}
-            actions={
-                <>
-                    {board && (
-                        <>
-                            <ListButton />
-                            <AddItem />
-                            <UpdateButton />
-                        </>
-                    )}
-                    <SettingsButton />
-                </>
+            status={
+                board && (
+                    <ToolbarStatusGroup role="group" aria-label="Board status">
+                        <Refreshed data={data} />
+                        <Counters />
+                    </ToolbarStatusGroup>
+                )
             }
+            actions={
+                board && (
+                    <>
+                        <ListButton />
+                        <AddItem />
+                        <UpdateButton />
+                    </>
+                )
+            }
+            settings={<SettingsButton />}
         />
     );
 }

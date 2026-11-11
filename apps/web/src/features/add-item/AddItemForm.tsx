@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DraftValues } from './AddItemStore';
 import { useAddItemStore } from './AddItemStore';
 import { CreateIssueBox, IssueFields } from './IssueFields';
+import { NoProjectNotice } from './NoProjectNotice';
 import { RepoSelect } from './RepoSelect';
 import { ticketOptions } from './TicketOptions';
 import { KIND_BADGES } from '@/features/items';
@@ -109,6 +110,7 @@ export function AddItemForm() {
                 detailsLabel="Details"
                 main={
                     <>
+                        <NoProjectNotice />
                         <Input
                             id="item-title"
                             name="title"
@@ -180,14 +182,19 @@ export function AddItemForm() {
                     )
                 }
             >
-                <Button {...buttonKind('other')} id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>
+                <Button
+                    {...buttonKind('other', { size: 'md' })}
+                    id="item-new"
+                    hidden={phase !== 'uncertain'}
+                    onClick={reset}
+                >
                     New item
                 </Button>
-                <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
+                <Button {...buttonKind('other', { size: 'md' })} onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
                 <Button
-                    {...buttonKind('main')}
+                    {...buttonKind('main', { size: 'md' })}
                     type="submit"
                     id="item-submit"
                     aria-describedby={data.capture?.enabled === false ? 'item-create-reason' : undefined}

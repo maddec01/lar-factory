@@ -272,7 +272,12 @@ test('a settled decision counts as done in its part bar, whatever its Status say
 
     const bar = [...col('bar').querySelectorAll<HTMLElement>('[data-part-bar] li')];
 
-    expect(bar.map((li) => [li.title, li.style.background === 'var(--color-board-done)'])).toEqual([
+    expect(
+        bar.map((li) => [
+            li.getAttribute('aria-label'),
+            li.querySelector<HTMLElement>('span')?.style.background === 'var(--color-board-done)',
+        ]),
+    ).toEqual([
         [expect.stringContaining('Complete'), true],
         [expect.stringContaining('Shaping'), false],
     ]);
@@ -454,9 +459,7 @@ test('once its blockers complete, Start build sends the build, and the header of
         ],
     ]);
     await answer({ thread: null, error: 'T3 is down.' }, 502);
-    expect(text(dossier().querySelector('p.start [role="alert"]')), 'its error shows under its row').toBe(
-        'T3 is down.',
-    );
+    expect(text(dossier().querySelector('.start [role="alert"]')), 'its error shows under its row').toBe('T3 is down.');
 });
 
 test('a Queued decision shows only Start after while a blocker is open, naming the last open one', async () => {

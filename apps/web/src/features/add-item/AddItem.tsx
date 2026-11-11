@@ -1,12 +1,13 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 
-import { repoName } from '@lar-factory/shared';
+import { noneOnboarded, repoName } from '@lar-factory/shared';
 import { Button, Modal, Text, ViewToggle } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { AddItemForm } from './AddItemForm';
 import type { AddItemPane } from './AddItemStore';
 import { useAddItemStore } from './AddItemStore';
+import { NoProjectNotice } from './NoProjectNotice';
 import { RepoSelect } from './RepoSelect';
 import { TicketPicker } from './TicketPicker';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -27,6 +28,7 @@ function PickTicketPane() {
     return (
         <>
             <TicketSearchPane id="pick-ticket">
+                <NoProjectNotice />
                 <PanelField heading="Project" htmlFor="pick-repo">
                     <RepoSelect id="pick-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
                 </PanelField>
@@ -47,7 +49,7 @@ function PickTicketPane() {
                     )
                 }
             >
-                <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
+                <Button {...buttonKind('other', { size: 'md' })} onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
             </Modal.Footer>
@@ -113,6 +115,7 @@ function AddItemDialog() {
 
 export function AddItem() {
     const { open, setOpen } = useAddItemStore();
+    const none = useBoardStore((state) => noneOnboarded(state.data));
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -129,7 +132,13 @@ export function AddItem() {
 
     return (
         <>
-            <AddItemButton label="Add item" title="Add item (⌘N)" keyShortcuts="Meta+N" onOpen={() => setOpen(true)} />
+            <AddItemButton
+                label="Add item"
+                title="Add item (⌘N)"
+                keyShortcuts="Meta+N"
+                waits={none}
+                onOpen={() => setOpen(true)}
+            />
             {open && <AddItemDialog />}
         </>
     );

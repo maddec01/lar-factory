@@ -52,7 +52,7 @@ test('a failed Move to List shows as a toast naming the item, which stays until 
     expect(toast()!.dataset.toastColor, 'a failure is red').toBe('danger');
     expect(text(toast())).toMatch(/^Couldn’t move #129 .* to List\. Couldn’t set List\. GitHub is down\.$/);
     expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
-    expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();
+    expect($('[data-item-dialog] [data-action-error]'), 'the dialog shows no inline error').toBeNull();
     expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to List');
     await settle(() => vi.advanceTimersByTime(60_000));
     expect(toast(), 'a failure stays').not.toBeNull();
@@ -158,7 +158,7 @@ test('queuing a source issue switches the open dialog to its new local work ID',
 
     expect(useItemDialogStore.getState().itemId).toBe('I_imported');
     expect(button('start', 'I_imported')).not.toBeNull();
-    expect($('[data-item-dialog] .action-error')).toBeNull();
+    expect($('[data-item-dialog] [data-action-error]')).toBeNull();
 });
 
 test('combined tracker failure keeps the confirmation open and allows Cancel', async () => {
@@ -354,6 +354,6 @@ test.each(['replace', 'reopen', 'other', 'closed', 'failure'])(
             outcome === 'replace' || outcome === 'closed' ? null : outcome === 'other' ? 'I_sample05' : 'I_sample01',
         );
 
-        if (outcome === 'failure') expect(text($('[data-item-dialog] .action-error'))).toContain('Queue refused');
+        if (outcome === 'failure') expect(text($('[data-item-dialog] [data-action-error]'))).toContain('Queue refused');
     },
 );

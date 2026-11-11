@@ -13,7 +13,7 @@ export function TrackerLabelList({
     children: ReactNode;
 }) {
     return (
-        <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] overflow-hidden rounded-lg border p-0">
+        <ul className="surface-panel m-0 grid list-none grid-cols-[minmax(0,1fr)] overflow-hidden rounded-xl border p-0">
             {children}
         </ul>
     );
@@ -41,7 +41,7 @@ export function TrackerLabelRow({
 } & DataAttributes) {
     return (
         <li {...data} className="border-b last:border-b-0">
-            <div className="flex min-w-0 items-center gap-3 px-3 py-1.5">
+            <div className="flex min-h-10 min-w-0 items-center gap-3 px-4 py-1.5">
                 <span className="max-w-[45%] min-w-0">{chip}</span>
                 <span className="text-fg-muted min-w-0 flex-1 truncate text-xs" title={detail}>
                     {detail}
@@ -53,7 +53,8 @@ export function TrackerLabelRow({
     );
 }
 
-/** The editor a label's row opens, ruled off under it on a faint tint. */
+/** The editor a label's row opens, ruled off under it on a faint tint. Enter in any of its fields submits it, as it has
+ *  no submit button of its own (Settings' footer saves it). */
 export function TrackerLabelEditor({
     onSubmit,
     children,
@@ -64,7 +65,16 @@ export function TrackerLabelEditor({
     children: ReactNode;
 }) {
     return (
-        <form className="bg-surface-sunken grid gap-3 border-t p-3" onSubmit={onSubmit}>
+        <form
+            className="bg-surface-sunken grid gap-3 border-t p-3"
+            onSubmit={onSubmit}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+                    event.preventDefault();
+                    event.currentTarget.requestSubmit();
+                }
+            }}
+        >
             {children}
         </form>
     );
@@ -81,7 +91,7 @@ export function CreateLabelForm({
     children: ReactNode;
 }) {
     return (
-        <form className="flex max-w-full min-w-0 flex-wrap gap-2" onSubmit={onSubmit}>
+        <form className="flex max-w-full min-w-0 flex-wrap items-center gap-2" onSubmit={onSubmit}>
             {children}
         </form>
     );

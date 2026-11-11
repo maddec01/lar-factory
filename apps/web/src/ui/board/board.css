@@ -1,5 +1,5 @@
-/* The board's own sheets, after the design system's styles: its role tokens, base styles, title bar, item parts and
-   rows. */
+/* The board's own sheets, after the design system's styles: its role tokens, base styles, the Refreshed ping, item
+   parts and rows. */
 @import './tokens.css';
 
 /* Board action hierarchy (ButtonKinds.ts): solid primary is the area's one next/submit action. A tinted Start
@@ -7,6 +7,6 @@
    means selected, running, or merely opens a thread. Neutral outlines open destinations or offer other actions.
    Quiet icon controls open tools or a thread within a concept parts list. Disabled actions retain their kind. */
 @import './base.css';
-@import './title-bar.css';
+@import './refreshed.css';
 @import './items.css';
 @import './rows.css';

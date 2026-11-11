@@ -34,7 +34,7 @@ import {
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { boardStatusState, DeskCard as Card, DeskHint, DeskSection } from '@/ui/board';
+import { boardStatusState, DeskCard as Card, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -59,10 +59,10 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
     const action = nextAction(item);
 
     return action?.kind === 'thread' ? (
-        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} />
+        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next />
     ) : (
         <>
-            <PrLink item={item} label={action?.label ?? 'Open PR'} />
+            <PrLink item={item} label={action?.label ?? 'Open PR'} next />
             <OpenThread item={item} data={data} iconOnly />
         </>
     );
@@ -100,6 +100,9 @@ export function Desk({ items: inScope }: { items: Item[] }) {
     const filters = useScopeStore((state) => state.filters);
     const items = deskItems({ ...data, items: inScope }, unavailable).filter(rowFilter(filters, data.repos));
     const scope = useShownScope();
+
+    // A card that lands on the desk pulses once, whatever the scope and filters show.
+    noteBoardPlaces('desk', new Map(deskItems(data, unavailable).map((item) => [item.id, 0])), data.firstRead.settled);
 
     return (
         <DeskSection

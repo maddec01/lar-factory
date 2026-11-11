@@ -16,6 +16,7 @@ import { ItemSummary } from './ItemSummary';
 import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
 import type { DescriptionEdit } from './useDescriptionEdit';
+import { useMovesItem } from './useMovesItem';
 import {
     ActionError,
     AgentWork,
@@ -66,6 +67,7 @@ export function ItemDialogContent({
     const editable = accessProblem === null;
     // The open editor in an expanded dialog takes the height the rest leaves.
     const fill = expanded && edit.editing;
+    const moves = useMovesItem(item, data);
 
     return (
         <Modal.Content
@@ -135,15 +137,18 @@ export function ItemDialogContent({
             </Modal.Body>
             <Modal.Footer
                 leading={
-                    <DialogActions presentation="leading">
-                        <MoveActions item={item} data={data} />
-                    </DialogActions>
+                    moves && (
+                        <DialogActions presentation="leading">
+                            <MoveActions item={item} data={data} />
+                        </DialogActions>
+                    )
                 }
             >
                 <DialogActions>
                     {item.url && (
                         <ButtonLink
-                            {...buttonKind('other')}
+                            look="app"
+                            {...buttonKind('other', { size: 'md' })}
                             icon={item.repo && onAzure(item.repo) ? ICON.azure : ICON.github}
                             href={item.url}
                             target="_blank"

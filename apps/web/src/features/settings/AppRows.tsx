@@ -4,7 +4,7 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { Button, FormResult, Text } from '@lar-works/design-system';
+import { Button, FormResult, SettingsNote, Text } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
@@ -19,7 +19,7 @@ import {
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
 import { SmallButton, Choice, Switch } from '@/shared/settings/SettingControls';
-import { buttonKind, SettingsNote } from '@/ui/board';
+import { buttonKind } from '@/ui/board';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
     { value: 'nightly', label: 'Nightly' },
@@ -177,7 +177,7 @@ export function UpdateAction() {
     const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
 
     return (
-        <Button {...buttonKind('other')} data-update-action disabled={busy} onClick={() => void run()}>
+        <Button {...buttonKind('other', { size: 'md' })} data-update-action disabled={busy} onClick={() => void run()}>
             {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}
         </Button>
     );

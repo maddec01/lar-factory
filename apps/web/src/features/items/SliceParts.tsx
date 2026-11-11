@@ -8,12 +8,14 @@ import { shownSliceProgress } from './SliceProgress';
 import { SourceIcon } from './SourceIcon';
 import { SliceBar as DesignSliceBar, SliceList as DesignSliceList, SliceRow } from '@/ui/board';
 
-/** A 6px segment for each recorded slice; waiting segments are faint. `still` stops an active one pulsing. */
-export function SliceBar({ item, still = false }: { item: Item; thick?: boolean; still?: boolean }) {
+/** A segment for each recorded slice, 4px on a row and 6px `thick` in the item dialog. `still` stops an active one
+ *  pulsing. */
+export function SliceBar({ item, thick = false, still = false }: { item: Item; thick?: boolean; still?: boolean }) {
     return (
         <DesignSliceBar
             slices={item.slices.map((s) => ({ name: itemName(s), progress: shownSliceProgress(item, s.progress) }))}
             still={still}
+            size={thick ? 'md' : 'sm'}
         />
     );
 }

@@ -54,7 +54,8 @@ test.each<[Item['status'], string, number, string, string]>([
     const row = $<HTMLElement>(status === 'List' ? '[data-list-modal] button[data-item]' : '.desk-card')!;
 
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
-    await settle(() => row.click());
+    // A desk card opens from its open button, stretched over the whole card.
+    await settle(() => (row.querySelector<HTMLButtonElement>(':scope > [data-slot="action-overlay"]') ?? row).click());
     expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
     await push(board({ ...item, number, url }));
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(label);

@@ -1,8 +1,8 @@
-// A piece of work's activity as the board reads it from T3: the track that sweeps while it runs, and its label.
+// A piece of work's activity as the board reads it from T3: the design system's segmented track, swept while it runs.
 
-import { ambientMotion } from '@lar-works/design-system';
+import { SegmentedProgress } from '@lar-works/design-system';
 
-/** A thin track named by `label`, swept by a bar while `running`. */
+/** A thin track named by `label`, swept by a bar while `running`; still, it is the bare track. */
 export function ActivityTrack({
     label,
     running,
@@ -13,10 +13,12 @@ export function ActivityTrack({
     running: boolean;
 }) {
     return (
-        <div role="img" aria-label={label} className="activity-track bg-track h-1.5 overflow-hidden rounded-full">
-            {running && (
-                <span ref={ambientMotion} className="activity-sweep bg-board-active block h-1.5 w-1/3 rounded-full" />
-            )}
+        <div className="activity-track min-w-0" data-activity-track={running ? 'running' : 'still'}>
+            <SegmentedProgress
+                label={label}
+                size="sm"
+                segments={[running ? { label, state: 'active', sweep: true } : { label }]}
+            />
         </div>
     );
 }

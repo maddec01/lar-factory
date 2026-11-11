@@ -33,6 +33,7 @@ import {
     hasFigures,
     hasLiveThread,
     usageLoading,
+    usageUnreadable,
     useActivityFeedback,
     useShownStatus,
 } from '@/features/items';
@@ -62,7 +63,8 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
     const { working, resume } = useShownStatus(item);
 
     if (resume)
-        return <OpenThread item={item} data={data} threadId={itemActivityThread(item)?.id} label="Resume in T3" />;
+        // Tinted like the other starts: resuming is the thing you can do now.
+        return <OpenThread item={item} data={data} threadId={itemActivityThread(item)?.id} label="Resume in T3" next />;
 
     if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
 
@@ -132,7 +134,10 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
         n === undefined && activity && activity !== 'unavailable' && activity !== 'stopped' && activity !== 'waiting';
     const figures = figuresOf(item, data);
     const prs = item.linkedPrs.slice(0, 1);
-    const hasFigureCell = Boolean((figures && hasFigures(figures)) || usageLoading(item, data));
+    // Usage T3 couldn't read says so, rather than leave the cell empty as if there were none.
+    const hasFigureCell = Boolean(
+        (figures && hasFigures(figures)) || usageLoading(item, data) || usageUnreadable(item),
+    );
     // A row with nothing but figures to add holds them beside its action, so it keeps a single row's height.
     const hasSecondLine =
         item.slices.length > 0 || working || showsActivity || prs.length > 0 || Boolean(blocked) || shown.light;

@@ -82,13 +82,17 @@ export function RepoIdentity({
     icon: ReactNode;
     /** The repository's name, truncating. */
     name: string;
-    /** The name in full, as its tooltip on the work map. */
+    /** The name in full, as its tooltip; a truncating name is its own tooltip by default. */
     title?: string;
     /** `row` in a row's line, `map` roomier on the work map, `wrap` when the name may wrap. */
     presentation?: 'row' | 'map' | 'wrap';
 } & DataAttributes) {
     return (
-        <span {...data} title={title} className={identities[presentation]}>
+        <span
+            {...data}
+            title={title ?? (presentation === 'wrap' ? undefined : name)}
+            className={identities[presentation]}
+        >
             {icon}
             <span className={presentation === 'wrap' ? 'min-w-0 wrap-anywhere' : 'truncate'}>{name}</span>
         </span>

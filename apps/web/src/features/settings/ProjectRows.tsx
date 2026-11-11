@@ -18,7 +18,8 @@ function onboardingDescription(progress: OnboardingProgress): string {
     return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
-/** Projects with their provider and work source. Read setups open a page, onboarding offers Resume. */
+/** Projects with their provider and work source. Read setups open a page, onboarding offers Resume; Resume and Add
+ *  project open the setup as a pane in place of this section. */
 export function repositoryGroup(data: SettingsData): Group {
     const onboarded: Row[] = data.repos.map((r) => ({
         id: `repo-${r.repo}`,
@@ -31,7 +32,10 @@ export function repositoryGroup(data: SettingsData): Group {
         ),
         control: custom(() =>
             r.setup ? (
-                <Button {...buttonKind('other')} onClick={() => useSettingsStore.getState().openProject(r.repo)}>
+                <Button
+                    {...buttonKind('other', { size: 'md' })}
+                    onClick={() => useSettingsStore.getState().openProject(r.repo)}
+                >
                     Open project
                 </Button>
             ) : null,
@@ -43,7 +47,10 @@ export function repositoryGroup(data: SettingsData): Group {
         icon: <ProjectIcon repo={repo} size="sm" />,
         description: onboardingDescription(progress),
         control: custom(() => (
-            <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().resume(repo)}>
+            <Button
+                {...buttonKind('other', { size: 'md' })}
+                onClick={() => useWizardStore.getState().resume(repo, 'settings')}
+            >
                 Resume
             </Button>
         )),
@@ -55,7 +62,7 @@ export function repositoryGroup(data: SettingsData): Group {
         description: 'Settings stay on this machine. Projects need no factory files.',
         rows: [...onboarded, ...onboarding],
         action: (
-            <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().start()}>
+            <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().start('settings')}>
                 Add project
             </Button>
         ),

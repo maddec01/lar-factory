@@ -83,7 +83,7 @@ export function UpdateDownloading({
                     aria-valuemax={100}
                     aria-valuenow={percent}
                     data-kind="control"
-                    className="update-button text-primary-fg focus-ring bg-primary-surface hover:bg-primary-surface-hover inline-flex h-7 items-center gap-1.5 rounded-md px-2.75 text-xs font-medium"
+                    className="update-button text-primary-fg focus-ring bg-primary-surface hover:bg-primary-surface-hover text-ui inline-flex h-7 items-center gap-1.5 rounded-md px-2.75 font-medium"
                 >
                     <UpdateStatusIcon status="downloading" percent={percent} />
                     {text} <span className="w-7 tabular-nums">{percent}%</span>

@@ -1,6 +1,7 @@
 // What sits around a piece of work's Start (board/items.css): the group that holds it, the tag that takes its place once
 // a thread started, and the line under it with Start's message or error.
 
+import { Alert, DismissButton } from '@lar-works/design-system';
 import type { ReactNode, Ref } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
@@ -62,35 +63,49 @@ export function StartLine({
     ...data
 }: {
     /** The line's element, for moving focus to it. */
-    ref?: Ref<HTMLParagraphElement>;
+    ref?: Ref<HTMLDivElement>;
     /** Makes the line focusable from script, as -1. */
     tabIndex?: number;
     /** Start's message or error, or what Auto-build says. */
     children: ReactNode;
 } & DataAttributes) {
     return (
-        <p {...data} ref={ref} tabIndex={tabIndex} className="start">
+        <div {...data} ref={ref} tabIndex={tabIndex} className="start">
             {children}
-        </p>
+        </div>
     );
 }
 
-/** An action's error in the danger text colour, on its own line after the controls beside it. */
+/** An action's error, on its own line after the controls beside it: the design system's compact danger Alert, announced
+ *  as it appears, with a close button named by `dismissLabel` when it can be closed. */
 export function ActionError({
     ref,
-    role,
+    dismissLabel,
+    onDismiss,
     children,
 }: {
-    /** The error's element, for moving focus to it. */
-    ref?: Ref<HTMLSpanElement>;
-    /** `alert` to announce the error as it appears. */
-    role?: 'alert';
+    /** The alert's element, for moving focus to it. */
+    ref?: Ref<HTMLDivElement>;
+    /** Names the close button, such as "Dismiss error for #61". */
+    dismissLabel?: string;
+    /** Called as the reader closes the error; none leaves it without a close button. */
+    onDismiss?: () => void;
     /** The error. */
     children: ReactNode;
 }) {
     return (
-        <span ref={ref} role={role} className="action-error">
-            {children}
-        </span>
+        <div data-action-error className="min-w-0 basis-full">
+            <Alert
+                ref={ref}
+                presentation="inline"
+                tone="danger"
+                message={children}
+                action={
+                    onDismiss ? (
+                        <DismissButton label={dismissLabel ?? 'Dismiss'} placement="inline" onClick={onDismiss} />
+                    ) : undefined
+                }
+            />
+        </div>
     );
 }

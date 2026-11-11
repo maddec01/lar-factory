@@ -1,5 +1,5 @@
 import { trackerCapabilities, type RepositorySetup } from '@lar-factory/shared';
-import { FormSection, InsetPanel, Stack } from '@lar-works/design-system';
+import { InsetPanel, SettingsGroup, Stack } from '@lar-works/design-system';
 
 import { useEditStore } from './EditStore';
 import { useVocabularyDiscovery } from './useVocabularyDiscovery';
@@ -47,14 +47,14 @@ export function EditVocabulary({ setup }: { setup: RepositorySetup }) {
     const heading = trackerCapabilities(setup.repo).heading.toLowerCase();
 
     return (
-        <FormSection
-            presentation="dense"
+        <SettingsGroup
+            panel={false}
             aria-label="Kind vocabulary"
             title={`Kinds and ${heading}`}
             help={`Map bugs, features and improvements to existing ${heading} and types. Suggestions are optional.`}
             helpLabel="kind mapping"
         >
             <VocabularySettings setup={setup} />
-        </FormSection>
+        </SettingsGroup>
     );
 }

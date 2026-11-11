@@ -130,6 +130,11 @@ const buttonIn = (el: Element, label: string) =>
     );
 const creating = () => section().querySelector<HTMLInputElement>('[data-new-label]')!;
 const confirmDelete = () => $('[data-delete-label]')!;
+/** Settings' footer's Save changes, which saves an open label editor. */
+const footerSave = () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[data-settings-footer] button')].find(
+        (b) => text(b) === 'Save changes',
+    );
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
@@ -187,10 +192,10 @@ test('rename, colour and description open in the row and send only what changed'
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
     await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'status-done');
     expect(text(section())).toContain('status-done is reserved for board status.');
-    expect(buttonIn(rowOf('docs')!, 'Save')!.disabled).toBe(true);
+    expect(footerSave()!.disabled).toBe(true);
     await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
     await settle(() => buttonIn(rowOf('docs')!, 'Colour #1D76DB')!.click());
-    await settle(() => buttonIn(rowOf('docs')!, 'Save')!.click());
+    await settle(() => footerSave()!.click());
     expect(tracker.sent).toContainEqual({
         repo: GITHUB,
         change: 'update',
@@ -326,7 +331,7 @@ test('an open mapping reads the tracker again after a rename, so the new name is
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
     await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
-    await settle(() => buttonIn(rowOf('docs')!, 'Save')!.click());
+    await settle(() => footerSave()!.click());
 
     const bug = $('[data-vocabulary="bug"]')!;
 

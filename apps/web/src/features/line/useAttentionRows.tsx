@@ -51,6 +51,7 @@ export function useAttentionRows(
                                       data={data}
                                       threadId={openQuestionThread(parent)?.id}
                                       label="Answer in T3"
+                                      next
                                   />
                               }
                           />,
@@ -68,6 +69,7 @@ export function useAttentionRows(
                                     data={data}
                                     threadId={openQuestionThread(p.item)?.id}
                                     label="Answer in T3"
+                                    next
                                 />
                             }
                         />

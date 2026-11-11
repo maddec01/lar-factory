@@ -3,7 +3,6 @@
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
 import {
-    EmptyState,
     Button,
     Comment as CommentCard,
     CommentList,
@@ -14,7 +13,7 @@ import {
 } from '@lar-works/design-system';
 
 import { useOlderComments, type DetailsEntry, type ItemDetailsRead } from '@/services/items/items.hooks';
-import { buttonKind, DetailsHeading, MainSection } from '@/ui/board';
+import { buttonKind, MainSection, SectionHeader } from '@/ui/board';
 
 function Comment({ comment, now }: { comment: ItemComment; now: number }) {
     return (
@@ -49,21 +48,19 @@ function Comments({
     return (
         <MainSection
             header={
-                <DetailsHeading presentation="label">
-                    {ticketContext ? 'Ticket comments' : 'Comments'}
-                    {comments.length > 0 && ` · ${comments.length}`}
-                </DetailsHeading>
+                <SectionHeader
+                    heading={`${ticketContext ? 'Ticket comments' : 'Comments'}${comments.length > 0 ? ` · ${comments.length}` : ''}`}
+                    empty={!comments.length && !older.hasMore && 'No comments.'}
+                />
             }
             data-comments
         >
-            {comments.length > 0 ? (
+            {comments.length > 0 && (
                 <CommentList>
                     {comments.map((c) => (
                         <Comment key={c.id} comment={c} now={now} />
                     ))}
                 </CommentList>
-            ) : (
-                !older.hasMore && <EmptyState size="inline" title="No comments." />
             )}
             {older.hasMore && (
                 <Inline as="span" wrap align="center" space="group">

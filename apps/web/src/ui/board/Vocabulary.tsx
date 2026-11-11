@@ -33,9 +33,9 @@ export function VocabularyRow({
     children?: ReactNode;
 } & DataAttributes) {
     return (
-        <div {...data} className="grid min-w-0 gap-2 px-3 py-3">
+        <div {...data} className="grid min-w-0 gap-2 px-4 py-3.5">
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-x-3 gap-y-2 sm:grid-cols-[5.5rem_8.5rem_minmax(0,1fr)]">
-                <span className="text-ui font-medium">{title}</span>
+                <span className="text-sm leading-5 font-medium">{title}</span>
                 {type}
                 <div
                     role="group"

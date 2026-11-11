@@ -132,7 +132,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
         else void finish(() => resolveNeedsYou(item.id, offer));
     };
     const confirmButton = (name: string, press: () => void) => (
-        <Button {...buttonKind('main')} {...state} key={name} disabled={held} onClick={press}>
+        <Button {...buttonKind('main', { size: 'md' })} {...state} key={name} disabled={held} onClick={press}>
             {name}
         </Button>
     );
@@ -156,7 +156,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
             return choices.map((branchChoice) => (
                 <DropdownMenu key={branchChoice}>
                     <DropdownMenu.Trigger asChild>
-                        <Button {...buttonKind('main')} {...state} disabled={held}>
+                        <Button {...buttonKind('main', { size: 'md' })} {...state} disabled={held}>
                             {branchChoice === 'continue' ? 'Continue on old branch' : 'Start on new branch'}
                         </Button>
                     </DropdownMenu.Trigger>
@@ -264,7 +264,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                     </Stack>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button {...buttonKind('other')} disabled={loading} onClick={dismiss}>
+                    <Button {...buttonKind('other', { size: 'md' })} disabled={loading} onClick={dismiss}>
                         Cancel
                     </Button>
                     {actions()}

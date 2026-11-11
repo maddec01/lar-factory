@@ -1,138 +1,68 @@
-import { Popover, PopoverHeader, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
-import { ButtonBase as Button, scrollFadeClassName, useScrollFade } from '@lar-works/design-system/primitives';
+import { Popover, StatusPopoverContent, StatusPopoverSection, ToolbarCounter } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
-
-import { buttonKind } from './ButtonKinds';
-
-/** The title bar's counters, in its status strip after the Refreshed time. */
-export function BoardCounters({
-    children,
-}: {
-    /** The counters, one BoardCounter each. */
-    children: ReactNode;
-}) {
-    return <div className="counters flex shrink-0 items-center gap-0.5 whitespace-nowrap">{children}</div>;
-}
-
-/** How wide a counter's value stays from dash or loader to number: a count, a count over a limit, or a spend under
- *  $1,000 with its plus. */
-const valueWidths = { count: 'min-w-[2ch]', limit: 'min-w-[4ch]', spend: 'min-w-[8ch]' };
-
-/** Which counters the title bar's width folds away: Shaping and Shipped below 54rem, then Spend below 66rem. */
-const folds = { never: '', medium: 'hidden @4xl:inline-flex', wide: 'hidden @6xl:inline-flex' };
 
 interface BoardCounterProps {
     /** The status's glyph, in its own colour. */
     icon: ReactNode;
     /** The counter's figure. */
     value: ReactNode;
-    /** The figure's reserved width, so the bar doesn't shift as it changes. */
-    width?: keyof typeof valueWidths;
+    /** Builds against a limit, as a mini track after the figure: `used` of `limit`. */
+    track?: { used: number; limit: number };
+    /** The figure's reserved width, so the bar doesn't shift as it changes: a count, a count with its track, or a
+     *  figure such as a spend. */
+    width?: 'count' | 'track' | 'figure';
     /** Names the counter before its visible value; `hint` supplies its accessible description. */
     label: string;
     /** What the number means, in the tooltip. */
     hint: string;
-    /** Below which title bar width the counter folds away. */
-    fold?: keyof typeof folds;
-    /** The panel's head: its title and, at its right, a figure such as the count. */
+    /** Below which title bar width the counter folds away: `medium` (56rem) or `wide` (72rem). */
+    fold?: 'never' | 'medium' | 'wide';
+    /** The popover's title. */
     title: string;
-    /** The number of items, independent of the header's detail. */
+    /** How many items it lists, quietly after the title. */
     count?: number;
-    /** A small line under the figure, such as a limit. */
-    sub?: ReactNode;
-    /** A note under the panel's list. */
+    /** A muted line under the title, such as a limit or a total. */
+    detail?: ReactNode;
+    /** A note under the list, on a divider. */
     foot?: ReactNode;
-    /** The panel's list, which scrolls. */
+    /** The popover's list, which scrolls. */
     children: ReactNode;
 }
 
-/** One counter: an App control with a glyph and a tabular value, its tooltip, and the panel it opens, padded as a
- *  menu, of everything behind the number. The control names its `fold` and value `width` in `data-fold` and
- *  `data-width`, and the panel marks its head, scrolling list and foot, so an app's tests can read them without
- *  depending on the classes behind them. */
+/** One title-bar counter: the design system's ToolbarCounter (a glyph, a tabular figure and an optional build track,
+ *  with its glass tooltip) opening a wide status popover (384px) of everything behind the number. Its list sits in
+ *  `data-counter-list`, so an app's tests can find it without depending on the classes behind it. */
 export function BoardCounter({
     icon,
     value,
-    width = 'count',
+    track,
+    width,
     label,
     hint,
     fold = 'never',
     title,
     count,
-    sub,
+    detail,
     foot,
     children,
 }: BoardCounterProps) {
     return (
-        <Popover>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Popover.Trigger asChild>
-                        <Button
-                            {...buttonKind('control')}
-                            aria-description={hint}
-                            data-fold={fold}
-                            data-width={width}
-                            className={`text-fg-muted hover:text-fg data-[state=open]:bg-fill-selected data-[state=open]:text-fg min-w-0 gap-1.5 ${folds[fold]}`}
-                        >
-                            <span className="sr-only">{label}:</span>{' '}
-                            <span className="counter-icon grid size-4 shrink-0 place-items-center [&_svg]:size-4">
-                                {icon}
-                            </span>
-                            <span
-                                className={`counter-value text-fg inline-flex items-center leading-4 font-medium tabular-nums [&_[data-loader]]:w-full [&_[data-loader]]:justify-center [&_svg]:size-3 ${valueWidths[width]}`}
-                            >
-                                {value}
-                            </span>
-                        </Button>
-                    </Popover.Trigger>
-                </TooltipTrigger>
-                <TooltipPopup side="bottom">{hint}</TooltipPopup>
-            </Tooltip>
-            {/* Counters sit at the bar's start: each panel opens from its counter's left edge, rightwards. */}
-            <Popover.Content side="bottom" align="start" layout="fill" presentation="flush">
-                <div className="counter-popup flex max-h-112 min-h-0 w-112 max-w-full flex-col">
-                    <div data-counter-head>
-                        <PopoverHeader
-                            title={title}
-                            count={count ?? (typeof sub === 'number' ? sub : undefined)}
-                            detail={typeof sub === 'number' ? undefined : sub}
-                        />
-                    </div>
-                    {/* Padded as a menu, so the first row never sits flush on the header's divider (which then reads as missing). */}
-                    <CounterScroll>{children}</CounterScroll>
-                    {foot !== undefined && (
-                        <div
-                            data-counter-foot
-                            className="border-line text-fg-muted shrink-0 border-t px-3 pt-1.5 pb-2 text-xs"
-                        >
-                            {foot}
-                        </div>
-                    )}
-                </div>
-            </Popover.Content>
-        </Popover>
-    );
-}
-
-/** A counter panel's rows, scrolling between its header and foot with the shared edge fade, never a hard cut. */
-function CounterScroll({ children }: { children: ReactNode }) {
-    const { setViewport } = useScrollFade();
-
-    return (
-        <div
-            ref={setViewport}
-            data-counter-list
-            className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 ${scrollFadeClassName}`}
+        <ToolbarCounter
+            icon={icon}
+            label={label}
+            value={value}
+            hint={hint}
+            fold={fold}
+            {...(track && { track })}
+            {...(width && { width })}
         >
-            {children}
-        </div>
+            <StatusPopoverContent width="wide" title={title} count={count} detail={detail} footer={foot}>
+                <div data-counter-list className="contents">
+                    {children}
+                </div>
+            </StatusPopoverContent>
+        </ToolbarCounter>
     );
-}
-
-/** The divider before the spend counter, which folds with it. */
-export function CounterDivider() {
-    return <span aria-hidden="true" className="bg-line mx-1 hidden h-4 w-px shrink-0 @6xl:block" />;
 }
 
 /** A panel's list split by status, each part under its name and count. */
@@ -142,9 +72,10 @@ export function CounterGroups({
     /** The groups, one CounterGroup each. */
     children: ReactNode;
 }) {
-    return <div className="grid gap-1">{children}</div>;
+    return <div className="grid">{children}</div>;
 }
 
+/** One part of a panel's list, under the status popover's group heading: its status's name and count. */
 export function CounterGroup({
     title,
     count,
@@ -158,12 +89,9 @@ export function CounterGroup({
     children: ReactNode;
 }) {
     return (
-        <section>
-            <h3 className="text-fg-muted m-0 flex h-7 items-center gap-1 px-2 text-xs font-medium">
-                {title} <span className="tabular-nums">{count}</span>
-            </h3>
+        <StatusPopoverSection title={title} count={count}>
             {children}
-        </section>
+        </StatusPopoverSection>
     );
 }
 
@@ -219,7 +147,7 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen }: C
                     {leading}
                     {/* Up to two lines, so a title is read, not cut after a few words. */}
                     <span className="line-clamp-2 min-w-0 flex-1">{title}</span>
-                    <span className="text-2xs text-fg-muted flex shrink-0 items-center gap-1.5 tabular-nums">
+                    <span className="text-fg-muted flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
                         {trailing}
                     </span>
                 </button>
@@ -261,28 +189,6 @@ export function CounterDash() {
     return <span className="text-fg-muted font-normal">–</span>;
 }
 
-/** A count against a limit, such as builds at work under the build limit: the count, then the limit as small
- *  LimitBars, so it never reads as a fraction such as "4/2". The counter's hint says it in words. */
-export function CounterOfLimit({
-    count,
-    used,
-    limit,
-}: {
-    /** The count, such as "4". */
-    count: ReactNode;
-    /** How many of the limit are used. */
-    used: number;
-    /** The limit. */
-    limit: number;
-}) {
-    return (
-        <span className="inline-flex items-center gap-1.5">
-            {count}
-            <LimitBars used={used} limit={limit} size="sm" />
-        </span>
-    );
-}
-
 /** A figure that covers only part of what it sums, marked with a plus: amber while some of it is unavailable, muted
  *  while some is still loading. */
 export function CounterPartial({
@@ -302,37 +208,44 @@ export function CounterPartial({
     );
 }
 
+/** The most bars LimitBars draws; past it, a count says how many more there are. */
+const MOST_BARS = 5;
+
 /** The build limit as bars, then `children`, such as "4 running · limit 2": one bar per build it allows, filled for
- *  each build at work, and extra builds past it after a gap. `sm` is the size inside a counter's value. */
+ *  each build at work, and extra builds past it after a gap. It draws MOST_BARS at most, then "+n" for the rest, so a
+ *  busy board's bars never run across the Build stage's header. */
 export function LimitBars({
     used,
     limit,
-    size = 'md',
     children,
 }: {
     /** How many builds are at work. */
     used: number;
     /** How many builds the limit allows. */
     limit: number;
-    /** `sm` bars for a counter, `md` for a section's header. */
-    size?: 'sm' | 'md';
     /** The count in words after the bars, such as "4 running · limit 2". */
     children?: ReactNode;
 }) {
     const bar = (n: number, on: boolean) => (
-        <span
-            key={n}
-            className={`bar ${size === 'sm' ? 'h-1 w-2' : 'h-1.5 w-3'} rounded-full ${on ? 'bg-board-active' : 'bg-line'}`}
-        />
+        <span key={n} className={`bar h-1.5 w-3 rounded-full ${on ? 'bg-board-active' : 'bg-line'}`} />
     );
+
+    const within = Math.min(limit, MOST_BARS);
+    const past = Math.min(Math.max(used - limit, 0), MOST_BARS - within);
+    const more = Math.max(limit, used) - within - past;
 
     return (
         <span className="inline-flex items-center gap-2">
-            <span aria-hidden className={`inline-flex items-center ${size === 'sm' ? 'gap-0.5' : 'gap-0.75'}`}>
-                {Array.from({ length: limit }, (_, n) => bar(n, n < used))}
-                {used > limit && (
-                    <span className={`ml-1 inline-flex ${size === 'sm' ? 'gap-0.5' : 'gap-0.75'}`}>
-                        {Array.from({ length: used - limit }, (_, n) => bar(limit + n, true))}
+            <span aria-hidden className="inline-flex items-center gap-0.75">
+                {Array.from({ length: within }, (_, n) => bar(n, n < used))}
+                {past > 0 && (
+                    <span className="ml-1 inline-flex gap-0.75">
+                        {Array.from({ length: past }, (_, n) => bar(limit + n, true))}
+                    </span>
+                )}
+                {more > 0 && (
+                    <span className="text-fg-muted ml-1 text-xs font-medium tabular-nums" data-bars-more>
+                        +{more}
                     </span>
                 )}
             </span>

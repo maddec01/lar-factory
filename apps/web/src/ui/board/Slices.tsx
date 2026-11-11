@@ -1,6 +1,7 @@
-// A piece of work's slices: the bar every view of the board draws, and a list with each slice's mark.
+// A piece of work's slices: the bar every view of the board draws (the design system's segmented track), and a list
+// with each slice's mark.
 
-import { ambientMotion, statusStateColors } from '@lar-works/design-system';
+import { ambientMotion, SegmentedProgress, statusStateColors } from '@lar-works/design-system';
 import { CheckIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -12,31 +13,37 @@ const SLICE_COLOR = Object.fromEntries(
     Object.entries(sliceProgressState).map(([progress, state]) => [progress, statusStateColors[state]]),
 ) as Record<SliceProgress, string>;
 
-/** A 6px segment for each slice, named by its tooltip; waiting segments are faint, and an active one pulses unless
- *  `still`. */
+/** A segment for each slice in its state's colour, named for screen readers and, all together, by the bar's tooltip;
+ *  an active one breathes unless `still`. `size` is `sm` (4px) on a row and `md` (6px) in the item dialog. */
 export function SliceBar({
     slices,
     still = false,
+    size = 'sm',
 }: {
     /** The slices, each with its name and state. */
     slices: { name: string; progress: SliceProgress }[];
     /** Keeps an active segment from pulsing. */
     still?: boolean;
+    /** `sm` on a row (the default), `md` in a dialog. */
+    size?: 'sm' | 'md';
 }) {
     if (!slices.length) return null;
 
+    const done = slices.filter((s) => s.progress === 'done').length;
+    const named = slices.map((s) => `${s.name}: ${sliceProgressLabel[s.progress]}`);
+
     return (
-        <ol className="m-0 flex list-none gap-0.5 p-0">
-            {slices.map((s, i) => (
-                <li
-                    key={i}
-                    ref={s.progress === 'active' && !still ? ambientMotion : undefined}
-                    title={s.name}
-                    className={`h-1.5 flex-1 rounded-full ${s.progress === 'active' && !still ? 'status-pulse' : ''}`}
-                    style={{ background: SLICE_COLOR[s.progress] }}
-                />
-            ))}
-        </ol>
+        <div className="min-w-0" title={named.join('\n')} data-slice-bar>
+            <SegmentedProgress
+                label={`Slices, ${done} of ${slices.length} done`}
+                size={size}
+                segments={slices.map((s, i) => ({
+                    label: named[i]!,
+                    state: sliceProgressState[s.progress],
+                    pulse: s.progress === 'active' && !still,
+                }))}
+            />
+        </div>
     );
 }
 
@@ -59,12 +66,12 @@ export function SliceMark({
                 background: progress === 'done' ? SLICE_COLOR.done : 'transparent',
             }}
         >
-            {progress === 'unknown' && <span className="text-[9px] leading-none">?</span>}
+            {progress === 'unknown' && <span className="text-xs leading-none font-semibold">?</span>}
             {progress === 'done' && <CheckIcon className="size-2.5 text-white" strokeWidth={3} />}
             {progress === 'active' && (
                 <span
                     ref={still ? undefined : ambientMotion}
-                    className={`${still ? '' : 'status-pulse '}size-1.5 bg-board-active rounded-full`}
+                    className={`${still ? '' : 'lar-status-pulse '}size-1.5 bg-board-active rounded-full`}
                 />
             )}
         </span>
@@ -105,7 +112,7 @@ export function SliceRow({
     label?: string | undefined;
 }) {
     return (
-        <li className="text-ui hover:bg-fill-hover flex items-start gap-2 rounded-md px-2 py-1">
+        <li className="hover:bg-fill-hover flex items-start gap-2 rounded-md px-2 py-1 text-sm">
             <span className="mt-0.5">
                 <SliceMark progress={progress} still={still} />
             </span>
@@ -116,7 +123,7 @@ export function SliceRow({
             >
                 {title}
             </span>
-            <span className="text-2xs text-fg-muted mt-px shrink-0" data-slice-state>
+            <span className="text-fg-muted mt-0.5 shrink-0 text-xs" data-slice-state>
                 {label}
             </span>
         </li>

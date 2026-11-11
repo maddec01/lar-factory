@@ -21,7 +21,11 @@ export function BoardAttentionList({
 }) {
     return (
         // The labels' column is 7.5rem, or as wide as the longest label so none wraps ("To verify or merge" needs more).
-        <dl className="m-0 grid grid-cols-[minmax(7.5rem,max-content)_minmax(0,1fr)] gap-x-4 gap-y-2" data-attention>
+        // On a phone each label sits on top of its entries, which take the full width.
+        <dl
+            className="m-0 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(7.5rem,max-content)_minmax(0,1fr)] sm:gap-y-2"
+            data-attention
+        >
             {rows.map((r) => (
                 <div key={r.key} className="contents" data-attention-row={r.key}>
                     <dt className="text-fg-soft flex items-center gap-1.5 self-start pt-2 text-xs font-medium whitespace-nowrap">
@@ -45,7 +49,7 @@ export function AttentionNone({
     children: ReactNode;
 }) {
     return (
-        <p className="text-ui text-fg-muted m-0" data-attention-none>
+        <p className="text-fg-muted m-0 text-sm" data-attention-none>
             {children}
         </p>
     );
@@ -132,7 +136,7 @@ export function AttentionMark({
     children: ReactNode;
 } & DataAttributes) {
     return (
-        <span {...data} className={`flex ${clamp ? 'min-w-0 ' : ''}items-start text-ui gap-1.5`}>
+        <span {...data} className={`flex ${clamp ? 'min-w-0 ' : ''}items-start gap-1.5 text-sm`}>
             {MARKS[mark]}
             <span className={clamp ? 'line-clamp-2' : undefined}>{children}</span>
         </span>

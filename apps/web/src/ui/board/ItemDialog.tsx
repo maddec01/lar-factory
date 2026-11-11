@@ -5,11 +5,12 @@ import { Alert } from '@lar-works/design-system';
 import { linkRecipe } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
+import { ButtonDensityProvider } from './ButtonDensity';
 import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
 
 /**
- * The summary under the dialog's title, a row each: `line` (the item's source, repository, status and age), its
+ * The summary under the dialog's header, a row each: `line` (the item's source, repository, status and age), its
  * `parent`, its `kind` and its ticket `actions`.
  */
 export function ItemSummary({
@@ -29,7 +30,8 @@ export function ItemSummary({
     actions: ReactNode;
 } & DataAttributes) {
     return (
-        <div {...data} className="text-fg-muted @container grid shrink-0 gap-1 px-5 pb-3 text-xs sm:px-6">
+        // Under the dialog's 52px header and its hairline, 16px in, as the body's own top inset.
+        <div {...data} className="text-fg-muted @container grid shrink-0 gap-1 px-5 pt-4 text-xs sm:px-6">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {line}
                 {kind}
@@ -223,7 +225,8 @@ export function AccessNotice({
     );
 }
 
-/** A group of the footer's actions: the `leading` ones that move the item, in small text, or the rest at its end. */
+/** A group of the footer's actions: the `leading` ones that move the item, in small text, or the rest at its end. Its
+ *  buttons are the dialog footer's `md` 32px, as in every dialog. */
 export function DialogActions({
     presentation = 'trailing',
     children,
@@ -241,7 +244,7 @@ export function DialogActions({
                     : 'inline-flex items-center gap-1.5'
             }
         >
-            {children}
+            <ButtonDensityProvider density="md">{children}</ButtonDensityProvider>
         </span>
     );
 }

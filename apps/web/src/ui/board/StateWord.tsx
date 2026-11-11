@@ -7,8 +7,8 @@ import type { ReactNode, Ref } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
 
-/** The state's light and its word, which truncates in a narrow slot (`title` then says it whole). Muted for an `off`
- *  state, as StatusIndicator's word. */
+/** The state's light and its word: the design system's StatusIndicator with a `label`, which truncates in a narrow
+ *  slot (`title` then says it whole) and is muted for an `off` state. */
 export function StateWord({
     state,
     color,
@@ -30,7 +30,7 @@ export function StateWord({
     tabIndex?: number | undefined;
     /** Places it in a board composition. */
     className?: string;
-    /** The state's word, such as "Merged". */
+    /** The state's word, such as "Merged"; anything richer than a string keeps the same light and type. */
     children: ReactNode;
 } & DataAttributes) {
     return (
@@ -39,10 +39,18 @@ export function StateWord({
             ref={ref}
             tabIndex={tabIndex}
             title={title}
-            className={`inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs font-medium ${state === 'off' ? 'text-fg-muted' : 'text-fg'} ${className}`}
+            className={`inline-flex max-w-full min-w-0 ${className}`}
         >
-            <StatusIndicator size="sm" state={state} labelColor={color} />
-            <span className="min-w-0 truncate">{children}</span>
+            {typeof children === 'string' ? (
+                <StatusIndicator state={state} labelColor={color} label={children} />
+            ) : (
+                <span
+                    className={`inline-flex max-w-full min-w-0 items-center gap-2 text-xs font-medium ${state === 'off' ? 'text-fg-muted' : 'text-fg'}`}
+                >
+                    <StatusIndicator state={state} labelColor={color} />
+                    <span className="min-w-0 truncate">{children}</span>
+                </span>
+            )}
         </span>
     );
 }

@@ -84,7 +84,7 @@ test('a tick that changes nothing renders no glyph, and the ages on the desk and
 
     expect(text($('.queue-age'))).toBe('just now');
     expect(deskAge()).toContain('just now');
-    expect($('.status-spin'), 'the running row spins').not.toBeNull();
+    expect($('.lar-status-spin'), 'the running row spins').not.toBeNull();
 
     await tickAt(NOW + 2 * HOUR);
     expect(glyphRenders).toBe(0);
@@ -110,13 +110,13 @@ test('the tick that makes the read stale stops the spinner, keeps T3’s activit
     );
     const onDesk = () => $$('.desk-card').map((card) => card.getAttribute('data-item'));
 
-    expect($('.status-spin')).not.toBeNull();
+    expect($('.lar-status-spin')).not.toBeNull();
     expect(text($('[data-activity="working"] [data-action]'))).toBe('Run the tests');
     expect(onDesk()).toEqual([]);
 
     await tickAt(NOW + 180_001);
     expect(glyphRenders).toBeGreaterThan(0);
-    expect($('.status-spin')).toBeNull();
+    expect($('.lar-status-spin')).toBeNull();
     expect(text($('[data-activity="working"] [data-action]')), 'a stale provider read says nothing of T3').toBe(
         'Run the tests',
     );

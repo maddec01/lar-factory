@@ -37,7 +37,7 @@ export function PartKindLabel({
     const Icon = KIND_ICON[kind];
 
     return (
-        <span className="text-2xs text-fg-muted inline-flex shrink-0 items-center gap-1.5" data-part-kind>
+        <span className="text-fg-muted inline-flex shrink-0 items-center gap-1.5 text-xs" data-part-kind>
             <Icon className="size-3.5 shrink-0" />
             {children}
         </span>
@@ -86,7 +86,7 @@ export function ShowDoneToggle({
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className="text-2xs text-fg-muted hover:bg-fill-hover justify-self-start rounded-xs px-2 py-1"
+            className="text-fg-muted hover:bg-fill-hover justify-self-start rounded-xs px-2 py-1 text-xs"
         >
             {children}
         </button>
@@ -150,7 +150,7 @@ export function PartRow({
                         {meta}
                     </span>
                     {usage && (
-                        <span className="text-2xs text-fg-muted min-w-0 pl-5 tabular-nums" data-part-usage>
+                        <span className="text-fg-muted min-w-0 pl-5 text-xs tabular-nums" data-part-usage>
                             {usage}
                         </span>
                     )}

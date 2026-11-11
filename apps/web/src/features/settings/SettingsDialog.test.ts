@@ -135,10 +135,10 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
 test('a search that leaves out the open section shows the first one it keeps, and clearing it goes back', async () => {
     await open('General');
     await type(search(), 'skill folders');
-    expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Skills');
+    expect(text(modal()!.querySelector('[data-slot="modal-header"] h2 span:last-child'))).toBe('Skills');
     expect(section('Skills').getAttribute('aria-current')).toBe('page');
     await type(search(), '');
-    expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
+    expect(text(modal()!.querySelector('[data-slot="modal-header"] h2 span:last-child'))).toBe('General');
     expect(section('General').getAttribute('aria-current')).toBe('page');
 });
 
@@ -147,7 +147,10 @@ test('an empty search replaces the form and clearing it restores the saved selec
     await type(search(), 'zzz');
     expect(sections()).toHaveLength(0);
     expect(text(body())).toContain('Nothing matches');
-    expect($$('[data-settings-body] .settings-row')).toHaveLength(0);
+    expect(
+        $$('[data-settings-body] .settings-row').filter((row) => !row.closest('[hidden]')),
+        'the form is hidden, but stays mounted so a draft in it survives',
+    ).toHaveLength(0);
 
     const clear = [...body()!.querySelectorAll<HTMLButtonElement>('button')].find(
         (button) => text(button) === 'Clear search',
@@ -183,7 +186,7 @@ const groups = () =>
         [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row')),
     ]);
 
-test('a repository still onboarding is listed with its provider and its step, and Resume reopens the dialog there', async () => {
+test('a repository still onboarding is listed with its provider and its step, and Resume reopens it there in Projects’ place', async () => {
     const data: BoardData = {
         ...sample,
         onboarding: [
@@ -226,7 +229,62 @@ test('a repository still onboarding is listed with its provider and its step, an
         [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click(),
     );
     await settle(() => vi.advanceTimersByTime(50));
-    expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');
+    expect(dialog(), 'no second dialog over Settings').toBeNull();
+    expect(text(pane()!.querySelector('[data-setup-title]'))).toBe('Work and docs');
+});
+
+const pane = () => $('[data-onboarding-pane]');
+/** The setup's way back, the arrow before the header's trail. */
+const back = () => modal()!.querySelector<HTMLButtonElement>('[data-slot="modal-header"] button[aria-label="Back"]')!;
+const breadcrumb = () => text(modal()!.querySelector('[data-slot="modal-header"] h2 span:last-child'));
+const button = (within: Element | null, label: string) =>
+    [...(within?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => text(b) === label);
+
+test('Add project takes Projects’ place in Settings with Back, and leaving it returns to Projects', async () => {
+    serve(sample, [project('lar-web')]);
+    await open('Projects');
+
+    const add = button(body(), 'Add project')!;
+
+    // A click focuses the button in a browser.
+    add.focus();
+    await settle(() => add.click());
+    await settle(() => vi.advanceTimersByTime(50));
+    expect($$('[data-slot="modal-content"]'), 'no second dialog over Settings').toHaveLength(1);
+    expect(dialog()).toBeNull();
+    expect(breadcrumb()).toBe('Add a project');
+    expect(text(body()), 'the section’s description goes').not.toContain('Manage projects and their local settings.');
+    expect(document.activeElement, 'the step’s heading takes focus').toBe(pane()!.querySelector('[data-setup-title]'));
+    expect(text(pane()!.querySelector('[data-setup-title]'))).toBe('Project');
+    expect(button($('[data-settings-footer]'), 'Next'), 'Next in Settings’ footer').toBeDefined();
+
+    // Back returns to Projects, with focus on the button that opened the setup.
+    await settle(() => back().click());
+    await settle(() => vi.advanceTimersByTime(50));
+    expect(pane()).toBeNull();
+    expect(breadcrumb()).toBe('Projects');
+    expect(text(body())).toContain('Manage projects and their local settings.');
+    expect(document.activeElement).toBe(add);
+
+    // Another section closes the setup too.
+    await settle(() => add.click());
+    await settle(() => section('Integrations').click());
+    await settle(() => section('Projects').click());
+    expect(pane()).toBeNull();
+});
+
+test('a folder typed for a new T3 project is a draft Back asks about first', async () => {
+    serve(sample, [project('lar-web')]);
+    await open('Projects');
+    await settle(() => button(body(), 'Add project')!.click());
+    await settle(() => pane()!.querySelector<HTMLInputElement>('[data-choice="new"] input[type="radio"]')!.click());
+    await type(pane()!.querySelector<HTMLInputElement>('input[aria-label="Repository folder"]')!, '~/Developer/new');
+    await settle(() => back().click());
+    await settle(() => vi.advanceTimersByTime(100));
+    expect(text($('[role="alertdialog"]'))).toContain('Discard changes?');
+    await settle(() => button($('[role="alertdialog"]'), 'Discard changes')!.click());
+    await settle(() => vi.advanceTimersByTime(100));
+    expect(pane()).toBeNull();
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];

@@ -9,21 +9,19 @@
     --color-board-you: var(--color-warning);
     /* Work in motion (active): a running thread, an item being shaped, built or reviewed. */
     --color-board-active: var(--color-info);
-    /* The Review stage's identity on a stage bar, so the bar tells it from building. Never a status: a status light,
-       glyph or word takes a state's colour. */
-    --color-board-review: var(--color-violet-500);
+    /* The Review stage's identity on a stage bar, so the bar tells it from building: the categorical palette's violet,
+       never a status. A status light, glyph or word takes a state's colour. */
+    --color-board-review: oklch(0.55 0.1 var(--category-violet));
     /* Finished (ready): built and ready to merge, or done. */
     --color-board-done: var(--color-success);
     /* Not started or stopped (off): listed, queued, an idle or stopped agent. */
     --color-board-idle: var(--color-line-strong);
     /* A stage the work has already passed, on a stage track. */
     --color-board-past: color-mix(in srgb, var(--color-fg) 28%, transparent);
-    /* The board's horizontal rhythm: its workspace gives cards more breathing room than an app list's gutter. */
-    --spacing-gutter-board: 1.5rem;
 }
 
 :root {
     @variant dark {
-        --color-board-review: var(--color-violet-400);
+        --color-board-review: oklch(0.7 0.1 var(--category-violet));
     }
 }

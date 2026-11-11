@@ -22,7 +22,16 @@ function option(args: readonly string[], name: string): string | undefined {
 }
 
 const READ_RESOURCES: Readonly<Record<string, readonly string[]>> = {
-    git: ['items', 'commits', 'trees', 'blobs', 'pullRequests', 'pullRequestStatuses', 'pullRequestReviewers'],
+    git: [
+        'items',
+        'commits',
+        'trees',
+        'blobs',
+        'pullRequests',
+        'pullRequestStatuses',
+        'pullRequestReviewers',
+        'pullRequestIterations',
+    ],
     wit: ['workitemsbatch', 'wiql', 'comments', 'tags', 'workitemtypes', 'workitemtypestates', 'workitemrelationtypes'],
     work: ['backlogconfiguration', 'backlogs', 'teamfieldvalues'],
     policy: ['evaluations'],

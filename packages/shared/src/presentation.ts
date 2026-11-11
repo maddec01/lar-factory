@@ -184,6 +184,9 @@ export function prReadiness(
 
     if (pr.state === 'merged') return { word: 'Merged', action: 'Review PR', state: 'ready' };
 
+    if (pr.checkProgress && pr.checkProgress.state !== 'current')
+        return { word: 'Review PR', action: 'Review PR', state: 'off' };
+
     if (pr.checks?.failed) return { word: 'Checks failed', action: 'Review failed checks', state: 'failed' };
 
     if (pr.state !== 'open' || pr.isDraft || pr.mergeState === 'blocked' || pr.mergeState === 'conflicts')
@@ -200,6 +203,9 @@ export function prReadiness(
             state: 'active',
         };
 
+    if (pr.checks && pr.checks.total > pr.checks.passed + pr.checks.failed + pr.checks.running)
+        return { word: 'Checks unknown', action: 'Review PR', state: 'off' };
+
     return null;
 }
 
@@ -211,7 +217,9 @@ export function checksPhrase(checks: Checks | null): string {
           ? 'Checks failed'
           : checks.running
             ? 'Checks running'
-            : 'Checks passed';
+            : checks.passed === checks.total
+              ? 'Checks passed'
+              : 'Checks unknown';
 }
 
 /** The name of the item's repository as the board shows it. */

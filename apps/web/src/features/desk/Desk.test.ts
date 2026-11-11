@@ -362,3 +362,90 @@ test.each(['own', 'concept'] as const)(
         expect(text(action())).toBe(answer);
     },
 );
+
+test('review progress identifies the delivery PR, updates without a dialog and marks retained counts stale on disconnect', async () => {
+    const original = sample.items.find((i) => i.id === 'I_sample27')!;
+    const data = withItem(original.id, {
+        linkedPrs: [
+            {
+                ...original.linkedPrs[0]!,
+                number: 881,
+                checks: { passed: 2, running: 1, failed: 1, total: 4, since: null },
+                checkProgress: { state: 'current' },
+            },
+        ],
+    });
+
+    await mountPage(data);
+    expect(text(card(original.id))).toContain('PR #881');
+    expect(text(card(original.id))).toContain('2 passed · 1 running · 1 failed · 4 total');
+    expect(text(card(original.id))).toContain('Checks failed');
+    expect(dialog()).toBeNull();
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() =>
+        useBoardStore.getState().receive(
+            withItem(original.id, {
+                linkedPrs: [
+                    {
+                        ...data.items.find((i) => i.id === original.id)!.linkedPrs[0]!,
+                        checks: { passed: 4, running: 0, failed: 0, total: 4, since: null },
+                    },
+                ],
+            }),
+        ),
+    );
+    expect(text(card(original.id))).toContain('4 passed · 0 running · 0 failed · 4 total');
+    await settle(() => useBoardStore.getState().fail('offline'));
+    expect(text(card(original.id))).toContain('Stale check observation');
+    expect(text(card(original.id))).toContain('4 passed');
+    expect(dialog()).toBeNull();
+});
+
+test.each([
+    ['loading', { pipelineUnread: true, checks: null, checkProgress: undefined }, 'Loading checks…'],
+    ['unread source checks', { checks: null, checkProgress: undefined }, 'Loading checks…'],
+    ['zero checks', { checks: null, checkProgress: { state: 'current' } }, 'No checks reported. 0 total.'],
+    ['unavailable', { checks: null, checkProgress: { state: 'unavailable' } }, 'Check evidence unavailable.'],
+    ['retained counts', { checkProgress: { state: 'stale' } }, 'Stale check observation.'],
+    [
+        'limited Azure coverage',
+        {
+            checkProgress: {
+                state: 'current',
+                coverage: 'build-validation',
+                prWideChecks: { passed: 0, running: 1, failed: 0, total: 1, since: null },
+            },
+        },
+        'Limited coverage: build validation only.',
+    ],
+] satisfies [string, Partial<Item['linkedPrs'][number]>, string][])(
+    'a desk card distinguishes %s beside its question',
+    async (_name, patch, message) => {
+        const original = sample.items.find((i) => i.id === 'I_sample27')!;
+
+        await mountPage(
+            withItem(original.id, {
+                status: 'Needs you',
+                threads: [{ id: 'question', title: 'Question', state: 'needs you', updated: '2026-11-01' }],
+                linkedPrs: [{ ...original.linkedPrs[0]!, ...patch }],
+            }),
+        );
+        expect(text(card(original.id))).toContain(message);
+        expect(text(card(original.id))).toContain('Answer in T3');
+
+        if (patch.checkProgress && 'prWideChecks' in patch.checkProgress)
+            expect(text(card(original.id))).toContain('PR-wide statuses: 0 passed · 1 running · 0 failed · 1 total');
+
+        expect(dialog()).toBeNull();
+    },
+);
+
+test('a provider disconnect marks retained progress stale while its readiness blocker remains visible', async () => {
+    const data = { ...sample, itemSourceProblems: [{ repo: 'maddec01/lar-apple', problem: 'Provider unavailable' }] };
+
+    await mountPage(data);
+    expect(text(card('I_sample27'))).toContain('Stale check observation.');
+    expect(text(card('I_sample27'))).toContain('Checks failed');
+});

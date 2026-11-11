@@ -17,7 +17,7 @@ import {
     readingScope,
     prReadiness,
 } from '@lar-factory/shared';
-import type { BoardData, Item } from '@lar-factory/shared';
+import type { BoardData, Item, Checks } from '@lar-factory/shared';
 import { Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
@@ -34,7 +34,7 @@ import {
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { boardStatusState, DeskCard as Card, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
+import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -52,6 +52,50 @@ function NextStep({ item }: { item: Item }) {
     }
 
     return <DeskHint>{HINTS[item.status]}</DeskHint>;
+}
+
+const counts = (checks: Checks) =>
+    `${checks.passed} passed · ${checks.running} running · ${checks.failed} failed · ${checks.total} total`;
+
+function Progress({ item, data }: { item: Item; data: BoardData }) {
+    const disconnected = useBoardStore((state) => state.clientError);
+    const pr = item.linkedPrs[0];
+
+    if (!pr || pr.state !== 'open') return null;
+
+    const stale =
+        disconnected ||
+        data.itemSourceProblems?.some((p) => p.repo === item.repo) ||
+        pr.checkProgress?.state === 'stale';
+    const unread = pr.pipelineUnread || (!pr.checkProgress && !pr.checks);
+    const unavailable = pr.checkProgress?.state === 'unavailable';
+    const limited = pr.checkProgress?.coverage === 'build-validation';
+
+    return (
+        <DeskPrProgress
+            label={`PR #${pr.number}`}
+            summary={
+                unread
+                    ? stale || unavailable
+                        ? 'Checks unavailable. Not yet observed.'
+                        : 'Loading checks…'
+                    : unavailable
+                      ? 'Check evidence unavailable.'
+                      : pr.checks
+                        ? counts(pr.checks)
+                        : 'No checks reported. 0 total.'
+            }
+            note={
+                [
+                    stale && 'Stale check observation.',
+                    limited && 'Limited coverage: build validation only. Status checks unavailable.',
+                ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+            }
+            wide={pr.checkProgress?.prWideChecks ? counts(pr.checkProgress.prWideChecks) : undefined}
+        />
+    );
 }
 
 /** The card's action, and Open thread as a square icon in the right corner unless it is the action. */
@@ -82,7 +126,12 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             age={<Age at={item.updatedAt} />}
             title={<ItemTitle item={item} />}
             name={itemName(item)}
-            details={<AzureFields azure={item.azure} />}
+            details={
+                <>
+                    <AzureFields azure={item.azure} />
+                    <Progress item={item} data={data} />
+                </>
+            }
             statusIcon={<ItemStatusGlyph item={item} />}
             status={shown.word}
             statusState={shown.state ?? boardStatusState[shown.glyph]}

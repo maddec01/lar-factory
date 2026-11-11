@@ -298,6 +298,38 @@ export function fakeAz({
                     `az devops invoke failed: ERROR: could not convert string to float: '${version.replace('-preview', '')}'`,
                 );
 
+            if (resource.startsWith('git/pullRequest') || resource === 'policy/evaluations') {
+                const pr = pullRequests.find(
+                    (p) =>
+                        p.pullRequestId ===
+                        Number(route(args, 'pullRequestId') ?? /CodeReviewId\/[^/]+\/(\d+)/.exec(args.join(' '))?.[1]),
+                );
+
+                if (!pr) throw new Error('fake az: pull request not found');
+
+                if (resource === 'git/pullRequests')
+                    return JSON.stringify({
+                        ...pr,
+                        mergeStatus: pr.mergeStatus ?? 'succeeded',
+                        lastMergeSourceCommit: { commitId: pr.sourceRevision ?? 'source-head' },
+                        repository: { webUrl: REPO_URL, project: { id: 'project-id' } },
+                    });
+
+                if (resource === 'git/pullRequestIterations')
+                    return JSON.stringify({
+                        value: [{ id: 1, sourceRefCommit: { commitId: pr.sourceRevision ?? 'source-head' } }],
+                    });
+
+                return JSON.stringify({
+                    value:
+                        resource === 'policy/evaluations'
+                            ? (pr.policies ?? [])
+                            : resource === 'git/pullRequestStatuses'
+                              ? (pr.statuses ?? [])
+                              : [],
+                });
+            }
+
             if (resource === 'wit/workitems' && route(args, 'id'))
                 throw new Error("az devops invoke failed: ERROR: 'type'");
 
@@ -439,6 +471,9 @@ export function fakeAz({
 
 /** A pull request on the fake repository, as az repos pr show prints it. */
 export interface FakePr {
+    sourceRevision?: string;
+    policies?: unknown[];
+    statuses?: unknown[];
     pullRequestId: number;
     status: 'active' | 'completed' | 'abandoned';
     isDraft?: boolean;

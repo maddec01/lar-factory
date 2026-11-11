@@ -996,6 +996,7 @@
                         "total": 3,
                         "since": "2026-10-21T09:52:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "checking"
                 }
             ],
@@ -1060,6 +1061,7 @@
                         "total": 2,
                         "since": "2026-10-20T13:00:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],
@@ -1131,6 +1133,7 @@
                         "total": 5,
                         "since": "2026-10-21T09:18:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "checking"
                 }
             ],
@@ -1194,6 +1197,7 @@
                         "total": 1,
                         "since": "2026-10-21T08:40:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],
@@ -1241,6 +1245,7 @@
                         "total": 6,
                         "since": "2026-10-21T09:15:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "checking"
                 }
             ],
@@ -1282,6 +1287,7 @@
                         "total": 4,
                         "since": "2026-10-21T07:30:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "blocked"
                 }
             ],
@@ -1317,6 +1323,7 @@
                     "state": "open",
                     "isDraft": false,
                     "checks": null,
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "conflicts"
                 }
             ],
@@ -1358,6 +1365,7 @@
                         "total": 5,
                         "since": "2026-10-21T08:30:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],
@@ -1454,6 +1462,7 @@
                         "total": 1,
                         "since": "2026-10-20T15:00:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],
@@ -1507,6 +1516,7 @@
                         "total": 2,
                         "since": "2026-10-18T10:00:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],
@@ -1576,6 +1586,7 @@
                         "total": 2,
                         "since": "2026-10-20T13:00:00Z"
                     },
+                    "checkProgress": { "state": "current", "coverage": "all" },
                     "mergeState": "can merge"
                 }
             ],

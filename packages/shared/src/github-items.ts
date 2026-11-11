@@ -77,6 +77,7 @@ export interface RawLinkedPr {
     /** Read for builds' linked PRs only, with the body. */
     mergedAt?: string | null;
     mergeStateStatus?: string;
+    headRefOid?: string;
     statusCheckRollup?: {
         contexts: {
             checkRunCountsByState: RawStateCount[];
@@ -183,12 +184,21 @@ export function normalizeMergeState(status: string | undefined): MergeState {
     return (status && Object.hasOwn(MERGE_STATES, status) ? MERGE_STATES[status] : undefined) ?? 'checking';
 }
 
-function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state, ...pr }: RawLinkedPr): LinkedPr {
+export function normalizeLinkedPr({
+    id: _id,
+    headRefOid,
+    statusCheckRollup,
+    mergeStateStatus,
+    state,
+    ...pr
+}: RawLinkedPr): LinkedPr {
     const prState = state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : 'open';
 
     return {
         ...pr,
         state: prState,
+        ...(headRefOid && { sourceRevision: headRefOid }),
+        checkProgress: { state: statusCheckRollup === undefined ? 'unavailable' : 'current', coverage: 'all' },
         checks: normalizeChecks(statusCheckRollup),
         mergeState: normalizeMergeState(mergeStateStatus),
     };

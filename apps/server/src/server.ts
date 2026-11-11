@@ -554,7 +554,7 @@ function showStatsRead(reads: T3Reads): void {
  * show through showStatsRead. The board keeps working without either.
  */
 function withT3Reads(items: Item[], withStats = true): Item[] {
-    return loopTrace.span('threads', () => itemsWithThreads(items, withStats));
+    return loopTrace.span('threads', () => itemsWithThreads(prObserver?.project(items) ?? items, withStats));
 }
 
 function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
@@ -1361,6 +1361,7 @@ let observing = false;
 const prObserver = records
     ? createPrObserver(records, {
           repositories: () => items.repos().map((repo) => repo.repo),
+          currentItems: () => board.snapshot().items,
           hidden: () => retention.hidden(),
           waits: (repo) =>
               (quotaLow && !onAzure(repo)) ||

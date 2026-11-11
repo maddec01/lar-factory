@@ -24,7 +24,7 @@ test('the board query reads the blocked-by issues, and no issue or linked PR bod
     );
     assert.match(
         OPEN_ISSUES_QUERY,
-        /id number url state isDraft mergeStateStatus\n/,
+        /id number url state isDraft mergeStateStatus headRefOid\n/,
         "linked PRs' bodies and merge times are read for builds only, by id",
     );
 });

@@ -1,11 +1,11 @@
-import type { Item } from '@lar-factory/shared';
+import type { Item, LinkedPr } from '@lar-factory/shared';
 import { openWorkRecords, type PullRequestState, type WorkRecords } from '@lar-factory/work-records';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
-import { conditionalPrReader, createPrObserver } from './pr-observer.ts';
+import { createPrObserver } from './pr-observer.ts';
 
 const repo = 'owner/repo';
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -30,26 +30,13 @@ async function fixture() {
         status: 'Review',
     });
     const record = records.setPullRequest(created.workId, created.revision, `${repo}#4`);
-    const read = vi.fn<(repo: string, number: number) => Promise<PullRequestState>>(async () => 'open');
+    const read = vi.fn<(repo: string, number: number) => Promise<PullRequestState | LinkedPr>>(async () => 'open');
     const changed = vi.fn();
     const hidden = new Set<string>();
     const options = { repositories: () => [repo], hidden: () => hidden, waits: () => false, read, changed };
 
     return { records, record, read, changed, hidden, options };
 }
-
-test('GitHub PR state reads retain their ETag and last state through a 304', async () => {
-    const run = vi.fn<(args: string[]) => Promise<string>>(
-        async () => 'HTTP/2.0 200 OK\r\nETag: "state-1"\r\n\r\n{"state":"open","merged_at":null}',
-    );
-    const read = conditionalPrReader(run);
-
-    expect(await read(repo, 4)).toBe('open');
-    // gh represents an unchanged response as a nonzero exit.
-    run.mockRejectedValueOnce(new Error('gh: HTTP 304'));
-    expect(await read(repo, 4)).toBe('open');
-    expect(run.mock.calls[1]![0]).toContain('If-None-Match: "state-1"');
-});
 
 test('an issue-free build follows its PR within fifteen seconds and stops reading once merged', async () => {
     const { records, record, options, read } = await fixture();
@@ -98,5 +85,193 @@ test('a failed conditional read keeps the last state and waits before retrying',
         { of: 'pr', state: 'open', failure: 'Provider unavailable' },
     ]);
     await observer.poll(16_000);
+    expect(read).toHaveBeenCalledTimes(2);
+});
+
+test('publishes progress for a recorded PR absent from ticket reads and retains stale counts after failures', async () => {
+    const { records, record, options, read } = await fixture();
+    const observer = createPrObserver(records, options);
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        state: 'open',
+        isDraft: false,
+        sourceRevision: 'head',
+        mergeState: 'blocked',
+        checks: { passed: 2, running: 1, failed: 0, total: 3, since: null },
+        checkProgress: { state: 'current', coverage: 'all' },
+    };
+    const items = [{ id: record.workId, linkedPrs: [{ ...pr, pipelineUnread: true, checks: null }] } as Item];
+
+    read.mockResolvedValue(pr);
+    await observer.poll(0);
+    expect(observer.project(items)[0]?.linkedPrs[0]).toMatchObject({
+        checks: { total: 3 },
+        checkProgress: { state: 'current' },
+    });
+    expect(observer.project(items)[0]?.linkedPrs[0]?.pipelineUnread).toBeUndefined();
+    read.mockRejectedValueOnce(new Error('offline'));
+    await observer.poll(15_000);
+    expect(observer.project(items)[0]?.linkedPrs[0]).toMatchObject({
+        checks: { passed: 2 },
+        checkProgress: { state: 'stale' },
+    });
+    read.mockResolvedValueOnce({ ...pr, sourceRevision: 'new', checks: null, checkProgress: { state: 'unavailable' } });
+    await observer.poll(30_000);
+    expect(observer.project(items)[0]?.linkedPrs[0]).toMatchObject({
+        sourceRevision: 'new',
+        checks: null,
+        checkProgress: { state: 'unavailable' },
+    });
+});
+
+test('a state-only ticket recovery does not freshen failed check evidence or hide observer updates behind an old ticket revision', async () => {
+    const { records, record, options, read } = await fixture();
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        state: 'open',
+        isDraft: false,
+        sourceRevision: 'old',
+        mergeState: 'can merge',
+        checks: { passed: 1, failed: 0, running: 0, total: 1, since: null },
+        checkProgress: { state: 'current' },
+    };
+    const observer = createPrObserver(records, options);
+
+    await observer.known([{ linkedPrs: [pr] } as Item], 0);
+    read.mockResolvedValueOnce({
+        ...pr,
+        sourceRevision: 'new',
+        checks: { passed: 2, failed: 0, running: 0, total: 2, since: null },
+    });
+    await observer.poll(300_000);
+
+    const projected = [{ id: record.workId, linkedPrs: [pr] } as Item];
+
+    expect(observer.project(projected)[0]?.linkedPrs[0]).toMatchObject({ sourceRevision: 'new', checks: { total: 2 } });
+    read.mockRejectedValueOnce(new Error('checks offline'));
+    await observer.poll(600_000);
+    await observer.known(
+        [{ linkedPrs: [{ ...pr, sourceRevision: 'new', checkProgress: undefined }] } as Item],
+        601_000,
+    );
+    expect(observer.project(projected)[0]?.linkedPrs[0]?.checkProgress?.state).toBe('stale');
+});
+
+test('a source read can finish the PR without the progress cache restoring its former open state', async () => {
+    const { records, record, options, read } = await fixture();
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        sourceRevision: 'head',
+        state: 'open',
+        isDraft: false,
+        mergeState: 'can merge',
+        checks: { passed: 1, failed: 0, running: 0, total: 1, since: null },
+        checkProgress: { state: 'current' },
+    };
+    const observer = createPrObserver(records, options);
+
+    read.mockResolvedValue(pr);
+    await observer.poll(0);
+
+    const merged = { ...pr, state: 'merged' as const, checkProgress: undefined };
+
+    await observer.known([{ linkedPrs: [merged] } as Item], 1000);
+    expect(records.read(record.workId).status).toBe('Done');
+    expect(observer.project([{ id: record.workId, linkedPrs: [merged] } as Item])[0]?.linkedPrs[0]?.state).toBe(
+        'merged',
+    );
+});
+
+test('idle progress uses the five-minute safety cadence and a new head restores prompt reads', async () => {
+    const { records, record, options, read } = await fixture();
+    const observer = createPrObserver(records, options);
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        sourceRevision: 'head',
+        state: 'open',
+        isDraft: false,
+        mergeState: 'can merge',
+        checks: { passed: 1, failed: 0, running: 0, total: 1, since: null },
+        checkProgress: { state: 'current' },
+    };
+
+    read.mockResolvedValue(pr);
+    await observer.poll(0);
+    await observer.poll(15_000);
+    await observer.poll(299_999);
+    expect(read).toHaveBeenCalledTimes(1);
+    await observer.poll(300_000);
+    expect(read).toHaveBeenCalledTimes(2);
+    await observer.known(
+        [{ linkedPrs: [{ ...pr, sourceRevision: 'new', checkProgress: undefined }] } as Item],
+        301_000,
+    );
+    read.mockResolvedValue({ ...pr, sourceRevision: 'new', checks: { ...pr.checks!, passed: 0, running: 1 } });
+    await observer.poll(315_000);
+    await observer.poll(330_000);
+    expect(read).toHaveBeenCalledTimes(4);
+    expect(observer.project([{ id: record.workId, linkedPrs: [pr] } as Item])[0]?.linkedPrs[0]).toMatchObject({
+        sourceRevision: 'new',
+        checks: { running: 1 },
+    });
+});
+
+test('unchanged unavailable progress backs off while preserving its unknown state', async () => {
+    const { records, record, options, read } = await fixture();
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        sourceRevision: 'head',
+        state: 'open',
+        isDraft: false,
+        mergeState: 'checking',
+        checks: null,
+        checkProgress: { state: 'unavailable' },
+    };
+    const observer = createPrObserver(records, options);
+
+    read.mockResolvedValue(pr);
+    await observer.poll(0);
+    await observer.poll(15_000);
+    await observer.poll(30_000);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(observer.project([{ id: record.workId, linkedPrs: [pr] } as Item])[0]?.linkedPrs[0]).toMatchObject({
+        checks: null,
+        checkProgress: { state: 'unavailable' },
+    });
+    await observer.poll(315_000);
+    expect(read).toHaveBeenCalledTimes(3);
+});
+
+test('a build without a ticket uses current board activity for prompt polling', async () => {
+    const { records, record, options, read } = await fixture();
+    const pr: LinkedPr = {
+        number: 4,
+        url: `https://github.com/${repo}/pull/4`,
+        state: 'open',
+        isDraft: false,
+        sourceRevision: 'head',
+        mergeState: 'can merge',
+        checks: { passed: 1, running: 0, failed: 0, total: 1, since: null },
+        checkProgress: { state: 'current' },
+    };
+    const boardItems = [{ id: record.workId, threads: [], slices: [] } as unknown as Item];
+    const observer = createPrObserver(records, { ...options, currentItems: () => boardItems });
+
+    expect(records.read(record.workId).ticket).toBeNull();
+    read.mockResolvedValue(pr);
+    await observer.known([], 0);
+    await observer.poll(0);
+    await observer.poll(15_000);
+    expect(read).toHaveBeenCalledTimes(1);
+    boardItems[0] = {
+        ...boardItems[0]!,
+        threads: [{ purpose: 'build', state: 'running', currentRunning: true }],
+    } as Item;
+    await observer.poll(30_000);
     expect(read).toHaveBeenCalledTimes(2);
 });

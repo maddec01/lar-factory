@@ -35,9 +35,6 @@ const opener = (id: string) => row(id).querySelector<HTMLButtonElement>('[data-r
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const col = (id: string, name: string) => row(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
 const side = (id: string) => col(id, 'side')!;
-/** A row's side after the agent figures that lead it: its status or action. */
-const sideAfterFigures = (id: string) =>
-    text(side(id)).slice(text(side(id).querySelector('[data-col="figures"]')).length);
 /** A section heading's title and the count shown beside it. */
 const heading = (id: string) => [
     text($(`#${id}`)),
@@ -760,7 +757,7 @@ describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread r
         await receive(at(threads('done'), { slices: [] }));
         expect(text(desk())).toContain('Review PR');
         expect(text(desk()!.querySelector('.desk-actions'))).toContain('Review PR');
-        expect(sideAfterFigures('I_sample13'), 'the status stays in one place on the Build row').toBe('');
+        expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
         expect(posted()).toEqual([]);
     });
 

@@ -252,48 +252,32 @@ export function QueueAge({
 }
 
 /** The row's action slot, at its right. With `passEmpty`, clicks on its controls stay there, and a click beside them
- *  reaches the row. `figures` lead the action on the same line, for a row with no second line to hold them, so it keeps
- *  the height of a row with none; they truncate before the action does. */
+ *  reaches the row. */
 export function RowSide({
     passEmpty = false,
-    figures,
     children,
 }: {
     /** Clicks beside its controls reach the row. */
     passEmpty?: boolean;
-    /** Figures before the action, such as usage. */
-    figures?: ReactNode;
     /** The row's action. */
     children: ReactNode;
 }) {
-    const content = figures ? (
-        <>
-            <span data-col="figures" className="flex min-w-0 shrink justify-end">
-                {figures}
-            </span>
-            {children}
-        </>
-    ) : (
-        children
-    );
-    const action = `${ROW_ACTION}${figures ? ' flex-nowrap' : ''}`;
-
     if (!passEmpty)
         return (
-            <span data-col="side" className={`row-side ${action}`}>
-                {content}
+            <span data-col="side" className={`row-side ${ROW_ACTION}`}>
+                {children}
             </span>
         );
 
     return (
         <span data-col="side" className="row-side">
             <span
-                className={action}
+                className={ROW_ACTION}
                 onClick={(event) => {
                     if (event.target !== event.currentTarget) event.stopPropagation();
                 }}
             >
-                {content}
+                {children}
             </span>
         </span>
     );

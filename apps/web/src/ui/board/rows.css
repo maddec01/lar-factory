@@ -13,7 +13,7 @@
     --row-kind: 6.75rem;
     /* Room for a state on one line, such as "Blocked · starts after #202". */
     --row-state: 11rem;
-    /* Room for an action and the figures of a row with no second line, such as "on your desk · 52m · 3.15M · $0.62". */
+    /* The action column and the figures below it share the same right edge. */
     --row-side: 13rem;
 }
 
@@ -214,21 +214,6 @@
         right: var(--row-inset);
         width: auto;
         max-width: 55%;
-    }
-    .row-side > [data-col='figures'] {
-        overflow: hidden;
-    }
-    /* A side with figures and no button (a row that waits on you, its usage on the first line at a desk's width)
-       leaves the top end to the title and puts its figures at the row's bottom right, where every other row's are. */
-    .row-side:not(:has(button, a)) {
-        position: static;
-        display: flex;
-        justify-content: flex-end;
-        width: auto;
-        max-width: none;
-        min-height: 0;
-        margin-top: --spacing(1);
-        padding-right: var(--row-inset);
     }
     .row-first:not(:has(> .row-side :is(button, a))) > .row-cols > [data-title-cell] {
         padding-right: 0;

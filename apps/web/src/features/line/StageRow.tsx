@@ -1,8 +1,7 @@
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
-// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures. A row
-// with only figures to add shows them beside its action instead.
+// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures.
 
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { blockedText, canRetryBuild, currentBuildThread, itemActivityThread, itemName } from '@lar-factory/shared';
@@ -138,9 +137,14 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
     const hasFigureCell = Boolean(
         (figures && hasFigures(figures)) || usageLoading(item, data) || usageUnreadable(item),
     );
-    // A row with nothing but figures to add holds them beside its action, so it keeps a single row's height.
     const hasSecondLine =
-        item.slices.length > 0 || working || showsActivity || prs.length > 0 || Boolean(blocked) || shown.light;
+        hasFigureCell ||
+        item.slices.length > 0 ||
+        working ||
+        showsActivity ||
+        prs.length > 0 ||
+        Boolean(blocked) ||
+        shown.light;
 
     return (
         <StageRowItem item={item.id} picked={isPicked}>
@@ -184,7 +188,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                         <AzureFields azure={item.azure} />
                     </RowStateCell>
                 </RowOpen>
-                <RowSide figures={!hasSecondLine && hasFigureCell && <Figures s={figures} item={item} />}>
+                <RowSide>
                     <Side item={item} data={data} />
                 </RowSide>
             </RowFirst>

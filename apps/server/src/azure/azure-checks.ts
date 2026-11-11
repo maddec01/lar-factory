@@ -3,7 +3,13 @@ import type { Checks } from '@lar-factory/shared';
 export interface Policy {
     evaluationId: string;
     status: string;
-    configuration: { id?: number; type?: { id: string }; isBlocking: boolean; isEnabled: boolean };
+    configuration: {
+        id?: number;
+        type?: { id: string };
+        settings?: Record<string, unknown>;
+        isBlocking: boolean;
+        isEnabled: boolean;
+    };
 }
 export interface PrStatus {
     id: number;

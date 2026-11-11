@@ -55,7 +55,7 @@ const footerControls = () =>
 
 test.each([
     ['Verify', 'Review PR', 'I_sample16'],
-    ['Ready to merge', 'Review PR', 'I_sample17'],
+    ['Ready to merge', 'Open PR', 'I_sample17'],
 ])('a %s item with no linked pull request has %s disabled, its title saying why', async (_status, label, itemId) => {
     await mountPage({ ...sample, items: sample.items.map((i) => (i.id === itemId ? { ...i, linkedPrs: [] } : i)) });
     await openItem(itemId);

@@ -27,7 +27,7 @@ export { useShownLabels } from './useShownLabels';
 export { NeedsYou } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
-export { PrLink } from './PrLink';
+export { PrAction } from './PrLink';
 export { PrList } from './PrList';
 export { RowActions } from './RowActions';
 export { SliceBar, SliceList } from './SliceParts';

@@ -281,6 +281,16 @@ export function createBoardServer({
 
     /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
     const WRITES: Record<string, Write> = {
+        '/api/inspect-merge': {
+            what: 'the recorded delivery PR',
+            disabled: 'Merge readiness is unavailable in sample mode.',
+            run: forItem('Name the item to inspect.', (itemId) => commands.inspectMerge(itemId)),
+        },
+        '/api/merge-pr': {
+            what: 'the confirmed delivery PR',
+            disabled: 'Merging is disabled in sample mode.',
+            run: forItem('Name the item to merge.', (itemId, input) => commands.mergePr(itemId, input)),
+        },
         '/api/pr-readiness': {
             what: 'the linked PR to read',
             disabled: 'Azure readiness is unavailable in sample mode.',

@@ -5,7 +5,7 @@ import { create } from 'zustand';
 
 export interface ItemAction {
     phase: 'pending' | 'error';
-    kind: 'queue' | 'back-to-list' | 'abandon' | 'needs-you' | 'dependency-met';
+    kind: 'queue' | 'back-to-list' | 'abandon' | 'needs-you' | 'dependency-met' | 'merge-pr';
     message?: string;
 }
 

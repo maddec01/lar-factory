@@ -27,7 +27,7 @@ export {
     CounterPartial,
 } from './Counters';
 export { noteBoardPlaces } from './BoardLife';
-export { DeskCard, DeskHint, DeskSection } from './Desk';
+export { DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote } from './List';
 export { LoadingScreen } from './LoadingScreen';

@@ -7,13 +7,14 @@ import {
     readTrackerStructure,
     trackerKind,
     normalizeItems,
+    normalizeLinkedPr,
     readBuilds,
     rawBuildPrs,
     rawDossiers,
     refKey,
 } from '@lar-factory/shared';
 // Reads repository issues and linked PRs through the local `gh` CLI (`gh api graphql`).
-import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
+import type { Item, LinkedPr, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
 import { structureProvider } from '@lar-factory/work-records/tracker-sync';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,6 +47,88 @@ const CHECKS = `statusCheckRollup {
     }
   }`;
 
+/** Revision-bound rollups for delivery PRs, at most 25 aliases per GraphQL request. */
+export async function readPrProgressBatch(
+    refs: readonly { repo: string; number: number }[],
+    run: (args: string[]) => Promise<string> = (args) => gh(args, undefined, true, true),
+): Promise<Map<string, PromiseSettledResult<LinkedPr>>> {
+    const results = new Map<string, PromiseSettledResult<LinkedPr>>();
+
+    await mapConcurrent(
+        Array.from({ length: Math.ceil(refs.length / 25) }, (_, i) => refs.slice(i * 25, (i + 1) * 25)),
+        async (chunk) => {
+            const vars: Record<string, string | number> = {};
+            const fields = chunk.map(({ repo, number }, i) => {
+                const [owner, name] = repo.split('/');
+
+                Object.assign(vars, { [`owner${i}`]: owner, [`name${i}`]: name, [`number${i}`]: number });
+
+                return `pr${i}: repository(owner: $owner${i}, name: $name${i}) { pullRequest(number: $number${i}) {
+                number url state isDraft mergeStateStatus headRefOid ${CHECKS}
+            } }`;
+            });
+            const parameters = chunk.flatMap((_, i) => [
+                `$owner${i}: String!`,
+                `$name${i}: String!`,
+                `$number${i}: Int!`,
+            ]);
+
+            try {
+                const result = await graphql<{
+                    data?: Record<string, { pullRequest: RawLinkedPr | null } | null>;
+                    errors?: { path?: (string | number)[]; message: string }[];
+                }>(`query(${parameters.join(', ')}) { ${fields.join(' ')} }`, vars, run);
+
+                chunk.forEach(({ repo, number }, i) => {
+                    const key = `${repo}#${number}`.toLowerCase();
+                    const pr = result.data?.[`pr${i}`]?.pullRequest;
+                    const error = result.errors?.find((e) => !e.path?.length || e.path[0] === `pr${i}`);
+
+                    if (
+                        error ||
+                        !pr ||
+                        pr.number !== number ||
+                        typeof pr.headRefOid !== 'string' ||
+                        !pr.headRefOid ||
+                        !['OPEN', 'CLOSED', 'MERGED'].includes(pr.state) ||
+                        typeof pr.isDraft !== 'boolean' ||
+                        pr.statusCheckRollup === undefined
+                    ) {
+                        results.set(key, {
+                            status: 'rejected',
+                            reason: new Error(error?.message ?? 'GitHub returned incomplete PR progress.'),
+                        });
+
+                        return;
+                    }
+
+                    try {
+                        results.set(key, {
+                            status: 'fulfilled',
+                            value: {
+                                ...normalizeLinkedPr(pr),
+                                checkProgress: {
+                                    state: 'current',
+                                    coverage: 'all',
+                                    observedAt: new Date().toISOString(),
+                                },
+                            },
+                        });
+                    } catch (reason) {
+                        results.set(key, { status: 'rejected', reason });
+                    }
+                });
+            } catch (reason) {
+                for (const { repo, number } of chunk)
+                    results.set(`${repo}#${number}`.toLowerCase(), { status: 'rejected', reason });
+            }
+        },
+        3,
+    );
+
+    return results;
+}
+
 /** The fields the board reads of a repository issue. */
 const ISSUE_FIELDS = `id number title url body issueType { name } state stateReason closedAt updatedAt
   repository { nameWithOwner }
@@ -57,7 +140,7 @@ const ISSUE_FIELDS = `id number title url body issueType { name } state stateRea
   blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
     nodes {
-      id number url state isDraft mergeStateStatus
+      id number url state isDraft mergeStateStatus headRefOid
       ${CHECKS}
     }
   }`;
@@ -179,7 +262,7 @@ export async function ghQuotaLow(): Promise<boolean> {
 /** gh's cooldown: once GitHub answers with a rate limit, every gh call fails at once until the limit resets. */
 export const ghCooldown = createCooldown('gh', ghReset);
 
-async function gh(args: string[], input?: string, cools = true): Promise<string> {
+export async function gh(args: string[], input?: string, cools = true, acceptPartial = false): Promise<string> {
     const command = toolCommand('gh');
 
     if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
@@ -195,6 +278,17 @@ async function gh(args: string[], input?: string, cools = true): Promise<string>
 
     if (result.code !== 0) {
         if (cools) await ghCooldown.failed(result.stderr || result.detail);
+
+        // Progress batches can retain successful aliases when GraphQL returns per-PR errors.
+        if (acceptPartial) {
+            try {
+                const partial = JSON.parse(result.stdout) as { data?: unknown; errors?: unknown[] };
+
+                if (partial.data && Array.isArray(partial.errors) && partial.errors.length) return result.stdout;
+            } catch {
+                /* A failed command without a partial GraphQL response remains a failed read. */
+            }
+        }
 
         throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
     }

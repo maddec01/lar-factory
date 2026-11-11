@@ -192,3 +192,29 @@ export function DeskHint({
         </span>
     );
 }
+
+/** Revision check progress stays visible alongside questions and readiness blockers. */
+export function DeskPrProgress({
+    label,
+    summary,
+    note,
+    wide,
+}: {
+    label: string;
+    summary: string;
+    note?: string;
+    wide?: string;
+}) {
+    return (
+        <div
+            className="text-fg-muted grid gap-1 text-xs tabular-nums"
+            role="status"
+            aria-label={`${label} check progress`}
+        >
+            <span className="text-fg font-medium">{label}</span>
+            <span>{summary}</span>
+            {wide && <span>PR-wide statuses: {wide}</span>}
+            {note && <span>{note}</span>}
+        </div>
+    );
+}

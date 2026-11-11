@@ -42,8 +42,17 @@ export interface Pipeline {
 /** GitHub's merge state status, in four: CLEAN, HAS_HOOKS and UNSTABLE can merge; UNKNOWN is checking; DIRTY is conflicts; the rest blocked. */
 export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts';
 
+export interface CheckProgress {
+    state: 'current' | 'stale' | 'unavailable';
+    coverage?: 'all' | 'build-validation';
+    observedAt?: string;
+    /** Azure statuses without an iteration, separate from revision-bound checks. */
+    prWideChecks?: Checks | null;
+}
+
 export interface LinkedPr extends Pipeline {
-    /** Azure source commit observed with this PR. */
+    checkProgress?: CheckProgress;
+    /** Source commit observed with this PR. */
     sourceRevision?: string;
     number: number;
     url: string;

@@ -339,7 +339,7 @@ export function checkState(checks: Checks | null): CheckState | null {
 
     if (checks.failed) return 'failed';
 
-    return checks.running ? 'running' : 'passed';
+    return checks.running ? 'running' : checks.passed === checks.total ? 'passed' : null;
 }
 
 /** The linked pull request Open PR opens, with its checks and merge state. */

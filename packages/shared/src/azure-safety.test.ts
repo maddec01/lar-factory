@@ -52,6 +52,7 @@ test.each([
     invoke('git', 'blobs'),
     invoke('git', 'pullRequests'),
     invoke('git', 'pullRequestStatuses'),
+    invoke('git', 'pullRequestIterations'),
     invoke('git', 'pullRequestReviewers'),
     invoke('policy', 'evaluations'),
     [

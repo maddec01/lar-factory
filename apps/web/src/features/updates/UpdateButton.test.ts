@@ -1,11 +1,9 @@
-// The title bar's update pill: hidden with no update, then "Update available", a progress ring with the percentage
-// while it downloads, and "Restart to update" once downloaded. Hovering it shows the changelog with the next step's
-// button. The bridge stands in for the app's preload and pushes each new update state, as the app does.
+// Update entry points exercised through the page and its desktop bridge.
 
 import type { UpdateState } from '@lar-factory/shared';
-import { describe, expect, test, vi } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 
-import { $, answerRestart, mountPage, settle, stubApp, text, toast } from '@/test/PageTest';
+import { $, mountPage, settle, stubApp, text, toast } from '@/test/PageTest';
 
 const idle: UpdateState = {
     enabled: true,
@@ -51,7 +49,7 @@ const withNotes: UpdateState = {
     omittedReleaseCount: 3,
 };
 
-function stubBridge(start: UpdateState, restart = true) {
+function stubBridge(start: UpdateState) {
     let push: (state: UpdateState) => void = () => {};
     const action = (state: UpdateState) => vi.fn(async () => ({ accepted: true, completed: false, state }));
     const bridge = stubApp({
@@ -64,169 +62,295 @@ function stubBridge(start: UpdateState, restart = true) {
         checkForUpdate: vi.fn(async () => ({ checked: true, state: idle })),
         downloadUpdate: action(downloading),
         installUpdate: action(downloaded),
-        confirmRestart: answerRestart(restart),
     });
 
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
 }
 
-const pill = () => $<HTMLElement>('.title-bar .update-button');
-const disabled = () => pill()!.getAttribute('aria-disabled') === 'true';
-const icon = (name: string) => pill()!.querySelector(`svg.lucide-${name}`);
-const click = () => settle(() => pill()!.click());
-const toastText = () => toast()?.textContent;
-const changelog = () => $('[data-slot="popover-content"]');
+const control = () => $<HTMLButtonElement>('.title-bar .update-button')!;
+const popover = () => $('[data-slot="popover-content"]');
+const confirmation = () => $('[data-restart-confirm]');
+const click = () => settle(() => control().click());
+const next = () => settle(() => $<HTMLButtonElement>('.update-next')!.click());
+const answer = (label: string) =>
+    settle(() =>
+        [...confirmation()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!.click(),
+    );
+const escape = () =>
+    settle(() =>
+        document.activeElement!.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        ),
+    );
+const requestRestart = async () => {
+    await click();
+    await next();
+};
 
-describe('available', () => {
-    test('a pill reads "Update available", just before Settings, and clicking it downloads', async () => {
-        const { bridge } = stubBridge(available);
+test('the quiet icon sits before Settings and downloads only from its click-open details', async () => {
+    const { bridge } = stubBridge(withNotes);
 
-        await mountPage();
-        expect(text(pill())).toBe('Update available');
-        expect(pill()!.classList, 'an App control’s corners, not a pill').not.toContain('rounded-full');
-        expect([pill()!.getAttribute('data-kind'), pill()!.classList.contains('text-primary-fg')]).toEqual([
-            'control',
-            true,
-        ]);
-        expect(icon('arrow-down-to-line')).not.toBeNull();
-
-        const controls = [...pill()!.closest('.title-bar')!.querySelectorAll('button')];
-
-        expect(
-            controls[controls.indexOf(pill() as HTMLButtonElement) + 1]!.classList,
-            'Settings comes right after it',
-        ).toContain('open-settings');
-        await click();
-        expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-    });
-
-    test('a failed download is available again and retries the download', async () => {
-        const { bridge } = stubBridge(downloadFailed);
-
-        await mountPage();
-        expect(text(pill())).toBe('Update available');
-        await click();
-        expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-    });
-
-    test('a download that fails returns to available, and T3’s toast gives the reason', async () => {
-        const { bridge, push } = stubBridge(available);
-
-        bridge.downloadUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: downloadFailed });
-        await mountPage();
-        await click();
-        await push(downloadFailed);
-        expect(text(pill())).toBe('Update available');
-        expect(toastText()).toBe('Couldn’t download update net::ERR_TIMED_OUT');
-    });
-
-    test('a download the app refuses shows the not-accepted toast and stays available', async () => {
-        const { bridge } = stubBridge(available);
-
-        bridge.downloadUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: available });
-        await mountPage();
-        await click();
-        expect(toastText()).toBe('Update not downloaded Download it from the update button once the updater is free.');
-        expect(text(pill())).toBe('Update available');
-    });
-
-    test('a second click while the download call runs does nothing', async () => {
-        const { bridge } = stubBridge(available);
-
-        bridge.downloadUpdate.mockImplementationOnce(() => new Promise(() => {}));
-        await mountPage();
-        await click();
-        expect(disabled()).toBe(true);
-        await click();
-        expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-    });
+    await mountPage();
+    expect(text(control())).toBe('');
+    expect(control().getAttribute('aria-label')).toBe('Update to 1.1.0');
+    expect(control().getAttribute('data-kind')).toBe('control');
+    expect(control().querySelector('svg.lucide-circle-fading-arrow-up')).not.toBeNull();
+    expect(control().nextElementSibling!.classList).toContain('open-settings');
+    await settle(() => control().focus());
+    expect(popover()).toBeNull();
+    await click();
+    expect(bridge.downloadUpdate).not.toHaveBeenCalled();
+    expect(text(popover())).toContain('Lar Factory 1.1.0');
+    expect(text(popover())).toContain('You have 1.0.0');
+    expect(text(popover())).toContain('feat(board): show the changelog');
+    expect(text(popover())).toContain('10 more changes in this release');
+    expect(text(popover())).toContain('3 older releases not shown');
+    await next();
+    expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
 });
 
-describe('downloaded', () => {
-    test('reads "Restart to update"; clicking it asks to restart, then installs on Restart', async () => {
+test('Escape closes details and returns focus to the icon', async () => {
+    stubBridge(available);
+    await mountPage();
+    await click();
+    expect(popover()).not.toBeNull();
+    await escape();
+    expect(popover()).toBeNull();
+    await settle(() => vi.advanceTimersByTime(0));
+    expect(document.activeElement === control()).toBe(true);
+});
+
+test('the same anchored popover survives download progress and completion', async () => {
+    const { push } = stubBridge(withNotes);
+
+    await mountPage();
+    await click();
+
+    const details = popover();
+
+    await push({ ...downloading, releaseNotes: withNotes.releaseNotes });
+    expect(popover()).toBe(details);
+    expect(control().getAttribute('aria-label')).toBe('Downloading 1.1.0 · 42%');
+    expect(control().querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('42');
+    expect(text(popover())).toContain('Downloading 1.1.0… 42%');
+    expect($('.update-next')).toBeNull();
+    await push(downloaded);
+    expect(popover()).toBe(details);
+    expect(text($('.update-next'))).toBe('Restart now');
+});
+
+test('an empty changelog leaves the versions and action usable', async () => {
+    stubBridge(available);
+    await mountPage();
+    await click();
+    expect(text(popover())).toContain('You have 1.0.0');
+    expect(text($('.update-next'))).toBe('Download');
+});
+
+test.each([idle, { ...idle, status: 'checking' as const }, { ...idle, enabled: false, status: 'disabled' as const }])(
+    'no actionable update hides the icon: $status',
+    async (state) => {
+        stubBridge(state);
+        await mountPage();
+        expect(control()).toBeNull();
+    },
+);
+
+test('restart closes details and asks in the board dialog before installing', async () => {
+    const { bridge } = stubBridge(downloaded);
+
+    await mountPage();
+    await requestRestart();
+    expect(popover()).toBeNull();
+    expect(text(confirmation())).toContain('Restart to install 1.1.0?');
+    expect(text(confirmation())).toContain('Lar Factory will restart to install 1.1.0.');
+    expect(confirmation()!.getAttribute('role')).toBe('alertdialog');
+    expect(bridge.installUpdate).not.toHaveBeenCalled();
+    await answer('Restart now');
+    expect(bridge.installUpdate).toHaveBeenCalledOnce();
+    expect(confirmation()).not.toBeNull();
+    expect(confirmation()!.querySelector('[aria-busy="true"]')).not.toBeNull();
+    await answer('Restart now');
+    expect(bridge.installUpdate).toHaveBeenCalledOnce();
+});
+
+test.each(['Later', 'Escape'])(
+    '%s cancels without losing the downloaded update and restores focus',
+    async (dismissal) => {
         const { bridge } = stubBridge(downloaded);
 
         await mountPage();
-        expect(text(pill())).toBe('Restart to update');
-        expect(
-            [pill()!.getAttribute('data-kind'), pill()!.classList.contains('text-primary-fg')],
-            'tinted, not filled',
-        ).toEqual(['control', true]);
-        expect(pill()!.classList).not.toContain('bg-primary');
-        expect(icon('rotate-ccw')).not.toBeNull();
-        await click();
-        expect(bridge.confirmRestart).toHaveBeenCalledExactlyOnceWith('The board app will restart to install 1.1.0.');
-        expect(bridge.installUpdate).toHaveBeenCalledOnce();
-    });
+        await requestRestart();
 
-    test('Cancel leaves the update downloaded, to install later', async () => {
-        const { bridge } = stubBridge(downloaded, false);
+        if (dismissal === 'Later') await answer('Later');
+        else await escape();
 
-        await mountPage();
-        await click();
+        expect(confirmation()).toBeNull();
+        await settle(() => vi.advanceTimersByTime(0));
+        expect(document.activeElement === control()).toBe(true);
         expect(bridge.installUpdate).not.toHaveBeenCalled();
-        expect(text(pill())).toBe('Restart to update');
-        expect(disabled()).toBe(false);
+        expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
         expect(toast()).toBeNull();
-    });
+        await requestRestart();
+        expect(confirmation()).not.toBeNull();
+    },
+);
 
-    test('a failed install reads "Restart to update" again and retries the install', async () => {
-        const { bridge } = stubBridge(installFailed);
-
-        await mountPage();
-        expect(text(pill())).toBe('Restart to update');
-        await click();
-        expect(bridge.installUpdate).toHaveBeenCalledOnce();
-    });
-
-    test('an install that fails returns to "Restart to update", and T3’s toast gives the reason', async () => {
+test.each(['refused', 'failed', 'rejected'])(
+    'a %s install ends the busy dialog, keeps the update and permits retry',
+    async (failure) => {
         const { bridge } = stubBridge(downloaded);
 
-        bridge.installUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: installFailed });
-        await mountPage();
-        await click();
-        expect(text(pill())).toBe('Restart to update');
-        expect(disabled()).toBe(false);
-        expect(toastText()).toBe('Couldn’t install update quit refused');
-    });
-
-    test('a background check keeps the pill, disabled until it ends', async () => {
-        const { bridge, push } = stubBridge(downloaded);
+        if (failure === 'rejected') bridge.installUpdate.mockRejectedValueOnce(new Error('quit refused'));
+        else
+            bridge.installUpdate.mockResolvedValueOnce({
+                accepted: failure !== 'refused',
+                completed: false,
+                state: failure === 'failed' ? installFailed : downloaded,
+            });
 
         await mountPage();
-        await push({ ...downloaded, status: 'checking', canRetry: false });
-        expect(text(pill())).toBe('Restart to update');
-        expect(disabled()).toBe(true);
-        await click();
-        expect(bridge.installUpdate).not.toHaveBeenCalled();
-    });
-});
-
-describe('installing', () => {
-    test('a failed install the app pushes later ends it, and clicking retries', async () => {
-        const { bridge, push } = stubBridge(downloaded);
-
-        bridge.installUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: downloaded });
-        await mountPage();
-        await click();
-        expect(text(pill())).toBe('Installing…');
-        await push(installFailed);
-        expect(text(pill())).toBe('Restart to update');
-        await click();
+        await requestRestart();
+        await answer('Restart now');
+        expect(confirmation()).toBeNull();
+        expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
+        expect(text(toast())).toContain(failure === 'refused' ? 'Update downloaded' : 'Couldn’t install update');
+        await requestRestart();
+        await answer('Restart now');
         expect(bridge.installUpdate).toHaveBeenCalledTimes(2);
-    });
+    },
+);
+
+test('a pushed install failure ends the busy dialog and permits retry', async () => {
+    const { bridge, push } = stubBridge(downloaded);
+
+    await mountPage();
+    await requestRestart();
+    await answer('Restart now');
+    await push(installFailed);
+    expect(confirmation()).toBeNull();
+    await requestRestart();
+    await answer('Restart now');
+    expect(bridge.installUpdate).toHaveBeenCalledTimes(2);
 });
 
-describe('the changelog', () => {
-    test('opens on keyboard focus, which stays on the pill, and Escape closes it', async () => {
-        stubBridge(withNotes);
+test('a background check retains the restart indicator and blocks installation until finished', async () => {
+    const { bridge, push } = stubBridge(downloaded);
+
+    await mountPage();
+    await push({ ...downloaded, status: 'checking' });
+    expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
+    await click();
+    expect($<HTMLButtonElement>('.update-next')!.disabled).toBe(true);
+    await next();
+    expect(confirmation()).toBeNull();
+    expect(bridge.installUpdate).not.toHaveBeenCalled();
+    await push(downloaded);
+    await next();
+    expect(confirmation()).not.toBeNull();
+});
+
+test('a pending download cannot run twice and failure leaves Download available', async () => {
+    const { bridge, push } = stubBridge(available);
+    let finish!: (value: { accepted: boolean; completed: boolean; state: UpdateState }) => void;
+
+    bridge.downloadUpdate.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finish = resolve;
+            }),
+    );
+    await mountPage();
+    await click();
+    await next();
+    await next();
+    expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
+    await settle(() => finish({ accepted: true, completed: false, state: downloadFailed }));
+    await push(downloadFailed);
+    expect(text(toast())).toContain('Couldn’t download update net::ERR_TIMED_OUT');
+    await next();
+    expect(bridge.downloadUpdate).toHaveBeenCalledTimes(2);
+});
+
+test('a refused download keeps its feedback and retry', async () => {
+    const { bridge } = stubBridge(available);
+
+    bridge.downloadUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: available });
+    await mountPage();
+    await click();
+    await next();
+    expect(text(toast())).toContain('Update not downloaded');
+    await next();
+    expect(bridge.downloadUpdate).toHaveBeenCalledTimes(2);
+});
+
+test.each(['download', 'restart'])(
+    'Board search keeps its direct %s action and returns focus after cancellation',
+    async (action) => {
+        const { bridge } = stubBridge(action === 'download' ? available : downloaded);
+
         await mountPage();
-        // Tab pressed on the page, which jsdom's :focus-visible reads.
-        await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
-        await settle(() => pill()!.focus());
-        expect(changelog()).not.toBeNull();
-        expect(document.activeElement).toBe(pill());
-        await settle(() => pill()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-        expect(changelog()).toBeNull();
+
+        const field = $<HTMLButtonElement>('[data-search-field]')!;
+
+        await settle(() => field.click());
+
+        const option = [...document.querySelectorAll<HTMLElement>('[data-command-palette] [role="option"]')].find(
+            (el) => text(el).includes(action === 'download' ? 'Download the update' : 'Restart to update'),
+        )!;
+
+        await settle(() => option.click());
+        expect($('[data-command-palette]')).toBeNull();
+
+        if (action === 'download') expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
+        else {
+            expect(bridge.installUpdate).not.toHaveBeenCalled();
+            expect(confirmation()).not.toBeNull();
+            await answer('Later');
+            await settle(() => vi.advanceTimersByTime(100));
+            expect(document.activeElement === field).toBe(true);
+        }
+    },
+);
+
+test('all entry points share the guards while checking and confirming', async () => {
+    const { bridge } = stubBridge(downloaded);
+
+    await mountPage();
+
+    const { useUpdateStore } = await import('./UpdateStore');
+    const store = useUpdateStore.getState;
+    let finish!: (value: { checked: boolean; state: UpdateState }) => void;
+
+    bridge.checkForUpdate.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finish = resolve;
+            }),
+    );
+    await settle(() => {
+        void store().check();
+        void store().check();
+        void store().run();
     });
+    expect(bridge.checkForUpdate).toHaveBeenCalledOnce();
+    expect(confirmation()).toBeNull();
+    await settle(() => finish({ checked: true, state: downloaded }));
+    await requestRestart();
+    await settle(() => {
+        void store().check();
+        void store().run();
+        void store().download();
+    });
+    expect(document.querySelectorAll('[data-restart-confirm]')).toHaveLength(1);
+    expect(bridge.checkForUpdate).toHaveBeenCalledOnce();
+    expect(bridge.downloadUpdate).not.toHaveBeenCalled();
+    await answer('Restart now');
+    await settle(() => {
+        void store().check();
+        void store().run();
+        void store().confirmInstall();
+    });
+    expect(bridge.installUpdate).toHaveBeenCalledOnce();
+    expect(bridge.checkForUpdate).toHaveBeenCalledOnce();
 });

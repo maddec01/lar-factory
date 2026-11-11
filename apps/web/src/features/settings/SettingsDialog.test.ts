@@ -18,11 +18,11 @@ import { dialog, project, serve } from '@/test/OnboardingTest';
 import {
     $,
     $$,
-    answerRestart,
     mountPage,
     chooseOption,
     push,
     sample,
+    push as pushBoard,
     settle,
     stubApp,
     text,
@@ -466,7 +466,6 @@ describe('updates', () => {
             checkForUpdate: vi.fn(async () => ({ checked: true, state: start })),
             downloadUpdate: vi.fn(async () => ({ accepted: true, completed: false, state: start })),
             installUpdate: vi.fn(async () => ({ accepted: true, completed: false, state: start })),
-            confirmRestart: answerRestart(true),
         });
 
         return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
@@ -534,7 +533,6 @@ describe('updates', () => {
         });
 
         bridge.installUpdate = vi.fn(() => new Promise<never>(() => {}));
-        bridge.confirmRestart = answerRestart(true);
         await open('Updates');
         expect(select().getAttribute('aria-disabled')).toBe('true');
         await pick('latest');
@@ -543,7 +541,7 @@ describe('updates', () => {
 
         await push(downloaded);
         expect(select().getAttribute('aria-disabled')).toBe('false');
-        await settle(() => $<HTMLButtonElement>('.update-button')!.click());
+        await settle(() => $<HTMLButtonElement>('[data-update-action]')!.click());
         expect(select().getAttribute('aria-disabled')).toBe('true');
     });
 
@@ -562,6 +560,53 @@ describe('updates', () => {
         expect(result().dataset.tone).toBe('danger');
     });
 
+    test.each([true, false])(
+        'Settings restart works when T3 is missing before confirmation: %s',
+        async (missingInitially) => {
+            const next = '0.2.0-nightly.20261024.42';
+            const { bridge } = stubChannel({
+                ...nightly,
+                status: 'downloaded',
+                availableVersion: next,
+                downloadedVersion: next,
+            });
+            const missing = { ...sample, tools: { ...sample.tools!, t3: { result: 'missing' as const } } };
+
+            await open('Updates', missingInitially ? missing : sample);
+
+            const action = $<HTMLButtonElement>('[data-update-action]')!;
+
+            await settle(() => {
+                action.focus();
+                action.click();
+            });
+
+            if (!missingInitially) await pushBoard(missing);
+
+            expect(text($('[data-restart-confirm]'))).toContain(`Restart to install ${next}?`);
+            expect(bridge.installUpdate).not.toHaveBeenCalled();
+            await settle(() =>
+                [...document.querySelectorAll<HTMLButtonElement>('[data-restart-confirm] button')]
+                    .find((b) => text(b) === 'Later')!
+                    .click(),
+            );
+            await settle(() => vi.advanceTimersByTime(100));
+            expect($('[data-restart-confirm]')).toBeNull();
+            expect(action.disabled).toBe(false);
+            expect(document.activeElement === action).toBe(true);
+            await settle(() => {
+                action.focus();
+                action.click();
+            });
+            await settle(() =>
+                [...document.querySelectorAll<HTMLButtonElement>('[data-restart-confirm] button')]
+                    .find((b) => text(b) === 'Restart now')!
+                    .click(),
+            );
+            expect(bridge.installUpdate).toHaveBeenCalledOnce();
+        },
+    );
+
     describe('shows the update pill’s state', () => {
         const next = '0.2.0-nightly.20261024.42';
         const available: UpdateState = { ...nightly, status: 'available', availableVersion: next };
@@ -577,10 +622,17 @@ describe('updates', () => {
             });
 
             await open('Updates');
-            expect([status(), text(pill())]).toEqual([`${next} is ready to install.`, 'Restart to update']);
+            expect(status()).toBe(`${next} is ready to install.`);
+            expect(pill().getAttribute('aria-label')).toBe(`Restart to install ${next}`);
             expect(text(action())).toBe('Restart to update');
             await settle(() => action()!.click());
-            expect(bridge.confirmRestart).toHaveBeenCalledOnce();
+            expect(bridge.installUpdate).not.toHaveBeenCalled();
+            expect(text($('[data-restart-confirm]'))).toContain(`Restart to install ${next}?`);
+            await settle(() =>
+                [...document.querySelectorAll<HTMLButtonElement>('[data-restart-confirm] button')]
+                    .find((b) => text(b) === 'Restart now')!
+                    .click(),
+            );
             expect(bridge.installUpdate).toHaveBeenCalledOnce();
         });
     });

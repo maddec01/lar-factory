@@ -1,4 +1,4 @@
-export { UpdateButton } from './UpdateButton';
+export { RestartConfirmation, UpdateButton } from './UpdateButton';
 export {
     canCheckForUpdate,
     getUpdateDisabledReason,

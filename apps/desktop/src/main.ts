@@ -33,7 +33,6 @@ import * as T3Instances from './skills/t3-instances.ts';
 import * as AppUpdates from './updates/AppUpdates.ts';
 import * as ChannelSetting from './updates/channel-setting.ts';
 import * as ElectronUpdater from './updates/ElectronUpdater.ts';
-import * as RestartDialog from './updates/restart-dialog.ts';
 import * as ExternalLink from './window/external-link.ts';
 import * as MainWindowBounds from './window/MainWindowBounds.ts';
 import * as StartingPage from './window/starting-page.ts';
@@ -306,13 +305,6 @@ const handleUpdates = (window: Electron.BrowserWindow, boardOrigin: () => string
         channel === 'latest' || channel === 'nightly'
             ? updates.setChannel(channel)
             : Effect.fail(new Error('The update channel must be latest or nightly')),
-    );
-    handle(IpcChannels.CONFIRM_RESTART, (message) =>
-        typeof message === 'string'
-            ? Effect.promise(() => Electron.dialog.showMessageBox(window, RestartDialog.options(message))).pipe(
-                  Effect.map(RestartDialog.confirmed),
-              )
-            : Effect.fail(new Error('The restart question must be a string')),
     );
 };
 

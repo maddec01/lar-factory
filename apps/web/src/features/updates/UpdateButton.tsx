@@ -1,21 +1,10 @@
-// The title bar's update pill, a Port of T3 Code's update pill (apps/web/src/components/sidebar/SidebarUpdatePill.tsx
-// at d53873b), drawn by the design system's UpdatePill as the board's other App controls are, tinted in every state,
-// instead of as T3's pill. With no update it doesn't show; Settings › Updates checks. An available update reads "Update available", a download shows a progress
-// ring with the percentage, and a downloaded update reads "Restart to update". Clicking the pill runs that step, with
-// T3's toasts from the store; installing asks first in the app's native dialog, as T3 does. While the app installs,
-// the pill reads "Installing…", disabled.
-// Hovering the pill, or focusing it from the keyboard, opens T3's changelog (as SidebarUpdateReleaseNotes) below it,
-// with the update's version, each Release's changes and the step's button. It closes 150 ms after the pointer leaves
-// both, as T3's does, and on Escape. Focus stays on the pill, which runs the same step.
-//
-// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
-
 import { boardApp, plural, type UpdateState } from '@lar-factory/shared';
+import { ConfirmDialog } from '@lar-works/design-system';
 import { useEffect } from 'react';
 
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './UpdateButtonLogic';
 import { useUpdateStore } from './UpdateStore';
-import { ReleaseNotes, UpdateDownloading, UpdatePill } from '@/ui/board';
+import { ReleaseNotes, UpdatePill } from '@/ui/board';
 
 /** Each Release's changes, newest Release first, with what the app left out. */
 function Notes({ state }: { state: UpdateState }) {
@@ -38,26 +27,32 @@ function Notes({ state }: { state: UpdateState }) {
     );
 }
 
-/** "Update available" or "Restart to update", with the changelog and the step's button. */
-function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
-    const { installing, pending, run } = useUpdateStore();
-    const disabled = installing || pending || resolveUpdateButtonAction(state) === 'none';
+/** The store owns confirmation so Settings and Board search use the same dialog. */
+export function RestartConfirmation() {
+    const { state, confirming, installing, pending, confirmInstall, cancelInstall } = useUpdateStore();
+
+    if (!state || !confirming) return null;
+
+    const version = state.downloadedVersion ?? state.availableVersion;
 
     return (
-        <UpdatePill
-            status={ready ? 'downloaded' : 'available'}
-            label={installing ? 'Installing…' : ready ? 'Restart to update' : 'Update available'}
-            heading={updateStatusText(state)}
-            notes={state.releaseNotes.length > 0 && <Notes state={state} />}
-            actionLabel={ready ? 'Restart now' : 'Download'}
-            disabled={disabled}
-            onRun={() => void run()}
+        <ConfirmDialog
+            data-restart-confirm
+            title={`Restart to install ${version}?`}
+            consequence={`Lar Factory will restart to install ${version}.`}
+            confirmLabel="Restart now"
+            cancelLabel="Later"
+            intent="default"
+            busy={installing}
+            confirmDisabled={pending || resolveUpdateButtonAction(state) !== 'install'}
+            onConfirm={() => void confirmInstall()}
+            onCancel={cancelInstall}
         />
     );
 }
 
 export function UpdateButton() {
-    const { state, follow } = useUpdateStore();
+    const { state, follow, installing, confirming, pending, run } = useUpdateStore();
 
     useEffect(follow, [follow]);
 
@@ -65,15 +60,28 @@ export function UpdateButton() {
 
     if (!boardApp() || !state || pill === 'none') return null;
 
-    if (pill === 'downloading')
-        return (
-            <UpdateDownloading
-                percent={downloadPercent(state)}
-                text="Downloading"
-                label={`Downloading ${state.availableVersion ?? 'the update'}`}
-                tooltip={updateStatusText(state)}
-            />
-        );
+    const ready = pill === 'ready';
+    const downloading = pill === 'downloading';
+    const version = state.downloadedVersion ?? state.availableVersion;
+    const label = installing
+        ? `Installing ${version}…`
+        : downloading
+          ? `Downloading ${version} · ${downloadPercent(state)}%`
+          : ready
+            ? `Restart to install ${version}`
+            : `Update to ${version}`;
 
-    return <NextStep state={state} ready={pill === 'ready'} />;
+    return (
+        <UpdatePill
+            status={downloading ? 'downloading' : ready ? 'downloaded' : 'available'}
+            percent={downloadPercent(state)}
+            label={label}
+            heading={`Lar Factory ${version}`}
+            detail={`${updateStatusText(state)} You have ${state.currentVersion}.`}
+            notes={state.releaseNotes.length > 0 && <Notes state={state} />}
+            actionLabel={installing ? 'Installing…' : ready ? 'Restart now' : 'Download'}
+            disabled={installing || confirming || pending || resolveUpdateButtonAction(state) === 'none'}
+            onRun={() => void run()}
+        />
+    );
 }

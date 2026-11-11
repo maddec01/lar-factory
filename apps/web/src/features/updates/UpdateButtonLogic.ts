@@ -83,15 +83,6 @@ export function updateStatusText(state: UpdateState): string {
     }
 }
 
-/** The board's wording, not T3's running-tasks warning. */
-export function getUpdateInstallConfirmationMessage(
-    state: Pick<UpdateState, 'availableVersion' | 'downloadedVersion'>,
-): string {
-    const version = state.downloadedVersion ?? state.availableVersion;
-
-    return `The board app will restart to install${version ? ` ${version}` : ' the update'}.`;
-}
-
 export function getUpdateActionError(result: UpdateActionResult): string | null {
     if (!result.accepted || result.completed) return null;
 

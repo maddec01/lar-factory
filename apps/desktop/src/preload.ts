@@ -70,7 +70,6 @@ const bridge: BoardAppBridge = {
     downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD),
     installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL),
     setUpdateChannel: (channel) => ipcRenderer.invoke(IpcChannels.UPDATE_SET_CHANNEL, channel),
-    confirmRestart: (message) => ipcRenderer.invoke(IpcChannels.CONFIRM_RESTART, message),
 };
 
 contextBridge.exposeInMainWorld('boardApp', bridge);

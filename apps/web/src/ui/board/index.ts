@@ -31,7 +31,7 @@ export { DeskCard, DeskHint, DeskSection } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote } from './List';
 export { LoadingScreen } from './LoadingScreen';
-export { ReleaseNotes, UpdateDownloading, UpdatePill } from './UpdatePill';
+export { ReleaseNotes, UpdatePill } from './UpdatePill';
 export { BoardWarning, BoardWarnings, ToolMissing } from './Warnings';
 export { ActivityLine, AgentAge, AgentList, AgentRow, WorkingAgents } from './ActivityLine';
 export { ActivityTrack } from './ActivityTrack';

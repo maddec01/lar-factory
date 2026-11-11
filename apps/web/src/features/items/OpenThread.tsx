@@ -8,6 +8,7 @@ import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-
 
 import { ICON } from './ButtonIcons';
 import { useOnRow } from './RowContext';
+import { useActivityUnavailable } from './useActivityFeedback';
 import { EarlierThread, EarlierThreadList, useButtonKind } from '@/ui/board';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
@@ -28,7 +29,7 @@ function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefi
         if (parent.kind === 'concept') {
             if (!Array.isArray(parent.threads) || parent.threads.some((thread) => thread.observedAt)) return undefined;
 
-            return parent.threads.find((thread) => thread.state === 'needs you' || thread.state === 'running');
+            return openQuestionThread(parent) ?? parent.threads.find((thread) => thread.state === 'running');
         }
 
         parentId = parent.parentId;
@@ -42,7 +43,7 @@ function latestThread(
     item: Item,
     data: BoardData,
     threadId?: string,
-): { link: string; conceptQuestion: boolean } | { reason: string } {
+): { link: string; question: boolean; conceptQuestion: boolean } | { reason: string } {
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
@@ -55,7 +56,9 @@ function latestThread(
 
     if (!data.t3EnvironmentId) return { reason: 'T3 Code hasn’t written its environment id' };
 
-    return { link: threadLink(data.t3EnvironmentId, latest.id), conceptQuestion: !own && Boolean(inherited) };
+    const question = latest.state === 'needs you' && !latest.observedAt;
+
+    return { link: threadLink(data.t3EnvironmentId, latest.id), question, conceptQuestion: !own && question };
 }
 
 /**
@@ -87,7 +90,14 @@ export function OpenThread({
 }) {
     const kindOf = useButtonKind();
     const thread = latestThread(item, data, threadId);
-    const actionLabel = 'link' in thread && thread.conceptQuestion ? 'Answer in concept thread' : label;
+    const unavailable = useActivityUnavailable();
+    const question = !unavailable && 'link' in thread && thread.question;
+    const actionLabel =
+        question && thread.conceptQuestion
+            ? 'Answer in concept thread'
+            : label === 'Answer in T3' && !question
+              ? 'Open thread'
+              : label;
     const onRow = useOnRow();
     const iconOnly = part || given || (onRow && actionLabel === 'Open thread');
     const tooltip = (part || onRow) && iconOnly;

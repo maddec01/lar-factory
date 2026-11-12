@@ -8,8 +8,9 @@ import {
     MessagesSquareIcon,
     ShapesIcon,
 } from '@lar-works/design-system/icons';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
+import { PartTiles } from './PartTiles';
 import { pickedRow, ROW_OPENS } from './RowStyles';
 
 const KIND_ICON = {
@@ -55,10 +56,12 @@ export function PartsList({
     /** The parts, one PartRow each. */
     children: ReactNode;
 }) {
+    const tiles = useContext(PartTiles);
+
     return (
         <div className="grid gap-1">
             <ol
-                className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-x-4 gap-y-1 p-0"
+                className={`m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-x-4 p-0 ${tiles ? 'gap-y-1.5' : 'gap-y-1'}`}
                 data-parts-list
             >
                 {children}
@@ -132,8 +135,13 @@ export function PartRow({
     /** What sits under the row, such as Start's message. */
     foot?: ReactNode;
 }) {
+    const tile = useContext(PartTiles) ? `border-line border ${picked ? '' : 'bg-surface-card'}` : '';
+
     return (
-        <li data-part={id} className={`hover:bg-fill-hover @container rounded-md px-3 py-2 ${pickedRow(picked)}`}>
+        <li
+            data-part={id}
+            className={`hover:bg-fill-hover @container rounded-md px-3 py-2 ${tile} ${pickedRow(picked)}`}
+        >
             <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
                 <button
                     type="button"

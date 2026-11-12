@@ -6,11 +6,12 @@ import { ChevronRightIcon } from '@lar-works/design-system/icons';
 import { BadgeBase as Badge } from '@lar-works/design-system/primitives';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { pickedRow, ROW_OPENS, ROW_RULE } from './RowStyles';
+import { PartTiles } from './PartTiles';
+import { pickedRow, ROW_OPENS } from './RowStyles';
 
 const stop = (event: MouseEvent) => event.stopPropagation();
 
-/** A dossier, named by `label`; `id` names it as `data-dossier`. */
+/** A dossier, a tile on its section's card like a stage row, named by `label`; `id` names it as `data-dossier`. */
 export function DossierRow({
     id,
     label,
@@ -24,20 +25,28 @@ export function DossierRow({
     children: ReactNode;
 }) {
     return (
-        <article className={`@container ${ROW_RULE}`} data-dossier={id} aria-label={label}>
+        <article
+            className="border-line bg-surface-sunken @container overflow-hidden rounded-lg border"
+            data-dossier={id}
+            aria-label={label}
+        >
             {children}
         </article>
     );
 }
 
-/** The dossiers in the dock. */
+/** The dossiers in the dock, apart by gaps. */
 export function DossierList({
     children,
 }: {
     /** The dossiers, one DossierRow each. */
     children: ReactNode;
 }) {
-    return <div data-dossiers>{children}</div>;
+    return (
+        <div className="grid gap-1.5" data-dossiers>
+            {children}
+        </div>
+    );
 }
 
 /** The chevron that expands a dossier in place, named by what it does now. */
@@ -323,7 +332,7 @@ export function PartsBar({
     );
 }
 
-/** What an expanded dossier holds, under its line. */
+/** What an expanded dossier holds, under its line; its parts are tiles on the dossier's tile. */
 export function DossierBody({
     children,
 }: {
@@ -332,7 +341,7 @@ export function DossierBody({
 }) {
     return (
         <div className="border-line grid gap-3 border-t p-3" data-dossier-body>
-            {children}
+            <PartTiles value>{children}</PartTiles>
         </div>
     );
 }

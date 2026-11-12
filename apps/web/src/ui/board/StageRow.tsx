@@ -10,10 +10,11 @@ import { useArrival } from './BoardLife';
 import { pickedRow, ROW_ACTION, ROW_OPENS } from './RowStyles';
 import { StateWord } from './StateWord';
 
-/** A stage row: `item` names it as `data-item`, and `picked` marks the item the dialog shows. A row a read just moved
- *  here from another lane slides in from that side and flashes the navy wash (BoardLife). A row is 40px with one line
- *  and 60 with two: 6px above its 28px first line and 6 below, the panel's hairline taking the last pixel. Its hover
- *  eases in as a card's does. */
+/** A stage row, a tile on its section's card: `item` names it as `data-item`, and `picked` marks the item the dialog
+ *  shows. A row a read just moved here from another lane slides in from that side and flashes the navy wash
+ *  (BoardLife). A row is 42px with one line and 62 with two: its hairline edge, 6px above its 28px first line and 6
+ *  below. Its hover and the picked wash sit over the tile's fill, as light mode's hover is the same wash as that fill;
+ *  the hover eases in as a card's does. */
 export function StageRowItem({
     item,
     picked,
@@ -32,9 +33,11 @@ export function StageRowItem({
         <li
             data-item={item}
             data-arrived={arrival?.from}
-            className={`hover:bg-fill-hover @container pt-1.5 pb-1.25 transition-colors last:pb-1.5 ${pickedRow(picked)}`}
+            className="border-line bg-surface-sunken @container overflow-hidden rounded-lg border"
         >
-            {children}
+            <div className={`hover:bg-fill-hover rounded-[inherit] py-1.5 transition-colors ${pickedRow(picked)}`}>
+                {children}
+            </div>
         </li>
     );
 }

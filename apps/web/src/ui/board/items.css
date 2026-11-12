@@ -57,9 +57,10 @@
 }
 
 /* The board's life (BoardLife.ts), on a read that moves things, never on the first paint. A row that changed lane slides
-   the last few pixels into place from the side it came from and flashes the current navy wash, which fades over
-   1.2 s; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced motion keeps the
-   wash and the ring's colour, without the travel. Both pause behind an open overlay, as the design system's loops do. */
+   the last few pixels into place from the side it came from and flashes the current navy wash, which fades over 1.2 s
+   back to its own fill; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced
+   motion keeps the wash and the ring's colour, without the travel. Both pause behind an open overlay, as the design
+   system's loops do. */
 @keyframes board-row-arrive {
     from {
         transform: translateY(var(--board-arrive-from, 0));
@@ -70,9 +71,6 @@
     from,
     25% {
         background-color: var(--color-current-surface);
-    }
-    to {
-        background-color: transparent;
     }
 }
 @keyframes board-card-pulse {

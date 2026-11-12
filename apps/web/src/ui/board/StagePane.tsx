@@ -1,14 +1,16 @@
-// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): the
-// design system's Panel, bordered on black with no fill, a titled list that takes the height of its rows. A lane with
-// no rows collapses to its header line, which says why it's empty, so the page scrolls past it in one line.
+// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): a
+// card on the page, with the card's fill, edge and shadow, its header on a sunken band, then its rows as tiles apart by
+// gaps. It forks the design system's Panel (PanelBase) without its hairlines, so it follows Panel's header and heading
+// when those change. A lane with no rows collapses to its header band, which says why it's empty, so the page scrolls
+// past it in one line.
 
-import { PanelBase } from '@lar-works/design-system/primitives';
+import { SectionTitle } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { LimitBars } from './Counters';
 
-/** A stage's section: its status glyph, title and count, anything at the header's `right`, then its rows; with no rows,
- *  its header line alone, ending in what `empty` says. */
+/** A stage's section: its status glyph, title and count on the header band, anything at the header's `right`, then its
+ *  rows; with no rows, its header band alone, ending in what `empty` says. */
 export function StagePane({
     id,
     title,
@@ -34,40 +36,49 @@ export function StagePane({
     children?: ReactNode;
 }) {
     const collapsed = Boolean(empty);
+    const headingId = `${id}-h`;
 
     return (
-        <PanelBase
+        <section
             data-stage={id}
             data-empty={collapsed || undefined}
-            headingId={`${id}-h`}
-            title={title}
-            icon={glyph}
-            count={count}
-            action={
-                collapsed ? (
-                    <span className="flex min-w-0 items-center gap-3">
-                        {empty}
-                        {right}
-                    </span>
-                ) : (
-                    right
-                )
-            }
-            collapsed={collapsed}
+            aria-labelledby={headingId}
+            className="surface-card min-w-0 overflow-hidden rounded-xl border"
         >
-            {collapsed ? null : children}
-        </PanelBase>
+            <header className="bg-surface-sunken flex min-h-10 items-center px-3 py-1">
+                <div className="min-w-0 flex-1">
+                    <SectionTitle
+                        id={headingId}
+                        level="h3"
+                        title={title}
+                        icon={glyph}
+                        count={count}
+                        actions={
+                            collapsed ? (
+                                <span className="flex min-w-0 items-center gap-3">
+                                    {empty}
+                                    {right}
+                                </span>
+                            ) : (
+                                right
+                            )
+                        }
+                    />
+                </div>
+            </header>
+            {!collapsed && children && <div className="@container min-w-0 p-1.5">{children}</div>}
+        </section>
     );
 }
 
-/** The rows of a stage's section, divided by the panel's hairlines. */
+/** The rows of a stage's section, each a tile, apart by gaps. */
 export function StageList({
     children,
 }: {
     /** The rows. */
     children: ReactNode;
 }) {
-    return <ol className="m-0 grid list-none p-0">{children}</ol>;
+    return <ol className="m-0 grid list-none gap-1.5 p-0">{children}</ol>;
 }
 
 /** What a collapsed lane's header line says: that it's loading, that nothing is in it, or that the filters hide every

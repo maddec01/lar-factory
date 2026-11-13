@@ -26,7 +26,7 @@ forward per [questions](shared/questions.md). Do not repeat an approval already
 given in the session.
 
 Read the local domain-doc setting per
-[where domain docs live](shared/domain-docs.md#where-domain-docs-live).
+[where domain docs live](shared/domain-docs-setting.md).
 
 ## Checks
 

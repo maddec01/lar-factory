@@ -12,7 +12,7 @@ The brief is the builder's handover. Editing it invalidates prior gate evidence.
 Run [Gate](gate.md) on the final text before marking it Ready. With Spec writing
 ON, the whole passing brief becomes the ticket's main description with its prior
 text kept as Original. From then on, trusted tracker edits update the record's
-copy. Follow [Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs).
+copy. Follow [Ticket Specs](shared/issue-tracker/ticket-specs.md).
 
 Write for the team reading that ticket: lead with the result and observable
 acceptance criteria. Keep each fact once. Confirmed holds product decisions,
@@ -23,7 +23,7 @@ prototype branch; name affected files and shared contracts for overlap checks; o
 and step-by-step implementation recipes. Omit empty optional sections. A routine brief should fit on one screen;
 add detail only when it changes what a reviewer must accept.
 
-Read the local [domain-doc setting](shared/domain-docs.md#where-domain-docs-live)
+Read the local [domain-doc setting](shared/domain-docs-setting.md)
 before drafting. With it OFF, write `none` under Domain docs and create no drafts.
 With it ON, use the entries and ADR drafts in the template below.
 

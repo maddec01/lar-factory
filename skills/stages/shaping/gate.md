@@ -26,7 +26,8 @@ and board-recorded approval, or a Needs you wait.
    `record-gate` and `record-gate-batch` calls refuse: use the one Needs you wait
    command in Questions, ask Pedro to approve in the board, and stop. A Verify note,
    an approver name or agent-written response reference never grants approval.
-   If this gate supersedes an answer, run `lar-work supersede-answer`, reconcile
+   If this gate supersedes an answer, run `lar-work supersede-answer` per
+   [Completion](shared/issue-tracker/completion.md), reconcile
    affected briefs and save the map. Rerun Doubt and approval for changed packages.
 5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.

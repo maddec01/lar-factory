@@ -13,7 +13,7 @@ use confirmed-missing recovery to bypass the suspension.
 ## Access
 
 Explicit issue creation and ordinary non-concept Ticket Specs still follow
-[work records](work-records.md#issue-creation), including verified Access,
+[work records](issue-creation.md), including verified Access,
 duplicate protection and the Azure read-only setting. Repository names,
 Connections and historical consent grant no write permission.
 

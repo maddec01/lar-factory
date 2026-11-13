@@ -4,23 +4,7 @@ Ported from mattpocock/skills (skills/engineering/domain-modeling/SKILL.md); see
 
 Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
 
-## Where domain docs live
-
-`repo-config.sh <repository>` reads this machine's local `domainDocs` setting.
-This setting controls drafting and file writes. `off` is OFF and `repository`
-is ON. A saved `private` value reads as OFF, never as a private drafting mode.
-No repository instructions or setup files are required.
-
-`{"kind": "repository", "glossary": "GLOSSARY.md", "adrs": "docs/adr"}`
-names the glossary file and ADR folder. Use the configured paths in place of the
-examples below. Builds include the relevant entries and ADRs in their build PR.
-
-`{"kind": "off"}` means write no domain drafts or glossary or ADR files. Read
-existing domain docs for context and write "none" in the brief's or map's Domain
-docs and a decision's domain-drafts body. Offer no later publication. When ON,
-shaping drafts entries in work records, the whole gated brief includes them in
-the ticket Spec when enabled, and the builder writes them in the build PR.
-Shaping alone writes no repository files in either mode.
+Read the [domain-doc setting](domain-docs-setting.md) before drafting or writing.
 
 ## File structure
 

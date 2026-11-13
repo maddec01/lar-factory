@@ -12,7 +12,7 @@ repository, cite it this way:
   `az repos pr show --id <PR id> --organization <org>`, then
   `/pullrequest/<PR id>`.
 - Work in another repository becomes a build there or a Dependency, per
-  [Other repositories](issue-tracker/work-records.md#other-repositories). Once
+  [Other repositories](issue-tracker/other-repositories.md). Once
   a Dependency's request reaches the owning team, cite that team's ticket. An
   implementer that finds work another repository needs, with
   no PR or published ticket covering it, reports

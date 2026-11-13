@@ -59,7 +59,7 @@ Anything the user adds or corrects is another open question. Then:
 
 - **Another repository changes, after following `choose-structure`** (its role says it serves or uses what this
   item changes, or the work needs a change there): route that part per
-  [Other repositories](shared/issue-tracker/work-records.md#other-repositories),
+  [Other repositories](shared/issue-tracker/other-repositories.md),
   and keep shaping this repository's part while the user chooses. Name each
   proposed build or recorded Dependency in the brief's **Notes for the
   builder**. This item is a build only if its own repository changes.

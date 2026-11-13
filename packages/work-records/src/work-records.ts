@@ -24,6 +24,7 @@ import { dependencyRecords, forgetDependencies, type DependencyRecords } from '.
 import { readFactorySettings } from './factory-settings.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
+import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { reviewSelection } from './run-settings-input.ts';
 import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
@@ -344,7 +345,14 @@ export interface CaptureSubmission {
 }
 
 export interface WorkRecords
-    extends RunSettingsRecords, ValidationRecords, TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
+    extends
+        RetitleRecords,
+        RunSettingsRecords,
+        ValidationRecords,
+        TrackerCache,
+        PublicationRecords,
+        DependencyRecords,
+        SpecRecords {
     captureSubmission(requestId: string): CaptureSubmission | null;
     /** Reserves the request before any provider create; replays return its durable outcome. */
     claimCapture(
@@ -1169,6 +1177,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
+        ...retitleRecords(database, (workId) => fromRow(find(workId))),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
         ...dependencyChanges,

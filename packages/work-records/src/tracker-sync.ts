@@ -43,6 +43,7 @@ export interface StructureProvider {
         number: number,
         previous?: Pick<StructureTicket, 'body' | 'title'>,
     ) => Promise<StructureTicket>;
+    replaceTitle?: (ticket: StructureTicket, title: string) => Promise<StructureTicket>;
     replaceSpec?: (ticket: StructureTicket, body: string) => Promise<StructureTicket>;
     read: (repository: string, number: number) => Promise<StructureTicket>;
     find(repository: string, identity: string): Promise<StructureTicket[]>;
@@ -447,6 +448,22 @@ export function structureProvider(): StructureProvider {
 
     return {
         readSpec,
+        replaceTitle: async (ticket, title) => {
+            const fresh = await readSpec(ticket.repository, ticket.number, ticket);
+
+            if (
+                fresh.title !== ticket.title ||
+                (ticket.repository.split('/').length !== 2 && fresh.version !== ticket.version)
+            )
+                throw Error('The ticket changed before the title write. Retry to read its latest title.');
+
+            return ticket.repository.split('/').length === 2
+                ? asTicket(
+                      ticket.repository,
+                      await github(`repos/${ticket.repository}/issues/${ticket.number}`, 'PATCH', { title }),
+                  )
+                : patchAzure(fresh, title, 'System.Title');
+        },
         replaceSpec: async (ticket, body) => {
             const fresh = await readSpec(ticket.repository, ticket.number, ticket);
 

@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import TurndownService from 'turndown';
 
 import type { SpecRemote, SpecState } from './spec-records.ts';
+import { syncTitles } from './title-sync.ts';
 import { acquireTrackerSyncLock } from './tracker-lock.ts';
 import { structureProvider, type StructureProvider, type StructureTicket } from './tracker-sync.ts';
 import type { WorkRecords } from './work-records.ts';
@@ -322,6 +323,9 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
     try {
         const provider = options.provider ?? structureProvider();
         const setups = options.setups ?? readRepositorySetups(options.dir ?? boardDataDir());
+
+        await lease.assertOwned();
+        await syncTitles(records, provider, setups, options.workId, () => lease.assertOwned());
 
         for (const workId of options.workId ? [options.workId] : records.specPending()) {
             if (!records.specEligible(workId)) continue;

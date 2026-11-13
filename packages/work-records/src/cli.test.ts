@@ -1287,3 +1287,25 @@ it('manages validation lists and failure descriptions without revisions', async 
     expect((await larWork(data, 'resolve-failure', run.checkId, '--reason', 'Added fixture')).code).toBe(0);
     expect((await larWork(data, 'checks', build.workId)).record.runs[0].failureState).toBe('resolved');
 }, 30_000);
+
+it('retitles through the CLI and exposes historical names', async () => {
+    const dir = tempDir();
+    const created = await larWork(
+        dir,
+        'create',
+        '--title',
+        'Before',
+        '--repository',
+        'example/repo',
+        '--kind',
+        'build',
+    );
+    const workId = created.record.workId;
+    const result = await larWork(dir, 'retitle', workId, '--revision', '1', '--title', 'After');
+
+    expect(result.record).toMatchObject({ title: 'After', revision: 2 });
+    expect((await larWork(dir, 'retitle', workId, '--revision', '1', '--title', 'Stale')).code).toBe(1);
+    expect((await larWork(dir, 'title-history', workId)).record).toEqual([
+        expect.objectContaining({ previous: 'Before', title: 'After' }),
+    ]);
+});

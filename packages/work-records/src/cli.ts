@@ -25,6 +25,7 @@ import { runSettingsCommand } from './run-settings-command.ts';
 import { scopeCommand } from './scope-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import { verificationCommand } from './verification-command.ts';
+import { workOrder, workOrderReport } from './work-order.ts';
 import {
     openWorkRecords,
     readRetention,
@@ -138,6 +139,7 @@ Reads
                                     F is Code's JSON list of {"reviewer":ID,
                                     "requestedBy":"code","reason":text}. Only skipped,
                                     non-never reviewers gain an escalation; run each once.
+  work-order <work-id> [--json]     Report group order, briefs, gates, blockers and waits.
   read <work-id>                    Print one record.
   context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
@@ -490,6 +492,7 @@ const TAKES_WORK_ID = [
     'completion',
     'refinement',
     'waiting-on',
+    'work-order',
     'set-fog',
     'finish',
     'set-body',
@@ -550,6 +553,7 @@ const COMMANDS = [
 ];
 
 const OPTIONS = {
+    json: { type: 'boolean' },
     'confirmed-missing-issue': { type: 'string' },
     plan: { type: 'string' },
     digest: { type: 'string' },
@@ -873,6 +877,11 @@ async function run(
         }
         case 'import':
             return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
+        case 'work-order': {
+            const rows = await records.snapshot(async () => workOrder(records, workId!));
+
+            return values.json ? rows : workOrderReport(rows);
+        }
         case 'read':
             return records.read(workId!);
         case 'context':
@@ -1181,7 +1190,13 @@ async function main(args: string[]): Promise<number> {
 
         if (command === 'set-phase') await refreshBoards(workId!, values['data-dir']);
 
-        const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
+        const validationCommand = [
+            'set-check-list',
+            'checks',
+            'describe-failure',
+            'resolve-failure',
+            'work-order',
+        ].includes(command);
 
         if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
 

@@ -6,6 +6,7 @@
     "type": "module",
     "exports": {
         ".": "./src/work-records.ts",
+        "./work-order": "./src/work-order.ts",
         "./export": "./src/export.ts",
         "./change-kind": "./src/change-kind.ts",
         "./create-ticket": "./src/create-ticket.ts",

@@ -241,6 +241,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             recorded: true,
             buildPhase: record.buildPhase,
             verification: records.verification(record.workId),
+            retro: records.retro(record.workId),
             completion: completionOf(record),
             releasePlan: records.releasePlan(record.workId),
             ...(record.kind === 'concept'

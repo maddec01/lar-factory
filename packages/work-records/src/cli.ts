@@ -21,6 +21,7 @@ import { gateWorkIds } from './gate-batch.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { requireHumanAction } from './human-action.ts';
 import { releaseCommand } from './release-command.ts';
+import { retroCommand } from './retro-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
@@ -79,6 +80,13 @@ Parent release records, local only
                                     Record done evidence after preceding steps are done.
   record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof
                                     Record the final observable check after release steps.
+
+Post-merge retro
+  retro <work-id>                  Read suggestions, the board choice and capture receipts.
+  propose-retro <work-id> --revision N --file F
+                                    After confirmed merge/Done, save [{title,description,
+                                    repository,kind}] (bug/feature/improvement), or [].
+                                    Only board buttons choose and create follow-ups.
 
 Validation records, local only and requiring no revision
   run-check <work-id> --role R [--live] [--reason X] -- <command>
@@ -1104,6 +1112,8 @@ async function main(args: string[]): Promise<number> {
 
     if (['run-settings', 'snapshot-run', 'start-role-run', 'finish-role-run'].includes(args[0]!))
         return runSettingsCommand(args[0]!, args.slice(1));
+
+    if (['retro', 'propose-retro'].includes(args[0]!)) return retroCommand(args[0]!, args.slice(1));
 
     if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
         return verificationCommand(args[0]!, args.slice(1));

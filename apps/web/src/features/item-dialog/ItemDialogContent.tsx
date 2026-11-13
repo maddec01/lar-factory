@@ -17,6 +17,7 @@ import { ItemProgress } from './ItemProgress';
 import { ItemSummary } from './ItemSummary';
 import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
+import { RetroFollowups } from './RetroFollowups';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import { useMovesItem } from './useMovesItem';
 import {
@@ -114,6 +115,7 @@ export function ItemDialogContent({
                     )}
                     <NeedsYou item={item} data={data} />
                     <VerifyBuild item={item} />
+                    <RetroFollowups item={item} />
                     {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
                     {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress plan={item.releasePlan} remaining={item.completion?.reasons} />

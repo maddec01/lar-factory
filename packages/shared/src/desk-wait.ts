@@ -1,12 +1,16 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
 import { questionOwnerParent, questionThreadAction } from './question-thread.ts';
+import { retroWaits } from './retro.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
     if (item.briefApproval)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
+
+    if (retroWaits(item.retro))
+        return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
 
     const concept = unavailable ? undefined : questionOwnerParent(item, all);
     const question = unavailable ? undefined : (openQuestionThread(item) ?? (concept && openQuestionThread(concept)));

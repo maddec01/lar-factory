@@ -112,7 +112,7 @@ describe('lar-work', { timeout: 30_000 }, () => {
         writeFileSync(join(data, 'boards', `${process.pid}.json`), JSON.stringify({ port }));
         vi.stubEnv('LAR_BOARD_PORT', '');
 
-        const phases = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks', 'retro'];
+        const phases = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks'];
 
         try {
             for (const [index, phase] of phases.entries()) {
@@ -1608,4 +1608,74 @@ it('work-order prints a human report or JSON and requires a group ID', async () 
     expect(json.code).toBe(0);
     expect(json.record[0]).toMatchObject({ workId: part.workId, brief: 'Exact brief', status: 'Queued' });
     expect((await larWork(data, 'work-order')).code).toBe(2);
+});
+
+describe('post-merge retro commands', () => {
+    it('records the complete proposal after merge and exposes the saved board choice', async () => {
+        const data = tempDir();
+        const records = await openWorkRecords(join(data, 'work-records.db'));
+
+        try {
+            let work = records.create({
+                title: 'Build',
+                repository: 'owner/repo',
+                kind: 'bug',
+                status: 'Ready to merge',
+            });
+            const id = work.workId;
+
+            work = records.setPullRequest(id, work.revision, 'owner/repo#1');
+            work = records.addThread(id, work.revision, 'build-thread', 'build');
+            work = records.setBuildPhase(id, work.revision, 'checks');
+
+            const file = join(data, 'retro.json');
+            const suggestions = [
+                {
+                    title: 'Improve help',
+                    description: 'Explain review evidence.',
+                    repository: 'owner/repo',
+                    kind: 'improvement',
+                },
+            ];
+
+            writeFileSync(file, JSON.stringify(suggestions));
+
+            const rejected = await larWork(
+                data,
+                'propose-retro',
+                id,
+                '--revision',
+                String(work.revision),
+                '--file',
+                file,
+            );
+
+            expect(rejected.code).toBe(1);
+            expect(rejected.stderr).toContain('confirmed merge');
+            work = records.observe(id, work.revision, { of: 'pr', state: 'merged' });
+            work = records.update(id, work.revision, { status: 'Done' });
+            records.prepareRetro(id);
+
+            const proposal = await larWork(
+                data,
+                'propose-retro',
+                id,
+                '--revision',
+                String(records.read(id).revision),
+                '--file',
+                file,
+            );
+
+            expect(proposal.code).toBe(0);
+            expect(proposal.record.suggestions).toEqual(suggestions);
+            records.chooseRetro(id, records.read(id).revision, [], 'Pedro');
+
+            const saved = await larWork(data, 'retro', id);
+
+            expect(saved.record.choice).toMatchObject({ selected: [], by: 'Pedro' });
+            expect(records.read(id).status).toBe('Done');
+        } finally {
+            records.close();
+        }
+    }, 30_000);
 });

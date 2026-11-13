@@ -8,6 +8,7 @@
 
 import {
     deskItems,
+    retroWaits,
     deskParentName,
     needsAnswer,
     deskWait,
@@ -41,6 +42,8 @@ import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSecti
  * leave out a zero count other than passed.
  */
 function NextStep({ item }: { item: Item }) {
+    if (retroWaits(item.retro)) return null;
+
     if (item.briefApproval) return <DeskHint>{item.briefApproval.reason}</DeskHint>;
 
     if (needsAnswer(item)) return null;
@@ -103,6 +106,7 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
     const wait = deskWait(item, useActivityUnavailable(), data.items);
+    const followups = retroWaits(item.retro);
     const picked = useItemDialogStore((state) => state.itemId === item.id);
 
     return (
@@ -117,14 +121,16 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             name={itemName(item)}
             parentName={deskParentName(item, data.items)}
             details={
-                <>
-                    <AzureFields azure={item.azure} />
-                    <Progress item={item} data={data} />
-                </>
+                !followups && (
+                    <>
+                        <AzureFields azure={item.azure} />
+                        <Progress item={item} data={data} />
+                    </>
+                )
             }
             statusIcon={<ItemStatusGlyph item={item} />}
-            status={wait.label}
-            statusState={shown.state ?? boardStatusState[shown.glyph]}
+            status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
+            statusState={followups ? 'waiting' : (shown.state ?? boardStatusState[shown.glyph])}
             next={<NextStep item={item} />}
             actions={<HumanWaitAction item={item} data={data} />}
         />

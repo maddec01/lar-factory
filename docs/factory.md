@@ -731,12 +731,12 @@ concepts or Auto-build, including dependents outside its concept. A ticket
 closure, Status change or thread ending cannot do this.
 Unmet release holds remain unmet after merge.
 
-Handback runs retro once after the final status and watch cleanup, with phase
-`retro`. It shows the PR, result and complete suggestion list. Only Pedro's
-explicit picks create follow-up records through the retro capture stage, using
-the saved issue-creation setting. Retro keeps the source build's final Status.
-While picks are pending, its waiting stage supplies a Choose follow-ups desk
-card. This wait does not block other concept builds or its delivery completion.
+After confirmed merge and **Done**, the board resumes the same build thread for
+retro once, with phase `retro`. It records the complete suggestion list. One
+**Choose follow-ups** desk card shows their count and opens item details, where the full list records Pedro's selection through
+**Create chosen follow-ups** or **No follow-ups**. Selected follow-ups become List
+records/tickets using each destination's saved retro setting. No suggestions
+means no desk card. The source build stays **Done**. This wait does not block other concept builds or its delivery completion.
 Cleanup and capture failures remain visible.
 
 Today: PR merge is guarded and provider-confirmed. Verify has no structured
@@ -785,18 +785,18 @@ and `lar-work` installation, and pass them to every role. Each thread reads pros
 rules once. Agent-document edits additionally read `shared/write-agent-docs.md`.
 Load step files only on reaching that step, never the whole workflow up front.
 
-| Thread or role                               | Files to load                                                                                                                                                                                                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shaping                                      | `lar-shape/SKILL.md`, `pick-up.md`, then `size-up.md`, `brief.md` and `gate.md` as reached. `shared/issue-tracker/work-records.md` supplies record operations.                                                                                                           |
-| Concept                                      | The shaping entry and pick-up, then `concepts.md`. Load question, research or prototype steps only when used. It does not load build orchestration to prepare a map.                                                                                                     |
-| Decision                                     | The shaping entry and pick-up's decision route, `concepts.md`'s Decisions section, and only its named method. A Clarification uses `grilling-with-docs.md`, `grill.md`, `shared/questions.md` and `shared/domain-docs.md`.                                               |
-| Gate-only                                    | The shaping entry's common rules, `gate.md`, `shared/questions.md` and the record guide. Doubt loads `lar-shape/agents/doubt.md`, orchestration and supplied record references. It does not load grilling or concept research.                                           |
-| Linked work                                  | The owning shaping/concept/decision entry, the record guide's Other repositories and Dependencies sections, and proposed `shared/reconcile-group.md`. Structural publication guidance is needed only for a publication question.                                         |
-| Build                                        | `lar-build/SKILL.md`, `agents/builder.md`, `project-rules.md`, the record guide and snapshotted project skills. Load `test-first.md`, `coding-style.md` and `design-modules.md` when implementing, then `review-session.md` and `shared/retro-capture.md` only at retro. |
-| Planner and implementer                      | Their respective `lar-build/agents/planner.md` or `implementer.md`, project rules, orchestration and `shared/issue-tracker/slices.md` as needed. Read only the coding/design guidance their role calls for.                                                              |
-| Reviewers                                    | Their `lar-build/agents/reviewer-*.md` or saved custom instructions, project rules, orchestration and only the checklist Copies that role loads.                                                                                                                         |
-| Approver and CI fixer                        | Their respective agent file, project rules and validation record, plus `write-pr.md` and `shared/issue-tracker/publication-pr.md` when delivering the PR.                                                                                                                |
-| Any thread asking, delegating or handing off | `shared/questions.md`, `shared/orchestration.md` or `shared/handoff.md` and `handoff-content.md` respectively, only when needed.                                                                                                                                         |
+| Thread or role                               | Files to load                                                                                                                                                                                                                                             |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shaping                                      | `lar-shape/SKILL.md`, `pick-up.md`, then `size-up.md`, `brief.md` and `gate.md` as reached. `shared/issue-tracker/work-records.md` supplies record operations.                                                                                            |
+| Concept                                      | The shaping entry and pick-up, then `concepts.md`. Load question, research or prototype steps only when used. It does not load build orchestration to prepare a map.                                                                                      |
+| Decision                                     | The shaping entry and pick-up's decision route, `concepts.md`'s Decisions section, and only its named method. A Clarification uses `grilling-with-docs.md`, `grill.md`, `shared/questions.md` and `shared/domain-docs.md`.                                |
+| Gate-only                                    | The shaping entry's common rules, `gate.md`, `shared/questions.md` and the record guide. Doubt loads `lar-shape/agents/doubt.md`, orchestration and supplied record references. It does not load grilling or concept research.                            |
+| Linked work                                  | The owning shaping/concept/decision entry, the record guide's Other repositories and Dependencies sections, and proposed `shared/reconcile-group.md`. Structural publication guidance is needed only for a publication question.                          |
+| Build                                        | `lar-build/SKILL.md`, `agents/builder.md`, `project-rules.md`, the record guide and snapshotted project skills. Load `test-first.md`, `coding-style.md` and `design-modules.md` when implementing, then `review-session.md` only at the post-merge retro. |
+| Planner and implementer                      | Their respective `lar-build/agents/planner.md` or `implementer.md`, project rules, orchestration and `shared/issue-tracker/slices.md` as needed. Read only the coding/design guidance their role calls for.                                               |
+| Reviewers                                    | Their `lar-build/agents/reviewer-*.md` or saved custom instructions, project rules, orchestration and only the checklist Copies that role loads.                                                                                                          |
+| Approver and CI fixer                        | Their respective agent file, project rules and validation record, plus `write-pr.md` and `shared/issue-tracker/publication-pr.md` when delivering the PR.                                                                                                 |
+| Any thread asking, delegating or handing off | `shared/questions.md`, `shared/orchestration.md` or `shared/handoff.md` and `handoff-content.md` respectively, only when needed.                                                                                                                          |
 
 Shared stages must become small independently loadable sections/files; this table
 sets the required context rather than requiring repeated reading of full guides.

@@ -755,7 +755,7 @@ test('an uncertain Start again keeps the no-thread notice until T3 shows its thr
     });
     const uncertain = await commands.startAgain(workId, undefined, {});
 
-    assert.deepEqual([uncertain.status, (uncertain.body as { uncertain?: boolean }).uncertain], [502, true]);
+    assert.deepEqual([uncertain.status, (uncertain.body as { uncertain?: boolean }).uncertain], [202, true]);
     assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'no-thread' }]);
     assert.equal((await commands.startAgain(workId, undefined, {})).status, 200);
     assert.deepEqual(records.read(workId).needsYouCauses, []);
@@ -1885,9 +1885,9 @@ test('after a restart, an unresolved start T3 shows no thread for sets Needs you
         const { commands, started } = recordedCommands(records, { recover: async () => answer });
         const waiting = await commands.start(work.workId, undefined);
 
-        assert.deepEqual([waiting.status, (waiting.body as { uncertain?: boolean }).uncertain], [502, true]);
+        assert.deepEqual([waiting.status, (waiting.body as { uncertain?: boolean }).uncertain], [202, true]);
         answer = 'absent';
-        assert.equal((await commands.start(work.workId, undefined)).status, 502, 'T3 may not show a new thread yet');
+        assert.equal((await commands.start(work.workId, undefined)).status, 202, 'T3 may not show a new thread yet');
         vi.setSystemTime(Date.parse('2026-10-31T10:01:00Z'));
 
         const refused = await commands.start(work.workId, undefined);
@@ -3112,3 +3112,41 @@ test('a concept paused during preparation cannot claim or launch a future build'
     assert.deepEqual(log, []);
     assert.deepEqual(records.launchIntents({}), []);
 });
+
+for (const purpose of ['shape', 'build'] as const) {
+    test(`an unconfirmed ${purpose} launch is accepted as pending and never launches a second thread`, async () => {
+        const records = await openRecords();
+        const work = records.create({
+            title: 'Work',
+            repository: WEB,
+            kind: 'feature',
+            status: purpose === 'shape' ? 'Queued' : 'Ready',
+        });
+
+        if (purpose === 'build') approveBuild(records, work.workId);
+
+        let launched = 0;
+        const { commands, board } = recordedCommands(records, {
+            during: () => {
+                launched++;
+            },
+            startAnswer: () => ({
+                thread: null,
+                uncertain: true,
+                error: 'T3 created the thread; its first turn is not running yet. The board will resume the same launch.',
+            }),
+            recover: async () => 'unknown',
+        });
+        const press = () =>
+            purpose === 'shape' ? commands.start(work.workId, undefined) : commands.startBuild(work.workId, undefined);
+        const first = await press();
+
+        assert.equal(first.status, 202);
+        assert.equal((first.body as StartResult).uncertain, true);
+        assert.equal(board.snapshot().startProgress?.[work.workId]?.[purpose]?.phase, 'may-have-started');
+        assert.equal((await press()).status, 202);
+        await commands.reconcileStarts(board.snapshot().items);
+        assert.equal(launched, 1);
+        assert.equal(records.launchIntents({ workId: work.workId, unresolved: true }).length, 1);
+    });
+}

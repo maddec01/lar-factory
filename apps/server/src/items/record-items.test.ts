@@ -9,13 +9,13 @@ import {
     type VocabularyMapping,
 } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { DEFAULT_RETENTION, openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { changeKind } from '@lar-factory/work-records/change-kind';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, test } from 'vite-plus/test';
+import { afterEach, test, vi } from 'vite-plus/test';
 
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
@@ -1193,4 +1193,52 @@ test('withdrawn approval asks for a new gate without claiming the brief or sourc
 
     assert.equal(item.staleGate, 'approval');
     assert.equal(item.briefApproval!.reason, 'Gate out of date: approval is no longer current');
+});
+
+test('a confirmed scope amendment refreshes while the previous brief awaits replacement', async () => {
+    const records = await open();
+    const work = records.create({ title: 'CLI greeting', repository: REPO, kind: 'feature' });
+    const scope = {
+        files: ['cli.js'],
+        tests: [],
+        behaviour: ['Print the greeting.'],
+        excluded: [],
+        size: 'Small' as const,
+        verify: { required: false, visibleUi: null },
+    };
+    const brief = (files: string[]) =>
+        `## Done when\n### Behaviour\n- Print the greeting.\n\n## Scope\n### Files\n${files.map((file) => `- ${file}`).join('\n')}\n### Size\nSmall\n\n## Verify\nno\n`;
+
+    records.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
+    records.setBody(work.workId, records.read(work.workId).revision, 'brief', brief(scope.files));
+    records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.');
+    assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval);
+
+    const amended = { ...scope, files: ['cli.js', 'test/cli.test.js'] };
+
+    records.confirmScope(work.workId, records.read(work.workId).revision, amended, 'Pedro', 'Add tests.');
+
+    const waiting = recordItems(records, [], [REPO])[0]!;
+
+    assert.equal(waiting.title, 'CLI greeting');
+    assert.equal(waiting.briefApproval, undefined, 'the old brief cannot offer approval');
+    assert.equal(waiting.passingBrief, false);
+    records.setBody(work.workId, records.read(work.workId).revision, 'brief', brief(amended.files));
+    assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval, 'a matching replacement offers approval again');
+});
+
+test('a refused record read identifies the work and reason without losing its error code', async () => {
+    const records = await open();
+    const work = records.create({ title: 'Broken work', repository: REPO, kind: 'feature' });
+
+    vi.spyOn(records, 'gate').mockImplementationOnce(() => {
+        throw new WorkRecordError('invalid', 'Invalid saved gate data.');
+    });
+    assert.throws(
+        () => recordItems(records, [], [REPO]),
+        (error: unknown) =>
+            error instanceof WorkRecordError &&
+            error.code === 'invalid' &&
+            error.message === `Work record ${work.workId} (Broken work): Invalid saved gate data.`,
+    );
 });

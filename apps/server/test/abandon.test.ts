@@ -132,7 +132,7 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
     );
 
     await until(unsure, (d) => d.items.length === 1);
-    assert.equal((await startItem(unsure, unsure.id(12))).status, 502);
+    assert.equal((await startItem(unsure, unsure.id(12))).status, 202);
     assert.equal((await abandon(unsure, unsure.id(12))).status, 409, 'uncertain');
     assert.deepEqual([...(await writes(board)), ...(await writes(unsure))], []);
 });

@@ -262,7 +262,7 @@ test(
 
         const unread = await start(down, workId);
 
-        assert.deepEqual([unread.status, (await unread.json()).uncertain], [502, true]);
+        assert.deepEqual([unread.status, (await unread.json()).uncertain], [202, true]);
         assert.equal(await starts(down), 0, "T3 that can't be read permits no retry");
         assert.ok(
             (await down.t3Calls()).some((args) => args[1] === 'list'),

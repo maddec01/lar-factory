@@ -68,6 +68,11 @@ or their tool's longest timeout where it has no background mode. Delegated
 roles use the foreground with their tool's longest timeout, per
 [Wait for delegated work](shared/orchestration.md#wait-for-delegated-work). Then, in this order, so completion reads it as complete:
 
+Read siblings with `lar-work decision-answer ID`; use current text or the resolved
+replacement. Within the approved destination, adjust proposed builds without asking.
+If this answer supersedes another, use `supersede-answer` per
+[Completion](shared/issue-tracker/work-records.md#completion) before saving the map.
+
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
    and, with domain docs ON, the drafts it settled, or "none"
    (`--body domain-drafts`). With domain docs OFF, save "none" and create no drafts.

@@ -171,6 +171,10 @@ Changes
                                     A failed create leaves the record local.
   retitle <work ID> --revision N --title X
   title-history <work ID>
+  decision-answer <work-id>        Current answer or its replacing reference.
+  answer-history <work-id>          Explicit version history.
+  supersede-answer <work-id> --revision N --file F
+                                    F: {answerRevision,by:{kind,workId,revision,answerRevision?|gateId?},affected:[{workId,revision}]}
   merge-build <work-id> --revision N --file F
                                     F: {into,revisions:{ID:N},dependencyRevisions?:{ID:N}}
                                     Revisions cover survivor, edge endpoints and parent.
@@ -428,6 +432,9 @@ const TAKES_WORK_ID = [
     'attach-ticket',
     'retitle',
     'title-history',
+    'decision-answer',
+    'answer-history',
+    'supersede-answer',
     'merge-build',
     'set-aside',
     'set-aside-history',
@@ -782,6 +789,16 @@ async function run(
             return records.retitle(workId!, revision(), need(values, 'title'));
         case 'title-history':
             return records.titleHistory(workId!);
+        case 'decision-answer':
+            return records.decisionAnswer(workId!);
+        case 'answer-history':
+            return records.answerHistory(workId!);
+        case 'supersede-answer':
+            return records.supersedeAnswer(
+                workId!,
+                revision(),
+                readJson(values, 'answer supersession') as Parameters<WorkRecords['supersedeAnswer']>[2],
+            );
         case 'merge-build':
             return records.mergeBuild(
                 workId!,
@@ -849,7 +866,16 @@ async function run(
             const body = need(values, 'body') as Body;
             const markdown = records.body(workId!, body);
 
-            if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
+            if (markdown === null) {
+                const replacement = body === 'answer' ? records.decisionAnswer(workId!).supersededBy : null;
+
+                throw new WorkRecordError(
+                    'not-found',
+                    replacement
+                        ? `The answer was superseded by ${JSON.stringify(replacement)}; use decision-answer or answer-history.`
+                        : `The work record ${workId} has no ${body}.`,
+                );
+            }
 
             return markdown;
         }

@@ -36,6 +36,9 @@
    retrying. Eligible tickets queue the whole brief as Spec under the saved
    setting. Gate evidence itself changes no Status. A failed write stays pending
    and does not block Ready; report its error and the retry in item details.
+   If this gate replaces a decision answer, run `lar-work supersede-answer` per
+   [Completion](shared/issue-tracker/work-records.md#completion), then reconcile
+   affected briefs and save the map before Ready.
 5. Set **Ready** on each build: this record if it's a build, and each build
    record made while shaping. Tell the user which builds are Ready and which
    work each waits on (`lar-work waiting-on`). This shaping thread is done.

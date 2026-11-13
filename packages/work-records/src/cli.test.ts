@@ -1309,3 +1309,29 @@ it('retitles through the CLI and exposes historical names', async () => {
         expect.objectContaining({ previous: 'Before', title: 'After' }),
     ]);
 });
+
+it('reads versioned current decision answers through the CLI', async () => {
+    const dir = tempDir();
+    const result = await larWork(
+        dir,
+        'create',
+        '--title',
+        'Contract',
+        '--repository',
+        'example/repo',
+        '--kind',
+        'decision',
+    );
+    const workId = result.record.workId;
+    const file = join(dir, 'answer.md');
+
+    writeFileSync(file, 'Current contract');
+    expect((await larWork(dir, 'set-body', workId, '--revision', '1', '--body', 'answer', '--file', file)).code).toBe(
+        0,
+    );
+    expect((await larWork(dir, 'decision-answer', workId)).record.current).toMatchObject({
+        revision: 1,
+        text: 'Current contract',
+    });
+    expect((await larWork(dir, 'answer-history', workId)).record).toHaveLength(1);
+});

@@ -1,0 +1,201 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, expect, it } from 'vite-plus/test';
+
+import { gateManifest } from './gate-batch.ts';
+import { openWorkRecords, type WorkRecords } from './work-records.ts';
+
+const opened: { records: WorkRecords; dir: string }[] = [];
+
+afterEach(() => {
+    for (const { records, dir } of opened.splice(0)) {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+async function fixture() {
+    const dir = mkdtempSync(join(tmpdir(), 'gate-batch-'));
+    const path = join(dir, 'records.db');
+    const records = await openWorkRecords(path);
+
+    opened.push({ records, dir });
+
+    const ids: string[] = [];
+
+    for (let i = 0; i < 8; i++) {
+        const work = records.create({
+            title: `Build ${i}`,
+            repository: 'fake/app',
+            ticket: `fake/app#${i + 1}`,
+            kind: 'build',
+        });
+
+        records.setBody(work.workId, work.revision, 'brief', `Complete brief ${i}.\nFiles: \`src/part-${i}.ts\``);
+        ids.push(work.workId);
+    }
+
+    const review = () => {
+        for (const id of ids) {
+            const input = records.doubtPackage(id);
+
+            records.recordDoubt(
+                id,
+                input.packageDigest,
+                `Doubt ${id}`,
+                'All findings resolved; code evidence checked.',
+                [],
+            );
+        }
+    };
+
+    review();
+
+    const approve = (manifest = records.gateBatch(ids)) =>
+        records.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes to this displayed batch, response 42.');
+    const empty = () => {
+        for (const id of ids) {
+            expect(records.gate(id).evidence).toEqual([]);
+            expect(records.specState(id).pending).toBeNull();
+        }
+    };
+
+    return { records, ids, path, review, approve, empty };
+}
+
+it('approves eight complete briefs with one manifest digest and one response', async () => {
+    const { records, ids, approve } = await fixture();
+    const manifest = records.gateBatch(ids);
+
+    expect(manifest.members).toHaveLength(8);
+    expect(manifest.members[0]).toMatchObject({
+        display: {
+            brief: expect.stringContaining('Complete brief'),
+            briefDigest: expect.any(String),
+            approvalDigest: expect.any(String),
+        },
+        doubt: { identity: expect.any(String), reviewId: expect.any(String) },
+    });
+
+    const result = approve(manifest);
+
+    expect(result.gates).toHaveLength(8);
+    for (const id of ids) {
+        expect(records.gate(id).passing).toMatchObject({
+            batchDigest: manifest.digest,
+            approvedBy: 'Pedro',
+            evidence: 'Yes to this displayed batch, response 42.',
+        });
+        expect(records.specState(id).pending).toBe(records.body(id, 'brief'));
+    }
+});
+
+it.each(['brief', 'kind', 'Doubt'] as const)(
+    'rejects the entire batch after a member %s changes; renewed approval succeeds',
+    async (change) => {
+        const { records, ids, review, approve, empty } = await fixture();
+        const manifest = records.gateBatch(ids);
+        const id = ids.at(-1)!;
+        const work = records.read(id);
+
+        if (change === 'brief') records.setBody(id, work.revision, 'brief', 'One changed word.');
+        else if (change === 'kind') records.update(id, work.revision, { kind: 'bug' });
+        else {
+            const input = records.doubtPackage(id);
+
+            records.recordDoubt(id, input.packageDigest, 'Fresh Doubt', 'New review result.', []);
+        }
+
+        expect(() => approve(manifest)).toThrow(/changed|Doubt|conflicting fields/);
+        empty();
+        review();
+        expect(approve().gates).toHaveLength(8);
+    },
+);
+
+it('rejects a word changed only in the displayed copy, duplicate members and the wrong approved digest', async () => {
+    const { records, ids, approve, empty } = await fixture();
+    const manifest = records.gateBatch(ids);
+    const edited = structuredClone(manifest);
+
+    edited.members[0]!.display.brief += ' Edited.';
+    expect(() => approve(edited)).toThrow(/manifest changed/);
+    expect(() => approve(gateManifest([manifest.members[0]!, manifest.members[0]!]))).toThrow(/duplicate/);
+    expect(() => records.recordGateBatch(manifest, 'wrong', 'Pedro', 'Yes')).toThrow(/digest/);
+    empty();
+});
+
+it('rolls back all gates and Spec outboxes if the final gate write fails', async () => {
+    const { ids, path, approve, empty } = await fixture();
+    const db = new DatabaseSync(path);
+
+    try {
+        db.exec(
+            `CREATE TRIGGER refuse_last_gate BEFORE INSERT ON brief_gates WHEN NEW.work_id = '${ids.at(-1)!}' BEGIN SELECT RAISE(ABORT, 'injected final gate failure'); END;`,
+        );
+        expect(() => approve()).toThrow(/injected final gate failure/);
+        empty();
+        db.exec('DROP TRIGGER refuse_last_gate');
+        expect(approve().gates).toHaveLength(8);
+    } finally {
+        db.close();
+    }
+});
+
+it('rechecks held Spec edits inside the batch transaction even when the brief revision is unchanged', async () => {
+    const { records, ids, approve, empty } = await fixture();
+    const manifest = records.gateBatch(ids);
+    const id = ids.at(-1)!;
+    const state = records.specState(id);
+
+    records.saveSpecState(id, state.generation, {
+        ...state,
+        held: { body: 'Unverified edit', title: 'Changed', version: 'v2', digest: 'remote' },
+    });
+    expect(() => approve(manifest)).toThrow(/held Spec edit/);
+    empty();
+
+    const held = records.specState(id);
+
+    records.saveSpecState(id, held.generation, { ...held, held: null });
+    expect(approve(manifest).gates).toHaveLength(8);
+});
+
+it('preserves one approved manifest through all members waiting, resuming and receiving observations', async () => {
+    const { records, ids, approve } = await fixture();
+    const manifest = records.gateBatch(ids);
+
+    for (const id of ids) {
+        const waiting = records.waitForUser(id, records.read(id).revision, 'Approve this batch');
+        const observed = records.observe(id, waiting.revision, { of: 'ticket', state: 'open' });
+
+        records.resumeFromUser(id, observed.revision, 'Shaping');
+    }
+
+    const result = approve(manifest);
+
+    expect(result.digest).toBe(manifest.digest);
+    expect(result.manifest).toEqual(manifest);
+    for (const member of manifest.members) {
+        expect(records.gate(member.display.workId).passing).toMatchObject({
+            batchDigest: manifest.digest,
+            approvalDigest: member.display.approvalDigest,
+        });
+        expect(records.read(member.display.workId)).toMatchObject({ status: 'Shaping', needsYou: null });
+    }
+});
+
+it('rejects the whole batch after an edited brief is restored and Doubt renewed', async () => {
+    const { records, ids, review, approve, empty } = await fixture();
+    const manifest = records.gateBatch(ids);
+    const id = ids.at(-1)!;
+    const brief = records.body(id, 'brief')!;
+    const changed = records.setBody(id, records.read(id).revision, 'brief', 'Changed scope.');
+
+    records.setBody(id, changed.revision, 'brief', brief);
+    review();
+    expect(() => approve(manifest)).toThrow(/conflicting fields: body.brief/);
+    empty();
+});

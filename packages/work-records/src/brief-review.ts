@@ -38,7 +38,7 @@ export interface OrderingReason {
     otherWorkId: string;
     reason: string;
 }
-interface DoubtReview {
+export interface DoubtReview {
     reviewId: string;
     packageDigest: string;
     identity: string;

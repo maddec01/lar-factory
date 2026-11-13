@@ -1491,3 +1491,102 @@ it('reads versioned current decision answers through the CLI', async () => {
     });
     expect((await larWork(dir, 'answer-history', workId)).record).toHaveLength(1);
 }, 30_000);
+
+it(
+    'approves a displayed batch once through the CLI and records none after a stale member',
+    { timeout: 30_000 },
+    async () => {
+        const data = tempDir();
+        const records = await openWorkRecords(join(data, 'work-records.db'));
+        const ids: string[] = [];
+
+        try {
+            for (let index = 0; index < 2; index++) {
+                const work = records.create({ title: `Build ${index}`, repository: 'fake/app', kind: 'build' });
+
+                records.setBody(work.workId, work.revision, 'brief', `Complete brief ${index}.`);
+
+                const input = records.doubtPackage(work.workId);
+
+                records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Code checked; clean.', []);
+                ids.push(work.workId);
+            }
+
+            const idsFile = join(data, 'ids.json');
+            const manifestFile = join(data, 'manifest.json');
+
+            writeFileSync(idsFile, JSON.stringify(ids));
+
+            const displayed = await larWork(data, 'gate-batch', '--file', idsFile);
+
+            expect(displayed.code).toBe(0);
+            expect(displayed.record.members).toHaveLength(2);
+            writeFileSync(manifestFile, JSON.stringify(displayed.record));
+
+            const last = records.read(ids[1]!);
+
+            records.setBody(last.workId, last.revision, 'brief', 'Changed after display.');
+
+            const approve = (digest: string) =>
+                larWork(
+                    data,
+                    'record-gate-batch',
+                    '--file',
+                    manifestFile,
+                    '--digest',
+                    digest,
+                    '--identity',
+                    'Pedro',
+                    '--evidence',
+                    'Yes to the displayed batch.',
+                );
+
+            expect(await approve(displayed.record.digest)).toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining('conflicting fields: body.brief'),
+            });
+            expect(ids.every((id) => records.gate(id).evidence.length === 0)).toBe(true);
+
+            const input = records.doubtPackage(last.workId);
+
+            records.recordDoubt(last.workId, input.packageDigest, 'Doubt', 'Rechecked; clean.', []);
+
+            const renewed = await larWork(data, 'gate-batch', '--file', idsFile);
+
+            writeFileSync(manifestFile, JSON.stringify(renewed.record));
+
+            const waiting = await larWork(
+                data,
+                'set-needs-you',
+                ids[0]!,
+                '--revision',
+                String(records.read(ids[0]!).revision),
+                '--reason',
+                'Approve this batch',
+            );
+
+            expect(waiting.code).toBe(0);
+            expect(
+                (
+                    await larWork(
+                        data,
+                        'clear-needs-you',
+                        ids[0]!,
+                        '--revision',
+                        String(waiting.record.revision),
+                        '--status',
+                        'Shaping',
+                    )
+                ).code,
+            ).toBe(0);
+
+            const result = await approve(renewed.record.digest);
+
+            expect(result.code).toBe(0);
+            expect(result.record.gates).toHaveLength(2);
+            expect(ids.every((id) => records.gate(id).passing?.batchDigest === renewed.record.digest)).toBe(true);
+        } finally {
+            records.close();
+        }
+    },
+);

@@ -21,6 +21,12 @@
    Record with `lar-work record-gate <work ID> --file display.json --digest <approved approvalDigest> --identity <approver> --evidence "<response reference, Doubt result and confirmed assumptions>"`.
    The command refreshes the ticket and checks displayed text, source revision
    and approval digest together. A mismatch requires renewed review and approval.
+   For several builds, save a JSON array of IDs and run
+   `lar-work gate-batch --file ids.json > manifest.json`. Display every complete
+   brief, its digests, source revision and Doubt result/identity, plus the manifest
+   `digest`. One explicit yes approves that manifest. Record it atomically with
+   `lar-work record-gate-batch --file manifest.json --digest <approved manifest digest> --identity <approver> --evidence "<response reference>"`.
+   Any stale member rejects all; renew review and approval for a fresh manifest.
    If this gate supersedes an answer, run `lar-work supersede-answer`, reconcile
    affected briefs and save the map. Rerun Doubt and approval for changed packages.
 5. Set **Ready** on gated builds. Report `lar-work waiting-on` for each. Eligible

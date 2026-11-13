@@ -16,14 +16,24 @@ import type {
 } from '@lar-factory/shared';
 import { createHash, randomUUID } from 'node:crypto';
 
+import { agentRevision } from './agent-revision.ts';
 import type { BriefReviewRecords } from './brief-review.ts';
 import { WorkRecordError, type Database } from './database.ts';
+import {
+    gateManifest,
+    gateWorkIds,
+    readGateManifest,
+    type GateManifest,
+    type GateBatchEvidence,
+} from './gate-batch.ts';
 import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval } from './gate-display.ts';
 import { queueTicketSpec } from './spec-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
 export interface PublicationRecords {
     gate(workId: string): GateResult;
+    gateBatch(workIds: string[]): GateManifest;
+    recordGateBatch(manifest: GateManifest, digest: string, approvedBy: string, evidence: string): GateBatchEvidence;
     displayGate(workId: string): GateDisplay;
     recordDisplayedGate(
         display: GateDisplay,
@@ -224,6 +234,7 @@ export function publicationRecords(
                 evidence: String(row.evidence),
                 recordedAt: String(row.recorded_at),
                 source: row.source as GateEvidence['source'],
+                ...(row.batch_digest ? { batchDigest: String(row.batch_digest) } : {}),
                 ...(row.approval_digest ? { approvalDigest: String(row.approval_digest) } : {}),
                 ...(row.review_digest
                     ? { reviewDigest: String(row.review_digest), doubtReviewId: String(row.doubt_review_id) }
@@ -1044,7 +1055,7 @@ export function publicationRecords(
     const saveGate = (workId: string, revision: number, value: GateApproval): GateEvidence => {
         const record = expected(workId, revision);
 
-        keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest', 'reviewDigest']);
+        keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest', 'reviewDigest', 'batchDigest']);
 
         if (['concept', 'decision', 'slice'].includes(record.kind))
             invalid('Only a publishable brief can pass a gate.');
@@ -1062,6 +1073,7 @@ export function publicationRecords(
         const item: GateEvidence = {
             ...(review ? { reviewDigest: review.packageDigest, doubtReviewId: review.reviewId } : {}),
             ...(value.approvalDigest ? { approvalDigest: value.approvalDigest } : {}),
+            ...(value.batchDigest ? { batchDigest: value.batchDigest } : {}),
             gateId: randomUUID(),
             workId,
             sourceRevision: revision,
@@ -1072,7 +1084,7 @@ export function publicationRecords(
         };
 
         db.prepare(
-            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest, review_digest, doubt_review_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest, review_digest, doubt_review_id, batch_digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         ).run(
             item.gateId,
             workId,
@@ -1084,6 +1096,7 @@ export function publicationRecords(
             item.approvalDigest ?? null,
             item.reviewDigest ?? null,
             item.doubtReviewId ?? null,
+            item.batchDigest ?? null,
         );
         db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
 
@@ -1100,8 +1113,90 @@ export function publicationRecords(
         return makeGateDisplay(workId, record.revision, brief!);
     };
 
+    const gateBatch = (workIds: string[]): GateManifest =>
+        gateManifest(
+            gateWorkIds(workIds).map((id) => {
+                if (
+                    db
+                        .prepare(
+                            "SELECT 1 FROM ticket_specs WHERE work_id = ? AND json_extract(state, '$.held') IS NOT NULL",
+                        )
+                        .get(id)
+                )
+                    invalid(`Resolve the held Spec edit for ${id} before gating this batch.`);
+
+                const display = displayGate(id);
+                const doubt = reviews?.currentDoubt(id);
+
+                if (!doubt)
+                    invalid(
+                        `Run Doubt and record-doubt for the current package of ${id} before displaying this batch.`,
+                    );
+
+                return { display, doubt: doubt! };
+            }),
+        );
+
     return {
         gate: (workId) => database.read(() => gate(workId)),
+        // Hold one SQLite snapshot for every displayed member, just as approval does.
+        gateBatch: (ids) => database.write(() => gateBatch(ids)),
+        recordGateBatch: (manifest, approvedDigest, approvedBy, evidence) =>
+            database.write(() => {
+                const displayed = readGateManifest(manifest);
+
+                if (displayed.digest !== approvedDigest)
+                    invalid('The approved batch digest does not match the displayed manifest.');
+
+                // Preserve the approved manifest while checking disjoint progress under the same write lock.
+                const revisions = displayed.members.map(({ display }) =>
+                    agentRevision(database, display.workId, display.sourceRevision, [
+                        'kind',
+                        'setAsideAt',
+                        'finishedAt',
+                        'body.brief',
+                        'gate',
+                        'ticket',
+                    ]),
+                );
+                const current = gateBatch(displayed.members.map((member) => member.display.workId));
+
+                const compared = gateManifest(
+                    current.members.map((member, index) => ({
+                        ...member,
+                        display: makeGateDisplay(
+                            member.display.workId,
+                            displayed.members[index]!.display.sourceRevision,
+                            member.display.brief,
+                        ),
+                    })),
+                );
+
+                if (compared.digest !== approvedDigest)
+                    invalid(
+                        'A displayed batch member changed; review and display the complete batch for renewed approval.',
+                    );
+
+                const gates = displayed.members.map(({ display, doubt }, index) =>
+                    saveGate(display.workId, revisions[index]!, {
+                        briefDigest: display.briefDigest,
+                        approvalDigest: display.approvalDigest,
+                        reviewDigest: doubt.packageDigest,
+                        batchDigest: displayed.digest,
+                        approvedBy,
+                        evidence,
+                    }),
+                );
+
+                return {
+                    digest: displayed.digest,
+                    manifest: displayed,
+                    approvedBy,
+                    evidence,
+                    recordedAt: now(),
+                    gates,
+                };
+            }),
         recordGate: (workId, revision, value) => database.write(() => saveGate(workId, revision, value)),
         displayGate: (workId) => database.read(() => displayGate(workId)),
         recordDisplayedGate: (display, approvalDigest, approvedBy, evidence) =>

@@ -528,4 +528,5 @@ export const MIGRATIONS: readonly Migration[] = [
         ALTER TABLE brief_gates ADD COLUMN doubt_review_id TEXT;
         ALTER TABLE brief_gates ADD COLUMN review_digest TEXT;
     `),
+    (db) => db.exec('ALTER TABLE brief_gates ADD COLUMN batch_digest TEXT'),
 ];

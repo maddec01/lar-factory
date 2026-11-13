@@ -16,6 +16,7 @@ import { createRecordTicket } from './create-ticket.ts';
 import { exportMarkdown } from './export.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
+import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import {
@@ -89,6 +90,16 @@ Identifiers
   A repository is the repository's name on the board, owner/name.
 
 Run settings, local only
+  role-launch <work-id> --run-id ID --role R --capabilities F --task F
+                                    Record the attempt and print delegate_task arguments.
+                                    F is T3 orchestrator_capabilities JSON (search omitted
+                                    models first); task is the role's brief as text.
+                                    Uses the supplied LAR_FACTORY_{BIN,SHAPE_SKILL,BUILD_SKILL}
+                                    environment. Optional --execution-id reuses an attempt;
+                                    --isolation shared|worktree overrides the role default.
+  role-finish <work-id> --execution-id ID [--file F]
+                                    Read T3's task result JSON (stdin by default), record
+                                    and compare it. Failure sets Needs you and exits 1.
   run-settings <work-id> [--run-id ID]
                                     Print immutable snapshots and role execution evidence.
   snapshot-run <work-id> --revision N --file F
@@ -99,7 +110,7 @@ Run settings, local only
                                     Record actual settings from a T3 report and the result.
 
 Reads
-  select-reviewers <work-id> --base SHA --head SHA
+  select-reviewers <work-id> --base SHA --head SHA [--run-id ID]
                    [--escalations F]
                                     Choose reviewers from saved settings and the exact
                                     committed diff in the current build checkout.
@@ -911,6 +922,8 @@ async function run(
 }
 
 async function main(args: string[]): Promise<number> {
+    if (args[0] === 'role-launch' || args[0] === 'role-finish') return roleCommand(args[0], args.slice(1));
+
     if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
 
     if (args[0] === 'select-reviewers') return selectReviewersCommand(args.slice(1));

@@ -1,7 +1,8 @@
 # Run settings records
 
-P10 supplies local records and CLI commands; P50 connects starts and role execution
-to them. None of these commands launches T3 or synchronizes a tracker. All accept
+The board freezes these records before launching shaping, concept, decision or
+build work. It validates the thread target against live T3 capabilities and passes
+the run ID and every role target to the thread. None of these commands launches T3 or synchronizes a tracker. All accept
 `--data-dir D` (otherwise the normal app data folder). Browser-safe result and
 input types live at `@lar-factory/shared/run-settings`. Server callers use the
 methods on `openWorkRecords()`.
@@ -56,13 +57,55 @@ Reuse the same `runId` on retry and handoff, with the current work revision.
 The existing snapshot is returned without rereading Settings or bumping the
 revision; changed input cannot replace it. Reusing the ID for a different kind
 is refused. Only a new logical run gets a new ID and captures current Settings.
-Callers must retain that ID alongside their launch identity (P50). A failed new
+The board associates the run with its launch intent through the thread execution ID. A failed new
 capture, including invalid inputs or a Settings recovery warning, writes nothing.
+
+## Delegated roles
+
+Save T3's `orchestrator_capabilities` JSON to a file, searching an omitted model
+before saving. Then use:
+
+```sh
+lar-work role-launch WORK_ID --run-id RUN_ID --role ROLE --capabilities capabilities.json --task brief.md
+```
+
+The command reads the frozen role, checks capabilities, maps effort to the
+advertised option and records the start. Its JSON is the exact `delegate_task`
+argument object: explicit provider/model/options, execution ID as
+`clientRequestId`, isolation and task. Implementer and Prototype default to
+worktree isolation; other roles default to shared. `--isolation` overrides it.
+`--execution-id ID` reuses a still-running attempt for lost-reply recovery;
+omit it for a new child. Exact resolved options are retained as `launchOptions`.
+
+The brief is text, appended after a generated preamble carrying work/run IDs,
+frozen roles, selected skills and any frozen reviewer instructions. The board
+supplies `LAR_FACTORY_BIN`, `LAR_FACTORY_SHAPE_SKILL` and
+`LAR_FACTORY_BUILD_SKILL` alongside its existing CLI/data environment. The command
+checks these absolute paths and carries them, the data folder and any Azure
+read-only setting into the child. Missing entries hold; global skills are never
+discovered as a fallback.
+
+Pass the launch JSON to `delegate_task` unchanged. After completion, save T3's
+task result and run:
+
+```sh
+lar-work role-finish WORK_ID --execution-id ID --file result.json
+```
+
+Without `--file`, the result is read from stdin; `--file -` also reads stdin.
+Both commands accept a plain T3 payload or its `structuredContent` envelope.
+Finish uses only T3's `providerInstanceId`, `executedModel` (otherwise `model`),
+`options`, `taskId`, `status` and `hasPendingChildRuns`. It records the report and
+compares provider, effective model and every launch option, independent of option
+order. A failed task, pending child, missing/malformed evidence, mismatch or
+unavailable capability records failure, sets Needs you and exits 1 with the hold
+reason. Stop on non-zero; cancel a mismatched active child. These commands read
+the current work revision for each write; callers do not manage revisions.
 
 ## Requested and reported execution
 
 `lar-work start-role-run WORK_ID --revision N --file F` takes
-`{runId, executionId, role, threadId?, taskId?}`. `role` is `thread`, a factory
+`{runId, executionId, role, threadId?, taskId?, launchOptions?}`. `role` is `thread`, a factory
 role, or `reviewer:<id>` from the snapshot. Requested model, provider instance,
 effort and options are copied from that snapshot. Actual settings start null.
 The same execution ID and identity return the saved attempt without a write;
@@ -92,8 +135,9 @@ records layer validates the shape; it does not independently query T3 or attest
 the caller's evidence. Missing values stay null (and absent options use `[]`),
 never copied from the request. A missing report is `report: null`. A failure uses
 `result: "failed"` and a nonempty `failure` reason, with any available report.
-Requested and actual differences are preserved for inspection; enforcing
-capabilities and surfacing mismatches are P50's responsibility. Completion is
+Requested and actual differences are preserved for inspection; the board validates capabilities, checks T3's reported selection and holds mismatches.
+A thread role entry records its launch attempt, not completion of the whole workflow.
+Child roles record completion through the shared orchestration contract. Completion is
 immutable; an identical replay is a no-op. Each changed write requires the current
 work revision and bumps it once. Read the work record for the next revision.
 
@@ -109,6 +153,6 @@ Escalation provenance remains separate, preserving the original trigger result.
 Round validation uses the snapshot's reviewer set and modes, so subsequent edits
 cannot remove a custom reviewer or change a running build's never policy.
 `review-rounds` returns the link and selection evidence. Legacy rounds keep their
-existing JSON shape and have no invented run ID. The caller must pass
-`snapshot.settings` to the selection API and use the snapshot's instruction
-text; connecting the existing selection CLI and all launch sites is P50.
+existing JSON shape and have no invented run ID. Use `select-reviewers WORK_ID --base SHA --head SHA --run-id RUN_ID`. It selects
+from the frozen settings and returns the frozen instruction text and role target.
+Omitting the run ID is refused once a work record has snapshots.

@@ -6,6 +6,14 @@ follow T3.
 
 ## Native subagent or child task
 
+**Run contract.** With a board-supplied run ID, launch every role with
+`lar-work role-launch WORK_ID --run-id RUN_ID --role ROLE --capabilities F --task F`
+and pass its JSON to `delegate_task` unchanged. Save `orchestrator_capabilities`
+JSON to F first (search omitted models); the task file holds the role's brief.
+When the child finishes, run `lar-work role-finish WORK_ID --execution-id ID`
+with T3's task result JSON on stdin (or `--file F`). If either command exits
+non-zero, stop; cancel a mismatched active child. Never substitute.
+
 A **child task** is `delegate_task` work this thread owns and tracks by its
 `taskId`. Start one when any of these holds; otherwise use a native subagent:
 

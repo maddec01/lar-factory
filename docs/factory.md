@@ -127,9 +127,12 @@ Your desk definition excludes grouped work; it must change with that behavior.
 
 ## Settings and roles
 
-The records-only [run settings contract](run-settings.md) implements `snapshot-run`,
-`run-settings`, role execution evidence and snapshot-linked review rounds. Launch
-wiring is a separate step; these commands do not start threads or roles.
+The [run settings contract](run-settings.md) freezes Settings before board launches,
+validates model capabilities, and records requested versus reported execution.
+Threads pass the snapshot to every delegated role and snapshot-linked review.
+`role-launch` constructs and records each delegate request from that snapshot;
+`role-finish` compares T3's reported execution and holds mismatches with Needs you.
+The skill supplies the role's brief and passes the command's launch JSON unchanged.
 
 Settings has machine-wide defaults for reviewers, models and effort. It offers
 model and effort per thread kind: shaping, concept, decision and

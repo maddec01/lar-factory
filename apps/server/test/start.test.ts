@@ -9,7 +9,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import { shapePrompt, recordBlockers, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
+import { shapePrompt, DEFAULT_SELECTION, recordBlockers, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
@@ -67,17 +67,18 @@ test("Start begins one lar-shape thread in the card's repository project and lea
     const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
     const response = await start(board, board.id(12));
 
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
     assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
     assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
     assert.deepEqual(await board.t3Calls(), [
-        ['thread', 'start', 'project-factory', message(board), '--json'],
+        ['launch', 'project-factory', await message(board), DEFAULT_SELECTION, { type: 'root' }, 'full-access'],
         [
-            'thread',
-            'start',
+            'launch',
             'project-server',
-            shapePrompt(board, '#30 Issue 30', board.id(30, 'maddec01/lar-server')),
-            '--json',
+            await shapePrompt(board, '#30 Issue 30', board.id(30, 'maddec01/lar-server')),
+            DEFAULT_SELECTION,
+            { type: 'root' },
+            'full-access',
         ],
     ]);
     assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
@@ -90,13 +91,13 @@ test('Start runs the thread on the picked model choice, still in the repository 
         model: 'claude-opus-5-5',
     });
 
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
     assert.deepEqual(await board.t3Calls(), [
         [
             'launch',
             'project-factory',
-            message(board),
-            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' },
+            await message(board),
+            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5', options: [] },
             { type: 'root' },
             'full-access',
         ],
@@ -133,7 +134,7 @@ test('Start finds the repository project by origin, whatever its folder is calle
     });
 
     assert.equal((await start(board, board.id(12))).status, 200);
-    assert.equal((await board.t3Calls())[0]?.[2], 'project-clone');
+    assert.equal((await board.t3Calls())[0]?.[1], 'project-clone');
 });
 
 const NO_PROJECT = 'No T3 project is a checkout of maddec01/lar-factory; add the checkout in T3 Code';
@@ -280,7 +281,7 @@ for (const fail of ['killed', 'garbage']) {
         assert.equal((await first.json()).uncertain, true);
         await board.update({ items: [boardIssue(12, 'Queued')] });
         assert.equal((await (await start(board, board.id(12))).json()).uncertain, true);
-        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start').length, 1);
+        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
     });
 }
 
@@ -354,7 +355,7 @@ for (const recover of ['late', 'deleted']) {
         else assert.equal(answer.uncertain, true);
 
         await start(board, board.id(12));
-        assert.equal((await board.t3Calls()).filter((args) => args[1] === 'start').length, 1);
+        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
         assert.ok((await board.t3Calls()).some((args) => args[1] === 'show'));
     });
 }

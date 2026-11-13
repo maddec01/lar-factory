@@ -48,7 +48,7 @@ function machine(t: TestContext, title = 'Issue 12') {
 }
 
 const start = (board: Board, workId: string) => board.postSession({ itemId: workId }, '/api/start');
-const starts = async (board: Board) => (await board.t3Calls()).filter((args) => args[1] === 'start').length;
+const starts = async (board: Board) => (await board.t3Calls()).filter((args) => args[0] === 'launch').length;
 
 /** The launch intents the work record holds, with each one's outcome. */
 async function intents(board: Board, workId: string) {
@@ -179,8 +179,8 @@ test('a successful start holds its thread after a restart, so Start there asks T
 
 test('a failed start stays a failure after a restart, so Start there asks T3 again', async (t) => {
     const boardOn = machine(t);
-    // No t3 at all is a certain failure: nothing ran, so no thread can exist.
-    const missing = await boardOn({}, true, { T3_PATH: '/nonexistent/t3' });
+    // T3's explicit authorization refusal is certain: no thread can exist.
+    const missing = await boardOn({ t3: { fail: 'refused' } }, true);
     const workId = missing.id(12);
 
     await until(missing, (d) => d.items.some((i) => i.id === workId));
@@ -214,8 +214,14 @@ test(
         await until(before, (d) => d.items.some((i) => i.id === workId));
 
         const message = earlierShapePrompt(before, `#12 ${title}`, workId);
+        const legacy = await openWorkRecords(workRecordsPath(before.dataDir));
 
-        assert.equal((await (await start(before, workId)).json()).uncertain, true);
+        try {
+            legacy.recordLaunchIntent(workId, legacy.read(workId).revision, 'shape');
+        } finally {
+            legacy.close();
+        }
+
         await before.stop();
 
         const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
@@ -244,9 +250,10 @@ test(
 
         await until(before, (d) => d.items.some((i) => i.id === workId));
 
-        const message = shapePrompt(before, `#12 ${title}`, workId);
-
         assert.equal((await (await start(before, workId)).json()).uncertain, true);
+
+        const message = await shapePrompt(before, `#12 ${title}`, workId);
+
         await before.stop();
 
         const down = await boardOn({ t3: { fail: 'down' } });

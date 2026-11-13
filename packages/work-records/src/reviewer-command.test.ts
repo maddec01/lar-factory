@@ -275,3 +275,72 @@ it('accepts Code requests through the CLI and saves their provenance with the re
         run('review-rounds', record.workId)[0].reviewers.find((entry: { axis: string }) => entry.axis === 'security'),
     ).toMatchObject({ verdict: 'approve', escalation });
 }, 30_000);
+
+it('selects from the named run after Settings edits, returning frozen instructions and role targets', async () => {
+    const { cwd, commit } = repository();
+    const data = directory();
+    const records = await openWorkRecords(workRecordsPath(data));
+    const record = records.create({ title: 'Frozen review', repository: 'example/repo', kind: 'build' });
+    const settings = defaultFactorySettings();
+
+    settings.roles['reviewer:code'] = { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' };
+    writeFactorySettings(settings, data);
+    records.snapshotRun(record.workId, record.revision, {
+        runId: 'build-run',
+        kind: 'build',
+        skills: [],
+        packaged: {
+            version: 'fixture',
+            reviewers: { code: 'Frozen code instructions', security: 'Security', ui: 'UI', performance: 'Performance' },
+        },
+    });
+
+    const before = records.read(record.workId);
+
+    records.close();
+    settings.reviewers[0]!.mode = { kind: 'never' };
+    writeFactorySettings(settings, data);
+
+    const base = commit();
+
+    writeFileSync(join(cwd, 'README.md'), 'Documentation.\n');
+
+    const head = commit();
+    const command = [
+        '--disable-warning=ExperimentalWarning',
+        join(import.meta.dirname, 'cli.ts'),
+        'select-reviewers',
+        record.workId,
+        '--base',
+        base,
+        '--head',
+        head,
+        '--data-dir',
+        data,
+    ];
+    const run = (...args: string[]) =>
+        execFileSync(process.execPath, [...command, ...args], {
+            cwd,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+    const output = JSON.parse(run('--run-id', 'build-run'));
+    const code = output.reviewers.find((reviewer: { id: string }) => reviewer.id === 'code');
+
+    expect(output.runId).toBe('build-run');
+    expect(code).toMatchObject({
+        run: true,
+        instructions: { text: 'Frozen code instructions', source: { version: 'fixture' } },
+        target: { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' },
+    });
+    expect(() => run()).toThrow(/requires --run-id/);
+    expect(() => run('--run-id', 'missing')).toThrow(/No run/);
+
+    const reread = await openWorkRecords(workRecordsPath(data));
+
+    try {
+        expect(reread.read(record.workId)).toEqual(before);
+    } finally {
+        reread.close();
+    }
+}, 30_000);

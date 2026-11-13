@@ -106,7 +106,7 @@ test('a refresh with a blocker incomplete starts nothing; once the last complete
 
     assert.deepEqual(
         calls.map(([kind, project, , selection]) => [kind, project, selection]),
-        [['launch', 'project-factory', { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }]],
+        [['launch', 'project-factory', { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5', options: [] }]],
     );
     assert.equal((calls[0]![4] as { type: string }).type, 'worktree', 'a build starts in its own worktree');
 });
@@ -227,7 +227,7 @@ test('an armed build whose fetch fails disarms, shows the error on the item and 
     );
     assert.deepEqual(failed.armed, {});
     assert.deepEqual(
-        (await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start'),
+        (await board.t3Calls()).filter((args) => args[0] === 'launch'),
         [],
     );
 });

@@ -20,7 +20,8 @@
         "./publication-settings": "./src/publication-settings.ts",
         "./tracker-labels": "./src/tracker-labels.ts",
         "./run-settings": "./src/run-settings.ts",
-        "./factory-settings": "./src/factory-settings-api.ts"
+        "./factory-settings": "./src/factory-settings-api.ts",
+        "./execution-target": "./src/execution-target.ts"
     },
     "scripts": {
         "test": "vp test run",

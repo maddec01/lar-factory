@@ -148,7 +148,7 @@ export function launchSelection(choice: ModelChoice, selection: ModelSelection |
 }
 
 /** Only the instance, model and option ids and values: the settings may hold secrets. */
-function parseSelection(value: unknown): ModelSelection | null {
+export function parseSelection(value: unknown): ModelSelection | null {
     if (!isRecord(value) || typeof value.instanceId !== 'string' || typeof value.model !== 'string') return null;
 
     const options = (Array.isArray(value.options) ? value.options : []).flatMap((option): ModelSelectionOption[] =>

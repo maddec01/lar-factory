@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
+import { createAgentTicket } from './agent-tracker-writes.ts';
+import { agentWrites } from './agent-writes.ts';
 import { captureWork, createRecordTicket, recordTicketPreview } from './create-ticket.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -673,3 +675,37 @@ test('on Azure a new tag has no create of its own: it goes on the work item, and
 
     expect(bad.body.error).toMatch(/semicolons/);
 });
+
+test.each([false, true])(
+    'agent ticket attachment preserves concurrent data and request identity; conflict=%s',
+    async (conflicting) => {
+        const { records, local, deps, writes } = await setup();
+        const create = deps.provider.create.bind(deps.provider);
+
+        deps.provider.create = async (...args) => {
+            if (conflicting) records.update(local.workId, local.revision, { kind: 'feature' });
+            else records.setNeedsYou(local.workId, local.revision, 'Concurrent note');
+
+            return create(...args);
+        };
+
+        const agentDeps = { ...deps, records: agentWrites(records) };
+        const input = { revision: local.revision, requestId: REQUEST };
+        const result = await createAgentTicket(local.workId, input, agentDeps);
+
+        expect(writes).toHaveLength(1);
+
+        if (conflicting) {
+            expect(result.body.error).toContain('conflicting fields: kind');
+            expect(records.read(local.workId)).toMatchObject({ kind: 'feature', ticket: null });
+        } else {
+            expect(result.body.record).toMatchObject({
+                workId: local.workId,
+                ticket: `${REPO}#13`,
+                needsYou: 'Concurrent note',
+            });
+            expect((await createAgentTicket(local.workId, input, agentDeps)).body.record?.workId).toBe(local.workId);
+            expect(writes).toHaveLength(1);
+        }
+    },
+);

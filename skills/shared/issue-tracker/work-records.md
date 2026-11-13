@@ -3,9 +3,7 @@
 Factory work lives in work records on the user's machine. A record holds the
 work's title, Status, structure, brief, map, decisions, threads and PR. Steps
 read and write records only through `lar-work` and the shared scripts.
-`lar-work --help` lists the commands and what each prints. Every change takes
-the `--revision` from your last read; when the record moved on, the change
-writes nothing, so read it again and redo the change.
+`lar-work --help` lists the commands; pass your last-read `--revision`. Unrelated changes reapply automatically; conflicts name the fields to reread and decide.
 
 Work records are the source of truth for factory progress, including queue,
 Status and build progress. Tickets hold created issues, gated Specs and the
@@ -112,7 +110,7 @@ From the first synced Spec, the ticket is the source of truth. The record keeps
 a copy for gate evidence and the builder. `lar-work gate <work ID>` rereads the
 ticket before returning its digest and sync status. Read the brief and revision
 after that refresh, before reviewing or gating the text. `record-gate` rereads
-again and rejects stale revisions or digests. A held GitHub edit needs Accept or
+again and requires the reviewed brief digest. A held GitHub edit needs Accept or
 Reject in item details before a later gate.
 
 A durable outbox survives closing the board. A failed Spec write keeps the item
@@ -168,7 +166,7 @@ It prints the work ID; keep it. This uses `lar-work create-part --parent ID
 --revision N --title X --repository R --kind build|decision --file F
 [--blocked-by ID]...`, where N is the parent's last-read revision. The named
 repository, body, parent, blockers and Queued state are saved in one transaction.
-A stale parent or any failure saves nothing; reread before retrying. Builds wait
+Any failure saves nothing. Builds wait
 for shaping and their gate before Ready. Ordinary standalone captures still start
 in List. No later `set-parent` or Status write is needed to finish a new part.
 
@@ -182,7 +180,7 @@ edges. `children`, `blockers` and `dependents` read the structure.
 
 Set aside with `lar-work set-aside ID --revision N --file F`. F lists every
 dependent `{workId,revision,action,reason}`; action is `remove`, `hold` or
-`replace` (also `blockerId,blockerRevision`). A stale record aborts all writes.
+`replace` (also `blockerId,blockerRevision`). Conflicting fields abort all writes.
 Use `set-aside-history ID` for the retained reasons.
 
 Merge proposed builds with `lar-work merge-build ID --revision N --file F`.

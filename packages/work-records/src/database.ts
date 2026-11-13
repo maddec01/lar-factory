@@ -13,6 +13,7 @@ import { backup, DatabaseSync } from 'node:sqlite';
 
 import { MIGRATIONS } from './migrations.ts';
 import { acquireTrackerSyncLock } from './tracker-lock.ts';
+import { flushWriteJournal } from './write-journal.ts';
 
 /** The work-record database in the factory's data folder. */
 export const workRecordsPath = (dir = boardDataDir()): string => join(dir, 'work-records.db');
@@ -252,6 +253,7 @@ export async function openDatabase(
     }
 
     // A newer process may update the schema while this one stays open; check before every statement batch.
+    const hasWriteJournal = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE name='write_dirty'").get());
     const versionRow = db.prepare('PRAGMA user_version');
     const checked = <T>(run: () => T): T => {
         const version = Number(versionRow.get()?.user_version ?? 0);
@@ -268,7 +270,15 @@ export async function openDatabase(
         db,
         write: (change) => {
             try {
-                const result = transaction(db, () => checked(change));
+                const result = transaction(db, () =>
+                    checked(() => {
+                        const result = change();
+
+                        if (hasWriteJournal) flushWriteJournal(db);
+
+                        return result;
+                    }),
+                );
 
                 committed++;
 

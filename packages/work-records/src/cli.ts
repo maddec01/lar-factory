@@ -10,10 +10,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { changeAgentKind, createAgentTicket } from './agent-tracker-writes.ts';
+import { agentWrites } from './agent-writes.ts';
 import { refreshBoards } from './board-refresh.ts';
-import { changeKind, checkKind } from './change-kind.ts';
+import { checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
-import { createRecordTicket } from './create-ticket.ts';
 import { exportMarkdown } from './export.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
@@ -130,7 +131,8 @@ Reads
 
 Changes
   Each change except create and import needs --revision, the revision you last
-  read. When the record has moved on, the change fails and nothing is written.
+  read. Unrelated changes are reapplied automatically. Conflicting fields are
+  named on stderr; reread the record and decide whether to reapply the write.
   create --title X --repository R --kind K [--status S] [--ticket T] [--file F]
                                     Make a record titled X, a single line, with the
                                     markdown in F as its initial context. Status
@@ -726,9 +728,13 @@ async function run(
             return records.completeCapture(values['request-id'], input).record;
         }
         case 'create-ticket': {
-            const result = await createRecordTicket(
+            const result = await createAgentTicket(
                 workId!,
-                { revision: revision(), requestId: need(values, 'request-id'), retro: values.retro },
+                {
+                    revision: revision(),
+                    requestId: need(values, 'request-id'),
+                    retro: values.retro,
+                },
                 {
                     records,
                     repos: () =>
@@ -763,7 +769,7 @@ async function run(
         }
         case 'change-kind': {
             const record = records.read(workId!);
-            const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, {
+            const result = await changeAgentKind(records, workId!, revision(), need(values, 'kind') as SwapKind, {
                 setup: setupOf(record.repository),
             });
 
@@ -1033,7 +1039,7 @@ async function main(args: string[]): Promise<number> {
             return 0;
         }
 
-        records = await openWorkRecords(workRecordsPath(values['data-dir']));
+        records = agentWrites(await openWorkRecords(workRecordsPath(values['data-dir'])));
 
         const result = await run(records, command, workId, values);
 

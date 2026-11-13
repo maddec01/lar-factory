@@ -5,6 +5,7 @@ import { accessSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { agentWrites } from './agent-writes.ts';
 import { roleCapabilities, roleFinish } from './role-evidence.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
@@ -87,7 +88,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
 
         const databasePath = workRecordsPath(values['data-dir']);
 
-        records = await openWorkRecords(databasePath);
+        records = agentWrites(await openWorkRecords(databasePath));
 
         const revision = () => records!.read(workId).revision;
         const hold = (failure: string) => {

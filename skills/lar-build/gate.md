@@ -16,7 +16,7 @@
    again. Record the passing gate with
    `lar-work record-gate <work ID> --revision N --digest <briefDigest> --identity <approver> --evidence "<Doubt result and confirmed assumptions>"`.
    Use the current revision and exact digest. The command rereads the ticket
-   again, so a stale revision or digest requires another read and review.
+   again; changed text requires another read and review.
    Eligible tickets queue the whole brief as Spec under the saved setting.
    Gate evidence itself changes no Status. A failed write stays pending and
    does not block Ready; report its error and the retry in item details.

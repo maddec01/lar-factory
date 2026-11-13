@@ -353,10 +353,12 @@ export async function captureWork(
         );
 
         return reply(200, { record: await finishSpec(record.workId), error: null });
-    } catch {
+    } catch (error) {
+        const conflict = error instanceof WorkRecordError && error.code === 'stale-revision' ? ` ${error.message}` : '';
+
         return reply(502, {
             uncertain: true,
-            error: `Created ${draft.repo}#${number}, but could not save its record. Use Find a ticket to add it. This submission will not create another issue.`,
+            error: `Created ${draft.repo}#${number}, but could not save its record. Use Find a ticket to add it. This submission will not create another issue.${conflict}`,
         });
     }
 }

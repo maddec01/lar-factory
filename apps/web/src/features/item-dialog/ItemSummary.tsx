@@ -3,7 +3,7 @@
 // kind as its row names it when the dialog's Kind control doesn't, and attaching or creating its ticket. The meta area
 // says when it was updated.
 
-import { blockedText, itemName, openBlockers } from '@lar-factory/shared';
+import { blockedText, staleGateReason, itemName, openBlockers } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
@@ -30,6 +30,7 @@ export function ItemSummary({ item }: { item: Item }) {
                     <SourceIcon item={item} />
                     <RepoCell item={item} />
                     <ItemStatusGlyph item={item} /> <SummaryStatus title={shown.recorded}>{shown.word}</SummaryStatus>
+                    {item.staleGate && <SummaryBlocked>{staleGateReason(item)}</SummaryBlocked>}
                     {openBlockers(item).length > 0 && !shown.blocked && (
                         <SummaryBlocked>{blockedText(item)}</SummaryBlocked>
                     )}

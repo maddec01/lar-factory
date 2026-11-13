@@ -8,6 +8,7 @@
 
 import {
     deskItems,
+    groupState,
     retroWaits,
     deskParentName,
     needsAnswer,
@@ -42,6 +43,11 @@ import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSecti
  * leave out a zero count other than passed.
  */
 function NextStep({ item }: { item: Item }) {
+    const data = useBoardStore((state) => state.data);
+    const group = groupState(item, data);
+
+    if (group) return <DeskHint>{group.word}</DeskHint>;
+
     if (retroWaits(item.retro)) return null;
 
     if (item.briefApproval) return <DeskHint>{item.briefApproval.reason}</DeskHint>;

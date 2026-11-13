@@ -1,5 +1,6 @@
 import { isLiveThread, type BoardData, type Item, type ItemThread } from './model.ts';
 import { rebaseSampleTimes } from './sample-clock.ts';
+import { ownerThreads } from './thread-domain.ts';
 
 /** A native subagent or child task working for a thread. */
 export interface ThreadAgent {
@@ -120,7 +121,7 @@ const UNDER_WAY: readonly Item['status'][] = ['Shaping', 'In progress', 'Review'
 export function itemActivityThread(item: Item): ItemThread | undefined {
     if (item.paused || item.archived || !Array.isArray(item.threads)) return undefined;
 
-    const threads = item.threads.filter((thread) => !thread.archived);
+    const threads = ownerThreads(item).filter((thread) => !thread.archived);
     const atWork = threads.find((thread) => isLiveThread(thread) || thread.hasRunningChildren);
 
     return atWork ?? (threads[0]?.state === 'stopped' && UNDER_WAY.includes(item.status) ? threads[0] : undefined);

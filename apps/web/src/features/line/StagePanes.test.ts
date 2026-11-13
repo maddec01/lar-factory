@@ -153,8 +153,8 @@ test('Build’s header counts the factory’s builds against the automatic build
 
     const header = $('[data-stage="build"] header .build-limit')!;
 
-    expect(text(header), 'In progress and Review count').toBe('4 building · limit 2');
-    expect(text($('[data-ready-build-controls]'))).toContain('4 building · limit 2');
+    expect(text(header), 'In progress and Review count').toBe('4 building · limit 2 · 2 over the limit');
+    expect(text($('[data-ready-build-controls]'))).toContain('4 building · limit 2 · 2 over the limit');
     expect(header.getAttribute('title')).toContain(
         'At capacity, manual starts are refused; scheduled starts wait for a slot.',
     );
@@ -164,7 +164,7 @@ test('Build’s header counts the factory’s builds against the automatic build
     expect(iconConcept(row('I_sample15').querySelector('[data-glyph]')!, conceptIcons)).toBe('stopped');
     await receive(withItem('I_sample09', { status: 'In progress' }, limited));
     expect(text($('[data-stage="build"] .build-limit')), 'a concept in progress is no build at work').toBe(
-        '4 building · limit 2',
+        '4 building · limit 2 · 2 over the limit',
     );
     await receive({
         ...limited,

@@ -7,6 +7,7 @@ import { startActionChoice, buildAccessProblem, sameRepo, type BoardData, type I
 import { Button } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
+import { HumanWaitAction } from './HumanWaitAction';
 import { hasLiveThread } from './ItemThreads';
 import { OpenThread } from './OpenThread';
 import { useOnRow } from './RowContext';
@@ -29,6 +30,8 @@ export function StartBuild({
     const { label } = startActionChoice(item, 'build');
 
     const concept = data.items.find((parent) => parent.id === item.parentId)?.conceptBuild;
+
+    if (item.briefApproval) return <HumanWaitAction item={item} data={data} />;
 
     // The concept authorizes its eligible builds together; its cards and details share that action.
     if (concept && (concept.holds.length === 0 || concept.run?.state === 'running')) return null;

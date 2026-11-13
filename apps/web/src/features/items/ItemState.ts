@@ -5,6 +5,7 @@
 
 import {
     isDecisionWork,
+    groupState,
     deskWait,
     needsAnswer,
     stoppedRunThread,
@@ -93,6 +94,7 @@ export interface ItemStateInputs {
     /** A start for the item is in flight, pressed on this page or reported by the server. */
     starting: boolean;
     all?: readonly Item[];
+    starts?: BoardData['startProgress'];
 }
 
 /** Whether T3's own run state says the item's work runs, when its activity can't say: a shaping thread, a build thread or
@@ -196,7 +198,13 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
             (!readiness && ['Verify', 'Ready to merge'].includes(item.status)))
             ? deskWait(item, stale, inputs.all).label
             : undefined;
+    const group = groupState(
+        item,
+        { items: [...(inputs.all ?? [])], startProgress: inputs.starts },
+        inputs.unavailable,
+    );
     const word =
+        group?.word ??
         wait ??
         (blockers.length
             ? blockedWord
@@ -256,7 +264,13 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         stageWord,
         state,
         // At work again, its glyph and colour are a build's.
-        glyph: readiness ? 'Review' : workingAgain(item, stale) ? 'In progress' : item.status,
+        glyph: group?.running
+            ? 'In progress'
+            : readiness
+              ? 'Review'
+              : workingAgain(item, stale)
+                ? 'In progress'
+                : item.status,
         glyphState:
             said === 'stopped'
                 ? 'off'
@@ -265,7 +279,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                   : undefined,
         light: Boolean(readiness || merged),
         // A read the board can't trust stills the motion, while a thread's own fresh line still names what it does.
-        running: atWork && !inputs.unavailable && !blockers.length,
+        running: group ? group.running && !inputs.unavailable : atWork && !inputs.unavailable && !blockers.length,
         working: workingAgain(item, stale),
         blocked: blockers.length > 0,
         resume: execution === 'stopped' && resumable(item),
@@ -309,6 +323,7 @@ export function useItemStates(): (item: Item) => ItemState {
     const disconnected = useBoardStore((state) => !!state.clientError);
     const starting = useStarting();
     const all = useBoardStore((state) => state.data.items);
+    const starts = useBoardStore((state) => state.data.startProgress);
 
     return (item) => {
         const now = Date.now();
@@ -316,6 +331,7 @@ export function useItemStates(): (item: Item) => ItemState {
         return itemState(item, {
             unavailable,
             all,
+            starts,
             line: itemActivityLine(item, now, disconnected)?.state,
             lost: activityLost(itemActivityThread(item)?.activity, now),
             starting: starting(item),
@@ -329,11 +345,12 @@ export function useItemState(item: Item): ItemState {
     const disconnected = useBoardStore((state) => !!state.clientError);
     const starting = useStarting()(item);
     const all = useBoardStore((state) => state.data.items);
+    const starts = useBoardStore((state) => state.data.startProgress);
     const line = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
     const lost = useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
 
     return useMemo(
-        () => itemState(item, { unavailable, line, lost, starting, all }),
-        [item, unavailable, line, lost, starting, all],
+        () => itemState(item, { unavailable, line, lost, starting, all, starts }),
+        [item, unavailable, line, lost, starting, all, starts],
     );
 }

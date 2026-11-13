@@ -4,6 +4,7 @@ import type { Item, ItemThread } from './model.ts';
 import {
     ACTIVITY_STALE_MS,
     itemActivityAgents,
+    itemActivityThread,
     itemActivityLine,
     itemActivityStill,
     threadActivityLine,
@@ -273,4 +274,36 @@ test("only a thread that waits, stopped or can't be read holds a row still", () 
     expect(itemActivityAgents(item([working('t', 'Read a.ts')]), NOW)).toEqual([
         { title: 'Lead thread', action: 'Read a.ts', actionAt: ago(1) },
     ]);
+});
+
+test('a running build owns activity even when a shaping thread still reports live work or a question', () => {
+    const shape = thread({
+        id: 'shape',
+        purpose: 'shape',
+        state: 'needs you',
+        activity: activity({ action: 'Shaping' }),
+    });
+    const build = thread({
+        id: 'build',
+        purpose: 'build',
+        activity: activity({ action: 'Implementing', actionAt: ago(0) }),
+    });
+    const work = item([shape, build], { status: 'In progress' });
+
+    expect(itemActivityThread(work)?.id).toBe('build');
+    expect(itemActivityLine(work, NOW)?.action).toBe('Implementing');
+    expect(itemActivityAgents(work, NOW)).not.toContainEqual(expect.objectContaining({ action: 'Shaping' }));
+    expect(itemActivityThread({ ...work, threads: [shape, { ...build, state: 'done' }] })).toBeUndefined();
+});
+
+test('returning to shaping transfers activity away from the earlier build', () => {
+    const work = item(
+        [
+            thread({ id: 'shape', purpose: 'shape', activity: activity({ action: 'Revising the brief' }) }),
+            thread({ id: 'build', purpose: 'build', activity: activity({ action: 'Earlier build' }) }),
+        ],
+        { status: 'Shaping' },
+    );
+
+    expect(itemActivityThread(work)?.id).toBe('shape');
 });

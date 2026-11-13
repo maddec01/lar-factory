@@ -55,24 +55,14 @@ export function StagePane({
             className="surface-card min-w-0 overflow-hidden rounded-xl border"
         >
             <header className="bg-surface-sunken flex min-h-10 items-center px-3 py-1">
-                <div className="min-w-0 flex-1">
-                    <SectionTitle
-                        id={headingId}
-                        level="h3"
-                        title={title}
-                        icon={glyph}
-                        count={count}
-                        actions={
-                            collapsed ? (
-                                <span className="flex min-w-0 items-center gap-3">
-                                    {empty}
-                                    {right}
-                                </span>
-                            ) : (
-                                right
-                            )
-                        }
-                    />
+                <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <SectionTitle id={headingId} level="h3" title={title} icon={glyph} count={count} />
+                    {(right || collapsed) && (
+                        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3" data-stage-controls>
+                            {collapsed && empty}
+                            {right}
+                        </div>
+                    )}
                 </div>
             </header>
             {!collapsed && children && <div className="@container min-w-0 p-1.5">{children}</div>}

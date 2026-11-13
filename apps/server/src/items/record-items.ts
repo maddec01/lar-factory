@@ -3,7 +3,15 @@
 // PRs and provider fields. Board grouping can also use tracker links without writing local ownership.
 // Spec sync can update title and brief; it never moves, restructures or blocks work.
 
-import { kindDisagreement, onAzure, parseConceptMap, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
+import {
+    kindDisagreement,
+    staleGateReason,
+    onAzure,
+    parseConceptMap,
+    refKey,
+    sameRepo,
+    ticketKindOf,
+} from '@lar-factory/shared';
 import type {
     Blocker,
     DependencyHold,
@@ -220,13 +228,21 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 ? null
                 : savedSpec;
         const gate = records.gate(record.workId);
+        const staleGate =
+            !done && !gate.current && gate.evidence.length > 0
+                ? gate.evidence.at(-1)!.briefDigest !== gate.briefDigest
+                    ? ('brief' as const)
+                    : gate.evidence.at(-1)!.reviewDigest &&
+                        gate.evidence.at(-1)!.reviewDigest !== records.currentDoubt(record.workId)?.packageDigest
+                      ? ('sources' as const)
+                      : ('approval' as const)
+                : undefined;
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const briefApproval =
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
-            ((activeBuild && gate.evidence.length > 0) ||
-                /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''));
+            (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''));
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -266,12 +282,15 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 }),
             revision: record.revision,
             passingBrief: gate.current,
+            ...(staleGate && { staleGate }),
             ...(briefApproval && {
                 briefApproval: {
                     digest: records.displayGate(record.workId).approvalDigest,
-                    reason: activeBuild
-                        ? 'The brief changed during Build. Review and approve the new brief.'
-                        : 'Review the complete brief before it becomes Ready.',
+                    reason:
+                        staleGateReason({ staleGate }) ??
+                        (activeBuild
+                            ? 'The brief changed during Build. Review and approve the new brief.'
+                            : 'Review the complete brief before it becomes Ready.'),
                 },
             }),
             status: derivedStatus,

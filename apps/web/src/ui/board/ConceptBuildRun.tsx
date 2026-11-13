@@ -20,7 +20,7 @@ export function ConceptBuildRun({
     compact?: boolean;
     showAction?: boolean;
     startLabel: string;
-    capacity: string;
+    capacity: string | null;
     plan: ConceptBuildPlan;
     pending: boolean;
     error: string | null;
@@ -65,26 +65,20 @@ export function ConceptBuildRun({
 
     return (
         <DetailsSection heading="Concept builds" data-concept-build-run>
-            <Text variant="caption" tone="muted" role="status">
-                {finished
-                    ? 'All planned builds are complete.'
+            <Text variant="caption" tone="muted" role="status" data-concept-build-progress>
+                {progress && progress.total > 0
+                    ? `${progress.building} building · ${progress.waiting} waiting · ${progress.complete}/${progress.total} complete`
                     : running
-                      ? 'Running · starts unblocked builds as shared capacity becomes available.'
+                      ? 'Starts unblocked builds as shared capacity becomes available.'
                       : plan.run
                         ? 'Paused · active builds continue.'
-                        : 'Not started · shares build capacity with Ready tickets.'}
+                        : 'No builds started.'}
             </Text>
-            <Text variant="caption" tone="muted" data-shared-build-capacity>
-                {capacity}
-            </Text>
-            {progress && progress.total > 0 && (
-                <Text variant="caption" tone="muted" data-concept-build-progress>
-                    {progress.complete === progress.total
-                        ? 'All planned builds are complete.'
-                        : `${progress.building} building · ${progress.waiting} waiting · ${progress.complete}/${progress.total} complete`}
+            {capacity && (
+                <Text variant="caption" tone="muted" data-shared-build-capacity>
+                    {capacity}
                 </Text>
             )}
-            {progress?.names && <Text variant="caption">Building: {progress.names}</Text>}
             {Boolean(progress?.outside) && (
                 <Text variant="caption">
                     {progress!.outside} {progress!.outside === 1 ? 'build is' : 'builds are'} outside the board. Add{' '}

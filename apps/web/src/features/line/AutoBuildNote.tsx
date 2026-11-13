@@ -1,11 +1,15 @@
 // A Ready row's note from Auto-build: why its automatic start failed, which pauses Auto-build on it until a Start build
 // on it succeeds or a new gate passes, or, with the switch on, that it waits for its concept's Refinement.
 
-import type { BoardData, Item } from '@lar-factory/shared';
+import { staleGateReason, type BoardData, type Item } from '@lar-factory/shared';
 
 import { ActionError, StartLine } from '@/ui/board';
 
 export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
+    const gate = staleGateReason(item);
+
+    if (gate) return <StartLine data-stale-gate={item.id}>{gate}</StartLine>;
+
     const pass = data.autoBuildPass;
     const paused = pass?.paused[item.id];
 

@@ -1,5 +1,6 @@
 import { applyAgentWrite } from './agent-apply.ts';
 import { agentConceptWrites } from './agent-concept-writes.ts';
+import { makeGateDisplay, verifyGateDisplay } from './gate-display.ts';
 import type { WorkRecords } from './work-records.ts';
 
 const active = ['kind', 'setAsideAt', 'finishedAt'];
@@ -135,6 +136,23 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 records.recordFinished(id, r),
             ),
         setFogGone: (id, rev, gone) => apply(id, rev, [...active, 'fogGoneAt'], (r) => records.setFogGone(id, r, gone)),
+        recordDisplayedGate: (display, approved, identity, evidence) =>
+            apply(display.workId, display.sourceRevision, [...active, 'body.brief', 'gate', 'ticket'], (r) => {
+                const current = records.displayGate(display.workId);
+
+                verifyGateDisplay(
+                    display,
+                    approved,
+                    makeGateDisplay(display.workId, display.sourceRevision, current.brief),
+                );
+
+                return records.recordGate(display.workId, r, {
+                    briefDigest: display.briefDigest,
+                    approvalDigest: approved,
+                    approvedBy: identity,
+                    evidence,
+                });
+            }),
         recordGate: (id, rev, gate) =>
             apply(id, rev, [...active, 'body.brief', 'gate', 'ticket'], (r) => records.recordGate(id, r, gate)),
         snapshotRun: (id, rev, input) =>

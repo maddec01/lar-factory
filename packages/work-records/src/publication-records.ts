@@ -17,16 +17,20 @@ import type {
 import { createHash, randomUUID } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval } from './gate-display.ts';
 import { queueTicketSpec } from './spec-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
 export interface PublicationRecords {
     gate(workId: string): GateResult;
-    recordGate(
-        workId: string,
-        revision: number,
-        evidence: Pick<GateEvidence, 'briefDigest' | 'approvedBy' | 'evidence'>,
+    displayGate(workId: string): GateDisplay;
+    recordDisplayedGate(
+        display: GateDisplay,
+        approvalDigest: string,
+        approvedBy: string,
+        evidence: string,
     ): GateEvidence;
+    recordGate(workId: string, revision: number, evidence: GateApproval): GateEvidence;
     publicationReadiness(workId: string): PublicationReadiness;
     /** Batched board projection. Does not load source text, fingerprints or plan payloads. */
     publicationSummaries(): Map<string, Pick<PublicationReadiness, 'eligible' | 'reasons'> & { recoverable?: true }>;
@@ -218,6 +222,7 @@ export function publicationRecords(
                 evidence: String(row.evidence),
                 recordedAt: String(row.recorded_at),
                 source: row.source as GateEvidence['source'],
+                ...(row.approval_digest ? { approvalDigest: String(row.approval_digest) } : {}),
             }));
         const passed = db
             .prepare(
@@ -1025,40 +1030,71 @@ export function publicationRecords(
         return load(plan.workId, plan.planId);
     };
 
+    const saveGate = (workId: string, revision: number, value: GateApproval): GateEvidence => {
+        const record = expected(workId, revision);
+
+        keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest']);
+
+        if (['concept', 'decision', 'slice'].includes(record.kind))
+            invalid('Only a publishable brief can pass a gate.');
+
+        const current = gate(workId);
+
+        if (!current.briefDigest || current.briefDigest !== value.briefDigest)
+            invalid('The brief changed or is missing; inspect it before recording its gate.');
+
+        const item: GateEvidence = {
+            ...(value.approvalDigest ? { approvalDigest: value.approvalDigest } : {}),
+            gateId: randomUUID(),
+            workId,
+            sourceRevision: revision,
+            briefDigest: current.briefDigest!,
+            approvedBy: filled(value.approvedBy, 'gate approval identity'),
+            evidence: filled(value.evidence, 'gate evidence'),
+            recordedAt: now(),
+        };
+
+        db.prepare(
+            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).run(
+            item.gateId,
+            workId,
+            revision,
+            item.briefDigest,
+            item.approvedBy,
+            item.evidence,
+            item.recordedAt,
+            item.approvalDigest ?? null,
+        );
+        db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
+
+        if (record.ticket) queueTicketSpec(database, workId, record.ticket, body(workId, 'brief')!);
+
+        return item;
+    };
+    const displayGate = (workId: string): GateDisplay => {
+        const record = find(workId);
+        const brief = body(workId, 'brief');
+
+        if (!brief?.trim()) invalid('A gate needs a complete brief.');
+
+        return makeGateDisplay(workId, record.revision, brief!);
+    };
+
     return {
         gate: (workId) => database.read(() => gate(workId)),
-        recordGate: (workId, revision, value) =>
+        recordGate: (workId, revision, value) => database.write(() => saveGate(workId, revision, value)),
+        displayGate: (workId) => database.read(() => displayGate(workId)),
+        recordDisplayedGate: (display, approvalDigest, approvedBy, evidence) =>
             database.write(() => {
-                const record = expected(workId, revision);
+                verifyGateDisplay(display, approvalDigest, displayGate(display.workId));
 
-                keys(value, ['briefDigest', 'approvedBy', 'evidence']);
-
-                if (['concept', 'decision', 'slice'].includes(record.kind))
-                    invalid('Only a publishable brief can pass a gate.');
-
-                const current = gate(workId);
-
-                if (!current.briefDigest || current.briefDigest !== value.briefDigest)
-                    invalid('The brief changed or is missing; inspect it before recording its gate.');
-
-                const item: GateEvidence = {
-                    gateId: randomUUID(),
-                    workId,
-                    sourceRevision: revision,
-                    briefDigest: current.briefDigest!,
-                    approvedBy: filled(value.approvedBy, 'gate approval identity'),
-                    evidence: filled(value.evidence, 'gate evidence'),
-                    recordedAt: now(),
-                };
-
-                db.prepare(
-                    'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                ).run(item.gateId, workId, revision, item.briefDigest, item.approvedBy, item.evidence, item.recordedAt);
-                db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
-
-                if (record.ticket) queueTicketSpec(database, workId, record.ticket, body(workId, 'brief')!);
-
-                return item;
+                return saveGate(display.workId, display.sourceRevision, {
+                    briefDigest: display.briefDigest,
+                    approvedBy,
+                    evidence,
+                    approvalDigest,
+                });
             }),
         publicationReceipt: (workId) =>
             database.read(() => {

@@ -36,3 +36,5 @@ export * from './ticket-spec.ts';
 export * from './item-next-action.ts';
 export * from './sample-clock.ts';
 export * from './pr-merge.ts';
+
+export { deskWait } from './desk-wait.ts';

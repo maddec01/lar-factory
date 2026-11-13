@@ -7,7 +7,7 @@ import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, 
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
     await mountPage(fresh());
-    expect($$('.desk-card')).toHaveLength(6);
+    expect($$('.desk-card')).toHaveLength(7);
     expect(text($('.list-button')), 'the list counts its 4 items').toBe('List4');
     expect(fetchMock).not.toHaveBeenCalled();
     expect($('#board-data')).not.toBeNull();

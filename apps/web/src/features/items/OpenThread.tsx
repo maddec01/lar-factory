@@ -47,8 +47,14 @@ function latestThread(
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
-    const inherited = !threadId && !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
-    const latest = own ?? inherited;
+    const concept = !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
+    const inherited =
+        concept && (!threadId || concept.id === threadId || concept.pendingRequest?.threadId === threadId)
+            ? concept
+            : undefined;
+    const requestOwner =
+        threadId && item.threads?.find((thread) => !thread.observedAt && thread.pendingRequest?.threadId === threadId);
+    const latest = own ?? requestOwner ?? inherited;
 
     if (!latest) return { reason: 'No T3 thread has worked on this yet' };
 
@@ -56,9 +62,13 @@ function latestThread(
 
     if (!data.t3EnvironmentId) return { reason: 'T3 Code hasn’t written its environment id' };
 
-    const question = latest.state === 'needs you' && !latest.observedAt;
+    const question = (latest.state === 'needs you' || !!latest.pendingRequest) && !latest.observedAt;
 
-    return { link: threadLink(data.t3EnvironmentId, latest.id), question, conceptQuestion: !own && question };
+    return {
+        link: threadLink(data.t3EnvironmentId, requestOwner ? threadId! : inherited && threadId ? threadId : latest.id),
+        question,
+        conceptQuestion: !!inherited && question,
+    };
 }
 
 /**
@@ -93,9 +103,9 @@ export function OpenThread({
     const unavailable = useActivityUnavailable();
     const question = !unavailable && 'link' in thread && thread.question;
     const actionLabel =
-        question && thread.conceptQuestion
+        question && thread.conceptQuestion && ['Answer in T3', 'Open thread'].includes(label)
             ? 'Answer in concept thread'
-            : label === 'Answer in T3' && !question
+            : ['Answer in T3', 'Approve brief', 'Resolve approval'].includes(label) && !question
               ? 'Open thread'
               : label;
     const onRow = useOnRow();

@@ -38,6 +38,12 @@ export interface ItemThread {
     updated: string;
     /** The pending request's question, when T3 supplies a summary. */
     questionSummary?: string;
+    /** The exact unresolved request, including one owned by a delegated thread. */
+    pendingRequest?: {
+        id: string;
+        threadId: string;
+        kind: 'question' | 'tool-approval' | 'brief-approval';
+    };
     /** Set while T3 can't be read: when the board last saw this state. */
     observedAt?: string;
     /** A running, waiting or queued descendant still belongs to this thread's work. */
@@ -157,7 +163,11 @@ export interface StartResult {
 
 export function openQuestionThread(item: Item) {
     return Array.isArray(item.threads)
-        ? item.threads.find((thread) => thread.state === 'needs you' && !thread.observedAt)
+        ? item.threads.find(
+              (thread) =>
+                  (thread.state === 'needs you' || (thread.childNeedsYou && thread.pendingRequest)) &&
+                  !thread.observedAt,
+          )
         : undefined;
 }
 
@@ -200,4 +210,23 @@ export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, u
             workingAgain(item, unavailable)
         );
     });
+}
+
+/** Stopped work under way needs a human retry or a reply in its existing T3 thread. */
+export function stoppedRunThread(item: Item): ItemThread | undefined {
+    if (
+        item.paused ||
+        item.archived ||
+        item.needsYou ||
+        !['Shaping', 'In progress', 'Review'].includes(item.status) ||
+        !Array.isArray(item.threads) ||
+        delegatedWorkRunning(item) ||
+        item.threads.some((thread) => thread.observedAt || isLiveThread(thread) || thread.hasRunningChildren)
+    )
+        return undefined;
+
+    const purpose = item.status === 'Shaping' ? 'shape' : 'build';
+    const thread = item.threads.find((entry) => entry.purpose === purpose) ?? item.threads[0];
+
+    return thread?.state === 'stopped' && !thread.archived ? thread : undefined;
 }

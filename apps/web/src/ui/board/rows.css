@@ -9,7 +9,7 @@
     --row-gap: --spacing(3);
     --row-line: --spacing(7);
     --row-glyph: 1.5rem;
-    --row-source: 7rem;
+    --row-source: clamp(7rem, 18cqi, 16rem);
     --row-kind: 6.75rem;
     /* Room for a state on one line, such as "Blocked · starts after #202". */
     --row-state: 11rem;
@@ -98,6 +98,7 @@
     .row-first,
     .row-second,
     .row-slices {
+        --row-source: clamp(7rem, 28cqi, 16rem);
         --row-kind: 5rem;
         --row-state: 7rem;
         --row-side: 11rem;

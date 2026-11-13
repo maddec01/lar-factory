@@ -1007,3 +1007,48 @@ it("keeps only what stats read from each thread's history, and still counts it",
     expect(rows.turns).toMatchObject([{ id: 'turn', thread: 'own', status: 'completed' }]);
     expect([...rows.active]).toEqual(['provider']);
 });
+
+it('projects the exact pending gate from a history read and drops it when the shell request changes', async () => {
+    const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
+    const observedAt = '2026-11-13T12:00:00Z';
+    const projection = {
+        thread: { id: 'shape' },
+        messages: [],
+        turnItems: [
+            {
+                type: 'user_input_request',
+                requestId: 'gate',
+                questions: [
+                    {
+                        header: 'Question',
+                        question: 'Q3 - Revised brief approval: May this exact brief be marked Ready?',
+                    },
+                ],
+            },
+        ],
+    };
+
+    fixture.read.mockResolvedValue({ availability: 'available', observation: { observedAt, projection } });
+    protocolItemThreads(['shape']);
+
+    const shell = { id: 'shape', updatedAt: observedAt, pendingRuntimeRequest: { id: 'gate', kind: 'user_input' } };
+    const publish = (thread: Record<string, unknown>) =>
+        fixture.changed!({
+            availability: 'available',
+            observation: { observedAt, snapshot: { threads: [thread], archivedThreads: [] } },
+        });
+
+    publish(shell);
+    await vi.waitFor(() => expect(protocolThreadById('shape').availability).toBe('available'));
+    expect(protocolItemThreads(['shape'])?.[0]).toMatchObject({
+        pendingRequest: { id: 'gate', threadId: 'shape', kind: 'brief-approval' },
+        questionSummary: projection.turnItems[0]!.questions[0]!.question,
+    });
+    expect(protocolThreadById('shape').observation?.projection).not.toHaveProperty('turnItems');
+    publish({ ...shell, pendingRuntimeRequest: { id: 'approval', kind: 'command' } });
+    expect(protocolItemThreads(['shape'])?.[0]).toMatchObject({
+        pendingRequest: { id: 'approval', kind: 'tool-approval' },
+    });
+    publish({ ...shell, pendingRuntimeRequest: null, status: 'completed' });
+    expect(protocolItemThreads(['shape'])?.[0]).not.toHaveProperty('pendingRequest');
+});

@@ -16,7 +16,25 @@ test -f .assembled-skills/lar-build/agents/builder.md
 test ! -d skills/lar-work
 python3 - <<'PY'
 from pathlib import Path
+import hashlib
 import re
+stages=Path('skills/stages/shaping')
+assert {p.name for p in stages.iterdir()} == {
+ 'concepts.md', 'diagnose-bug.md', 'grill.md', 'grilling-with-docs.md',
+ 'prototype-logic.md', 'prototype-question.md', 'prototype-ui.md',
+ 'research-question.md', 'start-build.md',
+}
+def hashes(root):
+ return {p.relative_to(root): hashlib.sha256(p.read_bytes()).hexdigest()
+         for p in root.rglob('*') if p.is_file()}
+for skill in ('lar-shape', 'lar-build'):
+ source=Path('skills')/skill
+ assert not any((source/p.name).exists() for p in stages.iterdir()), skill
+ expected=hashes(source)
+ expected.update(hashes(stages))
+ expected.update({Path('shared')/p: digest for p, digest in hashes(Path('skills/shared')).items()})
+ assert hashes(Path('.assembled-skills')/skill)==expected, skill
+ assert hashes(Path('.assembled-skills/skills')/skill)==expected, skill
 for skill in ('lar-shape', 'lar-build'):
  root=Path('.assembled-skills')/skill
  for p in root.rglob('*.md'):

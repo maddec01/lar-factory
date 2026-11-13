@@ -344,10 +344,15 @@ It reports what changed. A new product choice, conflict with Pedro's decision
 or expansion of scope still goes to questions. The same authority and question
 rules apply to changes affecting active builds.
 
-The agent proposes an affected-record change set. `amend-group` creates each
-new decision or build in its explicit `repository`, with `parentId`, body,
-blockers and `status: Queued` in one transaction. An unblocked queued build is
-ready for shaping, not implementation. Missing Project onboarding or Access
+For a new part, use `lar-work create-part --parent ID --revision N --title X
+--repository R --kind build|decision --file F [--blocked-by ID]...`, where N is
+the parent's last-read revision. It creates the decision or build in its explicit
+repository with its parent, body, blockers and Queued state in one transaction.
+A stale parent or failed write leaves no part or changed relationships.
+`slice.sh` calls it when given `--kind build|decision --repository R`; without
+`--kind`, buildable work keeps its private slices in the parent's repository.
+The proposed `amend-group` extends this to an affected-record change set.
+An unblocked queued build is ready for shaping, not implementation. Missing Project onboarding or Access
 shows the exact hold. It never silently puts new children in List. Ordinary
 standalone captures continue to start in List.
 
@@ -386,9 +391,10 @@ and `add-dependency-block` record it. Only Pedro's `mark-met` releases it;
 observed ticket closure or PR merge does not. `replace-dependency` can replace
 the hold with an onboarded build atomically.
 
-Today: `slice.sh` inherits the parent's repository and creates a List record
-through several writes. Cross-repository parts need `create` plus `set-parent`.
-There is no supported merge/retitle operation or automatic affected-brief audit.
+Today: `create-part` and `slice.sh` create complete Queued delivery parts in any
+named repository. Ordinary `create` still defaults to List; private slices keep
+their existing behavior. There is no supported group amendment, merge/retitle
+operation or automatic affected-brief audit.
 `set-aside` leaves edges for manual repair. Decision completion relies on body
 and map write times. The target records the incorporated answer revision.
 

@@ -12,6 +12,8 @@ test('a compact blocked action shows a short summary with expandable full reason
         holds: [
             { workId: 'decision', reason: "Its confirmed answer isn't recorded. Its domain drafts aren't recorded." },
             { workId: 'build', reason: 'The current brief needs an approved gate.' },
+            { workId: 'decision', reason: "Its Fog isn't gone." },
+            { workId: 'decision', reason: 'Its map is empty.' },
         ],
     };
     const root = document.createElement('div');
@@ -28,6 +30,10 @@ test('a compact blocked action shows a short summary with expandable full reason
         }),
     );
     expect(root.querySelector('button')?.disabled).toBe(true);
+    expect(root.textContent).toContain('Open questions still need answers.');
+    expect(root.textContent).toContain('No parts mapped yet.');
+    expect(root.querySelector('button')?.title).not.toContain('Fog');
+    expect(root.querySelector('button')?.title).toContain('No parts mapped yet.');
     expect(root.textContent).toContain('Waiting on 1 decision and 1 gate');
     expect(root.querySelector('details')?.open).toBe(false);
     expect(root.querySelector('details')?.textContent).toContain("Its domain drafts aren't recorded.");

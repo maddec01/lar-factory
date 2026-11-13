@@ -19,7 +19,7 @@ import {
 } from '@/features/items';
 import { isDone, partsOf, unreadParts, unreadPartsText } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DetailFact, PartName, PartRow, PartsList, MainSection, SectionHeader } from '@/ui/board';
+import { DetailFact, PartName, PartRow, PartsList, MainSection, SectionHeader, workHoldReason } from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn['’]t (?:settled|Done)[.]$`);
@@ -39,7 +39,7 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
         if (part) unfinished.set(part[1]!, [...(unfinished.get(part[1]!) ?? []), part[2]!]);
         else
             others.push(
-                reason
+                workHoldReason(reason)
                     .replace(/^Its build isn['’]t Done[.]$/, 'Builds remain.')
                     .replace(UNMET_DEPENDENCY, 'Dependency on $1 isn’t met.')
                     .replace(new RegExp(` ?${WORK_ID}`, 'g'), ''),

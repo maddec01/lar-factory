@@ -1,8 +1,9 @@
-import { releaseHolds, type ReleaseEvidence, type ReleasePlan } from '@lar-factory/shared';
-import { CopyButton, Text, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import { plural, releaseHolds, type ReleaseEvidence, type ReleasePlan } from '@lar-factory/shared';
+import { CopyButton, Disclosure, Text, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { CheckIcon, CircleIcon } from '@lar-works/design-system/icons';
 
 import { DetailFact, MainSection, SectionHeader } from './ItemDetails';
+import { workHoldReason } from './work-hold-reason';
 
 function RecordedAt({ evidence }: { evidence: ReleaseEvidence }) {
     const date = new Date(evidence.at);
@@ -49,17 +50,23 @@ export function ReleaseProgress({
 }) {
     if (!plan) return null;
 
-    const left = (remaining ?? releaseHolds(plan))
+    const reasons = remaining ?? releaseHolds(plan);
+    const unfinished = reasons.filter((reason) => /^Its build .+ isn't Done\.$/.test(reason));
+    const left = reasons
+        .filter((reason) => !unfinished.includes(reason))
         .map((reason) => {
             const step = plan.steps.find((step) => reason.startsWith(`Release step ${step.id}:`));
 
             if (step) return `${step.what} · ${step.who}`;
 
-            if (reason === "Its Fog isn't gone.") return 'Open questions remain.';
-
-            return reason.replace(/^Its build (.+) isn't Done\.$/, '$1 is not done.');
+            return workHoldReason(reason);
         })
         .map((reason) => reason.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, name));
+    const partNames = unfinished.map((reason) =>
+        reason
+            .replace(/^Its build (.+) isn't Done\.$/, '$1')
+            .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, name),
+    );
     const outcome = plan.outcomeCheck;
 
     return (
@@ -115,11 +122,25 @@ export function ReleaseProgress({
                 )}
             </div>
             <DetailFact label="What's left">
-                {left.length ? (
+                {left.length || partNames.length ? (
                     <ul className="m-0 grid list-disc gap-1 pl-4 text-xs" aria-label="What's left">
                         {left.map((reason) => (
                             <li key={reason}>{reason}</li>
                         ))}
+                        {partNames.length > 0 && (
+                            <li className="list-none">
+                                <Disclosure
+                                    label={`${plural(partNames.length, 'part')} not built yet`}
+                                    presentation="section"
+                                >
+                                    <ul className="m-0 grid gap-1 pl-5 text-sm wrap-anywhere">
+                                        {partNames.map((title, index) => (
+                                            <li key={index}>{title}</li>
+                                        ))}
+                                    </ul>
+                                </Disclosure>
+                            </li>
+                        )}
                     </ul>
                 ) : (
                     'Delivery complete'

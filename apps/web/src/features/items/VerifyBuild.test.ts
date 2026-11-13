@@ -152,3 +152,41 @@ test('stale-head refusal keeps the failure draft and offers an explicit PR head 
         reads + 1,
     );
 });
+
+test('details keeps earlier exact-head results readable while the next head awaits Verify', async () => {
+    const failed = {
+        ...context,
+        id: 'failed',
+        result: 'fail' as const,
+        at: '2026-11-13T11:00:00Z',
+        note: 'Clipped greeting.',
+    };
+    const passed = {
+        ...context,
+        id: 'passed',
+        head: 'b'.repeat(40),
+        result: 'pass' as const,
+        at: '2026-11-13T12:00:00Z',
+        note: null,
+    };
+    const historyBoard = fresh({
+        ...board,
+        items: [
+            {
+                ...item,
+                verification: { ...item.verification, latest: passed, history: [passed, failed], invalidated: true },
+            },
+        ],
+    });
+
+    api();
+    await mountPage(historyBoard);
+    await openVerify();
+    expect(text(dialog())).toContain('Verify results');
+    expect(text(dialog())).toContain('Failed by Pedro at');
+    expect(text(dialog())).toContain('Passed by Pedro at');
+    expect(text(dialog())).toContain('Tested head aaaaaaa');
+    expect(text(dialog())).toContain('Tested head bbbbbbb');
+    expect(text(dialog())).toContain('Clipped greeting.');
+    expect(dialog().querySelector('[data-verification]')).not.toBeNull();
+});

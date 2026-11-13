@@ -1,5 +1,5 @@
 import type { Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, Disclosure } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
@@ -68,16 +68,23 @@ export function VerifyBuild({ item }: { item: Item }) {
     const latest = item.verification.latest;
     const resume = item.verification.resume;
 
+    const results = item.verification.history ?? (latest ? [latest] : []);
+    const history = results.length > 0 && (
+        <Disclosure label="Verify results" presentation="section" defaultOpen>
+            {results.map((result) => (
+                <VerifyEvidence key={result.id}>
+                    {result.result === 'pass' ? 'Passed' : 'Failed'} by {result.by} at{' '}
+                    {new Date(result.at).toLocaleString()} · Tested head {result.head.slice(0, 7)}
+                    {result.note ? ` · ${result.note}` : ''}
+                </VerifyEvidence>
+            ))}
+        </Disclosure>
+    );
+
     if (!awaiting)
         return (
             <>
-                {latest && (
-                    <VerifyEvidence>
-                        {latest.result === 'pass' ? 'Passed' : 'Failed'} by {latest.by} at{' '}
-                        {new Date(latest.at).toLocaleString()} · Tested head {latest.head.slice(0, 7)}
-                        {latest.result === 'fail' && latest.note ? ` · Failed: ${latest.note}` : ''}
-                    </VerifyEvidence>
-                )}
+                {history}
                 {resume && !resume.sent && (
                     <>
                         <VerifyEvidence>
@@ -104,16 +111,19 @@ export function VerifyBuild({ item }: { item: Item }) {
         );
 
     return (
-        <VerifyResult
-            head={context?.head}
-            testSteps={context?.testSteps}
-            loading={loading}
-            pending={pending}
-            error={error}
-            note={note}
-            onNote={setNote}
-            onRefresh={() => setAttempt(attempt + 1)}
-            onResult={(result) => void submit(result)}
-        />
+        <>
+            {history}
+            <VerifyResult
+                head={context?.head}
+                testSteps={context?.testSteps}
+                loading={loading}
+                pending={pending}
+                error={error}
+                note={note}
+                onNote={setNote}
+                onRefresh={() => setAttempt(attempt + 1)}
+                onResult={(result) => void submit(result)}
+            />
+        </>
     );
 }

@@ -1339,7 +1339,7 @@ describe('work-record completion', () => {
             complete: false,
             reasons: [`Its concept ${concept.workId}'s map isn't updated since its answer and domain drafts.`],
         });
-        records.setBody(concept.workId, 3, 'map', '# Map\n\nSettled.');
+        records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map\n\nSettled.');
         expect(records.completion(decision.workId)).toEqual({ complete: true, reasons: [] });
         expect(() => records.setBody(lar(records, 'build').workId, 1, 'answer', 'x')).toThrow(
             'Only a decision holds an answer',

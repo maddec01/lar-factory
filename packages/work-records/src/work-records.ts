@@ -20,6 +20,14 @@ import type { StatementSync } from 'node:sqlite';
 import { validateBlockers } from './blocker-graph.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
+import {
+    decisionAnswers,
+    decisionAnswerIncorporated,
+    recordDecisionAnswer,
+    incorporateDecisionAnswers,
+    type DecisionAnswers,
+    type DecisionAnswerState,
+} from './decision-answers.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { readFactorySettings } from './factory-settings.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
@@ -284,6 +292,8 @@ export interface WorkRecord {
     setAside: boolean;
     /** Proposed work absorbed into this survivor; history remains on this record. */
     supersededBy?: string | null;
+    /** Current answer version or supersession reference; historical text is never projected as current. */
+    decisionAnswer?: DecisionAnswerState | null;
     /** Whether a concept's Fog is recorded gone; always false for other kinds. */
     fogGone: boolean;
     /** Why it waits on the user in free text, such as a merge conflict; null when it doesn't. Its Status stays as it was. */
@@ -351,6 +361,7 @@ export interface CaptureSubmission {
 export interface WorkRecords
     extends
         RetitleRecords,
+        DecisionAnswers,
         MergeBuildRecords,
         SetAsideRecords,
         RunSettingsRecords,
@@ -551,6 +562,7 @@ interface Row {
     pull_request: string | null;
     set_aside_at: string | null;
     superseded_by: string | null;
+    answer_state: string | null;
     fog_gone_at: string | null;
     needs_you: string | null;
     needs_you_causes: string | null;
@@ -577,6 +589,7 @@ const fromRow = (row: Row): WorkRecord => ({
     pullRequest: row.pull_request,
     setAside: row.set_aside_at !== null,
     supersededBy: row.superseded_by,
+    decisionAnswer: row.answer_state ? (JSON.parse(row.answer_state) as DecisionAnswerState) : null,
     fogGone: row.fog_gone_at !== null,
     needsYou: row.needs_you,
     needsYouCauses: row.needs_you_causes === null ? [] : (JSON.parse(row.needs_you_causes) as NeedsYouCause[]),
@@ -1078,9 +1091,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             if (reasons.length || !row.parent_id) return reasons;
 
-            const map = bodyWritten(row.parent_id, 'map');
+            const state = row.answer_state ? (JSON.parse(row.answer_state) as DecisionAnswerState) : null;
 
-            return map !== undefined && map > Math.max(answer!, drafts!)
+            return state?.incorporation?.conceptId === row.parent_id && decisionAnswerIncorporated(db, state, drafts!)
                 ? []
                 : [`Its concept ${row.parent_id}'s map isn't updated since its answer and domain drafts.`];
         }
@@ -1187,6 +1200,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
         ...retitleRecords(database, (workId) => fromRow(find(workId))),
+        ...decisionAnswers(database, (id) => fromRow(find(id))),
         ...mergeBuildRecords(database, {
             read: (id) => fromRow(find(id)),
             body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
@@ -1541,9 +1555,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const name = checkOneOf(BODIES, body, 'body');
             const text = checkText(markdown, name);
 
-            return change(workId, revision, (row) => {
+            return change(workId, revision, (row, touched) => {
                 checkHolds(row.kind, name);
                 writeBody(workId, name, text);
+
+                if ((name === 'answer' || name === 'domain-drafts') && row.parent_id) touched.push(row.parent_id);
+
+                if (name === 'answer') recordDecisionAnswer(db, workId, row.revision + 1, text);
+
+                if (name === 'map') touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
 
                 return {};
             });
@@ -1586,6 +1606,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 }
                 writeBody(workId, body, markdown);
 
+                if (body === 'answer') recordDecisionAnswer(db, workId, row.revision + 1, markdown);
+
+                if (body === 'map') touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
+
                 return { parent_id: parentId };
             });
         },
@@ -1593,7 +1617,13 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             database.read(() => {
                 const name = checkOneOf(BODIES, body, 'body');
 
-                find(workId);
+                const record = find(workId);
+
+                if (name === 'answer' && record.answer_state) {
+                    const state = JSON.parse(record.answer_state) as DecisionAnswerState;
+
+                    if (!state.current) return null;
+                }
 
                 const row = bodyText.get(workId, name);
 

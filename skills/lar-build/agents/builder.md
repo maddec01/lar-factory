@@ -245,65 +245,12 @@ Follow [Review](../stages/review.md), then Approve.
 
 ## Approve
 
-Start the **Approver subagent** with `approver.md`,
-`<lar-build>/project-rules.md`, the build's work ID, the repo path, every reviewer's final result,
-your rejected findings, the findings still
-open after round 2, the unreviewed fixes, the **Domain docs added by the
-build** list and the out-of-scope notes. An unreviewed fix is a round-2 fix;
-list each as a line naming the finding, its severity and its reviewer. It opens
-the PR and returns a recommended status; the item stays in Review. Record the
-PR on the build (`lar-work set-pr <work ID> --revision N --pr <owner/repo#n>`)
-and link it to this thread (`link_pull_request`).
-When the approver reports a rebase conflict or a failing check instead, hand
-it to the fixer; for a conflict, the fixer rebases onto `origin/$base_branch` and
-resolves it. Add the fix to the unreviewed fixes, then start the approver
-again. When it reports that the PR can't be delivered (no push access to the
-branch or fork, or a PR rule only the user can meet), set **Needs you**, tell
-the user what blocks it and what would unblock it, and ask how to go on; the
-record keeps the brief and the branch keeps the commits. After two restarts
-for a conflict or check, set **Needs you**, tell the user the conflict or
-failing check, and ask how to go on.
+Follow [Approve](../stages/approve.md).
 
 ## Checks
 
-Call `watch_pull_request` on the PR; T3 wakes you when checks finish, someone
-comments or the branch conflicts. Fast checks can finish first, so handle them
-now and on every wake: read `gh pr checks <pr> --required`, or on Azure Repos
-`az repos pr policy list --id <pr> --organization <org>`, where each policy
-with `configuration.isBlocking` true is a required check whose `status` is
-`approved` or `notApplicable` when green, `rejected` when failed, and `queued`
-or `running` while it runs. Then:
-
-- **Required checks green**: after a failed Verify, return to **Verify** on this same PR; only Pedro records the head-bound pass in the board. A status write never substitutes for that result. Run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
-  `unwatch_pull_request`, end the turn. The board resumes this thread for **Retro** only after the delivery PR is confirmed merged and the record is **Done**.
-- **A required check failed, or the branch conflicts**: start a **CI fixer
-  subagent** with `ci-fixer.md`, the build's work ID, repo path, PR URL and
-  the failing check (or "merge conflict"). The watch stays. If the fix or conflict resolution changed the final tree,
-  obtain an updated Approver assessment of every listed check against that
-  tree before handback. It records its own reuse reasons or reruns only checks
-  it cannot justify, without restarting reviews or repeating unaffected checks.
-  Then have the CI fixer update the PR's Checks section from the record and
-  use the updated status recommendation. Then restart **Checks**.
-- **Anything else** (checks running, a comment or review, a non-required check
-  failing, a run cancelled by a newer run on the same head):
-  end your turn only while required checks are pending. Non-required checks never block the status or start a fix.
-
-Set **Needs you** when the CI fixer returns `infrastructure` or `not fixed`, or
-a required check fails or the branch conflicts after two CI fixer runs (every
-run counts, merge conflicts included). Tell the user the failing job's name
-and run link (or "merge conflict") and the CI fixer's report,
-`unwatch_pull_request`, and ask how to go on (rerun the job, start a CI
-fixer, or stop). When they answer, set **Review**, do it, `watch_pull_request`
-and restart **Checks**. If they say stop, set **Needs you** and end the turn.
+Follow [Checks](../stages/ci.md).
 
 ## Retro
 
-Run once after the board confirms the delivery PR merged and the record is **Done**.
-Keep **Done**. Show the UI reviewer's screenshots with captions and absolute paths
-beside the PR link. Follow `<lar-build>/review-session.md` for this thread.
-Save every suggestion together with `lar-work propose-retro <work ID> --revision N
---file F`: a JSON array of `{title,description,repository,kind}`; kind is `bug`,
-`feature` or `improvement`, repository is the owning onboarded repository.
-Save `[]` if none. End the turn: the board's **Choose follow-ups** card collects
-and records the selection and creates the chosen List records/tickets using each
-destination's retro setting. Never ask for picks in chat or create them yourself.
+Follow [Retro](../stages/retro.md).

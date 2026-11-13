@@ -1614,6 +1614,42 @@ async function shapedBuild() {
     return { records, workId: made.workId };
 }
 
+for (const [name, live] of [
+    ['running', { state: 'running' }],
+    ['waiting for the user', { state: 'needs you' }],
+    ['queued', { state: 'done', queued: true }],
+    ['with live children', { state: 'done', hasLiveChildren: true }],
+] satisfies [string, Partial<ItemThread>][]) {
+    test(`Start build with shaping ${name} refuses without any record write`, async () => {
+        const { records, workId } = await shapedBuild();
+        const { commands, started } = recordedCommands(records, {
+            shown: (ids) =>
+                ids.map((id) => ({
+                    id,
+                    title: 'Shape',
+                    updated: '2026-11-01T08:00:00Z',
+                    purpose: 'shape',
+                    ...live,
+                })),
+        });
+        // No provider observer runs here, so every revision change would belong to Start build itself.
+        const before = records.read(workId);
+        const threads = records.threads(workId);
+        const reply = await commands.startBuild(workId, undefined);
+
+        assert.equal(reply.status, 409);
+        assert.equal(
+            (reply.body as { error: string }).error,
+            'A shaping thread is still at work on this item. Wait for it to finish, then start the build.',
+        );
+        assert.deepEqual(records.read(workId), before);
+        assert.deepEqual(records.threads(workId), threads);
+        assert.deepEqual(records.launchIntents({ workId }), []);
+        assert.deepEqual(records.pendingShapingThreadCleanups(), []);
+        assert.deepEqual(started, []);
+    });
+}
+
 test('Start build saves the setting, and its shaping threads wait for cleanup once the build thread is recorded', async () => {
     const { records, workId } = await shapedBuild();
     let intents = -1;

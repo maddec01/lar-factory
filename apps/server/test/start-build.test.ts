@@ -262,8 +262,17 @@ for (const [name, threads, requests] of [
     test(`Start build is refused while a shaping thread ${name}, writing no record and launching nothing`, async (t) => {
         const board = await shapingBoard(t, threads, requests);
         const records = await openWorkRecords(workRecordsPath(board.dataDir));
-        const before = (() => {
+        const before = await (async () => {
             try {
+                // The first ticket observation is a legitimate background write. Wait for it before measuring
+                // the refused command, keeping revision and updatedAt in the full-record equality below.
+                await until(
+                    board,
+                    (data) =>
+                        records.observations(board.id(12)).some((observation) => observation.of === 'ticket') &&
+                        data.items[0]?.revision === records.read(board.id(12)).revision,
+                );
+
                 return records.read(board.id(12));
             } finally {
                 records.close();

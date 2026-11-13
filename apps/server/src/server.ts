@@ -119,6 +119,7 @@ import { lookupThread } from './t3/t3.ts';
 import { activityReads, holdsActivityRead, withoutReadTimes } from './t3/thread-activity.ts';
 import { sendThreadCommand } from './t3/thread-commands.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
+import { createThreadOwnerDiscovery } from './threads/thread-owners.ts';
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
@@ -329,6 +330,7 @@ const statsSources: StatsSources = {
     home: homedir(),
 };
 const activityDatabase = createActivityDatabase(statsSources.db);
+const discoverThreadOwners = createThreadOwnerDiscovery(statsSources.db);
 const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
 // Each read publishes the repositories once their configs load, so Add item offers them while the items still load.
@@ -560,6 +562,8 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
 }
 
 function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
+    if (records && !fixture) discoverThreadOwners(records, items);
+
     const now = Date.now();
     // Each item and slice asks several times below, and the records can't change during this synchronous pass, so one read serves them all.
     const rows = loopTrace.span('thread rows', () => records?.threadsByWork());
@@ -1622,6 +1626,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
         stopMemorySampler();
         sample?.close();
         activityDatabase.close();
+        discoverThreadOwners.close();
         clearTimeout(toolRetry);
         stopProjectIcons?.();
         void autoBuildRun.release();

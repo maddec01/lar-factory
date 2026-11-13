@@ -172,7 +172,7 @@ test('a successful start holds its thread after a restart, so Start there asks T
 
     const again = await start(after, workId);
 
-    assert.deepEqual([again.status, (await again.json()).thread?.threadId], [200, 'thread-1']);
+    assert.deepEqual([again.status, (await again.json()).thread?.threadId], [409, 'thread-1']);
     assert.equal(await starts(after), 0);
     assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
 });

@@ -67,25 +67,18 @@ export interface ItemThread {
 export const isLiveThread = (thread: ItemThread): boolean =>
     thread.state === 'running' || thread.state === 'needs you' || !!thread.queued || !!thread.hasLiveChildren;
 
-/** Resume only an interrupted shaping session whose current thread family is known to have stopped. */
+/** Resume a shaping session only once its current thread family is known to have ended. */
 export function canResumeShaping(item: Item): boolean {
     if (item.status !== 'Shaping' || item.needsYou || !Array.isArray(item.threads) || !item.threads.length)
         return false;
 
-    if (
-        item.threads.some(
-            (thread) =>
-                thread.observedAt ||
-                thread.hasLiveChildren ||
-                thread.state === 'running' ||
-                thread.state === 'needs you',
-        )
-    )
-        return false;
+    if (item.threads.some((thread) => thread.observedAt || isLiveThread(thread))) return false;
 
     const shaping = item.threads.filter((thread) => thread.purpose === 'shape');
 
-    return (shaping.length ? shaping : item.threads)[0]?.state === 'stopped';
+    const current = (shaping.length ? shaping : item.threads)[0];
+
+    return current?.state === 'stopped' || current?.state === 'done';
 }
 
 /** Whether work a build delegated still runs, a slice's thread or a running child of its build thread, even after that thread's own run ended. */

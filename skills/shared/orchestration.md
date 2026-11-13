@@ -39,6 +39,12 @@ A thread that starts no child task makes no call.
 - Every prompt names the work ID it serves and carries the factory report
   rule: ≤300 words, no whole files, logs or screenshots.
 
+For an authorized top-level handoff, follow
+[Thread ownership](issue-tracker/work-records.md#thread-ownership): record its
+launch intent before asking T3 and resolve it to the returned thread ID. This
+also applies when a concept thread is asked to start a decision's shaping
+thread. An existing owner is continued, never given a second thread.
+
 ## Wait for delegated work
 
 Every delegated prompt, for a child task or a native subagent, carries this

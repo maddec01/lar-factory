@@ -521,4 +521,11 @@ export const MIGRATIONS: readonly Migration[] = [
         END;
     `),
     (db) => db.exec('ALTER TABLE brief_gates ADD COLUMN approval_digest TEXT'),
+    (db) =>
+        db.exec(`
+        CREATE TABLE doubt_reviews(review_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
+        CREATE INDEX doubt_reviews_owner ON doubt_reviews(work_id);
+        ALTER TABLE brief_gates ADD COLUMN doubt_review_id TEXT;
+        ALTER TABLE brief_gates ADD COLUMN review_digest TEXT;
+    `),
 ];

@@ -7,6 +7,9 @@ import type { VocabularyDiscovery } from './vocabulary.ts';
 export interface GateEvidence {
     /** Digest of the complete displayed brief and its source revision. */
     approvalDigest?: string;
+    /** Affected-work package reviewed by Doubt, including sibling contracts. */
+    reviewDigest?: string;
+    doubtReviewId?: string;
     source?: 'gate' | 'tracker' | 'user' | 'conflict';
     gateId: string;
     workId: string;

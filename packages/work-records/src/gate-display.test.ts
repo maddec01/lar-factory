@@ -14,6 +14,10 @@ it('binds the displayed text and source revision to durable approval evidence', 
 
         work = records.setBody(work.workId, work.revision, 'brief', 'Find saved searches.');
 
+        const input = records.doubtPackage(work.workId);
+
+        records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+
         const display = records.displayGate(work.workId);
         const approve = (copy = display, digest = display.approvalDigest) =>
             records.recordDisplayedGate(copy, digest, 'Pedro', 'Yes, response 12; Doubt clean.');

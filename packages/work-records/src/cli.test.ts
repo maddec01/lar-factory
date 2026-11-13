@@ -1140,6 +1140,42 @@ it('keeps the brief gate local and refuses removed refinement publication comman
 
     records.close();
 
+    expect(await larWork(data, 'record-gate', work.workId)).toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining('Run Doubt'),
+    });
+
+    const input = await larWork(data, 'doubt-package', work.workId);
+
+    expect(input.record.brief).toBe('Find saved searches.');
+    expect((await larWork(data, 'build-overlap', work.workId)).record.overlaps).toEqual([]);
+    expect(
+        await larWork(
+            data,
+            'record-doubt',
+            work.workId,
+            '--digest',
+            'stale',
+            '--identity',
+            'Doubt',
+            '--evidence',
+            'Code checked.',
+        ),
+    ).toMatchObject({ code: 1, stderr: expect.stringContaining('package changed') });
+    expect(
+        await larWork(
+            data,
+            'record-doubt',
+            work.workId,
+            '--digest',
+            input.record.packageDigest,
+            '--identity',
+            'Doubt',
+            '--evidence',
+            'Code checked.',
+        ),
+    ).toMatchObject({ code: 0, record: { identity: 'Doubt' } });
+
     const gate = await larWork(data, 'gate', work.workId);
 
     expect(gate.record).toMatchObject({ current: false, briefDigest: expect.any(String) });

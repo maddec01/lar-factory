@@ -21,6 +21,7 @@ import type { StatementSync } from 'node:sqlite';
 
 import { agentRevision } from './agent-revision.ts';
 import { validateBlockers } from './blocker-graph.ts';
+import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import {
@@ -375,6 +376,7 @@ export interface WorkRecords
         ValidationRecords,
         TrackerCache,
         PublicationRecords,
+        BriefReviewRecords,
         DependencyRecords,
         SpecRecords {
     captureSubmission(requestId: string): CaptureSubmission | null;
@@ -1224,13 +1226,23 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         return { build_phase: null };
     }
 
+    const answers = decisionAnswers(database, (id) => fromRow(find(id)));
+    const reviews = briefReviewRecords(
+        database,
+        (id) => fromRow(find(id)),
+        dependencyChanges,
+        (id) => !incomplete(find(id)).length,
+        answers,
+    );
+    const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, reviews);
+
     return {
         ...verificationRecords(database, (id) => fromRow(find(id))),
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
         ...retitleRecords(database, (workId) => fromRow(find(workId))),
-        ...decisionAnswers(database, (id) => fromRow(find(id))),
+        ...answers,
         ...mergeBuildRecords(database, {
             read: (id) => fromRow(find(id)),
             body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
@@ -1239,7 +1251,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         }),
         ...setAsideRecords(database, (id) => fromRow(find(id))),
         ...specRecords(database, (workId) => fromRow(find(workId))),
-        ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
+        ...publications,
+        ...reviews,
         ...dependencyChanges,
         captureSubmission: (requestId) =>
             database.read(() => {
@@ -2071,6 +2084,16 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     throw invalid(
                         'This proposed build needs Brief, code evidence, Doubt and a current passing gate before Start build.',
                     );
+
+                if (
+                    checked === 'build' &&
+                    work.status !== 'In progress' &&
+                    db
+                        .prepare('SELECT 1 FROM brief_gates WHERE work_id = ? AND review_digest IS NOT NULL')
+                        .get(workId) &&
+                    !publications.gate(workId).current
+                )
+                    throw invalid('The affected-work review changed; rerun Doubt and gate before Start build.');
 
                 if (
                     db

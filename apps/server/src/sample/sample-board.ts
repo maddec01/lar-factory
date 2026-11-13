@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import type { BoardState } from '../board/board-state.ts';
 import { changeRepositoryLabels } from '../config/repository-labels.ts';
 import { changeRepositorySettings } from '../config/repository-settings.ts';
-import { createItemDetails } from '../item-details/item-details.ts';
+import { createItemDetails, recordDetails } from '../item-details/item-details.ts';
 import { createCapture } from '../items/capture.ts';
 import { createItemCommands } from '../items/item-commands.ts';
 import { mergeSources } from '../items/item-sources.ts';
@@ -147,7 +147,16 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     return {
         commands,
         capture: adding,
-        itemDetails: details,
+        itemDetails: {
+            ...details,
+            async details(item: Item) {
+                const read = await details.details(item);
+                const record = recordDetails(records, item.id);
+
+                // Frozen local evidence needs no tracker or Spec synchronisation.
+                return record?.runSettings?.length && !('error' in read) ? { ...read, record } : read;
+            },
+        },
         showLabelChange(item: Item, { label, action }: LabelChange) {
             tickets = tickets.map((ticket) => {
                 if (ticket.repo !== item.repo || ticket.number !== item.number) return ticket;

@@ -1,6 +1,7 @@
 import type { ModelSelection } from './board-domain.ts';
 import { parseFactorySettings } from './factory-settings-parse.ts';
 import {
+    BUILTIN_REVIEWERS,
     FACTORY_ROLES,
     THREAD_KINDS,
     type ExecutionOverride,
@@ -78,11 +79,14 @@ export function resolveFactorySettings(
 export function reviewerInstructions(
     reviewer: ReviewerDefinition,
 ): { path: string } | { text: string; revision: number } {
-    const settings = parseFactorySettings({ version: 1, reviewers: [reviewer] });
+    if (BUILTIN_REVIEWERS.includes(reviewer.id as never))
+        return { path: `skills/lar-build/agents/reviewer-${reviewer.id}.md` };
+
+    const settings = parseFactorySettings({ version: 2, reviewers: [reviewer] });
     const valid = settings.reviewers.find((entry) => entry.id === reviewer.id)!;
 
     if (valid.instructions.kind === 'builtin')
         return { path: `skills/lar-build/agents/reviewer-${valid.instructions.reviewer}.md` };
 
-    return valid.revisions[valid.instructions.revision - 1]!;
+    return valid.revisions![valid.instructions.revision - 1]!;
 }

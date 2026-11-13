@@ -9,19 +9,102 @@
         "providers": {
             "codex": {
                 "models": [
-                    { "slug": "gpt-6.1-sol", "name": "GPT-6.1 Sol" },
-                    { "slug": "gpt-6-astra", "name": "GPT-6 Astra" }
-                ]
+                    {
+                        "slug": "gpt-6.1-sol",
+                        "name": "GPT-6.1 Sol",
+                        "profile": "sample"
+                    },
+                    {
+                        "slug": "gpt-6-astra",
+                        "name": "GPT-6 Astra",
+                        "profile": "sample"
+                    }
+                ],
+                "profiles": {
+                    "sample": {
+                        "capabilities": {
+                            "optionDescriptors": [
+                                {
+                                    "id": "reasoningEffort",
+                                    "type": "select",
+                                    "options": [
+                                        {
+                                            "id": "low",
+                                            "label": "Low"
+                                        },
+                                        {
+                                            "id": "medium",
+                                            "label": "Medium"
+                                        },
+                                        {
+                                            "id": "high",
+                                            "label": "High"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
             },
             "claudeAgent": {
                 "models": [
-                    { "slug": "claude-opus-5-5", "name": "Claude Opus 5.5" },
-                    { "slug": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5" },
-                    { "slug": "claude-fable-5-1", "name": "Claude Fable 5.1" },
-                    { "slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5" }
-                ]
+                    {
+                        "slug": "claude-opus-5-5",
+                        "name": "Claude Opus 5.5",
+                        "profile": "sample"
+                    },
+                    {
+                        "slug": "claude-sonnet-5-5",
+                        "name": "Claude Sonnet 5.5",
+                        "profile": "sample"
+                    },
+                    {
+                        "slug": "claude-fable-5-1",
+                        "name": "Claude Fable 5.1",
+                        "profile": "sample"
+                    },
+                    {
+                        "slug": "claude-haiku-5-5",
+                        "name": "Claude Haiku 5.5",
+                        "profile": "sample"
+                    }
+                ],
+                "profiles": {
+                    "sample": {
+                        "capabilities": {
+                            "optionDescriptors": [
+                                {
+                                    "id": "effort",
+                                    "type": "select",
+                                    "options": [
+                                        {
+                                            "id": "low",
+                                            "label": "Low"
+                                        },
+                                        {
+                                            "id": "medium",
+                                            "label": "Medium"
+                                        },
+                                        {
+                                            "id": "high",
+                                            "label": "High"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
             },
-            "cursor": { "models": [{ "slug": "cursor-agent", "name": "Cursor Agent" }] }
+            "cursor": {
+                "models": [
+                    {
+                        "slug": "cursor-agent",
+                        "name": "Cursor Agent"
+                    }
+                ]
+            }
         }
     }
 }

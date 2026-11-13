@@ -333,3 +333,32 @@ test('merges aliases, honours custom display names and labels context variants',
         },
     ]);
 });
+
+test('offers effort IDs and labels from a model or its manifest profile, without other capabilities', (t) => {
+    const manifest = structuredClone(MANIFEST);
+
+    Object.assign(manifest.manifest.providers.codex, {
+        profiles: {
+            reasoning: {
+                capabilities: {
+                    optionDescriptors: [
+                        {
+                            id: 'reasoningEffort',
+                            type: 'select',
+                            options: [{ id: 'high', label: 'High', secret: 'hidden' }],
+                        },
+                    ],
+                },
+            },
+        },
+    });
+    Object.assign(manifest.manifest.providers.codex.models[0]!, { profile: 'reasoning' });
+
+    const { settings, manifest: file } = files(t, { providerInstances: {} }, manifest);
+
+    assert.deepEqual(loadModelChoices(settings, file)[0]!.models[1], {
+        slug: 'gpt-a',
+        label: 'GPT A',
+        efforts: [{ value: 'high', label: 'High' }],
+    });
+});

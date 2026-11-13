@@ -31,7 +31,7 @@ import { OpenSettingsButton } from '@/ui/board';
 
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
-    { label: 'Board', ids: ['general', 'notifications', 'keybindings'] },
+    { label: 'Board', ids: ['general', 'factory', 'notifications', 'keybindings'] },
     { label: 'Connections', ids: ['projects', 'integrations', 't3', 'skills'] },
     { label: 'App', ids: ['updates', 'archive', 'diagnostics'] },
 ];
@@ -58,7 +58,7 @@ function GroupView({ group, shown }: { group: Group; shown?: ReadonlySet<string>
             action={group.action}
             footer={group.footer}
             note={group.note}
-            panel={group.rows.length > 0 || !!group.footer}
+            panel={group.panel ?? (group.rows.length > 0 || !!group.footer)}
         >
             {rows.map((row) => (
                 <div key={row.id} hidden={left(row) || undefined} inert={left(row) || undefined}>

@@ -1,4 +1,8 @@
-import { defaultFactorySettings, reviseReviewerInstructions } from '@lar-factory/shared/factory-settings';
+import {
+    defaultFactorySettings,
+    duplicateReviewer,
+    reviseReviewerInstructions,
+} from '@lar-factory/shared/factory-settings';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,7 +43,12 @@ it('upgrades missing settings without writing on read or changing Auto-build, re
 
 it('persists edited instructions and custom reviewers only inside the supplied data folder', () => {
     const dir = tempDir();
-    const settings = reviseReviewerInstructions(defaultFactorySettings(), 'security', 'Check local file input.');
+    const settings = duplicateReviewer(
+        defaultFactorySettings(),
+        'security',
+        'security-copy',
+        'Check local file input.',
+    );
 
     settings.roles['reviewer:security'] = { effort: 'high' };
     settings.reviewers.push({
@@ -62,22 +71,22 @@ it('persists edited instructions and custom reviewers only inside the supplied d
 
 it('invalid writes and instruction-history rewrites preserve both saved files', () => {
     const dir = tempDir();
-    const settings = reviseReviewerInstructions(defaultFactorySettings(), 'code', 'Original saved instructions.');
+    const settings = duplicateReviewer(defaultFactorySettings(), 'code', 'code-copy', 'Original saved instructions.');
 
     writeFactorySettings(settings, dir);
 
     const before = readdirSync(dir).map((file) => [file, readFileSync(join(dir, file), 'utf8')]);
     const rewritten = structuredClone(settings);
 
-    rewritten.reviewers[0]!.revisions[0]!.text = 'Rewritten past';
-    for (const invalid of [undefined, { version: 9 }, rewritten, defaultFactorySettings()])
+    rewritten.reviewers.find((entry) => entry.id === 'code-copy')!.revisions![0]!.text = 'Rewritten past';
+    for (const invalid of [undefined, { version: 9 }, rewritten])
         expect(() => writeFactorySettings(invalid, dir)).toThrow(
             /Factory settings are required|Invalid factory settings|Keep instruction revisions/,
         );
     for (const [file, text] of before) expect(readFileSync(join(dir, file!), 'utf8')).toBe(text);
     expect(readFactorySettings(dir).settings).toEqual(settings);
 
-    const edited = reviseReviewerInstructions(settings, 'code', 'Next revision.');
+    const edited = reviseReviewerInstructions(settings, 'code-copy', 'Next revision.');
 
     writeFactorySettings(edited, dir);
     expect(readFactorySettings(dir).settings).toEqual(edited);
@@ -106,4 +115,50 @@ it('fails visibly on corrupt settings without a valid backup instead of inventin
     expect(() => readFactorySettings(dir)).toThrow('no last good settings');
     expect(() => writeFactorySettings(defaultFactorySettings(), dir)).toThrow('no last good settings');
     expect(readFileSync(join(dir, 'factory-settings.json'), 'utf8')).toBe('broken');
+});
+
+it('removes custom reviewers and their role settings while keeping packaged reviewers', () => {
+    const dir = tempDir();
+    const settings = defaultFactorySettings();
+
+    settings.reviewers.push({
+        id: 'custom',
+        name: 'Custom',
+        mode: { kind: 'always' },
+        instructions: { kind: 'revision', revision: 1 },
+        revisions: [{ revision: 1, text: 'Custom instructions.' }],
+    });
+    writeFactorySettings(settings, dir);
+    writeFactorySettings(defaultFactorySettings(), dir);
+    expect(readFactorySettings(dir).settings).toEqual(defaultFactorySettings());
+});
+
+it('reads legacy built-in edits as custom copies and persists the migration on Save', () => {
+    const dir = tempDir();
+    const legacy = {
+        version: 1,
+        reviewers: [
+            {
+                id: 'code',
+                name: 'Code',
+                mode: { kind: 'always' },
+                instructions: { kind: 'revision', revision: 1 },
+                revisions: [{ revision: 1, text: 'Saved before packaged reviewers became read-only.' }],
+            },
+        ],
+    };
+    const file = join(dir, 'factory-settings.json');
+
+    writeFileSync(file, JSON.stringify(legacy));
+
+    const migrated = readFactorySettings(dir).settings;
+
+    expect(migrated.version).toBe(2);
+    expect(migrated.reviewers.find((entry) => entry.id === 'custom-code-copy')?.revisions).toEqual(
+        legacy.reviewers[0]!.revisions,
+    );
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(legacy);
+    writeFactorySettings(migrated, dir);
+    expect(readFactorySettings(dir).settings).toEqual(migrated);
+    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(2);
 });

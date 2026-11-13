@@ -193,3 +193,20 @@ export { conceptIcons } from './ConceptIcons';
 export { KindBadge } from './KindBadge';
 
 export { DossierParentContext, DossierStates } from './DossierContext';
+export {
+    FactorySettingsLayout,
+    FactorySettingsNotice,
+    FactorySettingsGroup,
+    FactoryChoice,
+    FactoryText,
+    FactoryAction,
+    FactoryActions,
+} from './FactorySettings';
+export { SavedRunSection } from './SavedRunSection';
+export {
+    FactoryReviewerMode,
+    FactoryCellChoice,
+    FactoryModelTable,
+    FactoryModelRow,
+    FactoryReviewerRow,
+} from './FactorySettingsLists';

@@ -81,6 +81,7 @@ import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { createSampleBoard } from './sample/sample-board.ts';
+import { factorySettingsService } from './settings/factory-settings.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
@@ -104,6 +105,7 @@ import {
 } from './t3/repository-project-discovery.ts';
 import { anyOnAzureDevOps } from './t3/repository-project.ts';
 import { sampleT3Session } from './t3/sample-t3-session.ts';
+import { readSettingsModels } from './t3/settings-models.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import {
     environmentIdPath,
@@ -1487,6 +1489,9 @@ const refreshProjects = createProjectRefresh(board, onboarded, offerModelChoices
 const projectIcons = fixture && !sampleT3 ? null : createProjectIcons(board);
 const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
 const { server, endStreams } = createBoardServer({
+    factorySettings: factorySettingsService(),
+    settingsModels: () =>
+        fixture ? Promise.resolve(board.snapshot().modelChoices) : readSettingsModels(board.snapshot().modelChoices),
     board,
     commands,
     capture: adding,

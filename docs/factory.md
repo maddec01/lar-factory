@@ -147,8 +147,11 @@ replace repeated manual picks. Auto-build keeps any existing explicit model
 choice on migration; otherwise it uses the build kind's setting. Roles inherit
 by default. No fixed vendor or model is silently substituted.
 
-Each reviewer has a stable ID, editable instructions, a model/effort override and
-a mode of always, on trigger or never. Pedro can add custom reviewers. Trigger
+Each reviewer has a stable ID, a model/effort override and a mode of always, on
+trigger or never. Packaged reviewers only allow mode changes; Duplicate copies their
+instructions and trigger into a new custom reviewer that Pedro can edit, disable or
+delete, or he can create a custom reviewer from scratch. Existing saved edits to
+packaged reviewers migrate to custom copies, keeping their instruction history. Trigger
 rules are saved, versioned predicates over changed paths and diff text. The
 selection command evaluates them without a model and records the matched rule
 and evidence. Custom reviewers start as always unless Pedro chooses another
@@ -184,10 +187,10 @@ heavy command limits retain their current machine settings. Existing issue
 creation, Spec writing, Access, domain docs and shaping thread cleanup defaults
 also stay unchanged.
 
-Today: the board chooses top-level models from T3, including default-model
-options. Auto-build saves a model choice. Reviewer selection is agent judgement,
-the four review axes are fixed, and there are no editable/custom reviewer or
-per-role model/effort settings and execution snapshots.
+Today: Settings offers reviewer modes, custom reviewers, and per-kind/per-role
+model and effort choices, while item details show saved choices from recorded
+run snapshots. Connecting every launch and its actual settings report to these
+records is still pending.
 
 ## Shaping stages
 

@@ -124,7 +124,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
         'a group with no match goes',
     ).toEqual(['Connections']);
     await type(search(), '');
-    expect(sections()).toHaveLength(7);
+    expect(sections()).toHaveLength(8);
     search().blur();
     await settle(() =>
         modal()!.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })),

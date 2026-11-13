@@ -125,7 +125,7 @@ it('captures only once; later edits, retry, handoff and reopening keep the snaps
 
     const custom = settings.reviewers.find((reviewer) => reviewer.id === 'custom')!;
 
-    custom.revisions.push({ revision: 2, text: 'New instructions.' });
+    custom.revisions!.push({ revision: 2, text: 'New instructions.' });
     custom.instructions = { kind: 'revision', revision: 2 };
     writeFactorySettings(settings, dir);
 

@@ -10,6 +10,8 @@ Incorporate amendments and present the revised understanding for confirmation.
 Silence leaves the checkpoint pending in Needs you.
 Show the item's stated constraints using `lar-work --help`'s scope schema. On confirmation, save that JSON with `lar-work confirm-scope <work ID> --revision N --file <scope.json> --identity <user> --evidence "<explicit response>"`; reuse `lar-work confirmed-scope <work ID>` on resume, and change it only after an explicit amendment.
 
+Capture `repositories` and `openDecisions` in that scope, then run `lar-work choose-structure <work ID>` and follow its result: `single` keeps this flow; `linked` keeps one parent and creates one build per repository with dependency blockers; `concept` records the open decisions as parts. Release and activation belong in the parent's release steps.
+
 On resume, reuse an explicit confirmation recorded in the thread or the brief's
 Confirmed section only when the proposed understanding is unchanged. Keep the
 confirmed understanding and the user's answer together for that comparison.
@@ -54,7 +56,7 @@ Anything the user adds or corrects is another open question. Then:
   description. Show the variants as below, ask for the user's pick, and keep
   it and the branch for the brief's **Confirmed** and **Notes for the builder**.
 
-- **Another repository changes** (its role says it serves or uses what this
+- **Another repository changes, after following `choose-structure`** (its role says it serves or uses what this
   item changes, or the work needs a change there): route that part per
   [Other repositories](shared/issue-tracker/work-records.md#other-repositories),
   and keep shaping this repository's part while the user chooses. Name each
@@ -62,5 +64,5 @@ Anything the user adds or corrects is another open question. Then:
   builder**. This item is a build only if its own repository changes.
 - **No open questions**: write the brief.
 - **Too big or unclear for one session**: [Concepts](concepts.md).
-  Repository count never makes an item a concept.
+  Keep the command's cross-repository structure choice; size alone does not turn settled linked work into a concept.
 

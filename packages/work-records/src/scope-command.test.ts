@@ -223,3 +223,24 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
 
     expect((await f.cli('confirmed-scope', other.workId)).code).toBe(1);
 }, 15000);
+
+it('chooses from persisted confirmation without changing records or guessing legacy scope', async () => {
+    const f = await fixture();
+
+    expect((await f.cli('choose-structure', f.id)).code).toBe(1);
+    await f.confirm();
+    expect((await f.cli('choose-structure', f.id)).stderr).toContain('explicit amendment');
+    writeFileSync(
+        f.file,
+        JSON.stringify({ ...scope, repositories: ['example/a', 'example/b', 'example/c'], openDecisions: [] }),
+    );
+    expect((await f.confirm()).code).toBe(0);
+
+    const revision = f.records.read(f.id).revision;
+    const result = await f.cli('choose-structure', f.id);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ structure: 'linked' });
+    expect((await f.cli('choose-structure', f.id)).stdout).toBe(result.stdout);
+    expect(f.records.read(f.id).revision).toBe(revision);
+}, 15000);

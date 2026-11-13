@@ -77,11 +77,11 @@ export function ItemDialogContent({
             data-item-dialog
             expanded={expanded}
             focusFirstField={false}
-            headerActions={
+            headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
+            headerDetails={
                 <>
                     <AgentWork item={item} label={item.kind === 'concept' ? 'Direct work' : undefined} />
                     <AgentWorkNote item={item} />
-                    <ExpandButton expanded={expanded} toggle={toggleExpanded} />
                 </>
             }
         >

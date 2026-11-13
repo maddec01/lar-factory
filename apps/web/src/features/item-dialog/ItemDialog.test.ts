@@ -16,6 +16,7 @@ import {
     moved,
     posted,
     pressMenu,
+    push,
     sample,
     settle,
     text,
@@ -972,4 +973,47 @@ describe('the working agents', () => {
         expect(text(section())).toContain('Check that T3 is connected');
         expect(section()!.querySelector('li')).toBeNull();
     });
+});
+
+test.each(['task', 'research', 'prototype', 'grill', null] as const)(
+    'a decision with method %s shows its own steps and names the work its Start begins',
+    async (method) => {
+        const base = sample.items.find((item) => item.id === 'I_sample4') ?? sample.items[0]!;
+        const decision: Item = {
+            ...base,
+            id: 'decision',
+            kind: 'decision',
+            decisionMethod: method,
+            status: 'Queued',
+            statuses: ['Queued'],
+            slices: [],
+            blockers: [],
+            threads: [],
+            linkedPrs: [],
+            completion: undefined,
+            kindDisagreement: undefined,
+        };
+
+        await mountPage({ ...sample, items: [decision] });
+        await openItem(decision.id);
+        expect(text(inDialog('[data-step-names]'))).toBe('QueueWorkingOutcome');
+        expect(text(inDialog('[data-steps]'))).toContain('Stage 1 of 3');
+        expect(text(button('start', decision.id))).toContain(`Start ${method ?? 'decision'}`);
+        await push(moved(decision.id, 'Shaping', { ...sample, items: [decision] }));
+        expect(text(inDialog('[data-steps]'))).toContain('Stage 2 of 3');
+        expect(text(inDialog('[data-item-summary]'))).toContain('Working');
+        await push(moved(decision.id, 'Done', { ...sample, items: [decision] }));
+        expect(text(inDialog('[data-steps]'))).toContain('Stage 3 of 3');
+        expect(text(inDialog('[data-item-summary]'))).toContain('Complete');
+    },
+);
+
+test('acceptance evidence retains full unbroken paths and hashes alongside the closed-ticket callout', async () => {
+    const evidence = `/proof/${'artifact'.repeat(48)}/assertions.txt SHA256: ${'a'.repeat(64)}`;
+
+    await mountPage(withDependency(dependencyBlocker('closed', { evidence })));
+    await openItem('I_sample13');
+    expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(`Evidence: ${evidence}`);
+    expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toContain('once the change is delivered');
+    expect(dependencyRow().querySelector('button')).not.toBeNull();
 });

@@ -42,4 +42,4 @@ export { useItemStates } from './ItemState';
 export type { ItemState } from './ItemState';
 export { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from './StatusGlyph';
 export { useStatusActivity } from './useStatusActivity';
-export { WORKFLOW_STEPS } from './WorkflowSteps';
+export { workflowSteps } from './WorkflowSteps';

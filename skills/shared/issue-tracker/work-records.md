@@ -286,3 +286,9 @@ keep the deleted-thread notice and report the error.
 Moving back with a passing brief asks whether to keep it passing or Reshape.
 Reshape preserves the text, gate history and ticket Spec, and requires a new
 passing gate. Moving back a build deletes its slices and clears its phase.
+
+
+A decision's method is saved on its work record. Its first `decision` body can begin
+with `Method: task` (or `grill`, `prototype`, `research`) to initialize that field.
+Later body updates preserve the saved method. To change or clear it explicitly, use
+`lar-work update <work ID> --revision N --decision-method task` (or `none` to clear).

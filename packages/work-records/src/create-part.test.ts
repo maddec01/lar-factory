@@ -41,6 +41,22 @@ async function fixture(parentKind: WorkKind = 'concept') {
 }
 
 describe('createPart', () => {
+    it('saves a task method when creating a decision part and keeps it across progress writes', async () => {
+        const { records, parent, input } = await fixture();
+        const task = records.createPart({
+            ...input,
+            parentRevision: parent.revision,
+            kind: 'decision',
+            body: 'Method: task\nActivate the release.',
+        });
+
+        expect(task.decisionMethod).toBe('task');
+
+        const changed = records.setBody(task.workId, task.revision, 'decision', 'Staged artifacts awaiting approval.');
+
+        expect(changed.decisionMethod).toBe('task');
+    });
+
     it.each(['build', 'decision'] as const)('creates a %s with its full state in either repository', async (kind) => {
         const { records, parent, blocker, input } = await fixture();
 

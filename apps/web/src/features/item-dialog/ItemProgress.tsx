@@ -17,7 +17,7 @@ import {
     shownSliceProgress,
     SourceIcon,
     STATUS_COLOR,
-    WORKFLOW_STEPS,
+    workflowSteps,
 } from '@/features/items';
 import { partsOf, unreadParts, unreadPartsText } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -39,7 +39,8 @@ export function ItemProgress({ item }: { item: Item }) {
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const items = useBoardStore((state) => state.data.items);
-    const at = WORKFLOW_STEPS.findIndex((stage) => stage === shown.progressStage);
+    const steps = workflowSteps(item);
+    const at = steps.findIndex((stage) => stage === shown.progressStage);
     const split = item.slices.length > 0;
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const concept = item.kind === 'concept';
@@ -63,13 +64,13 @@ export function ItemProgress({ item }: { item: Item }) {
             )}
             {at >= 0 && !concept && (
                 <WorkflowSteps
-                    steps={WORKFLOW_STEPS.map((s, i) => ({
+                    steps={steps.map((s, i) => ({
                         title: s,
-                        label: `Step ${i + 1} of ${WORKFLOW_STEPS.length}: ${s}`,
+                        label: `Step ${i + 1} of ${steps.length}: ${s}`,
                     }))}
                     at={at}
                     name={shown.progressStage}
-                    ordinal={`Stage ${at + 1} of ${WORKFLOW_STEPS.length}`}
+                    ordinal={`Stage ${at + 1} of ${steps.length}`}
                     // The presenter keeps the bar’s section and evidence aligned with the header.
                     color={
                         shown.progressState

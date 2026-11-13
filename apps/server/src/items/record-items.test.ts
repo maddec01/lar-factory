@@ -56,8 +56,21 @@ test('ticketless decisions expose their local method as soon as it is written', 
     const decision = records.create({ title: 'Choose the layout', repository: REPO, kind: 'decision' });
 
     assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, null);
-    records.setBody(decision.workId, decision.revision, 'decision', 'Method: prototype\nChoose the stage layout.');
+
+    let saved = records.setBody(
+        decision.workId,
+        decision.revision,
+        'decision',
+        'Method: prototype\nChoose the stage layout.',
+    );
+
     assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
+    saved = records.setBody(saved.workId, saved.revision, 'decision', 'Staged artifacts awaiting approval.');
+    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
+    saved = records.setBody(saved.workId, saved.revision, 'decision', 'Method: research\nA rewritten body.');
+    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
+    records.update(saved.workId, saved.revision, { decisionMethod: 'task' });
+    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'task');
 });
 
 test("a ticketless build's recorded PR is its linked PR, from the record's last observation, with its pipeline unread", async () => {

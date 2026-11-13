@@ -130,6 +130,56 @@ describe('lar-work', { timeout: 30_000 }, () => {
         }
     });
 
+    it('updates a saved decision method independently of subsequent body rewrites', async () => {
+        const dir = tempDir();
+        const created = await larWork(
+            dir,
+            'create',
+            '--title',
+            'Activate release',
+            '--repository',
+            'example/release',
+            '--kind',
+            'decision',
+        );
+        let record = created.record;
+
+        expect(created.code).toBe(0);
+
+        const chosen = await larWork(
+            dir,
+            'update',
+            record.workId,
+            '--revision',
+            String(record.revision),
+            '--decision-method',
+            'task',
+        );
+
+        expect(chosen.code).toBe(0);
+        record = chosen.record;
+        expect(record.decisionMethod).toBe('task');
+
+        const body = join(dir, 'decision.md');
+
+        writeFileSync(body, 'Staged artifacts awaiting approval.');
+
+        const rewritten = await larWork(
+            dir,
+            'set-body',
+            record.workId,
+            '--revision',
+            String(record.revision),
+            '--body',
+            'decision',
+            '--file',
+            body,
+        );
+
+        expect(rewritten.code).toBe(0);
+        expect(rewritten.record.decisionMethod).toBe('task');
+    });
+
     /** A gh answering one issue from a file, whose every write it logs and applies. */
     function fakeIssue(dir: string, issue: { labels: { name: string }[]; type: { name: string } | null }) {
         const log = join(dir, 'gh.log');

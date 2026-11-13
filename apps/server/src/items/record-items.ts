@@ -3,15 +3,7 @@
 // PRs and provider fields. Board grouping can also use tracker links without writing local ownership.
 // Spec sync can update title and brief; it never moves, restructures or blocks work.
 
-import {
-    kindDisagreement,
-    onAzure,
-    parseConceptMap,
-    parseDecisionMethod,
-    refKey,
-    sameRepo,
-    ticketKindOf,
-} from '@lar-factory/shared';
+import { kindDisagreement, onAzure, parseConceptMap, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
 import type {
     Blocker,
     DependencyHold,
@@ -253,9 +245,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 ticket?.flow === 'linked'
                     ? 'linked'
                     : 'single',
-            ...(record.kind === 'decision'
-                ? { decisionMethod: parseDecisionMethod(records.body(record.workId, 'decision') ?? '') }
-                : {}),
+            ...(record.kind === 'decision' ? { decisionMethod: record.decisionMethod ?? null } : {}),
             number: ticketNumber(record.ticket),
             title: record.title || ticket?.title || '',
             url: ticket?.url ?? attachment?.url ?? null,

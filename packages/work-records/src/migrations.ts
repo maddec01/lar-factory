@@ -1,5 +1,6 @@
 // The work-record database's schema, one step per entry. Never edit a released step: add one.
 
+import { parseDecisionMethod } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 
 import type { Migration } from './database.ts';
@@ -493,4 +494,18 @@ export const MIGRATIONS: readonly Migration[] = [
     (db) => db.exec('ALTER TABLE work_records ADD COLUMN superseded_by TEXT'),
     migrateDecisionAnswers,
     installWriteJournal,
+    (db) => {
+        db.exec(
+            "ALTER TABLE work_records ADD COLUMN decision_method TEXT CHECK (decision_method IN ('grill', 'prototype', 'research', 'task'))",
+        );
+
+        const save = db.prepare('UPDATE work_records SET decision_method = ? WHERE work_id = ?');
+
+        for (const row of db
+            .prepare(
+                "SELECT r.work_id, b.markdown FROM work_records r JOIN bodies b ON b.work_id = r.work_id WHERE r.kind = 'decision' AND b.body = 'decision'",
+            )
+            .all())
+            save.run(parseDecisionMethod(String(row.markdown)) ?? null, String(row.work_id));
+    },
 ];

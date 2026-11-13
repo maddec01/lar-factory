@@ -1,4 +1,5 @@
 import type { BoardData, Item } from '@lar-factory/shared';
+import { openWorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -213,4 +214,38 @@ test('sample startup ignores a supplied real data folder and never reads its set
     assert.ok(!board.logs().includes('sentinel settings'));
     await board.stop();
     assert.deepEqual(tree(home), before);
+});
+
+test('writable sample reads local decision bodies and keeps the saved method after progress updates', async (t) => {
+    const board = await startBoard(t, {}, true);
+    const match = /sample data folder: ([^\n]+)/.exec(board.logs());
+
+    assert.ok(match);
+
+    const records = await openWorkRecords(join(match[1]!.trim(), 'work-records.db'));
+    let task;
+
+    try {
+        task = records.create({ title: 'Activate sandbox', repository: repo, kind: 'decision', status: 'Queued' });
+        task = records.setBody(task.workId, task.revision, 'decision', 'Method: task\nStage the release.');
+        task = records.setBody(task.workId, task.revision, 'decision', 'Staged artifacts awaiting approval.');
+    } finally {
+        records.close();
+    }
+
+    const response = await board.post(
+        { action: 'link', kind: 'related', from: { repo, number: 61 }, to: { repo, number: 114 }, present: false },
+        board.url,
+        '/api/sample',
+    );
+
+    assert.equal(response.status, 200);
+
+    const item = ((await board.board()) as BoardData).items.find((item) => item.id === task.workId);
+
+    assert.equal(item?.decisionMethod, 'task');
+
+    const details = await fetch(`${board.url}/api/item-details?itemId=${task.workId}`).then((r) => r.json());
+
+    assert.equal(details.details.record.body, 'Staged artifacts awaiting approval.');
 });

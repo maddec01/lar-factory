@@ -327,7 +327,7 @@ test('a settled decision counts as done in its part bar, whatever its Status say
         ]),
     ).toEqual([
         [expect.stringContaining('Complete'), true],
-        [expect.stringContaining('Shaping'), false],
+        [expect.stringContaining('Working'), false],
     ]);
 });
 

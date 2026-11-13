@@ -172,8 +172,16 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
     const merged = !atWork && !readiness && prMerged;
     // A Ready item's blockers say why it hasn't started, whatever a thread still does.
     const blockers = item.status === 'Ready' && execution !== 'starting' ? openBlockers(item) : [];
+    const statusWord =
+        item.kind === 'decision'
+            ? item.completion?.complete || item.status === 'Done'
+                ? 'Complete'
+                : item.status === 'Shaping'
+                  ? 'Working'
+                  : item.status
+            : item.status;
     const blockedWord = `Blocked · starts after ${blockers.map((blocker) => blockerRef(item, blocker)).join(', ')}`;
-    const stageWord = blockers.length ? blockedWord : (stageReadiness?.word ?? (prMerged ? MERGED : item.status));
+    const stageWord = blockers.length ? blockedWord : (stageReadiness?.word ?? (prMerged ? MERGED : statusWord));
     const said = execution && execution !== 'starting' && execution !== 'unavailable' ? execution : undefined;
     const word = blockers.length
         ? blockedWord
@@ -182,7 +190,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
           : said
             ? EXECUTION_WORD[said]
             : (readiness?.word ??
-              (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : item.status));
+              (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : statusWord));
     const state: StatusState | undefined = blockers.length
         ? 'waiting'
         : said === 'waiting'
@@ -196,24 +204,32 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
     return {
         stage: item.status,
         progressStage:
-            prMerged || stageReadiness?.word === 'Merged'
-                ? 'Merge'
-                : stageReadiness?.state === 'failed'
-                  ? 'Verify'
-                  : (
-                        {
-                            List: 'List',
-                            Queued: 'Queue',
-                            Shaping: 'Shaping',
-                            'Needs you': 'Shaping',
-                            Ready: 'Ready to build',
-                            'In progress': 'Build',
-                            Review: 'Review',
-                            Verify: 'Verify',
-                            'Ready to merge': 'Merge',
-                            Done: 'Merge',
-                        } as const
-                    )[item.status],
+            item.kind === 'decision'
+                ? item.completion?.complete || item.status === 'Done'
+                    ? 'Outcome'
+                    : item.status === 'List' || item.status === 'Queued'
+                      ? item.status === 'List'
+                          ? 'List'
+                          : 'Queue'
+                      : 'Working'
+                : prMerged || stageReadiness?.word === 'Merged'
+                  ? 'Merge'
+                  : stageReadiness?.state === 'failed'
+                    ? 'Verify'
+                    : (
+                          {
+                              List: 'List',
+                              Queued: 'Queue',
+                              Shaping: 'Shaping',
+                              'Needs you': 'Shaping',
+                              Ready: 'Ready to build',
+                              'In progress': 'Build',
+                              Review: 'Review',
+                              Verify: 'Verify',
+                              'Ready to merge': 'Merge',
+                              Done: 'Merge',
+                          } as const
+                      )[item.status],
         progressState: stageReadiness?.state ?? state,
         execution,
         pr: readiness,

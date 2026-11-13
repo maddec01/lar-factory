@@ -67,6 +67,8 @@ import { readRepositorySetups } from '../config/repository-settings.ts';
 import { readJsonRecord } from '../json-file.ts';
 import { log } from '../log.ts';
 import { installHome } from '../skills/bundled-skills.ts';
+import { factorySkillDir } from '../skills/factory-skill-dir.ts';
+import { developmentModel } from '../t3/development-model.ts';
 import { liveWorktreePaths, protocolStartedThread } from '../t3/item-execution.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
@@ -264,11 +266,12 @@ function track<T>(
 }
 
 /** Where lar-build is installed, for the build message: under the board app's install root, else the home. */
-const larBuild = () => join(installHome(), '.agents/skills/lar-build');
+const larBuild = () => factorySkillDir('lar-build');
 const currentFactoryContext = (): FactoryThreadContext => ({
     dataDir: boardDataDir(),
     bin: join(installHome(), '.local/bin'),
-    shapeSkill: join(installHome(), '.agents/skills/lar-shape/SKILL.md'),
+    shapeSkill: join(factorySkillDir('lar-shape'), 'SKILL.md'),
+    delegationModel: developmentModel(),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
 

@@ -4,6 +4,7 @@ import { isRecord, type ModelChoice, type StartedThread, type StartResult } from
 
 import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
+import { developmentModel } from './development-model.ts';
 import { launchThread, type ExistingWorktree, type LaunchThread, type LaunchWorkspace } from './launch-thread.ts';
 import { launchSelection, projectDefaults, type ProjectDefaults } from './model-choices.ts';
 
@@ -33,18 +34,20 @@ export async function startThread(
     defaults: (project: string) => ProjectDefaults | null = projectDefaults,
     launch: LaunchThread = launchThread,
 ): Promise<StartResult> {
+    const development = developmentModel();
+    const selected = choice ?? development;
     const existing = worktree && 'type' in worktree ? worktree : undefined;
     const created = worktree && !('type' in worktree) ? worktree : undefined;
 
-    if (existing && !choice)
+    if (existing && !selected)
         return { thread: null, error: 'Choose a model before continuing in an existing worktree.' };
 
-    if (choice) {
+    if (selected) {
         const found = defaults(project);
 
         if (!found) return { thread: null, error: "Can't read T3 Code's settings. Check T3 Code, then start again." };
 
-        const selection = launchSelection(choice, found.selection);
+        const selection = launchSelection(selected, development ?? found.selection);
 
         // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
         if (existing) {

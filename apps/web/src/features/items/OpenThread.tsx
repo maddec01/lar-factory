@@ -3,7 +3,14 @@
 // written its environment id, or the thread is archived, whose link T3 opens as New thread.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { needsAnswer, openQuestionThread, questionOwnerParent, threadLink } from '@lar-factory/shared';
+import {
+    needsAnswer,
+    ownerThread,
+    ownerThreads,
+    openQuestionThread,
+    questionOwnerParent,
+    threadLink,
+} from '@lar-factory/shared';
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
@@ -19,7 +26,7 @@ function latestThread(
 ): { link: string; question: boolean; inheritedLabel: 'concept' | 'parent' | null } | { reason: string } {
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
-    const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
+    const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : ownerThread(item);
     const owner = questionOwnerParent(item, data.items);
     const concept = owner
         ? (openQuestionThread(owner) ??
@@ -138,9 +145,10 @@ export function OpenThread({
  */
 export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) {
     const earlier = Array.isArray(item.threads)
-        ? item.threads.filter(
+        ? ownerThreads(item).filter(
               (thread, index) =>
                   thread.archived ||
+                  (index === 0 && thread.purpose === 'build') ||
                   (index > 0 &&
                       (thread.purpose === 'shape' ||
                           (item.kind === 'decision' &&
@@ -162,7 +170,15 @@ export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) 
                             ? threadLink(data.t3EnvironmentId, thread.id)
                             : undefined
                     }
-                    state={thread.archived ? 'archived' : thread.purpose === 'shape' ? 'shaping' : 'earlier'}
+                    state={
+                        thread.archived
+                            ? 'archived'
+                            : thread.purpose === 'build'
+                              ? 'build'
+                              : thread.purpose === 'shape'
+                                ? 'shaping'
+                                : 'earlier'
+                    }
                 />
             ))}
         </EarlierThreadList>

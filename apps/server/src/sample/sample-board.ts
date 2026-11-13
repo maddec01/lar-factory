@@ -26,6 +26,7 @@ import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
 import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
+import { sampleDelivery } from './sample-delivery.ts';
 import { sampleRetro } from './sample-retro.ts';
 import { sampleVerification } from './sample-verification.ts';
 
@@ -35,6 +36,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const dir = boardDataDir();
     const repos = sampleRepositories(tracker, dir);
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+    const delivery = sampleDelivery(records);
     const sources = new Map(repos().map(({ repo }) => [repo, fakeItemSource(tracker, repo)]));
     const items = mergeSources(sources, new Map([...sources.values()].map((source) => [source, 'issues' as const])));
     const vocabulary = sampleVocabulary(tracker);
@@ -70,7 +72,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             items: projected.map((item) => {
                 const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
-                if (!ticket) return item;
+                if (!ticket) return delivery.project(item);
 
                 return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
@@ -225,6 +227,17 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             );
         },
         sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action === 'delivery') {
+                const workId = delivery.seed(repos()[0]!.repo);
+
+                // Two existing sample builds plus the delivery fixture's two builds share four slots.
+                board.update({ buildLimit: { limit: 4, automatic: 2 } });
+
+                reread();
+
+                return { status: 200, body: { workId, error: null } };
+            }
+
             if (input.action === 'brief-approval') {
                 const { workId } = await verification.control({ change: 'seed' });
 

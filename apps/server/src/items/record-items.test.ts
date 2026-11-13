@@ -1076,7 +1076,7 @@ test('a changed approved brief during Build carries a brief approval reason inst
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
     assert.equal(item.passingBrief, false);
-    assert.match(item.briefApproval!.reason, /changed during Build/);
+    assert.equal(item.briefApproval!.reason, 'Gate out of date: brief changed since approval');
     assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
 });
 
@@ -1119,4 +1119,78 @@ test('a group projects the live reconciliation count and record-backed ships-wit
 
     records.retitle(parts[0]!.workId, records.read(parts[0]!.workId).revision, 'A changed part');
     assert.notEqual(shown().reconciliation!.digest, before);
+});
+
+for (const status of ['Ready', 'Queued'] as const) {
+    test(`a stale gate at ${status} explains the hold and asks for renewed board approval`, async () => {
+        const records = await open();
+        let work = records.create({ title: 'Held', repository: REPO, kind: 'build', status });
+
+        work = records.setBody(work.workId, work.revision, 'brief', 'Approved brief.');
+        records.recordGate(work.workId, work.revision, {
+            briefDigest: records.gate(work.workId).briefDigest!,
+            approvedBy: 'Pedro',
+            evidence: 'Board approval.',
+        });
+        work = records.setBody(work.workId, work.revision, 'brief', 'Changed brief.');
+
+        const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+        assert.equal(item.status, status);
+        assert.equal(item.passingBrief, false);
+        assert.equal(item.staleGate, 'brief');
+        assert.equal(item.briefApproval!.reason, 'Gate out of date: brief changed since approval');
+        assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
+    });
+}
+
+test('a changed source invalidates a reviewed gate without claiming that its brief text changed', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Source hold', repository: REPO, kind: 'build', status: 'Ready' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', 'Keep the agreed contract.');
+
+    let parent = records.create({ title: 'Source concept', repository: REPO, kind: 'concept' });
+
+    parent = records.setBody(parent.workId, parent.revision, 'map', '## Destination\nKeep the agreed contract.');
+    work = records.setParent(work.workId, work.revision, parent.workId);
+
+    const reviewed = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Checked code evidence.', []);
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    records.setBody(
+        parent.workId,
+        records.read(parent.workId).revision,
+        'map',
+        '## Destination\nThe source contract changed.',
+    );
+
+    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+    assert.equal(item.passingBrief, false);
+    assert.equal(item.staleGate, 'sources');
+    assert.equal(item.briefApproval!.reason, 'Gate out of date: brief sources changed since approval');
+});
+
+test('withdrawn approval asks for a new gate without claiming the brief or sources changed', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Approval withdrawn', repository: REPO, kind: 'build', status: 'Ready' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', 'Unchanged brief.');
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    records.invalidateGate(work.workId, work.revision);
+
+    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+    assert.equal(item.staleGate, 'approval');
+    assert.equal(item.briefApproval!.reason, 'Gate out of date: approval is no longer current');
 });

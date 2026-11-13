@@ -201,9 +201,7 @@ test.each(['running', 'paused'] as const)(
         const { useItemDialogStore } = await import('./ItemDialogStore');
 
         await settle(() => useItemDialogStore.getState().open(concept.id));
-        expect(text($('[data-item-dialog] [data-shared-build-capacity]'))).toBe(
-            '3 building · limit 4: 2 from this concept',
-        );
+        expect($('[data-item-dialog] [data-shared-build-capacity]')).toBeNull();
     },
 );
 test('the concept shows active builds, total progress and an explicit capacity wait', async () => {
@@ -256,6 +254,6 @@ test('the concept shows active builds, total progress and an explicit capacity w
         parts,
     );
     expect(text($('[data-concept-build-progress]'))).toBe('1 building · 1 waiting · 0/2 complete');
-    expect(text($('[data-concept-build-run]'))).toContain('Building: Build running');
+    expect($('[data-concept-build-run]')!.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(text($('[data-concept-parts]'))).toContain('Waiting for shared build capacity.');
 });

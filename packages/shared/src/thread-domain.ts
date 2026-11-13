@@ -167,9 +167,28 @@ export interface StartResult {
     hold?: true;
 }
 
+/** Threads belonging to the item's current stage; old shaping activity cannot own a build. */
+export function ownerThreads(item: Item): ItemThread[] {
+    if (!Array.isArray(item.threads)) return [];
+
+    const building =
+        !['List', 'Queued', 'Shaping'].includes(item.status) &&
+        item.threads.some((thread) => thread.purpose === 'build');
+    const shaping = item.status === 'Shaping' && item.threads.some((thread) => thread.purpose === 'shape');
+
+    return building
+        ? item.threads.filter((thread) => thread.purpose !== 'shape')
+        : shaping
+          ? item.threads.filter((thread) => thread.purpose !== 'build')
+          : item.threads;
+}
+
+/** The current stage's newest owner, including finished and cached owners for navigation. */
+export const ownerThread = (item: Item): ItemThread | undefined => ownerThreads(item)[0];
+
 export function openQuestionThread(item: Item) {
     return Array.isArray(item.threads)
-        ? item.threads.find(
+        ? ownerThreads(item).find(
               (thread) =>
                   (thread.state === 'needs you' || (thread.childNeedsYou && thread.pendingRequest)) &&
                   !thread.observedAt,
@@ -180,7 +199,7 @@ export function openQuestionThread(item: Item) {
 /** The item's build thread as T3 shows it now, not a cached copy. */
 export function currentBuildThread(item: Item) {
     return Array.isArray(item.threads)
-        ? item.threads.find((thread) => thread.purpose === 'build' && !thread.observedAt)
+        ? ownerThreads(item).find((thread) => thread.purpose === 'build' && !thread.observedAt)
         : undefined;
 }
 

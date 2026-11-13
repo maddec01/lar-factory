@@ -4,6 +4,7 @@
 
 import {
     blockerRef,
+    ownerThreads,
     currentBuildThread,
     decisionType,
     delegatedWorkRunning,
@@ -95,7 +96,7 @@ const started = (item: Item) => STARTED.includes(item.status);
 export const isDone = (item: Item): boolean =>
     item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
 
-export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
+export const threadsOf = (item: Item): ItemThread[] => ownerThreads(item);
 
 /** Local kind is authoritative. Legacy source labels can still name a decision method. */
 export function partKind(item: Item): PartKind {

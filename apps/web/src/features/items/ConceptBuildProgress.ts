@@ -1,22 +1,13 @@
-import { blockedText, buildsAtWork, workingAgain, type BoardData, type Item } from '@lar-factory/shared';
+import {
+    blockedText,
+    staleGateReason,
+    buildsAtWork,
+    workingAgain,
+    type BoardData,
+    type Item,
+} from '@lar-factory/shared';
 
-/** Delivery progress follows confirmed completion, never a ticket's or manually written Done status. */
-export function conceptBuildProgress(parent: Item, data: BoardData) {
-    const members = parent.conceptBuild?.members.filter((member) => member.kind === 'build') ?? [];
-    const atWork = new Set(buildsAtWork(data).map((item) => item.id));
-    const building = members.filter((member) => !member.complete && atWork.has(member.workId));
-    const complete = members.filter((member) => member.complete).length;
-
-    return {
-        total: members.length,
-        complete,
-        building: building.length,
-        waiting: members.length - complete - building.length,
-        names: building.map((member) => member.title).join(', '),
-        outside: members.filter((member) => !member.complete && !data.items.some((item) => item.id === member.workId))
-            .length,
-    };
-}
+export { groupBuildProgress as conceptBuildProgress } from '@lar-factory/shared';
 
 /** A concept's Ready builds explain what must change next; active work keeps its usual stage presenter. */
 export function conceptBuildWait(item: Item, data: BoardData): string | null {
@@ -48,6 +39,8 @@ export function conceptBuildWait(item: Item, data: BoardData): string | null {
     const blocked = blockedText(item);
 
     if (blocked) return blocked;
+
+    if (item.staleGate) return staleGateReason(item);
 
     if (item.passingBrief === false) return 'Waiting for a current approved gate.';
 

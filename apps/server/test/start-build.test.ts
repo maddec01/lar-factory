@@ -42,13 +42,32 @@ async function buildBoard(
         t,
         { localSetups: { 'maddec01/lar-factory': { writeRefinedSpec: false } }, items, ...options },
         false,
-        false,
-        { ...startable, ...env },
+        true,
+        // These tests await local record/thread changes, not provider refresh timing.
+        { ...startable, FAST_LOCAL_REFRESH_ONLY: '1', ...env },
         undefined,
         skillCheck,
     );
 
     await until(board, (d) => d.items.length === items.length);
+
+    // The first ticket observation is a legitimate background write; let it land before seeding gated fixtures.
+    const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
+    try {
+        await until(
+            board,
+            (data) =>
+                data.items.length === items.length &&
+                data.items.every(
+                    (item) =>
+                        records.observations(item.id).some((observation) => observation.of === 'ticket') &&
+                        item.revision === records.read(item.id).revision,
+                ),
+        );
+    } finally {
+        records.close();
+    }
 
     await approveReadyBuilds(board);
 

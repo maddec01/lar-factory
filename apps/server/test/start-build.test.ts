@@ -81,6 +81,23 @@ test("Start build moves its concept's work record to In progress, writes nothing
         readyIssue(12, ['build'], 40),
         boardIssue(40, 'Ready', undefined, ['concept']),
     ]);
+
+    await changeRecords(
+        board,
+        (records) => {
+            const work = records.read(board.id(12));
+            const brief = records.setBody(work.workId, work.revision, 'brief', 'Build the approved destination.');
+
+            records.recordGate(work.workId, brief.revision, {
+                briefDigest: records.gate(work.workId).briefDigest!,
+                approvedBy: 'Pedro',
+                evidence: 'Doubt clean; approved.',
+            });
+        },
+        board.id(12),
+        (item) => item.passingBrief === true,
+    );
+
     const response = await startBuild(board, board.id(12));
 
     assert.equal(response.status, 200);

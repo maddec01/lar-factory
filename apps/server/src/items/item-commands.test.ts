@@ -126,6 +126,19 @@ test('a failed fetch refuses Start build with its error and writes nothing, then
 
     records.setParent(build.workId, build.revision, concept.workId);
 
+    const brief = records.setBody(
+        build.workId,
+        records.read(build.workId).revision,
+        'brief',
+        'Build the approved destination.',
+    );
+
+    records.recordGate(build.workId, brief.revision, {
+        briefDigest: records.gate(build.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Doubt clean; approved.',
+    });
+
     const before = records.read(build.workId);
     let offline = true;
     const { commands, log, bases } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
@@ -1373,6 +1386,14 @@ test("Start build moves the build's concept record to In progress and writes no 
     const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Shaping' });
     const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
     const build = records.setParent(made.workId, made.revision, concept.workId);
+    const brief = records.setBody(build.workId, build.revision, 'brief', 'Build the approved destination.');
+
+    records.recordGate(build.workId, brief.revision, {
+        briefDigest: records.gate(build.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Doubt clean; approved.',
+    });
+
     const decision = records.create({ title: 'Open decision', repository: WEB, kind: 'decision' });
 
     records.setParent(decision.workId, decision.revision, concept.workId);
@@ -1398,6 +1419,14 @@ test("Start build and Abandon write at the revision the board's own observations
     });
     const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
     const build = records.setParent(made.workId, made.revision, concept.workId);
+    const brief = records.setBody(build.workId, build.revision, 'brief', 'Build the approved destination.');
+
+    records.recordGate(build.workId, brief.revision, {
+        briefDigest: records.gate(build.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Doubt clean; approved.',
+    });
+
     const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', ticket: `${WEB}#41` });
     let showObservations = () => {};
     // An observation pass commits while the build starts, and the board shows it some turns later.
@@ -2873,3 +2902,40 @@ for (const state of ['done', 'stopped'] as const)
         assert.equal(after.started.length, 1);
         assert.equal((await after.commands.start(work.workId, undefined)).status, 409);
     });
+
+test('decision-authored drafts cannot launch through a forged Ready status', async () => {
+    const records = await openRecords();
+    const concept = records.create({ title: 'Destination', repository: WEB, kind: 'concept' });
+    const build = records.createPart({
+        parentId: concept.workId,
+        parentRevision: concept.revision,
+        title: 'Draft',
+        repository: WEB,
+        kind: 'build',
+        body: 'False code claim; depends on another build (prose only).',
+        blockerIds: [],
+    });
+    const ready = records.update(build.workId, build.revision, { status: 'Ready' });
+    const { commands, log } = commandsOn([], undefined, records);
+    const refused = await commands.startBuild(build.workId, undefined);
+
+    assert.equal(refused.status, 409);
+    assert.match((refused.body as { error: string }).error, /current passing gate/);
+    assert.deepEqual(log, []);
+    assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
+    assert.throws(() => records.recordLaunchIntent(build.workId, ready.revision, 'build'), /current passing gate/);
+
+    const fixed = records.setBody(
+        build.workId,
+        ready.revision,
+        'brief',
+        'Code claim corrected; no unrecorded dependency.',
+    );
+
+    records.recordGate(build.workId, fixed.revision, {
+        briefDigest: records.gate(build.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Code checked, Doubt clean; yes.',
+    });
+    assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+});

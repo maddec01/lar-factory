@@ -44,9 +44,14 @@ function factoryEnvironment(context: FactoryThreadContext): string {
 }
 
 function shapeInstructions(item: Item, context?: FactoryThreadContext | null): string {
-    if (!context) return `$lar-shape ${item.id}`;
+    const decision =
+        item.kind === 'decision'
+            ? '\nDecision-authored builds are drafts: Brief → code evidence → Doubt → gate → Ready. Record blockers and Dependencies; do not implement during shaping.'
+            : '';
 
-    return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.\n\n${factoryEnvironment(context)}`;
+    if (!context) return `$lar-shape ${item.id}${decision}`;
+
+    return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.${decision}\n\n${factoryEnvironment(context)}`;
 }
 
 /** The work message. Line 1, which T3 titles the thread from, is `Shaping` and the item's name in a sentence; then come its instructions, with its work ID. */

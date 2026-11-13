@@ -2032,7 +2032,19 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup) => {
             const checked = checkPurpose(purpose);
             const intentId = randomUUID();
-            const record = change(workId, revision, () => {
+            const record = change(workId, revision, (work) => {
+                if (
+                    checked === 'build' &&
+                    work.parent_id &&
+                    work.status !== 'In progress' &&
+                    !db
+                        .prepare("SELECT 1 FROM bodies WHERE work_id = ? AND body = 'brief' AND has_passing_gate = 1")
+                        .get(workId)
+                )
+                    throw invalid(
+                        'This proposed build needs Brief, code evidence, Doubt and a current passing gate before Start build.',
+                    );
+
                 if (
                     db
                         .prepare(

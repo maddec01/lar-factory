@@ -22,6 +22,7 @@ import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { readFactorySettings } from './factory-settings.ts';
+import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
@@ -281,6 +282,8 @@ export interface WorkRecord {
     pullRequest: string | null;
     /** Whether it is set aside, which leaves its Status as it was. */
     setAside: boolean;
+    /** Proposed work absorbed into this survivor; history remains on this record. */
+    supersededBy?: string | null;
     /** Whether a concept's Fog is recorded gone; always false for other kinds. */
     fogGone: boolean;
     /** Why it waits on the user in free text, such as a merge conflict; null when it doesn't. Its Status stays as it was. */
@@ -348,6 +351,7 @@ export interface CaptureSubmission {
 export interface WorkRecords
     extends
         RetitleRecords,
+        MergeBuildRecords,
         SetAsideRecords,
         RunSettingsRecords,
         ValidationRecords,
@@ -546,6 +550,7 @@ interface Row {
     build_phase: BuildPhase | null;
     pull_request: string | null;
     set_aside_at: string | null;
+    superseded_by: string | null;
     fog_gone_at: string | null;
     needs_you: string | null;
     needs_you_causes: string | null;
@@ -571,6 +576,7 @@ const fromRow = (row: Row): WorkRecord => ({
     buildBranch: row.build_branch,
     pullRequest: row.pull_request,
     setAside: row.set_aside_at !== null,
+    supersededBy: row.superseded_by,
     fogGone: row.fog_gone_at !== null,
     needsYou: row.needs_you,
     needsYouCauses: row.needs_you_causes === null ? [] : (JSON.parse(row.needs_you_causes) as NeedsYouCause[]),
@@ -1181,6 +1187,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
         ...retitleRecords(database, (workId) => fromRow(find(workId))),
+        ...mergeBuildRecords(database, {
+            read: (id) => fromRow(find(id)),
+            body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
+            initialContext: (id) => find(id).initial_context,
+            writeBody,
+        }),
         ...setAsideRecords(database, (id) => fromRow(find(id))),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
@@ -1418,6 +1430,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         importTicket: (record) => database.write(() => importTicket(record)),
         restore: (workId, revision) =>
             change(workId, revision, (row) => {
+                if (row.superseded_by)
+                    throw invalid(
+                        `This proposed build was absorbed into ${row.superseded_by}; retain its supersession history.`,
+                    );
+
                 if (!row.set_aside_at) throw invalid(`The work record ${workId} isn't set aside.`);
 
                 return { set_aside_at: null };

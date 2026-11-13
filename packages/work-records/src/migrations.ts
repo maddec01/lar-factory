@@ -488,4 +488,5 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'CREATE TABLE set_aside_changes(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
+    (db) => db.exec('ALTER TABLE work_records ADD COLUMN superseded_by TEXT'),
 ];

@@ -1590,3 +1590,29 @@ it(
         }
     },
 );
+it('work-order prints a human report or JSON and requires a group ID', async () => {
+    const data = tempDir();
+    const records = await openWorkRecords(join(data, 'work-records.db'));
+    const group = records.create({ title: 'Concept', kind: 'concept', repository: 'example/a' });
+    const part = records.createPart({
+        parentId: group.workId,
+        parentRevision: group.revision,
+        title: 'Implement',
+        kind: 'build',
+        repository: 'example/b',
+        body: 'Exact brief',
+        blockerIds: [],
+    });
+
+    records.close();
+
+    const text = await larWork(data, 'work-order', group.workId);
+    const json = await larWork(data, 'work-order', group.workId, '--json');
+
+    expect(text.code).toBe(0);
+    expect(text.stdout).toContain('Implement');
+    expect(text.stdout).toContain('Status is Queued.');
+    expect(json.code).toBe(0);
+    expect(json.record[0]).toMatchObject({ workId: part.workId, brief: 'Exact brief', status: 'Queued' });
+    expect((await larWork(data, 'work-order')).code).toBe(2);
+});

@@ -632,6 +632,26 @@ const fiveSettled = (['grill', 'prototype', 'research', 'task', 'grill'] as cons
     settledPart(`W_s${n}`, method),
 );
 
+test('map arrows meet the rendered cards at their vertical centres', async () => {
+    const first = workPart('W_first', { title: 'Limit provider calls to the metadata service', slices: base.slices });
+    const next = workPart('W_next', {
+        blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: first.id }],
+    });
+    const map = await mapOpen(conceptOf([first, next]));
+    const card = (id: string) => map.querySelector<HTMLElement>(`[data-map-part="${id}"]`)!;
+    const centre = (node: HTMLElement) =>
+        Number.parseFloat(node.parentElement!.style.top) + Number.parseFloat(node.style.height) / 2;
+    const from = card(first.id);
+    const to = card(next.id);
+    const path = map.querySelector('path[data-edge="W_first W_next"]')!.getAttribute('d')!;
+    const coordinates = path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+
+    expect(coordinates[1], 'the arrow leaves at the visible card centre').toBe(centre(from));
+    expect(coordinates.at(-1), 'the arrow arrives at the visible card centre').toBe(centre(to));
+    expect(text(from)).toContain(first.title);
+    expect(from.querySelector('[data-slice-bar]')).not.toBeNull();
+});
+
 test('a part waiting on a settled decision in the group keeps its edge, from the group, with its label', async () => {
     const held = workPart('W_next', {
         status: 'In progress',

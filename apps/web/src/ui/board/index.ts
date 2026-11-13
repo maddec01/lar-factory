@@ -111,6 +111,7 @@ export { StatusGlyph, StatusGlyphSlot } from './StatusGlyph';
 export { EarlierThread, EarlierThreadList } from './Threads';
 export {
     HistoryRow,
+    MAP_NODE_HEIGHT,
     MapBand,
     MapCanvas,
     MapCheckNode,

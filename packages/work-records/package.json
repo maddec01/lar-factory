@@ -10,7 +10,8 @@
         "./change-kind": "./src/change-kind.ts",
         "./create-ticket": "./src/create-ticket.ts",
         "./spec-sync": "./src/spec-sync.ts",
-        "./tracker-sync": "./src/tracker-sync.ts"
+        "./tracker-sync": "./src/tracker-sync.ts",
+        "./factory-settings": "./src/factory-settings.ts"
     },
     "bin": {
         "lar-work": "./src/cli.ts"

@@ -205,6 +205,14 @@ export function AbandonDialog() {
     };
     const loss = notice.choices.confirmLoss;
     const failedCombined = !!notice.failure?.combined && closesTicketOnAbandon(item);
+    const hasDetails = !!(
+        item.abandonRefusal ||
+        notice.checking ||
+        notice.uninspected ||
+        notice.choices.cleanup ||
+        notice.failure ||
+        error
+    );
 
     const confirmLabel = notice.failure
         ? failedCombined
@@ -252,21 +260,25 @@ export function AbandonDialog() {
                 ) : undefined
             }
         >
-            <Stack space="related">
-                {item.abandonRefusal && <Text>{item.abandonRefusal}</Text>}
-                {notice.checking && <Text role="status">Checking the branch and worktree…</Text>}
-                {notice.uninspected && <Alert tone="warning">{ABANDON_CLEANUP.uninspected(notice.uninspected)}</Alert>}
-                <CleanupChoices
-                    choices={notice.choices}
-                    remoteNote={hasClosedPr(item) && <Text>{ABANDON_CLEANUP.remoteWarning}</Text>}
-                />
-                {notice.failure && (
-                    <Alert tone="danger">
-                        {ABANDON_CLEANUP.failed(item)} {notice.failure.message}
-                    </Alert>
-                )}
-                {error && <Alert tone="danger">{error}</Alert>}
-            </Stack>
+            {hasDetails ? (
+                <Stack space="related">
+                    {item.abandonRefusal && <Text>{item.abandonRefusal}</Text>}
+                    {notice.checking && <Text role="status">Checking the branch and worktree…</Text>}
+                    {notice.uninspected && (
+                        <Alert tone="warning">{ABANDON_CLEANUP.uninspected(notice.uninspected)}</Alert>
+                    )}
+                    <CleanupChoices
+                        choices={notice.choices}
+                        remoteNote={hasClosedPr(item) && <Text>{ABANDON_CLEANUP.remoteWarning}</Text>}
+                    />
+                    {notice.failure && (
+                        <Alert tone="danger">
+                            {ABANDON_CLEANUP.failed(item)} {notice.failure.message}
+                        </Alert>
+                    )}
+                    {error && <Alert tone="danger">{error}</Alert>}
+                </Stack>
+            ) : undefined}
         </ConfirmDialog>
     );
 }

@@ -44,6 +44,8 @@ it.each([
     ['Status', (a, id, r) => a.update(id, r, { status: 'Review' })],
     ['Needs you', (a, id, r) => a.setNeedsYou(id, r, 'Verify this head')],
     ['clear Needs you', (a, id, r) => a.clearNeedsYou(id, r)],
+    ['wait for user', (a, id, r) => a.waitForUser(id, r, 'Approve this brief')],
+    ['resume from user', (a, id, r) => a.resumeFromUser(id, r, 'Shaping')],
     ['brief note', (a, id, r) => a.setBody(id, r, 'brief', 'Scope with a note')],
     ['skills', (a, id, r) => a.snapshotSkills(id, r, [])],
     ['branch', (a, id, r) => a.setBuildBranch(id, r, 'build/example')],
@@ -77,6 +79,27 @@ it.each([
         other.observe(record.workId, record.revision, { of: 'pr', state: 'open' });
         expect(() => write(agent, record.workId, record.revision)).not.toThrow();
         expect(records.observations(record.workId)[0]).toMatchObject({ state: 'open', subject: 'test/repo#2' });
+    },
+);
+
+it.each(['status', 'needsYou'] as const)(
+    'wait/resume reject concurrent %s changes without partial writes',
+    async (field) => {
+        for (const resume of [false, true]) {
+            const { records, other, record, agent } = await fixture();
+            const waiting = records.waitForUser(record.workId, record.revision, 'Approve this brief');
+            const changed =
+                field === 'status'
+                    ? other.update(record.workId, waiting.revision, { status: 'Review' })
+                    : other.setNeedsYou(record.workId, waiting.revision, 'Answer a different question');
+
+            expect(() =>
+                resume
+                    ? agent.resumeFromUser(record.workId, waiting.revision, 'Shaping')
+                    : agent.waitForUser(record.workId, waiting.revision, 'Approve this brief'),
+            ).toThrow(new RegExp(`conflicting fields: ${field}`));
+            expect(records.read(record.workId)).toEqual(changed);
+        }
     },
 );
 

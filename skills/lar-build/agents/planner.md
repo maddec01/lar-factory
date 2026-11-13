@@ -17,7 +17,7 @@ build's work ID and the repo path. `<lar-build>` is the installed skill folder h
 - Re-slicing a blocked slice (you also get its work ID): read it and its
   Needs you reason (`lar-work read`) and plan the work left. If it no longer
   carries a Needs you reason, another planner has it: write nothing; outcome
-  `not claimed`. Otherwise clear it (`lar-work clear-needs-you`), re-read the
+  `not claimed`. Otherwise clear it (`lar-work clear-needs-you <slice ID> --revision N --status "In progress"`), re-read the
   build's unfinished slices so you add no work already there, and re-slice per
   **Slices**; outcome `re-sliced`.
 - Work for another repository is never a slice: return it as

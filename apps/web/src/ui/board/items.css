@@ -56,6 +56,19 @@
     overflow-wrap: anywhere;
 }
 
+/* Keep Abandon's actions in one row where they fit. A narrow confirmation stacks its three choices together,
+   instead of stranding the primary action on a second row; Cancel remains first for safe focus. */
+#abandon-dialog {
+    overflow-wrap: anywhere;
+    container: abandon-confirmation / inline-size;
+}
+@container abandon-confirmation (width < 24rem) {
+    #abandon-dialog [data-slot='modal-footer']:has(> button:nth-of-type(3)) {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 /* The board's life (BoardLife.ts), on a read that moves things, never on the first paint. A row that changed lane slides
    the last few pixels into place from the side it came from and flashes the current navy wash, which fades over 1.2 s
    back to its own fill; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced

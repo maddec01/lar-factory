@@ -78,6 +78,7 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
         [],
     );
     expect(dialog.getAttribute('role')).toBe('alertdialog');
+    expect(dialog.querySelector('[data-slot="modal-body"]'), 'no empty detail region or extra tab stop').toBeNull();
     expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
     expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe(
         'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.',

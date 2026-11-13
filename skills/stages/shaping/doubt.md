@@ -2,64 +2,44 @@ Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTR
 
 # Doubt
 
-You try to disprove one lar brief before it is built. You get its exact
-`lar-work doubt-package <work ID>` output and repository paths, no conversation.
-Run `lar-work brief-scope-check <work ID>` first; report a mismatch or missing confirmation as an incomplete finding.
-Check its destination, current answers, sibling/overlapping briefs, declared
-files/contracts, blockers, Dependencies and release constraints together.
-Challenge cross-brief endpoint, hosting, redirect and CORS assumptions against
-code in each affected repository; unavailable evidence remains a gate finding. Read existing project instructions when present, its glossary and ADRs
-where available, and the code the brief's **Notes for the builder** names.
+Disprove the exact `lar-work doubt-package <work ID>` against each repository,
+never the shaping conversation. Read existing project instructions, glossary,
+relevant ADRs and the code named in Notes for the builder. Use supplied domain-doc
+setting/paths; missing evidence is not checked, never inferred approval.
+Run `lar-work brief-scope-check <work ID>` first; missing confirmation or drift
+is an incomplete finding. Check destination, current answers, siblings/overlaps,
+files/contracts, blockers, Dependencies and release constraints together. Challenge
+endpoint, hosting, redirect and CORS assumptions against code in every affected repo.
 
-By default, run no test suite, build, typecheck or lint. You may run the
-smallest command that settles a specific uncertainty reading cannot settle.
-Name that uncertainty in your report. Run each heavy command (a whole test
-suite, a production build, a performance measurement, or anything expected to
-take over about a minute) on its own as `lar-work heavy -- <command>`, in the
-foreground with your tool's longest timeout.
+Normally run no suite, build, typecheck or lint. Run only the smallest command
+needed to resolve a named uncertainty reading cannot settle. Follow the supplied
+orchestration guide for heavy commands and completion.
 
-Assume the author is overconfident. Hunt for:
+Check every category:
+- Wrong: verify claims about code, platform and current behavior against files.
+- Ambiguous: each Done when criterion has one observable interpretation.
+- Inconsistent: criteria, statuses and steps agree, including sibling contracts,
+  current decisions, blockers, Dependencies and release constraints.
+- Incomplete: cover error, empty, slow, cancelled and permission states; every
+  affected platform; migrations, deployment, existing data and choices otherwise
+  left to the builder.
+- Assumption: every relied-on assumption appears in Confirmed.
+- Repository: changes outside this repo belong to an authorized build there or
+  the owning team's Dependency, named in Notes for the builder.
+- Provider writes: reject progress in ticket bodies, comments, labels, tags or
+  Azure State. Only issue creation and whole gated Specs with Original follow
+  saved settings and verified Access; structural publication remains suspended.
+- Domain docs: OFF requires "none" and no drafts. ON requires each used term to
+  match existing language or be drafted with a canonical name, avoided synonyms
+  and a one- or two-sentence project definition, without implementation details.
+  ADRs state context, decision and reason and must be hard to reverse, surprising
+  without context AND a real trade-off. Contradicting an existing ADR requires
+  explicit supersession. Origin citations name published tickets or the build PR,
+  never work IDs/local paths. When draft structure is uncertain, read only the
+  [glossary](shared/glossary-format.md) or [ADR](shared/adr-format.md) format.
 
-- **Wrong**: a claim about the code, the platform or current behaviour that
-  the repo contradicts. Check each against the files.
-- **Ambiguous**: a **Done when** line two builders could read differently, or
-  a reviewer couldn't check by looking at the result.
-- **Inconsistent**: two **Done when** lines that contradict each other, or a
-  step that sets a Status or asks about work already Done by then. Check sibling
-  interfaces, current decisions, blockers, Dependencies and release constraints.
-- **Incomplete**: the error, empty, slow, cancelled and permission cases; every
-  platform the change reaches (web, Apple, server); migrations, deployment and
-  existing data; a decision the builder would have to make alone.
-- **Unstated assumptions**: anything the brief relies on that **Confirmed**
-  doesn't list.
-- **Repository**: anything the brief changes outside the repo path. That work
-  belongs in a build in that repository within the user's authorized scope, or in a
-  Dependency for the team that owns it, and **Notes for the builder** names
-  which one.
-- **Provider writes**: a step that writes factory progress to a ticket's body,
-  comments, labels, tags or Azure State. Issue creation, whole gated Specs with
-  Original follow saved settings and verified Access. Structural publication
-  remains suspended; progress stays in work records.
-- **Domain docs**: with the setting OFF, Domain docs says "none" and contains
-  no drafts. With it ON, every term the brief uses matches the glossary, or
-  **Domain docs** adds or changes it as a `glossary-format.md` entry. Nothing
-  contradicts an ADR without superseding it. Every ADR draft meets
-  these three conditions: hard to reverse, surprising without
-  context, the result of a real trade-off. A draft that cites its origin names
-  a published ticket or the build PR, never a work ID or local path.
-
-Use the supplied domain-doc setting and paths, not an authoring guide. Check
-terms define project concepts in one or two sentences, with one canonical name
-and avoided synonyms, without implementation details. ADRs state context,
-decision and reason; existing decisions are superseded explicitly. Read the
-[glossary](shared/glossary-format.md) or [ADR](shared/adr-format.md) format only
-when a draft's structure is uncertain. Return missing setting/evidence as
-not checked; never infer approval or write drafts yourself.
-
-Output: findings tied to the supplied brief/package revisions, for the owner
-to save with gate evidence. Report findings only; name each category a thorough pass found clean.
-
-Return:
+Return findings tied to the supplied brief/package revisions for the owner's
+gate evidence. Write no drafts. Name every category a thorough pass found clean.
 
 ```
 findings:
@@ -67,5 +47,5 @@ findings:
 clean:
 - <categories with no findings>
 not checked:
-- <anything you couldn't verify, and why>
+- <anything unverified and why>
 ```

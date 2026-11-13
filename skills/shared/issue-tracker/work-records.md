@@ -1,35 +1,24 @@
 # Work records
 
-Factory work lives in work records on the user's machine. A record holds the
-work's title, Status, structure, brief, map, decisions, threads and PR. Steps
-read and write records only through `lar-work` and the shared scripts.
-`lar-work --help` lists the commands; pass your last-read `--revision`. Unrelated changes reapply automatically; conflicts name the fields to reread and decide.
+Read/write factory progress only through `lar-work` and shared scripts in the
+supplied installation/data folder. Use command help for syntax and result fields.
+Pass your last-read revision. Unrelated changes reapply automatically; conflicts
+name fields to reread and reconsider. Records own queue, Status, structure,
+bodies, threads and delivery. Tickets hold issues, gated Specs and historical
+structure, not a backup of local progress.
 
-Work records are the source of truth for factory progress, including queue,
-Status and build progress. Tickets hold created issues, gated Specs and the
-historical structural projections. They are not a backup of local work records.
-
-Stage-event contract (not implemented): `lar-work record-stage ID --revision N --file F` stores stage inputs, outputs and wait/resume evidence; use existing bodies and thread references until available.
+Stage-event contract is unavailable: `record-stage ID --revision N --file F`.
+Keep stage inputs, outputs and wait/resume evidence in bodies/thread references
+until implemented.
 
 ## Picking
 
-A **work ID** names one record for its whole life. Work reaches the board through local capture or from the repository List.
-The configured GitHub issues or Azure DevOps team source supplies that List;
-there is no per-ticket import step. A source-backed record keeps its ticket
-reference and initial text
-(`lar-work context <work ID>`). That text is where shaping starts. A ticket
-already carrying Spec markers supplies its Original as initial context on a new
-machine, without restoring a local brief. Once this machine syncs a Spec, the
-ticket is the source of truth under [Ticket Specs](ticket-specs.md).
-
-Resolve a thread's argument, a work ID or a ticket (`owner/repo#12`, its issue
-URL, or an Azure work item URL), with
-`bash <this skill>/shared/scripts/work.sh <ref>`, which prints the record. For
-a ticket with no local record, use the repository List to add the work, then
-resolve it again. A thread uses the existing local identity instead of creating
-a duplicate record.
-
-Name the work ID in every handoff, delegated-task brief and thread message.
+Resolve a work ID or GitHub/Azure ticket reference with
+`bash <this skill>/shared/scripts/work.sh <ref>`. Reuse that identity throughout
+handoffs, delegated briefs and thread messages. If missing, use the repository List to add the ticket
+and resolve again; never create a duplicate. Read starting text with `context`.
+A marked ticket's Original supplies initial context on a new machine, not a
+restored local brief. After first Spec sync, follow [Ticket Specs](ticket-specs.md).
 
 ## Thread ownership
 
@@ -54,34 +43,28 @@ own role purposes, rather than claiming the parent's shaping or build stage.
 
 ## Status
 
-The statuses are List, Queued, Shaping, Needs you, Ready, In progress, Review,
-Verify, Ready to merge and Done. Move work with
-`bash <this skill>/shared/scripts/status.sh <work ID> "<Status>"` as the
-workflow directs. It writes only the record, then asks a running board to read
-it. It refuses Done, which completion decides, and a PR, which has no Status.
-Every wait on the user uses `lar-work set-needs-you ID --revision N --reason X`:
-Status and reason change together. Save the current Status before waiting; resume
-with `lar-work clear-needs-you ID --revision N --status "<saved Status>"`.
-`status.sh ID "Needs you" --reason X` uses the same command; moving out of Needs
-you through `status.sh` clears the reason in the same write.
+Use `bash <this skill>/shared/scripts/status.sh ID "<Status>"` as directed by
+the reached stage; it refreshes the board. Completion owns Done. A PR has no
+workflow Status. Never write factory progress to tracker fields or comments.
+Every wait uses `lar-work set-needs-you ID --revision N --reason X` to save reason
+and Needs you Status together. Save the current Status; resume atomically with
+`lar-work clear-needs-you ID --revision N --status "<saved Status>"`.
+`status.sh ID "Needs you" --reason X` uses the same command; moving out clears
+the reason in the same write.
 
-## Load only for the current operation
+## Operations
 
-- Creating a ticket: [Issue creation](issue-creation.md).
-- Reading, gating or publishing a ticket-backed brief: [Ticket Specs](ticket-specs.md).
-- Creating children or changing blockers: [Structure](structure.md).
-- Another repository or a Dependency: [Other repositories](other-repositories.md).
-- Checking refinement, delivery or blocker completion: [Completion](completion.md).
+Load only for the operation being performed:
+- Ticket creation: [Issue creation](issue-creation.md).
+- Ticket brief refresh/gate/publication: [Ticket Specs](ticket-specs.md).
+- Children/blockers: [Structure](structure.md).
+- Other repositories/Dependencies: [Other repositories](other-repositories.md).
+- Refinement/delivery/blocker completion: [Completion](completion.md).
 - Structural publication question: [Publication](publication.md).
-- Delivering a PR: [PR delivery](publication-pr.md).
-- Recovering a deleted thread: [Deleted threads](deleted-threads.md).
+- PR delivery: [PR delivery](publication-pr.md).
+- Deleted-thread recovery: [Deleted threads](deleted-threads.md).
 
-Factory structure stays local; Settings cannot resume structural publication.
-Explicit issue creation and ordinary gated Specs remain available.
-
-## Providers
-
-A repository's provider is its origin's host. Read GitHub tickets with the
-local `gh` login, and Azure DevOps work items per
-[Azure DevOps](azure-devops.md#azure-devops). A failed read leaves the record
-as it was.
+Structure stays local; Settings cannot resume its publication. Issue creation
+and ordinary gated Specs remain available. Determine provider from origin host:
+GitHub uses local `gh` login, Azure follows [Azure DevOps](azure-devops.md).
+A failed provider read preserves the record.

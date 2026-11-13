@@ -22,7 +22,8 @@ Send it through Gate again with new final confirmation before marking it Ready. 
   including final confirmation. Otherwise set **Ready** if it isn't and stop;
   report its readiness. [Gate](gate.md) owns the Ready handback.
 
-- Anything else: set Shaping. Delegate [Explore](#explore).
+- Anything else: set Shaping. Read local settings with `repo-config.sh` and
+  delegate [Explore](#explore) with the configured glossary/ADR paths.
 
 ## Explore
 

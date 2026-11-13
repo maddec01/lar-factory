@@ -9,7 +9,7 @@ Start the **Approver subagent** with [Approver](../agents/approver.md),
 `<lar-build>/project-rules.md`, the build's work ID, the repo path, every reviewer's final result,
 your rejected findings, the findings still
 open after round 2, the unreviewed fixes, the **Domain docs added by the
-build** list and the out-of-scope notes. An unreviewed fix is a round-2 fix;
+build** list, resolved domain-doc setting/paths and the out-of-scope notes. An unreviewed fix is a round-2 fix;
 list each as a line naming the finding, its severity and its reviewer. It opens
 the PR and returns a recommended status; the item stays in Review. Record the
 PR on the build (`lar-work set-pr <work ID> --revision N --pr <owner/repo#n>`)

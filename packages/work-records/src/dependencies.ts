@@ -6,6 +6,7 @@
 import { DEPENDENCY_OBSERVATION_KINDS, type DependencyObservationKind } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
 
+import { validateBlockers } from './blocker-graph.ts';
 import { WorkRecordError, type Database } from './database.ts';
 
 export { DEPENDENCY_OBSERVATION_KINDS, type DependencyObservationKind };
@@ -536,6 +537,7 @@ export function dependencyRecords(
 
                     bump(dependent);
                 }
+                validateBlockers(db);
                 deleteBlocks.run(dependencyId);
                 bump(buildId);
 

@@ -2,6 +2,8 @@ Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
 
 # Prototype
 
+Input: one look, interaction or state question. Output: variant references and user pick saved in Confirmed/answer with the branch in builder notes.
+
 A prototype is **throwaway code that answers a question**. The question decides the shape.
 
 ## Pick a branch

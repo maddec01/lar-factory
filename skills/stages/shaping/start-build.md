@@ -1,12 +1,13 @@
 # Start a build later
 
+Input: approved brief and saved eligibility facts. Output: board-recorded launch intent/thread or exact refusal; agents do not duplicate the launch.
+
 Reshape keeps the brief text and requires a new passing gate before Ready.
 
 Shaping marks Ready after a passing gate. A later agent edit to the local brief
 needs a fresh gate. Trusted tracker edits keep Status; a details Save records
 the user's approval of that exact Spec. Concept refinement is independent of
-delivery. The user's Start build on a child needs only the child's own gate and
-blockers, whatever the parent's Refinement result.
+delivery. Group readiness uses the shared eligibility contract below.
 
 The board's **Start build** on a Ready build is the user's Go. The exception is
 **Auto-build**. With this machine's Auto-build switch on, the board starts
@@ -40,3 +41,5 @@ project in T3. Start build:
    thread on the build. The branch starts from the fetched remote tip, whatever
    the local default branch holds, and has no upstream. The board then applies
    the machine's Shaping thread cleanup setting to the item's shaping threads.
+
+Eligibility/capacity and group-run contracts (not implemented): `lar-work prepare-build ID --revision N` and `lar-work set-build-run ID --revision N --state running|paused`; do not simulate reservations or scheduling in prose.

@@ -1,5 +1,7 @@
 Ported from mattpocock/skills (skills/engineering/research); see UPSTREAM.md.
 
+
+Input: factual question and repository. Output: findings branch and sources saved in the decision answer or brief references.
 Spin up a **background agent** to do the research, so you keep working while it reads.
 
 Its job:

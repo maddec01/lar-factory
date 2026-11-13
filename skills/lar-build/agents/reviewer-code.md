@@ -2,10 +2,7 @@
 
 `<lar-build>` is this file's parent folder's parent.
 
-You review one lar change. You get the build's work ID, the repo path and a
-diff command. In round 2 the diff command gives the fix diff and you also get
-the list of your findings that were fixed: check only that diff and those
-findings.
+Read [Review input and result](review-result.md).
 
 Follow `<lar-build>/skills/code-review/SKILL.md` over the diff, with
 `<lar-build>/coding-style.md`, existing project instructions when present and the project skills
@@ -34,15 +31,7 @@ leave the worktree as you found it. These Overrides replace parts of that Copy:
 Follow `project-rules.md#reviewer-checks` for validation-record reads and
 permitted broad checks.
 
-Return:
-
-```
-verdict: approve | changes
-findings:
-- [blocker|should|nit] path:line: problem. Fix: <suggestion>. Confidence: high|medium|low
-not checked:
-- <anything you couldn't verify, and why>
-escalations: [{"reviewer":"<skipped reviewer ID>","requestedBy":"code","reason":"<change it covers>"}]
-```
-
-Given the selection, request skipped reviewers whose remit the change needs (e.g. auth behind a neutral name); use `[]` when none, and never request a reviewer set to `never`.
+Return the shared review result, plus
+`escalations: [{"reviewer":"<skipped reviewer ID>","requestedBy":"code","reason":"<change it covers>"}]`.
+Request skipped reviewers whose remit the change needs; use `[]` when none.
+Never request a reviewer set to `never`.

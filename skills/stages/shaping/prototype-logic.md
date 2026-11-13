@@ -2,6 +2,8 @@ Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
 
 # Logic Prototype
 
+Input: isolated logic/state question. Output: HTML variants and branch for the owner to record with the accepted pick.
+
 A single, self-contained HTML file (a **shareable demo**) that lets anyone drive a state model by clicking buttons. Use this when the question is about **business logic, state transitions, or data shape**: the kind of thing that looks reasonable on paper but only feels wrong once you push it through real cases.
 
 Use domain language so a non-developer can drive the model inside T3.

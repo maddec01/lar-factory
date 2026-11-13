@@ -1,5 +1,8 @@
 # Question UI
 
+Input: unresolved choice, prior answers and resume Status. Output: saved question
+and answer (digest-bound gate evidence for approval), or an explicit wait.
+
 Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
 shows the thread as waiting for an unresolved decision: grilling rounds, the prototype pick,
 Size up confirmation, final brief approval, Gate assumptions, Doubt findings, Concepts,

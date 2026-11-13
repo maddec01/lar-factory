@@ -32,7 +32,7 @@ and board-recorded approval, or a Needs you wait.
    affected briefs and save the map. Rerun Doubt and approval for changed packages.
 5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.
-   Builds wait for Start build, or enabled Auto-build after concept refinement.
+   Starting later follows [Start build](start-build.md); a gate alone launches nothing.
 
 After group scope changes or board approval (single/batch), resume
 [Reconcile group](shared/reconcile-group.md).

@@ -66,4 +66,3 @@ Anything the user adds or corrects is another open question. Then:
 - **No open questions**: write the brief.
 - **Too big or unclear for one session**: [Concepts](concepts.md).
   Keep the command's cross-repository structure choice; size alone does not turn settled linked work into a concept.
-

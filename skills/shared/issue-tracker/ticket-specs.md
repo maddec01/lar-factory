@@ -45,4 +45,3 @@ the main description and Original collapsed. A ticket without factory markers
 keeps its ordinary display; removing markers from an active Spec makes the whole
 description count as Spec. Before the first Spec, or with its setting OFF,
 ticket edits do not replace local briefs.
-

@@ -35,4 +35,3 @@ and run link (or "merge conflict") and the CI fixer's report,
 `unwatch_pull_request`, and ask how to go on (rerun the job, start a CI
 fixer, or stop). When they answer, set **Review**, do it, `watch_pull_request`
 and restart **Checks**. If they say stop, set **Needs you** and end the turn.
-

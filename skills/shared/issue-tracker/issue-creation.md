@@ -45,4 +45,3 @@ the separate retro default, keeping failed captures local for later conversion.
 
 Every card, row and item details shows its source, using the GitHub or Azure mark
 for tickets and a laptop for local work. Conversion updates that source.
-

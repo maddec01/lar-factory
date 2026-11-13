@@ -22,4 +22,3 @@ and run [Gate](../gate.md), including fresh Doubt and explicit approval.
 Resume this build's saved phase only after its corrected digest passes; preserve
 its branch and PR. A gate does not launch another build. Keep the starting input
 and the approved correction distinct in the handoff.
-

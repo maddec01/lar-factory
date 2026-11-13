@@ -185,6 +185,11 @@ dependent `{workId,revision,action,reason}`; action is `remove`, `hold` or
 `replace` (also `blockerId,blockerRevision`). A stale record aborts all writes.
 Use `set-aside-history ID` for the retained reasons.
 
+Merge proposed builds with `lar-work merge-build ID --revision N --file F`.
+F is `{into,revisions:{ID:N},dependencyRevisions:{ID:N}}`: read the survivor,
+parent, edge endpoints and held Dependencies first. It absorbs acceptance and
+context, redirects blockers and requires a fresh gate; it never records a PR merge.
+
 ## Other repositories
 
 Route each part of the work that another repository needs by that repository.

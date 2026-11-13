@@ -171,6 +171,9 @@ Changes
                                     A failed create leaves the record local.
   retitle <work ID> --revision N --title X
   title-history <work ID>
+  merge-build <work-id> --revision N --file F
+                                    F: {into,revisions:{ID:N},dependencyRevisions?:{ID:N}}
+                                    Revisions cover survivor, edge endpoints and parent.
   set-aside <work-id> --revision N [--file F]
                                     Resolve every dependent atomically. F is JSON:
                                     [{workId,revision,action,reason,blockerId?,blockerRevision?}]
@@ -425,6 +428,7 @@ const TAKES_WORK_ID = [
     'attach-ticket',
     'retitle',
     'title-history',
+    'merge-build',
     'set-aside',
     'set-aside-history',
     'restore',
@@ -778,6 +782,12 @@ async function run(
             return records.retitle(workId!, revision(), need(values, 'title'));
         case 'title-history':
             return records.titleHistory(workId!);
+        case 'merge-build':
+            return records.mergeBuild(
+                workId!,
+                revision(),
+                readJson(values, 'proposed build merge') as Parameters<WorkRecords['mergeBuild']>[2],
+            );
         case 'set-aside':
             return records.setAside(
                 workId!,

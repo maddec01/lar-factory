@@ -6,6 +6,7 @@ import { workOrder } from './work-order.ts';
 import type { WorkRecords } from './work-records.ts';
 
 export interface ConceptRunRecords {
+    reconcileConceptBuildRuns(): void;
     conceptBuildPlan(workId: string): ConceptBuildPlan;
     setConceptBuildRun(workId: string, revision: number, state: 'running' | 'paused'): ConceptBuildPlan;
 }
@@ -138,6 +139,35 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
     };
 
     return {
+        reconcileConceptBuildRuns() {
+            const changed = database.read(() =>
+                db
+                    .prepare(
+                        `SELECT work_id FROM concept_build_runs WHERE json_extract(content, '$.state') = 'running'`,
+                    )
+                    .all()
+                    .map((row) => String(row.work_id))
+                    .filter((id) => plan(id).run?.state === 'paused'),
+            );
+
+            if (!changed.length) return;
+
+            database.write(() => {
+                for (const id of changed) {
+                    const current = plan(id).run;
+
+                    if (current?.state !== 'paused') continue;
+
+                    const row = db.prepare('SELECT content FROM concept_build_runs WHERE work_id=?').get(id)!;
+                    const saved = JSON.parse(String(row.content)) as SavedRun;
+
+                    db.prepare('UPDATE concept_build_runs SET content=? WHERE work_id=?').run(
+                        JSON.stringify({ ...saved, ...current, pausedAt: new Date().toISOString() }),
+                        id,
+                    );
+                }
+            });
+        },
         conceptBuildPlan: (workId) => database.read(() => plan(workId)),
         setConceptBuildRun: (workId, revision, state) =>
             database.write(() => {

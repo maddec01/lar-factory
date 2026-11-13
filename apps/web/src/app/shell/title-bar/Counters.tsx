@@ -50,7 +50,6 @@ export function Counters() {
         unavailable,
         usageStillLoading,
     );
-    const free = limit === undefined ? undefined : limit - building.length;
     const glyph = (status: Status) => (
         <StatusGlyph status={status} running={status === 'In progress' && builds.running > 0} />
     );
@@ -125,13 +124,11 @@ export function Counters() {
                 value={countOf(building.length)}
                 {...(limit !== undefined && { track: { used: building.length, limit } })}
                 hint={hintFor(building.length, builds.text)}
-                detail={limit === undefined ? undefined : `Automatic limit ${limit}`}
+                detail={limit === undefined ? undefined : `Shared limit ${limit}`}
                 foot={
-                    reading || free === undefined
+                    reading
                         ? undefined
-                        : free > 0
-                          ? 'Manual starts and Start after may exceed the automatic build limit.'
-                          : 'Manual starts and Start after may exceed the automatic build limit.'
+                        : 'Concept builds, manual starts, Start after and Auto-build share this limit. At capacity, manual starts are refused; scheduled starts wait for a slot.'
                 }
             >
                 {listOf(building, 'Nothing building right now.')}

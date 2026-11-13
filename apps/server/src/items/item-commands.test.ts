@@ -83,6 +83,22 @@ async function openRecords(): Promise<WorkRecords> {
     return records;
 }
 
+/** These launch tests start from a genuinely approved brief. */
+function approveBuild(records: WorkRecords, id: string) {
+    if (!records.body(id, 'brief')) records.setBody(id, records.read(id).revision, 'brief', 'Exact test build.');
+
+    records.recordGate(id, records.read(id).revision, {
+        briefDigest: records.gate(id).briefDigest!,
+        approvedBy: 'test',
+        evidence: 'Approved fixture.',
+    });
+}
+
+function refineConcept(records: WorkRecords, id: string) {
+    records.setFogGone(id, records.read(id).revision, true);
+    records.setBody(id, records.read(id).revision, 'map', 'Approved destination.');
+}
+
 for (const operation of ['push-branch', 'open-pr'] as const)
     for (const state of ['refused', 'unverified'] as const) {
         test(`${state} ${operation} prevents a build intent while read-only shaping still works`, async () => {
@@ -138,6 +154,7 @@ test('a failed fetch refuses Start build with its error and writes nothing, then
         approvedBy: 'Pedro',
         evidence: 'Doubt clean; approved.',
     });
+    refineConcept(records, concept.workId);
 
     const before = records.read(build.workId);
     let offline = true;
@@ -179,6 +196,9 @@ test("Start build marks the refusals that pass by themselves, a project or defau
         status: 'Ready',
         ticket: `${WEB}#7`,
     }).record;
+
+    approveBuild(records, build.workId);
+
     const failing: [string, Partial<ItemCommandsDeps>][] = [
         [
             'T3 has no project for this repository.',
@@ -553,7 +573,10 @@ async function closedPrBuild({
 } = {}) {
     const records = await openRecords();
     const created = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Review' });
-    let record = records.setPullRequest(created.workId, created.revision, `${WEB}#40`);
+
+    approveBuild(records, created.workId);
+
+    let record = records.setPullRequest(created.workId, records.read(created.workId).revision, `${WEB}#40`);
 
     record = records.addThread(created.workId, record.revision, 'thread-0', 'build');
     record = records.observe(created.workId, record.revision, { of: 'pr', state: 'closed' });
@@ -635,7 +658,10 @@ test('Start again on a no-thread notice stays out of Needs you, so only a starte
 async function noThreadWork(purpose: 'shape' | 'build', status: Status = purpose === 'build' ? 'Ready' : 'Queued') {
     const records = await openRecords();
     const work = records.create({ title: 'Work', repository: WEB, kind: 'build', status });
-    const { record, intent } = records.recordLaunchIntent(work.workId, work.revision, purpose);
+
+    if (purpose === 'build') approveBuild(records, work.workId);
+
+    const { record, intent } = records.recordLaunchIntent(work.workId, records.read(work.workId).revision, purpose);
     const failed = records.resolveLaunchIntent(work.workId, record.revision, intent.intentId, {
         failure: NO_THREAD,
     }).record;
@@ -1398,8 +1424,16 @@ test("Start build moves the build's concept record to In progress and writes no 
 
     records.setParent(decision.workId, decision.revision, concept.workId);
 
+    approveBuild(records, build.workId);
+    refineConcept(records, concept.workId);
+
     const { commands, log } = commandsOn([], undefined, records);
 
+    assert.equal((await commands.startBuild(build.workId, undefined)).status, 409);
+    assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
+    records.setBody(decision.workId, records.read(decision.workId).revision, 'answer', 'Settled.');
+    records.setBody(decision.workId, records.read(decision.workId).revision, 'domain-drafts', 'None.');
+    refineConcept(records, concept.workId);
     assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
     assert.equal(records.read(concept.workId).status, 'In progress');
     assert.ok(
@@ -1428,6 +1462,10 @@ test("Start build and Abandon write at the revision the board's own observations
     });
 
     const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', ticket: `${WEB}#41` });
+
+    approveBuild(records, build.workId);
+    refineConcept(records, concept.workId);
+
     let showObservations = () => {};
     // An observation pass commits while the build starts, and the board shows it some turns later.
     const observe = (workId: string) =>
@@ -1695,7 +1733,8 @@ async function shapedBuild() {
     const records = await openRecords();
     const made = records.create({ title: 'Build it', repository: WEB, kind: 'feature', status: 'Ready' });
 
-    records.addThread(made.workId, made.revision, 'shape-1', 'shape');
+    approveBuild(records, made.workId);
+    records.addThread(made.workId, records.read(made.workId).revision, 'shape-1', 'shape');
 
     return { records, workId: made.workId };
 }
@@ -1983,6 +2022,9 @@ test('a completed Ready shaping gate never resumes shaping even if its old threa
 test("Start build snapshots the repository's selected project skills on the record and names the work ID", async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Fix login', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
     const { commands, started } = recordedCommands(records, { skills: ['code-review', 'web-deploy'] });
 
     assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
@@ -2244,6 +2286,8 @@ test('Start again preserves launch intents and continues a deleted build on its 
     records.addThread(work.workId, records.read(work.workId).revision, 'deleted-build', 'build');
     records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
 
+    approveBuild(records, work.workId);
+
     const { board, commands, bases, branches } = commandsOn([], undefined, records);
     const item = board.find(work.workId)!;
 
@@ -2279,6 +2323,9 @@ test('Start again on a new branch starts from the fetched commit, and continuing
     records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
 
     const fetched: string[] = [];
+
+    approveBuild(records, work.workId);
+
     const { board, commands, bases } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
         fetchBase: async (_project, branch) => {
             fetched.push(branch);
@@ -2555,6 +2602,9 @@ test('T3 answering moves Queued work to Shaping and Ready work to In progress, a
     const records = await openRecords();
     const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Queued' });
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
     const { commands, board } = recordedCommands(records);
     const pushed: Status[] = [];
 
@@ -2651,6 +2701,9 @@ test("an unresolved start no longer running shows May have started, keeps today'
 test('a duplicate Start build after the move refuses with the running owner', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
     const { commands, started } = recordedCommands(records);
 
     await commands.startBuild(build.workId, undefined);
@@ -2665,6 +2718,9 @@ test('a duplicate Start build after the move refuses with the running owner', as
 test('a moved build whose thread stops before a phase offers a retry on a retry branch', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
     const { commands, started, board, reread } = recordedCommands(records, {
         shown: (ids) =>
             ids.map((id) => ({
@@ -2691,6 +2747,9 @@ test('a moved build whose thread stops before a phase offers a retry on a retry 
 test('a build that recorded a phase is not retried from In progress', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
     const { commands, started, reread } = recordedCommands(records, {
         shown: (ids) =>
             ids.map((id) => ({
@@ -2755,6 +2814,9 @@ for (const kind of ['issue', 'concept', 'decision', 'build'] as const)
             status: kind === 'build' ? 'Ready' : 'Queued',
             ticket: `${WEB}#5`,
         }).record;
+
+        if (kind === 'build') approveBuild(records, record.workId);
+
         const settings = defaultFactorySettings();
 
         settings.threadKinds[kind === 'issue' ? 'shaping' : kind] = {
@@ -2916,6 +2978,9 @@ test('decision-authored drafts cannot launch through a forged Ready status', asy
         blockerIds: [],
     });
     const ready = records.update(build.workId, build.revision, { status: 'Ready' });
+
+    refineConcept(records, concept.workId);
+
     const { commands, log } = commandsOn([], undefined, records);
     const refused = await commands.startBuild(build.workId, undefined);
 
@@ -2971,4 +3036,79 @@ test('concept run action refuses all holds and stale revisions, then saves start
     assert.equal(commands.setConceptBuildRun(group.workId, rev(group.workId), 'paused').status, 200);
     assert.equal(records.conceptBuildPlan(group.workId).run?.state, 'paused');
     assert.deepEqual(log, []);
+});
+
+test('two boards share one atomic capacity claim, and independent same-repository builds can use two slots', async () => {
+    for (const limit of [1, 2]) {
+        const records = await openRecords();
+        const a = records.create({ title: 'A', repository: WEB, kind: 'build', status: 'Ready' }).workId;
+        const b = records.create({ title: 'B', repository: WEB, kind: 'build', status: 'Ready' }).workId;
+
+        for (const id of [a, b]) approveBuild(records, id);
+
+        const first = commandsOn([], undefined, records);
+        const second = commandsOn([], undefined, records);
+
+        for (const { board } of [first, second]) board.update({ buildLimit: { limit, automatic: limit } });
+
+        const results = await Promise.all([
+            first.commands.startBuild(a, undefined),
+            second.commands.startBuild(b, undefined),
+        ]);
+
+        assert.equal(results.filter((result) => result.status === 200).length, limit);
+        assert.equal(records.launchIntents({}).length, limit);
+        assert.equal(
+            first.log.filter((line) => line.startsWith('start')).length +
+                second.log.filter((line) => line.startsWith('start')).length,
+            limit,
+        );
+    }
+});
+
+test('a gate changed during asynchronous preparation cannot launch a different approved brief', async () => {
+    const records = await openRecords();
+    const build = records.create({ title: 'Exact gate', repository: WEB, kind: 'build', status: 'Ready' }).workId;
+
+    approveBuild(records, build);
+
+    const { commands, log } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
+        fetchBase: async () => {
+            records.setBody(build, records.read(build).revision, 'brief', 'Different approved scope.');
+            approveBuild(records, build);
+
+            return 'release-tip';
+        },
+    });
+    const result = await commands.startBuild(build, undefined);
+
+    assert.equal(result.status, 409);
+    assert.match((result.body as StartResult).error!, /approved brief changed/);
+    assert.deepEqual(log, []);
+    assert.deepEqual(records.launchIntents({}), []);
+});
+
+test('a concept paused during preparation cannot claim or launch a future build', async () => {
+    const records = await openRecords();
+    const group = records.create({ title: 'Concept', repository: WEB, kind: 'concept' }).workId;
+    const build = records.create({ title: 'Part', repository: WEB, kind: 'build', status: 'Ready' }).workId;
+
+    records.setParent(build, records.read(build).revision, group);
+    approveBuild(records, build);
+    refineConcept(records, group);
+    records.setConceptBuildRun(group, records.read(group).revision, 'running');
+
+    const { commands, log } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
+        fetchBase: async () => {
+            records.setConceptBuildRun(group, records.read(group).revision, 'paused');
+
+            return 'release-tip';
+        },
+    });
+    const result = await commands.startBuild(build, undefined, undefined, true, { conceptId: group });
+
+    assert.equal(result.status, 409);
+    assert.match((result.body as StartResult).error!, /paused/);
+    assert.deepEqual(log, []);
+    assert.deepEqual(records.launchIntents({}), []);
 });

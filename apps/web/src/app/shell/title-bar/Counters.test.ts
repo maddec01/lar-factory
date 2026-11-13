@@ -114,7 +114,7 @@ test('a build counts while its start is in flight or in Review, and the count sh
     await mountPage(moved('I_sample14', 'Review', started));
     expect(value(counter('building'))).toBe('5');
     expect(nameOf(counter('building'))).toBe(
-        'building: 5 builds open · automatic limit 1: 2 working, 1 starting, 1 waiting to close, 1 run stopped',
+        'building: 5 builds open · shared limit 1: 2 working, 1 starting, 1 waiting to close, 1 run stopped',
     );
 });
 
@@ -125,7 +125,7 @@ test('a concept in progress is no build at work', async () => {
     const pop = await openCounter('building');
 
     expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');
-    expect(head(pop)).toBe('Building4Automatic limit 2');
+    expect(head(pop)).toBe('Building4Shared limit 2');
 });
 
 test('an item waiting on you during shaping counts in both need you and shaping', async () => {
@@ -216,7 +216,7 @@ test('while the first read could add items, a count with none is a dash, one wit
 
     const building = await openCounter('building');
 
-    expect(head(building), 'no zero claimed in the panel either').toBe('BuildingAutomatic limit 2');
+    expect(head(building), 'no zero claimed in the panel either').toBe('BuildingShared limit 2');
     expect(building.querySelector('[data-slot="popover-header"] [style]'), 'no empty limit bars').toBeNull();
     await close();
     await push({ ...data, items: [], firstRead });

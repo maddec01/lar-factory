@@ -12,6 +12,7 @@ import { recordItems } from '../items/record-items.ts';
 import { HOLD_RETRY_MS, createAutoBuild } from './auto-build.ts';
 
 const REPO = 'maddec01/lar-factory';
+const OTHER = 'maddec01/lar-other';
 const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-5-5' };
 const OFFERED: ModelGroup[] = [
     { instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }] },
@@ -42,8 +43,8 @@ function gate(records: WorkRecords, workId: string): void {
 }
 
 /** A Ready build with a brief; `gated` false leaves its gate unpassed. */
-function ready(records: WorkRecords, title: string, gated = true): string {
-    const { workId } = records.create({ title, repository: REPO, kind: 'build', status: 'Ready' });
+function ready(records: WorkRecords, title: string, gated = true, repository = REPO): string {
+    const { workId } = records.create({ title, repository, kind: 'build', status: 'Ready' });
 
     records.setBody(workId, at(records, workId), 'brief', `Build ${title}.`);
 
@@ -83,7 +84,7 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
         });
 
     const board = createBoardState({
-        items: recordItems(records, [], [REPO]),
+        items: recordItems(records, [], [REPO, OTHER]),
         repos: [],
         t3Availability: { availability: 'available' },
     } as unknown as BoardData);
@@ -97,7 +98,7 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
         limit: 10,
         choices: OFFERED,
         clock: 0,
-        reread: () => board.applyRead(recordItems(records, [], [REPO]), board.revision(), (items) => items),
+        reread: () => board.applyRead(recordItems(records, [], [REPO, OTHER]), board.revision(), (items) => items),
         pass: () => autoBuild.pass(),
         stop: () => autoBuild.release(),
     };
@@ -229,14 +230,14 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
         [
             'T3 unreachable',
             (s) => s.board.update({ t3Availability: { availability: 'unavailable' } }),
-            "Auto-build waits for T3, which the board can't reach.",
+            "Builds wait for T3, which the board can't reach.",
         ],
         [
             'model choices unreadable',
             (s) => {
                 s.choices = [];
             },
-            "Auto-build waits for T3's model choices, which the board can't read.",
+            "Builds wait for T3's model choices, which the board can't read.",
         ],
         [
             'saved model no longer offered',
@@ -491,4 +492,69 @@ test('Auto-build checks each build again just before it starts it', async () => 
     s.reread();
     await s.pass();
     assert.deepEqual([s.started, pass(s)?.wouldStart, pass(s)?.paused], [[first], 0, {}]);
+});
+
+function concept(s: SetUp) {
+    const { records } = s;
+    const group = records.create({ title: 'Deliver concept', repository: REPO, kind: 'concept' }).workId;
+    const a = ready(records, 'A');
+    const b = ready(records, 'B', true, OTHER);
+    const next = ready(records, 'After A');
+
+    for (const id of [a, b, next]) records.setParent(id, at(records, id), group);
+    records.addBlocker(next, at(records, next), a);
+    records.setFogGone(group, at(records, group), true);
+    records.setBody(group, at(records, group), 'map', 'Approved destination.');
+    records.setConceptBuildRun(group, at(records, group), 'running');
+
+    return { group, a, b, next };
+}
+
+test('an explicitly started concept runs independent repositories with Auto-build off and leaves standalone work alone', async () => {
+    const s = await setUp();
+    const standalone = ready(s.records, 'Standalone');
+    const { a, b, next } = concept(s);
+
+    s.auto.on = false;
+    s.limit = 2;
+    s.reread();
+    await s.pass();
+    assert.deepEqual(s.started, [a, b]);
+    assert.equal(s.records.read(next).status, 'Ready');
+    assert.equal(s.records.read(standalone).status, 'Ready');
+    await s.stop();
+});
+
+test('running concepts and automatic standalone builds compete by gate age for one capacity', async () => {
+    const s = await setUp();
+    const standalone = ready(s.records, 'Older standalone');
+    const { a, b } = concept(s);
+
+    s.limit = 2;
+    s.reread();
+    await s.pass();
+    assert.deepEqual(s.started, [standalone, a]);
+    s.records.update(standalone, at(s.records, standalone), { status: 'Ready to merge' });
+    s.reread();
+    await s.pass();
+    assert.deepEqual(s.started, [standalone, a, b]);
+    await s.stop();
+});
+
+test('Pause overrides Auto-build and scope changes durably pause future starts', async () => {
+    const s = await setUp();
+    const { group } = concept(s);
+
+    s.records.setConceptBuildRun(group, at(s.records, group), 'paused');
+    s.reread();
+    await s.pass();
+    assert.deepEqual(s.started, []);
+    s.records.setConceptBuildRun(group, at(s.records, group), 'running');
+    s.records.setBody(group, at(s.records, group), 'map', 'Changed destination.');
+    s.reread();
+    await s.pass();
+    s.records.setBody(group, at(s.records, group), 'map', 'Approved destination.');
+    assert.equal(s.records.conceptBuildPlan(group).run?.state, 'paused');
+    assert.deepEqual(s.started, []);
+    await s.stop();
 });

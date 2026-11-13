@@ -153,23 +153,35 @@ test('Build’s header counts the factory’s builds against the automatic build
 
     const header = $('[data-stage="build"] header .build-limit')!;
 
-    expect(text(header), 'In progress and Review count').toBe('4 open · limit 2');
+    expect(text(header), 'In progress and Review count').toBe('4 of 2 building');
+    expect(text($('[data-ready-build-controls]'))).toContain('4 of 2 building');
+    expect(header.getAttribute('title')).toContain(
+        'At capacity, manual starts are refused; scheduled starts wait for a slot.',
+    );
+    expect(header.getAttribute('title')).not.toContain('exceed');
     expect(header.querySelectorAll('.bar')).toHaveLength(4);
     expect(header.getAttribute('title')).toContain('2 working, 1 waiting to close, 1 run stopped');
     expect(iconConcept(row('I_sample15').querySelector('[data-glyph]')!, conceptIcons)).toBe('stopped');
     await receive(withItem('I_sample09', { status: 'In progress' }, limited));
-    expect(text($('.build-limit')), 'a concept in progress is no build at work').toBe('4 open · limit 2');
+    expect(text($('[data-stage="build"] .build-limit')), 'a concept in progress is no build at work').toBe(
+        '4 of 2 building',
+    );
     await receive({
         ...limited,
         items: sample.items.map((i) =>
             ['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Done' as const } : i,
         ),
     });
-    expect(text($('.build-limit'))).toBe('2 open · limit 2');
+    expect(text($('[data-stage="build"] .build-limit'))).toBe('2 of 2 building');
     await receive({ ...limited, buildLimit: { limit: 4, automatic: 2 } });
-    expect([text($('.build-limit')), $$('.build-limit .bar').length]).toEqual(['4 open · limit 4', 4]);
+    expect([text($('[data-stage="build"] .build-limit')), $$('[data-stage="build"] .build-limit .bar').length]).toEqual(
+        ['4 of 4 building', 4],
+    );
     await receive({ ...sample, buildLimit: undefined });
-    expect([text($('.build-limit')), $$('.build-limit .bar').length], 'no limit reported').toEqual(['4 open', 0]);
+    expect(
+        [text($('[data-stage="build"] .build-limit')), $$('[data-stage="build"] .build-limit .bar').length],
+        'no limit reported',
+    ).toEqual(['4 building', 0]);
 });
 
 test('scoped to a repository whose items haven’t landed yet, the main area says it’s reading instead of an empty desk and panes', async () => {

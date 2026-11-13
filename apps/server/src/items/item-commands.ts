@@ -51,6 +51,7 @@ import { executionMismatch } from '@lar-factory/shared/execution-target';
 import {
     readShapingThreadCleanup,
     WorkRecordError,
+    type BuildPreparation,
     type LaunchIntent,
     type PullRequestState,
     type SavedShapingThreadCleanup,
@@ -82,6 +83,7 @@ import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { fetchBaseCommit } from './base-commit.ts';
+import { buildPreparation, type BuildStartSource } from './build-preparation.ts';
 import { importPickedTicket } from './import-ticket.ts';
 import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
@@ -129,7 +131,13 @@ export interface ItemCommands {
     inspectRecovery(itemId: string): Promise<Reply>;
     startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
     setConceptBuildRun(itemId: string, revision: unknown, state: unknown): Reply;
-    startBuild(itemId: string, model: unknown, drift?: unknown, quiet?: boolean): Promise<Reply>;
+    startBuild(
+        itemId: string,
+        model: unknown,
+        drift?: unknown,
+        quiet?: boolean,
+        source?: BuildStartSource,
+    ): Promise<Reply>;
     /** Clears the refused or failed start the item shows for `purpose`, on every page. */
     dismissStartError(itemId: string, purpose: unknown): Reply;
     /**
@@ -992,6 +1000,7 @@ export function createItemCommands({
         prepare: () => void = () => {},
         recovery = false,
         stagedRecovery?: { branch: string; reset: boolean; message?: string },
+        preparation?: BuildPreparation,
     ): Promise<Start> {
         if (!records) return ask(message, choice);
 
@@ -1021,6 +1030,18 @@ export function createItemCommands({
                 refused: true,
             };
 
+        if (record === 'startedBuilds') {
+            preparation ??= { ...buildPreparation(board.snapshot()), recovery };
+
+            try {
+                const input = records.buildReadiness(item.id, preparation);
+
+                preparation.expectedGateId ??= input.gate.gateId;
+            } catch (error) {
+                return { thread: null, error: (error as Error).message, refused: true, hold: true };
+            }
+        }
+
         let run: Awaited<ReturnType<typeof prepareRunLaunch>> | undefined;
 
         if (factoryContext) {
@@ -1046,12 +1067,35 @@ export function createItemCommands({
             }
         }
 
-        prepare();
-
         const cleanup = record === 'startedBuilds' ? savedShapingThreadCleanup() : undefined;
-        const { intent } = write(item.id, (revision) =>
-            records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery, cleanup),
-        );
+        let intent: LaunchIntent;
+
+        try {
+            prepare();
+            ({ intent } = write(item.id, (revision) =>
+                preparation
+                    ? records.prepareBuild(
+                          item.id,
+                          revision,
+                          {
+                              ...preparation,
+                              ...buildPreparation(board.snapshot()),
+                              automatic: preparation.automatic,
+                              conceptId: preparation.conceptId,
+                          },
+                          stagedRecovery,
+                          cleanup,
+                      )
+                    : records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery, cleanup),
+            ));
+        } catch (error) {
+            reread();
+
+            return { thread: null, error: (error as Error).message, refused: true, hold: true };
+        }
+
+        if (intent.buildInput)
+            message += `\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(intent.buildInput)}`;
 
         if (run)
             records.startRoleRun(item.id, records.read(item.id).revision, {
@@ -2003,7 +2047,7 @@ export function createItemCommands({
             }
         },
 
-        startBuild: (itemId, model, drift, quiet = false) =>
+        startBuild: (itemId, model, drift, quiet = false, source) =>
             press('startedBuilds', itemId, quiet, () =>
                 startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
                     if (records) {
@@ -2061,6 +2105,22 @@ export function createItemCommands({
                     )
                         return withBoard(409, { error: LIVE_SHAPING, hold: true });
 
+                    let expectedGateId: string | undefined;
+
+                    if (
+                        records &&
+                        !records
+                            .launchIntents({ workId: item.id, unresolved: true })
+                            .some((intent) => intent.purpose === 'build')
+                    ) {
+                        try {
+                            expectedGateId = records.buildReadiness(item.id, buildPreparation(board.snapshot(), source))
+                                .gate.gateId;
+                        } catch (error) {
+                            return withBoard(409, { error: (error as Error).message, hold: true });
+                        }
+                    }
+
                     const previous = board.snapshot().startedBuilds?.[itemId];
                     const retry =
                         retryBuilds.has(itemId) ||
@@ -2076,20 +2136,6 @@ export function createItemCommands({
                         if (records) {
                             await refreshSpecs(records, { workId: item.id });
                             reread();
-
-                            const proposed = records.read(item.id);
-
-                            if (
-                                proposed.parentId &&
-                                proposed.status !== 'In progress' &&
-                                !records.gate(item.id).current
-                            )
-                                return {
-                                    thread: null,
-                                    error: 'This proposed build needs Brief, code evidence, Doubt and a current passing gate before Start build.',
-                                    refused: true,
-                                    hold: true,
-                                };
                         }
 
                         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
@@ -2112,10 +2158,6 @@ export function createItemCommands({
                         const base = await freshBase(repo, repoProject.projectId);
 
                         if (typeof base !== 'string') return base;
-
-                        const error = parentInProgress(item);
-
-                        if (error) return { thread: null, error };
 
                         // A build snapshots its skills once, so a retry keeps the selection its first start saw.
                         const snapshot = () => {
@@ -2146,11 +2188,18 @@ export function createItemCommands({
                                     context,
                                 ),
                             () => {
+                                const error = parentInProgress(item);
+
+                                if (error) throw new Error(error);
+
                                 snapshot();
 
                                 if (records)
                                     write(item.id, (revision) => records.setBuildBranch(item.id, revision, branch));
                             },
+                            false,
+                            undefined,
+                            { ...buildPreparation(board.snapshot(), source), expectedGateId },
                         );
                     };
                 }),

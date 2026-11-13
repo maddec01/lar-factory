@@ -1,6 +1,6 @@
 // The builds that count toward the build limit and what each is doing, from the one item-state presenter, so the Build
 // heading, the title bar's Building counter and the rows under them say the same, in numbers a reader can add up.
-// Capacity and execution are different: recorded builds count toward the automatic limit even while idle.
+// Capacity and execution are different: recorded builds count toward the shared limit even while idle.
 
 import { buildsAtWork, limitNumber } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
@@ -24,7 +24,7 @@ const inSentence = ({ word, stage, execution }: ItemState): string =>
               ? word
               : word.toLowerCase();
 
-/** "4 count toward the limit: 2 working, 1 stopped, 1 PR merged · 2 over the automatic limit", each part a row's word. */
+/** "4 count toward the limit: 2 working, 1 stopped, 1 PR merged · 2 over the shared limit", each part a row's word. */
 function buildsAgainstLimit(states: readonly ItemState[], limit: number | undefined): string {
     const counts = new Map<string, number>();
 
@@ -33,11 +33,17 @@ function buildsAgainstLimit(states: readonly ItemState[], limit: number | undefi
     const parts = [...counts].sort(([, a], [, b]) => b - a).map(([word, n]) => `${n} ${word}`);
     const building = states.length;
 
-    return `${building} builds open${limit === undefined ? '' : ` · automatic limit ${limit}`}${parts.length ? `: ${parts.join(', ')}` : ''}`;
+    return `${building} builds open${limit === undefined ? '' : ` · shared limit ${limit}`}${parts.length ? `: ${parts.join(', ')}` : ''}`;
 }
 
 /** The builds at work, each with its state, the limit, and the sentence that counts them. */
-export function useBuilds(): { items: Item[]; running: number; limit: number | undefined; text: string } {
+export function useBuilds(): {
+    items: Item[];
+    running: number;
+    limit: number | undefined;
+    text: string;
+    occupancy: string;
+} {
     const data = useBoardStore((state) => state.data);
     const unavailable = useBoardUnavailable();
     const states = useItemStates();
@@ -50,5 +56,6 @@ export function useBuilds(): { items: Item[]; running: number; limit: number | u
         running: shown.filter((state) => state.running).length,
         limit,
         text: buildsAgainstLimit(shown, limit),
+        occupancy: `${items.length}${limit === undefined ? '' : ` of ${limit}`} building`,
     };
 }

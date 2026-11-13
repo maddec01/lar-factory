@@ -11,6 +11,7 @@ import type { TestContext } from 'vite-plus/test';
 
 import { testEnv } from './repo-support.ts';
 import {
+    approveReadyBuilds,
     changeRecords,
     testFactoryContext,
     withRunPrompt,
@@ -39,7 +40,7 @@ async function buildBoard(
     const startable = startableEnv(t);
     const board = await startBoard(
         t,
-        { items, ...options },
+        { localSetups: { 'maddec01/lar-factory': { writeRefinedSpec: false } }, items, ...options },
         false,
         false,
         { ...startable, ...env },
@@ -48,6 +49,8 @@ async function buildBoard(
     );
 
     await until(board, (d) => d.items.length === items.length);
+
+    await approveReadyBuilds(board);
 
     return { board, home: startable.HOME! };
 }

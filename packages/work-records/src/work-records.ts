@@ -36,6 +36,7 @@ import {
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { readFactorySettings } from './factory-settings.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
+import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
@@ -50,6 +51,7 @@ import type { StructureTicket } from './tracker-sync.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
 import { verificationRecords, type VerificationRecords } from './verification-records.ts';
 
+export type { BuildInput, BuildPreparation } from './prepare-build.ts';
 export type { NewPart } from './create-part.ts';
 export type {
     CheckEntry,
@@ -214,6 +216,7 @@ export interface ShapingThreadCleanupRow {
 
 /** A start the board asked T3 for. This module only stores it and its outcome; it never launches or checks a thread. */
 export interface LaunchIntent {
+    buildInput?: BuildInput;
     request?: ThreadLaunchRequest;
     recovery?: { branch: string; reset: boolean; message?: string };
     intentId: string;
@@ -503,12 +506,21 @@ export interface WorkRecords
     /** Every record's recorded threads, oldest first, by work ID, in one read; a record with none is left out. */
     threadsByWork(): Map<string, RecordedThread[]>;
     /** Records that the board is about to ask T3 for a thread, before it asks. */
+    buildReadiness(workId: string, input: BuildPreparation): BuildInput;
+    prepareBuild(
+        workId: string,
+        revision: number,
+        input: BuildPreparation,
+        recovery?: LaunchIntent['recovery'],
+        cleanup?: SavedShapingThreadCleanup,
+    ): { record: WorkRecord; intent: LaunchIntent };
     recordLaunchIntent(
         workId: string,
         revision: number,
         purpose: string,
         recovery?: { branch: string; reset: boolean; message?: string },
         shapingThreadCleanup?: SavedShapingThreadCleanup,
+        preparation?: BuildPreparation,
     ): { record: WorkRecord; intent: LaunchIntent };
     /** The matching intents in the order they were recorded. */
     launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
@@ -629,6 +641,7 @@ const fromRow = (row: Row): WorkRecord => ({
 });
 
 interface IntentRow {
+    build_input?: string | null;
     request?: string | null;
     recovery?: string | null;
     intent_id: string;
@@ -642,6 +655,7 @@ interface IntentRow {
 }
 
 const fromIntentRow = (row: IntentRow): LaunchIntent => ({
+    ...(row.build_input ? { buildInput: JSON.parse(row.build_input) as BuildInput } : {}),
     ...(row.request ? { request: JSON.parse(row.request) as ThreadLaunchRequest } : {}),
     ...(row.recovery ? { recovery: JSON.parse(row.recovery) as NonNullable<LaunchIntent['recovery']> } : {}),
     ...(row.shaping_thread_cleanup ? { shapingThreadCleanup: row.shaping_thread_cleanup } : {}),
@@ -2075,7 +2089,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 return byWork;
             }),
-        recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup) => {
+        buildReadiness: (workId, input) => database.read(() => prepareBuildClaim(database, records, workId, input)),
+        prepareBuild: (workId, revision, input, recovery, cleanup) =>
+            records.recordLaunchIntent(workId, revision, 'build', recovery, cleanup, input),
+        recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup, preparation) => {
             const checked = checkPurpose(purpose);
             const intentId = randomUUID();
             const record = change(workId, revision, (work) => {
@@ -2112,7 +2129,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         `A ${checked} launch already owns this item. Resolve its existing intent before starting another thread.`,
                     );
 
+                const buildInput = preparation ? prepareBuildClaim(database, records, workId, preparation) : undefined;
+
                 insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
+
+                if (buildInput)
+                    db.prepare('UPDATE launch_intents SET build_input=? WHERE intent_id=?').run(
+                        JSON.stringify(buildInput),
+                        intentId,
+                    );
 
                 if (recovery)
                     db.prepare('UPDATE launch_intents SET recovery = ? WHERE intent_id = ?').run(

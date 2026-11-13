@@ -222,6 +222,34 @@ export async function changeRecords(
     });
 }
 
+/** Gated delivery fixtures use the production gate API; ordinary imported statuses alone authorize no build. */
+export async function approveReadyBuilds(board: Board): Promise<void> {
+    const records = await openWorkRecords(workRecordsPath(board.dataDir));
+    const ready: string[] = [];
+
+    try {
+        for (const work of records.list({ status: 'Ready' })) {
+            if (work.kind === 'concept' || work.kind === 'decision') continue;
+
+            records.setBody(work.workId, records.read(work.workId).revision, 'brief', 'Exact approved fixture build.');
+            records.recordGate(work.workId, records.read(work.workId).revision, {
+                briefDigest: records.gate(work.workId).briefDigest!,
+                approvedBy: 'test',
+                evidence: 'Approved fixture.',
+            });
+            ready.push(work.workId);
+        }
+        for (const group of records.list({ kind: 'concept' })) {
+            records.setFogGone(group.workId, records.read(group.workId).revision, true);
+            records.setBody(group.workId, records.read(group.workId).revision, 'map', 'Approved fixture destination.');
+        }
+    } finally {
+        records.close();
+    }
+
+    await until(board, (data) => ready.every((id) => data.items.find((item) => item.id === id)?.passingBrief));
+}
+
 /**
  * Records that the board's work `workId` waits on a new decision for each of `titles`, in a repository off the
  * board, and waits until the board shows them; returns their work IDs, for settleDecisions.
@@ -664,7 +692,12 @@ export async function withRunPrompt(dataDir: string, id: string, message: string
     try {
         const snapshot = records.runSettings(id).runs.at(-1);
 
-        return snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message;
+        const input = snapshot?.kind === 'build' ? records.launchIntents({ workId: id }).at(-1)?.buildInput : undefined;
+        const settings = snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message;
+
+        return input
+            ? `${settings}\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(input)}`
+            : settings;
     } finally {
         records.close();
     }

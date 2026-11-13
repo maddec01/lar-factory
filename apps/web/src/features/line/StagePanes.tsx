@@ -7,7 +7,7 @@ import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
 import { useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { BuildLimit as DesignBuildLimit, StageList } from '@/ui/board';
+import { BuildLimit as DesignBuildLimit, ReadyBuildControls, StageList } from '@/ui/board';
 
 type Shows = (row: Row) => boolean;
 
@@ -54,7 +54,12 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
             title="Ready to build"
             status="Ready"
             count={rows.length}
-            right={<AutoBuildSwitch />}
+            right={
+                <ReadyBuildControls>
+                    <BuildLimit />
+                    <AutoBuildSwitch />
+                </ReadyBuildControls>
+            }
             empty={
                 !rows.length && (
                     <PaneEmpty filtered={ready.length > 0} none="Nothing ready to build.">
@@ -77,9 +82,9 @@ function BuildLimit() {
         <DesignBuildLimit
             building={builds.items.length}
             limit={builds.limit}
-            title={`${builds.text}. ${BUILD_LIMIT_NOTE} Auto-build pauses new starts at this limit. Manual starts and Start after may exceed it.`}
+            title={`${builds.text}. ${BUILD_LIMIT_NOTE} Concept builds, manual starts, Start after and Auto-build share this limit. At capacity, manual starts are refused; scheduled starts wait for a slot.`}
         >
-            {builds.items.length} open{builds.limit === undefined ? '' : ` · limit ${builds.limit}`}
+            {builds.occupancy}
         </DesignBuildLimit>
     );
 }

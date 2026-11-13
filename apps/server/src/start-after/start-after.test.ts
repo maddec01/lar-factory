@@ -165,3 +165,47 @@ test('an armed start whose item the board does not show stays armed until the re
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('Start after retains authorization across a capacity hold and launches once when room returns', async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'start-after-capacity-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    t.onTestFinished(() => {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    const build = records.create({ title: 'Waiting build', repository: REPO, kind: 'build', status: 'Ready' });
+    const blocker = records.create({ title: 'Prerequisite', repository: REPO, kind: 'decision' });
+
+    records.addBlocker(build.workId, at(records, build.workId), blocker.workId);
+
+    const board = createBoardState({ items: recordItems(records, [], [REPO]), repos: [] } as unknown as BoardData);
+    let attempts = 0;
+    const startAfter = createStartAfter({
+        board,
+        file: join(dir, 'armed.json'),
+        gone: () => false,
+        offerModelChoices: () => [],
+        commands: {
+            start: async () => {
+                throw Error('A build must use Start build.');
+            },
+            startBuild: async () =>
+                ++attempts === 1
+                    ? { status: 409, body: { error: 'Shared build capacity is full.', hold: true } }
+                    : { status: 200, body: { error: null } },
+        },
+    });
+
+    assert.equal(startAfter.arm(build.workId, undefined).status, 200);
+    records.setBody(blocker.workId, at(records, blocker.workId), 'answer', 'Settled.');
+    records.setBody(blocker.workId, at(records, blocker.workId), 'domain-drafts', 'None.');
+    board.applyRead(recordItems(records, [], [REPO]), board.revision(), (items) => items);
+    await startAfter.startUnblocked();
+    assert.ok(board.snapshot().armed?.[build.workId]);
+    await startAfter.startUnblocked();
+    await startAfter.startUnblocked();
+    assert.equal(attempts, 2);
+    assert.equal(board.snapshot().armed?.[build.workId], undefined);
+});

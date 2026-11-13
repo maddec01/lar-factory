@@ -13,10 +13,12 @@ export function ConceptBuildRun({
     compact = false,
     showAction = true,
     startLabel,
+    capacity,
 }: {
     compact?: boolean;
     showAction?: boolean;
     startLabel: string;
+    capacity: string;
     plan: ConceptBuildPlan;
     pending: boolean;
     error: string | null;
@@ -57,6 +59,9 @@ export function ConceptBuildRun({
                     : plan.run
                       ? 'Paused · active builds continue.'
                       : 'Not started · shares build capacity with Ready tickets.'}
+            </Text>
+            <Text variant="caption" tone="muted" data-shared-build-capacity>
+                {capacity}
             </Text>
             {plan.run?.reason && <Text variant="caption">{plan.run.reason}</Text>}
             {plan.holds.length > 0 && (

@@ -11,6 +11,7 @@
         "./create-ticket": "./src/create-ticket.ts",
         "./spec-sync": "./src/spec-sync.ts",
         "./tracker-sync": "./src/tracker-sync.ts",
+        "./reviewer-selection": "./src/reviewer-selection.ts",
         "./factory-settings": "./src/factory-settings.ts"
     },
     "bin": {

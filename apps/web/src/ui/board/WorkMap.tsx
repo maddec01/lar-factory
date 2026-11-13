@@ -241,4 +241,4 @@ export function MapNode({
 }
 
 export { MapHistoryGroup, MapHistoryList, HistoryRow } from './WorkMapHistory';
-export { MapPartNode, MapCheckNode } from './WorkMapNodes';
+export { MAP_NODE_HEIGHT, MapPartNode, MapCheckNode } from './WorkMapNodes';

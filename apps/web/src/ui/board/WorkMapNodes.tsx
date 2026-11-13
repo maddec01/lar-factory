@@ -1,6 +1,9 @@
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
+/** Room for the action header, two title lines, status and slices; the graph uses the same height for its edges. */
+export const MAP_NODE_HEIGHT = 128;
+
 const NODE_ATTENTION = {
     default: 'border-line',
     asks: 'attention attention-warning',
@@ -76,22 +79,22 @@ export function MapPartNode({
             />
             {source}
             <span
-                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 items-center gap-1.5 pr-5 text-xs"
+                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 items-center gap-1.5 pr-5 text-xs"
                 data-map-head
             >
                 {head}
                 {action && <span className="pointer-events-auto ml-auto shrink-0">{action}</span>}
             </span>
-            <span className="pointer-events-none relative line-clamp-2 text-sm leading-5 font-medium">{name}</span>
-            <span
-                className={`pointer-events-none relative mt-auto flex min-w-0 items-center gap-1.5 text-xs ${slices ? 'mb-3' : ''}`}
-            >
+            <span className="pointer-events-none relative line-clamp-2 shrink-0 text-sm leading-5 font-medium wrap-anywhere">
+                {name}
+            </span>
+            <span className="pointer-events-none relative mt-auto flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
                 {glyph}
                 <span className="min-w-0 flex-1 truncate" data-map-facts>
                     {facts}
                 </span>
             </span>
-            {slices && <span className="pointer-events-none absolute inset-x-2.5 bottom-2">{slices}</span>}
+            {slices && <span className="pointer-events-none relative shrink-0">{slices}</span>}
         </div>
     );
 }

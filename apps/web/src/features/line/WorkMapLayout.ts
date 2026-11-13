@@ -8,6 +8,7 @@ import type { Part } from './DossierParts';
 import { DECISION_KINDS, isHistory, partActivity, partWaves, upstreamOf } from './DossierParts';
 import { startable } from './PartAvailability';
 import { YOURS } from './StageStatus';
+import { MAP_NODE_HEIGHT } from '@/ui/board';
 
 const DECISIONS = 'Decisions';
 const CHECK = 'e2e';
@@ -16,7 +17,7 @@ const HISTORY = 'history';
 const keyOf = (p: Part) => p.item.id;
 
 const LABEL_W = 116;
-const NODE_H = 112;
+const NODE_H = MAP_NODE_HEIGHT;
 /** The room between two nodes in a column: room for an arrow's 16px label with 8px on each side. */
 const GAP = 32;
 const PAD = 18;

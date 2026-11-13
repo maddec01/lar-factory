@@ -1,6 +1,6 @@
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
-// the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
+// the agent work figures on their own row below the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
 // people, labels, dates, milestone or iteration and area, its archived and earlier shaping threads, then its work record's brief, map or decision, and its ticket's
 // description and comments as ticket context; work with no ticket shows its record alone. The work it waits on,
 // sub-tickets and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the

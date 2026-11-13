@@ -588,20 +588,17 @@ test('the count unfolds the slice list under the row and folds it again, without
     expect(list('I_sample13')).toBeNull();
 });
 
-test.each(['Shaping', 'In progress', 'Review'] as const)(
-    'the status tooltip follows the latest real thread at %s',
-    async (status) => {
-        const id = 'I_sample14';
-        const data = withItem(id, { status, threads: [] });
+test('the status tooltip follows the latest real thread across shaping and build stages', async () => {
+    const id = 'I_sample14';
 
-        await mountPage(data);
+    await mountPage(withItem(id, { status: 'Shaping', threads: [] }));
 
-        const activity = () => state(id).title;
+    const activity = () => state(id).title;
+    const { useBoardStore } = await import('@/services/board/board.hooks');
 
-        expect(activity()).toBe('Not started');
-
-        const { useBoardStore } = await import('@/services/board/board.hooks');
-
+    for (const status of ['Shaping', 'In progress', 'Review'] as const) {
+        await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [] })));
+        expect(activity(), `${status}: no thread`).toBe('Not started');
         for (const [state, expected] of [
             ['running', 'Thread running'],
             ['stopped', 'Run stopped'],
@@ -614,10 +611,10 @@ test.each(['Shaping', 'In progress', 'Review'] as const)(
 
             if (status === 'Shaping' && state === 'needs you') {
                 expect($(`.desk-card[data-item="${id}"]`)).not.toBeNull();
-            } else expect(activity()).toBe(expected);
+            } else expect(activity(), `${status}: ${state}`).toBe(expected);
         }
         await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
-        expect(activity()).toBe('Thread unavailable');
+        expect(activity(), `${status}: unreadable thread`).toBe('Thread unavailable');
         await settle(() =>
             useBoardStore.getState().receive(
                 withItem(id, {
@@ -626,9 +623,9 @@ test.each(['Shaping', 'In progress', 'Review'] as const)(
                 }),
             ),
         );
-        expect(activity()).toMatch(/^Thread running, last seen \d\d:05$/);
-    },
-);
+        expect(activity(), `${status}: retained thread`).toMatch(/^Thread running, last seen \d\d:05$/);
+    }
+});
 
 test('a stopped build replaces its remembered Started tag with recovery, also in the item dialog', async () => {
     const data = unblocked();
@@ -746,19 +743,20 @@ test('usage with none known yet keeps naming usage after three seconds, keeps kn
     expect(text(row(id))).not.toMatch(/Loading usage|Still trying/);
 });
 
-describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running', (status) => {
-    const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [
-        thread('other', 'done'),
-        { ...thread('build', build), purpose: 'build', ...more },
-    ];
-    const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData =>
-        withItem('I_sample13', { status, blockers: [], threads: t, ...change }, fresh(loose));
-    const running = threads('running', { currentRunning: true });
-    const receive = async (data: BoardData) =>
-        settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
-    const desk = () => $('.desk-card[data-item="I_sample13"]');
+test.each(['Verify', 'Ready to merge'] as const)(
+    '%s: its running row returns to the desk when the thread stops or the board disconnects',
+    async (status) => {
+        const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [
+            thread('other', 'done'),
+            { ...thread('build', build), purpose: 'build', ...more },
+        ];
+        const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData =>
+            withItem('I_sample13', { status, blockers: [], threads: t, ...change }, fresh(loose));
+        const running = threads('running', { currentRunning: true });
+        const receive = async (data: BoardData) =>
+            settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
+        const desk = () => $('.desk-card[data-item="I_sample13"]');
 
-    test('its row sits in Build as Working, with Open thread on the build thread, and leaves the desk', async () => {
         await mountPage(at(running));
         expect(desk()).toBeNull();
         expect(text(state('I_sample13'))).toBe('Working');
@@ -769,26 +767,20 @@ describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread r
             'Open thread',
             't3code://threads/sample-environment/build',
         ]);
-    });
-
-    test('it returns to the desk with its Status when the thread stops, with no write', async () => {
-        await mountPage(at(running));
         await receive(at(threads('done'), { slices: [] }));
         expect(text(desk())).toContain('Review PR');
         expect(text(desk()!.querySelector('.desk-actions'))).toContain('Review PR');
         expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
         expect(posted()).toEqual([]);
-    });
-
-    test('it returns to the desk at its Status while the page can’t read the board', async () => {
-        await mountPage(at(running));
+        await receive(at(running));
         expect(desk()).toBeNull();
         await settle(async () =>
             (await import('@/services/board/board.hooks')).useBoardStore.getState().fail('HTTP 502'),
         );
         expect(text(desk())).toContain('Review PR');
-    });
-});
+        expect(posted()).toEqual([]);
+    },
+);
 
 describe('the activity line', () => {
     const at = (more: Partial<ItemThread> = {}, change: Partial<Item> = {}, data: BoardData = fresh(loose)) =>

@@ -65,6 +65,8 @@ test('one complete proposal and board choice persist across connections with sta
 
     const prepared = s.records.prepareRetro(s.id)!;
 
+    expect(s.records.read(s.id)).toMatchObject({ status: 'Done', buildPhase: 'retro' });
+
     expect(s.records.prepareRetro(s.id)).toEqual(prepared);
 
     const proposal = s.records.proposeRetro(s.id, s.at(), suggestions);

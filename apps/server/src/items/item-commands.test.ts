@@ -2715,7 +2715,7 @@ test('a duplicate Start build after the move refuses with the running owner', as
     assert.equal(started.length, 1);
 });
 
-test('a moved build whose thread stops before a phase offers a retry on a retry branch', async () => {
+test('a moved build whose thread stops in the dispatch plan offers a retry on a retry branch', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
 
@@ -2744,7 +2744,7 @@ test('a moved build whose thread stops before a phase offers a retry on a retry 
     assert.match(records.read(build.workId).buildBranch ?? '', new RegExp(`^${firstBranch}-retry-`));
 });
 
-test('a build that recorded a phase is not retried from In progress', async () => {
+test('a build that reached implementation is not retried from In progress', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
 
@@ -2762,7 +2762,7 @@ test('a build that recorded a phase is not retried from In progress', async () =
     });
 
     await commands.startBuild(build.workId, undefined);
-    records.setBuildPhase(build.workId, records.read(build.workId).revision, 'plan');
+    records.setBuildPhase(build.workId, records.read(build.workId).revision, 'implement');
     reread();
     assert.equal((await commands.startBuild(build.workId, undefined)).status, 409);
     assert.equal(started.length, 1);

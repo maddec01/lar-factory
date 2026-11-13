@@ -2,7 +2,6 @@
 
 Input: integrated branch and project rules. Output: saved check list, complete
 passing validation and diagnosed failures, or a saved missing-check hold.
-Set phase `full-checks`.
 
 A check subagent reads `<lar-build>/project-rules.md#validation-record` and saves the
    applicable checks with `lar-work set-check-list <work ID> --file <file>`.

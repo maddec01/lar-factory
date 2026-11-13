@@ -588,7 +588,14 @@ show active builds, capacity waits, blocker waits and PR merge waits.
 
 ## Building stages
 
-Each stage records its `stageEvents` entry and `buildPhase` through `set-phase`.
+Stage events remain proposed. Build phases are recorded by the commands that
+start or finish their steps: build dispatch, role launch/finish, reviewer selection
+and retro preparation. `set-phase` remains for direct Small implementation and
+compatibility; entering Review changes its phase and Status atomically.
+Domain-docs and checks role launches record `domain-docs` and `full-checks`.
+Approver launch records `approve`; its successful finish and CI fixer launch
+record `checks`. Failed roles never advance their phase; repeated commands reuse
+evidence without rewinding it. Fixers keep the step they serve.
 The build thread uses build settings. All delegated roles use the saved role
 settings and report only after their work and descendants are complete.
 
@@ -609,9 +616,13 @@ from that fetched remote tip, using `fix`, `feat` or `chore` plus ticket/ID and
 title for the branch. Local default-branch commits do not become its base.
 
 `record-intent`, `resolve-intent`, `set-build-branch` and `add-thread` keep the
-launch recoverable; retries reuse its identity. A successful launch sets the
-build In progress and the concept In progress. The board then applies the saved
-Shaping thread cleanup choice. During launch it says Starting build; failures
+launch recoverable; retries reuse its identity. Saving the build launch request
+records `plan` before T3 can start the builder, including for Small builds.
+A successful launch sets the build In progress and the concept In progress;
+a resumed build keeps its phase, and a replacement starts at `plan`. A stopped
+build still in the dispatch plan can retry only before it has slices or a PR;
+the system-recorded plan alone is not evidence that implementation started.
+The board then applies the saved Shaping thread cleanup choice. During launch it says Starting build; failures
 show their cause in the original section or group. Start ends only with a
 recorded thread, a proven refusal or an explicitly uncertain intent.
 
@@ -623,7 +634,8 @@ from an unapproved brief or the shaping conversation. Planning uses phase `plan`
 The builder judges whether this is a Small build: one change, or parts touching
 the same files. It records that route and implements directly without slices.
 
-Other builds start the planner. It saves private slice briefs and blocker edges
+Other builds start the planner; its role launch records `plan` and successful
+finish records `implement`. It saves private slice briefs and blocker edges
 with `shared/scripts/slice.sh`, using the build's repository and parent ID.
 Commands validate the graph and
 return ready slices. Planning ends with a recorded Small build route or a slice
@@ -631,7 +643,7 @@ plan. The board says Planning and shows slices only within the build.
 
 ### Implement and integrate
 
-Phase `implement` starts implementer tasks for ready slices, each in its own
+Launching an implementer records phase `implement` for ready slices, each in its own
 worktree from the local build branch. Reconcile existing slice/thread associations
 before launching to avoid duplicate attempts. The planner may re-slice a blocked
 slice, one planner at a time. A rebase conflict is not a reason to re-slice.
@@ -673,8 +685,8 @@ pushes the branch before review; no PR exists yet. The board says Checking.
 
 ### Each review
 
-The builder sets Review and phase `review`. `select-reviewers` chooses from the
-saved settings and whole-branch diff. Each selected reviewer runs independently
+`select-reviewers` starts Review with Status and phase `review` in one transaction,
+then returns its choices from the saved settings and whole-branch diff. Each selected reviewer runs independently
 on that diff. Code checks correctness, design and project conventions. Security
 checks trust boundaries and abuse cases. UI runs the app and checks every
 affected state and layout, returning screenshot paths and process ownership.
@@ -768,11 +780,14 @@ A closed unmerged PR or failed read preserves the work and shows its real state.
 A confirmed merge satisfies its blocker edges, releases any active capacity,
 refreshes affected group views and schedules newly eligible builds in running
 concepts or Auto-build, including dependents outside its concept. A ticket
-closure, Status change or thread ending cannot do this.
+closure, Status change or thread ending cannot do this. Merge confirmation also
+reads the ticket directly and refreshes its saved observation, bypassing cached
+open ticket lists. Done records continue using direct ticket reads. An open ticket
+stays open; a failed read retains the last observation with its read failure.
 Unmet release holds remain unmet after merge.
 
-After confirmed merge and **Done**, the board resumes the same build thread for
-retro once, with phase `retro`. It records the complete suggestion list. One
+After confirmed merge and **Done**, the board records phase `retro` with retro
+preparation and resumes the same build thread once. It records the complete suggestion list. One
 **Choose follow-ups** desk card shows their count and opens item details, where the full list records Pedro's selection through
 **Create chosen follow-ups** or **No follow-ups**. Selected follow-ups become List
 records/tickets using each destination's saved retro setting. No suggestions

@@ -406,6 +406,7 @@ export function createItemCommands({
     const retros = createRetro({ board, records, reread, ...retroDeps });
     const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
+        readTicket: (repo, number) => items.observeTicket(repo, number),
         board,
         records,
         reread,
@@ -523,7 +524,7 @@ export function createItemCommands({
 
                 if (
                     (purpose === 'build' ? ['Ready', 'In progress'] : ['Queued', 'Shaping']).includes(status) &&
-                    !buildPhase
+                    (!buildPhase || buildPhase === 'plan')
                 )
                     failures[purpose].set(workId, failure);
             }

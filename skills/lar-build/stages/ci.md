@@ -3,8 +3,6 @@
 Input: recorded PR and approver recommendation. Output: current-head required
 check results and handback Status, or a saved failure and retry count.
 
-Set phase `checks`.
-
 Call `watch_pull_request` on the PR; T3 wakes you when checks finish, someone
 comments or the branch conflicts. Fast checks can finish first, so handle them
 now and on every wake: read `gh pr checks <pr> --required`, or on Azure Repos

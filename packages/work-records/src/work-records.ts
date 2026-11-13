@@ -94,7 +94,7 @@ export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision
 export type WorkKind = (typeof WORK_KINDS)[number];
 
 /** The stages of the lar-build workflow (`skills/lar-build/agents/builder.md`): Build's plan, implement, domain docs and
- * full check suite steps, then Review, Approve, Checks and Retro. A Small build skips plan. */
+ * full check suite steps, then Review, Approve, Checks and Retro. Small builds classify their route in plan. */
 export const BUILD_PHASES = [
     'plan',
     'implement',
@@ -1532,6 +1532,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 return {
                     decision_method: method === undefined ? row.decision_method : method,
                     status: moved,
+                    ...(nextStatus === 'Review' &&
+                    row.status !== 'Review' &&
+                    !UNBUILT_KINDS.includes(nextKind ?? row.kind)
+                        ? { build_phase: 'review' as const }
+                        : {}),
                     kind: nextKind ?? row.kind,
                     queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),
                     agreed_ticket_kind: agreed ?? row.agreed_ticket_kind,
@@ -1805,7 +1810,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 )
                     throw invalid('Retro requires Done and a confirmed merge of the delivery PR.');
 
-                return { build_phase: checked };
+                if (row.build_phase === checked && (checked !== 'review' || row.status === 'Review')) return null;
+
+                return {
+                    build_phase: checked,
+                    ...(checked === 'review' ? { status: 'Review', queue_order: null } : {}),
+                };
             });
         },
         setPullRequest: (workId, revision, pullRequest) => {
@@ -2212,7 +2222,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             return { record, intent: intent(intentId) };
         },
         saveLaunchRequest: (workId, revision, intentId, request) =>
-            change(workId, revision, () => {
+            change(workId, revision, (work) => {
                 const row = selectIntent.get(intentId) as IntentRow | undefined;
 
                 if (row?.work_id !== workId) throw invalid('The launch intent does not belong to this work.');
@@ -2227,7 +2237,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     intentId,
                 );
 
-                return {};
+                const reset = row.recovery && (JSON.parse(row.recovery) as { reset: boolean }).reset;
+
+                return row.purpose === 'build' && (!work.build_phase || reset) && !row.request
+                    ? { build_phase: 'plan' }
+                    : {};
             }),
         launchIntents: (filter) =>
             database.read(() =>
@@ -2274,6 +2288,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         : threadId && row.purpose === 'build' && work.status === 'Ready'
                           ? { status: 'In progress', queue_order: null }
                           : {};
+
+                if (
+                    threadId &&
+                    row.purpose === 'build' &&
+                    !work.build_phase &&
+                    ['Ready', 'In progress'].includes(work.status)
+                )
+                    launched.build_phase = 'plan';
+
                 const staged = db
                     .prepare('SELECT recovery FROM launch_intents WHERE intent_id = ?')
                     .get(intentId)?.recovery;
@@ -2290,7 +2313,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                     return {
                         ...launched,
-                        ...(recovery.reset ? { build_phase: null } : {}),
+                        ...(recovery.reset ? { build_phase: row.request ? (work.build_phase ?? 'plan') : 'plan' } : {}),
                         needs_you: null,
                         needs_you_causes: null,
                     };

@@ -112,7 +112,7 @@ it('names every conflicting field and preserves both newer values', async () => 
     expect(records.read(record.workId)).toMatchObject({
         status: 'Review',
         buildPhase: 'review',
-        revision: moved.revision + 1,
+        revision: moved.revision,
     });
 });
 

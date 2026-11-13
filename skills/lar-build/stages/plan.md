@@ -1,10 +1,9 @@
 # Plan
 
 Input: record, approved brief, initial context and existing slices. Output:
-recorded Small build route or planner's private slices/blockers. Set phase `plan`.
+recorded Small build route or planner's private slices/blockers.
 
-1. Set **In progress**, unless a handoff resumes past **Build**. Read the
-   ticket Spec through `lar-work gate <work ID>`, then its brief
+1. Read the ticket Spec through `lar-work gate <work ID>`, then its brief
    (`lar-work body <work ID> --body brief`) and record (`lar-work read`),
    its initial context (`lar-work context`), the prototype or research branches
    the brief names, existing project instructions when present and `<lar-build>/project-rules.md`;
@@ -27,6 +26,6 @@ Retain the starting brief and frozen `lar-work run-settings <work ID> --run-id R
    unfinished slice is blocked, and goes to [Implement](implement.md).
    Otherwise decide whether this is a **Small build**: one change, or every
    part touches the same files. Keep the route in the thread and handoff.
-   Small builds set phase `implement` and go to [Implement](implement.md) without a planner or slices.
+   Small builds run `lar-work set-phase ID --revision N --phase implement` and go to [Implement](implement.md) without a planner or slices.
    Other builds start [Planner](../agents/planner.md) with the work ID and repo
    path; its saved slice list goes to Implement.

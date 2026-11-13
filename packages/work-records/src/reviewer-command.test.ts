@@ -126,7 +126,7 @@ it('returns uncertain text for invalid UTF-8, without silently replacing bytes',
     expect(readReviewerDiff(base, head, cwd).diff.files).toEqual([{ path: 'README.md', text: null }]);
 });
 
-it('selects through the CLI with saved modes, custom rules and no record mutation or tracker sync', async () => {
+it('selects through the CLI with saved modes and custom rules, atomically starting Review without tracker sync', async () => {
     const { cwd, commit } = repository();
     const data = directory();
     const records = await openWorkRecords(workRecordsPath(data));
@@ -202,7 +202,11 @@ it('selects through the CLI with saved modes, custom rules and no record mutatio
 
     const reopened = await openWorkRecords(workRecordsPath(data));
 
-    expect(reopened.read(record.workId)).toEqual(before);
+    expect(reopened.read(record.workId)).toMatchObject({
+        status: 'Review',
+        buildPhase: 'review',
+        revision: before.revision + 1,
+    });
     expect(reopened.reviewRounds(record.workId)).toEqual([]);
     reopened.close();
 }, 30_000);
@@ -253,7 +257,7 @@ it('accepts Code requests through the CLI and saves their provenance with the re
 
     expect(reviewers.filter((entry) => entry.escalation).map((entry) => entry.id)).toEqual(['security']);
     expect(reviewers.filter((entry) => entry.run).map((entry) => entry.id)).toEqual(['code', 'security']);
-    expect(run('read', record.workId).revision).toBe(1);
+    expect(run('read', record.workId).revision).toBe(2);
 
     const roundFile = join(data, 'round.json');
 
@@ -270,7 +274,7 @@ it('accepts Code requests through the CLI and saves their provenance with the re
             })),
         }),
     );
-    expect(run('record-review-round', record.workId, '--revision', '1', '--file', roundFile).revision).toBe(2);
+    expect(run('record-review-round', record.workId, '--revision', '2', '--file', roundFile).revision).toBe(3);
     expect(
         run('review-rounds', record.workId)[0].reviewers.find((entry: { axis: string }) => entry.axis === 'security'),
     ).toMatchObject({ verdict: 'approve', escalation });
@@ -339,7 +343,11 @@ it('selects from the named run after Settings edits, returning frozen instructio
     const reread = await openWorkRecords(workRecordsPath(data));
 
     try {
-        expect(reread.read(record.workId)).toEqual(before);
+        expect(reread.read(record.workId)).toMatchObject({
+            status: 'Review',
+            buildPhase: 'review',
+            revision: before.revision + 1,
+        });
     } finally {
         reread.close();
     }

@@ -1326,6 +1326,8 @@ let observedAt = -Infinity;
 let observing = false;
 const prObserver = records
     ? createPrObserver(records, {
+          readTicket: (repo, number) =>
+              onAzure(repo) ? items.observeTicket(repo, number) : observeIssue(repo, number),
           repositories: () => items.repos().map((repo) => repo.repo),
           currentItems: () => board.snapshot().items,
           hidden: () => retention.hidden(),

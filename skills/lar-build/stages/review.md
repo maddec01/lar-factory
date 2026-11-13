@@ -3,7 +3,7 @@
 Input: integrated branch and passing validation record. Output: `review-rounds`,
 fixed/rejected/open findings, unreviewed fixes and UI process ownership.
 
-Set phase `review` and **Review**. At most two rounds.
+At most two rounds.
 
 Round 1: in the build checkout, pin `head=$(git rev-parse HEAD)` and
 `base=$(git merge-base origin/$base_branch "$head")`, then run

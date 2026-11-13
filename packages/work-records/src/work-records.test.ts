@@ -1763,7 +1763,7 @@ it('commits staged recovery only after a confirmed launch across reopen', async 
     current = reopened.resolveLaunchIntent(build.workId, staged.record.revision, staged.intent.intentId, {
         threadId: 'confirmed',
     }).record;
-    expect(current).toMatchObject({ buildBranch: 'new-confirmed', buildPhase: null, needsYouCauses: [] });
+    expect(current).toMatchObject({ buildBranch: 'new-confirmed', buildPhase: 'plan', needsYouCauses: [] });
     expect(reopened.children(build.workId)).toEqual([]);
     reopened.close();
 });

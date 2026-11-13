@@ -101,11 +101,12 @@ export function delegatedWorkRunning(item: Item): boolean {
     );
 }
 
-/** Retry only a build moved to In progress whose current thread stopped before it recorded a build phase. */
+/** Retry a stopped build before implementation or saved slices; plan is recorded by dispatch. */
 export function canRetryBuild(item: Item): boolean {
     if (
         item.status !== 'In progress' ||
-        item.buildPhase ||
+        (item.buildPhase && item.buildPhase !== 'plan') ||
+        (item.buildPhase === 'plan' && (!!item.slices?.length || !!item.linkedPrs?.length)) ||
         item.needsYou ||
         delegatedWorkRunning(item) ||
         !Array.isArray(item.threads)

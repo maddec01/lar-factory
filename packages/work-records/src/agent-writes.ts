@@ -37,6 +37,7 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 [
                     ...active,
                     ...Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined),
+                    ...(patch.status === 'Review' ? ['buildPhase'] : []),
                     ...(patch.kind ? ['kindAnswer', 'parentId', 'children', 'dependencies'] : []),
                 ],
                 (r) => records.update(id, r, patch),
@@ -85,7 +86,9 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 (r) => records.setBody(id, r, body, text),
             ),
         setBuildPhase: (id, rev, phase) =>
-            apply(id, rev, [...build, 'buildPhase'], (r) => records.setBuildPhase(id, r, phase)),
+            apply(id, rev, [...build, 'buildPhase', ...(phase === 'review' ? ['status'] : [])], (r) =>
+                records.setBuildPhase(id, r, phase),
+            ),
         setPullRequest: (id, rev, pr) =>
             apply(id, rev, [...build, 'pullRequest', 'observations.pr'], (r) => records.setPullRequest(id, r, pr)),
         recordReviewRound: (id, rev, round) => apply(id, rev, review, (r) => records.recordReviewRound(id, r, round)),

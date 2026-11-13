@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vite-plus/test';
 
 import sample from '../test/sample.json' with { type: 'json' };
 import { deskItems, deskParentName, placementOf } from './board-view.ts';
+import { deskWait } from './desk-wait.ts';
 import { nextAction } from './item-next-action.ts';
 import type { Item, ItemThread } from './model.ts';
 
@@ -108,4 +109,100 @@ test('parent identity uses current board data, falls back to the ticket, and nam
     expect(deskParentName(child, [parent, child])).toBe('Local parent');
     expect(deskParentName(child, [child])).toBe('#9 Ticket parent');
     expect(deskParentName(work(), [])).toBeUndefined();
+});
+
+test('a ready Pedro release step is a desk wait; an agent step and later human steps are not', () => {
+    const plan = {
+        steps: [{ id: 'activate', who: 'Pedro', what: 'Activate', done: null }],
+        outcomeCheck: { what: 'Check composition', result: 'pending' as const, evidence: null },
+    };
+    const parent = work({ flow: 'linked', releasePlan: plan });
+
+    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
+    expect(deskWait(parent)).toEqual({
+        label: 'Release step',
+        action: { kind: 'details', label: 'Mark release step done' },
+    });
+    expect(
+        deskItems(
+            {
+                items: [
+                    work({ releasePlan: { ...plan, steps: [{ ...plan.steps[0]!, who: 'Agent' }, ...plan.steps] } }),
+                ],
+            },
+            false,
+        ),
+    ).toEqual([]);
+    expect(
+        deskItems(
+            {
+                items: [
+                    work({
+                        releasePlan: {
+                            ...plan,
+                            steps: [{ ...plan.steps[0]!, done: { by: 'Pedro', at: 'now', evidence: 'Activated.' } }],
+                        },
+                    }),
+                ],
+            },
+            false,
+        ),
+    ).toEqual([]);
+});
+
+test('a decision-owned child gate appears once on its build with concept identity, without hiding unrelated questions', () => {
+    const parent = work({ id: 'concept', kind: 'concept', number: 0, title: 'Deliver labels' });
+    const build = work({
+        id: 'build',
+        kind: 'build',
+        status: 'Needs you',
+        parentId: parent.id,
+        briefApproval: { reason: 'Approve the exact A1 brief', digest: 'exact-approval-digest' },
+    });
+    const owner = work({
+        id: 'decision',
+        kind: 'decision',
+        parentId: parent.id,
+        threads: [
+            {
+                ...question,
+                questionSummary:
+                    'Q6 - A1 final approval: May this exact brief be Ready?\napprovalDigest: exact-approval-digest',
+                pendingRequest: { id: 'gate', threadId: 'question', kind: 'question' },
+            },
+        ],
+    });
+    const unrelated = work({ id: 'other', threads: [question] });
+    const all = [parent, owner, build, unrelated];
+
+    expect(
+        deskItems({ items: all }, false)
+            .map((item) => item.id)
+            .sort(),
+    ).toEqual(['build', 'other']);
+    expect(deskParentName(build, all)).toBe('Deliver labels');
+    expect(deskWait(build, false, all)).toEqual({
+        label: 'Approve brief',
+        action: { kind: 'details', label: 'Approve brief' },
+    });
+    owner.threads = [
+        {
+            ...question,
+            state: 'done',
+            childNeedsYou: true,
+            questionSummary: 'A1 approval: proceed?\napprovalDigest: exact-approval-digest',
+            pendingRequest: { id: 'gate', threadId: 'delegate', kind: 'brief-approval' },
+        },
+    ];
+    expect(deskItems({ items: all }, false).map((item) => item.id)).not.toContain('decision');
+    owner.threads = [
+        {
+            ...question,
+            questionSummary: 'A1 approval: proceed?\napprovalDigest: different-digest',
+            pendingRequest: { id: 'gate', threadId: 'question', kind: 'brief-approval' },
+        },
+    ];
+    expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
+    owner.threads = [{ ...question, questionSummary: 'Which colour should we use?' }];
+    expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
 });

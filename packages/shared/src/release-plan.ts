@@ -21,3 +21,14 @@ export function releaseHolds(plan: ReleasePlan | null | undefined): string[] {
             : []),
     ];
 }
+
+/** Pedro's release receipts can only be submitted by the board. */
+export const isPedroReleaseStep = (step: ReleasePlan['steps'][number]): boolean =>
+    step.who.trim().toLowerCase() === 'pedro';
+
+/** Release order makes only the first unfinished step actionable. */
+export function pendingPedroReleaseStep(plan: ReleasePlan | null | undefined) {
+    const step = plan?.steps.find((step) => !step.done);
+
+    return step && isPedroReleaseStep(step) ? step : undefined;
+}

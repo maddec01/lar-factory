@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { agentWrites } from './agent-writes.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
@@ -205,14 +206,32 @@ it('round trips parent release commands in an isolated data folder', async () =>
         '--step',
         'stage',
         '--identity',
-        'Pedro',
+        'Builder',
         '--evidence',
         'Immutable manifest receipt.',
     );
 
+    await expect(
+        cli(
+            'complete-release-step',
+            '--revision',
+            String(f.revision()),
+            '--step',
+            'activate',
+            '--identity',
+            'Pedro',
+            '--evidence',
+            'Agent pretending to be Pedro.',
+        ),
+    ).rejects.toThrow(/board/i);
+    expect(f.records.releasePlan(f.id)?.steps[1]?.done).toBeNull();
+    expect(() =>
+        agentWrites(f.records).completeReleaseStep(f.id, f.revision(), 'activate', 'Builder', 'Receipt.'),
+    ).toThrow(/board/i);
+
     const read = JSON.parse((await cli('release-plan')).stdout);
 
-    expect(read.steps[0].done).toMatchObject({ by: 'Pedro', evidence: 'Immutable manifest receipt.' });
+    expect(read.steps[0].done).toMatchObject({ by: 'Builder', evidence: 'Immutable manifest receipt.' });
     await expect(
         cli(
             'record-outcome-check',

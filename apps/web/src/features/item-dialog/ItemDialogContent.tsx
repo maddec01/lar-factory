@@ -5,6 +5,7 @@ import { itemName, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/sh
 import type { BoardData, Item } from '@lar-factory/shared';
 import { ButtonLink, Modal, Stack } from '@lar-works/design-system';
 
+import { CompleteReleaseStep } from './CompleteReleaseStep';
 import { ConceptParts } from './ConceptParts';
 import { isGroupParent } from './group-parent';
 import { GroupDetails } from './GroupDetails';
@@ -119,6 +120,7 @@ export function ItemDialogContent({
                     {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
                     {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress plan={item.releasePlan} remaining={item.completion?.reasons} />
+                    <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (!group || record.body?.trim() || record.answer?.trim()) && (
                             <RecordText

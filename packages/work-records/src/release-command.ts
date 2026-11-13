@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
+import { agentWrites } from './agent-writes.ts';
 import { refreshBoards } from './board-refresh.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
@@ -27,7 +28,7 @@ export async function releaseCommand(command: string, args: string[]): Promise<n
 
         const id = positionals[0]!;
 
-        records = await openWorkRecords(workRecordsPath(values['data-dir']));
+        records = agentWrites(await openWorkRecords(workRecordsPath(values['data-dir'])));
 
         if (command !== 'release-plan' && !values.revision) throw Error('Use --revision N from a fresh parent read.');
 

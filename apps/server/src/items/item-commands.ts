@@ -90,6 +90,7 @@ import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
 import { createPrMerge } from './pr-merge.ts';
+import { createReleaseStep } from './release-step.ts';
 import { createRetro } from './retro.ts';
 import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
 import { createVerification } from './verification.ts';
@@ -103,6 +104,7 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    completeReleaseStep(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
@@ -1399,6 +1401,7 @@ export function createItemCommands({
 
     return {
         ...gating,
+        ...createReleaseStep({ board, records, reread }),
         ...verifying,
         chooseRetro: retros.chooseRetro,
         retryRetro: retros.retryRetro,

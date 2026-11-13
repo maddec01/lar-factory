@@ -1,5 +1,5 @@
-import type { ConceptBuildPlan } from '@lar-factory/shared';
-import { Button, Text } from '@lar-works/design-system';
+import { conceptBuildHoldSummary, type ConceptBuildPlan } from '@lar-factory/shared';
+import { Button, Disclosure, Text } from '@lar-works/design-system';
 
 import { buttonKind } from './ButtonKinds';
 import { DetailsSection } from './ItemDetailSections';
@@ -48,9 +48,16 @@ export function ConceptBuildRun({
             <div className="flex flex-wrap items-center gap-2" data-concept-build-action>
                 {action}
                 {!running && plan.holds.length > 0 && (
-                    <Text variant="caption" tone="muted" data-concept-build-hold>
-                        {plan.holds.map((hold) => hold.reason).join(' ')}
-                    </Text>
+                    <Disclosure label={conceptBuildHoldSummary(plan)}>
+                        <ul
+                            className="m-0 grid list-disc gap-1 pl-4 text-left text-sm"
+                            aria-label="Concept build holds"
+                        >
+                            {plan.holds.map((hold, index) => (
+                                <li key={`${hold.workId}-${index}`}>{hold.reason}</li>
+                            ))}
+                        </ul>
+                    </Disclosure>
                 )}
                 {error && <Text role="alert">{error}</Text>}
             </div>
@@ -86,7 +93,7 @@ export function ConceptBuildRun({
             )}
             {plan.run?.reason && <Text variant="caption">{plan.run.reason}</Text>}
             {plan.holds.length > 0 && (
-                <ul className="m-0 grid gap-1 pl-4 text-sm" aria-label="Concept build holds">
+                <ul className="m-0 grid list-disc gap-1 pl-4 text-left text-sm" aria-label="Concept build holds">
                     {plan.holds.map((hold, index) => (
                         <li key={`${hold.workId}-${index}`}>{hold.reason}</li>
                     ))}

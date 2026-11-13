@@ -1,3 +1,5 @@
+import { isPedroReleaseStep } from '@lar-factory/shared';
+
 import { applyAgentWrite } from './agent-apply.ts';
 import { agentConceptWrites } from './agent-concept-writes.ts';
 import { requireHumanAction } from './human-action.ts';
@@ -144,6 +146,13 @@ export function agentWrites(records: WorkRecords): WorkRecords {
         recordGate: () => requireHumanAction('Approve brief'),
         recordGateBatch: () => requireHumanAction('Approve briefs'),
         recordVerification: () => requireHumanAction('Record Verify'),
+        completeReleaseStep: (id, revision, stepId, by, evidence) => {
+            const step = records.releasePlan(id)?.steps.find((step) => step.id === stepId);
+
+            if (step && isPedroReleaseStep(step)) requireHumanAction('Mark release step done');
+
+            return records.completeReleaseStep(id, revision, stepId, by, evidence);
+        },
         snapshotRun: (id, rev, input) =>
             apply(id, rev, [...active, `runSettings.${input.runId}`], (r) => records.snapshotRun(id, r, input)),
         startRoleRun: (id, rev, input) =>

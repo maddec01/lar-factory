@@ -1077,4 +1077,5 @@ test('a changed approved brief during Build carries a brief approval reason inst
 
     assert.equal(item.passingBrief, false);
     assert.match(item.briefApproval!.reason, /changed during Build/);
+    assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
 });

@@ -2,7 +2,7 @@ import { expect, test } from 'vite-plus/test';
 
 import sample from '../test/sample.json' with { type: 'json' };
 import { placementOf } from './board-view.ts';
-import { deskWait } from './desk-wait.ts';
+import { deskWait, questionWaitReason } from './desk-wait.ts';
 import type { Item, ItemThread } from './model.ts';
 
 const stopped: ItemThread = { id: 'build', title: 'Build', purpose: 'build', state: 'stopped', updated: '2026-11-13' };
@@ -120,4 +120,21 @@ test.each(['single', 'linked'] as const)('a failed %s launch reaches the desk an
         flow === 'linked' ? 'dock' : 'shaping',
     ]);
     expect(deskWait(work)).toEqual({ label: 'Start failed', action: { kind: 'start-again', label: 'Start again' } });
+});
+
+test('a brief gate gets a short notice while ordinary questions retain their question', () => {
+    const work = item({
+        threads: [
+            {
+                ...stopped,
+                state: 'needs you',
+                questionSummary: '## What\nA full brief with `code` and long details.',
+                pendingRequest: { id: 'gate', threadId: 'shape', kind: 'brief-approval' },
+            },
+        ],
+    });
+
+    expect(questionWaitReason(work)).toBe('Review the brief below, then approve it or request changes in T3.');
+    work.threads = [{ ...stopped, state: 'needs you', questionSummary: 'Which account should own it?' }];
+    expect(questionWaitReason(work)).toBe('Which account should own it?');
 });

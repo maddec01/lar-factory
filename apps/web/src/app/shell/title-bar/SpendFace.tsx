@@ -1,7 +1,5 @@
 // The spend counter's value, notice and accessible summary, including partial, unavailable and loading figures.
 
-import { Loading } from '@lar-works/design-system';
-
 import { CounterDash, CounterPartial } from '@/ui/board';
 
 /** What the spend counter says: a figure once it knows one, marked with a plus while it covers only part of the usage. */
@@ -23,7 +21,7 @@ export function spendFace(figure: string, known: boolean, unavailable: boolean, 
         ) : unavailable ? (
             <CounterDash />
         ) : loading ? (
-            <Loading presentation="inline" title="Usage totals are still loading." />
+            <CounterDash />
         ) : (
             figure
         ),

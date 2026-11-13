@@ -20,7 +20,7 @@ export function pendingRequest(
     const gate = questions.some((question) => {
         const title = typeof question.question === 'string' ? question.question.split(':')[0] : '';
 
-        return /\b(?:brief approval|approve brief|approve the brief)\b/i.test(
+        return /\b(?:brief approval|approve (?:(?:the|revised|current|final) )?brief)\b/i.test(
             `${typeof question.header === 'string' ? question.header : ''} ${title}`,
         );
     });

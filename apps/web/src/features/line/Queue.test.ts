@@ -95,7 +95,7 @@ test('a Queued item blocked by an open issue shows only Start after', async () =
     const after = row('I_sample05').querySelector<HTMLElement>('[data-start-after]')!;
 
     expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual([
-        'Start after',
+        'Start shaping after #202',
         'start',
         true,
     ]);
@@ -169,7 +169,7 @@ test('a failed Start shows on its row with Retry start; closing the error doesnâ
     await press(row('I_sample05').querySelector<HTMLButtonElement>('.start button.dismiss')!);
     expect(row('I_sample05').querySelector('.start')).toBeNull();
     expect(dialog()).toBeNull();
-    expect(text(start())).toBe('Shape');
+    expect(text(start())).toBe('Start shaping');
 });
 
 test('a Start that may have run hides Shape; closing its message leaves a tag', async () => {

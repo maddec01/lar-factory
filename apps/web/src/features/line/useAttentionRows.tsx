@@ -142,11 +142,7 @@ export function useAttentionRows(
             entries: ahead
                 .filter(startable)
                 .map((p) => (
-                    <Entry
-                        key={p.item.id}
-                        main={<PartLink part={p} />}
-                        side={<PartStart part={p} data={data} label="Start" />}
-                    />
+                    <Entry key={p.item.id} main={<PartLink part={p} />} side={<PartStart part={p} data={data} />} />
                 )),
         },
         {

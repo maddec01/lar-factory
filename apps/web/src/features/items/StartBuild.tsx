@@ -3,7 +3,7 @@
 // while an issue it's blocked by is open. It's disabled, its title saying why, while its repository is still
 // onboarding or T3 has no project for its repository.
 
-import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
+import { startActionChoice, buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
@@ -13,24 +13,20 @@ import { useOnRow } from './RowContext';
 import { StartOrAfter } from './StartAfter';
 import { useButtonKind } from '@/ui/board';
 
-/** A dossier names it `label`; a row calls it Start. */
+/** The shared action choice names the build on every surface. */
 export function StartBuild({
     item,
     data,
-    label: given,
     linkedBeside,
-    namesBlocker,
 }: {
     item: Item;
     data: BoardData;
-    label?: string;
     linkedBeside?: string | undefined;
-    namesBlocker?: boolean;
 }) {
     const kindOf = useButtonKind();
     const short = useOnRow();
     const onRow = short;
-    const label = given ?? (short ? 'Start' : 'Start build');
+    const { label } = startActionChoice(item, 'build');
 
     // A thread already at work on the item would get a second one.
     if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
@@ -51,14 +47,5 @@ export function StartBuild({
             </Button>
         );
 
-    return (
-        <StartOrAfter
-            item={item}
-            data={data}
-            label={label}
-            kind="build"
-            linkedBeside={linkedBeside}
-            {...(namesBlocker === undefined ? {} : { namesBlocker })}
-        />
-    );
+    return <StartOrAfter item={item} data={data} kind="build" linkedBeside={linkedBeside} />;
 }

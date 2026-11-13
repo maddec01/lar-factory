@@ -53,3 +53,43 @@ test('item details show saved model, effort and reviewer choices read-only', asy
     expect(section.querySelector('input, textarea, select')).toBeNull();
     expect(wrote).toBe(false);
 });
+
+test('an open dialog updates the build phase from live board data while detail text stays cached', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+        const id = detailsRead(url);
+
+        if (!id) return new Response(JSON.stringify(sample));
+
+        const reply = await detailsReply(id).json();
+
+        reply.details.record = {
+            bodyKind: 'brief',
+            body: 'Brief',
+            context: '',
+            buildPhase: 'review',
+            reviewRounds: [],
+        };
+
+        return new Response(JSON.stringify(reply));
+    });
+
+    const data = {
+        ...sample,
+        items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, buildPhase: 'review' } : i)),
+    };
+
+    await mountPage(data);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() => useItemDialogStore.getState().open('I_sample13'));
+    expect(text(document.querySelector('[data-build-phase]'))).toBe('Build phaseReview');
+    await settle(() =>
+        useBoardStore.getState().receive({
+            ...data,
+            items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, buildPhase: 'approve' } : i)),
+        }),
+    );
+    expect(text(document.querySelector('[data-build-phase]'))).toBe('Build phaseAwaiting approval');
+});

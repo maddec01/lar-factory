@@ -172,7 +172,7 @@ test('a failed Start shows in the dialog, keeps Move to List and the last choice
     close.focus();
     await settle(() => close.click());
     expect(card().querySelector('.start')).toBeNull();
-    expect(text(start())).toBe('Shape');
+    expect(text(start())).toBe('Start shaping');
     expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
 
@@ -234,7 +234,7 @@ test('a failed start from the server offers Retry start, and closing it clears i
     expect(posted()).toEqual([['/api/dismiss-start-error', { session: 's1', itemId: 'I_sample05', purpose: 'shape' }]]);
     await answer({ error: null, board: withChoices });
     expect(card().querySelector('.start')).toBeNull();
-    expect(text(start())).toBe('Shape');
+    expect(text(start())).toBe('Start shaping');
 });
 
 test('a refusal the board holds no state for, as from a restarted server, keeps its error here', async () => {

@@ -62,7 +62,7 @@ export function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) 
 }
 
 const ACTIVITY_WORD: Record<PartActivity['kind'], string | null> = {
-    'needs you': 'Needs you',
+    'needs you': 'Question',
     working: 'Working',
     'child waiting': 'Child waiting',
     stopped: 'Run stopped',
@@ -111,23 +111,24 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
         action = (
             <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" next />
         );
-    else if (item.status === 'Ready' || item.status === 'Queued')
-        action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
+    else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} />;
 
     // Each card has one labelled thread action. Only a current question asks for an answer.
     const opensThread = threadsOf(item).length > 0 && !action;
     // The node says what its thread does beside its status, so the status leaves that out.
-    const status = complete ? 'Complete' : shown.stageWord;
+    const status = complete ? 'Complete' : asks ? shown.word : shown.stageWord;
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
     // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
     const word =
-        activity.kind === 'working' && (shown.execution === 'working' || shown.execution === 'quiet')
+        activity.kind === 'needs you'
             ? shown.word
-            : running?.running
-              ? running.label
-              : activity.kind === 'finished' && !RUNS.includes(item.status)
-                ? null
-                : ACTIVITY_WORD[activity.kind];
+            : activity.kind === 'working' && (shown.execution === 'working' || shown.execution === 'quiet')
+              ? shown.word
+              : running?.running
+                ? running.label
+                : activity.kind === 'finished' && !RUNS.includes(item.status)
+                  ? null
+                  : ACTIVITY_WORD[activity.kind];
     const seen = word && activity.thread ? lastSeen(activity.thread) : '';
     // One waiting reason: a question, else what blocks it, else a blocked slice over a waiting child.
     const waits = !asks && open.length ? `Waiting on ${waitText(item, open)}` : null;

@@ -270,16 +270,18 @@ const calm = (over: Partial<Item>) => ({
         .map((i) => (i.id === C200 ? { ...i, map: i.map && { ...i.map, fog: [] }, ...over } : i)),
 });
 
-test('the row shows one chip by priority: what asks for action over Refined, Refined over fog, and the rest count in its tooltip', async () => {
+test('the row shows one chip by priority: what asks for action over Refined, Refined over fog, and all remaining badges say what they mean', async () => {
     const words = (id = C200) => header(id).getAttribute('title');
 
     await mountPage(withItem(C200, refined));
     expect(chips(), 'a part in Needs you over open decisions and Refined').toEqual(['1 needs you']);
     expect(header().querySelector('[data-refined]')).toBeNull();
-    expect(text(more()!.querySelector('[aria-hidden]'))).toBe('+4');
-    expect(text(more()!.querySelector('.sr-only')), 'the rest read to a screen reader').toBe(
-        '2 decisions, Refined, no delivery planned, 2 open questions',
-    );
+    expect([...header().querySelectorAll('[data-chips-more]')].map(text)).toEqual([
+        '2 decisions',
+        'Refined',
+        'no delivery planned',
+        '2 open questions',
+    ]);
     expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 open questions');
 
     const title = next().querySelector('[title]')!;
@@ -419,8 +421,8 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
             clear,
         ),
     );
-    expect(text(next())).toBe('To merge#140 Owner accounts');
-    expect(text(step('I_sample13'))).toContain('Ready to merge');
+    expect(text(next())).toBe('Merge PR#140 Owner accounts');
+    expect(text(step('I_sample13'))).toContain('Merge PR');
 });
 
 test('a part with nothing to wait on is ready to start, with its Start', async () => {
@@ -452,7 +454,10 @@ test('the Ready to start row and the header agree on what can start: a Queued de
 
     const ready = () => dossier().querySelector('[data-attention-row="ready"]');
 
-    expect([text(ready()!.firstElementChild), text(startIn(col('side')))]).toEqual(['Ready to start 1', 'Start']);
+    expect([text(ready()!.firstElementChild), text(startIn(col('side')))]).toEqual([
+        'Ready to start 1',
+        'Start decision',
+    ]);
     await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
     expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
 });
@@ -492,7 +497,7 @@ test('once its blockers complete, Start build sends the build, and the header of
     await mountOpen(
         withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()),
     );
-    expect(text(startIn(col('side')))).toBe('Start');
+    expect(text(startIn(col('side')))).toBe('Start build');
     expect(
         next().querySelector('.sr-only')?.textContent,
         'Next reads to a screen reader and leaves its room to the title',
@@ -524,7 +529,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
     const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
 
     expect([text(after), after.title]).toEqual([
-        'Start after #140',
+        'Start decision after #140',
         'Pick a model to start it once #201, #140 complete',
     ]);
     await pressMenu(after);
@@ -533,7 +538,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
         ['/api/arm', { session: 's1', itemId: 'I_d204' }],
     ]);
     await answer({ error: null, board: { ...data, armed: { I_d204: {} } } });
-    expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
+    expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts decision after #140 ✓');
 });
 
 test('the parts list keeps cross-repository dependency order even when builds return to a repository', async () => {

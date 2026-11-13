@@ -4,6 +4,10 @@
 // surface names the same item differently.
 
 import {
+    isDecisionWork,
+    deskWait,
+    needsAnswer,
+    stoppedRunThread,
     activityLost,
     activityUnavailable,
     blockerRef,
@@ -36,8 +40,8 @@ type Execution = 'starting' | 'working' | 'quiet' | 'waiting' | 'stopped' | 'una
 const EXECUTION_WORD: Record<Exclude<Execution, 'starting'>, string> = {
     working: 'Working',
     quiet: 'Idle',
-    waiting: 'Needs you',
-    stopped: 'Stopped',
+    waiting: 'Question',
+    stopped: 'Run stopped',
     unavailable: 'Activity unavailable',
 };
 
@@ -88,6 +92,7 @@ export interface ItemStateInputs {
     lost: boolean;
     /** A start for the item is in flight, pressed on this page or reported by the server. */
     starting: boolean;
+    all?: readonly Item[];
 }
 
 /** Whether T3's own run state says the item's work runs, when its activity can't say: a shaping thread, a build thread or
@@ -172,25 +177,35 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
     const merged = !atWork && !readiness && prMerged;
     // A Ready item's blockers say why it hasn't started, whatever a thread still does.
     const blockers = item.status === 'Ready' && execution !== 'starting' ? openBlockers(item) : [];
-    const statusWord =
-        item.kind === 'decision'
-            ? item.completion?.complete || item.status === 'Done'
-                ? 'Complete'
-                : item.status === 'Shaping'
-                  ? 'Working'
-                  : item.status
-            : item.status;
+    const statusWord = isDecisionWork(item)
+        ? item.completion?.complete || item.status === 'Done'
+            ? 'Complete'
+            : item.status === 'Shaping'
+              ? 'Working'
+              : item.status
+        : item.status;
     const blockedWord = `Blocked · starts after ${blockers.map((blocker) => blockerRef(item, blocker)).join(', ')}`;
     const stageWord = blockers.length ? blockedWord : (stageReadiness?.word ?? (prMerged ? MERGED : statusWord));
     const said = execution && execution !== 'starting' && execution !== 'unavailable' ? execution : undefined;
-    const word = blockers.length
-        ? blockedWord
-        : said === 'working'
-          ? phaseOf(item, stale)
-          : said
-            ? EXECUTION_WORD[said]
-            : (readiness?.word ??
-              (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : statusWord));
+    const wait =
+        !inputs.starting &&
+        !atWork &&
+        (needsAnswer(item) ||
+            item.needsYou ||
+            (!stale && stoppedRunThread(item)) ||
+            (!readiness && ['Verify', 'Ready to merge'].includes(item.status)))
+            ? deskWait(item, stale, inputs.all).label
+            : undefined;
+    const word =
+        wait ??
+        (blockers.length
+            ? blockedWord
+            : said === 'working'
+              ? phaseOf(item, stale)
+              : said
+                ? EXECUTION_WORD[said]
+                : (readiness?.word ??
+                  (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : statusWord)));
     const state: StatusState | undefined = blockers.length
         ? 'waiting'
         : said === 'waiting'
@@ -203,33 +218,32 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
 
     return {
         stage: item.status,
-        progressStage:
-            item.kind === 'decision'
-                ? item.completion?.complete || item.status === 'Done'
-                    ? 'Outcome'
-                    : item.status === 'List' || item.status === 'Queued'
-                      ? item.status === 'List'
-                          ? 'List'
-                          : 'Queue'
-                      : 'Working'
-                : prMerged || stageReadiness?.word === 'Merged'
-                  ? 'Merge'
-                  : stageReadiness?.state === 'failed'
-                    ? 'Verify'
-                    : (
-                          {
-                              List: 'List',
-                              Queued: 'Queue',
-                              Shaping: 'Shaping',
-                              'Needs you': 'Shaping',
-                              Ready: 'Ready to build',
-                              'In progress': 'Build',
-                              Review: 'Review',
-                              Verify: 'Verify',
-                              'Ready to merge': 'Merge',
-                              Done: 'Merge',
-                          } as const
-                      )[item.status],
+        progressStage: isDecisionWork(item)
+            ? item.completion?.complete || item.status === 'Done'
+                ? 'Outcome'
+                : item.status === 'List' || item.status === 'Queued'
+                  ? item.status === 'List'
+                      ? 'List'
+                      : 'Queue'
+                  : 'Working'
+            : prMerged || stageReadiness?.word === 'Merged'
+              ? 'Merge'
+              : stageReadiness?.state === 'failed'
+                ? 'Verify'
+                : (
+                      {
+                          List: 'List',
+                          Queued: 'Queue',
+                          Shaping: 'Shaping',
+                          'Needs you': 'Shaping',
+                          Ready: 'Ready to build',
+                          'In progress': 'Build',
+                          Review: 'Review',
+                          Verify: 'Verify',
+                          'Ready to merge': 'Merge',
+                          Done: 'Merge',
+                      } as const
+                  )[item.status],
         progressState: stageReadiness?.state ?? state,
         execution,
         pr: readiness,
@@ -289,12 +303,14 @@ export function useItemStates(): (item: Item) => ItemState {
     const unavailable = useBoardUnavailable();
     const disconnected = useBoardStore((state) => !!state.clientError);
     const starting = useStarting();
+    const all = useBoardStore((state) => state.data.items);
 
     return (item) => {
         const now = Date.now();
 
         return itemState(item, {
             unavailable,
+            all,
             line: itemActivityLine(item, now, disconnected)?.state,
             lost: activityLost(itemActivityThread(item)?.activity, now),
             starting: starting(item),
@@ -307,11 +323,12 @@ export function useItemState(item: Item): ItemState {
     const unavailable = useBoardUnavailable();
     const disconnected = useBoardStore((state) => !!state.clientError);
     const starting = useStarting()(item);
+    const all = useBoardStore((state) => state.data.items);
     const line = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
     const lost = useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
 
     return useMemo(
-        () => itemState(item, { unavailable, line, lost, starting }),
-        [item, unavailable, line, lost, starting],
+        () => itemState(item, { unavailable, line, lost, starting, all }),
+        [item, unavailable, line, lost, starting, all],
     );
 }

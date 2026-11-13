@@ -48,7 +48,14 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.needsYou)
         return { label: 'Decision needed', action: { kind: 'details' as const, label: 'Review notice' } };
 
-    return { label: item.status === 'Needs you' ? 'Question' : 'Needs you', action: nextAction(item) };
+    return {
+        label:
+            item.status === 'Needs you' ||
+            (Array.isArray(item.threads) && item.threads.some((thread) => thread.childNeedsYou && !thread.observedAt))
+                ? 'Question'
+                : 'Needs you',
+        action: nextAction(item),
+    };
 }
 
 /** An unstarted part's saved question can be held in its nearest concept. */
@@ -75,4 +82,14 @@ function inheritedQuestion(item: Item, all: readonly Item[]) {
     }
 
     return undefined;
+}
+
+/** A gate's full brief belongs in the Brief section and T3, not a flattened wait notice. */
+export function questionWaitReason(item: Item): string {
+    const thread = openQuestionThread(item);
+
+    return thread?.pendingRequest?.kind === 'brief-approval'
+        ? 'Review the brief below, then approve it or request changes in T3.'
+        : thread?.questionSummary ||
+              'This work is waiting for your answer or decision. Open the thread in T3 to continue.';
 }

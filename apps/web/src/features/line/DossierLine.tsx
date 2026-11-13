@@ -16,7 +16,14 @@ import { PartStart } from './PartStart';
 import { figuresOf } from './RowDetails';
 import { RowKind, RowSource } from './RowIdentity';
 import { stageOf } from './StageStatus';
-import { AzureFields, ItemTitle, shownStatus, STATUS_COLOR, useActivityUnavailable } from '@/features/items';
+import {
+    AzureFields,
+    ItemTitle,
+    shownStatus,
+    useShownStatus,
+    STATUS_COLOR,
+    useActivityUnavailable,
+} from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     boardColor,
@@ -72,7 +79,7 @@ function PartsBar({ m }: { m: Moving }) {
     );
 }
 
-/** The first chip whole, and the rest in the line's tooltip. An empty dossier takes no room. */
+/** Every chip names its state; none collapse into an unexplained count. An empty dossier takes no room. */
 function Chips({ chips }: { chips: Chip[] }) {
     const [first, ...rest] = chips;
 
@@ -82,26 +89,11 @@ function Chips({ chips }: { chips: Chip[] }) {
 }
 
 /** Next, as a sentence. */
-function Next({ n, badged }: { n: ReturnType<typeof nextOf>; badged: boolean }) {
-    // A part on your desk is named as its attention row names it: Needs you, or to verify or merge.
-    const yours =
-        n.part?.item.status === 'Verify'
-            ? 'To verify'
-            : n.part?.item.status === 'Ready to merge'
-              ? 'To merge'
-              : 'Needs you';
-    const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
+function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
+    const shown = useShownStatus(n.part?.item ?? parent);
+    const word = { you: shown.word, start: 'Next', moving: 'Moving', none: '' }[n.tone];
 
-    // Start sits in the action slot labelled "Start", and a "need you" badge says Needs you, so those words are
-    // screen-reader text and leave their room to the title.
-    return (
-        <DossierNext
-            word={word}
-            yours={n.tone === 'you'}
-            unseen={n.tone === 'start' || (badged && word === 'Needs you')}
-            text={n.text}
-        />
-    );
+    return <DossierNext word={word} yours={n.tone === 'you'} unseen={n.tone === 'start'} text={n.text} />;
 }
 
 /** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, `note` follows its title, and `tools`, an expanded dossier's view controls, sit in the action slot beside any Start. */
@@ -158,7 +150,7 @@ export function DossierLine({
                         <DossierNote>{note}</DossierNote>
                         <DossierRepos>{repos}</DossierRepos>
                     </DossierTitleCell>
-                    {/* The first chip keeps its full width; the rest of the chips wait in the tooltip. */}
+                    {/* Every chip keeps its meaning visible. */}
                     <RowStateCell clips={false}>
                         <DossierStates>
                             <DossierState item={parent} />
@@ -169,7 +161,7 @@ export function DossierLine({
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
                 <RowSide passEmpty>
                     {tools && <DossierTools>{tools}</DossierTools>}
-                    {n.part && n.tone === 'start' && <PartStart part={n.part} data={data} label="Start" />}
+                    {n.part && n.tone === 'start' && <PartStart part={n.part} data={data} />}
                 </RowSide>
             </RowFirst>
             <RowSecondLine
@@ -186,7 +178,7 @@ export function DossierLine({
                 {parentContext ? (
                     <DossierParentContext>{parentContext}</DossierParentContext>
                 ) : (
-                    <Next n={n} badged={m.needsYou.length > 0} />
+                    <Next n={n} parent={parent} />
                 )}
             </RowSecondLine>
             <DossierActivity item={parent} />

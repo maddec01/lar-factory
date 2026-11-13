@@ -74,12 +74,12 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
             return hasLiveThread(item) ? (
                 <OpenThread item={item} data={data} />
             ) : (
-                <StartOrAfter item={item} data={data} label="Shape" namesBlocker={false} />
+                <StartOrAfter item={item} data={data} />
             );
         case 'Ready':
-            return <StartBuild item={item} data={data} namesBlocker={false} />;
+            return <StartBuild item={item} data={data} />;
         case 'In progress':
-            if (canRetryBuild(item)) return <StartBuild item={item} data={data} namesBlocker={false} />;
+            if (canRetryBuild(item)) return <StartBuild item={item} data={data} />;
 
             return <OpenThread item={item} data={data} />;
         case 'Shaping':

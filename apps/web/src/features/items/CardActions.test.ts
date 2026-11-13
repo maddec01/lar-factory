@@ -39,7 +39,7 @@ test('Queue shows pending state, then leaves Shape reachable without an overlay'
     await answer({ error: null, board: moved('I_sample01', 'Queued') });
     expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List3');
     expect(toast()).toBeNull();
-    expect(text(button('start', 'I_sample01'))).toContain('Shape');
+    expect(text(button('start', 'I_sample01'))).toContain('Start shaping');
 });
 
 test('a failed Move to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {

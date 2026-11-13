@@ -38,5 +38,7 @@ export * from './item-next-action.ts';
 export * from './sample-clock.ts';
 export * from './pr-merge.ts';
 
-export { deskWait } from './desk-wait.ts';
+export { deskWait, questionWaitReason } from './desk-wait.ts';
 export * from './work-map.ts';
+
+export * from './start-action.ts';

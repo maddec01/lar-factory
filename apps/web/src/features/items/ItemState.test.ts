@@ -25,7 +25,7 @@ test('a stopped Review build says Stopped everywhere, keeps Review as its record
     const state = stateOf(item('I_sample15'));
 
     expect([state.word, state.stage, state.execution, state.state, state.resume, state.recorded]).toEqual([
-        'Stopped',
+        'Run stopped',
         'Review',
         'stopped',
         'off',
@@ -88,4 +88,25 @@ test('failed PR checks share Verify while a merged PR advances to Merge', () => 
         expect(stateOf(subject)).toMatchObject({ progressStage: 'Verify', word: 'Checks failed', state: 'failed' });
     }
     expect(stateOf(item('I_sample23')).progressStage).toBe('Merge');
+});
+
+test.each([
+    ['question', 'Question'],
+    ['tool-approval', 'Tool approval'],
+    ['brief-approval', 'Approve brief'],
+] as const)('rows name the same %s wait as the desk', (kind, label) => {
+    const subject = item('I_sample14', {
+        status: 'Needs you',
+        threads: [
+            {
+                id: 'wait',
+                title: 'Wait',
+                state: 'needs you',
+                updated: '2026-10-21T10:00:00Z',
+                pendingRequest: { id: 'request', threadId: 'wait', kind },
+            },
+        ],
+    });
+
+    expect(stateOf(subject).word).toBe(label);
 });

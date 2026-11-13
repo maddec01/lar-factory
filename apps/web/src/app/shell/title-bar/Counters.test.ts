@@ -20,7 +20,7 @@ const completeSample = {
 const counters = () => $$<HTMLButtonElement>('[data-slot="title-bar-status"] [data-slot="toolbar-counter"]');
 /** A counter's label, as its name starts: "building:". */
 const labelOf = (b: Element) => /^[^:]*:/.exec(text(b))?.[0] ?? '';
-/** What a screen reader says for a counter: its label, then what its number means: "building: 4 builds open: 2 working, 1 waiting to close, 1 stopped". */
+/** What a screen reader says for a counter: its label, then what its number means: "building: 4 builds open: 2 working, 1 waiting to close, 1 run stopped". */
 const nameOf = (b: Element) => `${labelOf(b)} ${b.getAttribute('aria-description')}`;
 /** The number a counter shows. */
 const value = (b: Element) => text(b).slice(labelOf(b).length).trim();
@@ -114,7 +114,7 @@ test('a build counts while its start is in flight or in Review, and the count sh
     await mountPage(moved('I_sample14', 'Review', started));
     expect(value(counter('building'))).toBe('5');
     expect(nameOf(counter('building'))).toBe(
-        'building: 5 builds open · automatic limit 1: 2 working, 1 starting, 1 waiting to close, 1 stopped',
+        'building: 5 builds open · automatic limit 1: 2 working, 1 starting, 1 waiting to close, 1 run stopped',
     );
 });
 
@@ -300,4 +300,11 @@ test('current PR evidence groups failed checks and excludes checks-only waiting 
     expect(text(pop)).not.toContain('#149');
     expect(groups.some((group) => group.heading.startsWith('Checks running'))).toBe(false);
     expect(groups.find((group) => group.heading.startsWith('Ready to merge'))?.body ?? '').not.toContain('#142');
+});
+
+test('spend keeps a visible placeholder while no usage is known', async () => {
+    await mountPage({ ...completeSample, items: [], firstRead });
+    expect(value(counter('spend'))).toBe('–');
+    expect(counter('spend').querySelector('[data-loader]')).toBeNull();
+    expect(head(await openCounter('spend'))).toBe('Agent spendLoading');
 });

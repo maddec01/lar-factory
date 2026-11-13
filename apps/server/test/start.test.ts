@@ -104,24 +104,26 @@ test('Start runs the thread on the picked model choice, still in the repository 
     ]);
 });
 
-for (const [name, model] of [
-    ['an unknown instance', { instanceId: 'claudeAgent_work', model: 'claude-opus-5-5' }],
-    ['a disabled instance', { instanceId: 'cursor', model: 'cursor-agent' }],
-    ['an unknown model', { instanceId: 'codex', model: 'claude-opus-5-5' }],
-    ['an instance alone', { instanceId: 'codex' }],
-    ['a model alone', { model: 'gpt-6-astra' }],
-    ['a flag in place of a model', { instanceId: 'codex', model: '--help' }],
-    ['no object', 'codex/gpt-6-astra'],
-] as const) {
-    test(`Start refuses ${name} as the model choice and runs no t3`, async (t) => {
-        const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+test('Start refuses unoffered model choices without launching a thread', async (t) => {
+    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+
+    // Every input is refused before a launch or record write, so the cases can share one board.
+    for (const [name, model] of [
+        ['an unknown instance', { instanceId: 'claudeAgent_work', model: 'claude-opus-5-5' }],
+        ['a disabled instance', { instanceId: 'cursor', model: 'cursor-agent' }],
+        ['an unknown model', { instanceId: 'codex', model: 'claude-opus-5-5' }],
+        ['an instance alone', { instanceId: 'codex' }],
+        ['a model alone', { model: 'gpt-6-astra' }],
+        ['a flag in place of a model', { instanceId: 'codex', model: '--help' }],
+        ['no object', 'codex/gpt-6-astra'],
+    ] as const) {
         const response = await start(board, board.id(12), board.url, model);
 
-        assert.equal(response.status, 422);
-        assert.match((await response.json()).error, /isn't offered/);
-        assert.deepEqual(await board.t3Calls(), []);
-    });
-}
+        assert.equal(response.status, 422, name);
+        assert.match((await response.json()).error, /isn't offered/, name);
+        assert.deepEqual(await board.t3Calls(), [], name);
+    }
+});
 
 test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
     const { board } = await boardIn(t, [boardIssue(12, 'Queued')], {}, (dir) => {

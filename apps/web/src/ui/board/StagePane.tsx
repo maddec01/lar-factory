@@ -9,6 +9,15 @@ import type { ReactNode } from 'react';
 
 import { LimitBars } from './Counters';
 
+/** Ready keeps the shared occupancy beside its scheduling controls at every width. */
+export function ReadyBuildControls({ children }: { children: ReactNode }) {
+    return (
+        <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1" data-ready-build-controls>
+            {children}
+        </span>
+    );
+}
+
 /** A stage's section: its status glyph, title and count on the header band, anything at the header's `right`, then its
  *  rows; with no rows, its header band alone, ending in what `empty` says. */
 export function StagePane({
@@ -115,7 +124,7 @@ export function BuildLimit({
 }) {
     return (
         <span
-            className="build-limit text-fg-muted inline-flex items-center gap-1.5 text-xs whitespace-nowrap tabular-nums"
+            className="build-limit text-fg-muted inline-flex flex-wrap items-center gap-1.5 text-xs tabular-nums"
             title={title}
         >
             {limit !== undefined ? (

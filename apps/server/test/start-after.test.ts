@@ -8,6 +8,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
 import {
+    approveReadyBuilds,
     SAMPLE_MODELS,
     changeRecords,
     recordBlockers,
@@ -30,9 +31,16 @@ async function armableBoard(
     options: object = {},
     env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS },
 ) {
-    const board = await startBoard(t, { items, ...options }, false, false, env);
+    const board = await startBoard(
+        t,
+        { localSetups: { 'maddec01/lar-factory': { writeRefinedSpec: false } }, items, ...options },
+        false,
+        false,
+        env,
+    );
 
     await until(board, (d) => d.items.length === items.length);
+    await approveReadyBuilds(board);
 
     return { board, env };
 }
@@ -91,12 +99,12 @@ test('a refresh with a blocker incomplete starts nothing; once the last complete
     const { board, env, open } = await blockedBuildBoard(t);
 
     assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
-    // A start disarms its part before the read's data is served, so a part still armed didn't start.
+    // An incomplete blocker preserves the armed authorization.
     assert.deepEqual((await read(board)).armed, { [board.id(12)]: { model: OPUS } });
     // No ticket read is asked for: the board sees the decision complete in the work records.
     await settleDecisions(board, board.id(12), [open]);
 
-    const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)]);
+    const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)] && !d.armed?.[board.id(12)]);
 
     assert.deepEqual(started.armed, {});
     assert.deepEqual(armedFile(env.HOME!), {});
@@ -170,7 +178,7 @@ test('a Dependency whose ticket closed still holds Start and Start after until t
 
     assert.equal(marked.status, 200);
 
-    const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)]);
+    const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)] && !d.armed?.[board.id(12)]);
 
     assert.deepEqual(started.armed, {});
 });
@@ -212,7 +220,7 @@ test('a failed start disarms the part and shows its error on it, until it is arm
     assert.equal((await rearmed.json()).board.armedErrors[board.id(12)], undefined);
 });
 
-test('an armed build whose fetch fails disarms, shows the error on the item and starts nothing', async (t) => {
+test('an armed build whose fetch fails stays armed, shows the hold and starts nothing', async (t) => {
     const { board, env, open } = await blockedBuildBoard(t);
 
     assert.equal((await arm(board, board.id(12))).status, 200);
@@ -225,7 +233,7 @@ test('an armed build whose fetch fails disarms, shows the error on the item and 
         failed.armedErrors![board.id(12)],
         'Could not fetch main from origin. Check the network and your Git login, then start the build again.',
     );
-    assert.deepEqual(failed.armed, {});
+    assert.deepEqual(failed.armed, { [board.id(12)]: {} });
     assert.deepEqual(
         (await board.t3Calls()).filter((args) => args[0] === 'launch'),
         [],

@@ -1,8 +1,7 @@
-// Auto-build: with the switch on, the board starts each eligible Ready build through Start build, oldest passing gate
-// first and then by work ID, until the builds at work reach the build limit. A hold starts nothing, marks nothing on a
-// build and retries on the next pass. Any other refused or failed start pauses automatic attempts on that build, kept in
-// a JSON file in the data folder, until a Start build on it succeeds or a new gate passes. Only the board that owns the
-// data folder's Auto-build lock starts builds, so two running boards never both do.
+// One scheduler for Auto-build and explicitly running concepts. Eligible gates share the machine capacity,
+// ordered by gate age then work ID. A concept remains authorized with Auto-build off, until Pause or a scope change.
+// Holds retry; definite failures pause the item until a manual start succeeds or a new gate passes. Unknown launches
+// retain their durable intent and slot. One board owns automatic scheduling for the data folder.
 
 import {
     blockedText,
@@ -60,8 +59,8 @@ interface Pause {
     gateId: string | null;
 }
 
-const T3_UNREACHABLE = "Auto-build waits for T3, which the board can't reach.";
-const MODELS_UNREADABLE = "Auto-build waits for T3's model choices, which the board can't read.";
+const T3_UNREACHABLE = "Builds wait for T3, which the board can't reach.";
+const MODELS_UNREADABLE = "Builds wait for T3's model choices, which the board can't read.";
 const MODEL_GONE = "Auto-build's model isn't offered now. Choose another in Settings.";
 const ANOTHER_BOARD = 'Another board on this Mac starts the builds.';
 
@@ -151,12 +150,14 @@ export function createAutoBuild({
             if (!gate || records!.specState(item.id).held || records!.waitingOn(item.id).length || startPending(item))
                 return null;
 
-            if (
-                record.parentId &&
-                records!.read(record.parentId).kind === 'concept' &&
-                !records!.refinement(record.parentId).complete
-            )
-                return 'refinement';
+            if (record.parentId && records!.read(record.parentId).kind === 'concept') {
+                const plan = records!.conceptBuildPlan(record.parentId);
+
+                if (plan.run?.state === 'paused') return null;
+
+                if (!records!.refinement(record.parentId).complete || (!plan.run && plan.holds.length))
+                    return 'refinement';
+            }
 
             return { at: gate.recordedAt };
         } catch (err) {
@@ -164,6 +165,14 @@ export function createAutoBuild({
 
             return null;
         }
+    }
+
+    function conceptOf(item: Item): { id: string; explicit: boolean } | null {
+        const parent = records!.read(item.id).parentId;
+
+        return parent && records!.read(parent).kind === 'concept'
+            ? { id: parent, explicit: records!.conceptBuildPlan(parent).run?.state === 'running' }
+            : null;
     }
 
     /** The Ready builds that may start now, oldest passing gate first and then by work ID, and those waiting for Refinement. */
@@ -215,7 +224,7 @@ export function createAutoBuild({
     }
 
     /** Why nothing may start now for every build, or null. */
-    function hold(): string | null {
+    function hold(model?: AutoBuildState['model']): string | null {
         const data = board.snapshot();
 
         if (data.t3Availability?.availability !== 'available') return T3_UNREACHABLE;
@@ -223,8 +232,6 @@ export function createAutoBuild({
         const choices = offerModelChoices();
 
         if (!choices.length) return MODELS_UNREADABLE;
-
-        const { model } = setting();
 
         if (model && !findModelChoice(choices, model)) return MODEL_GONE;
 
@@ -265,6 +272,7 @@ export function createAutoBuild({
     async function passOnce(): Promise<void> {
         if (!records) return;
 
+        records.reconcileConceptBuildRuns();
         endPauses();
 
         const { builds, waitsForRefinement } = eligible();
@@ -279,7 +287,9 @@ export function createAutoBuild({
         });
         const { on, model } = setting();
 
-        if (!on || !builds.length || !room) return show(shown());
+        const scheduled = builds.filter((item) => on || conceptOf(item)?.explicit);
+
+        if (!scheduled.length || !room) return show(shown());
 
         const holds = hold() ?? ((await owns()) ? null : ANOTHER_BOARD);
 
@@ -287,7 +297,7 @@ export function createAutoBuild({
 
         let buildHold: string | null = null;
 
-        for (const item of builds) {
+        for (const item of scheduled) {
             if (!room) break;
 
             const retry = held.get(item.id);
@@ -307,7 +317,19 @@ export function createAutoBuild({
                 continue;
             }
 
-            const { body } = await commands.startBuild(item.id, model, undefined, true);
+            const concept = conceptOf(item);
+            const choice = concept?.explicit ? undefined : model;
+            const modelHold = hold(choice);
+
+            if (modelHold) {
+                buildHold ??= modelHold;
+                continue;
+            }
+
+            const { body } = await commands.startBuild(item.id, choice, undefined, true, {
+                automatic: !concept?.explicit,
+                ...(concept && { conceptId: concept.id }),
+            });
             const { error, uncertain, hold: passes } = body as Partial<StartResult>;
 
             if (passes && error) {

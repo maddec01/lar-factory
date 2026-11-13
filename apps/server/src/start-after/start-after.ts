@@ -109,14 +109,15 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
 
     /** Disarms the part, then runs its start and keeps the error a failed one gives. */
     async function startNow(item: Item, { model }: ArmedStart): Promise<void> {
-        const failed = save(without(armed(), item.id), errors());
-
-        if (failed) return log(failed);
-
         const { body } = await (item.status === 'Ready'
             ? commands.startBuild(item.id, model, undefined, true)
             : commands.start(item.id, model, true));
-        const { error } = body as { error?: string | null };
+        const { error, hold } = body as { error?: string | null; hold?: boolean };
+
+        // A capacity or prerequisite hold keeps the person's authorization for the next pass.
+        const failed = save(hold ? armed() : without(armed(), item.id), errors());
+
+        if (failed) return log(failed);
 
         if (!error) return log(`started #${item.number} after its blockers completed`);
 

@@ -79,7 +79,15 @@ export {
 } from './PullRequests';
 export { SliceBar, SliceList, SliceRow } from './Slices';
 export { SourceIcon } from './SourceIcon';
-export { BuildLimit, HeaderSwitch, StageList, StagePane, StagePaneEmpty, StageSections } from './StagePane';
+export {
+    BuildLimit,
+    ReadyBuildControls,
+    HeaderSwitch,
+    StageList,
+    StagePane,
+    StagePaneEmpty,
+    StageSections,
+} from './StagePane';
 export {
     QueueAge,
     QueuePlace,

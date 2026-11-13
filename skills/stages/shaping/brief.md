@@ -1,5 +1,8 @@
 ## 3. Brief
 
+Input: accepted answers, code evidence and affected sibling contracts. Output:
+a saved `brief` and its digest, ready for Gate.
+
 Write the brief to a file, then save it in the record with
 `lar-work set-body <work ID> --revision N --body brief --file <file>`. The
 user's original text stays in the record's initial context.
@@ -16,8 +19,8 @@ acceptance criteria. Keep each fact once. Confirmed holds product decisions,
 not approval records. Keep delegation, gate evidence, factory work IDs and
 workflow mechanics in local records. Notes for the builder holds only constraints
 or references that cannot be rediscovered from the code, such as a chosen
-prototype branch; omit code tours, line numbers and step-by-step implementation
-recipes. Omit empty optional sections. A routine brief should fit on one screen;
+prototype branch; name affected files and shared contracts for overlap checks; omit line numbers
+and step-by-step implementation recipes. Omit empty optional sections. A routine brief should fit on one screen;
 add detail only when it changes what a reviewer must accept.
 
 Read the local [domain-doc setting](shared/domain-docs.md#where-domain-docs-live)

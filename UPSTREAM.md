@@ -42,8 +42,7 @@ Maintainer ports an upstream change or skips it.
 | `skills/shared/adr-format.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/ADR-FORMAT.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/skill-mechanics.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL-MECHANICS.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/write-agent-docs.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL.md | `5beb35b040e3` | 2026-10-19 |
-| `skills/lar-build/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
-| `skills/lar-shape/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
+| `skills/stages/shaping/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
 | `skills/stages/shaping/grill.md` | mattpocock/skills | `skills/productivity/grilling` | skills/productivity/grilling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/stages/shaping/prototype-logic.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/LOGIC.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/stages/shaping/prototype-ui.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/UI.md | `5beb35b040e3` | 2026-10-19 |

@@ -39,6 +39,7 @@ Maintainer ports an upstream change or skips it.
 | `skills/shared/handoff-content.md` | mattpocock/skills | `skills/productivity/handoff` | skills/productivity/handoff/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/glossary-format.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/GLOSSARY-FORMAT.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/domain-docs.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/domain-docs-setting.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/adr-format.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/ADR-FORMAT.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/skill-mechanics.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL-MECHANICS.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/shared/write-agent-docs.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL.md | `5beb35b040e3` | 2026-10-19 |

@@ -36,7 +36,7 @@ Queue, Status and shaping or build progress live only in local work records.
 [Tracker structure sync](publication.md) saves concept and multi-repository kind,
 parts, Connections, Dependencies and issue grouping when the local
 option is ON. That path saves only shaping results needed for structure.
-[Issue creation and Ticket Specs](work-records.md#issue-creation) use independent
+[Issue creation and Ticket Specs](issue-creation.md) use independent
 ON-by-default settings. The whole gated brief, including enabled Domain docs,
 becomes the main text with the earlier text kept as Original. Decisions, slices,
 queue and progress stay local. The source supplies List without a per-ticket

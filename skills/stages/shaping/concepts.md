@@ -27,7 +27,7 @@ Dependencies. Never write nodes, edges, statuses or queue flags into map prose;
 record those facts with `lar-work` instead.
 
 The user's original text stays in the record's initial context. Follow the local
-[domain-doc setting](shared/domain-docs.md#where-domain-docs-live). With it OFF,
+[domain-doc setting](shared/domain-docs-setting.md). With it OFF,
 write "none" under Domain docs and in decision domain-drafts, without drafting entries.
 
 1. Grill the user ([Grilling with docs](grilling-with-docs.md) in [SKILL.md](grilling-with-docs.md))
@@ -69,7 +69,7 @@ roles use the foreground with their tool's longest timeout, per
 Read siblings with `lar-work decision-answer ID`; use current text or the resolved
 replacement. Within the approved destination, adjust proposed builds without asking.
 If this answer supersedes another, use `supersede-answer` per
-[Completion](shared/issue-tracker/work-records.md#completion) before saving the map.
+[Completion](shared/issue-tracker/completion.md) before saving the map.
 
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
    and, with domain docs ON, the drafts it settled, or "none"
@@ -102,7 +102,7 @@ and moved to Ready for the board to start
 should now print it complete; fix what its reasons name. Map builds follow the
 build rules: each changes one repository, and work in another repository becomes
 a build there or a Dependency per [Other
-repositories](shared/issue-tracker/work-records.md#other-repositories). A
+repositories](shared/issue-tracker/other-repositories.md). A
 blocked build starts once its blockers are complete and the user has marked each
 Dependency holding it met. Consult `lar-work refinement <concept work ID>`
 independently of delivery. Refinement requires a nonempty map, Fog recorded gone
@@ -114,6 +114,6 @@ machine's Auto-build switch on, the board starts eligible Ready builds by
 itself, up to the build limit. Auto-build starts a build under a concept only
 once the concept's Refinement is complete.
 
-Read [Completion](shared/issue-tracker/work-records.md#completion) for delivery
+Read [Completion](shared/issue-tracker/completion.md) for delivery
 and [Structural publication suspended](shared/issue-tracker/publication.md)
 for local structure and retained recovery data.

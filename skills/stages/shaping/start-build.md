@@ -13,7 +13,7 @@ The board's **Start build** on a Ready build is the user's Go. The exception is
 eligible Ready builds by itself, up to the build limit. Auto-build starts a
 build under a concept only once the concept's Refinement is complete. A build
 blocked by other work starts only once that work is complete
-([Completion](shared/issue-tracker/work-records.md#completion)), by hand,
+([Completion](shared/issue-tracker/completion.md)), by hand,
 through the board's **Start after** or through Auto-build. With no repository
 project for the build's repo, Start build stays disabled until the user adds the
 project in T3. Start build:

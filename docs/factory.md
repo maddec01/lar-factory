@@ -435,8 +435,10 @@ changes read from a ticket. Compact summaries group the work to re-check with
 expandable item names; full instructions remain in the thread checklist.
 No tracker request runs inside this command.
 
-The owning thread repairs affected records, re-gates changed briefs through Doubt
-and Pedro's board approval. It records each
+The thread follows `skills/shared/reconcile-group.md` after each decision, gate,
+scope change, set-aside, merge-build and observed PR merge. It repairs the records,
+reruns affected briefs through code evidence and Doubt with `doubt-package`, and
+requests Pedro's board approval only when a gate needs approval. It records each
 source-change review with `resolve-reconcile GROUP_ID --item KEY --digest H
 --evidence TEXT`. Changed fingerprints refuse stale acknowledgements. Mechanical
 holds clear only when the recorded condition is fixed; the next reconcile records

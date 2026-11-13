@@ -28,3 +28,5 @@
 5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.
    Builds wait for Start build, or enabled Auto-build after concept refinement.
+
+For grouped work, run [Reconcile the group](shared/reconcile-group.md) after scope changes and after board approval, including batch approval.

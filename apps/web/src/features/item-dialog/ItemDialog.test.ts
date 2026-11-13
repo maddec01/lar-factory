@@ -94,11 +94,11 @@ test.each([
 });
 
 test.each([['running'], ['needs you']] as const)(
-    'a Queued item with a %s thread offers Open thread instead of Shape, and neither Move to List nor Abandon',
+    'a Queued item with a %s thread offers its thread action instead of Shape, and neither Move to List nor Abandon',
     async (state) => {
         await mountPage(withThreads('I_sample05', [thread('live', state)]));
         await openItem('I_sample05');
-        expect(footerControls()).toEqual(['GitHub', 'Open thread']);
+        expect(footerControls()).toEqual(['GitHub', state === 'needs you' ? 'Answer in T3' : 'Open thread']);
         expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
     },
 );

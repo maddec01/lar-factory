@@ -93,6 +93,8 @@ interface DeskCardProps {
     title: ReactNode;
     /** The title's full text, which names the card. */
     name: string;
+    /** The concept or linked parent this work belongs to, supplied by the desk projection. */
+    parentName?: string;
     /** More about the item under its title, such as a work item's fields. */
     details?: ReactNode;
     /** The status's glyph, only where there is no `statusState` (whose light is drawn instead). */
@@ -124,6 +126,7 @@ export function DeskCard({
     age,
     title,
     name,
+    parentName,
     details,
     statusIcon,
     status,
@@ -174,6 +177,7 @@ export function DeskCard({
             }
             actions={<span className="desk-actions contents">{actions}</span>}
         >
+            {parentName && <p className="text-fg-muted text-xs">Part of {parentName}</p>}
             {details}
         </CardBase>
     );

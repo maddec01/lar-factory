@@ -609,10 +609,10 @@ test('sample covers every status and both repositories', () => {
 
     const { needsYou, shaping, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
 
-    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 5, 3, 4]);
+    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 6, 3, 4]);
 });
 
-test('the desk holds Needs you, Verify and Ready to merge, in flow order, leaving grouped concepts and Ready items out', () => {
+test('the desk holds Needs you, Verify and Ready to merge, in flow order, including grouped concepts and leaving Ready items out', () => {
     const now = Date.parse('2026-10-21T10:00:00Z');
     const items = [
         item('Verify'),
@@ -627,7 +627,7 @@ test('the desk holds Needs you, Verify and Ready to merge, in flow order, leavin
 
     assert.deepEqual(
         needsYou.map((i) => i.status),
-        ['Needs you', 'Verify', 'Ready to merge'],
+        ['Needs you', 'Needs you', 'Verify', 'Ready to merge'],
     );
 });
 

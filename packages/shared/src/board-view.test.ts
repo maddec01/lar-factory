@@ -216,13 +216,12 @@ for (const kind of ['issue', 'concept'] as const) {
                 threads: [{ id: 'q', state: 'needs you' }],
             } as Item;
             const data = { items: [item], repos: [], firstRead: { settled: true } } as unknown as BoardData;
-            const expected =
-                kind !== 'concept' && ['Shaping', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
+            const expected = status !== 'Done';
 
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(expected));
             item.threads = 'unavailable';
 
-            const ordinary = kind !== 'concept' && ['Needs you', 'Verify', 'Ready to merge'].includes(status);
+            const ordinary = ['Needs you', 'Verify', 'Ready to merge'].includes(status);
 
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
             item.threads = [{ id: 'q', state: 'needs you', observedAt: '2026-11-02' }] as Item['threads'];
@@ -297,7 +296,7 @@ describe('placementOf', () => {
     const sections = (item: Item, facts?: Partial<PlacementFacts>) => place(item, facts).sections;
 
     test.each(['concept', 'issue'] as const)(
-        '%s groups keep parents and children only in the dock across statuses',
+        '%s groups keep parents and children in the dock and add human waits to the desk',
         (kind) => {
             const parent = concept({ kind });
 
@@ -316,12 +315,16 @@ describe('placementOf', () => {
                 const child = part({ status, repo: 'owner/other', threads: [buildThread] });
                 const all = [parent, child];
 
-                assert.deepEqual(sections(child, { all }), ['dock'], status);
+                const expected: BoardSection[] = ['Needs you', 'Verify', 'Ready to merge'].includes(status)
+                    ? ['desk', 'dock']
+                    : ['dock'];
+
+                assert.deepEqual(sections(child, { all }), expected, status);
 
                 if (status !== 'List' && status !== 'Done') {
                     const changed = { ...parent, status };
 
-                    assert.deepEqual(sections(changed, { all: [changed, child] }), ['dock'], `parent ${status}`);
+                    assert.deepEqual(sections(changed, { all: [changed, child] }), expected, `parent ${status}`);
                 }
             }
         },
@@ -338,7 +341,7 @@ describe('placementOf', () => {
             [
                 'an open question on a concept',
                 concept({ threads: [{ id: 'q', state: 'needs you' }] as ItemThread[] }),
-                false,
+                true,
             ],
             ['Verify', work({ status: 'Verify' }), true],
             ['Ready to merge', work({ status: 'Ready to merge' }), true],
@@ -350,7 +353,7 @@ describe('placementOf', () => {
             ],
             ['Ready', work({ status: 'Ready' }), false],
             ['In progress', work({ status: 'In progress' }), false],
-            ['a concept at Verify', concept({ status: 'Verify' }), false],
+            ['a concept at Verify', concept({ status: 'Verify' }), true],
         ])('%s: %s', (_name, item, onDesk) => {
             assert.equal(sections(item).includes('desk'), onDesk);
         });
@@ -392,7 +395,7 @@ describe('placementOf', () => {
             const refined = { refinement: { complete: true, reasons: [] } };
 
             assert.deepEqual(sections(concept(refined)), ['dock']);
-            assert.deepEqual(sections(concept({ ...refined, status: 'Needs you' })), ['dock']);
+            assert.deepEqual(sections(concept({ ...refined, status: 'Needs you' })), ['desk', 'dock']);
             assert.deepEqual(sections(concept({ ...refined, status: 'Queued' }), { starts: { shape: starting } }), [
                 'dock',
             ]);
@@ -502,10 +505,10 @@ describe('placementOf', () => {
             assert.deepEqual(inDossier(change, facts), { sections: ['dock'] });
         });
 
-        test('Needs you with no recorded build thread appears only in its dossier', () => {
-            assert.deepEqual(inDossier({ status: 'Needs you' }), { sections: ['dock'] });
+        test('Needs you with no recorded build thread appears on the desk and in its dossier', () => {
+            assert.deepEqual(inDossier({ status: 'Needs you' }), { sections: ['desk', 'dock'] });
             assert.deepEqual(inDossier({ status: 'Needs you' }, { starts: { build: starting } }), {
-                sections: ['dock'],
+                sections: ['desk', 'dock'],
             });
         });
 
@@ -514,10 +517,14 @@ describe('placementOf', () => {
             ['Ready with a build start in flight', { status: 'Ready' }, ['dock'], { starts: { build: starting } }],
             ['In progress', { status: 'In progress' }, ['dock']],
             ['Review', { status: 'Review' }, ['dock']],
-            ['Verify', { status: 'Verify' }, ['dock']],
-            ['Ready to merge', { status: 'Ready to merge' }, ['dock']],
-            ['Needs you with a recorded build thread', { status: 'Needs you', threads: [buildThread] }, ['dock']],
-        ])('%s appears only in its dossier', (_name, change, expected, facts) => {
+            ['Verify', { status: 'Verify' }, ['desk', 'dock']],
+            ['Ready to merge', { status: 'Ready to merge' }, ['desk', 'dock']],
+            [
+                'Needs you with a recorded build thread',
+                { status: 'Needs you', threads: [buildThread] },
+                ['desk', 'dock'],
+            ],
+        ])('%s keeps its dossier placement', (_name, change, expected, facts) => {
             assert.deepEqual(inDossier(change, facts), { sections: expected });
         });
 

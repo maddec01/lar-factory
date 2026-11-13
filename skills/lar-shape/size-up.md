@@ -8,6 +8,7 @@ step in plain words. Ask the user to confirm or amend this understanding through
 grilling, prototypes or brief drafting, even for a fully specified issue.
 Incorporate amendments and present the revised understanding for confirmation.
 Silence leaves the checkpoint pending in Needs you.
+Show the item's stated constraints using `lar-work --help`'s scope schema. On confirmation, save that JSON with `lar-work confirm-scope <work ID> --revision N --file <scope.json> --identity <user> --evidence "<explicit response>"`; reuse `lar-work confirmed-scope <work ID>` on resume, and change it only after an explicit amendment.
 
 On resume, reuse an explicit confirmation recorded in the thread or the brief's
 Confirmed section only when the proposed understanding is unchanged. Keep the

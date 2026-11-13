@@ -22,6 +22,7 @@ import { heavyCommand } from './heavy-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
+import { scopeCommand } from './scope-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import { verificationCommand } from './verification-command.ts';
 import {
@@ -48,6 +49,20 @@ const HELP = `Usage: lar-work <command> [options]
 
 Reads and changes the factory's work records in the work-record database, which
 it opens directly. It works from any folder, with or without the board app.
+
+Confirmed scope, local only
+  confirm-scope <work-id> --revision N --file F --identity person --evidence response
+                                    Save the scope shown at understanding confirmation:
+                                    {files:[],tests:[],behaviour:[],excluded:[],
+                                     size:"Small"|"Larger"|null,
+                                     verify:{required:boolean,visibleUi:string|null}}.
+                                    Verify only for visible UI behaviour a person must check.
+                                    Empty lists/null size mean unspecified; never invent scope.
+  confirmed-scope <work-id> [--markdown]
+                                    Read the confirmation, or render the brief's authoritative
+                                    Done when, Scope and Verify sections without re-deriving them.
+  brief-scope-check <work-id>       Compare those sections; report missing/extra claims, exit 1
+                                    on mismatch or absent confirmation. Other prose needs Doubt.
 
 Validation records, local only and requiring no revision
   run-check <work-id> --role R [--live] [--reason X] -- <command>
@@ -1112,6 +1127,9 @@ async function main(args: string[]): Promise<number> {
 
     if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
         return verificationCommand(args[0]!, args.slice(1));
+
+    if (['confirm-scope', 'confirmed-scope', 'brief-scope-check'].includes(args[0]!))
+        return scopeCommand(args[0]!, args.slice(1));
 
     if (args[0] === 'heavy') return heavyCommand(args);
 

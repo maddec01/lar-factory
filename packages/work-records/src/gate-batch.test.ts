@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { scopeMarkdown, type BriefScope } from './brief-scope.ts';
 import { gateManifest } from './gate-batch.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
@@ -16,7 +17,16 @@ afterEach(() => {
     }
 });
 
-async function fixture() {
+const scopeFor = (index: number): BriefScope => ({
+    files: [`src/part-${index}.ts`],
+    tests: [],
+    behaviour: [`Complete brief ${index}.`],
+    excluded: [],
+    size: 'Small',
+    verify: { required: false, visibleUi: null },
+});
+
+async function fixture(captured = false) {
     const dir = mkdtempSync(join(tmpdir(), 'gate-batch-'));
     const path = join(dir, 'records.db');
     const records = await openWorkRecords(path);
@@ -34,6 +44,12 @@ async function fixture() {
         });
 
         records.setBody(work.workId, work.revision, 'brief', `Complete brief ${i}.\nFiles: \`src/part-${i}.ts\``);
+
+        if (captured) {
+            records.confirmScope(work.workId, records.read(work.workId).revision, scopeFor(i), 'Pedro', 'Yes.');
+            records.setBody(work.workId, records.read(work.workId).revision, 'brief', scopeMarkdown(scopeFor(i)));
+        }
+
         ids.push(work.workId);
     }
 
@@ -198,4 +214,37 @@ it('rejects the whole batch after an edited brief is restored and Doubt renewed'
     review();
     expect(() => approve(manifest)).toThrow(/conflicting fields: body.brief/);
     empty();
+});
+
+it.each([0, 1, 2, 3, 4, 5, 6, 7])(
+    'checks captured scope for batch member %s before display and approval',
+    async (index) => {
+        const { records, ids, review, approve, empty } = await fixture(true);
+        const manifest = records.gateBatch(ids);
+        const id = ids[index]!;
+        const amended = { ...scopeFor(index), excluded: ['No README examples.'] };
+
+        records.confirmScope(id, records.read(id).revision, amended, 'Pedro', 'Exclude README examples.');
+        review();
+        expect(() => records.gateBatch(ids)).toThrow(/brief differs from confirmed scope/);
+        expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
+        empty();
+        records.setBody(id, records.read(id).revision, 'brief', scopeMarkdown(amended));
+        review();
+        expect(approve().gates).toHaveLength(8);
+    },
+);
+
+it('rejects batch approval after captured scope is amended and restored, even with renewed Doubt', async () => {
+    const { records, ids, review, approve, empty } = await fixture(true);
+    const manifest = records.gateBatch(ids);
+    const id = ids.at(-1)!;
+    const original = scopeFor(7);
+
+    records.confirmScope(id, records.read(id).revision, { ...original, size: 'Larger' }, 'Pedro', 'Larger.');
+    records.confirmScope(id, records.read(id).revision, original, 'Pedro', 'Small again.');
+    review();
+    expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
+    empty();
+    expect(approve().gates).toHaveLength(8);
 });

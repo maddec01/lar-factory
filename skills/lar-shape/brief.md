@@ -3,6 +3,7 @@
 Write the brief to a file, then save it in the record with
 `lar-work set-body <work ID> --revision N --body brief --file <file>`. The
 user's original text stays in the record's initial context.
+Use `lar-work confirmed-scope <work ID> --markdown` for Done when, Scope and Verify below; keep scope claims there. Run `lar-work brief-scope-check <work ID>` after saving and fix every missing/extra claim before Gate.
 
 The brief is the builder's handover. Editing it invalidates prior gate evidence.
 Run [Gate](gate.md) on the final text before marking it Ready. With Spec writing
@@ -27,21 +28,17 @@ With it ON, use the entries and ADR drafts in the template below.
 ## What
 <the change, in the user's domain language>
 
-## Done when
-- <observable result a reviewer can check>
+<insert the command-rendered Done when, Scope and Verify sections>
 
 ## Confirmed
 - <each assumption the user confirmed, and each decision with its gist>
 
 ## Notes for the builder
 <essential constraints or a chosen prototype branch>
-Files: `<repo-relative path>`, ... (or none)
 Contracts: `<shared contract name>`, ... (or none)
 
 ## Domain docs
 - Glossary: <each term to add or change, as a GLOSSARY-FORMAT.md entry>, or "none"
 - ADRs: <each ADR to write, as an ADR-FORMAT.md draft>, or "none"
 
-## Verify
-<"yes" with why (visible, auth, migrations, deployment, hard to check), or "no">
 ```

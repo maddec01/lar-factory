@@ -2,7 +2,7 @@ import { expect, test } from 'vite-plus/test';
 
 import sample from '../test/sample.json' with { type: 'json' };
 import type { Item } from './item-domain.ts';
-import { questionOwnerConcept } from './question-thread.ts';
+import { questionOwnerParent } from './question-thread.ts';
 
 const item = (id: string, parentId: string | null, patch: Partial<Item> = {}): Item => ({
     ...(sample.items[0] as Item),
@@ -23,7 +23,7 @@ test('a nested part uses its nearest concept even when an outer concept has a qu
     const parent = item('parent', nearest.id);
     const part = item('part', parent.id);
 
-    expect(questionOwnerConcept(part, [outer, nearest, parent, part])).toBe(nearest);
+    expect(questionOwnerParent(part, [outer, nearest, parent, part])).toBe(nearest);
 });
 
 test('a cycle among intermediate parts cannot borrow an unrelated concept question', () => {
@@ -32,5 +32,5 @@ test('a cycle among intermediate parts cannot borrow an unrelated concept questi
     const concept = item('concept', null, { kind: 'concept' });
     const part = item('part', first.id);
 
-    expect(questionOwnerConcept(part, [concept, first, second, part])).toBeUndefined();
+    expect(questionOwnerParent(part, [concept, first, second, part])).toBeUndefined();
 });

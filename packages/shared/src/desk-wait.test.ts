@@ -153,3 +153,45 @@ test('a changed brief names its board approval and keeps the active build in Bui
     expect(questionWaitReason(work)).toBe('The brief changed during Build.');
     expect(placementOf(work, { all: [work], unavailable: false }).sections).toEqual(['desk', 'build']);
 });
+
+test('an unstarted linked child routes its gate to the exact request owner on its parent', () => {
+    const parent = item({
+        id: 'linked-parent',
+        kind: 'feature',
+        flow: 'linked',
+        threads: [
+            {
+                ...stopped,
+                id: 'parent-shape',
+                purpose: 'shape',
+                state: 'needs you',
+                pendingRequest: { id: 'gate', threadId: 'gate-owner', kind: 'brief-approval' },
+            },
+        ],
+    });
+    const child = item({ id: 'child', parentId: parent.id, status: 'Needs you', threads: [] });
+
+    expect(deskWait(child, false, [parent, child])).toEqual({
+        label: 'Approve brief',
+        action: { kind: 'thread', label: 'Approve brief', threadId: 'gate-owner' },
+    });
+    for (const threads of ['unavailable', [{ ...stopped, id: 'own', state: 'done' }]] as const) {
+        expect(
+            deskWait({ ...child, threads: threads === 'unavailable' ? threads : [...threads] }, false, [parent, child])
+                .action?.threadId,
+        ).not.toBe('gate-owner');
+    }
+    expect(
+        deskWait(child, false, [
+            { ...parent, threads: [{ ...(parent.threads as ItemThread[])[0]!, observedAt: 'old' }] },
+            child,
+        ]).action?.threadId,
+    ).not.toBe('gate-owner');
+});
+
+test('a board approval reaches desk placement independently of the stored stage', () => {
+    const work = item({ status: 'In progress', threads: [], briefApproval: { reason: 'Review the complete brief.' } });
+
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).toContain('desk');
+    expect(deskWait(work)).toEqual({ label: 'Approve brief', action: { kind: 'details', label: 'Approve brief' } });
+});

@@ -92,7 +92,7 @@ function Chips({ chips }: { chips: Chip[] }) {
 /** Next, as a sentence. */
 function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
     const shown = useShownStatus(n.part?.item ?? parent);
-    const word = { you: shown.word, start: 'Next', moving: 'Moving', none: '' }[n.tone];
+    const word = { you: n.waitLabel ?? shown.word, start: 'Next', moving: 'Moving', none: '' }[n.tone];
 
     return <DossierNext word={word} yours={n.tone === 'you'} unseen={n.tone === 'start'} text={n.text} />;
 }

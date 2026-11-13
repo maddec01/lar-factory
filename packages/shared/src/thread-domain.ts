@@ -207,6 +207,13 @@ export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, u
         if (item.kind === 'concept') return false;
 
         const start = startProgressOf(data, item.id, 'build');
+        const parentOnly =
+            item.flow === 'linked' &&
+            (item.subIssues?.total > 0 || data.items.some((part) => part.parentId === item.id)) &&
+            !item.linkedPrs?.length &&
+            !(Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build'));
+
+        if (parentOnly && start?.phase !== 'starting' && start?.phase !== 'may-have-started') return false;
 
         return (
             start?.phase === 'starting' ||

@@ -5,8 +5,7 @@ import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import {
     buildActivity,
     itemName,
-    needsAnswer,
-    openQuestionThread,
+    humanWait,
     plural,
     prLabel,
     projectWorkMap,
@@ -24,6 +23,7 @@ import { NODE_H } from './WorkMapLayout';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     conceptBuildWait,
+    HumanWaitAction,
     AzureFields,
     ItemStatusGlyph,
     ItemTitle,
@@ -103,26 +103,24 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const shown = useShownStatus(item);
     const unavailable = useActivityUnavailable();
     const activity = partActivity(part, shown.working, unavailable);
-    const asks = needsAnswer(item);
+    const wait = humanWait(item, unavailable, data.items);
+    const asks = !!wait;
     const attention = asks ? 'asks' : open.length ? 'waits' : 'default';
     let action: ReactNode = null;
 
     if (complete) action = null;
-    else if (asks)
-        action = (
-            <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" next />
-        );
+    else if (asks) action = <HumanWaitAction item={item} data={data} />;
     else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} />;
 
     // Each card has one labelled thread action. Only a current question asks for an answer.
     const opensThread = threadsOf(item).length > 0 && !action;
     // The node says what its thread does beside its status, so the status leaves that out.
-    const status = complete ? 'Complete' : asks ? shown.word : (conceptBuildWait(item, data) ?? shown.stageWord);
+    const status = complete ? 'Complete' : wait ? wait.label : (conceptBuildWait(item, data) ?? shown.stageWord);
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
     // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
     const word =
         activity.kind === 'needs you'
-            ? shown.word
+            ? (wait?.label ?? shown.word)
             : activity.kind === 'working' && (shown.execution === 'working' || shown.execution === 'quiet')
               ? shown.word
               : running?.running

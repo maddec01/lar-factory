@@ -1,7 +1,7 @@
 // What keeps a dossier's work moving, as the labelled rows its Attention lists.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { itemName, needsAnswer, openQuestionThread, ref, workingAgain } from '@lar-factory/shared';
+import { humanWait, itemName, needsAnswer, ref } from '@lar-factory/shared';
 
 import { PartLink, Refs } from './DossierEntries';
 import type { FindRef } from './DossierHelpers';
@@ -10,7 +10,7 @@ import type { Part } from './DossierParts';
 import { DECISION_KINDS, isDone, openWaits, partLabel } from './DossierParts';
 import { startable } from './PartAvailability';
 import { PartStart } from './PartStart';
-import { dependenciesOf, OpenThread, shownStatus, useActivityUnavailable } from '@/features/items';
+import { dependenciesOf, HumanWaitAction, shownStatus, useActivityUnavailable } from '@/features/items';
 import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle, RefButton } from '@/ui/board';
 
 /** The attention rows with entries: parts in Needs you, parts in Verify or Ready to merge, open decisions, blocked
@@ -36,37 +36,35 @@ export function useAttentionRows(
             label: 'Needs you',
             tone: 'yours' as const,
             entries: [
-                ...(needsAnswer(parent)
+                ...(humanWait(parent, unavailable, data.items)
                     ? [
                           <Entry
                               key={parent.id}
                               main={<EntryButton onOpen={() => open(parent)}>{itemName(parent)}</EntryButton>}
                               side={
-                                  <OpenThread
-                                      item={parent}
-                                      data={data}
-                                      threadId={openQuestionThread(parent)?.id}
-                                      label="Answer in T3"
-                                      next
-                                  />
+                                  <>
+                                      {humanWait(parent, unavailable, data.items)?.label}{' '}
+                                      <HumanWaitAction item={parent} data={data} />
+                                  </>
                               }
                           />,
                       ]
                     : []),
                 ...ahead
-                    .filter((p) => needsAnswer(p.item))
+                    .filter(
+                        (p) =>
+                            !['Verify', 'Ready to merge'].includes(p.item.status) &&
+                            humanWait(p.item, unavailable, data.items),
+                    )
                     .map((p) => (
                         <Entry
                             key={p.item.id}
                             main={<PartLink part={p} />}
                             side={
-                                <OpenThread
-                                    item={p.item}
-                                    data={data}
-                                    threadId={openQuestionThread(p.item)?.id}
-                                    label="Answer in T3"
-                                    next
-                                />
+                                <>
+                                    {humanWait(p.item, unavailable, data.items)?.label}{' '}
+                                    <HumanWaitAction item={p.item} data={data} />
+                                </>
                             }
                         />
                     )),
@@ -80,10 +78,19 @@ export function useAttentionRows(
                 .filter(
                     (p) =>
                         (p.item.status === 'Verify' || p.item.status === 'Ready to merge') &&
-                        !workingAgain(p.item, unavailable),
+                        humanWait(p.item, unavailable, data.items),
                 )
                 .map((p) => (
-                    <Entry key={p.item.id} main={<PartLink part={p} />} side={shownStatus(p.item, unavailable).word} />
+                    <Entry
+                        key={p.item.id}
+                        main={<PartLink part={p} />}
+                        side={
+                            <>
+                                {humanWait(p.item, unavailable, data.items)?.label}{' '}
+                                <HumanWaitAction item={p.item} data={data} />
+                            </>
+                        }
+                    />
                 )),
         },
         {

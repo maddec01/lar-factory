@@ -151,3 +151,88 @@ test('a failed grouped launch is counted and opens Start again recovery directly
     await settle(() => button.click());
     expect(text($('#needs-you-dialog'))).toContain('This starts a new shaping thread in T3.');
 });
+
+test('linked parent gate ownership and a later notice agree across desk, group and child details', async () => {
+    const parent: Item = {
+        ...base,
+        id: 'linked-parent',
+        title: 'Deliver linked greeting',
+        kind: 'feature',
+        flow: 'linked',
+        status: 'In progress',
+        parentId: null,
+        subIssues: { total: 1, completed: 0 },
+        linkedPrs: [],
+        threads: [
+            {
+                ...thread,
+                id: 'parent-shape',
+                pendingRequest: { id: 'gate', threadId: 'actual-owner', kind: 'brief-approval' },
+            },
+        ],
+    };
+    const child: Item = {
+        ...base,
+        id: 'linked-child',
+        title: 'Build the consumer',
+        kind: 'build',
+        flow: 'linked',
+        status: 'Needs you',
+        parentId: parent.id,
+        subIssues: { total: 0, completed: 0 },
+        linkedPrs: [],
+        threads: [],
+    };
+
+    await mountPage(fresh({ ...sample, items: [parent, child] }));
+
+    const cards = [...document.querySelectorAll('.desk-card')];
+
+    expect(cards).toHaveLength(2);
+    for (const entry of cards)
+        expect(entry.querySelector<HTMLAnchorElement>('[data-open-thread]')!.href).toBe(
+            't3code://threads/sample-environment/actual-owner',
+        );
+
+    const group = $(`[data-dossier="${parent.id}"]`)!;
+
+    await settle(() => (group.querySelector('[data-dossier-open]') as HTMLButtonElement).click());
+    expect(text(group)).toContain('Approve brief');
+    await settle(() => (cards[1]!.querySelector('button') as HTMLButtonElement).click());
+    expect($('[data-item-dialog] [data-open-thread]')?.getAttribute('href')).toBe(
+        't3code://threads/sample-environment/actual-owner',
+    );
+});
+
+test('a linked parent notice is the same human wait on the desk and in its group', async () => {
+    const parent: Item = {
+        ...base,
+        id: 'notice-parent',
+        title: 'Accepted delivery tracking hold',
+        kind: 'feature',
+        flow: 'linked',
+        status: 'In progress',
+        parentId: null,
+        subIssues: { total: 1, completed: 1 },
+        linkedPrs: [],
+        threads: [],
+        needsYou: {
+            reason: 'Resolve the parent delivery record.',
+            offers: ['mark-handled'],
+            causes: [],
+            ticketOpen: true,
+        },
+    };
+
+    await mountPage(fresh({ ...sample, items: [parent] }));
+    expect(text(card())).toContain('Decision needed');
+    expect(text(card())).toContain('Review notice');
+
+    const group = $(`[data-dossier="${parent.id}"]`)!;
+
+    expect(text(group)).toContain('Decision needed');
+    expect(text(group)).not.toContain('Nothing waits on you');
+    await settle(() => (group.querySelector('[data-dossier-open]') as HTMLButtonElement).click());
+    expect(text(group.querySelector('[data-attention-row="you"]'))).toContain('Review notice');
+    expect(text(group)).not.toContain('Nothing holds this up');
+});

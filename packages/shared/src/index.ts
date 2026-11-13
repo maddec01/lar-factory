@@ -39,10 +39,11 @@ export * from './sample-clock.ts';
 export * from './pr-merge.ts';
 
 export { deskWait, questionWaitReason } from './desk-wait.ts';
-export { questionOwnerConcept } from './question-thread.ts';
+export { questionOwnerParent } from './question-thread.ts';
 export * from './work-map.ts';
 
 export * from './start-action.ts';
 export * from './concept-build.ts';
 
 export * from './release-plan.ts';
+export { humanWait } from './human-wait.ts';

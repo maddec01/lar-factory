@@ -24,7 +24,7 @@ export {
 } from './ItemParts';
 export { KIND_BADGES } from './KindBadges';
 export { useShownLabels } from './useShownLabels';
-export { NeedsYou, StartAgain } from './NeedsYou';
+export { NeedsYou } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
 export { VerifyBuild } from './VerifyBuild';
@@ -46,5 +46,7 @@ export { useStatusActivity } from './useStatusActivity';
 export { workflowSteps } from './WorkflowSteps';
 
 export { ConceptBuild } from './ConceptBuild';
+
+export { HumanWaitAction } from './HumanWaitAction';
 
 export { conceptBuildWait } from './ConceptBuildProgress';

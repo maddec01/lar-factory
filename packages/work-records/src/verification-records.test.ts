@@ -180,3 +180,58 @@ test.each([30, 31, 32, 33])(
         expect(records.verification(later.workId).required).toBe(true);
     },
 );
+
+test('Verify history retains failures and passes through pushes, PR replacement and reopen', async () => {
+    const s = await setup();
+
+    s.input.result = 'fail';
+    s.input.note = 'Clipped greeting';
+
+    const failed = s.save().latest!;
+
+    s.records.update(s.id, s.records.read(s.id).revision, { status: 'Verify' });
+    s.records.observeVerificationHead(s.id, s.input.pr, next);
+    s.input.head = next;
+    s.input.result = 'pass';
+
+    const passed = s.save().latest!;
+
+    expect(s.records.verification(s.id).history).toEqual([passed, failed]);
+    s.records.setPullRequest(s.id, s.records.read(s.id).revision, 'owner/repo#9');
+    expect(s.records.verification(s.id).latest).toBeNull();
+
+    const reopened = await openWorkRecords(join(s.dir, 'work.db'));
+
+    try {
+        expect(reopened.verification(s.id).history).toEqual([passed, failed]);
+    } finally {
+        reopened.close();
+    }
+});
+
+test('schema 38 preserves the pre-upgrade latest result in history', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'verify-history-upgrade-'));
+    const path = join(dir, 'work.db');
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 38) });
+    const result = {
+        id: 'legacy-pass',
+        pr: 'owner/repo#8',
+        head,
+        result: 'pass',
+        by: 'Pedro',
+        at: '2026-11-13T12:00:00Z',
+        note: null,
+        testSteps: 'Test it.',
+    };
+
+    old.db.exec(
+        "INSERT INTO work_records(work_id,repository,kind,status,revision,created_at,updated_at,title) VALUES('legacy','owner/repo','build','Verify',1,'2026-11-13','2026-11-13','Legacy')",
+    );
+    old.db.prepare('UPDATE verification SET latest=? WHERE work_id=?').run(JSON.stringify(result), 'legacy');
+    old.close();
+
+    const records = await openWorkRecords(path);
+
+    opened.push({ dir, records });
+    expect(records.verification('legacy')).toMatchObject({ latest: result, history: [result] });
+});

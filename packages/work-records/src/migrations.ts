@@ -542,4 +542,17 @@ export const MIGRATIONS: readonly Migration[] = [
             'CREATE TABLE concept_build_runs(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
     (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN build_input TEXT'),
+    (db) =>
+        db.exec(`
+        CREATE TABLE verification_results (
+          id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,
+          content TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX verification_results_owner ON verification_results(work_id);
+        INSERT INTO verification_results(id, work_id, content)
+          SELECT json_extract(latest, '$.id'), work_id, latest FROM verification WHERE latest IS NOT NULL;
+        CREATE TRIGGER immutable_verification_result BEFORE UPDATE ON verification_results BEGIN
+          SELECT RAISE(ABORT, 'Verify results are immutable');
+        END;
+    `),
 ];

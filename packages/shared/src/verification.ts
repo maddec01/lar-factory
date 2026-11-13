@@ -15,6 +15,7 @@ export interface Verification {
     head: string | null;
     invalidated?: boolean;
     latest: VerificationResult | null;
+    history?: VerificationResult[];
     resume: { threadId: string; commandId: string; messageId: string; error: string | null; sent: boolean } | null;
 }
 

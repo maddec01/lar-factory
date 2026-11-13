@@ -40,6 +40,10 @@ export function verificationRecords(database: Database, read: (id: string) => Wo
             invalidated: !!row?.invalidated,
             head: (row?.head as string | null) ?? null,
             latest: row?.latest ? JSON.parse(String(row.latest)) : null,
+            history: db
+                .prepare('SELECT content FROM verification_results WHERE work_id=? ORDER BY rowid DESC')
+                .all(id)
+                .map((result) => JSON.parse(String(result.content)) as VerificationResult),
             resume: row?.resume ? JSON.parse(String(row.resume)) : null,
         };
     };
@@ -131,6 +135,11 @@ export function verificationRecords(database: Database, read: (id: string) => Wo
                       }
                     : null;
 
+                db.prepare('INSERT INTO verification_results(id, work_id, content) VALUES(?,?,?)').run(
+                    result.id,
+                    id,
+                    JSON.stringify(result),
+                );
                 db.prepare('UPDATE verification SET latest=?, resume=?, invalidated=0 WHERE work_id=?').run(
                     JSON.stringify(result),
                     resume ? JSON.stringify(resume) : null,

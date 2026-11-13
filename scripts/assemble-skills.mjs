@@ -1,7 +1,8 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
+const shaping = new URL('skills/stages/shaping/', root);
 
 for (const name of ['lar-shape', 'lar-build']) {
     const output = new URL(`.assembled-skills/${name}/`, root);
@@ -9,6 +10,10 @@ for (const name of ['lar-shape', 'lar-build']) {
     await rm(output, { recursive: true, force: true });
     await mkdir(output, { recursive: true });
     await cp(fileURLToPath(new URL(`skills/${name}/`, root)), fileURLToPath(output), { recursive: true });
+    // Both workflows load these steps at their root; keep one shaping source without rewriting links.
+    for (const step of await readdir(shaping)) {
+        await cp(new URL(step, shaping), new URL(step, output), { force: false, errorOnExist: true });
+    }
     await cp(fileURLToPath(new URL('skills/shared/', root)), fileURLToPath(new URL('shared/', output)), {
         recursive: true,
     });

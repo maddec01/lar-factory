@@ -107,7 +107,7 @@ export function ItemMeta({
             )}
             {item.kind === 'concept' && item.completion && (
                 <Fact label="Delivery">
-                    <ConceptState state={item.completion} />
+                    <ConceptState state={item.completion} item={item} />
                 </Fact>
             )}
             {item.kind === 'concept' && <ConceptWork item={item} />}

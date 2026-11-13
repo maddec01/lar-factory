@@ -817,7 +817,7 @@ test('a Dossier total marks a sum with a failed part partial with a + after its 
         ],
         'a + on screen, partial for a screen reader',
     ).toEqual(['+ partial', true]);
-    expect(dossierTotal().title).toContain('This total is incomplete');
+    expect(dossierTotal().title).toContain('Some agent usage is not available yet.');
 });
 
 test('decision map and attention actions use answer wording only for a current question', async () => {

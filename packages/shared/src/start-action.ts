@@ -13,7 +13,14 @@ export function startActionChoice(
     kind: 'refine' | 'build' = item.status === 'Ready' ? 'build' : 'refine',
     after?: { prerequisite: string; armed: boolean },
 ) {
-    const work = kind === 'build' ? 'build' : isDecisionWork(item) ? 'decision' : 'shaping';
+    const work =
+        kind === 'build'
+            ? item.kind === 'concept'
+                ? 'concept builds'
+                : 'build'
+            : isDecisionWork(item)
+              ? 'decision'
+              : 'shaping';
     const verb = kind === 'refine' && canResumeShaping(item) ? 'Resume' : 'Start';
 
     return {

@@ -28,6 +28,11 @@ export function StartBuild({
     const onRow = short;
     const { label } = startActionChoice(item, 'build');
 
+    const concept = data.items.find((parent) => parent.id === item.parentId)?.conceptBuild;
+
+    // The concept authorizes its eligible builds together; its cards and details share that action.
+    if (concept && (concept.holds.length === 0 || concept.run?.state === 'running')) return null;
+
     // A thread already at work on the item would get a second one.
     if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
 

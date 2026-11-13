@@ -11,6 +11,7 @@ test.each([
     [{ status: 'Queued', kind: 'concept' }, 'Start shaping'],
     [{ status: 'Queued', kind: 'decision', decisionMethod: 'task' }, 'Start decision'],
     [{ status: 'Ready', kind: 'build' }, 'Start build'],
+    [{ status: 'Ready', kind: 'concept' }, 'Start concept builds'],
     [{ status: 'Queued', kind: 'issue', recorded: false, labels: ['decision-task'] }, 'Start decision'],
     [{ status: 'Queued', kind: 'build', recorded: true, labels: ['decision-task'] }, 'Start shaping'],
     [{ status: 'Queued', kind: 'issue', recorded: false, labels: ['decision-unknown'] }, 'Start shaping'],

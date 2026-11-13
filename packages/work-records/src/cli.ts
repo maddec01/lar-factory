@@ -139,6 +139,9 @@ Reads
                                     F is Code's JSON list of {"reviewer":ID,
                                     "requestedBy":"code","reason":text}. Only skipped,
                                     non-never reviewers gain an escalation; run each once.
+  concept-build-plan <work-id>      Read all concept start holds and the saved run.
+  set-build-run <work-id> --revision N --state running|paused
+                                    Start only after every preflight hold clears, or pause.
   work-order <work-id> [--json]     Report group order, briefs, gates, blockers and waits.
   read <work-id>                    Print one record.
   context <work-id>                 Print the markdown the record began with.
@@ -493,6 +496,8 @@ const TAKES_WORK_ID = [
     'refinement',
     'waiting-on',
     'work-order',
+    'concept-build-plan',
+    'set-build-run',
     'set-fog',
     'finish',
     'set-body',
@@ -877,6 +882,10 @@ async function run(
         }
         case 'import':
             return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
+        case 'concept-build-plan':
+            return records.conceptBuildPlan(workId!);
+        case 'set-build-run':
+            return records.setConceptBuildRun(workId!, revision(), need(values, 'state') as 'running' | 'paused');
         case 'work-order': {
             const rows = await records.snapshot(async () => workOrder(records, workId!));
 
@@ -1188,7 +1197,7 @@ async function main(args: string[]): Promise<number> {
 
         const result = await run(records, command, workId, values);
 
-        if (command === 'set-phase') await refreshBoards(workId!, values['data-dir']);
+        if (command === 'set-phase' || command === 'set-build-run') await refreshBoards(workId!, values['data-dir']);
 
         const validationCommand = [
             'set-check-list',
@@ -1196,6 +1205,7 @@ async function main(args: string[]): Promise<number> {
             'describe-failure',
             'resolve-failure',
             'work-order',
+            'concept-build-plan',
         ].includes(command);
 
         if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });

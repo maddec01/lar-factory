@@ -128,6 +128,7 @@ export interface ItemCommands {
     executeOwnedCleanup(itemId: string, input: unknown): Promise<Reply>;
     inspectRecovery(itemId: string): Promise<Reply>;
     startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
+    setConceptBuildRun(itemId: string, revision: unknown, state: unknown): Reply;
     startBuild(itemId: string, model: unknown, drift?: unknown, quiet?: boolean): Promise<Reply>;
     /** Clears the refused or failed start the item shows for `purpose`, on every page. */
     dismissStartError(itemId: string, purpose: unknown): Reply;
@@ -1981,6 +1982,25 @@ export function createItemCommands({
                     };
                 },
             );
+        },
+
+        setConceptBuildRun(itemId, revision, state) {
+            if (!records) return withBoard(409, { error: 'Concept runs need writable local records.' });
+
+            if (!Number.isSafeInteger(revision) || (state !== 'running' && state !== 'paused'))
+                return withBoard(422, { error: 'Read the concept revision and choose running or paused.' });
+
+            try {
+                records.setConceptBuildRun(itemId, revision as number, state);
+                reread();
+                board.push();
+
+                return withBoard(200, { error: null });
+            } catch (error) {
+                reread();
+
+                return withBoard(409, { error: (error as Error).message });
+            }
         },
 
         startBuild: (itemId, model, drift, quiet = false) =>

@@ -17,6 +17,7 @@ import { figuresOf } from './RowDetails';
 import { RowKind, RowSource } from './RowIdentity';
 import { stageOf } from './StageStatus';
 import {
+    ConceptBuild,
     AzureFields,
     ItemTitle,
     shownStatus,
@@ -161,7 +162,11 @@ export function DossierLine({
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
                 <RowSide passEmpty>
                     {tools && <DossierTools>{tools}</DossierTools>}
-                    {n.part && n.tone === 'start' && <PartStart part={n.part} data={data} />}
+                    {parent.conceptBuild ? (
+                        <ConceptBuild item={parent} compact />
+                    ) : (
+                        n.part && n.tone === 'start' && <PartStart part={n.part} data={data} />
+                    )}
                 </RowSide>
             </RowFirst>
             <RowSecondLine

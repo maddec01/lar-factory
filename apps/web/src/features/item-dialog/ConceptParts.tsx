@@ -4,12 +4,10 @@
 
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Text } from '@lar-works/design-system';
 
 import {
     AgentWork,
     hasFigures,
-    INCOMPLETE_TOTAL,
     ItemTitle,
     usageUnreadable,
     useShownStatus,
@@ -22,8 +20,8 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { DetailFact, DetailsSection, PartName, PartRow, PartsList } from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn’t (?:settled|Done)\\.$`);
-const UNMET_DEPENDENCY = new RegExp(`^Its Dependency ${WORK_ID} on (.+) isn’t met\\.$`);
+const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn['’]t (?:settled|Done)[.]$`);
+const UNMET_DEPENDENCY = new RegExp(`^Its Dependency ${WORK_ID} on (.+) isn['’]t met[.]$`);
 
 /**
  * What a concept's refinement or delivery still needs, in words for a person: unfinished parts counted by kind with
@@ -54,7 +52,28 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
 }
 
 /** A concept's Refinement or Delivery: Complete, or what it still needs, naming unfinished parts in its tooltip. */
-export function ConceptState({ state }: { state: { complete: boolean; reasons: string[] } }) {
+export function ConceptState({ state, item }: { state: { complete: boolean; reasons: string[] }; item?: Item }) {
+    const items = useBoardStore((board) => board.data.items);
+    const builds = item && partsOf(item, items).filter((part) => part.kind === 'build');
+    const otherReasons = state.reasons.filter((reason) => !reason.startsWith('Its build '));
+
+    if (builds?.length)
+        return (
+            <>
+                {builds.filter((part) => isDone(part.item)).length} of {builds.length} builds done
+                {otherReasons.length > 0 && (
+                    <>
+                        {' '}
+                        · <ConceptReasons state={{ complete: false, reasons: otherReasons }} />
+                    </>
+                )}
+            </>
+        );
+
+    return <ConceptReasons state={state} />;
+}
+
+function ConceptReasons({ state }: { state: { complete: boolean; reasons: string[] } }) {
     const { text, names } = readableReasons(
         state.reasons,
         useBoardStore((board) => board.data.items),
@@ -70,17 +89,11 @@ export function ConceptWork({ item }: { item: Item }) {
         useBoardStore((state) => state.data.items),
     );
 
-    if (!total || (total !== 'unavailable' && !hasFigures(total))) return null;
+    if (!total || total === 'unavailable' || !hasFigures(total)) return null;
 
     return (
         <DetailFact label="With parts" data-concept-work>
-            {total === 'unavailable' ? (
-                <Text variant="caption" tone="muted" data-total-incomplete>
-                    {INCOMPLETE_TOTAL}
-                </Text>
-            ) : (
-                total && <AgentWork item={item} stats={total} />
-            )}
+            <AgentWork item={item} stats={total} />
         </DetailFact>
     );
 }

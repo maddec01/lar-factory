@@ -37,6 +37,8 @@ const latestThread = (item: Item) => (Array.isArray(item.threads) ? item.threads
 function statusAction(item: Item, data: BoardData, { working, resume }: ItemState): StatusAction {
     const linkedBeside = latestThread(item);
 
+    if (item.conceptBuild && ['Ready', 'In progress', 'Review'].includes(item.status)) return { control: null };
+
     if (resume) return { opens: itemActivityThread(item)?.id, label: 'Resume in T3', primary: true };
 
     if (working) return { opens: currentBuildThread(item)?.id };

@@ -22,6 +22,7 @@ import type { StatementSync } from 'node:sqlite';
 import { agentRevision } from './agent-revision.ts';
 import { validateBlockers } from './blocker-graph.ts';
 import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
+import { conceptRunRecords, type ConceptRunRecords } from './concept-build.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import {
@@ -369,6 +370,7 @@ export interface CaptureSubmission {
 export interface WorkRecords
     extends
         ScopeRecords,
+        ConceptRunRecords,
         RetitleRecords,
         DecisionAnswers,
         MergeBuildRecords,
@@ -1238,9 +1240,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     );
     const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, reviews);
 
-    return {
+    const records: WorkRecords = {
         ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
+        ...conceptRunRecords(database, () => records),
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
@@ -2460,4 +2463,6 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         changes: () => database.changes(),
         close: () => database.close(),
     };
+
+    return records;
 }

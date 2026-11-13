@@ -457,6 +457,13 @@ export function createBoardServer({
                 commands.startAgain(itemId, input.model, input.options),
             ),
         },
+        '/api/concept-build-run': {
+            sampleWrite: 'fake',
+            what: 'the concept build run',
+            run: forItem('Name the concept.', (itemId, input) =>
+                commands.setConceptBuildRun(itemId, input.revision, input.state),
+            ),
+        },
         '/api/start-build': {
             sampleWrite: 'refuse',
             what: 'the build to start',

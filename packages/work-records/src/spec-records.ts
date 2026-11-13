@@ -14,6 +14,8 @@ export interface SpecRemote {
     titleEditorWrite?: boolean;
 }
 export interface SpecState {
+    /** Latest trusted ticket request before a Spec exists; capture text remains retained separately. */
+    startingContext?: string;
     generation: number;
     changedAt?: string;
     retryAfter?: number;
@@ -30,6 +32,7 @@ export interface SpecState {
 }
 interface SpecChange {
     text: string;
+    contextOnly?: boolean;
     title?: string;
     source: NonNullable<GateEvidence['source']>;
     identity: string;
@@ -118,12 +121,16 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
 
                 if (before.generation !== generation || state.ticket !== record.ticket) return false;
 
-                if (['concept', 'decision', 'slice'].includes(record.kind))
+                if (change && !change.contextOnly && ['concept', 'decision', 'slice'].includes(record.kind))
                     throw new WorkRecordError('invalid', 'This record cannot hold a ticket Spec.');
 
                 save(database, workId, state.error?.startsWith('Title: ') ? { ...state, error: before.error } : state);
 
-                if (change) {
+                if (change?.contextOnly) {
+                    db.prepare(
+                        'UPDATE work_records SET title = ?, revision = revision + 1, updated_at = ? WHERE work_id = ?',
+                    ).run(change.title ?? record.title, new Date().toISOString(), workId);
+                } else if (change) {
                     const digest = createHash('sha256').update(JSON.stringify(change.text)).digest('hex');
                     const approved = change.source === 'user';
 

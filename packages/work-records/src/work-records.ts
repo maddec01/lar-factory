@@ -421,7 +421,7 @@ export interface WorkRecords
     read(workId: string): WorkRecord;
     /** CLI-only reapplication guard; store mutations remain strict. */
     writeRevision(id: string, revision: number, fields: readonly string[], entity?: 'work' | 'dependency'): number;
-    /** The markdown the record began with, or an empty string. */
+    /** Latest trusted starting request, falling back to captured text. Build launches freeze their own input. */
     initialContext(workId: string): string;
     /** The matching records, Queued ones in Queue order first, then the rest in the order they were made. */
     list(filter: WorkRecordFilter): WorkRecord[];
@@ -1296,7 +1296,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...mergeBuildRecords(database, {
             read: (id) => fromRow(find(id)),
             body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
-            initialContext: (id) => find(id).initial_context,
+            initialContext: (id) => records.initialContext(id),
             writeBody,
         }),
         ...setAsideRecords(database, (id) => fromRow(find(id))),
@@ -1442,7 +1442,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         create: (record) => database.write(() => insert(record)),
         createPart: partCreator(database, { insert, read: (workId) => fromRow(find(workId)), writeBody }),
         read: (workId) => database.read(() => fromRow(find(workId))),
-        initialContext: (workId) => database.read(() => find(workId).initial_context),
+        initialContext: (workId) =>
+            database.read(() => {
+                const captured = find(workId).initial_context;
+                const current = db
+                    .prepare(
+                        "SELECT json_extract(state, '$.startingContext') AS context FROM ticket_specs WHERE work_id = ?",
+                    )
+                    .get(workId);
+
+                return (current?.context as string | undefined) ?? captured;
+            }),
         list: (filter) =>
             database.read(() =>
                 (

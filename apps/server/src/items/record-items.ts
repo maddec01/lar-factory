@@ -213,10 +213,12 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             : record.status;
         const done = derivedStatus === 'Done' || (isDone(record) && !group);
         const sync = trackerState(record.workId);
+        const savedSpec = records.specState(record.workId);
         const spec =
-            setups.find((setup) => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false
+            setups.find((setup) => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false &&
+            (savedSpec.active || savedSpec.pending !== null)
                 ? null
-                : records.specState(record.workId);
+                : savedSpec;
         const gate = records.gate(record.workId);
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const briefApproval =

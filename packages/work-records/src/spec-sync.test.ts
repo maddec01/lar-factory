@@ -125,7 +125,9 @@ test('a tracker edit wins a waiting write, preserves Ready and records the repla
     });
     f.edit({ body: formatTicketSpec('Edited on tracker.', 'Authored request.'), title: 'New title', version: '3' });
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
-    expect(f.writes).toHaveLength(1);
+    expect(f.writes).toHaveLength(2); // The second write marks the retained tracker Spec out of date.
+    expect(f.remote().body).toContain('Out-of-date Spec');
+    expect(readTicketSpec(f.remote().body).spec).toBe('Edited on tracker.');
     expect(f.records.body(record.workId, 'brief')).toBe('Edited on tracker.');
     expect(f.records.read(record.workId)).toMatchObject({ title: 'New title', status: 'Ready' });
     expect(f.records.specState(record.workId).warning).toContain('unsent');
@@ -525,3 +527,107 @@ test.each([false, true])(
         expect(readTicketSpec(f.remote().body).spec).toBe('Newer gated Spec.');
     },
 );
+
+test('trusted queued ticket edits refresh starting context without approving a brief; active builds keep their starting request', async () => {
+    const f = await fixture();
+    let r = f.records.create({
+        title: 'Starting request',
+        context: 'Captured request.',
+        repository: setup.repo,
+        kind: 'build',
+        status: 'Queued',
+        ticket: `${setup.repo}#81`,
+    });
+    const contextId = r.workId;
+
+    f.edit({ number: 81, title: 'Starting request', body: 'First tracker request.', version: '1' });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.records.initialContext(contextId)).toBe('First tracker request.');
+    expect(f.records.body(contextId, 'brief')).toBeNull();
+    f.edit({
+        body: 'Pedro added reconnect acceptance criteria.',
+        title: 'Reconnect after address changes',
+        version: '2',
+    });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.records.initialContext(contextId)).toBe('Pedro added reconnect acceptance criteria.');
+    expect(f.records.read(contextId).title).toBe('Reconnect after address changes');
+    expect(f.records.gate(contextId).evidence).toEqual([]);
+    r = f.records.read(contextId);
+    r = f.records.setBody(contextId, r.revision, 'brief', 'Approved reconnect brief.');
+    f.records.recordGate(contextId, r.revision, {
+        briefDigest: f.records.gate(contextId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    r = f.records.update(contextId, r.revision, { status: 'Ready' });
+
+    const frozen = f.records.prepareBuild(contextId, r.revision, { limit: 2, atWorkIds: [] }).intent.buildInput!;
+
+    f.edit({ body: 'Changed while build runs.', version: '3' });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: contextId });
+    expect(frozen.context).toBe('Pedro added reconnect acceptance criteria.');
+    expect(f.records.launchIntents({ workId: contextId })[0]!.buildInput).toEqual(frozen);
+});
+
+test('unknown starting edits are held, explicitly accepted as context, and a read failure retains that context', async () => {
+    const f = await fixture();
+    const r = f.records.create({
+        title: 'Starting request',
+        context: 'Captured.',
+        repository: setup.repo,
+        kind: 'build',
+        status: 'List',
+        ticket: `${setup.repo}#82`,
+    });
+
+    f.edit({ number: 82, title: 'Starting request', body: 'Untrusted request.', version: '1', editorWrite: undefined });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: r.workId });
+    expect(f.records.initialContext(r.workId)).toBe('Captured.');
+    expect(f.records.specState(r.workId).held?.body).toBe('Untrusted request.');
+    await resolveSpecEdit(f.records, r.workId, f.records.specState(r.workId).generation, 'accept', 'Pedro', {
+        provider: f.provider,
+        setups: [setup],
+    });
+    expect(f.records.initialContext(r.workId)).toBe('Untrusted request.');
+    expect(f.records.body(r.workId, 'brief')).toBeNull();
+    expect(f.records.specState(r.workId).active).toBe(false);
+    expect(f.records.gate(r.workId).current).toBe(false);
+    f.fail(true);
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: r.workId });
+    expect(f.records.initialContext(r.workId)).toBe('Untrusted request.');
+    expect(f.records.specState(r.workId).warning).toContain('Offline');
+});
+
+test('a changed brief marks the retained approved ticket Spec out of date, then re-gating replaces it and removes the marker', async () => {
+    const f = await fixture();
+
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+
+    const old = readTicketSpec(f.remote().body);
+    const id = f.record.workId;
+
+    f.records.setBody(id, f.records.read(id).revision, 'brief', 'New unapproved reconnect scope.');
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.remote().body).toContain('Out-of-date Spec');
+    expect(readTicketSpec(f.remote().body)).toEqual(old);
+    expect(f.remote().body).not.toContain('New unapproved reconnect scope.');
+
+    const count = f.writes.length;
+
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.writes).toHaveLength(count);
+    f.records.recordGate(id, f.records.read(id).revision, {
+        briefDigest: f.records.gate(id).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    f.fail(true);
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup], workId: id });
+    expect(f.records.specState(id).error).toContain('Offline');
+    expect(readTicketSpec(f.remote().body)).toEqual(old);
+    f.fail(false);
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup], workId: id });
+    expect(f.remote().body).not.toContain('Out-of-date Spec');
+    expect(readTicketSpec(f.remote().body)).toEqual({ ...old, spec: 'New unapproved reconnect scope.' });
+});

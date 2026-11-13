@@ -1,5 +1,13 @@
 import { trackerMarkdownHtml } from './tracker-markdown.ts';
 
+/** Visible on both trackers, outside the retained approved Spec. */
+export const OUT_OF_DATE_SPEC =
+    '<p><strong>Out-of-date Spec</strong>: changes await brief approval on the board.</p>\n';
+export const withoutSpecFreshness = (body: string): string =>
+    body.startsWith(OUT_OF_DATE_SPEC) ? body.slice(OUT_OF_DATE_SPEC.length) : body;
+export const markSpecFreshness = (body: string, stale: boolean): string =>
+    (stale ? OUT_OF_DATE_SPEC : '') + withoutSpecFreshness(body);
+
 // Ticket text shared by local conversion and subsequent Spec writes.
 export function formatTicketSpec(
     spec: string,
@@ -17,6 +25,8 @@ export function formatTicketSpec(
 
 /** Markerless descriptions are whole Specs. Metadata is kept separately by the writer. */
 export function readTicketSpec(body: string): { marked: boolean; spec: string; original: string | null } {
+    body = withoutSpecFreshness(body);
+
     const match =
         /^<!-- lar-factory:spec -->\n([\s\S]*)\n\n<!-- lar-factory:original -->\n<details>\n<summary>Original<\/summary>\n\n([\s\S]*)\n\n<\/details>\n<!-- lar-factory:end -->\s*$/.exec(
             body,

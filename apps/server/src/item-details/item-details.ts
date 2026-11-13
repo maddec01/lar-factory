@@ -254,7 +254,8 @@ export function createItemDetails(
 
             return {
                 ...details,
-                body: outdated ? approvedSpec : record!.body,
+                body:
+                    !state.active && state.pending === null ? record!.context : outdated ? approvedSpec : record!.body,
                 format: 'markdown',
                 record,
                 spec: {

@@ -12,6 +12,8 @@ export interface BuildPreparation {
     recovery?: boolean;
 }
 export interface BuildInput {
+    /** The request at launch. Later tracker edits never rewrite this snapshot. */
+    context?: string;
     brief: string;
     gate: GateEvidence;
     revision: number;
@@ -102,6 +104,7 @@ export function prepareBuildClaim(
     if (counted.size >= input.limit) refuse('The shared build capacity is full. Wait for a build to hand back.');
 
     return {
+        context: records.initialContext(workId),
         brief: records.body(workId, 'brief')!,
         gate: gate!,
         revision: work.revision,

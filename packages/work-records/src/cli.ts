@@ -16,6 +16,7 @@ import { createRecordTicket } from './create-ticket.ts';
 import { exportMarkdown } from './export.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
+import { runSettingsCommand } from './run-settings-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import {
     openWorkRecords,
@@ -86,6 +87,16 @@ Identifiers
   A ticket is a published ticket reference, owner/name#12. A record holds at most
   one, and attaching it keeps the work ID.
   A repository is the repository's name on the board, owner/name.
+
+Run settings, local only
+  run-settings <work-id> [--run-id ID]
+                                    Print immutable snapshots and role execution evidence.
+  snapshot-run <work-id> --revision N --file F
+                                    Resolve saved Settings once for F's stable runId.
+  start-role-run <work-id> --revision N --file F
+                                    Record a role attempt and its frozen requested settings.
+  finish-role-run <work-id> --revision N --file F
+                                    Record actual settings from a T3 report and the result.
 
 Reads
   select-reviewers <work-id> --base SHA --head SHA
@@ -903,6 +914,9 @@ async function main(args: string[]): Promise<number> {
     if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
 
     if (args[0] === 'select-reviewers') return selectReviewersCommand(args.slice(1));
+
+    if (['run-settings', 'snapshot-run', 'start-role-run', 'finish-role-run'].includes(args[0]!))
+        return runSettingsCommand(args[0]!, args.slice(1));
 
     if (args[0] === 'heavy') return heavyCommand(args);
 

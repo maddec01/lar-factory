@@ -10,6 +10,7 @@ import {
     type ShapingThreadCleanup,
     type Status,
 } from '@lar-factory/shared';
+import type { ReviewSelectionEvidence } from '@lar-factory/shared/run-settings';
 import { createHash, randomUUID } from 'node:crypto';
 import { rmSync, lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -22,6 +23,8 @@ import { readFactorySettings } from './factory-settings.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
+import { reviewSelection } from './run-settings-input.ts';
+import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
@@ -120,6 +123,7 @@ export interface ReviewFinding {
 }
 
 export interface AxisReview {
+    selection?: ReviewSelectionEvidence;
     axis: ReviewAxis;
     escalation?: ReviewEscalation;
     verdict: ReviewVerdict;
@@ -129,6 +133,8 @@ export interface AxisReview {
 }
 
 export interface ReviewRound {
+    /** Absent on legacy rounds with no captured run. */
+    runId?: string;
     /** Counts the build's rounds from 1. */
     round: number;
     /** The commit the round reviewed from. */
@@ -138,8 +144,10 @@ export interface ReviewRound {
 }
 
 export interface NewReviewRound {
+    runId?: string;
     base: string;
     reviewers: readonly {
+        selection?: ReviewSelectionEvidence;
         axis: ReviewAxis;
         escalation?: ReviewEscalation;
         verdict: ReviewVerdict;
@@ -333,7 +341,7 @@ export interface CaptureSubmission {
 }
 
 export interface WorkRecords
-    extends ValidationRecords, TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
+    extends RunSettingsRecords, ValidationRecords, TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
     captureSubmission(requestId: string): CaptureSubmission | null;
     /** Reserves the request before any provider create; replays return its durable outcome. */
     claimCapture(
@@ -760,9 +768,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         'SELECT * FROM review_findings WHERE work_id = ? AND round = ? AND axis = ? ORDER BY finding',
     );
     const nextRound = db.prepare('SELECT coalesce(max(round), 0) + 1 AS next FROM review_rounds WHERE work_id = ?');
-    const insertRound = db.prepare('INSERT INTO review_rounds (work_id, round, base, recorded_at) VALUES (?, ?, ?, ?)');
+    const insertRound = db.prepare(
+        'INSERT INTO review_rounds (work_id, round, base, recorded_at, run_id) VALUES (?, ?, ?, ?, ?)',
+    );
     const insertAxis = db.prepare(
-        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked, escalation) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked, escalation, selection) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
     const insertFinding = db.prepare(
         'INSERT INTO review_findings (work_id, round, axis, finding, severity, summary, disposition, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1150,6 +1160,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
     return {
         ...validationRecords(database, (id) => fromRow(find(id))),
+        ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
@@ -1650,10 +1661,18 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 const number = Number(nextRound.get(workId)!.next);
 
-                insertRound.run(workId, number, round.base, new Date().toISOString());
+                const snapshot = round.runId === undefined ? null : savedRun(database, workId, round.runId);
+
+                if (!snapshot && db.prepare('SELECT 1 FROM run_settings WHERE work_id=? LIMIT 1').get(workId))
+                    throw invalid('A review must name its runId when the work record has run snapshots.');
+
+                if (snapshot && snapshot.kind !== 'build')
+                    throw invalid('A review round requires a build run snapshot.');
+
+                insertRound.run(workId, number, round.base, new Date().toISOString(), snapshot?.runId ?? null);
 
                 const seen = new Set<ReviewAxis>();
-                const settings = readFactorySettings(dataDir).settings;
+                const settings = snapshot?.settings ?? readFactorySettings(dataDir).settings;
 
                 for (const reviewer of round.reviewers) {
                     const axis = checkOneOf(
@@ -1685,7 +1704,28 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                             ? null
                             : checkRecordedEscalation(reviewer.escalation, axis, round.reviewers, settings);
 
-                    insertAxis.run(workId, number, axis, verdict, notChecked, escalation && JSON.stringify(escalation));
+                    const selection =
+                        reviewer.selection === undefined ? null : reviewSelection(reviewer.selection, verdict);
+
+                    if (snapshot && !selection)
+                        throw invalid('A snapshot-linked review requires selection evidence for each reviewer.');
+
+                    if (
+                        snapshot &&
+                        verdict !== 'skipped' &&
+                        settings.reviewers.find((entry) => entry.id === axis)?.mode.kind === 'never'
+                    )
+                        throw invalid(`The ${axis} reviewer is set to never in this run.`);
+
+                    insertAxis.run(
+                        workId,
+                        number,
+                        axis,
+                        verdict,
+                        notChecked,
+                        escalation && JSON.stringify(escalation),
+                        selection && JSON.stringify(selection),
+                    );
                     reviewer.findings.forEach((finding, index) => {
                         const severity = checkOneOf(FINDING_SEVERITIES, finding?.severity, 'severity');
                         const summary = checkFilled(finding.summary, `${axis} finding`);
@@ -1718,10 +1758,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 return roundRows.all(workId).map((round): ReviewRound => ({
                     round: Number(round.round),
+                    ...(round.run_id ? { runId: String(round.run_id) } : {}),
                     base: String(round.base),
                     recordedAt: String(round.recorded_at),
                     reviewers: axisRows.all(workId, Number(round.round)).map((axis): AxisReview => ({
                         axis: axis.axis as ReviewAxis,
+                        ...(axis.selection
+                            ? { selection: JSON.parse(String(axis.selection)) as ReviewSelectionEvidence }
+                            : {}),
                         ...(axis.escalation
                             ? { escalation: JSON.parse(String(axis.escalation)) as ReviewEscalation }
                             : {}),

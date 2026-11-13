@@ -12,6 +12,7 @@
         "./spec-sync": "./src/spec-sync.ts",
         "./tracker-sync": "./src/tracker-sync.ts",
         "./reviewer-selection": "./src/reviewer-selection.ts",
+        "./run-settings": "./src/run-settings.ts",
         "./factory-settings": "./src/factory-settings.ts"
     },
     "bin": {

@@ -15,7 +15,7 @@ or push the default branch. Follow project commit rules and
 - Fresh shaping: [Size up](size-up.md); settled questions go to
   [Brief](brief.md), then [Gate](gate.md). Shaping ends at Ready.
 - Concept: after confirming understanding, [Concepts](concepts.md).
-- Decision: pick-up routes to [Decisions](concepts.md#decisions), then only its method.
+- Decision: pick-up routes to [Decisions](decisions.md), then only its method.
 - Gate-only with a resolved work ID and saved brief: [Gate](gate.md) directly.
 - Build-time correction uses the same Brief and Gate, then returns to the
   paused build's recorded phase; it starts no second build.

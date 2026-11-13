@@ -1,5 +1,9 @@
 # Concepts
 
+Input: confirmed destination, boundaries and child records. Output: saved map,
+queued decisions and recorded research associations. Read
+[Structure](shared/issue-tracker/structure.md) when creating parts.
+
 A concept's map, decisions and builds live in its work record and the records
 it owns, per [work records](shared/issue-tracker/work-records.md). Record the
 kind `concept` (`lar-work update --kind concept`), then write the **map** to a
@@ -30,7 +34,7 @@ The user's original text stays in the record's initial context. Follow the local
 [domain-doc setting](shared/domain-docs-setting.md). With it OFF,
 write "none" under Domain docs and in decision domain-drafts, without drafting entries.
 
-1. Grill the user ([Grilling with docs](grilling-with-docs.md) in [SKILL.md](grilling-with-docs.md))
+1. Grill the user ([Grilling with docs](grilling-with-docs.md))
    only on the destination and the out-of-scope list.
 
    Save the proposed map and explain the parts and open questions. Continue
@@ -54,66 +58,8 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
    after. Research decisions get no thread. Tell the user in chat which
    decisions wait on which; this shaping thread is done.
 
+After group changes, follow [Reconcile group](shared/reconcile-group.md) before ending.
+
 ## Decisions
 
-Work a decision record by the method its text names (**Grilling with docs** in
-[SKILL.md](grilling-with-docs.md), prototype per
-[SKILL.md 2. Size up](size-up.md), research findings, or a small task).
-Run each heavy command (a whole test suite, a production build, a performance
-measurement, or anything expected to take over about a minute) on its own as
-`lar-work heavy -- <command>`. Top-level decision threads use the background,
-or their tool's longest timeout where it has no background mode. Delegated
-roles use the foreground with their tool's longest timeout, per
-[Wait for delegated work](shared/orchestration.md#wait-for-delegated-work). Then, in this order, so completion reads it as complete:
-
-Read siblings with `lar-work decision-answer ID`; use current text or the resolved
-replacement. Within the approved destination, adjust proposed builds without asking.
-If this answer supersedes another, use `supersede-answer` per
-[Completion](shared/issue-tracker/completion.md) before saving the map.
-
-1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
-   and, with domain docs ON, the drafts it settled, or "none"
-   (`--body domain-drafts`). With domain docs OFF, save "none" and create no drafts.
-2. Turn fog that cleared into new decision records, as in step 2. When part of
-   the destination is fully decided, make a build record for it
-   (`slice.sh <concept work ID> "<title>" <brief file> --kind build --repository <owner/repo> [--blocked-by <work ID>]...`) with a
-   brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
-   build needs. These are drafts in Queued. After saving the map below, follow
-   [Brief](brief.md), check code evidence, run Doubt and the [gate](gate.md) for
-   each, then set Ready. Decision
-   answers, prose dependencies and decision completion never approve a brief.
-   Record ordering with `lar-work add-blocker`; use Dependencies for other teams.
-3. Save the concept's map. Put only results needed to explain parts or
-   relationships in Decisions so far; keep the full answer in the decision
-   record. Copy its drafts into Domain docs and remove cleared fog. Record
-   changed blockers and Dependencies in the work records, never in map prose.
-   Once no Fog is left, record it with
-   `lar-work set-fog <concept work ID> --revision N --fog gone`.
-
-Run [Reconcile the group](shared/reconcile-group.md) after these changes, before ending.
-
-Start each new research decision at once, as in step 3; every other new decision
-waits in Queued as in step 4. Adjust proposed builds within the approved destination;
-ask only for expanded scope, new decisions or changes to active builds. Changed
-briefs need Doubt and a fresh gate; retain the last approved ticket Spec meanwhile.
-Builds remain Queued for shaping until gated
-and moved to Ready for the board to start
-([5. Start the build](start-build.md)). `lar-work completion` on this decision
-should now print it complete; fix what its reasons name. Map builds follow the
-build rules: each changes one repository, and work in another repository becomes
-a build there or a Dependency per [Other
-repositories](shared/issue-tracker/other-repositories.md). A
-blocked build starts once its blockers are complete and the user has marked each
-Dependency holding it met. Consult `lar-work refinement <concept work ID>`
-independently of delivery. Refinement requires a nonempty map, Fog recorded gone
-and every active decision settled. Fix its incomplete reasons. Proposed builds
-need neither passing gates nor merged PRs for refinement. The user's Start build
-on a child needs only the child's own gate and blockers. A Ready build waits for
-the user's Start build on the board. The exception is Auto-build. With this
-machine's Auto-build switch on, the board starts eligible Ready builds by
-itself, up to the build limit. Auto-build starts a build under a concept only
-once the concept's Refinement is complete.
-
-Read [Completion](shared/issue-tracker/completion.md) for delivery
-and [Structural publication suspended](shared/issue-tracker/publication.md)
-for local structure and retained recovery data.
+A decision thread reads [Decisions](decisions.md), then only its named method.

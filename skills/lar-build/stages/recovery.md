@@ -17,7 +17,7 @@ If a decision is missing, follow [Questions](../shared/questions.md) and keep
 its exact resume phase. A Clash follows [Project rules](../project-rules.md).
 If the brief is wrong, pause implementation, explain the evidence and resolve
 missing product choices. Revise through [Brief](../brief.md), reconcile affected
-work through [Other repositories](../shared/issue-tracker/other-repositories.md),
+work through [Reconcile group](../shared/reconcile-group.md),
 and run [Gate](../gate.md), including fresh Doubt and explicit approval.
 Resume this build's saved phase only after its corrected digest passes; preserve
 its branch and PR. A gate does not launch another build. Keep the starting input

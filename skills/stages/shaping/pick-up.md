@@ -8,14 +8,14 @@ Resolve the argument to its work record with
 `bash <this skill>/shared/scripts/work.sh <argument>` ([Picking](shared/issue-tracker/work-records.md#picking)).
 If it fails, tell the user its reason and stop. Read the record, its initial
 context (`lar-work context`), its brief, map or decision (`lar-work body`), its
-parent, children and blockers. Before accepting an existing passing brief,
+parent, children blockers and Dependencies. Before accepting an existing passing brief,
 run `lar-work gate <work ID>` to refresh its ticket Spec, inspect the sync
 warnings and held edits, then reread the brief and revision. A Reshape
 item keeps its brief text and gate history but has no current passing gate.
 Send it through Gate again with new final confirmation before marking it Ready. Follow
 [Gate](gate.md) when the text changed or an edit needs approval. Then route:
 
-- A decision: [Decisions](concepts.md#decisions).
+- A decision: [Decisions](decisions.md).
 - A record with a current passing brief, also when resuming a shaping
   handoff: accept it only when gate evidence records explicit user approval of
   the current digest. If that evidence is missing, follow [Gate](gate.md),

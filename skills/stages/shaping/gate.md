@@ -5,7 +5,8 @@ and board-recorded approval, or a Needs you wait.
 
 1. Run `lar-work gate <work ID>`. Resolve held edits in `specSync`; report read
    failures and warnings. Review its refreshed `display.brief` against code.
-2. Run `lar-work build-overlap <work ID>`. Review declared Files/Contracts and
+2. For grouped or overlapping work, follow [Reconcile group](shared/reconcile-group.md).
+   Run `lar-work build-overlap <work ID>`. Review declared Files/Contracts and
    semantic conflicts, including other concepts and standalone work. Record
    ordering with `lar-work add-blocker`, or save reasons as
    `[ {"otherWorkId":"ID","reason":"why no ordering is needed"} ]`.

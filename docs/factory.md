@@ -581,6 +581,8 @@ Performance checks rendering, polling, queries and data costs. Custom reviewers
 follow their saved instructions. All report verdict, findings and what they
 could not check. The board names running reviewers and shows completed results.
 
+Code may request a skipped reviewer when it spots a change that reviewer covers; the builder runs it once and records Code's ID and reason as the reviewer's `escalation`, with Settings' `never` always winning.
+
 The builder records round 1 through `record-review-round`, including skipped
 reviewers, base SHA, `approve` or `changes`, `notChecked`, finding severity and
 disposition. It judges findings, justifies rejection and gives accepted findings
@@ -594,8 +596,8 @@ findings, with no third round. Review ends after round 1 if nothing was fixed,
 otherwise after round 2. Remaining findings and unreviewed round-2 fixes go to
 the approver. Stop only UI processes whose recorded ownership still matches.
 
-Today: review records accept only the four built-in axes. They need stable
-custom IDs and actual role-setting evidence. The two-round policy already exists.
+Today: review records accept built-in and saved custom reviewer IDs; actual
+role-setting evidence remains to be added. The two-round policy already exists.
 
 ### Approval and PR
 

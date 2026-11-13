@@ -18,8 +18,10 @@ import type { StatementSync } from 'node:sqlite';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
+import { readFactorySettings } from './factory-settings.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
+import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
@@ -97,7 +99,8 @@ const BODY_HOLDERS: Partial<Record<Body, WorkKind>> = {
 
 /** The lar-build reviewers, one axis each (`skills/lar-build/agents/builder.md`, Review). */
 export const REVIEW_AXES = ['code', 'security', 'ui', 'performance'] as const;
-export type ReviewAxis = (typeof REVIEW_AXES)[number];
+/** A built-in axis or a saved custom reviewer ID. */
+export type ReviewAxis = string;
 /** A reviewer's verdict, or `skipped` when the builder didn't run it. */
 export const REVIEW_VERDICTS = ['approve', 'changes', 'skipped'] as const;
 export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
@@ -118,6 +121,7 @@ export interface ReviewFinding {
 
 export interface AxisReview {
     axis: ReviewAxis;
+    escalation?: ReviewEscalation;
     verdict: ReviewVerdict;
     /** What the reviewer couldn't check, or why a skipped axis was skipped. */
     notChecked: string | null;
@@ -137,6 +141,7 @@ export interface NewReviewRound {
     base: string;
     reviewers: readonly {
         axis: ReviewAxis;
+        escalation?: ReviewEscalation;
         verdict: ReviewVerdict;
         notChecked?: string;
         findings: readonly {
@@ -757,7 +762,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const nextRound = db.prepare('SELECT coalesce(max(round), 0) + 1 AS next FROM review_rounds WHERE work_id = ?');
     const insertRound = db.prepare('INSERT INTO review_rounds (work_id, round, base, recorded_at) VALUES (?, ?, ?, ?)');
     const insertAxis = db.prepare(
-        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked, escalation) VALUES (?, ?, ?, ?, ?, ?)',
     );
     const insertFinding = db.prepare(
         'INSERT INTO review_findings (work_id, round, axis, finding, severity, summary, disposition, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1648,9 +1653,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 insertRound.run(workId, number, round.base, new Date().toISOString());
 
                 const seen = new Set<ReviewAxis>();
+                const settings = readFactorySettings(dataDir).settings;
 
                 for (const reviewer of round.reviewers) {
-                    const axis = checkOneOf(REVIEW_AXES, reviewer?.axis, 'axis');
+                    const axis = checkOneOf(
+                        [...REVIEW_AXES, ...settings.reviewers.map((entry) => entry.id)],
+                        reviewer?.axis,
+                        'axis',
+                    );
 
                     if (seen.has(axis)) throw invalid(`The round lists the ${axis} reviewer twice.`);
 
@@ -1670,7 +1680,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     if (verdict === 'skipped' && reviewer.findings.length)
                         throw invalid(`The skipped ${axis} reviewer can't have findings.`);
 
-                    insertAxis.run(workId, number, axis, verdict, notChecked);
+                    const escalation =
+                        reviewer.escalation === undefined
+                            ? null
+                            : checkRecordedEscalation(reviewer.escalation, axis, round.reviewers, settings);
+
+                    insertAxis.run(workId, number, axis, verdict, notChecked, escalation && JSON.stringify(escalation));
                     reviewer.findings.forEach((finding, index) => {
                         const severity = checkOneOf(FINDING_SEVERITIES, finding?.severity, 'severity');
                         const summary = checkFilled(finding.summary, `${axis} finding`);
@@ -1707,6 +1722,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     recordedAt: String(round.recorded_at),
                     reviewers: axisRows.all(workId, Number(round.round)).map((axis): AxisReview => ({
                         axis: axis.axis as ReviewAxis,
+                        ...(axis.escalation
+                            ? { escalation: JSON.parse(String(axis.escalation)) as ReviewEscalation }
+                            : {}),
                         verdict: axis.verdict as ReviewVerdict,
                         notChecked: axis.not_checked as string | null,
                         findings: findingRows

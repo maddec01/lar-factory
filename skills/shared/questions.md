@@ -1,71 +1,36 @@
 # Question UI
 
-Input: unresolved choice, prior answers and resume Status. Output: saved question
-and answer (digest-bound gate evidence for approval), or an explicit wait.
+Input: unresolved choice, prior answers and resume Status. Output: saved answer
+or explicit wait. Final brief approval is stored only in digest-bound gate evidence.
 
-Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
-shows the thread as waiting for an unresolved decision: grilling rounds, the prototype pick,
-Size up confirmation, final brief approval, Gate assumptions, Doubt findings, Concepts,
-grill decisions, and the builder's stops. Retro picks and their
-clarifications use [chat](#retro-picks).
-If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
-in chat with each numbered question, its title and body, followed by the
-recommended answer. Separate questions with a horizontal rule. Word each so
-"yes" accepts the recommendation.
+Use the available question UI for ordinary decisions, including understanding,
+prototype picks, grilling, gate findings and build holds. Discover deferred
+question tools when needed. If unavailable, save the numbered question and
+Needs you notice, and ask in chat: title, body, recommended answer, separated
+from other questions by a horizontal rule. Word recommendations so "yes"
+accepts them. Brief approval uses [Gate](../gate.md); chat or T3 answers
+cannot record approval.
 
-Reuse answers and authorization already given. State routine shaping routes and
-implementation choices, then continue. The Size up and final brief checkpoints require explicit confirmation as
-lar-shape's Size up step and lar-shape's Gate step specify.
-Otherwise ask only for a missing decision, genuine conflict or expansion of scope. The saved sync choice needs no per-update prompt.
+Reuse prior answers and authorization. Continue routine routes and implementation
+choices. Ask only for missing decisions, real conflicts or expanded scope,
+except Size up and Gate always need their specified explicit confirmations.
+Keep questions short; use title/ticket for context, never local work IDs.
 
-Keep questions short. Use the issue title or ticket number only when context is
-needed. Local work IDs belong in commands and tool identifiers, never in the
-question text shown to the user.
-
-Every ordinary question batch runs these once, however many calls it takes:
-
-1. Keep the step's resume Status. Run `lar-work set-needs-you <work ID> --revision N
-   --reason "<question or decision needed>"` (reason and Status together), then make the calls. Wait for the answers before continuing,
-   including when the tool returns asynchronously. Silence never grants approval.
-2. After the last call, keep the answers for the record: a decision's answer
-   body, or the brief's or map's **Confirmed** when you write them. Include
-   Domain docs drafts only when that setting is ON; otherwise write "none".
-   A whole gated brief reaches its ticket through the saved Spec setting, rather
-   than separate question-and-answer comments.
-   Exception: final brief approval goes only in gate evidence bound to the
-   approved digest, per lar-shape's Gate step. Keep the response in the
-   thread until recording that gate; do not append it to Confirmed or otherwise
-   edit the approved brief to store the answer.
-3. Run `lar-work clear-needs-you <work ID> --revision N --status "<resume Status>"`
+For each ordinary batch, however many calls it takes:
+1. Save the question reference and resume Status; run `lar-work set-needs-you ID
+   --revision N --reason "<question>"` before asking. Wait for every answer,
+   including asynchronous replies. Silence is not approval.
+2. Save answers in the decision's answer or the brief/map's Confirmed section.
+   Draft domain docs only when ON, otherwise "none". Keep final approval only in
+   board-recorded gate evidence; never append it to Confirmed.
+3. Run `lar-work clear-needs-you ID --revision N --status "<resume Status>"`
    to clear the reason and restore Shaping, In progress or Review together.
 
-Use this format for the call:
+Format calls as `Qn - <title>: <body>`. Put the recommended option first, with
+`(Recommended)` in its label and reasons in its description. With no honest
+recommendation, such as a prototype choice, mark none. Supply at least two real
+alternatives, leaving free text available. Keep headers within 12 characters
+and labels to 1–5 words plus the recommendation suffix. Respect the tool's
+question limit, at most four per call; continue numbering across calls to cover
+the whole frontier. Follow up only for a necessary unresolved decision.
 
-- question: `Qn - <title>: <body>`, worded so "yes" accepts the
-  recommendation;
-- first option: the recommended answer, its label ending `(Recommended)`, the
-  reasoning in its description. The others are the real alternatives; "Other"
-  stays for free text. Without an honest recommendation (a prototype pick),
-  mark nothing `(Recommended)`;
-- at least 2 options representing real alternatives. Ask a follow-up only when
-  the selected answer leaves a necessary decision unresolved;
-- `header` ≤12 characters; option labels 1–5 words plus `(Recommended)`;
-- ≤4 questions per call. Split a longer batch (a grilling round, Gate
-  assumptions, Doubt findings) into consecutive calls, numbering on, so a round
-  still asks the whole frontier.
-
-## Retro picks
-
-Show every suggestion together as one complete numbered list in chat, with
-its name and full description, even for more than four suggestions or long
-descriptions. Keep selection and any clarification entirely in chat; question
-UI option limits must neither split nor truncate the list.
-
-Ask the user to reply with numbers, names, free-text descriptions, “all” or
-“none”, then wait for their reply using normal chat waiting. Add no notification
-feature. With no suggestions, skip the selection question.
-
-Follow [Retro capture](retro-capture.md#select-and-route) to resolve the reply
-and capture explicit picks. It is the answers record for this chat exchange;
-skip steps 1–3 above and keep the source build's final Status throughout
-selection, clarification, capture, retries and failure reporting.

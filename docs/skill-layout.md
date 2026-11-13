@@ -16,18 +16,18 @@ Proposed commands are explicitly marked, never presented as available operations
 Group changes and observed delivery merges load `reconcile-group.md`; `lar-work
 reconcile` owns its checklist, while the stage owns semantic repairs and re-gates.
 
-| Thread or role      | Route                                                                       |
-| ------------------- | --------------------------------------------------------------------------- |
-| Fresh shaping       | entry → pick-up → size-up → brief → gate                                    |
-| Concept             | entry → pick-up → confirmed size-up → concepts; methods only as used        |
-| Decision            | entry → pick-up → decisions → named method                                  |
-| Gate-only           | entry common rules → gate; no exploration or size-up                        |
-| Linked work         | owning route + other-repositories and reconcile-group                       |
-| Build               | entry → agents/builder → recorded phase in stages/                          |
-| Planner/implementer | own agent file, project rules, orchestration and slices as needed           |
-| Each reviewer       | own agent file + review-result + only that role's Copies                    |
-| Approver/CI fixer   | own agent file, project rules, validation and PR delivery when used         |
-| Doubt               | canonical doubt stage, orchestration, prose and exact affected-work package |
+| Thread or role      | Route                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| Fresh shaping       | entry → pick-up → size-up → brief → gate                                           |
+| Concept             | entry → pick-up → confirmed size-up → concepts; methods only as used               |
+| Decision            | entry → pick-up → decisions → named method                                         |
+| Gate-only           | entry common rules → gate; no exploration or size-up                               |
+| Linked work         | owning route + other-repositories and reconcile-group                              |
+| Build               | entry → agents/builder → recorded phase in stages/                                 |
+| Planner/implementer | own agent file, project rules, orchestration and slices as needed                  |
+| Each reviewer       | own agent file + review-result + only that role's Copies                           |
+| Approver/CI fixer   | own agent file, project rules, validation and PR delivery when used                |
+| Doubt               | canonical doubt checks, orchestration report rules and exact affected-work package |
 
 Build phases live in `skills/lar-build/stages`: plan, implement/integrate,
 domain-docs, full-checks, review, approve, ci and retro. Recovery, handoff and
@@ -40,8 +40,12 @@ corrections use shared Brief, reconciliation and Gate, then resume the same buil
 `skills/shared/issue-tracker/work-records.md` holds identity, revisions and Status;
 separate operation files hold ticket creation, Specs, structure, other repositories,
 completion and deleted-thread recovery. `domain-docs-setting.md` reads the local
-setting; `domain-docs.md` loads when drafting/reviewing domain language. Prose loads
-once; agent-document guidance loads when writing those documents. Questions,
+setting; authors load `domain-docs.md`, while Doubt and reviewers receive the
+resolved setting and inspect drafts against their role checks and formats.
+Owners read `write-prose.md` once. Roles use orchestration's short report rules;
+repository prose authors also load `write-prose.md`, and agent-document authors
+load `write-agent-docs.md`. Grilling and its domain-aware wrapper share one file;
+handoff content and launch guidance share one file. Questions,
 orchestration and handoff load only when used.
 
 Shared text is lar-owned or a Port listed in `UPSTREAM.md`. Edit these directly.

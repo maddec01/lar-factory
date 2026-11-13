@@ -5,11 +5,9 @@ Spec when the saved setting is ON, preserving prior text as Original. Concepts,
 decisions, slices and Dependencies do not use this path. Never publish progress
 or structure through it.
 
-Run `lar-work gate ID` before reviewing or gating, then read the refreshed brief
-and revision. Inspect `specSync`: report read errors and use the last local copy;
-resolve held GitHub edits through Accept/Reject in details before using them.
-`record-gate` refreshes again and requires the reviewed digest. Changed text requires
-fresh review and explicit digest-bound approval.
+When approval is needed, follow [Gate](../../gate.md) for refresh, review
+and board-only approval.
+Changed text needs fresh review and approval; agent gate writes refuse.
 
 Failed writes stay pending with Retry in details and do not block Ready. Report
 the error without claiming publication. Inspect warnings when tracker text

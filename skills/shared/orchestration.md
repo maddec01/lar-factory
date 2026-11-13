@@ -24,7 +24,8 @@ and paths instead of whole files, logs or screenshots. Authors of
 repository prose additionally read [Write prose](write-prose.md); editing agent
 documents also loads [Write agent docs](write-agent-docs.md). Reports, findings, research notes and slice briefs use these prose rules.
 
-Track children by `taskId`; follow their returned `next`. Follow-up work uses a
+Track children by `taskId`; follow their returned `next`. Cancel replaced or
+unneeded tasks with `task_cancel`. Follow-up work uses a
 new `delegate_task` with the earlier brief and findings, never `childThreadId` as
 a conversation. Commit before worktree delegation, which starts from the local
 commit. Top-level handoffs, including concept-to-decision, follow
@@ -38,7 +39,7 @@ Roles run each heavy command separately as `lar-work heavy -- <command>`, in
 the foreground with the longest tool timeout. Heavy means a whole suite,
 production build, performance measurement or expected runtime over a minute.
 `run-check` supplies its own slot. Waiting for a slot counts toward timeout.
-Send no report until work and descendants finish. If a tool backgrounds an
+Send no message until work and descendants finish; the last message is the report. If a tool backgrounds an
 unfinished command, end silently and resume on completion. If it kills the
 command, report unfinished, never passed; do not retry it. The owner decides.
 Research may run in the background while its owner continues. UI reviewers may

@@ -56,7 +56,7 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
      each round-2 fix, the finding, its severity and its reviewer. Name
      findings, not commits: autosquash rewrote the shas;
    - the builder's **Domain docs added by the build** list when repository
-     mode produced entries for this PR. Private drafts stay in local records;
+     mode produced entries for this PR;
    - an `## Out of scope` section with the builder's notes on work another
      repository needs, when any;
    - this build's own closing reference when it has a ticket, alongside other

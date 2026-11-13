@@ -7,6 +7,8 @@ import { subscribeProjects } from './project-subscription.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
 let pending: Promise<ProjectRead> | undefined;
+let retryAt = 0;
+const RETRY_MS = 2_000;
 let current:
     | { key: string; origin: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> }
     | undefined;
@@ -73,9 +75,22 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
         return current?.read ?? { availability: 'unavailable' };
     }
 
-    if (current?.key === key) return current.read;
+    if (current?.key === key) {
+        if (Date.now() < retryAt) return current.read;
+
+        retryAt = Date.now() + RETRY_MS;
+
+        const state = current;
+        const read = await state.protocol.readProjects();
+
+        state.read = { ...read, observation: read.observation ?? state.read.observation };
+        announce(state.read);
+
+        return state.read;
+    }
 
     current?.stop();
+    retryAt = Date.now() + RETRY_MS;
 
     try {
         const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
@@ -90,6 +105,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
         };
 
         current = state;
+        announce(state.read);
         // The HTTP read can lack what the shell supplies, so the first shell data always counts as a change.
         announced = undefined;
         state.stop = subscribeProjects(new URL(runtime.origin), version, protocol, (read) => {
@@ -127,4 +143,14 @@ export function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
     });
 
     return authorizing;
+}
+
+/** Run checks discards the cached transport and rediscovers the current runtime. */
+export async function reconnectRepositoryProjects(env: NodeJS.ProcessEnv = process.env): Promise<ProjectRead> {
+    await pending;
+    current?.stop();
+
+    if (current) current.key = '';
+
+    return repositoryProjects(env);
 }

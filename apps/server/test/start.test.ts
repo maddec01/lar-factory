@@ -192,7 +192,8 @@ const refusals: {
     {
         name: 'a missing T3 database',
         db: (dir) => join(dir, 'none.sqlite'),
-        error: () => "Can't read T3 Code's projects; reconnect T3 Code before starting",
+        error: () =>
+            "Can't read T3 Code's projects; the board retries automatically. Open T3 Code or run checks in Diagnostics.",
     },
 ];
 
@@ -232,7 +233,10 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
     const response = await start(board, board.id(12));
 
     assert.equal(response.status, 409);
-    assert.equal((await response.json()).error, "Can't read T3 Code's projects; reconnect T3 Code before starting");
+    assert.equal(
+        (await response.json()).error,
+        "Can't read T3 Code's projects; the board retries automatically. Open T3 Code or run checks in Diagnostics.",
+    );
     assert.deepEqual(await board.t3Calls(), []);
 });
 

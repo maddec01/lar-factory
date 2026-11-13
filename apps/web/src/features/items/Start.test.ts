@@ -261,3 +261,20 @@ test('Started clears after its server record disappears', async () => {
     expect(card().querySelector('.started-tag')).toBeNull();
     expect(start()).toBeTruthy();
 });
+
+test('a held Shape explains why visibly and becomes available when project discovery recovers', async () => {
+    const item = withChoices.items.find((item) => item.id === 'I_sample05')!;
+    const reason = "Can't read T3 Code's projects; the board retries automatically";
+
+    await mountItem({ ...withChoices, repositoryProjects: { [item.repo!]: reason } });
+    expect(start().disabled).toBe(true);
+    expect(text(document.getElementById(start().getAttribute('aria-describedby')!))).toBe(reason);
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() =>
+        useBoardStore.setState({ data: { ...withChoices, repositoryProjects: { [item.repo!]: null } } }),
+    );
+    expect(start().disabled).toBe(false);
+    expect(text(card())).not.toContain(reason);
+});

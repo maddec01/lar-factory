@@ -700,6 +700,13 @@ attempt. It reconciles unresolved launch intents first. A quiet thread or T3
 read failure alone never proves deletion. A genuine missing decision waits on
 the desk; a routine handoff keeps the current stage and placement.
 
+The board retries T3 project reads while disconnected and rediscovers a restarted
+server's current process and address. Recovery refreshes project launch holds,
+project defaults and model choices independently of tracker reads. A disabled
+Shape shows its reason beside the control. Diagnostics shows the authenticated
+T3 project connection separately from the CLI and board server; Run checks opens
+a fresh connection. Retained observations never authorize a launch.
+
 ## Skill context by thread kind
 
 Assembly copies `skills/shared` into each installed skill. Paths below refer

@@ -56,6 +56,7 @@ export type SettingsData = Pick<
     | 'autoBuild'
     | 'modelChoices'
     | 't3Defaults'
+    | 't3Availability'
 > & { everRead: boolean };
 
 export function settingsData({
@@ -73,6 +74,7 @@ export function settingsData({
     autoBuild,
     modelChoices,
     t3Defaults,
+    t3Availability,
     fetchedAt,
 }: BoardData): SettingsData {
     return {
@@ -90,6 +92,7 @@ export function settingsData({
         autoBuild,
         modelChoices,
         t3Defaults,
+        t3Availability,
         everRead: !!fetchedAt,
     };
 }

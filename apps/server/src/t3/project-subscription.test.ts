@@ -94,10 +94,12 @@ it('retains observations across disconnect and requests a fresh snapshot', async
     vi.stubGlobal('fetch', request);
 
     const changed = vi.fn();
+    const authenticated = protocol();
+    const invalidate = vi.spyOn(authenticated, 'invalidateSession');
     const close = subscribeProjects(
         new URL('http://127.0.0.1:3773'),
         '0.1.6-nightly.20261031.3977',
-        protocol(),
+        authenticated,
         changed,
     );
 
@@ -119,6 +121,7 @@ it('retains observations across disconnect and requests a fresh snapshot', async
 
     first.chunk([{ kind: 'project.removed', sequence: 2, projectId: 'one' }]);
     first.close();
+    expect(invalidate).not.toHaveBeenCalled();
     expect(changed).toHaveBeenLastCalledWith({ availability: 'unavailable', observation });
     await vi.advanceTimersByTimeAsync(1000);
     expect(request).toHaveBeenCalledTimes(2);

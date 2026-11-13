@@ -27,7 +27,8 @@ const ghLoggedOut = { ...allOk, gh: { result: 'logged-out', version: '2.96.0', f
 /** Whether every check the first lookup asked for has landed. */
 const landed = (data: BoardData) =>
     (['t3', 'git', 'jq', 'curl'] as const).every((name) => data.tools?.[name]) &&
-    !data.toolProgress?.checking.includes('gh');
+    !data.toolProgress?.checking.includes('gh') &&
+    !data.toolProgress?.checking.includes('az');
 const checked = (board: Board) => until(board, landed);
 
 /** The board data once the first read has finished, or failed, and every check has landed. */

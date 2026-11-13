@@ -261,6 +261,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             passingBrief: gate.current,
             ...(briefApproval && {
                 briefApproval: {
+                    digest: records.displayGate(record.workId).approvalDigest,
                     reason: activeBuild
                         ? 'The brief changed during Build. Review and approve the new brief.'
                         : 'Review the complete brief before it becomes Ready.',

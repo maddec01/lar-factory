@@ -96,13 +96,15 @@ export function ReleaseProgress({ plan, remaining }: { plan: ReleasePlan | null 
                 )}
             </div>
             <DetailFact label="What's left">
-                {left.length
-                    ? left.map((reason) => (
-                          <Text key={reason} variant="caption" breaks>
-                              {reason}
-                          </Text>
-                      ))
-                    : 'Delivery complete'}
+                {left.length ? (
+                    <ul className="m-0 grid list-disc gap-1 pl-4 text-xs" aria-label="What's left">
+                        {left.map((reason) => (
+                            <li key={reason}>{reason}</li>
+                        ))}
+                    </ul>
+                ) : (
+                    'Delivery complete'
+                )}
             </DetailFact>
         </MainSection>
     );

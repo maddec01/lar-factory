@@ -122,11 +122,29 @@ test('a ready concept has one start per surface and its footer never starts an o
 });
 
 test('compact disabled starts show their hold next to the action', async () => {
-    await show({ run: null, holds: [{ workId: 'd', reason: '1 decision open' }], members: [] });
+    await show({
+        run: null,
+        holds: [{ workId: 'd', reason: 'Its confirmed answer is missing.' }],
+        members: [
+            {
+                workId: 'd',
+                kind: 'decision',
+                title: 'Choose colour',
+                repository: 'fake/app',
+                status: 'Shaping',
+                waits: [],
+                complete: false,
+            },
+        ],
+    });
 
     const action = $('[data-concept-build-action]')!;
 
-    expect(text(action.querySelector('[data-concept-build-hold]'))).toBe('1 decision open');
+    expect(text(action.querySelector('summary'))).toBe('Waiting on 1 decision');
+    expect(action.querySelector('details')?.open).toBe(false);
+    await settle(() => action.querySelector('summary')!.click());
+    expect(action.querySelector('details')?.open).toBe(true);
+    expect(text(action)).toContain('Its confirmed answer is missing.');
 });
 
 test.each(['running', 'paused'] as const)('the %s concept header describes the run', async (state) => {

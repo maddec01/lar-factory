@@ -32,16 +32,17 @@ export interface Moving {
 
 export function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
     const ahead = parts.filter((p) => !isDone(p.item));
+    const all = [parent, ...parts.map((part) => part.item)];
 
     return {
-        parentWait: humanWait(parent, unavailable),
+        parentWait: humanWait(parent, unavailable, all),
         parts,
         done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
         count: Math.max(parent.subIssues.total, parts.length),
         needsYou: ahead.filter(
-            (p) => !['Verify', 'Ready to merge'].includes(p.item.status) && humanWait(p.item, unavailable),
+            (p) => !['Verify', 'Ready to merge'].includes(p.item.status) && humanWait(p.item, unavailable, all),
         ),
-        yours: ahead.filter((p) => YOURS.includes(p.item.status) && humanWait(p.item, unavailable)),
+        yours: ahead.filter((p) => YOURS.includes(p.item.status) && humanWait(p.item, unavailable, all)),
         decisions: ahead.filter((p) => DECISION_KINDS.includes(p.kind)),
         blockedSlices: ahead.flatMap((part) =>
             part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })),

@@ -9,7 +9,7 @@ export function GroupDetails({ item }: { item: Item }) {
     const { data } = useBoardStore();
     const parts = partsOf(item, data.items);
     const unavailable = useActivityUnavailable();
-    const waiting = humanWait(item, unavailable);
+    const waiting = humanWait(item, unavailable, data.items);
     const running = parts.filter(
         (part) =>
             !unavailable &&
@@ -27,7 +27,7 @@ export function GroupDetails({ item }: { item: Item }) {
           ? 'Group paused'
           : item.conceptBuild?.run?.state === 'paused' && pending.some((part) => part.kind === 'build')
             ? 'Concept builds paused'
-            : waiting
+            : waiting && waiting.label !== 'Release step'
               ? waiting.label
               : running
                 ? `${plural(running, 'build')} running`

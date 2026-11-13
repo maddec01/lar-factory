@@ -1,5 +1,5 @@
 import type { Item } from './item-domain.ts';
-import type { ItemThread } from './thread-domain.ts';
+import { openQuestionThread, type ItemThread } from './thread-domain.ts';
 
 /** The next action names the pending request and opens its exact owner, including a child thread. */
 export function questionThreadAction(thread: ItemThread | undefined) {
@@ -43,4 +43,27 @@ export function questionOwnerParent(item: Item, all: readonly Item[]): Item | un
     }
 
     return undefined;
+}
+
+/** A shaping owner may ask for a sibling build's gate; the exact digest identifies that approval. */
+export function delegatedBriefApproval(owner: Item, all: readonly Item[]): Item | undefined {
+    const request = openQuestionThread(owner);
+    const summary = request?.questionSummary;
+
+    if (
+        !request?.pendingRequest ||
+        request.pendingRequest.kind === 'tool-approval' ||
+        !summary ||
+        !/approv/i.test(summary.split('\n')[0] ?? '')
+    )
+        return undefined;
+
+    return all.find(
+        (candidate) =>
+            candidate.id !== owner.id &&
+            candidate.status !== 'Done' &&
+            !!candidate.briefApproval?.digest &&
+            summary.includes(candidate.briefApproval.digest) &&
+            (candidate.parentId === owner.id || (!!owner.parentId && candidate.parentId === owner.parentId)),
+    );
 }

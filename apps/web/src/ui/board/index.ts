@@ -226,3 +226,5 @@ export { ReleaseProgress } from './ReleaseProgress';
 
 export { GroupStatus } from './ItemDialog';
 export { RetroChoices } from './RetroChoices';
+
+export { ReleaseStepForm } from './ReleaseStepForm';

@@ -29,7 +29,10 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
         createElement(
             TooltipProvider,
             null,
-            createElement(ReleaseProgress, { plan, remaining: ['Activation is still pending.'] }),
+            createElement(ReleaseProgress, {
+                plan,
+                remaining: ['Activation is still pending.', 'Outcome check pending.'],
+            }),
         ),
     );
 
@@ -49,6 +52,10 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
         expect(text).toContain(value);
     expect(text).not.toContain('Delivery complete');
     expect(text).not.toContain('a'.repeat(64));
+    expect([...root.querySelectorAll('ul[aria-label="What\'s left"] li')].map((node) => node.textContent)).toEqual([
+        'Activation is still pending.',
+        'Outcome check pending.',
+    ]);
     expect(root.querySelector('time')?.dateTime).toBe('now');
     expect(root.querySelectorAll('ol[aria-label="Release steps"] li')).toHaveLength(2);
     expect(root.querySelector('[aria-label="Copy full release evidence"]')).not.toBeNull();

@@ -35,7 +35,10 @@ export async function releaseCommand(command: string, args: string[]): Promise<n
         const revision = Number(values.revision);
 
         if (command === 'set-release-plan') {
-            if (!values.file) throw Error('Use --file F with {steps:[{id,who,what}],outcomeCheck:"observable check"}.');
+            if (!values.file)
+                throw Error(
+                    'Use --file F with {steps:[{id,who,what,shipsWith?:[work IDs]}],outcomeCheck:"observable check"}.',
+                );
 
             records.setReleasePlan(
                 id,

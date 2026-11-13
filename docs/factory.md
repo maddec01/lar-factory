@@ -424,6 +424,33 @@ Both preserve tickets and history; closing a tracker ticket is a separate choice
 An active build affected by a scope change pauses for reconciliation and a fresh
 gate. The running `buildInput` is never silently rewritten.
 
+`lar-work reconcile GROUP_ID` derives a fingerprinted checklist from the group's
+records, current Doubt packages and its last clean snapshot. It lists changed
+answers (including supersession), brief/scope/contracts, map nodes, Dependencies
+and release steps with before/after facts. It checks missing overlap ordering,
+redundant blocker paths, unincorporated answers, stale approved gates, held ticket
+edits, ticket title/Spec mismatches and pending/failed approved writes. No tracker request runs inside this command.
+
+The owning thread repairs affected records, re-gates changed briefs through Doubt
+and Pedro's board approval. It records each
+source-change review with `resolve-reconcile GROUP_ID --item KEY --digest H
+--evidence TEXT`. Changed fingerprints refuse stale acknowledgements. Mechanical
+holds clear only when the recorded condition is fixed; the next reconcile records
+them done. A clean checklist checkpoints the new baseline, preserving completion
+evidence. Semantic agreement remains the thread's and Doubt's responsibility;
+commands compare declarations and recorded evidence, never infer prose contracts.
+
+`set-release-plan GROUP_ID --revision N --file F` uses the parent delivery plan:
+`{steps:[{id,who,what,shipsWith?:[work IDs]}],outcomeCheck:"observable check"}`.
+A ships-with release step names at least two active delivery parts, such as the
+server and app changes that must ship together. The map and parts view show their
+names in the same release plan. Reconcile flags removed/set-aside members and
+merged pairs still lacking release evidence. Use the existing
+`complete-release-step` and `record-outcome-check` commands; PR merge is never
+release evidence. Invalid members prevent delivery completion even if old evidence
+exists. Release contracts enter Doubt's digest; later evidence alone does not
+invalidate a reviewed contract. No second release store is introduced.
+
 Reconciliation ends only when affected records agree, affected gates are marked,
 and every required approved Spec write is queued or its failure is visible.
 Changed ungated text stays local until approved. The ticket keeps the last

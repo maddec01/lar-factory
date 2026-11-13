@@ -5,7 +5,7 @@ export interface ReleaseEvidence {
     at: string;
 }
 export interface ReleasePlan {
-    steps: { id: string; who: string; what: string; done: ReleaseEvidence | null }[];
+    steps: { id: string; who: string; what: string; done: ReleaseEvidence | null; shipsWith?: string[] }[];
     outcomeCheck: { what: string; result: 'pending' | 'passed' | 'failed'; evidence: ReleaseEvidence | null };
 }
 

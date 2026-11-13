@@ -567,4 +567,8 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(`
         CREATE TABLE retros(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
     `),
+    (db) =>
+        db.exec(`
+        CREATE TABLE group_reconciliation(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, baseline TEXT NOT NULL, completed TEXT NOT NULL, pending TEXT NOT NULL) STRICT;
+    `),
 ];

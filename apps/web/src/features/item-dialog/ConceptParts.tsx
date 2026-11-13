@@ -10,15 +10,16 @@ import {
     AgentWork,
     hasFigures,
     ItemTitle,
+    RepoCell,
     usageUnreadable,
     useShownStatus,
     OpenThread,
     SourceIcon,
     ItemStatusGlyph,
 } from '@/features/items';
-import { isDone, partsOf } from '@/features/line';
+import { isDone, partsOf, unreadParts, unreadPartsText } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DetailFact, DetailsSection, PartName, PartRow, PartsList } from '@/ui/board';
+import { DetailFact, PartName, PartRow, PartsList, MainSection, SectionHeader } from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn['’]t (?:settled|Done)[.]$`);
@@ -39,6 +40,7 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
         else
             others.push(
                 reason
+                    .replace(/^Its build isn['’]t Done[.]$/, 'Builds remain.')
                     .replace(UNMET_DEPENDENCY, 'Dependency on $1 isn’t met.')
                     .replace(new RegExp(` ?${WORK_ID}`, 'g'), ''),
             );
@@ -119,7 +121,12 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
                     <ItemTitle item={item} />
                 </PartName>
             }
-            meta={complete ? 'Complete' : (conceptBuildWait(item, data) ?? shown.word)}
+            meta={
+                <>
+                    <RepoCell item={item} />
+                    {complete ? 'Done' : (conceptBuildWait(item, data) ?? shown.word)}
+                </>
+            }
             usage={usage}
             action={hasThread && <OpenThread item={item} data={data} part />}
         />
@@ -136,17 +143,38 @@ export function ConceptParts({
     openPart: (itemId: string) => void;
 }) {
     const parts = partsOf(item, data.items);
-
-    if (!parts.length) return null;
+    const missing = unreadParts(item, parts);
 
     return (
-        // The progress above names the parts and counts them, so the list needs no heading of its own.
-        <DetailsSection data-concept-parts>
+        <MainSection data-concept-parts header={<SectionHeader heading="Parts" />}>
+            {item.completion && (
+                <DetailFact label="Delivery">
+                    <ConceptState
+                        state={
+                            parts.some((part) => part.kind === 'build')
+                                ? { ...item.completion, reasons: [] }
+                                : item.completion
+                        }
+                        item={item}
+                    />
+                </DetailFact>
+            )}
+            {missing > 0 && <DetailFact label="Parts outside the board">{unreadPartsText(missing)}</DetailFact>}
+            {!parts.length && (
+                <DetailFact label="Parts">
+                    {item.subIssues.total ? 'Parts are outside the board.' : 'No parts planned yet.'}
+                </DetailFact>
+            )}
+            {!item.releasePlan && item.completion && (
+                <DetailFact label="What's left">
+                    <ConceptReasons state={item.completion} />
+                </DetailFact>
+            )}
             <PartsList>
                 {parts.map((part) => (
                     <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
                 ))}
             </PartsList>
-        </DetailsSection>
+        </MainSection>
     );
 }

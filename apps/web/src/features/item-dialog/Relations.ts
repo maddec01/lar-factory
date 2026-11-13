@@ -16,8 +16,8 @@ export const sidebarSubTickets = (item: Item, subTickets: IssueRef[]): IssueRef[
     item.currentSprint ? subTickets : subTickets.filter((s) => !item.slices.some((slice) => slice.number === s.number));
 
 /** Whether the sidebar has anything: work it waits on, Dependencies, pull requests, or sub-tickets beyond the slices (as many as the board counts while the details load). */
-export const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
-    item.kind === 'build' ||
+export const hasRelations = (item: Item, read: ItemDetailsRead, group = false): boolean =>
+    (item.kind === 'build' && !group) ||
     item.linkedPrs.length > 0 ||
     waitsOn(item).length > 0 ||
     dependenciesOf(item).length > 0 ||

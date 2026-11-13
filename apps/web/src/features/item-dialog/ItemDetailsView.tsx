@@ -100,16 +100,12 @@ export function ItemMeta({
             <Fact label="Updated">
                 <When iso={item.updatedAt} now={now} />
             </Fact>
-            {item.kind === 'concept' && item.refinement && (
+            {item.kind === 'concept' && item.status !== 'Done' && !item.releasePlan && item.refinement && (
                 <Fact label="Refinement">
                     <ConceptState state={item.refinement} />
                 </Fact>
             )}
-            {(item.kind === 'concept' || (item.flow === 'linked' && item.subIssues.total > 0)) && item.completion && (
-                <Fact label="Delivery">
-                    <ConceptState state={item.completion} item={item} />
-                </Fact>
-            )}
+
             {item.kind === 'concept' && <ConceptWork item={item} />}
         </MetaArea>
     );

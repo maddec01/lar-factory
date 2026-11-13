@@ -8,12 +8,18 @@ import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
 import { CreateTicket } from './CreateTicket';
+import { isGroupParent } from './group-parent';
 import { ItemKindControl } from './ItemKindControl';
 import { ItemKind, ItemStatusGlyph, RepoCell, SourceIcon, StructureSync, useShownStatus } from '@/features/items';
 import { RowKind } from '@/features/line';
+import { useBoardStore } from '@/services/board/board.hooks';
 import { ItemSummary as Summary, SummaryBlocked, SummaryParent, SummaryStatus } from '@/ui/board';
 
 export function ItemSummary({ item }: { item: Item }) {
+    const group = isGroupParent(
+        item,
+        useBoardStore((state) => state.data.items),
+    );
     const shown = useShownStatus(item);
 
     return (
@@ -45,14 +51,16 @@ export function ItemSummary({ item }: { item: Item }) {
                         item={item}
                         summaryKind={<ItemKindControl item={item} fallback={<RowKind item={item} />} />}
                     />
-                    <StructureSync item={item} />
+                    <StructureSync item={item} localNote={!group} />
                 </>
             }
             actions={
-                <>
-                    <AttachTicket item={item} />
-                    <CreateTicket item={item} />
-                </>
+                item.status !== 'Done' && (
+                    <>
+                        <AttachTicket item={item} />
+                        <CreateTicket item={item} />
+                    </>
+                )
             }
         />
     );

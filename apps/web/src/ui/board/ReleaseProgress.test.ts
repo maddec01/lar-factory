@@ -1,4 +1,5 @@
 import type { ReleasePlan } from '@lar-factory/shared';
+import { TooltipProvider } from '@lar-works/design-system';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vite-plus/test';
@@ -12,7 +13,7 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
                 id: 'stage',
                 who: 'Agent',
                 what: 'Stage the merged bundle',
-                done: { by: 'Builder', at: 'now', evidence: 'Manifest SHA256 receipt' },
+                done: { by: 'Builder', at: 'now', evidence: `Manifest SHA256 ${'a'.repeat(64)}` },
             },
             { id: 'activate', who: 'Pedro', what: 'Activate the accepted manifest', done: null },
         ],
@@ -25,15 +26,19 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
     const root = document.createElement('div');
 
     root.innerHTML = renderToStaticMarkup(
-        createElement(ReleaseProgress, { plan, remaining: ['Activation is still pending.'] }),
+        createElement(
+            TooltipProvider,
+            null,
+            createElement(ReleaseProgress, { plan, remaining: ['Activation is still pending.'] }),
+        ),
     );
 
     const text = root.textContent!;
 
-    expect(text.indexOf('1. Agent')).toBeLessThan(text.indexOf('2. Pedro'));
+    expect(text.indexOf('Stage the merged bundle')).toBeLessThan(text.indexOf('Activate the accepted manifest'));
     for (const value of [
         'Done',
-        'Manifest SHA256 receipt',
+        'Manifest SHA256 aaaaaaaaaaaa…',
         'Pending',
         'Activate the accepted manifest',
         'failed',
@@ -43,4 +48,8 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
     ])
         expect(text).toContain(value);
     expect(text).not.toContain('Delivery complete');
+    expect(text).not.toContain('a'.repeat(64));
+    expect(root.querySelector('time')?.dateTime).toBe('now');
+    expect(root.querySelectorAll('ol[aria-label="Release steps"] li')).toHaveLength(2);
+    expect(root.querySelector('[aria-label="Copy full release evidence"]')).not.toBeNull();
 });

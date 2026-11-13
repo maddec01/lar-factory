@@ -26,7 +26,8 @@ forward per [questions](shared/questions.md). Do not repeat an approval already
 given in the session.
 
 Read the local domain-doc setting per
-[where domain docs live](shared/domain-docs-setting.md).
+[domain-doc setting](shared/domain-docs-setting.md). When writing or reviewing
+domain drafts, load [Domain modeling](shared/domain-docs.md).
 
 ## Checks
 

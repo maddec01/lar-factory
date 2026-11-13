@@ -25,7 +25,8 @@ Assume the author is overconfident. Hunt for:
 - **Ambiguous**: a **Done when** line two builders could read differently, or
   a reviewer couldn't check by looking at the result.
 - **Inconsistent**: two **Done when** lines that contradict each other, or a
-  step that sets a Status or asks about work already Done by then.
+  step that sets a Status or asks about work already Done by then. Check sibling
+  interfaces, current decisions, blockers, Dependencies and release constraints.
 - **Incomplete**: the error, empty, slow, cancelled and permission cases; every
   platform the change reaches (web, Apple, server); migrations, deployment and
   existing data; a decision the builder would have to make alone.
@@ -37,8 +38,8 @@ Assume the author is overconfident. Hunt for:
   which one.
 - **Provider writes**: a step that writes factory progress to a ticket's body,
   comments, labels, tags or Azure State. Issue creation, whole gated Specs with
-  Original and structural sync follow the repository's saved settings and
-  verified Access. Those writes are allowed; progress stays in work records.
+  Original follow saved settings and verified Access. Structural publication
+  remains suspended; progress stays in work records.
 - **Domain docs**: with the setting OFF, Domain docs says "none" and contains
   no drafts. With it ON, every term the brief uses matches the glossary, or
   **Domain docs** adds or changes it as a `glossary-format.md` entry. Nothing
@@ -47,7 +48,11 @@ Assume the author is overconfident. Hunt for:
   context, the result of a real trade-off. A draft that cites its origin names
   a published ticket or the build PR, never a work ID or local path.
 
-Report findings only; name each category a thorough pass found clean.
+Read [domain-doc setting](shared/domain-docs-setting.md); load
+[Domain modeling](shared/domain-docs.md) only when checking drafts.
+
+Output: findings tied to the supplied brief/package revisions, for the owner
+to save with gate evidence. Report findings only; name each category a thorough pass found clean.
 
 Return:
 

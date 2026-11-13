@@ -25,7 +25,8 @@ add detail only when it changes what a reviewer must accept.
 
 Read the local [domain-doc setting](shared/domain-docs-setting.md)
 before drafting. With it OFF, write `none` under Domain docs and create no drafts.
-With it ON, use the entries and ADR drafts in the template below.
+With it ON, follow [Domain modeling](shared/domain-docs.md) for the entries
+and ADR drafts in the template below.
 
 ```markdown
 ## What

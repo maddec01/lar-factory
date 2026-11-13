@@ -10,5 +10,13 @@ export interface ConceptBuildRun {
 export interface ConceptBuildPlan {
     run: ConceptBuildRun | null;
     holds: { workId: string; reason: string }[];
-    members: { workId: string; status: string; waits: string[]; complete: boolean }[];
+    members: {
+        workId: string;
+        title: string;
+        repository: string;
+        kind: string;
+        status: string;
+        waits: string[];
+        complete: boolean;
+    }[];
 }

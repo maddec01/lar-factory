@@ -42,10 +42,13 @@ export function orderWork(rows: readonly OrderedWork[]): OrderedWork[] {
 
 /** Read within records.snapshot when the caller awaits, so every detail comes from the same database state. */
 export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] {
-    records.read(groupId);
+    const deliveryGroup =
+        records.read(groupId).kind === 'concept' || records.children(groupId).some((child) => child.kind !== 'slice');
 
     const descendants = (id: string): WorkRecord[] =>
-        records.children(id).flatMap((child) => [child, ...descendants(child.workId)]);
+        records
+            .children(id)
+            .flatMap((child) => (deliveryGroup && child.kind === 'slice' ? [] : [child, ...descendants(child.workId)]));
 
     return orderWork(
         descendants(groupId).map((record) => {
@@ -56,7 +59,7 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
                 .waitingOn(id)
                 .flatMap((wait) =>
                     'workId' in wait
-                        ? [`Waits for ${records.read(wait.workId).title} (${wait.workId}): ${wait.reasons.join(' ')}`]
+                        ? [`Waits for ${records.read(wait.workId).title}: ${wait.reasons.join(' ')}`]
                         : [`Dependency ${wait.dependencyId}: ${wait.reasons.join(' ')}`],
                 );
 
@@ -71,6 +74,8 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
                     if (records.specState(id).held) waits.push('The ticket Spec has an unresolved change.');
 
                     if (record.status !== 'Ready') waits.push(`Status is ${record.status}.`);
+
+                    if (record.status === 'Done') waits.push(...records.completion(id).reasons);
                 }
             }
 
@@ -83,11 +88,14 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
                 revision: record.revision,
                 brief: records.body(id, 'brief') ?? '',
                 gate,
-                blockers: records.blockers(id).map((blocker) => ({
-                    workId: blocker.workId,
-                    title: blocker.title,
-                    complete: records.completion(blocker.workId).complete,
-                })),
+                blockers: records
+                    .blockers(id)
+                    .filter((blocker) => !deliveryGroup || blocker.kind !== 'slice')
+                    .map((blocker) => ({
+                        workId: blocker.workId,
+                        title: blocker.title,
+                        complete: records.completion(blocker.workId).complete,
+                    })),
                 waits: complete ? [] : waits,
                 complete,
                 setAside: record.setAside,

@@ -134,7 +134,15 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
         return {
             run,
             holds,
-            members: rows.map(({ workId, status, waits, complete }) => ({ workId, status, waits, complete })),
+            members: rows.map(({ workId, title, repository, kind, status, waits, complete }) => ({
+                workId,
+                title,
+                repository,
+                kind,
+                status,
+                waits,
+                complete,
+            })),
         };
     };
 

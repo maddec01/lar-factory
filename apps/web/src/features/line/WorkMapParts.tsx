@@ -23,6 +23,7 @@ import { lastSeen } from './StageStatus';
 import { NODE_H } from './WorkMapLayout';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
+    conceptBuildWait,
     AzureFields,
     ItemStatusGlyph,
     ItemTitle,
@@ -116,7 +117,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     // Each card has one labelled thread action. Only a current question asks for an answer.
     const opensThread = threadsOf(item).length > 0 && !action;
     // The node says what its thread does beside its status, so the status leaves that out.
-    const status = complete ? 'Complete' : asks ? shown.word : shown.stageWord;
+    const status = complete ? 'Complete' : asks ? shown.word : (conceptBuildWait(item, data) ?? shown.stageWord);
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
     // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
     const word =

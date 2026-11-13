@@ -17,6 +17,7 @@ import { Track } from './StageTrack';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { PartKindLabel } from './WorkMapParts';
 import {
+    conceptBuildWait,
     AzureFields,
     OpenThread,
     RepoCell,
@@ -142,7 +143,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
                             waiting={waits.length > 0}
                         />
                     </PartTrack>
-                    <span>{isDone(item) ? 'Complete' : word}</span>
+                    <span>{isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word)}</span>
                     <AzureFields azure={item.azure} />
                 </>
             }

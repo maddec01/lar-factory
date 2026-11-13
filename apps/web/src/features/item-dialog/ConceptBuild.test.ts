@@ -1,14 +1,14 @@
-import type { BoardData, ConceptBuildPlan } from '@lar-factory/shared';
+import type { BoardData, ConceptBuildPlan, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
 import { $, holdPosts, mountPage, posted, sample, settle, text } from '@/test/PageTest';
 
-async function show(plan: ConceptBuildPlan) {
+async function show(plan: ConceptBuildPlan, parts: Item[] = []) {
     const concept = sample.items.find((item) => item.kind === 'concept')!;
     const data: BoardData = {
         ...sample,
         capture: { session: 's1', enabled: true },
-        items: sample.items.map((item) =>
+        items: [...sample.items, ...parts].map((item) =>
             item.id === concept.id ? { ...item, revision: 7, conceptBuild: plan } : item,
         ),
     };
@@ -67,6 +67,9 @@ test('a ready concept has one start per surface and its footer never starts an o
         holds: [],
         members: ['build-a', 'build-b', 'build-c'].map((workId) => ({
             workId,
+            title: workId,
+            repository: 'example/a',
+            kind: 'build',
             status: 'Ready',
             waits: [],
             complete: false,
@@ -142,6 +145,9 @@ test.each(['running', 'paused'] as const)(
         const base = sample.items.find((item) => item.kind !== 'concept')!;
         const members = ['a1', 'a2', 'b1'].map((workId) => ({
             workId,
+            title: workId,
+            repository: 'example/a',
+            kind: 'build',
             status: workId === 'a2' ? 'Ready' : 'In progress',
             waits: [],
             complete: false,
@@ -180,3 +186,56 @@ test.each(['running', 'paused'] as const)(
         expect(text($('[data-item-dialog] [data-shared-build-capacity]'))).toBe('3 of 4 building: 2 from this concept');
     },
 );
+test('the concept shows active builds, total progress and an explicit capacity wait', async () => {
+    const parent = sample.items.find((item) => item.kind === 'concept')!;
+    const part = sample.items.find((item) => item.kind !== 'concept')!;
+    const parts: Item[] = [
+        {
+            ...part,
+            id: 'running',
+            title: 'Build running',
+            kind: 'build',
+            status: 'In progress',
+            parentId: parent.id,
+            recorded: true,
+            threads: [],
+            blockers: [],
+            slices: [],
+            completion: { complete: false, reasons: [] },
+        },
+        {
+            ...part,
+            id: 'waiting',
+            title: 'Build waiting',
+            kind: 'build',
+            status: 'Ready',
+            parentId: parent.id,
+            recorded: true,
+            threads: [],
+            blockers: [],
+            slices: [],
+            passingBrief: true,
+            completion: { complete: false, reasons: [] },
+        },
+    ];
+
+    await show(
+        {
+            run: { state: 'running', startedAt: '2026-01-01', prepared: {} },
+            holds: [],
+            members: parts.map((item) => ({
+                workId: item.id,
+                title: item.title,
+                repository: item.repo,
+                kind: item.kind,
+                status: item.status,
+                waits: [],
+                complete: false,
+            })),
+        },
+        parts,
+    );
+    expect(text($('[data-concept-build-progress]'))).toBe('1 building · 1 waiting · 0/2 complete');
+    expect(text($('[data-concept-build-run]'))).toContain('Building: Build running');
+    expect(text($('[data-concept-parts]'))).toContain('Waiting for shared build capacity.');
+});

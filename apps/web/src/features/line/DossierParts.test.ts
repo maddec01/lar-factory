@@ -265,3 +265,26 @@ test('a finished part folds into history only once nothing of it is still at wor
     );
     expect(isHistory(partWith([quiet])), 'not finished').toBe(false);
 });
+
+test('a record-derived concept uses the same deterministic member order as its CLI report', () => {
+    const parent = {
+        id: 'group',
+        kind: 'concept',
+        conceptBuild: { members: [{ workId: 'older' }, { workId: 'dependent' }, { workId: 'newer' }] },
+    } as Item;
+    const part = (id: string) =>
+        ({
+            id,
+            kind: 'build',
+            parentId: 'group',
+            status: 'Ready',
+            blockers: [],
+            labels: [],
+            recorded: true,
+            subIssues: { total: 0, completed: 0 },
+        }) as unknown as Item;
+
+    expect(
+        partsOf(parent, [parent, part('newer'), part('dependent'), part('older')]).map((entry) => entry.item.id),
+    ).toEqual(['older', 'dependent', 'newer']);
+});

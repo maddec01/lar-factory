@@ -118,3 +118,27 @@ it.each(['brief', 'gate', 'blocker', 'map'] as const)('pauses when the approved 
         reason: expect.stringContaining('changed'),
     });
 });
+
+it('keeps private slices inside their active build, without pausing the concept or holding Resume', async () => {
+    const { records, group, build, change, prepare } = await fixture();
+
+    prepare();
+    records.setConceptBuildRun(group, change(group), 'running');
+    records.update(build, change(build), { status: 'In progress' });
+
+    const slice = records.create({
+        title: 'Private implementation slice',
+        repository: 'example/b',
+        kind: 'slice',
+        status: 'Queued',
+    }).workId;
+
+    records.setParent(slice, change(slice), build);
+    records.addBlocker(build, change(build), slice);
+    records.reconcileConceptBuildRuns();
+    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
+    expect(records.conceptBuildPlan(group).members.map((member) => member.workId)).toEqual([build]);
+    records.setConceptBuildRun(group, change(group), 'paused');
+    expect(records.setConceptBuildRun(group, change(group), 'running').run?.state).toBe('running');
+    expect(records.read(slice).status).toBe('Queued');
+});

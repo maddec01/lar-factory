@@ -38,18 +38,32 @@ function Evidence({ evidence }: { evidence: ReleaseEvidence }) {
 }
 
 /** Parent-owned release checklist, shared by the group and its item details. */
-export function ReleaseProgress({ plan, remaining }: { plan: ReleasePlan | null | undefined; remaining?: string[] }) {
+export function ReleaseProgress({
+    plan,
+    remaining,
+    name = (id) => id,
+}: {
+    plan: ReleasePlan | null | undefined;
+    remaining?: string[];
+    name?: (id: string) => string;
+}) {
     if (!plan) return null;
 
-    const left = (remaining ?? releaseHolds(plan)).map((reason) => {
-        const step = plan.steps.find((step) => reason.startsWith(`Release step ${step.id}:`));
+    const left = (remaining ?? releaseHolds(plan))
+        .map((reason) => {
+            const step = plan.steps.find((step) => reason.startsWith(`Release step ${step.id}:`));
 
-        return step ? `${step.what} · ${step.who}` : reason;
-    });
+            if (step) return `${step.what} · ${step.who}`;
+
+            if (reason === "Its Fog isn't gone.") return 'Open questions remain.';
+
+            return reason.replace(/^Its build (.+) isn't Done\.$/, '$1 is not done.');
+        })
+        .map((reason) => reason.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, name));
     const outcome = plan.outcomeCheck;
 
     return (
-        <MainSection data-release-progress header={<SectionHeader heading="Release steps" />}>
+        <MainSection data-release-steps data-release-progress header={<SectionHeader heading="Release steps" />}>
             <ol className="m-0 grid list-none gap-3 p-0" aria-label="Release steps">
                 {plan.steps.map((step) => {
                     const Icon = step.done ? CheckIcon : CircleIcon;
@@ -64,6 +78,11 @@ export function ReleaseProgress({ plan, remaining }: { plan: ReleasePlan | null 
                                 <Text as="span" breaks>
                                     {step.what}
                                 </Text>
+                                {!!step.shipsWith?.length && (
+                                    <Text variant="caption" breaks>
+                                        Ships with: {step.shipsWith.map(name).join(' + ')}
+                                    </Text>
+                                )}
                                 <Text variant="caption" tone="muted" breaks>
                                     {step.who} · {step.done ? 'Done' : 'Pending'}
                                     {step.done && (

@@ -1079,3 +1079,44 @@ test('a changed approved brief during Build carries a brief approval reason inst
     assert.match(item.briefApproval!.reason, /changed during Build/);
     assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
 });
+
+test('a group projects the live reconciliation count and record-backed ships-with release steps', async () => {
+    const records = await open();
+    const group = records.create({ title: 'Reconnect', repository: REPO, kind: 'concept' });
+    const parts = [1, 2].map((n) =>
+        records.createPart({
+            title: `Part ${n}`,
+            repository: REPO,
+            parentId: group.workId,
+            parentRevision: records.read(group.workId).revision,
+            kind: 'build',
+            body: 'Reconnect safely.',
+            blockerIds: [],
+        }),
+    );
+
+    records.setReleasePlan(group.workId, records.read(group.workId).revision, {
+        steps: [
+            {
+                id: 'together',
+                who: 'Pedro',
+                what: 'Release together',
+                shipsWith: parts.map((p) => p.workId),
+            },
+        ],
+        outcomeCheck: 'Both parts work together.',
+    });
+
+    const shown = () => recordItems(records, [], [REPO]).find((r) => r.id === group.workId)!;
+
+    assert.equal(shown().reconciliation!.items.length, records.reconciliation(group.workId).items.length);
+    assert.deepEqual(
+        shown().releasePlan!.steps[0]!.shipsWith,
+        parts.map((p) => p.workId),
+    );
+
+    const before = shown().reconciliation!.digest;
+
+    records.retitle(parts[0]!.workId, records.read(parts[0]!.workId).revision, 'A changed part');
+    assert.notEqual(shown().reconciliation!.digest, before);
+});

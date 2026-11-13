@@ -29,6 +29,7 @@ import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync } from '@/feat
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     ReleaseProgress,
+    GroupUpkeep,
     DossierBody as Body,
     DossierList,
     DossierRow as Row,
@@ -62,7 +63,15 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                 </Text>
             )}
             <StructureSync item={unsynced} />
-            <ReleaseProgress plan={parent.releasePlan} remaining={parent.completion?.reasons} />
+            <GroupUpkeep
+                report={parent.reconciliation}
+                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
+            />
+            <ReleaseProgress
+                plan={parent.releasePlan}
+                remaining={parent.completion?.reasons}
+                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
+            />
             {view === 'map' ? (
                 <>
                     <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />

@@ -429,7 +429,10 @@ records, current Doubt packages and its last clean snapshot. It lists changed
 answers (including supersession), brief/scope/contracts, map nodes, Dependencies
 and release steps with before/after facts. It checks missing overlap ordering,
 redundant blocker paths, unincorporated answers, stale approved gates, held ticket
-edits, ticket title/Spec mismatches and pending/failed approved writes. No tracker request runs inside this command.
+edits, ticket title/Spec mismatches and pending/failed approved writes. The group
+shows **Out of date: N items** immediately after a recorded change, including
+changes read from a ticket. Compact summaries group the work to re-check with
+expandable item names; full instructions remain in the thread checklist. No tracker request runs inside this command.
 
 The owning thread repairs affected records, re-gates changed briefs through Doubt
 and Pedro's board approval. It records each

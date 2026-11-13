@@ -94,7 +94,7 @@ export function RepoIdentity({
             className={identities[presentation]}
         >
             {icon}
-            <span className={presentation === 'wrap' ? 'min-w-0 wrap-anywhere' : 'truncate'}>{name}</span>
+            <span className={presentation !== 'row' ? 'min-w-0 wrap-anywhere' : 'truncate'}>{name}</span>
         </span>
     );
 }

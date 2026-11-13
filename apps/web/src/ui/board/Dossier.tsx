@@ -119,7 +119,7 @@ export function DossierTitleCell({
     children: ReactNode;
 }) {
     return (
-        <span className="flex min-w-0 items-center gap-1.5" data-line="1" data-title-cell>
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5" data-line="1" data-title-cell>
             {children}
         </span>
     );
@@ -147,7 +147,7 @@ export function DossierTitle({
             }}
             title={name}
             data-title
-            className={`text-fg min-w-0 truncate rounded-xs text-left text-sm leading-7 font-medium hover:underline ${ROW_OPENS}`}
+            className={`text-fg w-full min-w-0 rounded-xs text-left text-sm leading-5 font-medium wrap-anywhere hover:underline ${ROW_OPENS}`}
         >
             {children}
         </button>

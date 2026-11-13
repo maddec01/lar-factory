@@ -2939,3 +2939,36 @@ test('decision-authored drafts cannot launch through a forged Ready status', asy
     });
     assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
 });
+
+test('concept run action refuses all holds and stale revisions, then saves start and pause without launching', async () => {
+    const records = await openRecords();
+    const group = records.create({ title: 'Deliver concept', repository: WEB, kind: 'concept' });
+    const build = records.createPart({
+        parentId: group.workId,
+        parentRevision: group.revision,
+        title: 'Build part',
+        repository: WEB,
+        kind: 'build',
+        body: 'Exact brief',
+        blockerIds: [],
+    });
+    const { commands, log } = commandsOn([], undefined, records);
+    const rev = (id: string) => records.read(id).revision;
+
+    assert.equal(commands.setConceptBuildRun(group.workId, rev(group.workId), 'running').status, 409);
+    assert.equal(records.conceptBuildPlan(group.workId).run, null);
+    records.setFogGone(group.workId, rev(group.workId), true);
+    records.setBody(group.workId, rev(group.workId), 'map', 'Approved destination');
+    records.update(build.workId, rev(build.workId), { status: 'Ready' });
+    records.recordGate(build.workId, rev(build.workId), {
+        briefDigest: records.gate(build.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes',
+    });
+    assert.equal(commands.setConceptBuildRun(group.workId, 1, 'running').status, 409);
+    assert.equal(commands.setConceptBuildRun(group.workId, rev(group.workId), 'running').status, 200);
+    assert.equal(records.conceptBuildPlan(group.workId).run?.state, 'running');
+    assert.equal(commands.setConceptBuildRun(group.workId, rev(group.workId), 'paused').status, 200);
+    assert.equal(records.conceptBuildPlan(group.workId).run?.state, 'paused');
+    assert.deepEqual(log, []);
+});

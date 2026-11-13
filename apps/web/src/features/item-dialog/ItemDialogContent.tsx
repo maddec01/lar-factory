@@ -18,6 +18,7 @@ import { hasRelations } from './Relations';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import { useMovesItem } from './useMovesItem';
 import {
+    ConceptBuild,
     ActionError,
     AgentWork,
     AgentWorkNote,
@@ -97,6 +98,7 @@ export function ItemDialogContent({
                     )}
                     <NeedsYou item={item} data={data} />
                     <VerifyBuild item={item} />
+                    {item.kind === 'concept' && <ConceptBuild item={item} />}
                     {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (

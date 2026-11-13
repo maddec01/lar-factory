@@ -25,7 +25,7 @@ import { PartsList } from './PartsList';
 import { OPEN, VIEW, useStored } from './useStored';
 import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
-import { ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
+import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle, RowGlyph } from '@/ui/board';
 
@@ -43,6 +43,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
 
     return (
         <Body>
+            {parent.conceptBuild && <ConceptBuild item={parent} showAction={false} />}
             {noDelivery(parent) && (
                 <Text variant="caption" tone="muted" data-no-delivery>
                     {NO_DELIVERY}

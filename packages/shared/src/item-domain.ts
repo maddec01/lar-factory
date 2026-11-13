@@ -1,6 +1,6 @@
-// Instructions sent to work threads; separate from board copy.
-
 import { type Kind } from './board-domain.ts';
+// Instructions sent to work threads; separate from board copy.
+import type { ConceptBuildPlan } from './concept-build.ts';
 import type { KindDisagreement } from './kind-disagreement.ts';
 import { type ItemThread, type NeedsYouOffer, type NeedsYouCause } from './thread-domain.ts';
 
@@ -301,6 +301,7 @@ export interface Item {
     verification?: import('./verification.ts').Verification;
     /** Local completion facts, independent of the board Status and absent on provider-only items. Never published. */
     completion?: { complete: boolean; reasons: string[] };
+    conceptBuild?: ConceptBuildPlan;
     refinement?: { complete: boolean; reasons: string[] };
     specSync?: { pending: boolean; error: string | null; warning: string | null };
     sync?: { state: 'saved' | 'pending' | 'error' | 'conflict'; message?: string };

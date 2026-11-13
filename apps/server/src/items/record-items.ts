@@ -226,7 +226,12 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             buildPhase: record.buildPhase,
             verification: records.verification(record.workId),
             completion: completionOf(record),
-            ...(record.kind === 'concept' ? { refinement: records.refinement(record.workId) } : {}),
+            ...(record.kind === 'concept'
+                ? {
+                      refinement: records.refinement(record.workId),
+                      conceptBuild: records.conceptBuildPlan(record.workId),
+                  }
+                : {}),
             ...(ticket?.tracker && { tracker: ticket.tracker }),
             ...(sync && { sync }),
             ...(disagreement && { kindDisagreement: disagreement }),

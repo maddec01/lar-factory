@@ -8,7 +8,7 @@ import { hasFigures, usageUnreadable } from './UsageFigures';
 import { useLastKnown } from './useLastKnown';
 
 /** Why a total isn't the whole sum. */
-export const INCOMPLETE_TOTAL = 'This total is incomplete: usage for part of it is still loading or can’t be read.';
+export const INCOMPLETE_TOTAL = 'Some agent usage is not available yet.';
 
 /**
  * Agent time, tokens and cost, in the board's order, as one small muted line after any `label`, with the wall time while
@@ -71,6 +71,15 @@ export function AgentWork({
 
 /** The header’s muted work state when there are no figures, including loading and unreadable usage. */
 export function AgentWorkNote({ item }: { item: Item }) {
+    if (item.conceptBuild?.run)
+        return (
+            <Text variant="caption" tone="muted" data-agent-work-note>
+                {item.conceptBuild.run.state === 'running'
+                    ? 'Concept builds running'
+                    : 'Concept builds paused · active builds continue'}
+            </Text>
+        );
+
     // Usage loads only for recorded threads, which T3 may not have answered for yet.
     const hasThread = item.usageState === 'loading' || (Array.isArray(item.threads) && item.threads.length > 0);
     const s = usageUnreadable(item) ? 'unavailable' : hasThread ? item.stats : undefined;

@@ -9,6 +9,8 @@ Work records are the source of truth for factory progress, including queue,
 Status and build progress. Tickets hold created issues, gated Specs and the
 historical structural projections. They are not a backup of local work records.
 
+Stage-event contract (not implemented): `lar-work record-stage ID --revision N --file F` stores stage inputs, outputs and wait/resume evidence; use existing bodies and thread references until available.
+
 ## Picking
 
 A **work ID** names one record for its whole life. Work reaches the board through local capture or from the repository List.

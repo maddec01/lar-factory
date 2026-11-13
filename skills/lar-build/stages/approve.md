@@ -24,3 +24,4 @@ record keeps the brief and the branch keeps the commits. After two restarts
 for a conflict or check, set **Needs you**, tell the user the conflict or
 failing check, and ask how to go on.
 
+On completion continue to [Ci](ci.md).

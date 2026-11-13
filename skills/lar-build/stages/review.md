@@ -53,3 +53,5 @@ Review ends when round 1 fixed no finding, or after round 2. When review
 ends, stop the processes listed in every UI app report of the build. Whoever
 stops them, now or in a later thread, first confirms each one still holds
 what its report names and stops only the ones that do.
+
+On completion continue to [Approve](approve.md).

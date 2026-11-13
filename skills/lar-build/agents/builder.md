@@ -29,8 +29,6 @@ Load only its file; completed phases stay completed:
 | `checks` | [CI](../stages/ci.md) | required checks and handback Status |
 | `retro` | [Retro](../stages/retro.md) | explicit picks and captures |
 
-Stage-event contract (not implemented): `lar-work record-stage ID --revision N --file F` records each stage's input revisions, outputs and exit/wait; use existing bodies, phase, validation and review records today.
-
 ## Delegation and exceptions
 
 You orchestrate; roles explore, edit, check and drive the app. Small builds are

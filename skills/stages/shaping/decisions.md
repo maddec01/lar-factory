@@ -7,6 +7,8 @@ Read [Structure](shared/issue-tracker/structure.md),
 [Completion](shared/issue-tracker/completion.md) and the
 [domain-doc setting](shared/domain-docs-setting.md).
 
+With domain docs ON, draft through [Domain modeling](shared/domain-docs.md).
+
 Use only the named method: [Grilling with docs](grilling-with-docs.md),
 [Prototype](prototype-question.md), [Research](research-question.md), or the
 bounded pre-task. A task permits no ungated product implementation. Prototype

@@ -64,6 +64,7 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
         closedAs: null,
         parent: null,
         parentId: null,
+        flow: 'single',
         subIssues: { total: 0, completed: 0 },
         blockers: [],
         updatedAt: '2026-10-21T09:00:00Z',
@@ -609,7 +610,7 @@ test('sample covers every status and both repositories', () => {
 
     const { needsYou, shaping, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
 
-    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 6, 3, 4]);
+    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 6, 1, 4]);
 });
 
 test('the desk holds Needs you, Verify and Ready to merge, in flow order, including grouped concepts and leaving Ready items out', () => {

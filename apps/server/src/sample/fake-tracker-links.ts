@@ -64,6 +64,7 @@ export function fakeTrackerLinks(repositories: () => Map<string, FakeRepository>
             const related = (details.related ?? []).map(get);
 
             item.parent = parent ? reference(parent) : null;
+            item.flow = item.kind === 'concept' || parent || children.length ? 'linked' : 'single';
             item.subIssues = {
                 total: children.length,
                 completed: children.filter((child) => child.item.state === 'closed').length,

@@ -12,6 +12,14 @@ _Avoid_: repository as the visible name for this. Use repository only for the re
 A workspace for understanding an outcome through questions, evidence, decisions and proposed work. Its refinement can finish before its delivery.
 _Avoid_: delivery ticket as a synonym for concept.
 
+**Single-flow issue**:
+Work that moves through Queue, Shaping, Ready to build and Build. Its private slices stay inside its build and do not change its flow.
+_Avoid_: treating a sliced build as linked work.
+
+**Concepts and linked work**:
+The board section for concepts, linked-work parents and their parts at every stage, including queued concepts with no parts. Human waits also appear on Your desk. A part whose parent is off-board remains reachable here; completed parts remain in their group's history.
+_Avoid_: moving grouped parts into single-issue stages.
+
 **Refinement**:
 The work of settling a concept's open questions and recording the resulting understanding in its map. Completed refinement does not mean the proposed work has shipped.
 _Avoid_: delivery completion.

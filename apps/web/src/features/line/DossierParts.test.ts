@@ -29,19 +29,20 @@ const child = (number: number, parent: Item, change: Partial<Item> = {}): Item =
     labels: [],
     parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'open' },
     parentId: parent.id,
+    flow: 'linked',
     ...change,
 });
 
-test('every open concept, and every open item with a sub-issue on the board, is a dossier, in board order', () => {
-    expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([200, 180]);
+test('explicit groups and off-board parents’ parts have dossiers in board order', () => {
+    expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([22, 200, 23, 180]);
 
-    const parent = byNumber(150);
-    const withChild = [...items, child(151, parent)];
+    const parent = { ...byNumber(150), flow: 'linked' as const };
+    const withChild = [...items.map((item) => (item.id === parent.id ? parent : item)), child(151, parent)];
 
     expect(
         dossiersOf(withChild, withChild).map((d) => d.parent.number),
         'coupled work',
-    ).toEqual([200, 150, 180]);
+    ).toEqual([22, 200, 23, 150, 180]);
 
     const listed = withChild.map((i) =>
         i.number === 150 ? { ...i, status: 'List' as const } : i.number === 180 ? { ...i, status: 'Done' as const } : i,
@@ -49,8 +50,8 @@ test('every open concept, and every open item with a sub-issue on the board, is 
 
     expect(
         dossiersOf(listed, listed).map((d) => d.parent.number),
-        'none in the list or Done',
-    ).toEqual([200]);
+        'List stays grouped; a fully finished group leaves the dock',
+    ).toEqual([22, 200, 23, 150]);
 });
 
 test('a dossier shows where its parent or any part is in the scope', () => {
@@ -59,7 +60,7 @@ test('a dossier shows where its parent or any part is in the scope', () => {
     expect(
         dossiersOf(apple, items).map((d) => d.parent.number),
         '#180 through its Apple build #40',
-    ).toEqual([180]);
+    ).toEqual([22, 23, 180]);
     expect(dossiersOf([], items)).toEqual([]);
 });
 

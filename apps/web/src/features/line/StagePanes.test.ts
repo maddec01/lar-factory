@@ -26,7 +26,7 @@ import {
 import { conceptIcons } from '@/ui/board';
 
 const PANES = ['shaping', 'ready', 'build'];
-const SHAPING = [130, 22, 23];
+const SHAPING = [130];
 const BUILD = [31, 149, 34, 147, 142, 141, 150, 30];
 const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
 const row = (id: string) =>
@@ -75,7 +75,7 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
     items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
 });
 /** The sample with #140 out of its concept's dossier, so it has a row in the table. */
-const loose = withItem('I_sample13', { parent: null, parentId: null, status: 'Review' });
+const loose = withItem('I_sample13', { parent: null, parentId: null, flow: 'single', status: 'Review' });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData =>
     withItem(
@@ -127,13 +127,14 @@ test('each pane holds the rows the placement rule gives it, and Build lists the 
 });
 
 test('a live board push moves a row between sections with no reload', async () => {
-    await mountPage(withItem('I_sample13', { blockers: [], parentId: null }));
+    await mountPage(withItem('I_sample13', { blockers: [], parentId: null, flow: 'single' }));
     expect(readyRows()).toContain(140);
     await settle(async () =>
         (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(
             withItem('I_sample13', {
                 blockers: [],
                 parentId: null,
+                flow: 'single',
                 status: 'In progress',
                 statuses: ['In progress'],
             }),
@@ -917,7 +918,12 @@ test('Build and its row animate for current execution, stop together, and shapin
 
 test('status icons require current execution and suppress unavailable, cached, held and starting work', async () => {
     const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
-    const idle = { ...fresh(), items: sample.items.map((item) => ({ ...item, threads: [], slices: [] })) };
+    const idle = {
+        ...fresh(),
+        items: sample.items
+            .filter((item) => ['I_sample14', 'I_sample02'].includes(item.id))
+            .map((item) => ({ ...item, threads: [], slices: [] })),
+    };
     const data = withItem(
         'I_sample14',
         { threads: [build] },

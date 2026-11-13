@@ -88,12 +88,16 @@ export interface PlacementFacts {
     all: readonly Item[];
 }
 
-const hasChildren = (item: Item, all: readonly Item[]) => all.some((child) => child.parentId === item.id);
-const stillOpen = (item: Item) => item.status !== 'List' && item.status !== 'Done';
+/** Group membership survives missing, filtered and finished parents. */
+const grouped = (item: Item) => item.kind === 'concept' || item.flow === 'linked';
 
-/** Whether the item heads a dossier: an open concept, or an open item with sub-issues. */
+/** A group root, or a part whose parent is outside the board, keeps a reachable dossier. */
 export function isDossierParent(item: Item, all: readonly Item[]): boolean {
-    return stillOpen(item) && (item.kind === 'concept' || hasChildren(item, all));
+    return (
+        grouped(item) &&
+        (item.status !== 'Done' || all.some((part) => part.parentId === item.id && part.status !== 'Done')) &&
+        !all.some((parent) => parent.id === item.parentId && parent.id !== item.id && grouped(parent))
+    );
 }
 
 /** Whether a start's outcome is still open: a failed one is over. */
@@ -113,20 +117,12 @@ const onDesk = (item: Item, unavailable: boolean) =>
         !workingAgain(item, unavailable) &&
         prReadiness(item)?.state !== 'active');
 
-/** The one stage section an item's row belongs in. A concept builds nothing itself, so it only ever queues or refines. */
+/** Only single-flow work has an ordinary stage row. */
 function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
     const shaping = inFlight(starts?.shape);
     const building = inFlight(starts?.build);
 
-    if (item.status === 'Done') return null;
-
-    if (item.kind === 'concept') {
-        if (!shaping && !building && item.status === 'List') return null;
-
-        if (!shaping && !building && item.status === 'Queued') return 'queue';
-
-        return item.refinement?.complete ? null : 'shaping';
-    }
+    if (item.status === 'Done' || grouped(item)) return null;
 
     if (building) return 'build';
 
@@ -153,11 +149,11 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
 
 /** Grouped parents and parts stay in the dock; other work keeps its ordinary stage and desk placement. */
 export function placementOf(item: Item, { starts, unavailable, all }: PlacementFacts): Placement {
-    const parent = item.parentId == null ? undefined : all.find((other) => other.id === item.parentId);
-    const part = !!parent && isDossierParent(parent, all);
     const stage = stageSection(item, starts);
     const dock =
-        part || (stillOpen(item) && (hasChildren(item, all) || (item.kind === 'concept' && stage !== 'queue')));
+        grouped(item) &&
+        (item.status !== 'Done' ||
+            all.some((other) => other.id === item.parentId || (other.parentId === item.id && other.status !== 'Done')));
 
     return {
         sections: [

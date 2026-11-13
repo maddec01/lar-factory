@@ -133,7 +133,14 @@ test('a start error on a hidden row stays out of view, and shows on the row once
     expect(text($('[data-stage="queue"] li[data-item="Q1"] [role="alert"]'))).toBe('T3 is down');
 });
 
-const parent = item('P', { number: 10, title: 'Parent', kind: 'bug', status: 'In progress', labels: ['area: web'] });
+const parent = item('P', {
+    number: 10,
+    title: 'Parent',
+    flow: 'linked',
+    kind: 'bug',
+    status: 'In progress',
+    labels: ['area: web'],
+});
 const part = item('C', {
     number: 11,
     title: 'Part',
@@ -141,6 +148,7 @@ const part = item('C', {
     status: 'In progress',
     labels: ['only-on-part'],
     parentId: 'P',
+    flow: 'linked',
 });
 
 test('a dossier follows its parent, whatever its part matches; its part stays out of other stages', async () => {

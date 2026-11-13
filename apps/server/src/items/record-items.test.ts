@@ -999,3 +999,49 @@ test('commits between turns stay out of the read, which shows one state of the r
         'the next read shows them',
     );
 });
+
+test('flow is projected from typed records and tracker links, independently of visible parents and private slices', async () => {
+    const records = await open();
+    const concept = records.create({ title: 'Concept', repository: 'owner/other', kind: 'concept', status: 'Queued' });
+
+    assert.equal(recordItems(records, [], ['owner/other'])[0]!.flow, 'linked', 'a queued concept has no children yet');
+
+    const part = records.create({ title: 'Part', repository: REPO, kind: 'build' });
+
+    records.setParent(part.workId, part.revision, concept.workId);
+
+    const build = records.create({ title: 'Single build', repository: REPO, kind: 'build' });
+    const slice = records.create({ title: 'Private slice', repository: REPO, kind: 'slice' });
+
+    records.setParent(slice.workId, slice.revision, build.workId);
+
+    const parent = records.importTicket({
+        ticket: `${REPO}#50`,
+        title: 'Linked parent',
+        repository: REPO,
+        kind: 'issue',
+    }).record;
+    const child = records.importTicket({
+        ticket: `${REPO}#51`,
+        title: 'Linked part',
+        repository: REPO,
+        kind: 'issue',
+    }).record;
+    const [parentTicket, childTicket] = tickets([50, 'List'], [51, 'List']);
+
+    parentTicket!.flow = 'linked';
+    childTicket!.flow = 'linked';
+    childTicket!.parent = { number: 50, repo: REPO, title: 'Linked parent', url: '', state: 'open' };
+
+    const projected = recordItems(records, [parentTicket!, childTicket!], [REPO]);
+    const shown = (id: string) => projected.find((item) => item.id === id)!;
+
+    assert.equal(recordItems(records, [], ['owner/other'])[0]!.flow, 'linked');
+    assert.equal(shown(part.workId).flow, 'linked', 'the concept is outside the onboarded repositories');
+    assert.equal(shown(build.workId).flow, 'single');
+    assert.equal(shown(build.workId).slices.length, 1);
+    assert.ok(!shown(slice.workId), 'private slices are never board items');
+    assert.equal(shown(parent.workId).flow, 'linked');
+    assert.equal(shown(child.workId).flow, 'linked');
+    assert.equal(shown(child.workId).parentId, parent.workId);
+});

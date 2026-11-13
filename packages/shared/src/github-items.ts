@@ -288,6 +288,7 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
         status: closed.closedAs === 'done' ? 'Done' : (statuses[0] ?? 'List'),
         statuses,
         kind: trackerKind(rawLabels(raw), c.issueType?.name),
+        flow: 'single',
         content: 'ticket',
         number: c.number,
         title: c.title,
@@ -360,6 +361,8 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
 
         if (map) item.map = map;
     }
+
+    item.flow = item.kind === 'concept' || item.parent || item.subIssues.total > 0 ? 'linked' : 'single';
 
     return item;
 }

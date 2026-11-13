@@ -41,6 +41,7 @@ const queued = (id: number, extra: Partial<Item> = {}): Item => ({
     closedAs: null,
     parent: null,
     parentId: null,
+    flow: 'single',
     subIssues: { total: 0, completed: 0 },
     blockers: [],
     updatedAt: '2026-10-21T08:00:00Z',

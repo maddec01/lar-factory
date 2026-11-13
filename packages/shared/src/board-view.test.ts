@@ -276,7 +276,15 @@ test('a closed PR is one a cause names or the ticket links', () => {
 
 describe('placementOf', () => {
     const work = (change: Partial<Item> = {}) =>
-        ({ ...ticketed('owner/repo'), id: 'work', kind: 'issue', status: 'Shaping', threads: [], ...change }) as Item;
+        ({
+            ...ticketed('owner/repo'),
+            id: 'work',
+            flow: 'single',
+            kind: 'issue',
+            status: 'Shaping',
+            threads: [],
+            ...change,
+        }) as Item;
     const concept = (change: Partial<Item> = {}) =>
         work({
             id: 'concept',
@@ -285,7 +293,7 @@ describe('placementOf', () => {
             refinement: { complete: false, reasons: ['open'] },
             ...change,
         });
-    const part = (change: Partial<Item> = {}) => work({ parentId: 'concept', ...change });
+    const part = (change: Partial<Item> = {}) => work({ parentId: 'concept', flow: 'linked', ...change });
     const buildThread = { id: 'build', purpose: 'build', state: 'done' } as ItemThread;
     const running = { ...buildThread, state: 'running', currentRunning: true } as ItemThread;
     const starting = { phase: 'starting' } as const;
@@ -298,7 +306,7 @@ describe('placementOf', () => {
     test.each(['concept', 'issue'] as const)(
         '%s groups keep parents and children in the dock and add human waits to the desk',
         (kind) => {
-            const parent = concept({ kind });
+            const parent = concept({ kind, flow: 'linked' });
 
             for (const status of [
                 'List',
@@ -367,9 +375,9 @@ describe('placementOf', () => {
     });
 
     describe('Queue', () => {
-        test('holds Queued items and Queued concepts with no start in flight', () => {
+        test('holds only single Queued items with no start in flight', () => {
             assert.deepEqual(sections(work({ status: 'Queued' })), ['queue']);
-            assert.deepEqual(sections(concept({ status: 'Queued' })), ['queue']);
+            assert.deepEqual(sections(concept({ status: 'Queued' })), ['dock']);
             assert.deepEqual(
                 sections(work({ status: 'Queued' }), { starts: { shape: failed } }),
                 ['queue'],
@@ -453,12 +461,12 @@ describe('placementOf', () => {
     });
 
     describe('Concepts and linked work', () => {
-        test('holds concepts once started and items with sub-issues', () => {
+        test('holds queued concepts and explicitly linked parents', () => {
             const child = part();
-            const parent = work({ id: 'concept', status: 'In progress' });
+            const parent = work({ id: 'concept', flow: 'linked', status: 'In progress' });
 
             assert.ok(sections(concept()).includes('dock'));
-            assert.ok(!sections(concept({ status: 'Queued' })).includes('dock'));
+            assert.ok(sections(concept({ status: 'Queued' })).includes('dock'));
             assert.deepEqual(sections(parent, { all: [parent, child] }), ['dock']);
 
             const queued = concept({ status: 'Queued' });
@@ -466,26 +474,26 @@ describe('placementOf', () => {
             assert.deepEqual(
                 sections(queued, { all: [queued, child] }),
                 ['dock'],
-                'a sub-issue makes it linked work before it starts',
+                'the concept stays grouped before it starts',
             );
         });
 
-        test('leaves out List and Done parents and their children', () => {
+        test('keeps groups together with a List or Done parent', () => {
             for (const status of ['List', 'Done'] as const) {
                 const parent = concept({ status });
                 const child = part({ status: 'Shaping' });
 
-                assert.deepEqual(sections(parent, { all: [parent, child] }), []);
+                assert.deepEqual(sections(parent, { all: [parent, child] }), ['dock']);
                 assert.deepEqual(
                     place(child, { all: [parent, child] }),
-                    { sections: ['shaping'] },
-                    'a closed parent has no dossier to hold it',
+                    { sections: ['dock'] },
+                    'an unfinished part keeps its group reachable',
                 );
             }
         });
 
-        test('a part with a missing parent is ordinary work', () => {
-            assert.deepEqual(place(part({ status: 'Ready' })), { sections: ['ready'] });
+        test('a part with a missing parent stays grouped', () => {
+            assert.deepEqual(place(part({ status: 'Ready' })), { sections: ['dock'] });
         });
     });
 
@@ -533,9 +541,9 @@ describe('placementOf', () => {
         });
     });
 
-    test('a List item shows in no section', () => {
+    test('single List work has no stage row; an unqueued concept stays grouped', () => {
         assert.deepEqual(sections(work({ status: 'List' })), []);
-        assert.deepEqual(sections(concept({ status: 'List' })), []);
+        assert.deepEqual(sections(concept({ status: 'List' })), ['dock']);
     });
 });
 
@@ -585,7 +593,7 @@ test('shaping follows the placement rule: a pending start joins it, and a part s
     assert.deepEqual(ids(boardSections(boardWith(queued, failed), AT)), [], 'a failed start waits in the Queue again');
 
     const parent = delivered('In progress', { state: 'done' }, { id: 'parent' });
-    const part = { ...shaping, parentId: 'parent' };
+    const part = { ...shaping, parentId: 'parent', flow: 'linked' as const };
 
     assert.deepEqual(ids(boardSections(boardWith(part, { items: [parent, part] }), AT)), []);
 });

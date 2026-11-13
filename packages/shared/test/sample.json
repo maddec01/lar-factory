@@ -163,6 +163,7 @@
     "items": [
         {
             "id": "I_sample01",
+            "flow": "single",
             "kindDisagreement": {
                 "ticketKind": "improvement",
                 "changed": "ticket",
@@ -203,6 +204,7 @@
         },
         {
             "id": "I_sample02",
+            "flow": "single",
             "revision": 1,
             "status": "List",
             "statuses": ["List"],
@@ -232,6 +234,7 @@
         },
         {
             "id": "I_sample03",
+            "flow": "single",
             "revision": 1,
             "status": "List",
             "statuses": ["List"],
@@ -263,6 +266,7 @@
         },
         {
             "id": "I_sample04",
+            "flow": "single",
             "revision": 1,
             "status": "List",
             "statuses": ["List"],
@@ -289,6 +293,7 @@
         },
         {
             "id": "I_sample05",
+            "flow": "single",
             "revision": 1,
             "status": "Queued",
             "statuses": ["Queued"],
@@ -319,6 +324,7 @@
         },
         {
             "id": "I_sample06",
+            "flow": "single",
             "kindDisagreement": {
                 "ticketKind": "bug",
                 "changed": "item",
@@ -359,6 +365,7 @@
         },
         {
             "id": "I_sample21",
+            "flow": "single",
             "revision": 1,
             "status": "Queued",
             "statuses": ["Queued"],
@@ -385,6 +392,7 @@
         },
         {
             "id": "I_sample07",
+            "flow": "single",
             "revision": 1,
             "status": "Shaping",
             "statuses": ["Shaping"],
@@ -433,6 +441,7 @@
         },
         {
             "id": "I_sample08",
+            "flow": "linked",
             "revision": 1,
             "status": "Shaping",
             "statuses": ["Shaping"],
@@ -487,6 +496,7 @@
         },
         {
             "id": "I_sample09",
+            "flow": "linked",
             "revision": 1,
             "status": "Shaping",
             "statuses": ["Shaping"],
@@ -533,6 +543,7 @@
         },
         {
             "id": "I_sample10",
+            "flow": "linked",
             "revision": 1,
             "status": "Shaping",
             "statuses": ["Shaping"],
@@ -593,6 +604,7 @@
         },
         {
             "id": "I_sample11",
+            "flow": "linked",
             "revision": 1,
             "status": "Needs you",
             "statuses": ["Needs you"],
@@ -641,6 +653,7 @@
         },
         {
             "id": "I_sample12",
+            "flow": "linked",
             "revision": 1,
             "status": "Needs you",
             "statuses": ["Needs you"],
@@ -701,6 +714,7 @@
         },
         {
             "id": "I_sample13",
+            "flow": "linked",
             "usageState": "current",
             "revision": 1,
             "status": "Ready",
@@ -779,6 +793,7 @@
         },
         {
             "id": "I_sample22",
+            "flow": "single",
             "revision": 1,
             "status": "In progress",
             "statuses": ["In progress"],
@@ -958,6 +973,7 @@
         },
         {
             "id": "I_sample14",
+            "flow": "single",
             "revision": 1,
             "status": "In progress",
             "statuses": ["In progress"],
@@ -1026,6 +1042,7 @@
         },
         {
             "id": "I_sample23",
+            "flow": "linked",
             "revision": 1,
             "status": "In progress",
             "statuses": ["In progress"],
@@ -1099,6 +1116,7 @@
         },
         {
             "id": "I_sample15",
+            "flow": "single",
             "revision": 1,
             "status": "Review",
             "statuses": ["Review"],
@@ -1163,6 +1181,7 @@
         },
         {
             "id": "I_sample16",
+            "flow": "single",
             "revision": 1,
             "status": "Verify",
             "statuses": ["Verify"],
@@ -1211,6 +1230,7 @@
         },
         {
             "id": "I_sample26",
+            "flow": "single",
             "revision": 1,
             "status": "Verify",
             "statuses": ["Verify"],
@@ -1253,6 +1273,7 @@
         },
         {
             "id": "I_sample27",
+            "flow": "single",
             "revision": 1,
             "status": "Verify",
             "statuses": ["Verify"],
@@ -1295,6 +1316,7 @@
         },
         {
             "id": "I_sample28",
+            "flow": "single",
             "revision": 1,
             "status": "Verify",
             "statuses": ["Verify"],
@@ -1331,6 +1353,7 @@
         },
         {
             "id": "I_sample17",
+            "flow": "single",
             "revision": 1,
             "status": "Ready to merge",
             "statuses": ["Ready to merge"],
@@ -1379,6 +1402,7 @@
         },
         {
             "id": "I_sample18",
+            "flow": "linked",
             "revision": 1,
             "status": "Done",
             "statuses": [],
@@ -1425,6 +1449,7 @@
         },
         {
             "id": "I_sample19",
+            "flow": "single",
             "revision": 1,
             "status": "Done",
             "statuses": [],
@@ -1475,6 +1500,7 @@
         },
         {
             "id": "I_sample24",
+            "flow": "linked",
             "revision": 1,
             "status": "Done",
             "statuses": [],
@@ -1539,6 +1565,7 @@
         },
         {
             "id": "I_sample25",
+            "flow": "linked",
             "revision": 1,
             "status": "Done",
             "statuses": [],
@@ -1609,6 +1636,7 @@
         },
         {
             "id": "I_sample20",
+            "flow": "single",
             "revision": 1,
             "status": "Done",
             "statuses": [],

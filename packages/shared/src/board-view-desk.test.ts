@@ -9,6 +9,7 @@ const work = (change: Partial<Item> = {}): Item => ({
     ...(sample.items[0] as Item),
     id: 'work',
     kind: 'issue',
+    flow: 'single',
     status: 'In progress',
     parentId: null,
     parent: null,
@@ -26,10 +27,14 @@ const kinds: [string, Partial<Item>, Item[]][] = [
     ['build', { kind: 'build' }, []],
     ['concept', { kind: 'concept' }, []],
     ['decision', { kind: 'decision' }, []],
-    ['linked parent', {}, [work({ id: 'child', parentId: 'work' })]],
-    ['concept part', { parentId: 'parent' }, [work({ id: 'parent', kind: 'concept' })]],
-    ['linked part', { parentId: 'parent' }, [work({ id: 'parent' })]],
-    ['decision part', { kind: 'decision', parentId: 'parent' }, [work({ id: 'parent', kind: 'concept' })]],
+    ['linked parent', { flow: 'linked' }, [work({ id: 'child', parentId: 'work' })]],
+    ['concept part', { parentId: 'parent', flow: 'linked' }, [work({ id: 'parent', kind: 'concept' })]],
+    ['linked part', { parentId: 'parent', flow: 'linked' }, [work({ id: 'parent' })]],
+    [
+        'decision part',
+        { kind: 'decision', parentId: 'parent', flow: 'linked' },
+        [work({ id: 'parent', kind: 'concept' })],
+    ],
 ];
 const waits: [string, Partial<Item>, boolean][] = [
     ['question during a build', { threads: [question] }, true],

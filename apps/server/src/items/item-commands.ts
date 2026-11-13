@@ -750,7 +750,7 @@ export function createItemCommands({
 
         const { refused, ...result } = await pending;
 
-        return withBoard(refused ? 409 : result.error ? 502 : 200, result);
+        return withBoard(refused ? 409 : result.uncertain ? 202 : result.error ? 502 : 200, result);
     }
 
     /**

@@ -40,6 +40,7 @@ import { createAutoBuildSetting } from './auto-build/auto-build-setting.ts';
 import { createAutoBuild } from './auto-build/auto-build.ts';
 import { createBoardState } from './board/board-state.ts';
 import { coalesced } from './board/coalesced.ts';
+import { createLocalWork } from './board/local-work.ts';
 import { oneAtATime } from './board/one-at-a-time.ts';
 import { showInTurns } from './board/show-in-turns.ts';
 import { observePr } from './config/pr-host.ts';
@@ -164,43 +165,10 @@ let records: WorkRecords | null = null;
 /** Reads the records in turns on a second connection, which only reads, each read in one snapshot as the board's own writes go on. */
 let readRecordsInTurns: ReturnType<typeof recordItemsReader> | null = null;
 let recordsProblem: string | null = null;
-let localUpdatesBlocked = false;
-let localFailureCode: string | undefined;
-
-/** A newer CLI may upgrade the shared database while this process still serves its last good view. */
-function localFailure(error: unknown): void {
-    const code = error instanceof WorkRecordError ? error.code : 'local-refresh-failed';
-
-    if (localUpdatesBlocked && code !== 'schema-too-new') return;
-
-    const restart = code === 'schema-too-new';
-
-    if (restart) localUpdatesBlocked = true;
-
-    const problem = restart
-        ? 'Restart Lar Factory to continue.'
-        : 'Local work could not refresh. The board will retry.';
-
-    if (restart) recordsProblem = problem;
-
-    if (localFailureCode === code) return;
-
-    localFailureCode = code;
-    log(`local work paused: ${code}`);
-    board.update({ localProblem: problem, ...(restart && { error: problem }) });
-    board.push();
-}
-
-/** Periodic local work must not turn an expected database-version refusal into an unhandled rejection. */
-function runLocal(work: () => unknown): void {
-    if (localUpdatesBlocked) return;
-
-    try {
-        void Promise.resolve(work()).catch(localFailure);
-    } catch (error) {
-        localFailure(error);
-    }
-}
+const localWork = createLocalWork(board, log, (problem) => {
+    recordsProblem = problem;
+});
+const runLocal = localWork.run;
 
 if (!fixture) {
     try {
@@ -224,7 +192,7 @@ const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () =
 const { heavyCommandLimit, buildLimit } = createLimitSettings({
     changed: () => {
         reread();
-        runLocal(() => autoBuildRun.pass());
+        runLocal('auto build', () => autoBuildRun.pass());
     },
 });
 /** This Mac's Auto-build switch and the model it starts builds on. */
@@ -232,7 +200,7 @@ const autoBuild = createAutoBuildSetting({
     offerModelChoices,
     changed: () => {
         reread();
-        runLocal(() => autoBuildRun.pass());
+        runLocal('auto build', () => autoBuildRun.pass());
     },
 });
 /** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
@@ -439,7 +407,7 @@ const settleFirstRead = () => {
 
     moveFirstRead({ running: [], waiting: undefined, ready: undefined, settled: true });
     timed('first read settled');
-    runLocal(() => usageCatchUp?.advance());
+    runLocal('stats', () => usageCatchUp?.advance());
 };
 
 /** Whether gh's check blocks sources of `kind`. A gh that wasn't checked, as no listed repository was on GitHub, blocks nothing. */
@@ -824,15 +792,15 @@ async function checkQuota(): Promise<void> {
  * already copied into its snapshot, even while a provider read runs.
  */
 function refreshLocal(recordsChanged = false): void {
-    runLocal(() => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
+    runLocal('local refresh', () => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
 }
 
 function showT3Availability(): void {
     void refreshProjects().catch(() => log('reading T3 launch prerequisites failed'));
 }
 
-async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
-    if (refreshing && !recordsChanged) return;
+async function refreshLocalNow(recordsChanged: boolean) {
+    if (refreshing && !recordsChanged) return false;
 
     const before = board.snapshot().items;
 
@@ -853,10 +821,10 @@ function afterLocalRefresh(before: Item[], recordsChanged: boolean): void {
 
     if (finished) askForStats(true);
 
-    runLocal(() => loopTrace.span('reconcile starts', () => commands.reconcileStarts(after)));
-    runLocal(() => loopTrace.span('shaping sweep', () => sweepShapingThreads?.()));
+    runLocal('reconcile starts', () => loopTrace.span('reconcile starts', () => commands.reconcileStarts(after)));
+    runLocal('shaping sweep', () => loopTrace.span('shaping sweep', () => sweepShapingThreads?.()));
     // Before the return below, so a build that finished, or a hold that passed, starts the next build with nothing else changed.
-    runLocal(() => loopTrace.span('auto build', () => autoBuildRun.pass()));
+    runLocal('auto build', () => loopTrace.span('auto build', () => autoBuildRun.pass()));
 
     if (
         !recordsChanged &&
@@ -878,11 +846,11 @@ function afterLocalRefresh(before: Item[], recordsChanged: boolean): void {
     board.push();
     void loopTrace.span('pr stats', () => syncPrStats(after));
     // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
-    runLocal(() => startAfter.startUnblocked());
+    runLocal('start after', () => startAfter.startUnblocked());
 }
 
 /** Asks for a stats read, which runs apart from what asks; a board that hasn't caught up reads at its own pace. */
-const askForStats = (urgent = false) => runLocal(() => usageCatchUp?.want(urgent));
+const askForStats = (urgent = false) => runLocal('stats request', () => usageCatchUp?.want(urgent));
 
 /** Changes the ticket as last read and shows it, since each refresh of the records goes back to that read. */
 function showLabelChange(item: Item, { label, action }: LabelChange): void {
@@ -925,6 +893,7 @@ function showRecords(withStats = false): void {
     if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
 
     recordsShown();
+    localWork.succeeded('local refresh');
 }
 
 /** showRecords for the board's own refreshes, in turns of the event loop, which a command's change needn't wait for. */
@@ -957,7 +926,7 @@ function recordsShown(): void {
 
     recordsLogged = true;
     timed(`records shown (${length} items)`);
-    runLocal(() => usageCatchUp?.advance());
+    runLocal('stats', () => usageCatchUp?.advance());
 }
 
 /**
@@ -1165,11 +1134,11 @@ function ghStopsRead(checks: ToolChecks | undefined): boolean {
  * Reads the sources due at the pace now; while a read runs this one is skipped, so two reads never run together, and
  * a tick with no source due reads nothing.
  */
-async function refresh(): Promise<void> {
-    if (refreshing || localUpdatesBlocked) return;
+async function refresh() {
+    if (refreshing || localWork.blocked()) return false;
 
     // Every source reads with a tool the first lookup finds; each waits for its own provider's check through the pace.
-    if (!lookedUp) return;
+    if (!lookedUp) return false;
 
     refreshing = true;
     readAgain = false;
@@ -1185,7 +1154,7 @@ async function refresh(): Promise<void> {
 
         await items.probe(pace);
 
-        if (!items.due(pace)) return;
+        if (!items.due(pace)) return false;
 
         loopTrace.span('read start', () => {
             loopTrace.span('model choices', offerModelChoices);
@@ -1233,7 +1202,7 @@ async function refresh(): Promise<void> {
             repos.length > 0 &&
             repos.every((repo) => snapshot.waiting?.includes(repo.repo) || blockedByTool(itemSource(repo)))
         )
-            return;
+            return false;
 
         const recovered = (error !== null && error !== (settings.problem ?? recordsProblem)) || fetchedAt === null;
         const fresh = snapshot.items.filter((item) => items.readAfresh(item));
@@ -1272,11 +1241,7 @@ async function refresh(): Promise<void> {
 
         read = true;
     } catch (err) {
-        if (err instanceof WorkRecordError) {
-            localFailure(err);
-
-            return;
-        }
+        if (err instanceof WorkRecordError) throw err;
 
         // While a listed repository is on GitHub, probe gh, so a gh that went missing or logged out shows its notice instead
         // of Stale; a cooling gh calls nothing. An Azure DevOps source names its own az problems.
@@ -1300,14 +1265,14 @@ async function refresh(): Promise<void> {
         // A source still waiting for its provider's first check reads once it lands, which asks for the read that settles
         // the first read then.
         if (
-            !localUpdatesBlocked &&
+            !localWork.blocked() &&
             !readAgain &&
             !items.repos().some((repo) => unchecked.has(providerTool(itemSource(repo))))
         )
             settleFirstRead();
 
         // A read asked for during this one starts once this one ends, though it read nothing.
-        if (readAgain && !localUpdatesBlocked) queueMicrotask(() => runLocal(() => refresh()));
+        if (readAgain && !localWork.blocked()) queueMicrotask(() => runLocal('refresh', () => refresh()));
     }
 
     board.push();
@@ -1315,7 +1280,7 @@ async function refresh(): Promise<void> {
     if (read && records && specWorkIds.length) {
         const local = records;
 
-        runLocal(async () => {
+        runLocal('Spec refresh', async () => {
             await refreshSpecs(local, { workIds: specWorkIds });
             refreshLocal(true);
         });
@@ -1326,11 +1291,13 @@ async function refresh(): Promise<void> {
     // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
     if (read) void syncPrStats(board.snapshot().items);
 
-    if (read) runLocal(() => startAfter.startUnblocked());
+    if (read) runLocal('start after', () => startAfter.startUnblocked());
 
-    if (read) runLocal(() => autoBuildRun.pass());
+    if (read) runLocal('auto build', () => autoBuildRun.pass());
 
-    if (read) runLocal(() => observeProviders());
+    if (read) runLocal('provider observations', () => observeProviders());
+
+    return read;
 }
 
 /**
@@ -1348,7 +1315,7 @@ function knownTicket(repo: string, number: number): TicketObservation | undefine
 
 /** How far apart a pass of observations shows the records, whose every read lands with changes to show. */
 const OBSERVED_SHOW_MS = 1_000;
-const showPass = coalesced(() => runLocal(() => showRecordsInTurns()), OBSERVED_SHOW_MS);
+const showPass = coalesced(() => runLocal('local refresh', () => showRecordsInTurns()), OBSERVED_SHOW_MS);
 const showObserved = () => {
     observations++;
     showPass();
@@ -1600,20 +1567,20 @@ const timer = setInterval(() => {
             board.update({ fetchedAt: new Date().toISOString() });
             board.push();
         }
-    } else loopTrace.span('read tick', () => runLocal(() => refresh()));
+    } else loopTrace.span('read tick', () => runLocal('refresh', () => refresh()));
 }, 1_000);
 const localTimer = setInterval(() => {
     if (!fixture || sampleT3) showT3Availability();
 
     if (!fixture) {
         loopTrace.span('local tick', () =>
-            runLocal(() => {
+            runLocal('local tick', () => {
                 refreshLocal();
-                runLocal(() => usageCatchUp?.advance());
-                runLocal(() => loopTrace.span('pr poll', () => prObserver?.poll()));
+                runLocal('stats', () => usageCatchUp?.advance());
+                runLocal('pr poll', () => loopTrace.span('pr poll', () => prObserver?.poll()));
 
                 if (loopTrace.span('spec check', () => records?.specPending().length))
-                    runLocal(() => loopTrace.span('spec sync', () => syncSpecs(records!)));
+                    runLocal('Spec sync', () => loopTrace.span('spec sync', () => syncSpecs(records!)));
             }),
         );
     }

@@ -807,8 +807,17 @@ the desk; a routine handoff keeps the current stage and placement.
 For a resolved model, the board saves its exact launch request and uses the intent
 ID as T3's command ID. An interrupted launch replays that request, including after
 a board restart, so creation and the first message resume on the same thread.
-Success requires the first user message and a run past preparation. A matching empty
+Until the first user message and a run past preparation are confirmed, the start
+request returns HTTP 202 and the board shows a pending launch. It retains the
+intent and replays the same command; no new thread is started on another press.
+A confirmed refusal returns a failure. A matching empty
 thread from an older launch is reported as unsent, never missing.
+
+A scope amendment can temporarily leave the previous brief out of date. The board
+continues refreshing that work and offers approval only after the brief matches
+confirmed scope. Local refresh warnings identify the failed operation and, for a
+refused record read, the work ID and reason. They retry automatically and clear
+when that operation succeeds; an upgraded database requires a restart.
 
 The board retries T3 project reads while disconnected and rediscovers a restarted
 server's current process and address. Recovery refreshes project launch holds,

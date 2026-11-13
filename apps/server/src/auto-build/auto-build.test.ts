@@ -354,7 +354,7 @@ test('a start T3 may have made keeps its place against the limit and is never st
 
     s.limit = 1;
     s.answers.set(uncertain, {
-        status: 502,
+        status: 202,
         body: { thread: null, error: 'T3 may have started it.', uncertain: true },
     });
     s.reread();

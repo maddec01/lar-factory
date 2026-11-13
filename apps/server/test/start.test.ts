@@ -272,10 +272,10 @@ test('an uncertain T3 error prevents another launch', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'down' } });
     const failed = await start(board, board.id(12));
 
-    assert.equal(failed.status, 502);
+    assert.equal(failed.status, 202);
     assert.match((await failed.json()).error, /could not be confirmed/);
     await board.update({ items: [boardIssue(12, 'Queued')] });
-    assert.equal((await start(board, board.id(12))).status, 502);
+    assert.equal((await start(board, board.id(12))).status, 202);
 });
 
 for (const fail of ['killed', 'garbage']) {
@@ -283,7 +283,7 @@ for (const fail of ['killed', 'garbage']) {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail } });
         const first = await start(board, board.id(12));
 
-        assert.equal(first.status, 502);
+        assert.equal(first.status, 202);
         assert.equal((await first.json()).uncertain, true);
         await board.update({ items: [boardIssue(12, 'Queued')] });
         assert.equal((await (await start(board, board.id(12))).json()).uncertain, true);
@@ -353,13 +353,13 @@ for (const recover of ['late', 'deleted']) {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
         const response = await start(board, board.id(12));
 
-        assert.equal(response.status, 502);
+        assert.equal(response.status, 202);
         assert.equal((await response.json()).uncertain, true);
 
         // This older-launch fixture has no saved request; recovery checks it on the next press.
         const retried = await start(board, board.id(12));
 
-        assert.equal(retried.status, recover === 'late' ? 200 : 502);
+        assert.equal(retried.status, recover === 'late' ? 200 : 202);
 
         const answer = await retried.json();
 

@@ -24,7 +24,7 @@ import type {
     SwapKind,
     TicketKindFacts,
 } from '@lar-factory/shared';
-import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
+import { WorkRecordError, type Dependency, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
@@ -242,7 +242,8 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
-            (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''));
+            (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
+            (!records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok);
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -330,7 +331,22 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         return item;
     };
 
-    return { ticketOf, toItem };
+    return {
+        ticketOf,
+        toItem: (record: WorkRecord) => {
+            try {
+                return toItem(record);
+            } catch (error) {
+                if (error instanceof WorkRecordError && error.code !== 'schema-too-new')
+                    throw new WorkRecordError(
+                        error.code,
+                        `Work record ${record.workId} (${record.ticket ?? record.title}): ${error.message}`,
+                    );
+
+                throw error;
+            }
+        },
+    };
 }
 
 /** Whether the record is work the board lists: not a slice, in one of `repos`. */

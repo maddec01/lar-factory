@@ -98,6 +98,7 @@ listen() {
 # status.sh and lar-work read board records and the database from this home, never the real one.
 export HOME="$bin/home"
 export LAR_FACTORY_DATA_DIR="$HOME/Library/Application Support/Lar Factory"
+unset LAR_BOARD_PORT
 records="$HOME/Library/Application Support/Lar Factory/boards"
 record() { mkdir -p "$records"; printf '{"port":%s}' "$2" >"$records/$1.json"; }
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
@@ -291,11 +292,120 @@ refuses "an unknown work ID passes lar-work's reason through" "lar-work: "
 set_status https://github.com/maddec01/lar-factory/pull/3 Review
 refuses "a PR has no board status" "has no board status. Set the status on the work it delivers"
 
+# Only the tools the scripts need: no installed lar-work, even if this machine has one.
+checkout_bin="$bin/checkout-bin"
+mkdir -p "$checkout_bin"
+for tool in bash dirname basename jq node curl; do
+    ln -s "$(command -v "$tool")" "$checkout_bin/$tool"
+done
+elsewhere="$bin/checkout data"
+elsewhere_id=$(LAR_FACTORY_DATA_DIR="$elsewhere" make maddec01/lar-factory#7)
+mkdir -p "$elsewhere/boards" "$records"
+printf '{"port":%s}' "$a_port" >"$elsewhere/boards/$a_pid.json"
+record "$b_pid" "$b_port"
+: >"$bin/a"; : >"$bin/b"; : >"$log"
+status=0
+output=$(cd "$bin" && PATH="$checkout_bin" LAR_FACTORY_DATA_DIR="$elsewhere" bash "$status_sh" \
+    maddec01/lar-factory#7 Shaping 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+if ((status == 0)) && [[ $output == "$elsewhere_id → Shaping" && -z $errors ]] &&
+    [[ $(LAR_FACTORY_DATA_DIR="$elsewhere" status_of "$elsewhere_id") == Shaping ]] &&
+    [[ $(status_of "$work_id") == "Ready to merge" ]] && (($(reads a) == 1)) && [[ -z $(requests b) ]]; then
+    pass "without installed lar-work, the checkout updates its isolated database and refreshes only its board from another cwd"
+else
+    fail "without installed lar-work, the checkout updates its isolated database and refreshes only its board from another cwd: $status $output / $errors / $(cat "$log")"
+fi
+status=0
+output=$(PATH="$checkout_bin" LAR_FACTORY_DATA_DIR="$elsewhere" bash "$here/work.sh" "$elsewhere_id" 2>"$bin/err") || status=$?
+if ((status == 0)) && [[ $(jq -r .workId <<<"$output") == "$elsewhere_id" ]]; then
+    pass "work.sh reads a checkout record without installed lar-work"
+else
+    fail "work.sh reads a checkout record without installed lar-work: $status $output / $(cat "$bin/err")"
+fi
+rm -rf "$records" "$elsewhere"
+
+# A copied/installed skill has no checkout CLI alongside it and still uses PATH.
+installed="$bin/installed/scripts"
+mkdir -p "$installed"
+cp "$here/"{status,work,boards,azure}.sh "$installed/"
 : >"$log"
 status=0
-output=$(PATH="$(dirname "$(command -v jq)"):/usr/bin:/bin" bash "$status_sh" "$id" Ready 2>"$bin/err") || status=$?
+output=$(bash "$installed/status.sh" "$id" Shaping 2>"$bin/err") || status=$?
 errors=$(cat "$bin/err")
-refuses "without lar-work on PATH, says how to install it" "lar-work isn't on PATH. Open the Lar Factory app once" "$id"
+sets "installed scripts still use lar-work on PATH" "$id" Shaping
+
+id=$(make "")
+: >"$log"
+status=0
+output=$(PATH="$checkout_bin" bash "$installed/status.sh" "$id" Ready 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+refuses "with neither CLI available, explains checkout and app setup" "Run from a factory checkout" "$id"
+
+# A global launcher may be stale or hard-code the real app's data folder. A
+# checkout must never call it, including when its own CLI is damaged.
+hostile="$bin/hostile"
+mkdir -p "$hostile"
+cat >"$hostile/lar-work" <<'SH'
+#!/bin/bash
+echo 'installed CLI called' >>"$FAKE_GH_LOG"
+exit 97
+SH
+chmod +x "$hostile/lar-work"
+status=0
+output=$(PATH="$hostile:$checkout_bin" bash "$here/work.sh" "$id" 2>"$bin/err") || status=$?
+if ((status == 0)) && [[ $(jq -r .workId <<<"$output") == "$id" ]] && ! grep -q 'installed CLI called' "$log"; then
+    pass "the checkout CLI takes precedence over an installed command"
+else
+    fail "the checkout CLI takes precedence over an installed command: $status $output / $(cat "$bin/err")"
+fi
+
+# Assembled skills are deeper in the checkout than the source scripts; spaces in
+# checkout paths and status arguments must survive CLI resolution unchanged.
+assembled="$bin/factory checkout/.assembled-skills/skills/lar-build/shared/scripts"
+mkdir -p "$assembled" "$bin/factory checkout/packages/work-records/src"
+cp "$here/"{status,work,boards,azure}.sh "$assembled/"
+ln -s "$root/packages/work-records/src/cli.ts" "$bin/factory checkout/packages/work-records/src/cli.ts"
+status=0
+output=$(PATH="$hostile:$checkout_bin" FAKE_CURL_OFF=1 bash "$assembled/status.sh" "$id" "Needs you" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+sets "assembled checkout scripts resolve their own CLI and preserve arguments" "$id" "Needs you"
+
+for data_override in '' relative; do
+    status=0
+    output=$(PATH="$checkout_bin" LAR_FACTORY_DATA_DIR="$data_override" bash "$here/work.sh" "$id" 2>"$bin/err") || status=$?
+    if ((status == 0)) && [[ $(jq -r .workId <<<"$output") == "$id" ]]; then
+        pass "checkout ignores a non-absolute data override ($data_override), like the board"
+    else
+        fail "checkout ignores a non-absolute data override ($data_override), like the board: $status $output / $(cat "$bin/err")"
+    fi
+done
+
+rm "$bin/factory checkout/packages/work-records/src/cli.ts"
+status=0
+output=$(PATH="$hostile:$checkout_bin" bash "$assembled/work.sh" "$id" 2>"$bin/err") || status=$?
+if ((status != 0)) && [[ -z $output ]] && grep -q 'Restore the factory checkout' "$bin/err" && ! grep -q 'installed CLI called' "$log"; then
+    pass "a missing checkout CLI explains repair without falling back to the installed app"
+else
+    fail "a missing checkout CLI explains repair without falling back to the installed app: $status $output / $(cat "$bin/err")"
+fi
+printf 'throw new Error("broken checkout CLI");\n' >"$bin/factory checkout/packages/work-records/src/cli.ts"
+status=0
+output=$(PATH="$hostile:$checkout_bin" bash "$assembled/work.sh" "$id" 2>"$bin/err") || status=$?
+if ((status != 0)) && [[ -z $output ]] && grep -q 'broken checkout CLI' "$bin/err" && ! grep -q 'installed CLI called' "$log"; then
+    pass "a failing checkout CLI passes its reason through without calling the installed app"
+else
+    fail "a failing checkout CLI passes its reason through without calling the installed app: $status $output / $(cat "$bin/err")"
+fi
+
+mv "$checkout_bin/node" "$bin/test-node"
+status=0
+output=$(PATH="$hostile:$checkout_bin" bash "$here/work.sh" "$id" 2>"$bin/err") || status=$?
+mv "$bin/test-node" "$checkout_bin/node"
+if ((status != 0)) && [[ -z $output ]] && grep -q 'needs Node >=24.15 on PATH' "$bin/err" && ! grep -q 'installed CLI called' "$log"; then
+    pass "a checkout without Node explains the required runtime and setup"
+else
+    fail "a checkout without Node explains the required runtime and setup: $status $output / $(cat "$bin/err")"
+fi
 
 # work.sh run as a command prints the record a picked ticket names, as a manual thread resolves its argument.
 id=$(make maddec01/lar-factory#9)

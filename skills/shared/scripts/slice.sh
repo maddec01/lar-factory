@@ -59,12 +59,12 @@ for ref in ${blocker_refs[@]+"${blocker_refs[@]}"}; do
     blocker_ids+=("$(jq -r .workId <<<"$blocker")")
 done
 
-record=$(lar-work create --title "$title" --repository "$(jq -r .repository <<<"$parent")" --kind "$kind")
+record=$(work_cli create --title "$title" --repository "$(jq -r .repository <<<"$parent")" --kind "$kind")
 work_id=$(jq -r .workId <<<"$record")
 # step <lar-work args>: runs a change to the new record, keeping its latest revision in $record. A failure names the
 # record made so far, which the caller finishes with lar-work or sets aside.
 step() {
-    if ! record=$(lar-work "$1" "$work_id" --revision "$(jq -r .revision <<<"$record")" "${@:2}"); then
+    if ! record=$(work_cli "$1" "$work_id" --revision "$(jq -r .revision <<<"$record")" "${@:2}"); then
         echo "slice.sh: made $work_id, but couldn't $1 it. Finish it with lar-work or set it aside." >&2
         exit 1
     fi

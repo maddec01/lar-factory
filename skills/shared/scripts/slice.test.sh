@@ -123,4 +123,23 @@ refuses "a body file it can't read makes nothing" "can't read $bin/missing.md"
 run "$build" "Sign in" "$bin/body.md" --parent x
 refuses "an unknown option shows the usage" "usage: slice.sh"
 
+# work.sh resolves reads for slice.sh too: every write must use that same CLI.
+checkout_bin="$bin/checkout-bin"
+mkdir -p "$checkout_bin"
+for tool in bash dirname basename jq node curl; do
+    ln -s "$(command -v "$tool")" "$checkout_bin/$tool"
+done
+: >"$log"
+status=0
+output=$(PATH="$checkout_bin" bash "$slice_sh" "$build" "From checkout" "$bin/body.md" --blocked-by "$first" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+if ((status == 0)) && [[ -z $errors ]] &&
+    [[ $(lar-work read "$output" | jq -r .parentId) == "$build" ]] &&
+    [[ $(lar-work blockers "$output" | jq -r '.[0].workId') == "$first" ]] &&
+    grep -q "^curl .*127.0.0.1:4999/api/read" "$log"; then
+    pass "without installed lar-work, slice reads and writes through the checkout CLI and refreshes the board"
+else
+    fail "without installed lar-work, slice reads and writes through the checkout CLI and refreshes the board: $status $output / $errors"
+fi
+
 ((failures == 0))

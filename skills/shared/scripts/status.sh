@@ -28,7 +28,7 @@ fi
 record=$(work_record "$ref")
 work_id=$(jq -r .workId <<<"$record")
 # lar-work names an unknown Status, or a record that changed since the read, on stderr.
-lar-work update "$work_id" --revision "$(jq -r .revision <<<"$record")" --status "$status" >/dev/null
+work_cli update "$work_id" --revision "$(jq -r .revision <<<"$record")" --status "$status" >/dev/null
 echo "$work_id → $status"
 
 ask_boards_to_read "$work_id"

@@ -158,6 +158,10 @@ it. It refuses Done, which completion decides, and a PR, which has no Status.
 
 ## Structure
 
+Retitle with `lar-work retitle ID --revision N --title X`; `title-history ID`
+keeps old names and projection failures. Ticket titles queue under the existing
+Spec setting and Access; never edit the tracker directly.
+
 A concept or linked-work parent owns delivery parts. Create each part with
 `bash <this skill>/shared/scripts/slice.sh <parent> "<title>" <body-file> --kind decision|build --repository <owner/repo> [--blocked-by <work>]...`.
 It prints the work ID; keep it. This uses `lar-work create-part --parent ID

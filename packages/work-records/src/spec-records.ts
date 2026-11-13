@@ -93,7 +93,17 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                     !db.prepare('SELECT 1 FROM dependencies WHERE lower(ticket) = lower(?)').get(record.ticket)
                 );
             }),
-        specState: (workId) => database.read(() => load(database, workId, read(workId).ticket)),
+        specState: (workId) =>
+            database.read(() => {
+                const state = load(database, workId, read(workId).ticket);
+                const failure = db
+                    .prepare(
+                        "SELECT json_extract(content, '$.error') AS error FROM title_changes WHERE work_id = ? AND json_extract(content, '$.pending') = 1",
+                    )
+                    .get(workId);
+
+                return { ...state, error: state.error ?? (failure?.error ? `Title: ${String(failure.error)}` : null) };
+            }),
         specPending: () =>
             database.read(() =>
                 db
@@ -111,7 +121,7 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                 if (['concept', 'decision', 'slice'].includes(record.kind))
                     throw new WorkRecordError('invalid', 'This record cannot hold a ticket Spec.');
 
-                save(database, workId, state);
+                save(database, workId, state.error?.startsWith('Title: ') ? { ...state, error: before.error } : state);
 
                 if (change) {
                     const digest = createHash('sha256').update(JSON.stringify(change.text)).digest('hex');

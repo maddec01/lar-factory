@@ -169,6 +169,8 @@ Changes
                                     --retro obeys the retro capture setting and sends
                                     the description. Reuse ID to recover a lost result.
                                     A failed create leaves the record local.
+  retitle <work ID> --revision N --title X
+  title-history <work ID>
   set-aside <work-id> --revision N  Set the record aside. Its Status stays.
   restore <work-id> --revision N    Bring a set-aside record back.
   set-needs-you <work-id> --revision N --reason X
@@ -417,6 +419,8 @@ const TAKES_WORK_ID = [
     'context',
     'update',
     'attach-ticket',
+    'retitle',
+    'title-history',
     'set-aside',
     'restore',
     'set-needs-you',
@@ -765,6 +769,10 @@ async function run(
         }
         case 'attach-ticket':
             return records.attachTicket(workId!, revision(), need(values, 'ticket'));
+        case 'retitle':
+            return records.retitle(workId!, revision(), need(values, 'title'));
+        case 'title-history':
+            return records.titleHistory(workId!);
         case 'set-aside':
             return records.setAside(workId!, revision());
         case 'restore':

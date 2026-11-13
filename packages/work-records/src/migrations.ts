@@ -480,4 +480,8 @@ export const MIGRATIONS: readonly Migration[] = [
     END;
   `),
     (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN request TEXT'),
+    (db) =>
+        db.exec(
+            'CREATE TABLE title_changes(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, revision INTEGER NOT NULL, content TEXT NOT NULL, PRIMARY KEY(work_id, revision)) STRICT',
+        ),
 ];

@@ -437,7 +437,11 @@ test('a double press, a retry or another page starts no second build thread', as
         responses.map((r) => r.status),
         [200, 200],
     );
-    assert.equal((await startBuild(board, board.id(12))).status, 200);
+
+    const duplicate = await startBuild(board, board.id(12));
+
+    assert.equal(duplicate.status, 409);
+    assert.match((await duplicate.json()).error, /already owns.*build.*Open thread/);
     assert.equal((await board.t3Calls()).length, 1);
 });
 

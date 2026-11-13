@@ -31,6 +31,27 @@ a duplicate record.
 
 Name the work ID in every handoff, delegated-task brief and thread message.
 
+## Thread ownership
+
+The board and factory handoffs share the same thread history. Before an
+authorized top-level shaping or build handoff, read `lar-work threads <work ID>`
+and `lar-work intents --unresolved`. Reuse an existing thread for that stage
+while it or its children are active, queued or waiting for the user; when its
+state cannot be checked, keep its ownership and report the uncertainty.
+
+Before asking T3 to launch, save
+`lar-work record-intent <work ID> --revision N --purpose shape|build`. Keep its
+intent ID. Start the first message with `/lar-shape <work ID>` for shaping or
+`Build <work ID>.` for a build. Once T3 returns its thread ID, reread the record
+revision and run
+`lar-work resolve-intent <work ID> --revision N --intent <intent ID> --thread <T3 thread ID>`.
+This registers the owner durably and moves Queued to Shaping or Ready to In
+progress, just as the board's Start does. A confirmed failed launch resolves
+with `--failure <reason>` instead. An uncertain launch keeps its intent; recover
+the original result rather than launching again. Never use a new intent to
+bypass an unresolved launch. Delegated reviewers and implementers keep their
+own role purposes, rather than claiming the parent's shaping or build stage.
+
 ## Issue creation
 
 Onboarding and Settings offer Create issues from Add item, Create issues from

@@ -107,6 +107,23 @@ export interface ThreadRows {
     active: Set<string>;
 }
 
+/** Root first messages for ownership discovery, without scanning history once per thread.
+ * SQLite's single MIN selects the bare payload from the same earliest row (lang_select.html#bareagg).
+ */
+export function factoryThreadNames(db: DatabaseSync): { id: string; text: unknown; firstMessageAt: unknown }[] {
+    return db
+        .prepare(`
+        SELECT t.thread_id AS id, json_extract(m.payload_json, '$.text') AS text,
+          MIN(m.created_at) AS firstMessageAt
+        FROM orchestration_v2_projection_threads t
+        JOIN orchestration_v2_projection_messages m ON m.thread_id = t.thread_id
+        WHERE m.role = 'user' AND t.deleted_at IS NULL
+          AND json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NULL
+        GROUP BY t.thread_id
+    `)
+        .all() as { id: string; text: unknown; firstMessageAt: unknown }[];
+}
+
 export function threadRows(db: DatabaseSync): ThreadRows {
     return {
         threads: db.prepare(THREADS).all() as unknown as ThreadRow[],

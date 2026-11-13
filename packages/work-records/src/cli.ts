@@ -346,7 +346,7 @@ Dependencies
                                     repository later leaves the Dependency as it is.
 
 Threads and launch intents
-  A thread ID is T3's. A launch intent is recorded before the board asks T3 to
+  A thread ID is T3's. A launch intent is recorded before the board or a factory thread asks T3 to
   start a thread, and resolved once T3 answers, so a restart finds the start
   instead of making a second one. lar-work never starts or checks a thread.
   A purpose is a lowercase word naming what the thread does, such as build.

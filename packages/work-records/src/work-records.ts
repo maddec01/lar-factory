@@ -1906,6 +1906,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const checked = checkPurpose(purpose);
             const intentId = randomUUID();
             const record = change(workId, revision, () => {
+                if (
+                    db
+                        .prepare(
+                            'SELECT 1 FROM launch_intents WHERE work_id = ? AND purpose = ? AND resolved_at IS NULL',
+                        )
+                        .get(workId, checked)
+                )
+                    throw invalid(
+                        `A ${checked} launch already owns this item. Resolve its existing intent before starting another thread.`,
+                    );
+
                 insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
 
                 if (recovery)

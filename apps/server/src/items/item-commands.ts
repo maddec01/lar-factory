@@ -911,7 +911,7 @@ export function createItemCommands({
         if (
             history.at(-1)?.deletedAt &&
             Array.isArray(item.threads) &&
-            !item.threads.some((t) => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)
+            !item.threads.some((t) => t.observedAt || isLiveThread(t))
         )
             return null;
 
@@ -921,7 +921,7 @@ export function createItemCommands({
 
             const shown = Array.isArray(item.threads) ? item.threads.find((t) => t.id === threadId) : undefined;
 
-            if (shown && shown.state !== 'running' && shown.state !== 'needs you' && !shown.hasLiveChildren) continue;
+            if (shown && !shown.observedAt && !isLiveThread(shown)) continue;
 
             return { threadId, title: shown?.title ?? item.title };
         }
@@ -974,7 +974,12 @@ export function createItemCommands({
               : heldThread(board.find(item.id) ?? item, purpose);
         const shown = board.snapshot()[record]?.[item.id];
 
-        if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
+        if (held)
+            return {
+                thread: shown?.threadId === held.threadId ? shown : held,
+                error: `A thread already owns this item's ${purpose === 'shape' ? 'shaping' : 'build'} stage. Open thread to continue.`,
+                refused: true,
+            };
 
         let run: Awaited<ReturnType<typeof prepareRunLaunch>> | undefined;
 
@@ -1550,15 +1555,21 @@ export function createItemCommands({
         start: (itemId, model, quiet = false) =>
             press('started', itemId, quiet, () =>
                 startOnce(starts, 'started', itemId, model, (item, choice) => {
-                    const held = records && item.status === 'Shaping' ? heldThread(item, PURPOSES.started) : null;
+                    if (records) {
+                        reread();
+                        item = board.find(itemId) ?? item;
+                    }
 
-                    if (
-                        held &&
-                        records
-                            ?.launchIntents({ workId: item.id })
-                            .some((intent) => intent.purpose === 'shape' && intent.threadId === held.threadId)
-                    )
-                        return withBoard(200, { thread: held, error: null });
+                    const held =
+                        records && ['Queued', 'Shaping'].includes(item.status)
+                            ? heldThread(item, PURPOSES.started)
+                            : null;
+
+                    if (held)
+                        return withBoard(409, {
+                            thread: held,
+                            error: "A thread already owns this item's shaping stage. Open thread to continue.",
+                        });
 
                     if (item.status !== 'Queued' && !canResumeShaping(item))
                         return reply(409, {
@@ -1895,23 +1906,24 @@ export function createItemCommands({
         startBuild: (itemId, model, drift, quiet = false) =>
             press('startedBuilds', itemId, quiet, () =>
                 startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
+                    if (records) {
+                        reread();
+                        item = board.find(itemId) ?? item;
+                    }
+
                     if (drift !== undefined && !isDriftChoice(drift))
                         return reply(422, { error: 'Choose Replace and start or Start anyway.' });
 
-                    // A press that crossed the start's move answers with the thread it opened.
                     const held =
-                        records && item.status === 'In progress' ? heldThread(item, PURPOSES.startedBuilds) : null;
+                        records && ['Ready', 'In progress'].includes(item.status) && !prClosed(item.id)
+                            ? heldThread(item, PURPOSES.startedBuilds)
+                            : null;
 
-                    if (
-                        held &&
-                        records
-                            ?.launchIntents({ workId: item.id })
-                            .some(
-                                (intent) =>
-                                    intent.purpose === PURPOSES.startedBuilds && intent.threadId === held.threadId,
-                            )
-                    )
-                        return withBoard(200, { thread: held, error: null });
+                    if (held)
+                        return withBoard(409, {
+                            thread: held,
+                            error: "A thread already owns this item's build stage. Open thread to continue.",
+                        });
 
                     if (item.status !== 'Ready' && !canRetryBuild(item))
                         return reply(409, {

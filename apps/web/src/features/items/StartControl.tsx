@@ -100,7 +100,7 @@ export function StartControl({
             : undefined;
     const stopped = observed?.state === 'stopped';
 
-    if (thread && observed?.state === 'done') {
+    if (thread && observed?.state === 'done' && !resume) {
         return (
             <StartGroup>
                 <StartNote>
@@ -114,7 +114,7 @@ export function StartControl({
     }
 
     // The toast announces a start; the tag only keeps Start from running twice.
-    if (thread && !stopped && !pending)
+    if (thread && !stopped && !resume && !pending)
         return (
             <StartGroup>
                 <StartTag data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>

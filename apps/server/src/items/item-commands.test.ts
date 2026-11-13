@@ -1562,7 +1562,7 @@ test('after a restart, an unresolved start records the thread T3 shows for it an
         records.threads(work.workId).map((t) => t.threadId),
         ['late'],
     );
-    assert.equal((await commands.start(work.workId, undefined)).status, 200);
+    assert.equal((await commands.start(work.workId, undefined)).status, 409);
     assert.deepEqual(started, [], 'the recorded running thread is the start');
 });
 
@@ -1795,7 +1795,7 @@ test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be
 
     const kept = await unavailable.commands.start(work.workId, undefined);
 
-    assert.deepEqual([kept.status, (kept.body as { thread: { threadId: string } }).thread.threadId], [200, 'gone']);
+    assert.deepEqual([kept.status, (kept.body as { thread: { threadId: string } }).thread.threadId], [409, 'gone']);
     assert.deepEqual(unavailable.started, [], 'an unavailable thread may still run');
     assert.equal(records.threads(work.workId)[0]!.deletedAt, null);
 
@@ -1849,13 +1849,13 @@ test('stopped shaping resumes in one new thread without changing its gate or sta
     );
     assert.equal(
         (await commands.start(work.workId, undefined)).status,
-        200,
-        'a repeated request returns the running resumed thread',
+        409,
+        'a repeated request identifies the running resumed thread',
     );
     assert.equal(started.length, 1, 'a repeated request never starts another thread');
 });
 
-for (const state of ['running', 'needs you', 'done', 'unavailable', 'live child', 'stale'] as const)
+for (const state of ['running', 'needs you', 'unavailable', 'live child', 'stale'] as const)
     test(`shaping cannot resume from ${state} thread evidence`, async () => {
         const records = await openRecords();
         let work = records.create({ title: 'Prototype', repository: WEB, kind: 'feature', status: 'Shaping' });
@@ -2562,7 +2562,7 @@ test("an unresolved start no longer running shows May have started, keeps today'
     assert.deepEqual(started, []);
 });
 
-test('a duplicate Start build after the move answers with the running thread', async () => {
+test('a duplicate Start build after the move refuses with the running owner', async () => {
     const records = await openRecords();
     const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
     const { commands, started } = recordedCommands(records);
@@ -2571,7 +2571,7 @@ test('a duplicate Start build after the move answers with the running thread', a
 
     const again = await commands.startBuild(build.workId, undefined);
 
-    assert.equal(again.status, 200);
+    assert.equal(again.status, 409);
     assert.equal((again.body as StartResult).thread?.threadId, 'thread-1');
     assert.equal(started.length, 1);
 });
@@ -2749,4 +2749,70 @@ for (const kind of ['issue', 'concept', 'decision', 'build'] as const)
         assert.equal(roleRuns[0]!.result, 'failed');
         assert.equal(roleRuns.at(-1)!.result, 'completed');
         assert.deepEqual(roleRuns.at(-1)!.requested, roleRuns.at(-1)!.actual);
+        assert.equal(records.launchIntents({ workId: record.workId, unresolved: true }).length, 0);
+        assert.deepEqual(
+            records.threads(record.workId).map(({ threadId, purpose }) => ({ threadId, purpose })),
+            [{ threadId: 'configured', purpose: kind === 'build' ? 'build' : 'shape' }],
+        );
+        assert.equal(roleRuns.at(-1)!.executionId, records.launchIntents({ workId: record.workId })[0]!.intentId);
+    });
+
+for (const launch of ['board', 'skill', 'direct handoff'] as const)
+    for (const state of ['running', 'needs you', 'queued', 'unavailable'] as const)
+        test(`${launch} shaping owner blocks a second Start, including after a board restart (${state})`, async () => {
+            const records = await openRecords();
+            let work = records.create({ title: 'Decision', repository: WEB, kind: 'decision', status: 'Queued' });
+            let owner = 'skill-thread';
+
+            if (launch === 'board') {
+                await recordedCommands(records).commands.start(work.workId, undefined);
+                owner = 'thread-1';
+            } else if (launch === 'skill') {
+                const saved = records.recordLaunchIntent(work.workId, work.revision, 'shape');
+
+                records.resolveLaunchIntent(work.workId, saved.record.revision, saved.intent.intentId, {
+                    threadId: owner,
+                });
+            } else records.addThread(work.workId, work.revision, owner, 'shape');
+
+            const after = recordedCommands(records, {
+                shown: (ids) =>
+                    state === 'unavailable'
+                        ? 'unavailable'
+                        : ids.map((id) => ({
+                              id,
+                              title: 'Decision',
+                              state: state === 'queued' ? 'done' : state,
+                              ...(state === 'queued' && { queued: true as const }),
+                              updated: '2026-10-31T00:00:00Z',
+                          })),
+            });
+            const reply = await after.commands.start(work.workId, undefined);
+
+            assert.equal(reply.status, 409);
+            assert.match((reply.body as { error: string }).error, /already owns.*shaping.*Open thread/);
+            assert.equal((reply.body as { thread: { threadId: string } }).thread.threadId, owner);
+            assert.deepEqual(after.started, []);
+        });
+
+for (const state of ['done', 'stopped'] as const)
+    test(`a ${state} owner releases unfinished shaping for another Start`, async () => {
+        const records = await openRecords();
+        let work = records.create({ title: 'Decision', repository: WEB, kind: 'decision', status: 'Shaping' });
+
+        work = records.addThread(work.workId, work.revision, 'old', 'shape');
+
+        const after = recordedCommands(records, {
+            shown: (ids) =>
+                ids.map((id) => ({
+                    id,
+                    title: 'Decision',
+                    state: id === 'old' ? state : 'running',
+                    updated: '2026-10-31T00:00:00Z',
+                })),
+        });
+
+        assert.equal((await after.commands.start(work.workId, undefined)).status, 200);
+        assert.equal(after.started.length, 1);
+        assert.equal((await after.commands.start(work.workId, undefined)).status, 409);
     });

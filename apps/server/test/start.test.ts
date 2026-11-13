@@ -249,7 +249,11 @@ test('a double press, a retry or another page starts no second thread for the it
         responses.map((r) => r.status),
         [200, 200],
     );
-    assert.equal((await start(board, board.id(12))).status, 200);
+
+    const duplicate = await start(board, board.id(12));
+
+    assert.equal(duplicate.status, 409);
+    assert.match((await duplicate.json()).error, /already owns.*shaping.*Open thread/);
 
     const thread = { threadId: 'thread-1', title: 'Shaping #12 Issue 12' };
 

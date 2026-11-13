@@ -278,3 +278,34 @@ test('a held Shape explains why visibly and becomes available when project disco
     expect(start().disabled).toBe(false);
     expect(text(card())).not.toContain(reason);
 });
+
+for (const state of ['done', 'stopped'] as const)
+    test(`an ended shaping owner offers Resume shaping after ${state}, including a saved board start`, async () => {
+        const id = 'I_sample05';
+        const owner = { threadId: 'previous-shape', title: 'Previous shape' };
+        const data: BoardData = {
+            ...withChoices,
+            started: { [id]: owner },
+            items: withChoices.items.map((item) =>
+                item.id === id
+                    ? {
+                          ...item,
+                          status: 'Shaping',
+                          threads: [
+                              {
+                                  id: owner.threadId,
+                                  title: owner.title,
+                                  state,
+                                  purpose: 'shape',
+                                  updated: '2026-11-13T10:00:00Z',
+                              },
+                          ],
+                      }
+                    : item,
+            ),
+        };
+
+        await mountItem(data);
+        expect(start()?.textContent).toContain('Resume shaping');
+        expect(card().querySelector('[data-start-result]')).toBeNull();
+    });

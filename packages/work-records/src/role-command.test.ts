@@ -390,6 +390,41 @@ const reported = (overrides: Record<string, unknown> = {}) => ({
     ...overrides,
 });
 
+for (const launch of ['skill', 'direct handoff'] as const)
+    it(`configured child roles preserve the ${launch} stage owner`, async () => {
+        const f = await fixture();
+
+        if (launch === 'skill') {
+            const { intent, record } = f.records.recordLaunchIntent(
+                f.workId,
+                f.records.read(f.workId).revision,
+                'build',
+            );
+
+            f.records.resolveLaunchIntent(f.workId, record.revision, intent.intentId, { threadId: 'owner' });
+        } else f.records.addThread(f.workId, f.records.read(f.workId).revision, 'owner', 'build');
+
+        const owners = f.records.threads(f.workId);
+        const launched = await f.launch('implementer');
+
+        expect(launched.status).toBe(0);
+
+        const { clientRequestId, target } = JSON.parse(launched.stdout);
+
+        expect(target).toEqual({
+            providerInstanceId: 'codex',
+            model: 'configured',
+            options: { reasoningEffort: 'high' },
+        });
+        expect((await f.finish(clientRequestId, reported({ childThreadId: 'implementer' }))).status).toBe(0);
+        expect(f.records.runSettings(f.workId).roleRuns.at(-1)).toMatchObject({
+            role: 'implementer',
+            result: 'completed',
+        });
+        expect(f.records.threads(f.workId)).toEqual(owners);
+        expect(f.records.launchIntents({ workId: f.workId, unresolved: true })).toEqual([]);
+    });
+
 it('finishes from a file and preserves T3 evidence', async () => {
     const f = await fixture();
     const { clientRequestId } = JSON.parse((await f.launch()).stdout);

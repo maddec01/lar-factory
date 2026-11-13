@@ -660,6 +660,10 @@ throw Error('Local exploration must not call a tracker');
             .record;
 
         expect((await larWork(data, 'intents', '--unresolved')).record).toEqual([intent]);
+        expect(await larWork(data, 'record-intent', workId, '--revision', '2', '--purpose', 'shape')).toMatchObject({
+            code: 1,
+            stderr: expect.stringContaining('already owns this item'),
+        });
 
         const resolved = await larWork(
             data,

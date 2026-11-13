@@ -85,12 +85,17 @@ test('only the latest stopped shaping session can resume, with fresh evidence th
     };
 
     assert.equal(canResumeShaping(item('Shaping', [], { threads: [stopped] })), true);
-    for (const state of ['running', 'needs you', 'done'] as const) {
+    for (const state of ['running', 'needs you'] as const) {
         assert.equal(
             canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, id: 'new', state }, stopped] })),
             false,
         );
     }
+    assert.equal(canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, state: 'done' }] })), true);
+    assert.equal(
+        canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, state: 'done', queued: true }] })),
+        false,
+    );
     assert.equal(canResumeShaping(item('Ready', [], { threads: [stopped] })), false);
     assert.equal(
         canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, observedAt: stopped.updated }] })),

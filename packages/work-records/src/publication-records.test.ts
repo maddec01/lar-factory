@@ -1185,6 +1185,7 @@ it('keeps projection query cost constant as briefs and publication history grow'
             },
             (id) => records.read(id),
             () => {},
+            records,
         );
         const build = await passingBuild(records);
 

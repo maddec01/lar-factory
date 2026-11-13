@@ -1,12 +1,11 @@
 import { applyAgentWrite } from './agent-apply.ts';
 import { agentConceptWrites } from './agent-concept-writes.ts';
-import { makeGateDisplay, verifyGateDisplay } from './gate-display.ts';
-import { WorkRecordError, type WorkRecords } from './work-records.ts';
+import { requireHumanAction } from './human-action.ts';
+import { type WorkRecords } from './work-records.ts';
 
 const active = ['kind', 'setAsideAt', 'finishedAt'];
 const build = [...active, 'buildBranch'];
 const review = [...build, 'pullRequest', 'body.brief', 'reviewRounds', 'runSettings'];
-const gateFields = [...active, 'body.brief', 'gate', 'ticket', 'confirmedScope'];
 
 /** Command adapter: preserve each intent and let the strict store reject a race during reapplication. */
 export function agentWrites(records: WorkRecords): WorkRecords {
@@ -141,33 +140,10 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 records.recordFinished(id, r),
             ),
         setFogGone: (id, rev, gone) => apply(id, rev, [...active, 'fogGoneAt'], (r) => records.setFogGone(id, r, gone)),
-        recordDisplayedGate: (display, approved, identity, evidence) =>
-            apply(display.workId, display.sourceRevision, gateFields, (r) => {
-                const current = records.displayGate(display.workId);
-
-                verifyGateDisplay(
-                    display,
-                    approved,
-                    makeGateDisplay(display.workId, display.sourceRevision, current.brief),
-                );
-
-                const review = records.currentDoubt(display.workId);
-
-                if (!review)
-                    throw new WorkRecordError(
-                        'invalid',
-                        'Run Doubt on the current doubt-package and record-doubt before approval.',
-                    );
-
-                return records.recordGate(display.workId, r, {
-                    reviewDigest: review.packageDigest,
-                    briefDigest: display.briefDigest,
-                    approvalDigest: approved,
-                    approvedBy: identity,
-                    evidence,
-                });
-            }),
-        recordGate: (id, rev, gate) => apply(id, rev, gateFields, (r) => records.recordGate(id, r, gate)),
+        recordDisplayedGate: () => requireHumanAction('Approve brief'),
+        recordGate: () => requireHumanAction('Approve brief'),
+        recordGateBatch: () => requireHumanAction('Approve briefs'),
+        recordVerification: () => requireHumanAction('Record Verify'),
         snapshotRun: (id, rev, input) =>
             apply(id, rev, [...active, `runSettings.${input.runId}`], (r) => records.snapshotRun(id, r, input)),
         startRoleRun: (id, rev, input) =>

@@ -12,7 +12,9 @@ import {
 import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
+import { ApproveBrief } from './ApproveBrief';
 import { SavedRunSettings } from './SavedRunSettings';
+import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction } from '@/services/board/board.service';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import { buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
@@ -71,8 +73,31 @@ export function ExportedLine({ exported }: { exported: Exported }) {
     return null;
 }
 
-export function RecordText({ item, record, spec = false }: { spec?: boolean; item: Item; record: RecordDetails }) {
+export function RecordText({
+    item,
+    record,
+    spec = false,
+    refresh,
+}: {
+    spec?: boolean;
+    item: Item;
+    record: RecordDetails;
+    refresh?: () => Promise<boolean>;
+}) {
     const [exported, setExported] = useState<Exported>({ state: 'idle' });
+    const items = useBoardStore((state) => state.data.items);
+    const pendingBriefs =
+        record.bodyKind === 'map'
+            ? items
+                  .filter(
+                      (part) =>
+                          part.parentId === item.id &&
+                          part.passingBrief === false &&
+                          !['concept', 'decision', 'slice'].includes(part.kind) &&
+                          part.status !== 'Done',
+                  )
+                  .map((part) => part.id)
+            : [];
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
         record.bodyKind === 'map'
@@ -94,6 +119,12 @@ export function RecordText({ item, record, spec = false }: { spec?: boolean; ite
             data-record
         >
             <ExportedLine exported={exported} />
+            {pendingBriefs.length > 0 && (
+                <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
+            )}
+            {record.bodyKind === 'brief' && record.body && item.passingBrief === false && item.status !== 'Done' && (
+                <ApproveBrief itemId={item.id} onApproved={refresh} />
+            )}
             {!spec && (
                 <div data-record-body>
                     {answer ? (

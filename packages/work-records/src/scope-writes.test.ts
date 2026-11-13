@@ -144,6 +144,6 @@ it('refuses single displayed approval after scope is amended and restored', asyn
         'Larger.',
     );
     records.confirmScope(work.workId, records.read(work.workId).revision, scope, 'Pedro', 'Small again.');
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes.')).toThrow(/confirmedScope/);
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes.')).toThrow(/requires Pedro/);
     expect(records.gate(work.workId).evidence).toEqual([]);
 });

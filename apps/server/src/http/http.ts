@@ -309,6 +309,16 @@ export function createBoardServer({
                 return factorySettings?.save(input) ?? { status: 503, body: { error: 'Settings are unavailable.' } };
             },
         },
+        '/api/inspect-brief': {
+            sampleWrite: 'fake',
+            what: 'the exact brief for approval',
+            run: forItem('Name the brief to display.', (id, input) => commands.inspectBrief(id, input)),
+        },
+        '/api/approve-brief': {
+            sampleWrite: 'fake',
+            what: 'the displayed brief approval',
+            run: forItem('Name the brief to approve.', (id, input) => commands.approveBrief(id, input)),
+        },
         '/api/inspect-verification': {
             sampleWrite: 'fake',
             what: 'the recorded Verify head',

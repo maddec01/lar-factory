@@ -105,6 +105,7 @@ export function ItemDialogContent({
                             <RecordText
                                 item={item}
                                 record={record}
+                                refresh={refresh}
                                 spec={read.state === 'loaded' && Boolean(read.details.spec)}
                             />
                         )}

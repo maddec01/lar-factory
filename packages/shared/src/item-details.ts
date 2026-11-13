@@ -69,6 +69,7 @@ export interface ItemDetails {
     /** The work record's text and progress; absent in sample mode and for an item with no record. */
     record?: RecordDetails;
     spec?: {
+        outdated?: boolean;
         generation: number;
         pending: boolean;
         error: string | null;

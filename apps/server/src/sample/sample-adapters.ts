@@ -80,6 +80,27 @@ const snapshot = ({ item, details }: FakeIssue): StructureTicket => ({
 /** Creation and description reads share the real capture contract, including its durable request identity. */
 export function sampleProvider(tracker: Tracker, changed: () => Promise<void>): StructureProvider {
     return {
+        async readSpec(repo, number) {
+            const issue = await tracker.read(repo, number);
+
+            if (!issue) throw Error('Sample issue not found.');
+
+            return { ...snapshot(issue), editorWrite: true, titleEditorWrite: true };
+        },
+        async replaceSpec(ticket, body) {
+            const before = await tracker.read(ticket.repository, ticket.number);
+
+            if (!before || String(before.item.revision) !== ticket.version)
+                throw Error('The sample Spec changed before writing.');
+
+            await tracker.edit(ticket.repository, ticket.number, { body });
+
+            const after = await tracker.read(ticket.repository, ticket.number);
+
+            await changed();
+
+            return { ...snapshot(after!), editorWrite: true, titleEditorWrite: true };
+        },
         async read(repo, number) {
             const issue = await tracker.read(repo, number);
 

@@ -226,24 +226,29 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                       ? 'List'
                       : 'Queue'
                   : 'Working'
-            : prMerged || stageReadiness?.word === 'Merged'
-              ? 'Merge'
-              : stageReadiness?.state === 'failed'
-                ? 'Verify'
-                : (
-                      {
-                          List: 'List',
-                          Queued: 'Queue',
-                          Shaping: 'Shaping',
-                          'Needs you': 'Shaping',
-                          Ready: 'Ready to build',
-                          'In progress': 'Build',
-                          Review: 'Review',
-                          Verify: 'Verify',
-                          'Ready to merge': 'Merge',
-                          Done: 'Merge',
-                      } as const
-                  )[item.status],
+            : item.briefApproval &&
+                (item.buildPhase ||
+                    item.linkedPrs.length ||
+                    (Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build')))
+              ? 'Build'
+              : prMerged || stageReadiness?.word === 'Merged'
+                ? 'Merge'
+                : stageReadiness?.state === 'failed'
+                  ? 'Verify'
+                  : (
+                        {
+                            List: 'List',
+                            Queued: 'Queue',
+                            Shaping: 'Shaping',
+                            'Needs you': 'Shaping',
+                            Ready: 'Ready to build',
+                            'In progress': 'Build',
+                            Review: 'Review',
+                            Verify: 'Verify',
+                            'Ready to merge': 'Merge',
+                            Done: 'Merge',
+                        } as const
+                    )[item.status],
         progressState: stageReadiness?.state ?? state,
         execution,
         pr: readiness,

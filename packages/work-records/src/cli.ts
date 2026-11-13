@@ -17,8 +17,9 @@ import type { OrderingReason } from './brief-review.ts';
 import { checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
 import { exportMarkdown } from './export.ts';
-import { gateWorkIds, readGateManifest } from './gate-batch.ts';
+import { gateWorkIds } from './gate-batch.ts';
 import { heavyCommand } from './heavy-command.ts';
+import { requireHumanAction } from './human-action.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
@@ -314,8 +315,8 @@ Verify evidence, local only
   verification-head <work-id> --pr owner/name#N --head SHA
                                     Record a fresh provider head; a push invalidates a pass.
   record-verification <work-id> --revision N --file F
-                                    JSON: {pr,head,result: pass|fail,by,testSteps,note}.
-                                    A failure needs a short note and resumes the same build
+                                    Refused for agents: Pedro records Verify in the board.
+                                    A board failure needs a note and resumes the same build
                                     through the board. Agents never invent Pedro's result.
 
 Brief gate
@@ -328,12 +329,10 @@ Brief gate
                                     Bind Doubt to its package; explain unordered overlaps.
   gate-batch --file work-ids.json   Print complete briefs, Doubt results and the batch digest.
   record-gate-batch --file manifest.json --digest H --identity I --evidence E
-                                    Approve every displayed member atomically, or none.
+                                    Refused for agents: ask Pedro to Approve briefs in the board.
   record-gate <work-id> --file display.json --digest H --identity I --evidence E
-                                    Attest that this exact brief passed its gate.
-                                    Rereads again; stale revisions or digests fail.
-                                    Eligible tickets queue a durable Spec write. A
-                                    failed write keeps Ready and offers retry in details.
+                                    Refused for agents: ask Pedro to Approve brief in the board.
+                                    Set Needs you with the one wait command, then stop.
   Spec writes preserve prior text as Original. A digest on GitHub or revision on
   Azure identifies tracker edits; an unchanged ticket keeps an unsent brief.
   Concurrent tracker text wins, with the unsent text retained in gate history.
@@ -745,33 +744,8 @@ async function run(
 
             return records.gateBatch(ids);
         }
-        case 'record-gate-batch': {
-            const manifest = readGateManifest(readJson(values, 'displayed gate manifest'));
-            const approvedDigest = need(values, 'digest');
-
-            if (manifest.digest !== approvedDigest)
-                throw new WorkRecordError(
-                    'invalid',
-                    'The approved batch digest does not match the displayed manifest.',
-                );
-
-            for (const { display } of manifest.members) {
-                await refreshSpecs(records, { workId: display.workId, dir: values['data-dir'], initialize: true });
-
-                if (records.specState(display.workId).held)
-                    throw new WorkRecordError(
-                        'invalid',
-                        `Resolve the held Spec edit for ${display.workId} before approving this batch.`,
-                    );
-            }
-
-            return records.recordGateBatch(
-                manifest,
-                approvedDigest,
-                need(values, 'identity'),
-                need(values, 'evidence'),
-            );
-        }
+        case 'record-gate-batch':
+            return requireHumanAction('Approve briefs');
         case 'doubt-package':
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
 
@@ -809,33 +783,7 @@ async function run(
             };
         }
         case 'record-gate':
-            await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
-
-            if (records.specState(workId!).held)
-                throw new WorkRecordError(
-                    'invalid',
-                    'Accept or reject the held GitHub edit in item details before recording a later gate.',
-                );
-
-            if (!records.currentDoubt(workId!))
-                throw new WorkRecordError(
-                    'invalid',
-                    'Run Doubt on the current doubt-package and record-doubt before approval.',
-                );
-
-            {
-                const display = readJson(values, 'displayed gate') as import('./gate-display.ts').GateDisplay;
-
-                if (display?.workId !== workId)
-                    throw new WorkRecordError('invalid', 'The displayed gate belongs to another work record.');
-
-                return records.recordDisplayedGate(
-                    display,
-                    need(values, 'digest'),
-                    need(values, 'identity'),
-                    need(values, 'evidence'),
-                );
-            }
+            return requireHumanAction('Approve brief');
         case 'create-part':
             return records.createPart({
                 title: need(values, 'title'),

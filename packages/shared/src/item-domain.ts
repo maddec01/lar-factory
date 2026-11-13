@@ -311,6 +311,7 @@ export interface Item {
     recorded?: boolean;
     /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
     passingBrief?: boolean;
+    briefApproval?: { reason: string };
     publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & {
         recoverable?: boolean;
     };

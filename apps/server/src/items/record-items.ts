@@ -209,6 +209,14 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             setups.find((setup) => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false
                 ? null
                 : records.specState(record.workId);
+        const gate = records.gate(record.workId);
+        const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
+        const briefApproval =
+            !done &&
+            !gate.current &&
+            !!records.body(record.workId, 'brief') &&
+            ((activeBuild && gate.evidence.length > 0) ||
+                /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''));
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -240,7 +248,14 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                     specSync: { pending: spec.pending !== null, error: spec.error, warning: spec.warning },
                 }),
             revision: record.revision,
-            passingBrief: records.gate(record.workId).current,
+            passingBrief: gate.current,
+            ...(briefApproval && {
+                briefApproval: {
+                    reason: activeBuild
+                        ? 'The brief changed during Build. Review and approve the new brief.'
+                        : 'Review the complete brief before it becomes Ready.',
+                },
+            }),
             status: record.status,
             statuses: done ? [] : [record.status],
             kind: record.kind === 'slice' ? 'issue' : record.kind,

@@ -110,3 +110,14 @@ test.each([
 
     expect(stateOf(subject).word).toBe(label);
 });
+
+test('re-gating an active build keeps Build progress while its human wait says Approve brief', () => {
+    const subject = item('I_sample14', {
+        status: 'Needs you',
+        buildPhase: 'implement',
+        briefApproval: { reason: 'The brief changed during Build.' },
+        threads: [],
+    });
+
+    expect(stateOf(subject)).toMatchObject({ progressStage: 'Build', word: 'Approve brief' });
+});

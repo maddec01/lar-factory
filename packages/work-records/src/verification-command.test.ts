@@ -9,7 +9,7 @@ import { openWorkRecords } from './work-records.ts';
 
 const execute = promisify(execFile);
 
-test('CLI observes a head and records a revision-bound human result, with JSON reads', async () => {
+test('CLI observes heads but refuses an agent-authored Verify result naming Pedro', { timeout: 15000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-cli-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
 
@@ -42,13 +42,11 @@ test('CLI observes a head and records a revision-bound human result, with JSON r
                 testSteps: '1. Test it.',
             }),
         );
-        await cli('record-verification', '--revision', String(records.read(work.workId).revision), '--file', file);
-        expect(JSON.parse((await cli('verification')).stdout).latest).toMatchObject({
-            head,
-            by: 'Pedro',
-            result: 'pass',
-        });
-        expect(records.read(work.workId).status).toBe('Ready to merge');
+        await expect(
+            cli('record-verification', '--revision', String(records.read(work.workId).revision), '--file', file),
+        ).rejects.toMatchObject({ stderr: expect.stringContaining('requires Pedro') });
+        expect(JSON.parse((await cli('verification')).stdout).latest).toBeNull();
+        expect(records.read(work.workId).status).toBe('Verify');
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

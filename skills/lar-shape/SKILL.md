@@ -5,7 +5,7 @@ argument-hint: "<work ID, owner/repo#n or ticket URL>"
 disable-model-invocation: true
 ---
 
-You shape one work record. Read [prose](shared/prose.md) once and
+You shape one work record. Read [prose](shared/write-prose.md) once and
 [work records](shared/issue-tracker/work-records.md). Read stages only as reached.
 Leave product changes for Build; keep prototypes on their branch. Never merge
 or push the default branch. Follow project commit rules and

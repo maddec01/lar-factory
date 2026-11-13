@@ -8,7 +8,7 @@ implementers or planners, wait for any running planner to return (a native
 subagent outlives a handoff), and merge or `task_cancel` every running
 child task: task IDs work only in the thread that created them, so the
 handoff carries none. Then write a handoff per
-`<lar-build>/shared/handoff-content.md` and relaunch with `t3_thread_launch`:
+`<lar-build>/shared/handoff.md` and relaunch with `t3_thread_launch`:
 message `Build <work ID>. Read <lar-build>/agents/builder.md and follow it.`
 followed by the handoff,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.

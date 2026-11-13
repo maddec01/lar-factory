@@ -1,12 +1,15 @@
+Ported from mattpocock/skills (skills/productivity/handoff/SKILL.md); see UPSTREAM.md.
+
 # Handoff
 
-Write a handoff per [handoff](handoff-content.md), then continue in a fresh
-thread with `t3_thread_launch`, the handoff following the first line of its
-message.
+Write a continuation summary naming the work ID and current stage, decisions
+and missing work. Reference existing specs, records, commits, diffs and ADRs by
+path/URL/ID instead of copying them. Include suggested skills for the next agent
+to invoke. Redact secrets and personal information. Use the user's arguments
+to focus the continuation. Put the summary after the new thread's first line.
 
-- Shaping thread: first line `/lar-shape <work ID>`, in the work's repository
-  project, `workspaceStrategy` `{"type":"root"}`.
-- Build thread: follow the handoff paragraph under **Build** in `lar-build`'s
-  `stages/handoff.md`. It says when to hand off, the message and
-  `workspaceStrategy`, and the fields the handoff carries; a sliced build's
-  unfinished slice records carry the rest.
+- Shaping: launch with `t3_thread_launch` in the repository project, first line
+  `/lar-shape <work ID>`, `workspaceStrategy:{"type":"root"}`.
+- Build: follow `lar-build/stages/handoff.md` for settling tasks, preserved build
+  and review state, message and workspace strategy. Slice records carry slice
+  details. Live task IDs are not reusable in the continuation.

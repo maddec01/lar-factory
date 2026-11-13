@@ -2,79 +2,25 @@ Ported from mattpocock/skills (skills/engineering/domain-modeling/SKILL.md); see
 
 # Domain modeling
 
-Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
+Read the [domain-doc setting](domain-docs-setting.md). Existing glossary/ADRs
+remain context even when writing is OFF. Use configured paths. If a root
+`GLOSSARY-MAP.md` exists, follow its context paths and system/context ADRs;
+otherwise use the root glossary and configured ADR folder. Create files only
+during Build when the first entry is needed.
 
-Read the [domain-doc setting](domain-docs-setting.md) before drafting or writing.
+Challenge language that conflicts with the glossary immediately. Propose a
+canonical term for vague or overloaded words. Test relationships with concrete
+edge cases. Check claims against code and ask about contradictions rather than
+silently picking one interpretation.
 
-## File structure
+With docs ON, save each resolved term using [Glossary format](glossary-format.md)
+and each qualifying decision using [ADR format](adr-format.md). Shaping, concept
+and decision threads draft in work records, leaving the checkout unchanged.
+Save a decision's `domain-drafts` with `set-body`, then include them in the
+brief/map's Domain docs. Build writes them in its PR. Origin citations use a
+published ticket or the build PR, never a work ID or local path. With docs OFF,
+Domain docs and domain-drafts say "none"; create no drafts or files.
 
-Most repos have a single context:
-
-```
-/
-├── GLOSSARY.md
-├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
-└── src/
-```
-
-If a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
-
-```
-/
-├── GLOSSARY-MAP.md
-├── docs/
-│   └── adr/                          ← system-wide decisions
-├── src/
-│   ├── ordering/
-│   │   ├── GLOSSARY.md
-│   │   └── docs/adr/                 ← context-specific decisions
-│   └── billing/
-│       ├── GLOSSARY.md
-│       └── docs/adr/
-```
-
-In repository mode, create files lazily during the build: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
-
-## During the session
-
-### Challenge against the glossary
-
-When the user uses a term that conflicts with the existing language in `GLOSSARY.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y. Which is it?"
-
-### Sharpen fuzzy language
-
-When the user uses vague or overloaded terms, propose a precise canonical term. "You're saying 'account': do you mean the Customer or the User? Those are different things."
-
-### Discuss concrete scenarios
-
-When domain relationships are being discussed, stress-test them with specific scenarios. Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts.
-
-### Cross-reference with code
-
-When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible. Which is right?"
-
-### Capture domain docs
-
-When domain docs are ON, shaping, concept and decision threads draft each
-resolved entry in the work record. Save a decision's domain drafts with
-`lar-work set-body --body domain-drafts`, then include them in the brief's or
-map's Domain docs. They leave the checkout as found. The builder writes those
-drafts in the build PR. An entry or ADR that cites its origin names the published
-ticket, or the build PR when there is none, never a work ID or local path.
-Capture each term as it settles using [glossary-format.md](./glossary-format.md).
-With domain docs OFF, keep Domain docs and domain-drafts as "none".
-
-`GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
-
-### Draft ADRs sparingly
-
-Draft an ADR only when all three are true:
-
-1. **Hard to reverse**: the cost of changing your mind later is meaningful
-2. **Surprising without context**: a future reader will wonder "why did they do it this way?"
-3. **The result of a real trade-off**: there were genuine alternatives and you picked one for specific reasons
-
-If any of the three is missing, skip the ADR. Use the format in [adr-format.md](./adr-format.md).
+Glossaries define project language, not implementation details, specs or notes.
+Draft an ADR only for a decision that is hard to reverse, surprising without
+context AND the result of a real trade-off. Otherwise skip it.

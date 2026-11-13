@@ -74,7 +74,8 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    relationships. Report any unresolved link with the PR result. A PR without
    a ticket still has the complete outcome, decisions and reasons above. Its
    recorded merge makes the build Done.
-3. Recommend the status for once required checks pass:
+3. Recommend the status for once required checks pass. A configured skipped
+   review is disclosed but alone is not an inability to check and does not force Verify:
    - **Verify** when the change is visible on screen, the brief says Verify,
      it touches auth, permissions, migrations
      or deployment, a reviewer couldn't check something, a finding is

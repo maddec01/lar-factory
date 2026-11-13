@@ -8,7 +8,7 @@ Resolve the argument to its work record with
 `bash <this skill>/shared/scripts/work.sh <argument>` ([Picking](shared/issue-tracker/work-records.md#picking)).
 If it fails, tell the user its reason and stop. Read the record, its initial
 context (`lar-work context`), its brief, map or decision (`lar-work body`), its
-parent, children blockers and Dependencies. Before accepting an existing passing brief,
+parent, children, blockers and Dependencies. Before accepting an existing passing brief,
 run `lar-work gate <work ID>` to refresh its ticket Spec, inspect the sync
 warnings and held edits, then reread the brief and revision. A Reshape
 item keeps its brief text and gate history but has no current passing gate.
@@ -29,7 +29,7 @@ Send it through Gate again with new final confirmation before marking it Ready. 
 Read existing project instructions when present,
 neighboring code conventions, its glossary and relevant ADRs ([where domain docs live](shared/domain-docs-setting.md)),
   and the code this work touches, and returns ≤300 words in
-  [domain-modeling](shared/domain-docs.md) vocabulary: what exists, where, and
+  the project's vocabulary: what exists, where, and
   what the work would change. By default it runs no test suite, build, typecheck
   or lint. It may run the smallest command that settles a specific uncertainty
   reading cannot settle, and names that uncertainty in its report. It runs each

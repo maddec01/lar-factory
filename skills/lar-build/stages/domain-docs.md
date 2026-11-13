@@ -4,7 +4,7 @@ Input: brief drafts, local domain-doc setting and new build decisions. Output:
 committed docs and the current **Domain docs added by the build** list.
 Set phase `domain-docs`.
 
-Read the [domain-doc setting](../shared/domain-docs-setting.md). When they live in the repository, a
+Read the [domain-doc setting](../shared/domain-docs-setting.md). With it ON, a
    subagent writes the brief's **Domain docs** to those paths in its own
    commit, following [Domain modeling](../shared/domain-docs.md), its glossary/ADR formats and next ADR number,
    creating the glossary or ADR folder only for their first entry. A doc that

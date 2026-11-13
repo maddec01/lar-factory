@@ -36,7 +36,8 @@ A thread that starts no child task makes no call.
 - Top-level threads are a different thing: the board starts shaping, decision
   and build threads, and a thread uses `t3_thread_launch` only for its own
   handoff.
-- Every prompt names the work ID it serves and carries the factory report
+- Every prompt names the work ID, exact data folder/CLI and role instructions.
+  Pass [Prose](prose.md) for the role to read once. Carry the factory report
   rule: ≤300 words, no whole files, logs or screenshots.
 
 For an authorized top-level handoff, follow

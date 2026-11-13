@@ -4,7 +4,7 @@ description: Deliver a passing lar brief through implementation, review and PR c
 disable-model-invocation: true
 ---
 
-Read [prose](shared/prose.md) once and follow
+Read [prose](shared/write-prose.md) once and follow
 [Builder](agents/builder.md). Read each stage only when reached; pass a role its
 own instruction path, not the builder's stages. The user verifies changes and
 merges every PR. Follow [project rules](project-rules.md) and

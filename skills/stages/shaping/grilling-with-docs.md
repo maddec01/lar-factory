@@ -1,15 +1,22 @@
+Ported from mattpocock/skills (skills/productivity/grilling); see UPSTREAM.md.
+
 # Grilling with docs
 
-Input: unsettled questions and domain-doc setting. Output: accepted vocabulary/answers and enabled domain drafts in the record.
+Input: unresolved choices, prior answers and approved destination. Output:
+accepted answers and enabled domain drafts; unresolved choices remain holds.
 
+Read [Domain modeling](shared/domain-docs.md) to challenge terms against the
+existing glossary/ADRs and draft each settled term or qualifying decision in
+records when enabled. With docs OFF, read existing language and write "none".
 
-Wherever this skill grills (open questions in **2. Size up**,
-[Concepts](concepts.md) step 1, grill decisions), load [Grill](grill.md) and
-[domain-modeling](shared/domain-docs.md), as upstream `grill-with-docs` does. Challenge the user's terms
-against the repo's glossary and ADRs
-([where domain docs live](shared/domain-docs-setting.md)); capture each resolved term and
-ADR-worthy decision the moment it settles, only when domain docs are ON.
-With them OFF, read existing docs for context and keep Domain docs as "none".
+Map the design's dependent decisions. Each round asks the whole frontier whose
+prerequisites are settled, using [Questions](shared/questions.md): number each
+question, recommend an answer and word it so "yes" accepts that recommendation.
+Wait for answers, then recompute the frontier. Dependent unanswered questions
+belong to a later round. Reuse prior answers without asking again.
 
-Follow [Domain docs](shared/domain-docs.md) for drafting entries during shaping
-and writing them in the build PR.
+Facts are the agent's job. Delegate exploration/research for facts available
+from code, tools or sources; continue independent questions while it runs.
+A running exploration is an unsettled prerequisite. Product decisions go to
+the user. Finish only when every branch is settled and nothing remains silently
+assumed. Save answers in Confirmed, the decision answer or map before Brief.

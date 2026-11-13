@@ -89,9 +89,13 @@ Identifiers
 
 Reads
   select-reviewers <work-id> --base SHA --head SHA
+                   [--escalations F]
                                     Choose reviewers from saved settings and the exact
                                     committed diff in the current build checkout.
                                     Print run/skip reasons, evidence and trigger version.
+                                    F is Code's JSON list of {"reviewer":ID,
+                                    "requestedBy":"code","reason":text}. Only skipped,
+                                    non-never reviewers gain an escalation; run each once.
   read <work-id>                    Print one record.
   context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
@@ -229,9 +233,10 @@ Content
   record-review-round <work-id> --revision N --file F
                                     Record the build's next review round from the
                                     JSON in F: {"base": sha, "reviewers": [{"axis",
-                                    "verdict", "notChecked"?, "findings": [{"severity",
-                                    "summary", "disposition", "reason"?}]}]}. Axes are
-                                    code, security, ui and performance; verdicts
+                                    "verdict", "notChecked"?, "escalation"?, "findings": [{"severity",
+                                    "summary", "disposition", "reason"?}]}]}. Escalation is
+                                    {"requestedBy":"code","reason":text}; never wins.
+                                    Axes are built-in or saved custom reviewer IDs; verdicts
                                     approve, changes and skipped; severities blocker,
                                     should and nit; dispositions open, fixed and
                                     rejected. A skipped axis or a rejection needs a

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { readFactorySettings } from './factory-settings.ts';
@@ -13,11 +14,18 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
         parsed = parseArgs({
             args,
             allowPositionals: true,
-            options: { base: { type: 'string' }, head: { type: 'string' }, 'data-dir': { type: 'string' } },
+            options: {
+                base: { type: 'string' },
+                head: { type: 'string' },
+                'data-dir': { type: 'string' },
+                escalations: { type: 'string' },
+            },
         });
 
         if (parsed.positionals.length !== 1 || !parsed.values.base || !parsed.values.head)
-            throw new Error('Expected select-reviewers <work ID> --base <SHA> --head <SHA> [--data-dir D].');
+            throw new Error(
+                'Expected select-reviewers <work ID> --base <SHA> --head <SHA> [--escalations F] [--data-dir D].',
+            );
     } catch (error) {
         process.stderr.write(`lar-work: ${(error as Error).message}\n`);
 
@@ -35,7 +43,8 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
 
         const { settings, problem } = readFactorySettings(parsed.values['data-dir']);
         const { root, diff } = readReviewerDiff(base!, head!);
-        const reviewers = selectReviewers(settings, diff);
+        const requests = parsed.values.escalations ? JSON.parse(readFileSync(parsed.values.escalations, 'utf8')) : [];
+        const reviewers = selectReviewers(settings, diff, requests);
 
         if (problem) process.stderr.write(`lar-work: ${problem}\n`);
 

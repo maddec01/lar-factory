@@ -42,4 +42,7 @@ findings:
 - [blocker|should|nit] path:line: problem. Fix: <suggestion>. Confidence: high|medium|low
 not checked:
 - <anything you couldn't verify, and why>
+escalations: [{"reviewer":"<skipped reviewer ID>","requestedBy":"code","reason":"<change it covers>"}]
 ```
+
+Given the selection, request skipped reviewers whose remit the change needs (e.g. auth behind a neutral name); use `[]` when none, and never request a reviewer set to `never`.

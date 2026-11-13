@@ -257,6 +257,11 @@ delegated work**, its selected instructions, the build's work ID, the repo path 
 diff command `git diff <base SHA> <head SHA>` from selection. Note each reviewer you skip with a reason, and
 say so in chat.
 
+Give Code the selection too. For its `escalations`, rerun the same pinned selection with
+`--escalations <json file>`; start each newly escalated reviewer once on that same diff,
+before fixing findings. Never overrides requests. Copy each returned `escalation`
+(requesting reviewer and reason) into that reviewer's round-1 record.
+
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
 check. Give each finding you reject a reason. Before handing the ones you
 agree with to the fixer, note HEAD (`git rev-parse HEAD`) as this round's

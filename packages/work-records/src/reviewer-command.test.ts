@@ -206,3 +206,72 @@ it('selects through the CLI with saved modes, custom rules and no record mutatio
     expect(reopened.reviewRounds(record.workId)).toEqual([]);
     reopened.close();
 }, 30_000);
+
+it('accepts Code requests through the CLI and saves their provenance with the resulting round', async () => {
+    const { cwd, commit } = repository();
+    const data = directory();
+    const records = await openWorkRecords(workRecordsPath(data));
+    const record = records.create({ title: 'Escalation fixture', repository: 'example/repo', kind: 'feature' });
+
+    records.close();
+
+    const settings = defaultFactorySettings();
+
+    settings.reviewers.find((entry) => entry.id === 'ui')!.mode = { kind: 'never' };
+    writeFactorySettings(settings, data);
+
+    const base = commit();
+
+    writeFileSync(join(cwd, 'helper.ts'), 'verifyCaller();\n');
+
+    const head = commit();
+    const escalation = { requestedBy: 'code', reason: 'verifyCaller changes auth.' };
+    const request = { reviewer: 'security', ...escalation };
+    const file = join(data, 'requests.json');
+
+    writeFileSync(
+        file,
+        JSON.stringify([request, request, { ...request, reviewer: 'ui' }, { ...request, reviewer: 'code' }]),
+    );
+
+    const run = (...args: string[]) =>
+        JSON.parse(
+            execFileSync(
+                process.execPath,
+                [
+                    '--disable-warning=ExperimentalWarning',
+                    join(import.meta.dirname, 'cli.ts'),
+                    ...args,
+                    '--data-dir',
+                    data,
+                ],
+                { cwd, encoding: 'utf8' },
+            ),
+        );
+    const selected = run('select-reviewers', record.workId, '--base', base, '--head', head, '--escalations', file);
+    const reviewers = selected.reviewers as { id: string; run: boolean; reason: string; escalation?: unknown }[];
+
+    expect(reviewers.filter((entry) => entry.escalation).map((entry) => entry.id)).toEqual(['security']);
+    expect(reviewers.filter((entry) => entry.run).map((entry) => entry.id)).toEqual(['code', 'security']);
+    expect(run('read', record.workId).revision).toBe(1);
+
+    const roundFile = join(data, 'round.json');
+
+    writeFileSync(
+        roundFile,
+        JSON.stringify({
+            base,
+            reviewers: reviewers.map((entry) => ({
+                axis: entry.id,
+                verdict: entry.run ? 'approve' : 'skipped',
+                findings: [],
+                notChecked: entry.run ? undefined : entry.reason,
+                escalation: entry.escalation,
+            })),
+        }),
+    );
+    expect(run('record-review-round', record.workId, '--revision', '1', '--file', roundFile).revision).toBe(2);
+    expect(
+        run('review-rounds', record.workId)[0].reviewers.find((entry: { axis: string }) => entry.axis === 'security'),
+    ).toMatchObject({ verdict: 'approve', escalation });
+}, 30_000);

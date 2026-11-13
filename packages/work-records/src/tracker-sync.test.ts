@@ -519,7 +519,10 @@ test('legacy upgrade preserves every stored row and repeats without changing pen
     const path = records.trackerDatabasePath();
     const raw = new DatabaseSync(path);
 
-    raw.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+    // Replay only the no-op structural-writer fence (schema 24), never a later schema change.
+    const migrations = MIGRATIONS.slice(0, 24);
+
+    raw.exec('PRAGMA user_version = 23');
 
     const rows = () =>
         raw
@@ -529,7 +532,7 @@ test('legacy upgrade preserves every stored row and repeats without changing pen
     const before = JSON.stringify(rows());
 
     for (let attempt = 0; attempt < 2; attempt++) {
-        const upgraded = await openDatabase(path);
+        const upgraded = await openDatabase(path, { migrations });
 
         expect(JSON.stringify(rows())).toBe(before);
         upgraded.close();

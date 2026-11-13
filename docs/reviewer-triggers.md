@@ -1,11 +1,19 @@
 # Reviewer triggers, version 1
 
 Run `lar-work select-reviewers ID --base SHA --head SHA` in the build checkout.
+
 Both arguments must be full commit SHAs. For whole-branch review, pass the
 merge base with the target branch as base and the pinned HEAD as head. This
 compares those two trees directly; it does not include uncommitted files or
 compute a different merge base. `--data-dir D` selects local saved settings and
 the work-record database, as for other lar-work commands.
+
+When Code identifies a missed reviewer, repeat the same command with
+`--escalations requests.json`, a list of `{ "reviewer": "security", "requestedBy": "code", "reason": "..." }`.
+Only skipped reviewers gain `escalation` metadata and become selected; `never` wins,
+and already selected reviewers or repeated requests add no run. Start each newly
+escalated reviewer once, then copy its `escalation` into its `record-review-round`
+entry with the result. The command remains read-only; the round stores the provenance.
 
 The result identifies the work ID, checkout, commits and trigger version, and
 contains every reviewer, sorted by stable ID. Each has `run`, `reason`, `mode`,

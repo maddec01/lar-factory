@@ -456,4 +456,5 @@ export const MIGRATIONS: readonly Migration[] = [
   `),
     // Fence legacy structural writers without changing their journals or settings.
     () => {},
+    (db) => db.exec('ALTER TABLE review_axes ADD COLUMN escalation TEXT'),
 ];

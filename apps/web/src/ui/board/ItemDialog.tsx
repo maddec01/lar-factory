@@ -240,8 +240,8 @@ export function DialogActions({
         <span
             className={
                 presentation === 'leading'
-                    ? 'inline-flex items-center gap-3 text-xs'
-                    : 'inline-flex items-center gap-1.5'
+                    ? 'inline-flex max-w-full min-w-0 flex-wrap items-center gap-3 text-xs'
+                    : 'inline-flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1.5'
             }
         >
             <ButtonDensityProvider density="md">{children}</ButtonDensityProvider>

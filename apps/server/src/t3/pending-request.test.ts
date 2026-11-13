@@ -72,3 +72,24 @@ test('a changed shell request cannot reuse an old gate title', () => {
 
     expect(lookup(['owner'])?.[0]?.pendingRequest).toEqual({ id: 'new', threadId: 'owner', kind: 'question' });
 });
+
+test.each(['Approve revised brief', 'Approve current brief', 'Approve final brief'])(
+    'the exact pending %s title is a brief gate',
+    (title) => {
+        expect(
+            pendingRequest(shell, {
+                turnItems: [
+                    {
+                        ...input,
+                        questions: [
+                            {
+                                header: 'Question',
+                                question: `Q3 - ${title}: Does this version meet your expectations?`,
+                            },
+                        ],
+                    },
+                ],
+            })?.kind,
+        ).toBe('brief-approval');
+    },
+);

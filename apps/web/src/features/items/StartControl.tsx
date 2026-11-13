@@ -4,6 +4,7 @@ import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 // click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 import {
+    startActionChoice,
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
@@ -70,16 +71,15 @@ export function StartEntries({
 export function StartControl({
     item,
     data,
-    label = 'Start',
     kind = 'refine',
     linkedBeside,
 }: {
     item: Item;
     data: BoardData;
-    label?: string;
     kind?: StartKind;
     linkedBeside?: string | undefined;
 }) {
+    const { label } = startActionChoice(item, kind);
     const kindOf = useButtonKind();
     const onRow = useOnRow();
     const { pending, uncertain, error } = useShownStart(item, data, kind);

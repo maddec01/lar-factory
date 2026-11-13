@@ -656,7 +656,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
     );
-    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start after server team']);
+    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start build after Dependency on server team']);
     expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe(
         'Pick a model to start it once you mark the Dependency on server team met',
     );
@@ -998,7 +998,7 @@ test.each(['task', 'research', 'prototype', 'grill', null] as const)(
         await openItem(decision.id);
         expect(text(inDialog('[data-step-names]'))).toBe('QueueWorkingOutcome');
         expect(text(inDialog('[data-steps]'))).toContain('Stage 1 of 3');
-        expect(text(button('start', decision.id))).toContain(`Start ${method ?? 'decision'}`);
+        expect(text(button('start', decision.id))).toContain('Start decision');
         await push(moved(decision.id, 'Shaping', { ...sample, items: [decision] }));
         expect(text(inDialog('[data-steps]'))).toContain('Stage 2 of 3');
         expect(text(inDialog('[data-item-summary]'))).toContain('Working');

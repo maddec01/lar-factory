@@ -212,7 +212,7 @@ export function DossierChips({
     more: string[];
 }) {
     return (
-        <span onClick={stop} className="flex shrink-0 items-center gap-1" data-chips>
+        <span onClick={stop} className="flex min-w-0 flex-wrap items-center gap-1" data-chips>
             <Badge
                 tone={first.tone}
                 className="whitespace-nowrap tabular-nums"
@@ -222,23 +222,11 @@ export function DossierChips({
                 {first.icon}
                 {first.words}
             </Badge>
-            {more.length > 0 && (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <span
-                            className="focus-ring text-fg-muted rounded-xs tabular-nums"
-                            data-chips-more
-                            tabIndex={0}
-                            role="img"
-                            aria-label={more.join(', ')}
-                        >
-                            <span aria-hidden="true">+{more.length}</span>
-                            <span className="sr-only">{more.join(', ')}</span>
-                        </span>
-                    </TooltipTrigger>
-                    <TooltipPopup>{more.join(' · ')}</TooltipPopup>
-                </Tooltip>
-            )}
+            {more.map((words) => (
+                <Badge key={words} tone="neutral" data-chips-more>
+                    {words}
+                </Badge>
+            ))}
         </span>
     );
 }

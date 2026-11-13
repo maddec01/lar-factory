@@ -155,7 +155,7 @@ test('Build’s header counts the factory’s builds against the automatic build
 
     expect(text(header), 'In progress and Review count').toBe('4 open · limit 2');
     expect(header.querySelectorAll('.bar')).toHaveLength(4);
-    expect(header.getAttribute('title')).toContain('2 working, 1 waiting to close, 1 stopped');
+    expect(header.getAttribute('title')).toContain('2 working, 1 waiting to close, 1 run stopped');
     expect(iconConcept(row('I_sample15').querySelector('[data-glyph]')!, conceptIcons)).toBe('stopped');
     await receive(withItem('I_sample09', { status: 'In progress' }, limited));
     expect(text($('.build-limit')), 'a concept in progress is no build at work').toBe('4 open · limit 2');
@@ -275,12 +275,12 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
         error: null,
         board: { ...blocked, armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } },
     });
-    expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after ✓', 'true']);
+    expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts build after #202 ✓', 'true']);
     expect(after().title).toBe('Starts by itself once #202 completes. Pressing it again disarms it');
     await press(after());
     expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'I_sample13' }]);
     await answer({ error: null, board: { ...blocked, armed: {} } });
-    expect(text(after()), 'the row already says what blocks it').toBe('Start after');
+    expect(text(after()), 'the row already says what blocks it').toBe('Start build after #202');
     expect(after().title, 'nothing starts by itself until it is armed').toBe(
         'Pick a model to start it once #202 completes',
     );
@@ -709,7 +709,7 @@ test('live slice transitions update the bar, expanded list and count without a r
     }
 });
 
-test('usage with none known yet says it’s still trying after three seconds, keeps known figures, and says when T3 couldn’t read it', async () => {
+test('usage with none known yet keeps naming usage after three seconds, keeps known figures, and says when T3 couldn’t read it', async () => {
     const id = 'I_sample13';
     const at = (change: Partial<Item>) =>
         withItem(
@@ -723,7 +723,8 @@ test('usage with none known yet says it’s still trying after three seconds, ke
     await mountPage(at({}));
     expect(text(row(id))).toContain('Loading usage');
     await settle(() => vi.advanceTimersByTime(3_000));
-    expect(text(row(id))).toContain('Still trying…');
+    expect(text(row(id))).toContain('Loading usage');
+    expect(text(row(id))).not.toContain('Still trying…');
     expect(row(id).querySelector('[data-loader]')!.getAttribute('title')).toBe('Loading usage');
     await receive(at({ usageState: 'loading', stats: { agentMs: 120_000, tokens: 34_000 } }));
     expect(text(row(id)), 'known figures stay while usage loads').toContain('2m');
@@ -832,12 +833,12 @@ describe('the activity line', () => {
 
         await mountPage(at(waiting));
         expect(line()).toBeNull();
-        expect(text(state('I_sample13'))).toBe('Needs you');
+        expect(text(state('I_sample13'))).toBe('Question');
         expect(moving()).toBeNull();
         await settle(async () =>
             (await store()).receive(at({ ...waiting, state: 'done', hasLiveChildren: true, childNeedsYou: true })),
         );
-        expect(text(state('I_sample13'))).toBe('Needs you');
+        expect(text(state('I_sample13'))).toBe('Question');
         expect(moving()).toBeNull();
     });
 

@@ -5,6 +5,7 @@
 
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import {
+    startActionChoice,
     blockerGroups,
     itemName,
     openBlockerRefs,
@@ -58,17 +59,17 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
 }
 
 /** Start after #n, or Starts after #n ✓ while armed, a Start. */
-function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData; namesBlocker: boolean }) {
+function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: StartKind }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const after = startsAfter(item);
-    const label = startsAfter(item, true);
 
     if (!after) return null;
 
     const armed = !!data.armed?.[item.id];
+    const { label } = startActionChoice(item, kind, { prerequisite: after, armed });
     const writes = pending ? { 'aria-disabled': true as const } : writeState(data);
     const held = Boolean(writes['aria-disabled']);
     const run = async (choice: ModelChoice | undefined | null) => {
@@ -90,12 +91,12 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                 mark="✓"
                 data-start-after={item.id}
                 aria-pressed
-                aria-label={`Starts after ${after}`}
+                aria-label={`${label} for ${itemName(item)}`}
                 title={`Starts by itself once ${waitsFor(item)}. Pressing it again disarms it`}
                 {...writes}
                 onClick={() => !held && void run(null)}
             >
-                Starts after{namesBlocker && ` ${label}`}
+                {label}
             </Button>
         );
     }
@@ -115,11 +116,11 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                     shrinks
                     rightIcon={<ChevronDownIcon />}
                     data-start-after={item.id}
-                    aria-label={`Start ${itemName(item)} after ${after}`}
+                    aria-label={`${label} for ${itemName(item)}`}
                     title={`Pick a model to start it once ${waitsFor(item)}`}
                     {...(data.capture?.enabled === false ? {} : writes)}
                 >
-                    Start after{namesBlocker && ` ${label}`}
+                    {label}
                 </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content
@@ -145,32 +146,30 @@ const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * it. While a blocker holds it, Start after takes its place. While only the repository holds it, Start shows
  * disabled, with the hold's reason beside it; an armed start would fail then, so none is offered, but one armed
  * before the hold still shows while a blocker is open, so it can be disarmed. Beside text that names the blockers,
- * `namesBlocker` false leaves them out of Start after's label; its accessible name and title keep them.
+ * The action always names the work and prerequisite.
  */
 export function StartOrAfter({
     item,
     data,
-    label = 'Start',
     kind = 'refine',
     linkedBeside,
-    namesBlocker = true,
 }: {
     item: Item;
     data: BoardData;
-    label?: string;
     kind?: StartKind;
     linkedBeside?: string | undefined;
-    namesBlocker?: boolean;
 }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
     const reasonId = useId();
 
-    if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
+    const { label } = startActionChoice(item, kind);
+
+    if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} kind={kind} />;
 
     const hold = startHold(data, item.repo);
 
-    if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} linkedBeside={linkedBeside} />;
+    if (!hold) return <StartControl item={item} data={data} kind={kind} linkedBeside={linkedBeside} />;
 
     return (
         <>

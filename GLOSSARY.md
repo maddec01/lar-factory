@@ -163,3 +163,6 @@ _Avoid_: Grill as a visible method name.
 **Outcome check**:
 The final check that the concept’s proposed work achieves its intended outcome.
 _Avoid_: end-to-end check as a visible map label.
+
+**Start shaping**, **Start decision**, **Start build**:
+The action names the work it begins on every row, map node and item detail. A deferred action also names its prerequisite (for example, “Start build after #42”); armed work reads “Starts build after #42”.

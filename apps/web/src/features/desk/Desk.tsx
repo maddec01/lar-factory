@@ -118,7 +118,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
 
     if (action?.kind === 'retry-build') return <StartBuild item={item} data={data} />;
 
-    if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} label="Resume shaping" />;
+    if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} />;
 
     if ((item.status === 'Verify' && item.verification?.required) || action?.kind === 'details')
         return (

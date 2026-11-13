@@ -89,8 +89,7 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
             </RefButton>
         );
 
-    if (!done && (status === 'Ready' || status === 'Queued'))
-        return <PartStart part={part} data={data} label="Start" />;
+    if (!done && (status === 'Ready' || status === 'Queued')) return <PartStart part={part} data={data} />;
 
     const waiting = !done && openWaits(part).length > 0;
 

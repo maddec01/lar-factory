@@ -311,16 +311,20 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
         return { label: 'Finishing build', running };
     }
 
-    const phases: Record<string, string> = {
-        plan: 'Planning',
-        implement: 'Implementing',
-        review: 'Review',
-        checks: 'Checks',
-        'full-checks': 'Checks',
-        'domain-docs': 'Updating docs',
-        approve: 'Awaiting approval',
-        retro: 'Retro',
-    };
-
-    return { label: phases[item.buildPhase ?? ''] ?? 'Working', running };
+    return { label: BUILD_PHASE_WORDS[item.buildPhase ?? ''] ?? 'Working', running };
 }
+
+const BUILD_PHASE_WORDS: Record<string, string> = {
+    plan: 'Planning',
+    implement: 'Implementing',
+    review: 'Review',
+    checks: 'Checks',
+    'full-checks': 'Checks',
+    'domain-docs': 'Updating docs',
+    approve: 'Awaiting approval',
+    retro: 'Retro',
+};
+
+/** The recorded build phase in the same words as current activity. */
+export const buildPhaseLabel = (phase: string | null | undefined): string | undefined =>
+    phase ? (BUILD_PHASE_WORDS[phase] ?? phase) : undefined;

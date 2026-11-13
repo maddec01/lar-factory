@@ -7,27 +7,16 @@ import type { BoardData } from '@lar-factory/shared';
 import type { Part } from './DossierParts';
 import { hasLiveThread, OpenThread, StartBuild, StartOrAfter } from '@/features/items';
 
-/** `label` names the Start, StartBuild's own on a Ready build and Start on a Queued one by default; other statuses get none. The Work map's state line names the blockers, so its Start after leaves them out. */
-export function PartStart({
-    part,
-    data,
-    label,
-    namesBlocker = true,
-}: {
-    part: Part;
-    data: BoardData;
-    label?: string;
-    namesBlocker?: boolean;
-}) {
+/** Ready work starts a build; Queued work starts shaping or a decision. Other statuses get none. */
+export function PartStart({ part, data }: { part: Part; data: BoardData }) {
     const { item } = part;
 
-    if (item.status === 'Ready')
-        return <StartBuild item={item} data={data} label={label} namesBlocker={namesBlocker} />;
+    if (item.status === 'Ready') return <StartBuild item={item} data={data} />;
 
     if (item.status !== 'Queued') return null;
 
     // A thread already at work on the item would get a second one.
     if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
 
-    return <StartOrAfter item={item} data={data} label={label} namesBlocker={namesBlocker} />;
+    return <StartOrAfter item={item} data={data} />;
 }

@@ -1,4 +1,4 @@
-import { itemName, needsAnswer, openQuestionThread } from '@lar-factory/shared';
+import { itemName, needsAnswer, questionWaitReason } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
@@ -26,15 +26,8 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
 
     if (!item.needsYou) {
-        const thread = openQuestionThread(item);
-        const summary = thread?.questionSummary;
-
         return needsAnswer(item) ? (
-            <NeedsYouNotice
-                reason={
-                    summary || 'This work is waiting for your answer or decision. Open the thread in T3 to continue.'
-                }
-            >
+            <NeedsYouNotice reason={questionWaitReason(item)}>
                 {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
             </NeedsYouNotice>
         ) : cleanupResult ? (

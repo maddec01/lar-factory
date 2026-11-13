@@ -203,6 +203,7 @@ export {
     FactoryAction,
     FactoryActions,
 } from './FactorySettings';
+export { VerifyResult, VerifyEvidence } from './VerifyResult';
 export { SavedRunSection } from './SavedRunSection';
 export {
     FactoryReviewerMode,

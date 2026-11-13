@@ -39,6 +39,7 @@ export function azureMerge(run: Az = az): MergeProvider {
                 pullRequestId: number;
                 lastMergeSourceCommit: { commitId: string };
                 targetRefName: string;
+                description?: string;
                 completionQueueTime?: string;
                 mergeFailureType?: string;
                 repository: { id: string; project: { id: string } };
@@ -109,6 +110,7 @@ export function azureMerge(run: Az = az): MergeProvider {
             return {
                 pr: {
                     ...evidence.pullRequest,
+                    body: metadata.description,
                     checks: evidence.progress?.checks ?? null,
                     checkProgress: evidence.progress
                         ? {

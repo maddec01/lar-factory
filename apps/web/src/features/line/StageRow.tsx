@@ -54,6 +54,7 @@ import {
     RowTitle,
     RowTitleCell,
     StageRowItem,
+    VerifyEvidence,
 } from '@/ui/board';
 
 /** The one thing a status asks next, or where to act on an item that waits on you. */
@@ -230,6 +231,9 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             )}
             {['Queued', 'Ready', 'In progress'].includes(item.status) && (
                 <RowFoot>
+                    {item.status === 'In progress' && item.verification?.latest?.result === 'fail' && (
+                        <VerifyEvidence>Fixing failed Verify: {item.verification.latest.note}</VerifyEvidence>
+                    )}
                     <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />
                     <StartAfterError item={item} data={data} />
                     <AutoBuildNote item={item} data={data} />

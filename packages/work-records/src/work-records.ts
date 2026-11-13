@@ -45,6 +45,7 @@ import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
+import { verificationRecords, type VerificationRecords } from './verification-records.ts';
 
 export type { NewPart } from './create-part.ts';
 export type {
@@ -369,6 +370,7 @@ export interface WorkRecords
         DecisionAnswers,
         MergeBuildRecords,
         SetAsideRecords,
+        VerificationRecords,
         RunSettingsRecords,
         ValidationRecords,
         TrackerCache,
@@ -1223,6 +1225,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     }
 
     return {
+        ...verificationRecords(database, (id) => fromRow(find(id))),
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
@@ -1434,6 +1437,23 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 }
 
                 const moved = nextStatus ?? row.status;
+
+                if (moved === 'Ready to merge') {
+                    const evidence = db
+                        .prepare('SELECT head, latest, invalidated FROM verification WHERE work_id=?')
+                        .get(workId);
+                    const latest = evidence?.latest ? JSON.parse(String(evidence.latest)) : null;
+
+                    if (
+                        evidence &&
+                        (evidence.invalidated ||
+                            !evidence.head ||
+                            latest?.head !== evidence.head ||
+                            latest?.pr !== row.pull_request ||
+                            latest?.result !== 'pass')
+                    )
+                        throw invalid('Pass Verify for the current PR head before Ready to merge.');
+                }
 
                 return {
                     decision_method: method === undefined ? row.decision_method : method,
@@ -1709,8 +1729,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 if (row.pull_request) replacePullRequest.run(workId, row.pull_request, new Date().toISOString());
 
                 deleteObservation.run(workId, 'pr');
+                db.prepare('UPDATE verification SET head=NULL, latest=NULL, resume=NULL WHERE work_id=?').run(workId);
 
-                return { pull_request: reference };
+                return {
+                    pull_request: reference,
+                    ...(row.status === 'Ready to merge' &&
+                    db.prepare('SELECT 1 FROM verification WHERE work_id=?').get(workId)
+                        ? { status: 'Verify' as const }
+                        : {}),
+                };
             });
         },
         observe: (workId, revision, observation) => {

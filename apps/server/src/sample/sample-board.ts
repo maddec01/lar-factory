@@ -24,6 +24,7 @@ import { fakeItemSource } from './fake-item-source.ts';
 import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
 import { sampleControls } from './sample-controls.ts';
+import { sampleVerification } from './sample-verification.ts';
 
 /** All writable sample dependencies live here. No real source, tracker or T3 command is reachable from them. */
 export async function createSampleBoard(board: BoardState, fixture: BoardData) {
@@ -35,6 +36,11 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const items = mergeSources(sources, new Map([...sources.values()].map((source) => [source, 'issues' as const])));
     const vocabulary = sampleVocabulary(tracker);
     let tickets: Item[] = [];
+    const verification = sampleVerification(
+        records,
+        () => tickets,
+        () => reread(),
+    );
     const reread = () => {
         const configs = repos();
         const projected = recordItems(
@@ -63,14 +69,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
 
                 if (!ticket) return item;
 
-                return {
+                return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
                     parentId: ticket.parentId ? (shownIds.get(ticket.parentId) ?? ticket.parentId) : null,
                     parent: ticket.parent,
                     subIssues: ticket.subIssues,
                     tracker: ticket.tracker,
                     blockers: ticket.blockers,
-                };
+                });
             }),
         });
         board.push();
@@ -109,6 +115,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         archive: () => [],
         offerModelChoices: () => board.snapshot().modelChoices,
         clearedFailuresFile: null,
+        verificationDeps: verification.dependencies,
         kindTracker: (repo) => ({ labels: tracker.labels(repo), kinds: tracker.kinds(repo) }),
     });
     const details = createItemDetails(
@@ -204,7 +211,15 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 async (repo, name) => (await tracker.labels(repo).create({ name })).name,
             );
         },
-        sampleControl: sampleControls(tracker, refresh),
+        sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action !== 'verification') return sampleControls(tracker, refresh)(input);
+
+            try {
+                return { status: 200, body: { ...(await verification.control(input)), error: null } };
+            } catch (error) {
+                return { status: 400, body: { error: (error as Error).message } };
+            }
+        },
         close: () => records.close(),
     };
 }

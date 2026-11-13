@@ -46,7 +46,16 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
 
     if (action?.kind === 'thread') return { opens: action.threadId, label: action.label };
 
-    if (action?.kind === 'pr') return { control: <PrAction item={item} label={action.label} primary /> };
+    if (action?.kind === 'pr')
+        return {
+            control: (
+                <PrAction
+                    item={item}
+                    label={item.status === 'Verify' && item.verification?.required ? 'Open PR to test' : action.label}
+                    primary
+                />
+            ),
+        };
 
     switch (item.status) {
         case 'List':

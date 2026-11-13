@@ -104,6 +104,9 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                 throw error;
             }
 
+            if (typeof next !== 'string' && next.state === 'open' && next.sourceRevision)
+                records.observeVerificationHead(record.workId, record.pullRequest!, next.sourceRevision);
+
             // A merge is terminal. An older in-flight read cannot reopen its observation.
             if (records.observations(record.workId).some((o) => o.of === 'pr' && o.state === 'merged')) return 'merged';
 
@@ -214,6 +217,9 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                     progress.set(pr.url.toLowerCase(), pr);
                     checkedAt.set(record.pullRequest!.toLowerCase(), now);
                 }
+
+                if (pr.state === 'open' && pr.sourceRevision)
+                    records.observeVerificationHead(record.workId, record.pullRequest!, pr.sourceRevision);
 
                 const previous = records.observations(record.workId).find((observation) => observation.of === 'pr');
 

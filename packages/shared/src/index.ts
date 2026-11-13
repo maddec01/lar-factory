@@ -2,6 +2,7 @@
 // the page can bundle them; the skill installer, which does, is @lar-factory/shared/install-skills.
 
 export * from './model.ts';
+export * from './verification.ts';
 export * from './thread-activity.ts';
 export * from './format.ts';
 export * from './blocked-skill.ts';

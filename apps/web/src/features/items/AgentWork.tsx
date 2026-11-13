@@ -81,7 +81,16 @@ export function AgentWorkNote({ item }: { item: Item }) {
     // Figures from threads no longer recorded still say work happened, which the header shows.
     if (!hasThread && item.stats && item.stats !== 'unavailable' && hasFigures(item.stats)) return null;
 
-    const none = item.kind === 'concept' ? 'No direct agent work yet' : 'No agent work yet';
+    const none =
+        item.status === 'Verify' && item.linkedPrs.length
+            ? 'Build ready for verification'
+            : item.status === 'Ready to merge' && item.linkedPrs.length
+              ? 'Build ready to merge'
+              : item.verification?.latest?.result === 'fail'
+                ? 'Fixing failed Verify'
+                : item.kind === 'concept'
+                  ? 'No direct agent work yet'
+                  : 'No agent work yet';
 
     return (
         <Text variant="caption" tone="muted" data-agent-work-note>

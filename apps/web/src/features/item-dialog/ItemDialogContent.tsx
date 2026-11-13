@@ -24,6 +24,7 @@ import {
     EarlierThreads,
     ICON,
     NeedsYou,
+    VerifyBuild,
     StartAfterError,
     StartMessage,
 } from '@/features/items';
@@ -95,6 +96,7 @@ export function ItemDialogContent({
                         <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
                     <NeedsYou item={item} data={data} />
+                    <VerifyBuild item={item} />
                     {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (

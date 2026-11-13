@@ -115,7 +115,9 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         null,
         (item) => tickets.find((ticket) => ticket.repo === item.repo && ticket.number === item.number),
         {
-            records: null,
+            records,
+            specSync: { provider, dir },
+            setupOf: (repo) => repos().find((config) => config.repo === repo)?.setup,
             labelsOf: tracker.labels,
             kindsOf: tracker.kinds,
             readDetails: async (item) => (await tracker.read(item.repo, item.number))!.details,

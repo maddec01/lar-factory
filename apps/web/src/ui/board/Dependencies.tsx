@@ -10,7 +10,7 @@ export function DependencyList({
     /** The Dependencies, one DependencyItem each. */
     children: ReactNode;
 }) {
-    return <ul className="m-0 grid list-none gap-3 p-0 text-sm">{children}</ul>;
+    return <ul className="m-0 grid min-w-0 list-none grid-cols-[minmax(0,1fr)] gap-3 p-0 text-sm">{children}</ul>;
 }
 
 /** A Dependency: who owns it and whether it's met, its need, its latest read and evidence, what the board asks about it,
@@ -40,7 +40,7 @@ export function DependencyItem({
     action: ReactNode;
 }) {
     return (
-        <li className="grid gap-1" data-dependency={id}>
+        <li className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 wrap-anywhere" data-dependency={id}>
             <span className="font-medium" data-dependency-owner>
                 {owner}
             </span>

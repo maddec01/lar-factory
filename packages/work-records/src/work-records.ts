@@ -4,6 +4,8 @@
 
 import {
     readTicketSpec,
+    parseDecisionMethod,
+    type Item,
     stripTrackerStructure,
     STATUSES,
     type NeedsYouCause,
@@ -276,6 +278,8 @@ export interface WorkRecord {
     /** The repository the work belongs to, as the board names it: `owner/name`. */
     repository: string;
     kind: WorkKind;
+    /** Saved independently of the decision body after its initial method header is imported. */
+    decisionMethod?: Item['decisionMethod'];
     status: Status;
     /** A Queued record's place in its repository's Queue; null in every other Status. */
     queueOrder: number | null;
@@ -402,7 +406,12 @@ export interface WorkRecords
     update(
         workId: string,
         revision: number,
-        change: { status?: Status; kind?: WorkKind; agreedTicketKind?: WorkKind },
+        change: {
+            status?: Status;
+            kind?: WorkKind;
+            agreedTicketKind?: WorkKind;
+            decisionMethod?: Item['decisionMethod'];
+        },
     ): WorkRecord;
     /** Records the user's answer about the record's kind and `ticketKind`, as they are now. */
     recordKindAnswer(workId: string, revision: number, answer: Pick<KindAnswer, 'answer' | 'ticketKind'>): WorkRecord;
@@ -556,6 +565,7 @@ interface Row {
     initial_context: string;
     repository: string;
     kind: WorkKind;
+    decision_method: Exclude<Item['decisionMethod'], undefined>;
     status: Status;
     queue_order: number | null;
     ticket: string | null;
@@ -583,6 +593,7 @@ const fromRow = (row: Row): WorkRecord => ({
     title: row.title,
     repository: row.repository,
     kind: row.kind,
+    decisionMethod: row.decision_method,
     status: row.status,
     queueOrder: row.queue_order,
     ticket: row.ticket,
@@ -830,6 +841,13 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex')
                 : '';
 
+        // Import the legacy header only on the first decision-body write. Later prose never changes the saved choice.
+        if (body === 'decision' && !bodyText.get(workId, body))
+            db.prepare('UPDATE work_records SET decision_method = coalesce(decision_method, ?) WHERE work_id = ?').run(
+                parseDecisionMethod(markdown) ?? null,
+                workId,
+            );
+
         writeBodyRow.run(workId, body, markdown, Number(Boolean(markdown.trim())), workId, digest);
     };
     const bodyWrittenRow = db.prepare('SELECT written FROM bodies WHERE work_id = ? AND body = ?');
@@ -957,7 +975,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     };
 
     const updateRow =
-        db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
+        db.prepare(`UPDATE work_records SET kind = ?, decision_method = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
     pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, needs_you_causes = ?, skills = ?, finished_at = ?, agreed_ticket_kind = ?, kind_answer = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
     /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
      * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
@@ -985,6 +1003,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             const next = {
                 ...row,
+                decision_method: find(workId).decision_method,
                 ...patch,
                 revision: row.revision + 1,
                 updated_at: patch.updated_at ?? new Date().toISOString(),
@@ -992,6 +1011,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             updateRow.run(
                 next.kind,
+                next.decision_method,
                 next.status,
                 next.queue_order,
                 next.ticket,
@@ -1365,17 +1385,25 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     ]) as unknown as Row[]
                 ).map(fromRow),
             ),
-        update: (workId, revision, { status, kind, agreedTicketKind }) => {
+        update: (workId, revision, { status, kind, agreedTicketKind, decisionMethod }) => {
             const nextStatus = status === undefined ? undefined : checkStatus(status);
             const nextKind = kind === undefined ? undefined : checkKind(kind);
+            const method =
+                decisionMethod == null
+                    ? decisionMethod
+                    : checkOneOf(['grill', 'prototype', 'research', 'task'], decisionMethod, 'decision method');
             const agreed = agreedTicketKind === undefined ? undefined : checkKind(agreedTicketKind);
 
             return change(workId, revision, (row) => {
+                if (method !== undefined && (nextKind ?? row.kind) !== 'decision')
+                    throw invalid('Only a decision holds a method.');
+
                 // A Status the record already has writes nothing, so an agent's later call is harmless.
                 if (
                     (nextStatus ?? row.status) === row.status &&
                     (nextKind ?? row.kind) === row.kind &&
-                    (agreed ?? row.agreed_ticket_kind) === row.agreed_ticket_kind
+                    (agreed ?? row.agreed_ticket_kind) === row.agreed_ticket_kind &&
+                    (method === undefined || method === row.decision_method)
                 )
                     return null;
 
@@ -1404,6 +1432,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 const moved = nextStatus ?? row.status;
 
                 return {
+                    decision_method: method === undefined ? row.decision_method : method,
                     status: moved,
                     kind: nextKind ?? row.kind,
                     queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),

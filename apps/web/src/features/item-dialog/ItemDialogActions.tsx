@@ -3,6 +3,7 @@
 
 import {
     canResumeShaping,
+    decisionType,
     canRetryBuild,
     currentBuildThread,
     itemActivityThread,
@@ -54,7 +55,14 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
             if (hasLiveThread(item)) return LATEST_THREAD;
 
             return {
-                control: <StartOrAfter item={item} data={data} label="Shape" linkedBeside={linkedBeside} />,
+                control: (
+                    <StartOrAfter
+                        item={item}
+                        data={data}
+                        label={item.kind === 'decision' ? `Start ${decisionType(item) ?? 'decision'}` : 'Shape'}
+                        linkedBeside={linkedBeside}
+                    />
+                ),
             };
         case 'Ready':
             return hasLiveThread(item)
@@ -64,7 +72,16 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
             return canResumeShaping(item)
                 ? {
                       control: (
-                          <StartOrAfter item={item} data={data} label="Resume shaping" linkedBeside={linkedBeside} />
+                          <StartOrAfter
+                              item={item}
+                              data={data}
+                              label={
+                                  item.kind === 'decision'
+                                      ? `Resume ${decisionType(item) ?? 'decision'}`
+                                      : 'Resume shaping'
+                              }
+                              linkedBeside={linkedBeside}
+                          />
                       ),
                   }
                 : LATEST_THREAD;

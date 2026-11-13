@@ -7,6 +7,7 @@ import { agentWrites } from './agent-writes.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
+import { installWriteJournal } from './write-journal.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
@@ -218,7 +219,7 @@ it('refuses history from before an upgrade and permits writes from its known bas
     dirs.push(dir);
 
     const path = join(dir, 'work-records.db');
-    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, MIGRATIONS.indexOf(installWriteJournal)) });
 
     old.db
         .prepare(

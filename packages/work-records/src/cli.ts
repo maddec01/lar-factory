@@ -4,7 +4,7 @@
 // and each error as one line on stderr.
 
 import { sameRepo } from '@lar-factory/shared';
-import type { Status, SwapKind } from '@lar-factory/shared';
+import type { Item, Status, SwapKind } from '@lar-factory/shared';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -148,6 +148,7 @@ Changes
                                     none does. Repeating it never makes a second one
                                     and never changes the title or initial context.
   update <work-id> --revision N [--status S] [--kind K]
+                                    [--decision-method grill|prototype|research|task|none]
                                     Changes the record alone. --kind writes nothing to
                                     the ticket; change-kind does.
   change-kind <work-id> --revision N --kind bug|feature|improvement
@@ -520,6 +521,7 @@ const OPTIONS = {
     title: { type: 'string' },
     repository: { type: 'string' },
     kind: { type: 'string' },
+    'decision-method': { type: 'string' },
     status: { type: 'string' },
     ticket: { type: 'string' },
     revision: { type: 'string' },
@@ -761,7 +763,18 @@ async function run(
         case 'list':
             return records.list({ repository: values.repository, status, kind });
         case 'update':
-            return records.update(workId!, revision(), { status, kind });
+            return records.update(workId!, revision(), {
+                status,
+                kind,
+                ...(values['decision-method'] !== undefined
+                    ? {
+                          decisionMethod:
+                              values['decision-method'] === 'none'
+                                  ? null
+                                  : (values['decision-method'] as Item['decisionMethod']),
+                      }
+                    : {}),
+            });
         case 'kind-disagreement': {
             const record = records.read(workId!);
 

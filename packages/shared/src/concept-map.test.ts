@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { parseConceptMap } from './concept-map.ts';
+import { conceptMapProse, parseConceptMap } from './concept-map.ts';
 
 const BODY = `## Destination
 Stop watching on one device and resume on another
@@ -35,6 +35,7 @@ test('a map body parses into its destination, decisions, fog and end-to-end chec
         destination: 'Stop watching on one device and resume on another at the same second.',
         decisions: ['Positions are stored per profile (#181).', 'Apps poll on foreground.'],
         fog: ['Does the relay carry the stream too?'],
+        boundaries: ['Offline downloads'],
         check: {
             title: 'Pause on iPhone, resume on Apple TV',
             steps: [
@@ -84,14 +85,22 @@ test('a bullet that only says none is no fog and no decision', () => {
     assert.deepEqual(parseConceptMap('## Fog\n- None of the apps poll yet\n').fog, ['None of the apps poll yet']);
 });
 
-test("the Map's bullets outside its flowchart are the unmet Dependencies holding the concept's builds", () => {
+test('Map prose and stale diagrams cannot create Dependencies or graph facts', () => {
     const body =
-        '## Map\n```mermaid\nflowchart\n- not a Dependency\nb1[Resume] --> dep1{{Relay API}}\n```\n- A resume endpoint, from team/relay, blocks Resume\n* none\n\n## Fog\n- Two\n';
+        '## Map\n```mermaid\nflowchart\n- not a Dependency\nb1[Resume] --> dep1{{Relay API}}\n```\n- A resume endpoint, from team/relay, blocks Resume\n* No external Dependencies are recorded.\n* #12 depends on #13; #12 is to shape.\n\n## Fog\n- Two\n';
 
     assert.deepEqual(parseConceptMap(body), {
         destination: '',
         decisions: [],
         fog: ['Two'],
-        dependencies: ['A resume endpoint, from team/relay, blocks Resume'],
     });
+});
+
+test('map prose shows only destination, choices and boundaries, leaving legacy graph and status lists out', () => {
+    const prose = conceptMapProse(BODY + '\n## Map\n- #181 is to shape\n- #182 waits for #181\n');
+
+    assert.match(prose, /## Destination/);
+    assert.match(prose, /## Decisions so far/);
+    assert.match(prose, /## Out of scope/);
+    assert.doesNotMatch(prose, /to shape|waits for|## Map|## Fog|End-to-end check|Original issue/);
 });

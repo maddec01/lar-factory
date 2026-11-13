@@ -1,8 +1,8 @@
 // The work map's layout: which lane and column each part takes, the arrows between them with the history group in
 // place of each finished part, and each arrow's line.
 
-import type { BoardData } from '@lar-factory/shared';
-import { itemName, needsAnswer, plural, repoKey } from '@lar-factory/shared';
+import type { BoardData, WorkMapPrerequisite } from '@lar-factory/shared';
+import { itemName, needsAnswer, plural, projectWorkMap, repoKey } from '@lar-factory/shared';
 
 import type { Part } from './DossierParts';
 import { DECISION_KINDS, isHistory, partActivity, partWaves, upstreamOf } from './DossierParts';
@@ -12,6 +12,7 @@ import { MAP_NODE_HEIGHT } from '@/ui/board';
 
 const DECISIONS = 'Decisions';
 const CHECK = 'e2e';
+const PREREQUISITES = 'Prerequisites';
 const HISTORY = 'history';
 /** A part's work ID, which ticketless parts have too. */
 const keyOf = (p: Part) => p.item.id;
@@ -27,11 +28,12 @@ const MAX_COL = 340;
 const GROUP_H = 36;
 const GROUP_PAD = 8;
 
-export { DECISIONS, GAP, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H };
+export { DECISIONS, GAP, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H, PREREQUISITES };
 
 export interface Placed {
     key: string;
     part: Part | null;
+    prerequisite?: WorkMapPrerequisite;
     col: number;
     x: number;
     y: number;
@@ -41,6 +43,7 @@ interface Edge {
     to: string;
     label?: string;
     names?: string;
+    kind?: 'blocker' | 'dependency';
 }
 
 /** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
@@ -58,41 +61,55 @@ function urgency(p: Part): number {
 function edgesOf(parts: Part[], check: boolean): Edge[] {
     const ups = upstreamOf(parts);
     const shownKey = (p: Part) => (isHistory(p) ? HISTORY : keyOf(p));
-    const pairs = parts.flatMap((p) =>
-        ups(p).map((u) => ({ from: shownKey(u), to: shownKey(p), via: isHistory(u) ? u : p })),
-    );
+    const graph = projectWorkMap(parts.map((p) => p.item));
+    const byId = new Map(parts.map((p) => [p.item.id, p]));
+    const pairs = graph.edges.map((edge) => ({
+        from: byId.has(edge.from) ? shownKey(byId.get(edge.from)!) : edge.from,
+        to: shownKey(byId.get(edge.to)!),
+        kind: edge.kind,
+        via: byId.get(edge.from) && isHistory(byId.get(edge.from)!) ? byId.get(edge.from)! : byId.get(edge.to)!,
+    }));
 
     if (check) {
         // The check waits on every build; arrows come only from the last ones, the rest it waits on through them.
         const sinks = parts.filter((p) => !parts.some((u) => ups(u).includes(p)));
         const ends = sinks.filter((p) => p.kind === 'build');
 
-        pairs.push(...(ends.length ? ends : sinks).map((p) => ({ from: shownKey(p), to: CHECK, via: p })));
+        pairs.push(
+            ...(ends.length ? ends : sinks).map((p) => ({
+                from: shownKey(p),
+                to: CHECK,
+                kind: 'blocker' as const,
+                via: p,
+            })),
+        );
     }
 
-    const edges = new Map<string, { from: string; to: string; via: Set<Part> }>();
+    const edges = new Map<string, { from: string; to: string; kind: 'blocker' | 'dependency'; via: Set<Part> }>();
 
-    for (const { from, to, via } of pairs) {
+    for (const { from, to, via, kind } of pairs) {
         if (from === HISTORY && to === HISTORY) continue;
 
-        const edge = edges.get(`${from} ${to}`) ?? { from, to, via: new Set<Part>() };
+        const edge = edges.get(`${from} ${to}`) ?? { from, to, kind, via: new Set<Part>() };
 
         edge.via.add(via);
         edges.set(`${from} ${to}`, edge);
     }
 
-    return [...edges.values()].map(({ from, to, via }) => {
+    return [...edges.values()].map(({ from, to, via, kind }) => {
         const names = [...via].map((p) => itemName(p.item)).join(', ');
 
-        if (from === HISTORY) return { from, to, label: plural(via.size, 'completed prerequisite'), names };
+        if (from === HISTORY) return { from, to, kind, label: plural(via.size, 'completed prerequisite'), names };
 
         return to === HISTORY
-            ? { from, to, label: `before ${plural(via.size, 'completed part')}`, names }
-            : { from, to };
+            ? { from, to, kind, label: `before ${plural(via.size, 'completed part')}`, names }
+            : { from, to, kind };
     });
 }
 
 export function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
+    const graph = projectWorkMap(parts.map((p) => p.item));
+    const offset = graph.prerequisites.length ? 1 : 0;
     const current = parts.filter((p) => !isHistory(p));
     const depth = partWaves(current);
     const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
@@ -101,17 +118,32 @@ export function layout(parts: Part[], data: BoardData, width: number, check: boo
     const lanes = [...new Set(named)]
         .filter((l) => current.some((p) => laneOf(p) === l))
         .sort((a, b) => first(a) - first(b));
-    const cols = Math.max(1, Math.max(-1, ...depth.values()) + 1 + (check ? 1 : 0));
+    const cols = Math.max(1, Math.max(-1, ...depth.values()) + 1 + offset + (check ? 1 : 0));
     const colW = Math.min(MAX_COL, Math.max(MIN_COL, Math.floor((width - LABEL_W) / cols)));
     const nodeW = colW - 28;
     const placed: Placed[] = [];
     const bands: { lane: string; top: number; height: number }[] = [];
     let top = 0;
 
+    if (offset) {
+        graph.prerequisites.forEach((prerequisite, row) =>
+            placed.push({
+                key: prerequisite.id,
+                part: null,
+                prerequisite,
+                col: 0,
+                x: LABEL_W + 14,
+                y: PAD + row * (NODE_H + GAP),
+            }),
+        );
+        top = PAD * 2 + graph.prerequisites.length * NODE_H + (graph.prerequisites.length - 1) * GAP;
+        bands.push({ lane: PREREQUISITES, top: 0, height: top });
+    }
+
     lanes.forEach((lane) => {
         const here = current.filter((p) => laneOf(p) === lane);
         const inCol = (c: number) =>
-            here.filter((p) => depth.get(keyOf(p)) === c).sort((a, b) => urgency(a) - urgency(b));
+            here.filter((p) => depth.get(keyOf(p))! + offset === c).sort((a, b) => urgency(a) - urgency(b));
         const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
 
         for (let c = 0; c < cols; c++) {

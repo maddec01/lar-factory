@@ -68,7 +68,7 @@ export function AttentionEntry({
     return (
         <div className="hover:bg-fill-hover flex min-h-9 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-2 py-1.5">
             <span className="min-w-0 flex-1 basis-64">{main}</span>
-            {side && <span className="text-fg-muted ml-auto shrink-0 text-xs">{side}</span>}
+            {side && <span className="text-fg-muted ml-auto max-w-full min-w-0 text-xs wrap-anywhere">{side}</span>}
         </div>
     );
 }

@@ -16,7 +16,11 @@ export function WorkMapFrame({
     children: ReactNode;
 }) {
     return (
-        <div ref={frameRef} className="border-line bg-surface-page overflow-x-auto rounded-lg border" data-work-map>
+        <div
+            ref={frameRef}
+            className="border-line bg-surface-page @container overflow-x-auto rounded-lg border"
+            data-work-map
+        >
             {children}
         </div>
     );
@@ -71,7 +75,7 @@ export function MapBand({
             style={{ top, height, width }}
         >
             <div
-                className="bg-surface-page/85 sticky left-0 flex h-full flex-col justify-center gap-0.5 px-3"
+                className="bg-surface-page/85 flex h-full flex-none flex-col justify-center gap-0.5 px-3"
                 style={{ width: labelWidth }}
             >
                 <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">{children}</span>
@@ -104,6 +108,7 @@ export function MapLaneName({
  *  while either end is hovered, and `dim` faint while another is. */
 export interface MapEdge {
     key: string;
+    kind?: 'blocker' | 'dependency' | undefined;
     d: string;
     done: boolean;
     lit: boolean;
@@ -153,9 +158,10 @@ export function MapEdges({
                     d={e.d}
                     fill="none"
                     data-edge={e.key}
+                    data-edge-kind={e.kind}
                     stroke={e.done ? 'var(--color-board-done)' : 'var(--color-fg-muted)'}
                     strokeWidth={e.lit ? 2.5 : 1.5}
-                    strokeDasharray={e.done ? undefined : '5 4'}
+                    strokeDasharray={e.kind === 'dependency' ? '2 4' : e.done ? undefined : '5 4'}
                     opacity={e.dim ? 0.2 : e.done ? 0.7 : 0.9}
                     markerEnd={`url(#${markerId}-${e.done ? 'done' : 'open'})`}
                 />
@@ -241,4 +247,4 @@ export function MapNode({
 }
 
 export { MapHistoryGroup, MapHistoryList, HistoryRow } from './WorkMapHistory';
-export { MAP_NODE_HEIGHT, MapPartNode, MapCheckNode } from './WorkMapNodes';
+export { MAP_NODE_HEIGHT, MapPartNode, MapCheckNode, MapPrerequisiteNode } from './WorkMapNodes';

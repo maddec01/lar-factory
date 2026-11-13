@@ -2,7 +2,7 @@
 // record's brief, with its build phase, review rounds and the initial context it began with, folded. Export markdown
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
 
-import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
+import { conceptMapProse, parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
 import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
@@ -69,9 +69,11 @@ export function RecordText({ item, record, spec = false }: { spec?: boolean; ite
     const [exported, setExported] = useState<Exported>({ state: 'idle' });
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
-        record.bodyKind === 'decision' && record.body && parseDecisionMethod(record.body)
-            ? record.body.split('\n').slice(1).join('\n').trimStart()
-            : record.body;
+        record.bodyKind === 'map'
+            ? conceptMapProse(record.body ?? '')
+            : record.bodyKind === 'decision' && record.body && parseDecisionMethod(record.body)
+              ? record.body.split('\n').slice(1).join('\n').trimStart()
+              : record.body;
     const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
 
     return (

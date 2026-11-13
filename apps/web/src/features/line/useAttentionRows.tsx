@@ -27,10 +27,6 @@ export function useAttentionRows(
     const unfinished = parts.filter((p) => !isDone(p.item));
     const ahead = only ? [] : unfinished;
     const holds = unfinished.flatMap((part) => dependenciesOf(part.item).map((hold) => ({ part, hold })));
-    // A map's line naming a Dependency the records hold says less than the record, so it goes.
-    const written = (parent.map?.dependencies ?? []).filter(
-        (d) => !holds.some(({ hold }) => hold.need && d.toLowerCase().includes(hold.need.toLowerCase())),
-    );
     const blocked = ahead.flatMap((part) =>
         part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })),
     );
@@ -157,39 +153,27 @@ export function useAttentionRows(
             key: 'dependencies',
             label: 'Dependencies',
             tone: 'blocked' as const,
-            entries: [
-                ...holds.map(({ part, hold }) => (
-                    <Entry
-                        key={`${part.item.id} ${hold.dependencyId}`}
-                        main={
-                            <AttentionMark
-                                mark={hold.met ? 'met' : 'blocked'}
-                                data-dependency-state={hold.met ? 'met' : 'unmet'}
-                            >
-                                {hold.owner}: {hold.need}
-                            </AttentionMark>
-                        }
-                        side={
-                            <>
-                                {hold.met ? 'met' : 'not met'} · holds{' '}
-                                <RefButton title={part.item.title} onOpen={() => open(part.item)}>
-                                    {ref(part.item)}
-                                </RefButton>
-                            </>
-                        }
-                    />
-                )),
-                ...written.map((d) => (
-                    <Entry
-                        key={d}
-                        main={
-                            <AttentionMark mark="blocked">
-                                <Refs text={d} find={find} />
-                            </AttentionMark>
-                        }
-                    />
-                )),
-            ],
+            entries: holds.map(({ part, hold }) => (
+                <Entry
+                    key={`${part.item.id} ${hold.dependencyId}`}
+                    main={
+                        <AttentionMark
+                            mark={hold.met ? 'met' : 'blocked'}
+                            data-dependency-state={hold.met ? 'met' : 'unmet'}
+                        >
+                            {hold.owner}: {hold.need}
+                        </AttentionMark>
+                    }
+                    side={
+                        <>
+                            {hold.met ? 'met' : 'not met'} · holds{' '}
+                            <RefButton title={part.item.title} onOpen={() => open(part.item)}>
+                                {ref(part.item)}
+                            </RefButton>
+                        </>
+                    }
+                />
+            )),
         },
         {
             key: 'fog',

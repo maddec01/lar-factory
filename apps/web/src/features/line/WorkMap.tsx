@@ -9,7 +9,18 @@ import { useId, useState } from 'react';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
 import type { Part } from './DossierParts';
 import { useWidth } from './useWidth';
-import { DECISIONS, GAP, GROUP_H, HISTORY, LABEL_W, edgeLine, historyText, keyOf, layout } from './WorkMapLayout';
+import {
+    DECISIONS,
+    GAP,
+    GROUP_H,
+    HISTORY,
+    LABEL_W,
+    PREREQUISITES,
+    edgeLine,
+    historyText,
+    keyOf,
+    layout,
+} from './WorkMapLayout';
 import { CheckNode, HistoryRow, PartNode, RepoIdentity } from './WorkMapParts';
 import { StatusGlyph } from '@/features/items';
 import {
@@ -21,6 +32,7 @@ import {
     MapHistoryList,
     MapLaneName,
     MapNode,
+    MapPrerequisiteNode,
     WorkMapFrame,
 } from '@/ui/board';
 
@@ -62,7 +74,9 @@ export function WorkMap({
             <MapCanvas width={m.width} height={m.height}>
                 {m.bands.map((b, n) => (
                     <MapBand key={b.lane} index={n} top={b.top} height={b.height} width={m.width} labelWidth={LABEL_W}>
-                        {b.lane === DECISIONS ? (
+                        {b.lane === PREREQUISITES ? (
+                            <MapLaneName lane="decisions">Prerequisites</MapLaneName>
+                        ) : b.lane === DECISIONS ? (
                             <MapLaneName lane="decisions">{DECISIONS}</MapLaneName>
                         ) : b.lane === home ? (
                             <MapLaneName lane="builds">Builds</MapLaneName>
@@ -88,7 +102,11 @@ export function WorkMap({
                             {
                                 key: `${e.from} ${e.to}`,
                                 d,
-                                done: e.from === HISTORY || (!!a?.part && isDone(a.part.item)),
+                                kind: e.kind,
+                                done:
+                                    e.from === HISTORY ||
+                                    (!!a?.part && isDone(a.part.item)) ||
+                                    a?.prerequisite?.blocker.state === 'closed',
                                 lit,
                                 dim: !!hover && !lit,
                             },
@@ -130,7 +148,9 @@ export function WorkMap({
                         dim={!near(p.key)}
                         onHover={(on) => setHover(on ? p.key : null)}
                     >
-                        {p.part ? (
+                        {p.prerequisite ? (
+                            <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} />
+                        ) : p.part ? (
                             <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
                         ) : (
                             check && <CheckNode check={check} width={m.nodeW} after={builds} />
@@ -153,7 +173,7 @@ export function WorkMap({
                 )}
             </MapCanvas>
             {showHistory && (
-                <MapHistoryList width={m.width}>
+                <MapHistoryList>
                     {history.map((p) => (
                         <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} home={home} />
                     ))}

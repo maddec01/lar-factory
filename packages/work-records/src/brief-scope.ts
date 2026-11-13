@@ -1,9 +1,13 @@
+import { isRepo } from '@lar-factory/shared/repository-settings';
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError } from './database.ts';
 
 /** Only stated constraints; empty lists and null size mean unspecified. */
 export interface BriefScope {
+    /** Absent on legacy confirmations; structure choice requires both fields. */
+    repositories?: string[];
+    openDecisions?: string[];
     files: string[];
     tests: string[];
     behaviour: string[];
@@ -44,7 +48,16 @@ const line = (value: unknown): string => {
 };
 
 export function parseBriefScope(value: unknown): BriefScope {
-    const input = object(value, ['files', 'tests', 'behaviour', 'excluded', 'size', 'verify']);
+    const hasStructure = !!value && typeof value === 'object' && ('repositories' in value || 'openDecisions' in value);
+    const input = object(value, [
+        'files',
+        'tests',
+        'behaviour',
+        'excluded',
+        'size',
+        'verify',
+        ...(hasStructure ? ['repositories', 'openDecisions'] : []),
+    ]);
     const list = (key: string): string[] => {
         const entries = input[key];
 
@@ -74,6 +87,18 @@ export function parseBriefScope(value: unknown): BriefScope {
         size: input.size as BriefScope['size'],
         verify: { required: verify.required as boolean, visibleUi },
     };
+
+    if (hasStructure) {
+        scope.repositories = list('repositories');
+        scope.openDecisions = list('openDecisions');
+
+        if (
+            !scope.repositories.length ||
+            !scope.repositories.every(isRepo) ||
+            new Set(scope.repositories.map((repo) => repo.toLowerCase())).size !== scope.repositories.length
+        )
+            invalid();
+    }
 
     if (!scope.behaviour.length) invalid();
 

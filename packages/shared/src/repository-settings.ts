@@ -21,6 +21,8 @@ import {
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { join } from 'node:path';
 
+export { isRepo } from './repository-list.ts';
+
 import { connectedTo, isItemSource, readListFile, writeListFile } from './repository-list.ts';
 
 /** One repository's local settings as its list entry keeps them. */

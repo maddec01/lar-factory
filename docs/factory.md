@@ -370,6 +370,15 @@ text; the target requires a current gate for the exact snapshot launched.
 
 ### Create and reconcile parts
 
+`lar-work choose-structure ID` reads the confirmed scope's `repositories` and
+`openDecisions` and returns the structure with its reason. Several repositories
+with open product decisions the item does not settle become a Concept, with
+those decisions as parts. Settled scope across several repositories becomes
+linked work, with one parent, one build per repository and blockers by dependency.
+One repository keeps a single flow. Legacy scope without those fields needs an
+explicit confirmed amendment before the command can choose.
+Release and activation steps belong on the parent as release steps.
+
 A concept starts when size-up identifies investigation too large or uncertain
 for one session, or Pedro captures a concept directly. The concept owner reads
 its destination, boundaries, open questions and all child records. It saves

@@ -9,7 +9,7 @@ A repository the board works with, as a person sees it on the board and in Setti
 _Avoid_: repository as the visible name for this. Use repository only for the real GitHub or Azure repository.
 
 **Concept**:
-A workspace for understanding an outcome through questions, evidence, decisions and proposed work. Its refinement can finish before its delivery.
+A workspace for understanding an outcome through questions, evidence, decisions and proposed work. Its refinement can finish before its delivery. Work across several repositories with open product decisions becomes a Concept, with decisions as parts. `lar-work choose-structure` reads the confirmed scope and makes that choice.
 _Avoid_: delivery ticket as a synonym for concept.
 
 **Single-flow issue**:
@@ -17,7 +17,7 @@ Work that moves through Queue, Shaping, Ready to build and Build. Its private sl
 _Avoid_: treating a sliced build as linked work.
 
 **Concepts and linked work**:
-The board section for concepts, linked-work parents and their parts at every stage, including queued concepts with no parts. Human waits also appear on Your desk. A part whose parent is off-board remains reachable here; completed parts remain in their group's history.
+Settled scope across several repositories uses one parent and one build per repository, with blockers by dependency. Release and activation steps stay on the parent. The board section for concepts, linked-work parents and their parts at every stage, including queued concepts with no parts. Human waits also appear on Your desk. A part whose parent is off-board remains reachable here; completed parts remain in their group's history.
 _Avoid_: moving grouped parts into single-issue stages.
 
 **Refinement**:

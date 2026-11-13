@@ -55,7 +55,8 @@ it opens directly. It works from any folder, with or without the board app.
 Confirmed scope, local only
   confirm-scope <work-id> --revision N --file F --identity person --evidence response
                                     Save the scope shown at understanding confirmation:
-                                    {files:[],tests:[],behaviour:[],excluded:[],
+                                    {repositories:["owner/repo"],openDecisions:[],
+                                     files:[],tests:[],behaviour:[],excluded:[],
                                      size:"Small"|"Larger"|null,
                                      verify:{required:boolean,visibleUi:string|null}}.
                                     Verify only for visible UI behaviour a person must check.
@@ -63,6 +64,8 @@ Confirmed scope, local only
   confirmed-scope <work-id> [--markdown]
                                     Read the confirmation, or render the brief's authoritative
                                     Done when, Scope and Verify sections without re-deriving them.
+  choose-structure <work-id>       Read confirmed repositories/openDecisions; return single,
+                                    linked or concept with its reason. Missing fields refuse.
   brief-scope-check <work-id>       Compare those sections; report missing/extra claims, exit 1
                                     on mismatch or absent confirmation. Other prose needs Doubt.
 
@@ -1094,7 +1097,7 @@ async function main(args: string[]): Promise<number> {
     if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
         return verificationCommand(args[0]!, args.slice(1));
 
-    if (['confirm-scope', 'confirmed-scope', 'brief-scope-check'].includes(args[0]!))
+    if (['confirm-scope', 'confirmed-scope', 'brief-scope-check', 'choose-structure'].includes(args[0]!))
         return scopeCommand(args[0]!, args.slice(1));
 
     if (args[0] === 'heavy') return heavyCommand(args);

@@ -2,57 +2,43 @@ Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
 
 # Prototype
 
-Input: one look, interaction or state question. Output: variant references and user pick saved in Confirmed/answer with the branch in builder notes.
+Answer one question with throwaway code. Logic/state/data questions use
+[Logic prototype](prototype-logic.md), a single HTML demo. Appearance/interaction
+questions use [UI prototype](prototype-ui.md), two or three structural variants.
+Resolve ambiguity from the prompt/code or ask; if the user is absent, choose the
+closest branch and state the assumption at the top of the prototype.
 
-A prototype is **throwaway code that answers a question**. The question decides the shape.
+Keep clearly named prototype code near its intended module/page, following
+existing routing conventions. Make it run with one project-task command or an
+HTML file. Use memory only, except persistence questions may use a clearly
+marked disposable database/file. Add no tests, abstractions or error handling
+beyond what makes it runnable. Show full relevant state after each action or
+variant switch. Commit all artifacts on `prototype/<slug>`, leaving product
+code unchanged. The owner records the pick in Confirmed/answer and the branch
+in builder notes; later Build implements it properly.
 
-## Pick a branch
+Run no project-wide tests, typecheck, lint or unused-code check, even if project
+change instructions ask for them. Build only what startup needs. Drive every
+variant/walkthrough and the interaction being studied once. Fix failures or
+report them. Follow orchestration's heavy-command rules.
 
-Identify which question is being answered, using the user's prompt, the surrounding code, or by asking if the user is around:
-
-- **"Does this logic / state model feel right?"** → [prototype-logic.md](prototype-logic.md). Build a single shareable HTML file (free-play buttons plus tabbed guided walkthroughs) that pushes the state machine through cases that are hard to reason about on paper, and that a non-developer can drive.
-- **"What should this look like?"** → [prototype-ui.md](prototype-ui.md). Generate several radically different UI variations on a single route, switchable via a URL search param and a floating bottom bar.
-
-The two branches produce very different artifacts, so getting this wrong wastes the whole prototype. If the question is genuinely ambiguous and the user isn't reachable, default to whichever branch better matches the surrounding code (a backend module → logic; a page or component → UI) and state the assumption at the top of the prototype.
-
-## Rules that apply to both
-
-1. **Throwaway from day one, and clearly marked as such.** Locate the prototype code close to where it will actually be used (next to the module or page it's prototyping for) so context is obvious, but name it so a casual reader can see it's a prototype, not production. For throwaway UI routes, obey whatever routing convention the project already uses; don't invent a new top-level structure.
-2. **Trivial to run.** A UI prototype starts from one command in the project's task runner: `pnpm <name>`, `python <path>`, `bun <path>`, etc. A logic demo is a single HTML file shown inside T3. Either way, no thinking required to start it.
-3. **No persistence by default.** State lives in memory. Persistence is the thing the prototype is _checking_, not something it should depend on. If the question explicitly involves a database, hit a scratch DB or a local file with a clear "PROTOTYPE, wipe me" name.
-4. **Skip the polish.** No tests, no error handling beyond what makes the prototype _runnable_, no abstractions. The point is to learn something fast.
-5. **Surface the state.** After every action (logic) or on every variant switch (UI), print or render the full relevant state so the user can see what changed.
-6. **Capture it when done.** Record the validated decision without implementing the product change. Capture the prototype itself as a **primary source**: commit it to a `prototype/<slug>` branch, out of main, and leave a context pointer to that branch in the work record's brief or decision answer. Capture the answer too (the verdict and the question it settled) in the work record or a commit. Shaping leaves the main branch unchanged.
-
-## Run the prototype
-
-Run no project-wide typecheck, lint, unused-code check or test suite, even when
-project instructions ask for them on changes. Build only what starting the
-prototype needs. Then drive the interaction its question depends on, including
-every variant or walkthrough once. Fix what fails or name it in your report.
-Run each heavy command (a whole test suite, a production build, a performance
-measurement, or anything expected to take over about a minute) on its own as
-`lar-work heavy -- <command>`, in the foreground with your tool's longest
-timeout.
+The child returns worktree, branch, preferred port, each variant's command or
+HTML path and short description, leaving no server running. Screenshots stay
+in the child's context. The owner presents variants and asks for the pick.
 
 ## Show the variants inside T3
 
-The Prototype child returns each variant's start command or HTML path, worktree path, branch, preferred port and short description. Keep screenshots in the child's context. The shaping or decision thread shows every variant inside T3; never hand the user a path, URL or command or open anything outside T3.
+Show every variant inside T3, never just give the user a path/URL/command or open
+an external viewer. Follow T3's current preview/device instructions.
+Run from the child's worktree. For a needed server, choose a free port using
+`lsof -ti tcp:<port> -sTCP:LISTEN`, bind `127.0.0.1` and record the listening PID.
+Use `preview_open` for HTTP(S), never `file://`. If the preview tools require
+serving HTML, serve only its folder with `python3 -m http.server --bind
+127.0.0.1 --directory <dir> <port>`.
 
-- Run the variants from the child task's worktree. Start each server on a
-  port where `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing, bound to
-  `127.0.0.1`, and note the PID that holds the port, not a launcher's.
-- Web and HTML: open the URL with `preview_open` (absolute http(s) URL, never
-  `file://`). Serve a static HTML file's folder with
-  `python3 -m http.server --bind 127.0.0.1 --directory <dir> <port>`.
-- Native iOS or Android: run the build and install scripts named in the
-  target project's existing instructions or inferred from its scripts and
-  manifests, one variant at a time, then
-  `device_open` (`device_list` finds the device id).
-- Say in chat which variant is showing. For another round, send the request
-  to a Prototype child task.
-- When the user picks, or the thread ends without a pick, stop exactly the
-  noted PIDs. An app left installed on the simulator stays.
-- If `preview_open` or `device_open` is unavailable or fails, stop, tell
-  the user why and ask how to go on per [Questions](shared/questions.md). Never fall
-  back to anything outside T3.
+For iOS/Android, use project build/install scripts or infer them from manifests,
+one variant at a time; use `device_list` and `device_open`. Name the visible
+variant in chat. Delegate another Prototype task for a new round. On a pick or
+thread end, stop only recorded owned PIDs; installed simulator apps may remain.
+If preview/device tools fail or are unavailable, report why and ask through
+[Questions](shared/questions.md), without falling back outside T3.

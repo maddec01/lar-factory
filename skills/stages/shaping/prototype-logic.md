@@ -1,74 +1,37 @@
 Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
 
-# Logic Prototype
+# Logic prototype
 
-Input: isolated logic/state question. Output: HTML variants and branch for the owner to record with the accepted pick.
+Answer one business-logic/state/data-shape question with a self-contained HTML
+file a non-developer can operate. Appearance questions use
+[UI prototype](prototype-ui.md). At the top, visibly state the model and question
+in one paragraph so the user can check the premise.
 
-A single, self-contained HTML file (a **shareable demo**) that lets anyone drive a state model by clicking buttons. Use this when the question is about **business logic, state transitions, or data shape**: the kind of thing that looks reasonable on paper but only feels wrong once you push it through real cases.
+Put the logic in a small pure module in one script block. Choose a reducer for
+discrete events, explicit states/transitions for legal-action questions, pure
+functions for transformations, or a class/module when ongoing state is essential.
+Choose for the question, not UI wiring convenience. The page calls this module;
+the module knows no DOM, document or button handlers. Keep it portable as a
+reference for later Build, with its HTML on the prototype branch.
 
-Use domain language so a non-developer can drive the model inside T3.
+Inline HTML, CSS and JavaScript in one file, without a framework/bundler/server
+application. Serving for T3 preview is allowed. Use domain-language labels and
+plain explanations. Arrange:
+1. Title and one-line explanation of the question.
+2. Full relevant state as labeled fields, not raw JSON, refreshed after each
+   action; highlight what changed when useful.
+3. Always-available free-play buttons for every action, usable in any order.
+4. Tabbed guided scenarios with plain descriptions and ordered action buttons.
+   Each step performs its action and advances; starting resets to a known state.
 
-## When this is the right shape
+Include the happy path, awkward edge cases and an illegal-action attempt. Keep
+clean typography, generous spacing and one accent color, without animations or
+gimmicks. Show walkthroughs/free play inside T3 per
+[Show variants](prototype-question.md#show-the-variants-inside-t3); add requested
+actions/scenarios. Use memory unless persistence is the question. Add no tests,
+generalization or real database dependency.
 
-- "I'm not sure if this state machine handles the edge case where X then Y."
-- "Does this data model actually let me represent the case where..."
-- "I want to feel out what the API should look like before writing it."
-- Anything where someone wants to **press buttons and watch state change**.
-
-If the question is "what should this look like," this is the wrong branch. Use [prototype-ui.md](prototype-ui.md).
-
-## Process
-
-### 1. State the question
-
-Before writing code, write down what state model and what question you're prototyping. One paragraph, at the top of the demo (in a visible intro, not just a comment). A logic prototype that answers the wrong question is pure waste, so make the question explicit so it can be checked later, whether the user is watching now or returning to it AFK.
-
-### 2. Isolate the logic in a portable module
-
-Put the actual logic (the bit that's answering the question) in a single `<script>` block written as a small, pure module that could be lifted out and dropped into the real codebase later. Keep both the module and the page on the prototype branch. A later build may use the model as a reference.
-
-The right shape depends on the question:
-
-- **A pure reducer**: `(state, action) => state`. Good when actions are discrete events and state is a single value.
-- **A state machine**: explicit states and transitions. Good when "which actions are even legal right now" is part of the question.
-- **A small set of pure functions** over a plain data type. Good when there's no implicit current state, just transformations.
-- **A class or module with a clear method surface** when the logic genuinely owns ongoing internal state.
-
-Pick whichever shape best fits the question being asked, *not* whichever is easiest to wire to a page. Keep it pure: no DOM, no `document`, no button handlers reaching inside it. The page calls into it; nothing flows the other direction. The pure module makes the chosen model easy to understand when a later build implements it.
-
-### 3. Build the shareable HTML file
-
-Use one file with inline HTML, CSS and JavaScript. Show it inside T3 per [Show the variants](prototype-question.md#show-the-variants-inside-t3).
-
-Write it for a non-developer. Every label is in **domain language**, not code: buttons and state read like the business, not the reducer. Explain in plain words what's happening.
-
-Lay it out with a clean hierarchy, top to bottom:
-
-1. **Title and one-line explanation** of what this demo lets you explore (the question from step 1).
-2. **Current state**: the full relevant state, rendered as a readable panel (labelled fields, not a raw JSON dump), re-rendered after every click so the change is visible. Where it helps a non-developer follow, call out what just changed.
-3. **Free-play buttons**: one button per action, always available, so anyone can poke at the model in any order. Each click dispatches its action and re-renders the state.
-4. **Guided walkthroughs**: a set of **scenarios**, one per tab. Each tab holds a short plain-language description of the scenario (the situation it sets up and what to watch for) and underneath it, the ordered **buttons to press** for that scenario. Each step is a real button: clicking it performs that action and moves to the next step. Starting a walkthrough resets to a known initial state so the scenario runs the same way every time.
-
-Choose scenarios that demonstrate the awkward cases, the ones hard to reason about on paper: the happy path, a tricky edge case, an attempt at something that should be illegal.
-
-Keep it beautiful but restrained: clean typography, generous spacing, one accent colour. No animations, no gimmicks: nothing that competes with the state and the buttons.
-
-### 4. Hand it over
-
-Show the walkthroughs and free play inside T3. Add requested actions or scenarios.
-
-### 5. Capture the answer and the prototype
-
-Record the answer and its scenarios in the local shaping result. Capture the
-complete HTML file and pure module on the prototype branch per
-[prototype capture](prototype-question.md). Leave product code unchanged.
-A later build implements the chosen model with the project checks and review.
-
-## Anti-patterns
-
-- **Don't add tests.** A prototype that needs tests is no longer a prototype.
-- **Don't wire it to the real database.** Use in-memory state unless the question is specifically about persistence.
-- **Don't generalise.** No "what if we wanted to support X later." The prototype answers one question.
-- **Don't blur the logic and the page together.** If the pure module references the DOM, `document`, or button handlers, it's no longer liftable. Keep the page as a thin shell over a pure module.
-- **Don't reach for a framework, bundler, or server.** Keep the demo in one file; serving it for T3 preview is allowed.
-- **Don't ship the HTML shell into production.** The page is optimised for being clicked through by hand. The logic module behind it is the bit worth keeping.
+The owner records the answer/scenarios and branch in the local shaping result.
+Keep the entire demo/module on that branch; leave product code unchanged. Later
+Build uses the model as a reference with project checks/review, never ships the
+HTML shell directly.

@@ -258,8 +258,7 @@ export class ProjectProtocol {
 
             return result('available');
         } catch {
-            this.invalidateSession(session);
-
+            // A transport failure does not reject a credential shared by other boards.
             return result('unavailable');
         }
     }

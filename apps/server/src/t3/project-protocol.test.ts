@@ -370,3 +370,27 @@ it.each([
 ])('lists a project with the invalid icon %j as having none', async (projectIcon) => {
     expect((await projectsWith({ projectIcon })).projectIcon).toBeNull();
 });
+
+it('keeps a valid session across a temporary network failure', async () => {
+    const session = { token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' };
+    let connected = false;
+    const adapter = new ProjectProtocol(
+        { read: async () => session, write: async () => {} },
+        {
+            issue: async () => {
+                throw new Error('must not renew on network failure');
+            },
+            revoke: async () => {},
+        },
+        async () => {
+            if (!connected) throw new Error('connection refused');
+
+            return Response.json({ projects: [], updatedAt: '2026-11-13' });
+        },
+        '',
+    );
+
+    expect((await adapter.readProjects()).availability).toBe('unavailable');
+    connected = true;
+    expect((await adapter.readProjects()).availability).toBe('available');
+});

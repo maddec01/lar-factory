@@ -15,7 +15,7 @@ import {
 } from '@lar-factory/shared';
 import { Button, DropdownMenu } from '@lar-works/design-system';
 import { ChevronDownIcon } from '@lar-works/design-system/icons';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { writeState } from './ActionAvailability';
@@ -27,7 +27,7 @@ import type { StartKind } from './StartStore';
 import { closeKeepingFocus, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ActionError, StartLine, useButtonKind } from '@/ui/board';
+import { ActionError, StartLine, StartHold, useButtonKind } from '@/ui/board';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
@@ -143,7 +143,7 @@ const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does its
  * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
  * it. While a blocker holds it, Start after takes its place. While only the repository holds it, Start shows
- * disabled, its title giving the hold's reason; an armed start would fail then, so none is offered, but one armed
+ * disabled, with the hold's reason beside it; an armed start would fail then, so none is offered, but one armed
  * before the hold still shows while a blocker is open, so it can be disarmed. Beside text that names the blockers,
  * `namesBlocker` false leaves them out of Start after's label; its accessible name and title keep them.
  */
@@ -164,6 +164,7 @@ export function StartOrAfter({
 }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
+    const reasonId = useId();
 
     if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
 
@@ -171,11 +172,20 @@ export function StartOrAfter({
 
     if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} linkedBeside={linkedBeside} />;
 
-    // Pointer events stay on while it's disabled, so its title says why.
     return (
-        <Button {...kindOf(onRow ? 'start' : 'main')} leftIcon={ICON.play} data-start={item.id} disabled title={hold}>
-            {label}
-        </Button>
+        <>
+            <Button
+                {...kindOf(onRow ? 'start' : 'main')}
+                leftIcon={ICON.play}
+                data-start={item.id}
+                disabled
+                title={hold}
+                aria-describedby={reasonId}
+            >
+                {label}
+            </Button>
+            <StartHold id={reasonId}>{hold}</StartHold>
+        </>
     );
 }
 

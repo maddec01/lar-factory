@@ -18,13 +18,17 @@ export function StartGroup({
 }
 
 /** A sentence on a line of its own in StartGroup, such as "Run finished.". */
-export function StartNote({
-    children,
-}: {
-    /** The sentence, such as "Run finished.". */
-    children: ReactNode;
-}) {
+export function StartNote({ children }: { children: ReactNode }) {
     return <span className="basis-full">{children}</span>;
+}
+
+/** A disabled start's visible, accessible reason; narrow rows give it a separate line. */
+export function StartHold({ id, children }: { id: string; children: ReactNode }) {
+    return (
+        <span id={id} data-start-hold className="basis-full">
+            {children}
+        </span>
+    );
 }
 
 /** The state that takes Start's place, a light and its word: Started, or May have started while it's `unsure`. It takes focus back from a closed

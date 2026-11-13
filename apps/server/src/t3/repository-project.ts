@@ -4,7 +4,7 @@
 // one. The same checkouts tell whether a listed repository is on Azure DevOps, which only
 // then needs az. An Azure DevOps repository is named `organization/project/repository`.
 
-import type { ModelSelection, RepoConfig } from '@lar-factory/shared';
+import type { ModelSelection } from '@lar-factory/shared';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -38,7 +38,7 @@ export async function repositoryProject(
  * project, else why not; and its effective T3 Project default, which one whose project or default can't be read doesn't have.
  */
 export async function repositoryProjectReads(
-    repos: readonly RepoConfig[],
+    repos: readonly { repo: string }[],
     env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ repositoryProjects: Record<string, string | null>; t3Defaults: Record<string, ModelSelection> }> {
     const find = await projectFinder(env);
@@ -135,7 +135,9 @@ async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => 
     try {
         projects = await checkouts(env);
     } catch {
-        return () => ({ error: "Can't read T3 Code's projects; reconnect T3 Code before starting" });
+        return () => ({
+            error: "Can't read T3 Code's projects; the board retries automatically. Open T3 Code or run checks in Diagnostics.",
+        });
     }
 
     return (repo) => {

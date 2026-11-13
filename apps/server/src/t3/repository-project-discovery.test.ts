@@ -133,11 +133,11 @@ test('tells subscribers when project facts or availability change, not when only
     fixture.running.mockReturnValue(true);
     await repositoryProjects();
     fixture.notify(shell('2026-11-03T00:00:04Z', 'logo.png'));
-    expect(changed).toHaveBeenCalledTimes(4);
+    expect(changed).toHaveBeenCalledTimes(5);
 
     stop();
     fixture.notify({ availability: 'malformed' });
-    expect(changed).toHaveBeenCalledTimes(4);
+    expect(changed).toHaveBeenCalledTimes(5);
 });
 
 test('reads with the Keychain session until told to use another', async () => {
@@ -159,4 +159,23 @@ test('reads with the Keychain session until told to use another', async () => {
     setProjectSessions(own);
     await reauthorizeRepositoryProjects();
     expect(fixture.sessions).toHaveBeenLastCalledWith(own);
+});
+
+test('retries a failed read on the same runtime even without a recovering shell', async () => {
+    vi.useFakeTimers();
+
+    try {
+        fixture.read = { availability: 'unavailable' };
+        await reauthorizeRepositoryProjects();
+
+        const previous = (await repositoryProjects()).observation;
+
+        expect((await repositoryProjects()).availability).toBe('unavailable');
+        expect(previous).toBeDefined();
+        fixture.read = { availability: 'available', observation: { projects: [], observedAt: '2026-11-13T00:00:00Z' } };
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(await repositoryProjects()).toEqual(fixture.read);
+    } finally {
+        vi.useRealTimers();
+    }
 });

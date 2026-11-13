@@ -96,12 +96,13 @@ import {
 } from './t3/item-execution.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
+import { createProjectRefresh } from './t3/project-refresh.ts';
 import {
-    repositoryProjects,
+    reconnectRepositoryProjects,
     reauthorizeRepositoryProjects,
     setProjectSessions,
 } from './t3/repository-project-discovery.ts';
-import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
+import { anyOnAzureDevOps } from './t3/repository-project.ts';
 import { sampleT3Session } from './t3/sample-t3-session.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import {
@@ -821,16 +822,11 @@ function refreshLocal(recordsChanged = false): void {
 }
 
 function showT3Availability(): void {
-    void loopTrace.span('t3 availability', t3Availability).then((source) => {
-        board.update({ t3Availability: source });
-        board.push();
-    });
+    void refreshProjects().catch(() => log('reading T3 launch prerequisites failed'));
 }
 
 async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
     if (refreshing && !recordsChanged) return;
-
-    showT3Availability();
 
     const before = board.snapshot().items;
 
@@ -1263,9 +1259,7 @@ async function refresh(): Promise<void> {
             fetchedAt: new Date().toISOString(),
             error: settings.problem ?? recordsProblem,
             itemSourceProblems: snapshot.problems ?? [],
-            t3Availability: await t3Availability(),
             t3EnvironmentId: readEnvironmentId(environmentIdFile),
-            ...(await repositoryProjectReads(repos)),
         });
 
         if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
@@ -1489,6 +1483,7 @@ const autoBuildRun = createAutoBuild({
     limit: () => limitNumber(buildLimit.state()),
 });
 // Sample mode asks T3 for nothing, so its boards show toned initials, unless it reads T3.
+const refreshProjects = createProjectRefresh(board, onboarded, offerModelChoices);
 const projectIcons = fixture && !sampleT3 ? null : createProjectIcons(board);
 const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
 const { server, endStreams } = createBoardServer({
@@ -1511,9 +1506,15 @@ const { server, endStreams } = createBoardServer({
 
         board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
 
+        await refreshProjects(true);
+
         if (read.availability !== 'available') throw new Error('T3 unavailable');
     },
-    recheck: (options) => recheckTools(true, options),
+    recheck: async (options) => {
+        await recheckTools(true, options);
+        await reconnectRepositoryProjects();
+        await refreshProjects(true);
+    },
     itemDetails: createItemDetails(null, ticketOf, { records }),
     showLabelChange,
     showTicketType,
@@ -1593,7 +1594,7 @@ const timer = setInterval(() => {
     } else loopTrace.span('read tick', () => runLocal(() => refresh()));
 }, 1_000);
 const localTimer = setInterval(() => {
-    if (sampleT3) showT3Availability();
+    if (!fixture || sampleT3) showT3Availability();
 
     if (!fixture) {
         loopTrace.span('local tick', () =>
@@ -1626,10 +1627,4 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
         server.close(() => void Promise.resolve(revoked).finally(() => process.exit(0)));
         setTimeout(() => process.exit(0), 2000).unref();
     });
-}
-
-async function t3Availability() {
-    const read = await repositoryProjects();
-
-    return { availability: read.availability, observedAt: read.observation?.observedAt };
 }

@@ -192,6 +192,26 @@ export function pages(input: PagesInput): Page[] {
                             control: custom(() => <ToolState {...stateOf(data, 'az')} />),
                         },
                         {
+                            id: 'd-t3-connection',
+                            title: 'T3 project connection',
+                            description:
+                                data.t3Availability?.availability === 'available'
+                                    ? 'Projects are available. Run checks opens a fresh connection.'
+                                    : data.t3Availability?.availability === 'renewal-required'
+                                      ? 'T3 authorization needs renewal. Open T3 Code and run checks again.'
+                                      : data.t3Availability?.availability === 'malformed'
+                                        ? 'T3 Code returned an unreadable project observation.'
+                                        : 'Cannot read T3 projects. The board retries automatically while T3 Code is running.',
+                            control: custom(() => (
+                                <ToolState
+                                    text={
+                                        data.t3Availability?.availability === 'available' ? 'Connected' : 'Unavailable'
+                                    }
+                                    state={data.t3Availability?.availability === 'available' ? 'ready' : 'failed'}
+                                />
+                            )),
+                        },
+                        {
                             id: 'd-server',
                             title: 'Board server',
                             description: `${location.origin} · last read ${data.everRead ? 'OK' : 'never'}`,

@@ -870,3 +870,15 @@ test('manual ticks wait while a global recovery is pending and become usable aft
     await settle(() => finish({ snapshot: drifted, error: 'Copy failed' }));
     expect(control.getAttribute('aria-disabled')).toBe('false');
 });
+
+test('Diagnostics reports project connection failure even with a healthy CLI and board', async () => {
+    const data = { ...sample, tools: toolChecks(), t3Availability: { availability: 'unavailable' as const } };
+
+    await open('Diagnostics', data);
+    expect(text(row('d-t3-connection'))).toContain('Cannot read T3 projects');
+    expect(text(row('d-t3-connection'))).toContain('Unavailable');
+    await push({ ...data, t3Availability: { availability: 'available' } });
+    expect(text(row('d-t3-connection'))).toContain('Connected');
+    await push({ ...data, t3Availability: { availability: 'renewal-required' } });
+    expect(text(row('d-t3-connection'))).toContain('authorization needs renewal');
+});

@@ -82,7 +82,7 @@ export function subscribeProjects(
                             retry = undefined;
                             void connect();
                         },
-                        Math.min(30_000, 1000 * 2 ** Math.min(failures++, 5)),
+                        Math.min(5_000, 1000 * 2 ** Math.min(failures++, 3)),
                     );
             }
         };
@@ -164,7 +164,7 @@ export function subscribeProjects(
                 }),
             );
             heartbeat = setInterval(() => {
-                if (Date.now() - lastPong > 15_000) disconnected(true);
+                if (Date.now() - lastPong > 15_000) disconnected();
                 else if (ws.readyState === WebSocket.OPEN) send({ _tag: 'Ping' });
             }, 5000);
             ws.addEventListener('message', (event) =>
@@ -207,10 +207,10 @@ export function subscribeProjects(
                     }
                 }),
             );
-            ws.addEventListener('close', () => disconnected(true));
-            ws.addEventListener('error', () => disconnected(true));
+            ws.addEventListener('close', () => disconnected());
+            ws.addEventListener('error', () => disconnected());
         } catch {
-            disconnected(true);
+            disconnected(availability === 'renewal-required');
         }
     };
 

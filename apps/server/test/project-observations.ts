@@ -44,3 +44,7 @@ export const setProjectSessions = ({ vault }: BoardSessions): void => {
 export async function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
     return repositoryProjects();
 }
+
+export async function reconnectRepositoryProjects(): Promise<ProjectRead> {
+    return repositoryProjects();
+}

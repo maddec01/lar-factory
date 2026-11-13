@@ -31,9 +31,7 @@
    and revision. A changed digest requires review and renewed confirmation.
    Only for the unchanged approved digest, record the passing gate with
    `lar-work record-gate <work ID> --revision N --digest <approved briefDigest> --identity <approver> --evidence "<explicit user approval of this digest, response reference, Doubt result and confirmed assumptions>"`.
-   The command rereads the ticket again. A stale revision or digest requires
-   another read; changed text requires review and renewed confirmation before
-   retrying. Eligible tickets queue the whole brief as Spec under the saved
+   The command rereads the ticket again; changed text requires review and renewed confirmation. Eligible tickets queue the whole brief as Spec under the saved
    setting. Gate evidence itself changes no Status. A failed write stays pending
    and does not block Ready; report its error and the retry in item details.
    If this gate replaces a decision answer, run `lar-work supersede-answer` per

@@ -10,6 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { changeAgentKind } from './agent-tracker-writes.ts';
+import { agentWrites } from './agent-writes.ts';
 import { changeKind, checkKind } from './change-kind.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
@@ -442,3 +444,33 @@ test("the check plans the swap as the change would: a type the backlog doesn't s
     });
     expect(tracker.writes).toEqual([]);
 });
+
+test.each([false, true])(
+    'agent kind changes protect intent across provider waits; conflict=%s',
+    async (conflicting) => {
+        const records = await open();
+        const record = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+        const tracker = fakeTracker({ labels: ['type: bug'], type: 'Bug' });
+        const read = tracker.kinds.read.bind(tracker.kinds);
+
+        tracker.kinds.read = async (...args) => {
+            if (conflicting) records.update(record.workId, record.revision, { kind: 'improvement' });
+            else records.setNeedsYou(record.workId, record.revision, 'Concurrent note');
+
+            return read(...args);
+        };
+
+        const result = await changeAgentKind(agentWrites(records), record.workId, record.revision, 'feature', {
+            setup: setupOf(REPO),
+            ...tracker,
+        });
+
+        if (conflicting) {
+            expect(result.error).toContain('conflicting fields: kind');
+            expect(records.read(record.workId).kind).toBe('improvement');
+        } else {
+            expect(result.error).toBeNull();
+            expect(records.read(record.workId)).toMatchObject({ kind: 'feature', needsYou: 'Concurrent note' });
+        }
+    },
+);

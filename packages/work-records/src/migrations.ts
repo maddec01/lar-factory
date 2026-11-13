@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 
 import type { Migration } from './database.ts';
 import { migrateDecisionAnswers } from './decision-answer-migration.ts';
+import { installWriteJournal } from './write-journal.ts';
 
 export const MIGRATIONS: readonly Migration[] = [
     (db) =>
@@ -491,4 +492,5 @@ export const MIGRATIONS: readonly Migration[] = [
         ),
     (db) => db.exec('ALTER TABLE work_records ADD COLUMN superseded_by TEXT'),
     migrateDecisionAnswers,
+    installWriteJournal,
 ];

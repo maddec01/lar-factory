@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vite-plus/test';
 
 import { openDatabase } from './database.ts';
+import { migrateDecisionAnswers } from './decision-answer-migration.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords } from './work-records.ts';
 
@@ -12,7 +13,9 @@ test('upgrades an incorporated legacy answer without inventing its source revisi
     const path = join(dir, 'work.db');
 
     try {
-        const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+        const old = await openDatabase(path, {
+            migrations: MIGRATIONS.slice(0, MIGRATIONS.indexOf(migrateDecisionAnswers)),
+        });
 
         for (const [id, kind, parent] of [
             ['g', 'concept', null],

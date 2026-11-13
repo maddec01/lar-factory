@@ -17,6 +17,7 @@ import { rmSync, lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { StatementSync } from 'node:sqlite';
 
+import { agentRevision } from './agent-revision.ts';
 import { validateBlockers } from './blocker-graph.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
@@ -392,6 +393,8 @@ export interface WorkRecords
     createPart(part: NewPart): WorkRecord;
     /** Throws `not-found` when no record has `workId`. */
     read(workId: string): WorkRecord;
+    /** CLI-only reapplication guard; store mutations remain strict. */
+    writeRevision(id: string, revision: number, fields: readonly string[], entity?: 'work' | 'dependency'): number;
     /** The markdown the record began with, or an empty string. */
     initialContext(workId: string): string;
     /** The matching records, Queued ones in Queue order first, then the rest in the order they were made. */
@@ -1306,7 +1309,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         throw invalid('This submission belongs to another item.');
 
                     if (current.revision !== checkRevision(target.revision))
-                        throw invalid('The local item changed while creating its ticket.');
+                        throw new WorkRecordError(
+                            'stale-revision',
+                            'The local item changed while creating its ticket; reread it and decide whether to reapply.',
+                        );
 
                     if (current.ticket && current.ticket !== record.ticket)
                         throw invalid('This item already holds another ticket.');
@@ -2323,6 +2329,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 return { fog_gone_at: gone ? new Date().toISOString() : null };
             });
         },
+        writeRevision: (id, revision, fields, entity) => agentRevision(database, id, revision, fields, entity),
         children: (workId) => related(childRows, workId),
         blockers: (workId) => related(blockerRows, workId),
         dependents: (workId) => related(dependentRows, workId),

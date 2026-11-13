@@ -22,8 +22,7 @@ association, even if already completed:
 The board derives activity from child state; completion still requires merge and finish.
 
 On failed or uncertain writes, report the identities and error, reread records
-and threads, and retry only missing writes with fresh revisions and the same
-child. Never redelegate to repair reporting. If still failing, preserve the gap
+and threads, and retry only missing writes for the same child. Never redelegate to repair reporting. If still failing, preserve the gap
 and identities in the thread or handoff, follow T3's wait instruction, and repair
 on resume. A failed phase write blocks new launches.
 

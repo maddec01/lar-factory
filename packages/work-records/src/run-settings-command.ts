@@ -2,6 +2,7 @@ import type { RoleRunFinish, RoleRunInput, SnapshotRunInput } from '@lar-factory
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
+import { agentWrites } from './agent-writes.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
 /** These local evidence commands deliberately bypass tracker synchronization. */
@@ -25,7 +26,7 @@ export async function runSettingsCommand(command: string, args: string[]): Promi
                 `${command} needs a work ID${command === 'run-settings' ? '' : ', --revision N and --file F'}.`,
             );
 
-        records = await openWorkRecords(workRecordsPath(values['data-dir']));
+        records = agentWrites(await openWorkRecords(workRecordsPath(values['data-dir'])));
 
         const workId = positionals[0]!;
         const input = () => JSON.parse(readFileSync(values.file === '-' ? 0 : values.file!, 'utf8'));

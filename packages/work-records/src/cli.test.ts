@@ -49,6 +49,35 @@ async function larWork(dataDir: string, ...args: string[]) {
 
 // Each run starts a Node process, about a second apiece.
 describe('lar-work', { timeout: 30_000 }, () => {
+    it('applies concurrent disjoint commands and gives actionable field conflicts', async () => {
+        const data = tempDir();
+        const records = await openWorkRecords(join(data, 'work-records.db'));
+        const build = records.create({ title: 'Build', repository: 'example/product', kind: 'build' });
+
+        try {
+            const results = await Promise.all([
+                larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'checks'),
+                larWork(data, 'set-needs-you', build.workId, '--revision', '1', '--reason', 'Verify this head'),
+            ]);
+
+            expect(results.map((result) => result.code)).toEqual([0, 0]);
+            expect(records.read(build.workId)).toMatchObject({
+                revision: 3,
+                buildPhase: 'checks',
+                needsYou: 'Verify this head',
+            });
+
+            const refused = await larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'review');
+
+            expect(refused.code).toBe(1);
+            expect(refused.stderr).toContain('conflicting fields: buildPhase');
+            expect(refused.stderr).toContain('Reread the record and decide whether to reapply');
+            expect(records.read(build.workId).revision).toBe(3);
+        } finally {
+            records.close();
+        }
+    });
+
     it('publishes every phase immediately to its own running board, only after a successful write', async () => {
         const data = tempDir();
         const records = await openWorkRecords(join(data, 'work-records.db'));
@@ -596,7 +625,7 @@ throw Error('Local exploration must not call a tracker');
         expect(stale).toMatchObject({
             code: 1,
             stdout: '',
-            stderr: `lar-work: The work record ${workId} is at revision 2, not 1; read it again and retry.\n`,
+            stderr: `lar-work: The work record ${workId} is at revision 2, not 1; conflicting fields: status. Reread the record and decide whether to reapply the write.\n`,
         });
         expect((await larWork(data, 'read', workId)).record).toMatchObject({ status: 'Shaping', revision: 2 });
     });
@@ -1308,7 +1337,7 @@ it('retitles through the CLI and exposes historical names', async () => {
     expect((await larWork(dir, 'title-history', workId)).record).toEqual([
         expect.objectContaining({ previous: 'Before', title: 'After' }),
     ]);
-});
+}, 30_000);
 
 it('reads versioned current decision answers through the CLI', async () => {
     const dir = tempDir();
@@ -1334,4 +1363,4 @@ it('reads versioned current decision answers through the CLI', async () => {
         text: 'Current contract',
     });
     expect((await larWork(dir, 'answer-history', workId)).record).toHaveLength(1);
-});
+}, 30_000);

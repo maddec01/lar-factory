@@ -195,6 +195,15 @@ test('an old read says unavailable, while a fresh one keeps quiet, ages and runn
 
 test('a thread that finished with nothing at work shows nothing', () => {
     expect(threadActivityLine(thread({ state: 'done' }), NOW)).toBeUndefined();
+    for (const readAt of [ago(0), ago(60)]) {
+        const ended = thread({
+            state: 'done',
+            activity: activity({ action: 'Using a tool', toolRunning: true, readAt }),
+        });
+
+        expect(threadActivityLine(ended, NOW)).toBeUndefined();
+        expect(itemActivityLine({ status: 'Verify', threads: [ended] } as Item, NOW)).toBeUndefined();
+    }
 });
 
 const item = (threads: Item['threads'], over: Partial<Item> = {}) =>

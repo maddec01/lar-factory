@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { boardSessionAuthority } from './board-session.ts';
-import { launchThread } from './launch-thread.ts';
+import { launchThread, resumeLaunch } from './launch-thread.ts';
 import { subscribeProjects } from './project-subscription.ts';
 
 vi.mock('./board-session.ts');
@@ -16,6 +16,85 @@ afterEach(() => {
     vi.useRealTimers();
 });
 describe('thread launch', () => {
+    it('keeps a replay protected when authorization fails, since its earlier request may already have created a thread', async () => {
+        vi.mocked(boardSessionAuthority).mockReturnValue({
+            issue: async () => {
+                throw Error('unavailable');
+            },
+            revoke: vi.fn(),
+        });
+        expect(
+            await resumeLaunch(
+                { projectId: 'project', text: 'Continue', selection, workspace, runtimeMode: 'approval-required' },
+                'intent',
+            ),
+        ).toEqual({ thread: null, error: 'T3 launch authorization failed.', uncertain: true });
+        expect(subscribeProjects).not.toHaveBeenCalled();
+    });
+    it.each(['empty', 'preparing'])(
+        'freezes the request before sending, and replays the same command after an %s launch',
+        async (state) => {
+            vi.useFakeTimers();
+            vi.mocked(boardSessionAuthority).mockReturnValue({
+                issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
+                revoke: vi.fn().mockResolvedValue(undefined),
+            });
+
+            const remember = vi.fn();
+            const payloads: unknown[] = [];
+
+            vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
+                expect(remember).toHaveBeenCalledOnce();
+                payloads.push(execution!.payload);
+                execution!.accept({
+                    threadId: 'same-thread',
+                    resumed: payloads.length > 1,
+                    projection: {
+                        thread: { id: 'same-thread', modelSelection: selection },
+                        messages:
+                            payloads.length > 1 || state === 'preparing' ? [{ role: 'user', text: 'Continue' }] : [],
+                        runs:
+                            payloads.length > 1
+                                ? [{ id: 'run', status: 'running', modelSelection: selection }]
+                                : state === 'preparing'
+                                  ? [{ status: 'preparing' }]
+                                  : [],
+                    },
+                });
+
+                return vi.fn();
+            });
+
+            const first = launchThread(
+                'project',
+                'Continue',
+                selection,
+                workspace,
+                'approval-required',
+                ORIGIN,
+                'intent',
+                remember,
+            );
+
+            await vi.advanceTimersByTimeAsync(30_000);
+            expect(await first).toMatchObject({ thread: null, uncertain: true });
+            expect(remember).toHaveBeenCalledWith({
+                projectId: 'project',
+                text: 'Continue',
+                selection,
+                workspace,
+                runtimeMode: 'approval-required',
+            });
+            expect(
+                await launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN, 'intent'),
+            ).toMatchObject({
+                thread: { threadId: 'same-thread', title: 'Continue' },
+                error: null,
+                executionReport: { source: 't3', reference: 'run' },
+            });
+            expect(payloads[1]).toEqual(payloads[0]);
+        },
+    );
     it('reports authorization failure without sending a launch', async () => {
         vi.mocked(boardSessionAuthority).mockReturnValue({
             issue: async () => {

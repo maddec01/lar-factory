@@ -1454,11 +1454,13 @@ function recordedCommands(
         beforeLaunch = () => {},
         cleanupChoice = (): ShapingThreadCleanup => 'archive',
         startAnswer = () => null,
+        resumeLaunch,
         clearedFailuresFile = null,
     }: {
         clearedFailuresFile?: string | null;
         cleanupChoice?: () => ShapingThreadCleanup;
         startAnswer?: () => StartResult | null;
+        resumeLaunch?: ItemCommandsDeps['resumeLaunch'];
         shown?: (ids: string[]) => Item['threads'];
         recover?: (
             project: string,
@@ -1504,6 +1506,7 @@ function recordedCommands(
         fetchBase: async (_project, branch) => `${branch}-tip`,
         buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }),
         recoverThread: recover,
+        resumeLaunch,
         skillsOf: () => skills,
         shapingThreadCleanupChoice: cleanupChoice,
         startThread: async (_project, message) => {
@@ -1565,6 +1568,60 @@ test('after a restart, an unresolved start records the thread T3 shows for it an
     assert.equal((await commands.start(work.workId, undefined)).status, 200);
     assert.deepEqual(started, [], 'the recorded running thread is the start');
 });
+
+test.each([null, 'Execution mismatch.'])(
+    'restart recovery replays the same command after the grace period, preserving execution error %s',
+    async (executionFailure) => {
+        const records = await openRecords();
+        const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+        const { record, intent } = records.recordLaunchIntent(work.workId, work.revision, 'shape');
+        const request = {
+            projectId: WEB,
+            text: 'Original first message',
+            selection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+            workspace: { type: 'root' as const },
+            runtimeMode: 'full-access',
+        };
+
+        records.saveLaunchRequest(work.workId, record.revision, intent.intentId, request);
+
+        const calls: string[] = [];
+        const { commands, board, started } = recordedCommands(records, {
+            recover: async () => {
+                throw Error('A title lookup cannot establish whether the first message ran.');
+            },
+            resumeLaunch: async (saved, commandId) => {
+                assert.deepEqual(saved, request);
+                calls.push(commandId);
+
+                return calls.length === 1
+                    ? { thread: null, uncertain: true, error: 'First turn not confirmed.' }
+                    : { thread: { threadId: 'original-thread', title: 'Work' }, error: executionFailure };
+            },
+        });
+
+        vi.useFakeTimers({ toFake: ['Date'] });
+
+        try {
+            vi.setSystemTime(Date.now() + 120_000);
+            await commands.reconcileStarts(board.snapshot().items);
+            assert.equal(records.launchIntents({ unresolved: true }).length, 1);
+            assert.deepEqual(records.read(work.workId).needsYouCauses, []);
+            vi.setSystemTime(Date.now() + 30_000);
+            await commands.reconcileStarts(board.snapshot().items);
+            assert.deepEqual(calls, [intent.intentId, intent.intentId]);
+            assert.deepEqual(
+                records.threads(work.workId).map((thread) => thread.threadId),
+                ['original-thread'],
+            );
+            assert.equal(records.read(work.workId).status, 'Shaping');
+            assert.equal(records.read(work.workId).needsYou, executionFailure);
+            assert.deepEqual(started, []);
+        } finally {
+            vi.useRealTimers();
+        }
+    },
+);
 
 test('an unresolved start looks for its thread under both the new message and the one before the phase names', async () => {
     const records = await openRecords();

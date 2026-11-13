@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -48,6 +49,58 @@ async function larWork(dataDir: string, ...args: string[]) {
 
 // Each run starts a Node process, about a second apiece.
 describe('lar-work', { timeout: 30_000 }, () => {
+    it('publishes every phase immediately to its own running board, only after a successful write', async () => {
+        const data = tempDir();
+        const records = await openWorkRecords(join(data, 'work-records.db'));
+        const build = records.create({ title: 'Build', repository: 'example/product', kind: 'build' });
+        const seen: string[] = [];
+        const listener = createServer(async (request, response) => {
+            let body = '';
+
+            for await (const chunk of request) body += chunk;
+            expect(JSON.parse(body)).toEqual({ workId: build.workId });
+            expect(request.headers.origin).toBe(`http://127.0.0.1:${port}`);
+            seen.push(records.read(build.workId).buildPhase!);
+            response.end('{}');
+        });
+
+        await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
+
+        const port = (listener.address() as { port: number }).port;
+
+        mkdirSync(join(data, 'boards'));
+        writeFileSync(join(data, 'boards', `${process.pid}.json`), JSON.stringify({ port }));
+        vi.stubEnv('LAR_BOARD_PORT', '');
+
+        const phases = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks', 'retro'];
+
+        try {
+            for (const [index, phase] of phases.entries()) {
+                const result = await larWork(
+                    data,
+                    'set-phase',
+                    build.workId,
+                    '--revision',
+                    String(index + 1),
+                    '--phase',
+                    phase,
+                );
+
+                expect(result.code).toBe(0);
+                expect(result.record.buildPhase).toBe(phase);
+                expect(seen).toEqual(phases.slice(0, index + 1));
+            }
+            expect(
+                (await larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'implement')).code,
+            ).toBe(1);
+            expect(seen).toEqual(phases);
+        } finally {
+            listener.closeAllConnections();
+            await new Promise<void>((resolve) => listener.close(() => resolve()));
+            records.close();
+        }
+    });
+
     /** A gh answering one issue from a file, whose every write it logs and applies. */
     function fakeIssue(dir: string, issue: { labels: { name: string }[]; type: { name: string } | null }) {
         const log = join(dir, 'gh.log');

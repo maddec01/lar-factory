@@ -878,7 +878,7 @@ describe('work-record threads and launch intents', () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);
         const build = lar(first, 'build');
-        const { record, intent } = first.recordLaunchIntent(build.workId, 1, 'build');
+        let { record, intent } = first.recordLaunchIntent(build.workId, 1, 'build');
 
         expect(record.revision).toBe(2);
         expect(intent).toMatchObject({
@@ -888,6 +888,21 @@ describe('work-record threads and launch intents', () => {
             threadId: null,
             resolvedAt: null,
         });
+
+        const request = {
+            projectId: 'project',
+            text: 'Build',
+            selection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+            workspace: { type: 'root' as const },
+            runtimeMode: 'full-access',
+        };
+
+        record = first.saveLaunchRequest(build.workId, record.revision, intent.intentId, request);
+        intent = first.launchIntents({ workId: build.workId })[0]!;
+        expect(intent.request).toEqual(request);
+        expect(() =>
+            first.saveLaunchRequest(build.workId, record.revision, intent.intentId, { ...request, text: 'Different' }),
+        ).toThrow(/frozen/);
         first.close();
 
         const board = await open(path);
@@ -895,13 +910,13 @@ describe('work-record threads and launch intents', () => {
 
         expect(board.launchIntents({ unresolved: true })).toEqual([intent]);
 
-        const resolved = board.resolveLaunchIntent(build.workId, 2, intent.intentId, { threadId: 'thread-9' });
+        const resolved = board.resolveLaunchIntent(build.workId, 3, intent.intentId, { threadId: 'thread-9' });
 
         expect(resolved.intent).toMatchObject({ outcome: 'started', threadId: 'thread-9' });
-        expect(resolved.record.revision).toBe(3);
+        expect(resolved.record.revision).toBe(4);
         expect(board.threads(build.workId).map((t) => [t.threadId, t.purpose])).toEqual([['thread-9', 'build']]);
 
-        expect(() => thread.resolveLaunchIntent(build.workId, 3, intent.intentId, { threadId: 'thread-10' })).toThrow(
+        expect(() => thread.resolveLaunchIntent(build.workId, 4, intent.intentId, { threadId: 'thread-10' })).toThrow(
             expect.objectContaining({ code: 'invalid', message: expect.stringContaining('already resolved') }),
         );
         expect(thread.launchIntents({ unresolved: true })).toEqual([]);

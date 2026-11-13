@@ -106,10 +106,7 @@ test('a stale running item does not count once its run ended, and a new run has 
         readAt: AT,
     });
 
-    expect(after, 'a thread whose agents or background work go on shows its last action, as finished').toMatchObject({
-        action: 'pnpm test',
-        toolRunning: false,
-    });
+    expect(after).toEqual({ available: true, readAt: AT, toolRunning: false, agents: [] });
 });
 
 test('a running tool counts for the thread or an agent, however old, but waiting on an agent does not', () => {
@@ -236,8 +233,6 @@ test('a pass reads the agents under a build, its child tasks and their native su
     expect(reads.read(atWork).activity).toEqual({
         available: true,
         readAt: expect.any(String),
-        action: 'Using a tool',
-        actionAt: AT,
         toolRunning: true,
         agents: [
             { title: 'Slice', model: 'opus', action: 'pnpm test', actionAt: AT },

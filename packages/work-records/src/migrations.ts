@@ -479,4 +479,5 @@ export const MIGRATIONS: readonly Migration[] = [
         THEN RAISE(ABORT, 'Review snapshot must belong to the work record') END;
     END;
   `),
+    (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN request TEXT'),
 ];

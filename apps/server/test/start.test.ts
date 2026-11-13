@@ -347,14 +347,19 @@ for (const recover of ['late', 'deleted']) {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
         const response = await start(board, board.id(12));
 
-        assert.equal(response.status, recover === 'late' ? 200 : 502);
+        assert.equal(response.status, 502);
+        assert.equal((await response.json()).uncertain, true);
 
-        const answer = await response.json();
+        // This older-launch fixture has no saved request; recovery checks it on the next press.
+        const retried = await start(board, board.id(12));
+
+        assert.equal(retried.status, recover === 'late' ? 200 : 502);
+
+        const answer = await retried.json();
 
         if (recover === 'late') assert.equal(answer.thread.threadId, 'thread-1');
         else assert.equal(answer.uncertain, true);
 
-        await start(board, board.id(12));
         assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
         assert.ok((await board.t3Calls()).some((args) => args[1] === 'show'));
     });

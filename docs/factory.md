@@ -546,7 +546,8 @@ Phase `implement` starts implementer tasks for ready slices, each in its own
 worktree from the local build branch. Reconcile existing slice/thread associations
 before launching to avoid duplicate attempts. The planner may re-slice a blocked
 slice, one planner at a time. A rebase conflict is not a reason to re-slice.
-Small builds use the builder directly. Both follow project conventions and
+Small builds set phase `implement` before the builder edits. Each `set-phase`
+command asks the local boards to read immediately. Both follow project conventions and
 test-first guidance where appropriate, commit their work and run focused checks.
 
 The builder fast-forwards each successful slice into the build branch, then uses
@@ -642,6 +643,9 @@ Phase `checks` watches the PR and reads required checks on its current head.
 While they run, the board says Waiting for required checks without a desk card.
 Green required checks apply the approver's recommendation. Non-required failures
 do not start a fixer or block that transition.
+The builder writes Verify or Ready to merge before ending its turn when checks
+are green, including after a CI fix. Finished runs clear their tool activity;
+the board shows the item's next step.
 
 A required failure or branch conflict starts CI fixer with that job's run link
 or conflict evidence. It diagnoses first, fixes code or title as needed, uses
@@ -710,6 +714,12 @@ work ID and offers the recorded branch/worktree or an explicitly new build
 attempt. It reconciles unresolved launch intents first. A quiet thread or T3
 read failure alone never proves deletion. A genuine missing decision waits on
 the desk; a routine handoff keeps the current stage and placement.
+
+For a resolved model, the board saves its exact launch request and uses the intent
+ID as T3's command ID. An interrupted launch replays that request, including after
+a board restart, so creation and the first message resume on the same thread.
+Success requires the first user message and a run past preparation. A matching empty
+thread from an older launch is reported as unsent, never missing.
 
 The board retries T3 project reads while disconnected and rediscovers a restarted
 server's current process and address. Recovery refreshes project launch holds,

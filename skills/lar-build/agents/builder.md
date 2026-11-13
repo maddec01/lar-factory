@@ -241,26 +241,20 @@ every finished slice has had its run.
 
 Set **Review**. Review runs in review rounds, at most two.
 
-Round 1: read what `git diff origin/$base_branch...HEAD` touches and pick the
-reviewers from it. In parallel, start one **reviewer subagent** for each:
-
-- **Code** (`reviewer-code.md`): always.
-- **Security** (`reviewer-security.md`): the diff touches input handling,
-  auth, sessions or permissions, filesystem paths or uploads, shell scripts,
-  dependencies or lockfiles, CI, secrets or network calls.
-- **UI** (`reviewer-ui.md`): anything visible on screen changed. It runs the
-  app itself and returns its screenshots' absolute paths and an app report:
-  the commit it ran, how to reach the app, and the processes it started,
-  each with something a later thread can recheck, such as the port it
-  listens on.
-- **Performance** (`reviewer-performance.md`): the diff touches rendering,
-  polling, queries or loops over large data.
+Round 1: in the build checkout, pin `head=$(git rev-parse HEAD)` and
+`base=$(git merge-base origin/$base_branch "$head")`, then run
+`lar-work select-reviewers <work ID> --base "$base" --head "$head"`.
+Use its run/skip decisions and reasons, including uncertain matches. In
+parallel, start one **reviewer subagent** for each selected reviewer, using
+its returned instruction path (under the installed lar-build skill) or saved
+instruction text. UI returns screenshot paths and an app report: the commit,
+how to reach the app, and each process it started with a recheckable port or
+other ownership evidence.
 
 Give each only the prose rules, `<lar-build>/project-rules.md`,
 `<lar-build>/shared/orchestration.md` with the instruction to apply **Wait for
-delegated work**, its file's path, the build's work ID, the repo path and the
-diff command
-`git diff origin/$base_branch...HEAD`. Note each reviewer you skip with a reason, and
+delegated work**, its selected instructions, the build's work ID, the repo path and the
+diff command `git diff <base SHA> <head SHA>` from selection. Note each reviewer you skip with a reason, and
 say so in chat.
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't

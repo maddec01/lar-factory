@@ -15,6 +15,7 @@ import { checkCommand } from './check-runner.ts';
 import { createRecordTicket } from './create-ticket.ts';
 import { exportMarkdown } from './export.ts';
 import { heavyCommand } from './heavy-command.ts';
+import { selectReviewersCommand } from './reviewer-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import {
     openWorkRecords,
@@ -87,6 +88,10 @@ Identifiers
   A repository is the repository's name on the board, owner/name.
 
 Reads
+  select-reviewers <work-id> --base SHA --head SHA
+                                    Choose reviewers from saved settings and the exact
+                                    committed diff in the current build checkout.
+                                    Print run/skip reasons, evidence and trigger version.
   read <work-id>                    Print one record.
   context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
@@ -891,6 +896,8 @@ async function run(
 
 async function main(args: string[]): Promise<number> {
     if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
+
+    if (args[0] === 'select-reviewers') return selectReviewersCommand(args.slice(1));
 
     if (args[0] === 'heavy') return heavyCommand(args);
 

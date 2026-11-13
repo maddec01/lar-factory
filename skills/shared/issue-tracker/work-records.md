@@ -137,18 +137,22 @@ it. It refuses Done, which completion decides, and a PR, which has no Status.
 
 ## Structure
 
-A concept owns decisions and builds. Buildable work owns slices, including bugs,
-features, improvements and issues. Create owned work
-with
-`bash <this skill>/shared/scripts/slice.sh <parent> "<title>" <body-file> [--kind decision|build] [--blocked-by <work>]...`.
-It prints the new work ID; keep it. Under a concept, `--kind` names a decision
-or a build; under a build the record is a slice. Record a later blocker with
-`lar-work add-blocker <work ID> --revision N --blocker <work ID>`, and drop one
-with `remove-blocker`. `children`, `blockers` and `dependents` read the
-structure.
+A concept or linked-work parent owns delivery parts. Create each part with
+`bash <this skill>/shared/scripts/slice.sh <parent> "<title>" <body-file> --kind decision|build --repository <owner/repo> [--blocked-by <work>]...`.
+It prints the work ID; keep it. This uses `lar-work create-part --parent ID
+--revision N --title X --repository R --kind build|decision --file F
+[--blocked-by ID]...`, where N is the parent's last-read revision. The named
+repository, body, parent, blockers and Queued state are saved in one transaction.
+A stale parent or any failure saves nothing; reread before retrying. Builds wait
+for shaping and their gate before Ready. Ordinary standalone captures still start
+in List. No later `set-parent` or Status write is needed to finish a new part.
 
-Owned work takes its parent's repository unless it is a build in another
-repository, as [Other repositories](#other-repositories) routes it.
+Buildable work, including bugs, features, improvements and issues, owns private
+slices. Call `slice.sh` without `--kind` or `--repository` for these: they stay in
+the parent's repository and are private implementation records, not delivery parts.
+Record a later blocker with `lar-work add-blocker <work ID> --revision N
+--blocker <work ID>`, and drop one with `remove-blocker`. `children`, `blockers`
+and `dependents` read the structure.
 
 ## Other repositories
 
@@ -161,9 +165,9 @@ connected to this one.
   permission to act. When the work needs a change in a connected onboarded
   repository, describe the required part and shape it within the user's authorized scope.
   Ask only when it adds scope the user has not authorized. Make it with
-  `lar-work create --title X --repository <owner/repo> --kind build`, put it
-  under the concept with `lar-work set-parent` or record the wait with
-  `lar-work add-blocker`, and shape it in that repository. An onboarded
+  `slice.sh <parent> "<title>" <brief-file> --kind build --repository <owner/repo>
+  [--blocked-by <work ID>]...` under its concept or linked-work parent, and
+  shape it in that repository. An onboarded
   repository that isn't connected comes into play only when the user names it.
 - In a repository that is not onboarded, read code, docs and tickets for
   context and write nothing there. When required work is there, keep refining

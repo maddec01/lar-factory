@@ -61,7 +61,7 @@ first=$(make slice)
 run "$build" "Sign in" "$bin/body.md"
 record=$(lar-work read "$output" 2>/dev/null || true)
 if ((status == 0)) && [[ -z $errors ]] && jq -e --arg build "$build" '.kind == "slice" and .title == "Sign in"
-    and .parentId == $build and .repository == "maddec01/lar-factory" and .ticket == null' <<<"$record" >/dev/null &&
+    and .status == "List" and .queueOrder == null and .parentId == $build and .repository == "maddec01/lar-factory" and .ticket == null' <<<"$record" >/dev/null &&
     [[ $(lar-work body "$output" --body brief) == "$(cat "$bin/body.md")" ]] && no_provider &&
     grep -q "^curl .*127.0.0.1:4999/api/read" "$log" && grep -qF "\"workId\":\"$build\"" "$log"; then
     pass "a build's work ID gets a private slice record with the brief, no ticket, and the board asked to read the build"
@@ -93,13 +93,31 @@ for parent_kind in bug feature improvement issue; do
 done
 
 concept=$(make concept)
-run "$concept" "Which store" "$bin/body.md" --kind decision
+run "$concept" "Which store" "$bin/body.md" --kind decision --repository maddec01/lar-factory
 if ((status == 0)) && [[ $(lar-work read "$output" | jq -r '.kind + " " + .parentId') == "decision $concept" ]] &&
-    [[ $(lar-work body "$output" --body decision) == "$(cat "$bin/body.md")" ]]; then
+    [[ $(lar-work body "$output" --body decision) == "$(cat "$bin/body.md")" ]] &&
+    [[ $(lar-work read "$output" | jq -r .status) == Queued ]]; then
     pass "under a concept, --kind decision makes a decision with the text as its decision"
 else
     fail "under a concept, --kind decision makes a decision with the text as its decision: $status $output / $errors"
 fi
+
+for parent in "$concept" "$build"; do
+    run "$parent" "Client build" "$bin/body.md" --kind build --repository example/client --blocked-by "$slice" --blocked-by "$first"
+    record=$(lar-work read "$output" 2>/dev/null || true)
+    if ((status == 0)) && jq -e --arg parent "$parent" '.parentId == $parent and .kind == "build"
+        and .repository == "example/client" and .status == "Queued" and .queueOrder != null' <<<"$record" >/dev/null &&
+        [[ $(lar-work body "$output" --body brief) == "$(cat "$bin/body.md")" ]] &&
+        [[ $(lar-work blockers "$output" | jq length) == 2 ]] && no_provider; then
+        pass "a delivery part under $parent is created Queued in its named repository with body and blockers"
+    else
+        fail "cross-repository delivery part: $status $output / $errors / $record"
+    fi
+done
+
+before=$(count)
+run "$concept" "Refused" "$bin/body.md" --kind build --repository 'invalid repository'
+refuses "a refused atomic part leaves no record" "isn't a repository name"
 
 before=$(count)
 run maddec01/lar-factory#99 "Sign in" "$bin/body.md"
@@ -112,7 +130,10 @@ run "$concept" "Store" "$bin/body.md"
 refuses "under a concept, a missing --kind is refused" "under a concept, --kind names decision or build"
 
 run "$build" "Store" "$bin/body.md" --kind decision
-refuses "a build takes no other kind" "a build owns only slices"
+refuses "a delivery part needs its repository" "needs --repository"
+
+run "$build" "Private slice" "$bin/body.md" --repository example/elsewhere
+refuses "a private slice cannot move repositories" "private slice must use its parent's repository"
 
 run "$slice" "Deeper" "$bin/body.md"
 refuses "a slice owns no work" "only buildable work or a concept owns work"

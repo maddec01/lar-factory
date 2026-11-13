@@ -104,6 +104,11 @@ Changes
                                     markdown in F as its initial context. Status
                                     defaults to List. create alone stays local.
                                     --request-id ID reuses a capture on reruns.
+  create-part --parent ID --revision N --title X --repository R --kind build|decision
+              --file F [--blocked-by ID]...
+                                    Atomically create a Queued delivery part with its
+                                    body, parent and blockers. N is the parent's revision.
+                                    R may differ from the parent's repository.
   import --title X --repository R --kind K --ticket T [--status S] [--file F]
                                     Print the record holding T, making it first if
                                     none does. Repeating it never makes a second one
@@ -437,6 +442,7 @@ const TAKES_DEPENDENCY_ID = [
 ];
 const COMMANDS = [
     'create',
+    'create-part',
     'import',
     'list',
     'intents',
@@ -464,6 +470,7 @@ const OPTIONS = {
     revision: { type: 'string' },
     parent: { type: 'string' },
     blocker: { type: 'string' },
+    'blocked-by': { type: 'string', multiple: true },
     build: { type: 'string' },
     subject: { type: 'string' },
     detail: { type: 'string' },
@@ -645,6 +652,16 @@ async function run(
                 briefDigest: need(values, 'digest'),
                 approvedBy: need(values, 'identity'),
                 evidence: need(values, 'evidence'),
+            });
+        case 'create-part':
+            return records.createPart({
+                title: need(values, 'title'),
+                repository: need(values, 'repository'),
+                parentId: need(values, 'parent'),
+                parentRevision: revision(),
+                kind: need(values, 'kind') as 'build' | 'decision',
+                body: readInput(values),
+                blockerIds: values['blocked-by'] ?? [],
             });
         case 'create': {
             const input = { ...captured(), ticket: values.ticket };

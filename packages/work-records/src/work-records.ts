@@ -15,6 +15,7 @@ import { rmSync, lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { StatementSync } from 'node:sqlite';
 
+import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -24,6 +25,7 @@ import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
 
+export type { NewPart } from './create-part.ts';
 export type {
     CheckEntry,
     CheckStart,
@@ -345,6 +347,8 @@ export interface WorkRecords
         target?: { workId: string; revision: number },
     ) => { record: WorkRecord; created: boolean };
     create(record: NewWorkRecord): WorkRecord;
+    /** Atomically creates a Queued delivery part in its named repository. */
+    createPart(part: NewPart): WorkRecord;
     /** Throws `not-found` when no record has `workId`. */
     read(workId: string): WorkRecord;
     /** The markdown the record began with, or an empty string. */
@@ -1277,6 +1281,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 return imported;
             }),
         create: (record) => database.write(() => insert(record)),
+        createPart: partCreator(database, { insert, read: (workId) => fromRow(find(workId)), writeBody }),
         read: (workId) => database.read(() => fromRow(find(workId))),
         initialContext: (workId) => database.read(() => find(workId).initial_context),
         list: (filter) =>

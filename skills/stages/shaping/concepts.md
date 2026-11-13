@@ -41,10 +41,11 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
    without committing the user to implementation.
 
 2. Make a decision record for each decision you can phrase now:
-   `bash <this skill>/shared/scripts/slice.sh <concept work ID> "<title>" <file> --kind decision [--blocked-by <work ID>]...`,
+   `bash <this skill>/shared/scripts/slice.sh <concept work ID> "<title>" <file> --kind decision --repository <owner/repo> [--blocked-by <work ID>]...`,
    where the file's first line is `Method: grill`, `prototype`, `research` or
-   `task`, followed by the question. Set each to Queued with `status.sh`; the
-   rest stays in Fog.
+   `task`, followed by the question. The command creates the complete part in
+   Queued, with its parent and blockers; the rest stays in Fog. Name the
+   repository where the decision belongs, even when it differs from the concept.
 3. Start each research decision now, in the background, with the
    [research](research-question.md) step.
 4. Keep the concept in Shaping while decisions are open. Each grill,
@@ -72,9 +73,9 @@ roles use the foreground with their tool's longest timeout, per
    (`--body domain-drafts`). With domain docs OFF, save "none" and create no drafts.
 2. Turn fog that cleared into new decision records, as in step 2. When part of
    the destination is fully decided, make a build record for it
-   (`slice.sh <concept work ID> "<title>" <brief file> --kind build`) with a
+   (`slice.sh <concept work ID> "<title>" <brief file> --kind build --repository <owner/repo> [--blocked-by <work ID>]...`) with a
    brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
-   build needs. Proposed builds can remain ungated. Run the [gate](gate.md)
+   build needs. New builds start Queued and can remain ungated. Run the [gate](gate.md)
    and set a build Ready when preparing it for implementation.
 3. Save the concept's map. Put only results needed to explain parts or
    relationships in Decisions so far; keep the full answer in the decision
@@ -83,7 +84,8 @@ roles use the foreground with their tool's longest timeout, per
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision at once, as in step 3; every other new decision
-waits in Queued as in step 4, and each build in Ready for the board to start
+waits in Queued as in step 4. Builds remain Queued for shaping until gated
+and moved to Ready for the board to start
 ([5. Start the build](start-build.md)). `lar-work completion` on this decision
 should now print it complete; fix what its reasons name. Map builds follow the
 build rules: each changes one repository, and work in another repository becomes

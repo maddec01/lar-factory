@@ -11,6 +11,7 @@ recorded Small build route or planner's private slices/blockers. Set phase `plan
    follow existing worktree instructions if present. When no instructions exist,
    infer setup and checks from package scripts, manifests, CI and nearby code.
    Missing factory setup or agent instruction files never block a build.
+   Follow [Ticket Specs](../shared/issue-tracker/ticket-specs.md).
    Inspect the gate's Spec sync warnings. If the ticket read failed, report
    that this build uses the last local copy. Held GitHub edits need the user's
    Accept or Reject in details before use. Later tracker edits update the
@@ -29,4 +30,3 @@ Build input/settings snapshots are proposed commands: `prepare-build` and `snaps
    Small builds set phase `implement` and go to [Implement](implement.md) without a planner or slices.
    Other builds start [Planner](../agents/planner.md) with the work ID and repo
    path; its saved slice list goes to Implement.
-

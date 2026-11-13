@@ -85,4 +85,3 @@ A repository's provider is its origin's host. Read GitHub tickets with the
 local `gh` login, and Azure DevOps work items per
 [Azure DevOps](azure-devops.md#azure-devops). A failed read leaves the record
 as it was.
-

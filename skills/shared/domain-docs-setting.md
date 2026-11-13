@@ -17,4 +17,3 @@ docs and a decision's domain-drafts body. Offer no later publication. When ON,
 shaping drafts entries in work records, the whole gated brief includes them in
 the ticket Spec when enabled, and the builder writes them in the build PR.
 Shaping alone writes no repository files in either mode.
-

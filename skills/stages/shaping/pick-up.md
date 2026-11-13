@@ -42,4 +42,3 @@ neighboring code conventions, its glossary and relevant ADRs ([where domain docs
   (or an Azure repository's origin URL or `<org>/<project>/<repo>`) prints
   one's local machine settings. The checkout may be another repository's.
   Missing instructions, glossary or ADRs never block shaping.
-

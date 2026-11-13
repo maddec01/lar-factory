@@ -9,6 +9,7 @@ import {
     type NeedsYouCause,
     type ShapingThreadCleanup,
     type Status,
+    type ThreadLaunchRequest,
 } from '@lar-factory/shared';
 import type { ReviewSelectionEvidence } from '@lar-factory/shared/run-settings';
 import { createHash, randomUUID } from 'node:crypto';
@@ -194,6 +195,7 @@ export interface ShapingThreadCleanupRow {
 
 /** A start the board asked T3 for. This module only stores it and its outcome; it never launches or checks a thread. */
 export interface LaunchIntent {
+    request?: ThreadLaunchRequest;
     recovery?: { branch: string; reset: boolean; message?: string };
     intentId: string;
     workId: string;
@@ -461,6 +463,8 @@ export interface WorkRecords
     ): { record: WorkRecord; intent: LaunchIntent };
     /** The matching intents in the order they were recorded. */
     launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
+    /** Saves the exact request before sending it. A saved request cannot be changed. */
+    saveLaunchRequest(workId: string, revision: number, intentId: string, request: ThreadLaunchRequest): WorkRecord;
     /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure.
      * A thread for an intent with a saved cleanup choice adds a row for each shaping thread on the record without one. */
     resolveLaunchIntent(
@@ -570,6 +574,7 @@ const fromRow = (row: Row): WorkRecord => ({
 });
 
 interface IntentRow {
+    request?: string | null;
     recovery?: string | null;
     intent_id: string;
     work_id: string;
@@ -582,6 +587,7 @@ interface IntentRow {
 }
 
 const fromIntentRow = (row: IntentRow): LaunchIntent => ({
+    ...(row.request ? { request: JSON.parse(row.request) as ThreadLaunchRequest } : {}),
     ...(row.recovery ? { recovery: JSON.parse(row.recovery) as NonNullable<LaunchIntent['recovery']> } : {}),
     ...(row.shaping_thread_cleanup ? { shapingThreadCleanup: row.shaping_thread_cleanup } : {}),
     intentId: row.intent_id,
@@ -1934,6 +1940,24 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             return { record, intent: intent(intentId) };
         },
+        saveLaunchRequest: (workId, revision, intentId, request) =>
+            change(workId, revision, () => {
+                const row = selectIntent.get(intentId) as IntentRow | undefined;
+
+                if (row?.work_id !== workId) throw invalid('The launch intent does not belong to this work.');
+
+                if (row.resolved_at) throw invalid('The launch intent is already resolved.');
+
+                if (row.request && row.request !== JSON.stringify(request))
+                    throw invalid('The launch request is frozen.');
+
+                db.prepare('UPDATE launch_intents SET request = ? WHERE intent_id = ?').run(
+                    JSON.stringify(request),
+                    intentId,
+                );
+
+                return {};
+            }),
         launchIntents: (filter) =>
             database.read(() =>
                 (

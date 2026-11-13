@@ -71,6 +71,15 @@ const ageOf = (at: string, now: number): number => Math.max(0, now - Date.parse(
 export function threadActivityLine(thread: ItemThread, now: number): ThreadActivityLine | undefined {
     const { activity } = thread;
 
+    if (
+        !thread.observedAt &&
+        thread.state === 'done' &&
+        !thread.queued &&
+        !thread.hasLiveChildren &&
+        !thread.hasRunningChildren
+    )
+        return undefined;
+
     if (thread.observedAt || activity?.available === false || activityLost(activity, now)) return UNAVAILABLE;
 
     const agents = activity?.agents ?? [];

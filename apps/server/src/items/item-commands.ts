@@ -75,6 +75,7 @@ import { factorySkillDir } from '../skills/factory-skill-dir.ts';
 import { developmentModel } from '../t3/development-model.ts';
 import { verifyRecoveredExecution } from '../t3/execution-report.ts';
 import { liveWorktreePaths, protocolStartedThread } from '../t3/item-execution.ts';
+import { resumeLaunch, type LaunchContext } from '../t3/launch-thread.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
@@ -207,13 +208,14 @@ export interface ItemCommandsDeps {
     buildAccessOf?: (repo: string) => Partial<Record<'push-branch' | 'open-pr', OperationAccess>>;
     /** Starts a T3 thread; tests stand in for t3. */
     startThread?: typeof startThread;
+    resumeLaunch?: typeof resumeLaunch;
     showThread?: typeof lookupThread;
     /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
     recoverThread?: (
         projectId: string,
         messages: readonly string[],
         known: readonly string[],
-    ) => Promise<StartedThread | 'absent' | 'unknown'>;
+    ) => Promise<StartedThread | 'absent' | 'empty' | 'unknown'>;
     /** This machine's shaping thread cleanup choice, which throws when unreadable; tests stand in for the local setting. */
     shapingThreadCleanupChoice?: () => ShapingThreadCleanup;
     /** The project skills selected for the repository as builds start now; tests stand in for the local settings. */
@@ -302,7 +304,7 @@ async function recoverStartedThread(
     projectId: string,
     messages: readonly string[],
     known: readonly string[],
-): Promise<StartedThread | 'absent' | 'unknown'> {
+): Promise<StartedThread | 'absent' | 'empty' | 'unknown'> {
     try {
         const found = protocolStartedThread(projectId, messages, known);
 
@@ -363,6 +365,7 @@ export function createItemCommands({
     buildAccessOf = (repo) => readRepositorySetups().find((setup) => sameRepo(setup.repo, repo))?.access ?? {},
     showThread = lookupThread,
     startThread: startIn = startThread,
+    resumeLaunch: resume = resumeLaunch,
     recoverThread = recoverStartedThread,
     shapingThreadCleanupChoice = readShapingThreadCleanup,
     skillsOf = selectedSkills,
@@ -823,22 +826,44 @@ export function createItemCommands({
             (async (): Promise<Start> => {
                 const known = records!.threads(item.id).map((t) => t.threadId);
                 let found: Awaited<ReturnType<typeof recoverThread>>;
+                let replayed: StartResult | undefined;
 
                 try {
-                    found = await recoverThread(
-                        projectId,
-                        intent.recovery?.message ? [intent.recovery.message] : messages,
-                        known,
-                    );
+                    if (intent.request) {
+                        const result = await resume(intent.request, intent.intentId);
+
+                        replayed = result;
+
+                        if (!result.thread) {
+                            if (!result.uncertain)
+                                write(item.id, (revision) =>
+                                    records!.resolveLaunchIntent(item.id, revision, intent.intentId, {
+                                        failure: result.error ?? 'T3 refused the launch.',
+                                    }),
+                                );
+
+                            return result;
+                        }
+
+                        found = result.thread;
+                    } else
+                        found = await recoverThread(
+                            projectId,
+                            intent.recovery?.message ? [intent.recovery.message] : messages,
+                            known,
+                        );
                 } catch {
                     found = 'unknown';
                 }
 
                 if (typeof found === 'object') {
-                    let executionFailure: string | null = null;
+                    let executionFailure: string | null = replayed?.error ?? null;
 
                     if (evidence && evidence.result === 'running') {
-                        const { report, failure } = await verifyRecovered(found.threadId, evidence.requested);
+                        const { report, failure } =
+                            replayed?.executionReport !== undefined
+                                ? { report: replayed.executionReport, failure: replayed.error }
+                                : await verifyRecovered(found.threadId, evidence.requested);
 
                         executionFailure = failure;
                         records!.finishRoleRun(item.id, records!.read(item.id).revision, {
@@ -896,6 +921,13 @@ export function createItemCommands({
                     return { thread: null, error: `Needs you: ${NO_THREAD}`, refused: true };
                 }
 
+                if (found === 'empty')
+                    return {
+                        thread: null,
+                        uncertain: true,
+                        error: 'T3 has a matching thread, but its first message was not sent. Open it in T3 Code to continue; the board will not create a duplicate.',
+                    };
+
                 return { thread: null, error: MAY_HAVE_STARTED, uncertain: true };
             })(),
         );
@@ -948,7 +980,7 @@ export function createItemCommands({
         projectId: string,
         message: string,
         choice: ModelChoice | undefined,
-        ask: (message: string, selection?: ModelSelection) => Promise<StartResult>,
+        ask: (message: string, selection?: ModelSelection, context?: LaunchContext) => Promise<StartResult>,
         prepare: () => void = () => {},
         recovery = false,
         stagedRecovery?: { branch: string; reset: boolean; message?: string },
@@ -1022,7 +1054,11 @@ export function createItemCommands({
 
         asking.add(intent.intentId);
 
-        const result = await ask(message, run?.selection ?? choice).finally(() => asking.delete(intent.intentId));
+        const result = await ask(message, run?.selection ?? choice, {
+            commandId: intent.intentId,
+            remember: (request) =>
+                write(item.id, (revision) => records!.saveLaunchRequest(item.id, revision, intent.intentId, request)),
+        }).finally(() => asking.delete(intent.intentId));
 
         if (run && !result.uncertain) {
             if (result.thread && result.executionReport === undefined) {
@@ -1612,8 +1648,23 @@ export function createItemCommands({
                         const current = board.find(item.id) ?? item;
                         const message = workMessage(current, factoryContext);
 
-                        return launch(current, 'started', repoProject.projectId, message, choice, (text, selection) =>
-                            startIn(repoProject.projectId, text, selection),
+                        return launch(
+                            current,
+                            'started',
+                            repoProject.projectId,
+                            message,
+                            choice,
+                            (text, selection, context) =>
+                                startIn(
+                                    repoProject.projectId,
+                                    text,
+                                    selection,
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    context,
+                                ),
                         );
                     };
                 }),
@@ -1804,7 +1855,17 @@ export function createItemCommands({
                                     project.projectId,
                                     workMessage(item, factoryContext),
                                     choice,
-                                    (text, selection) => startIn(project.projectId, text, selection),
+                                    (text, selection, context) =>
+                                        startIn(
+                                            project.projectId,
+                                            text,
+                                            selection,
+                                            undefined,
+                                            undefined,
+                                            undefined,
+                                            undefined,
+                                            context,
+                                        ),
                                     undefined,
                                     true,
                                 );
@@ -1870,7 +1931,17 @@ export function createItemCommands({
                                 project.projectId,
                                 message,
                                 choice,
-                                (text, selection) => startIn(project.projectId, text, selection, workspace),
+                                (text, selection, context) =>
+                                    startIn(
+                                        project.projectId,
+                                        text,
+                                        selection,
+                                        workspace,
+                                        undefined,
+                                        undefined,
+                                        undefined,
+                                        context,
+                                    ),
                                 () => {
                                     if (!continuing) {
                                         write(itemId, (revision) =>
@@ -2020,7 +2091,17 @@ export function createItemCommands({
                             repoProject.projectId,
                             message,
                             choice,
-                            (text, selection) => startIn(repoProject.projectId, text, selection, { base, branch }),
+                            (text, selection, context) =>
+                                startIn(
+                                    repoProject.projectId,
+                                    text,
+                                    selection,
+                                    { base, branch },
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    context,
+                                ),
                             () => {
                                 snapshot();
 

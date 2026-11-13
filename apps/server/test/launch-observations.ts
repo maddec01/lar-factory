@@ -1,3 +1,4 @@
+import type { ThreadLaunchRequest } from '@lar-factory/shared';
 // Spawned board fixtures record a launch where the fake t3 records its calls, and answer like T3. Never reaches a real T3.
 import { executionSettingsOf } from '@lar-factory/shared/execution-target';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -31,3 +32,14 @@ export const launchThread: LaunchThread = async (projectId, text, selection, wor
         executionReport: { source: 't3', reference: threadId, actual: executionSettingsOf(selection) },
     };
 };
+
+export const resumeLaunch = (request: ThreadLaunchRequest, commandId: string) =>
+    launchThread(
+        request.projectId,
+        request.text,
+        request.selection,
+        request.workspace,
+        request.runtimeMode,
+        undefined,
+        commandId,
+    );

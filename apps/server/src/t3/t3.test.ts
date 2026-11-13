@@ -118,6 +118,22 @@ test('finding a started thread skips the recorded ones, and tells absent from un
     );
 });
 
+test('a matching empty thread is not reported missing or accepted as a started turn', async () => {
+    const { findStartedThread } = await import('./t3.ts');
+    const run: T3Run = async (args) => ({
+        code: 0,
+        stderr: '',
+        detail: '',
+        stdout: JSON.stringify(
+            args[1] === 'list'
+                ? [{ threadId: 'empty', title: 'Build' }]
+                : { thread: { threadId: 'empty' }, messages: [] },
+        ),
+    });
+
+    assert.equal(await findStartedThread('project', ['Build\nissue'], [], run), 'empty');
+});
+
 /** T3 answering with `threads`, each its title and first message, and listing a duplicated row as `duplicate`. */
 const threadsOf =
     (threads: Record<string, { title: string; text: string }>, duplicate?: string): T3Run =>
@@ -209,6 +225,49 @@ function launches(selection: ModelSelection | null, runtimeMode = 'full-access')
 
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 const MEDIUM = [{ id: 'effort', value: 'medium' }];
+
+test('a record-backed Project default launch freezes its resolved options and keeps its intent ID on an uncertain result', async () => {
+    const { startThread } = await import('./t3.ts');
+    const { run, calls } = t3With({});
+    const remember = vi.fn();
+    const request = {
+        projectId: 'project',
+        text: 'Build',
+        selection: { ...OPUS, options: MEDIUM },
+        workspace: { type: 'root' as const },
+        runtimeMode: 'full-access',
+    };
+    const launch: LaunchThread = async (
+        projectId,
+        text,
+        selection,
+        workspace,
+        runtimeMode,
+        _origin,
+        commandId,
+        save,
+    ) => {
+        assert.equal(commandId, 'saved-intent');
+        save!({ projectId, text, selection, workspace, runtimeMode });
+
+        return { thread: null, uncertain: true, error: 'First turn not confirmed.' };
+    };
+    const answer = await startThread(
+        'project',
+        'Build',
+        undefined,
+        undefined,
+        run,
+        () => ({ selection: request.selection, runtimeMode: request.runtimeMode }),
+        launch,
+        { commandId: 'saved-intent', remember },
+    );
+
+    assert.equal(answer.uncertain, true);
+    assert.equal(answer.error, 'First turn not confirmed.');
+    assert.deepEqual(remember.mock.calls, [[request]]);
+    assert.deepEqual(calls, [], 'the saved command is resumed instead of a title-based CLI lookup');
+});
 
 test('a development run freezes model and effort for default launches while allowing an explicit other model', async () => {
     const { startThread } = await import('./t3.ts');

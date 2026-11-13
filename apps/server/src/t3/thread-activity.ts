@@ -102,15 +102,11 @@ const underWay = (item: ActivityItemRow): boolean =>
     item.runLive !== 0 && (isTool(item) ? UNFINISHED.has(item.status) : !!item.streaming);
 
 /**
- * What a thread or agent's items say now. `current` keeps only the items of a run still at work, so a new run with no
- * items yet has no action rather than its last run's. Otherwise, as when a thread's run ended and its agents work on, its
- * last items count, as finished. Finished text moves the time on without naming an action.
+ * Only live runs name an action, so a new run with no items cannot show its previous run's tool.
+ * Native subagent items have no run and use their agent's liveness. Finished text moves the time on.
  */
-function actionFrom(
-    items: ActivityItemRow[],
-    current: boolean,
-): { action?: string; actionAt?: string; toolRunning: boolean } {
-    const shown = items.filter((item) => !current || item.runLive !== 0);
+function actionFrom(items: ActivityItemRow[]): { action?: string; actionAt?: string; toolRunning: boolean } {
+    const shown = items.filter((item) => item.runLive !== 0);
     const newestFirst = shown.filter((item) => timeOf(item)).sort((a, b) => timeOf(b)!.localeCompare(timeOf(a)!));
     const action = newestFirst.map((item) => actionOf(underWay(item) ? item : { ...item, streaming: 0 })).find(Boolean);
 
@@ -142,10 +138,10 @@ export interface ActivityRows {
 
 /** The activity these rows say. */
 export function threadActivity({ items, runLive, agents, commandRunning, readAt }: ActivityRows): ThreadActivity {
-    const { toolRunning, ...own } = actionFrom(items, runLive);
+    const { toolRunning, ...own } = actionFrom(runLive ? items : []);
     let anyTool = toolRunning || commandRunning;
     const working = agents.map(({ row, items: agentItems }): ThreadAgent => {
-        const { toolRunning: agentTool, action, actionAt } = actionFrom(agentItems, true);
+        const { toolRunning: agentTool, action, actionAt } = actionFrom(agentItems);
 
         anyTool ||= agentTool;
 
@@ -246,7 +242,11 @@ export function activityReads(
     return {
         /** The thread with its activity when it is at work, as T3 shows it now. A thread seen only through an outage is unavailable. */
         read: (thread: ItemThread): ItemThread => {
-            if (!isLiveThread(thread) && !thread.hasRunningChildren) return thread;
+            if (!isLiveThread(thread) && !thread.hasRunningChildren) {
+                const { activity: _, ...finished } = thread;
+
+                return finished;
+            }
 
             if (thread.observedAt) return { ...thread, activity: UNAVAILABLE };
 

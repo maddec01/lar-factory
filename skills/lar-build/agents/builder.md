@@ -75,7 +75,7 @@ Build step 1 and plan from the brief.
    has slices (`lar-work children <work ID>`) starts a re-slice planner if any
    unfinished slice is blocked, and goes to **Implement**.
    Otherwise decide whether this is a **Small build**: one change, or every
-   part touches the same files. Implement a Small build yourself in this
+   part touches the same files. Set phase `implement`, then implement a Small build yourself in this
    worktree, test first per `<lar-build>/test-first.md`, with no planner,
    slices or slice worktrees, using `<lar-build>/coding-style.md`,
    plus `<lar-build>/design-modules.md` when a module's shape changes. Commit
@@ -321,7 +321,7 @@ with `configuration.isBlocking` true is a required check whose `status` is
 `approved` or `notApplicable` when green, `rejected` when failed, and `queued`
 or `running` while it runs. Then:
 
-- **Required checks green**: set the recommended status,
+- **Required checks green**: run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
   `unwatch_pull_request`, go to **Retro**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with `ci-fixer.md`, the build's work ID, repo path, PR URL and
@@ -330,10 +330,10 @@ or `running` while it runs. Then:
   tree before handback. It records its own reuse reasons or reruns only checks
   it cannot justify, without restarting reviews or repeating unaffected checks.
   Then have the CI fixer update the PR's Checks section from the record and
-  use the updated status recommendation. Then end your turn.
+  use the updated status recommendation. Then restart **Checks**.
 - **Anything else** (checks running, a comment or review, a non-required check
   failing, a run cancelled by a newer run on the same head):
-  end your turn. Non-required checks never block the status or start a fix.
+  end your turn only while required checks are pending. Non-required checks never block the status or start a fix.
 
 Set **Needs you** when the CI fixer returns `infrastructure` or `not fixed`, or
 a required check fails or the branch conflicts after two CI fixer runs (every

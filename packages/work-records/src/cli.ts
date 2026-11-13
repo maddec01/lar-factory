@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { refreshBoards } from './board-refresh.ts';
 import { changeKind, checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
 import { createRecordTicket } from './create-ticket.ts';
@@ -978,6 +979,9 @@ async function main(args: string[]): Promise<number> {
         records = await openWorkRecords(workRecordsPath(values['data-dir']));
 
         const result = await run(records, command, workId, values);
+
+        if (command === 'set-phase') await refreshBoards(workId!, values['data-dir']);
+
         const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
 
         if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });

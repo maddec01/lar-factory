@@ -1,8 +1,21 @@
-import { type BoardData } from './board-domain.ts';
 // Project settings and onboarding contracts.
+
+import { type BoardData, type ModelSelection } from './board-domain.ts';
 import { type Item } from './item-domain.ts';
 import type { RoleRunFinish } from './run-settings.ts';
 import type { ThreadActivity } from './thread-activity.ts';
+
+/** Frozen before a launch is sent, so an interrupted launch replays the same T3 command. */
+export interface ThreadLaunchRequest {
+    projectId: string;
+    text: string;
+    selection: ModelSelection;
+    workspace:
+        | { type: 'root' }
+        | { type: 'worktree'; baseRef: string; branch: string }
+        | { type: 'existing_worktree'; worktreePath: string; branch: string };
+    runtimeMode: string;
+}
 
 /** What the board offers for work that needs you. */
 export const NEEDS_YOU_OFFERS = [

@@ -5,7 +5,13 @@ import { isRecord, type ModelSelection, type StartedThread, type StartResult } f
 import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 import { developmentModel } from './development-model.ts';
-import { launchThread, type ExistingWorktree, type LaunchThread, type LaunchWorkspace } from './launch-thread.ts';
+import {
+    launchThread,
+    type ExistingWorktree,
+    type LaunchContext,
+    type LaunchThread,
+    type LaunchWorkspace,
+} from './launch-thread.ts';
 import { launchSelection, projectDefaults, type ProjectDefaults } from './model-choices.ts';
 
 const UNCERTAIN: StartResult = {
@@ -22,7 +28,8 @@ export interface NewWorktree {
 
 /**
  * A model choice launches through T3's `orchestration.launchThread`, whose selection can hold options, which the CLI's
- * can't. Without one, `t3 thread start <project id> <message> --json` lets T3 use the project's default; `worktree`
+ * can't. Record-backed starts resolve Project default too, so its request can be replayed. Without a readable selection,
+ * `t3 thread start <project id> <message> --json` lets T3 choose; `worktree`
  * adds `--worktree <base> --branch <branch>` to run the thread in a new worktree instead of the project's folder.
  */
 export async function startThread(
@@ -33,9 +40,10 @@ export async function startThread(
     run: T3Run = runT3,
     defaults: (project: string) => ProjectDefaults | null = projectDefaults,
     launch: LaunchThread = launchThread,
+    context?: LaunchContext,
 ): Promise<StartResult> {
     const development = developmentModel();
-    const selected = choice ?? development;
+    const selected = choice ?? development ?? (context ? (defaults(project)?.selection ?? undefined) : undefined);
     const existing = worktree && 'type' in worktree ? worktree : undefined;
     const created = worktree && !('type' in worktree) ? worktree : undefined;
 
@@ -50,19 +58,24 @@ export async function startThread(
         const selection =
             choice?.options !== undefined ? choice : launchSelection(selected, development ?? found.selection);
 
+        const send: LaunchThread = (projectId, text, model, workspace, mode) =>
+            context
+                ? launch(projectId, text, model, workspace, mode, undefined, context.commandId, context.remember)
+                : launch(projectId, text, model, workspace, mode);
+
         // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
         if (existing) {
-            const result = await launch(project, message, selection, existing, 'approval-required');
+            const result = await send(project, message, selection, existing, 'approval-required');
 
-            return result.uncertain ? UNCERTAIN : result;
+            return result.uncertain && !context ? UNCERTAIN : result;
         }
 
         const workspace: LaunchWorkspace = created
             ? { type: 'worktree', baseRef: created.base, branch: created.branch }
             : { type: 'root' };
-        const result = await launch(project, message, selection, workspace, found.runtimeMode);
+        const result = await send(project, message, selection, workspace, found.runtimeMode);
 
-        return result.uncertain ? recoverStart(project, message, run) : result;
+        return result.uncertain && !context ? recoverStart(project, message, run) : result;
     }
 
     const where = created ? ['--worktree', created.base, '--branch', created.branch] : [];
@@ -119,7 +132,7 @@ export async function findStartedThread(
     messages: readonly string[],
     known: readonly string[],
     run: T3Run = runT3,
-): Promise<StartedThread | 'absent' | 'unknown'> {
+): Promise<StartedThread | 'absent' | 'empty' | 'unknown'> {
     try {
         const listed = await run(['thread', 'list', '--project', project, '--json'], 10_000);
 
@@ -130,6 +143,7 @@ export async function findStartedThread(
         if (!Array.isArray(threads)) return 'unknown';
 
         const matches = new Map<string, StartedThread>();
+        let empty = false;
 
         for (const thread of threads) {
             if (!isRecord(thread) || typeof thread.threadId !== 'string') return 'unknown';
@@ -153,11 +167,13 @@ export async function findStartedThread(
 
             const first = answer.messages.find((entry) => isRecord(entry) && entry.role === 'user');
 
+            if (!first) empty = true;
+
             if (isRecord(first) && messages.some((message) => first.text === message))
                 matches.set(thread.threadId, { threadId: thread.threadId, title: String(thread.title) });
         }
 
-        return matches.size === 1 ? [...matches.values()][0]! : matches.size ? 'unknown' : 'absent';
+        return empty ? 'empty' : matches.size === 1 ? [...matches.values()][0]! : matches.size ? 'unknown' : 'absent';
     } catch {
         return 'unknown';
     }

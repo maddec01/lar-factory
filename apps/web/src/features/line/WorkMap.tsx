@@ -6,6 +6,7 @@ import { ref } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useId, useState } from 'react';
 
+import { CompactWorkMap } from './CompactWorkMap';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
 import type { Part } from './DossierParts';
 import { useWidth } from './useWidth';
@@ -56,6 +57,7 @@ export function WorkMap({
     if (!parts.length && !check) return null;
 
     const m = layout(parts, data, width, Boolean(check));
+    const compact = width > 0 && width < 600;
     const at = new Map(m.placed.map((p) => [p.key, p]));
     const near = (key: string) =>
         !hover ||
@@ -71,96 +73,112 @@ export function WorkMap({
 
     return (
         <WorkMapFrame frameRef={box}>
-            <MapCanvas width={m.width} height={m.height}>
-                {m.bands.map((b, n) => (
-                    <MapBand key={b.lane} index={n} top={b.top} height={b.height} width={m.width} labelWidth={LABEL_W}>
-                        {b.lane === PREREQUISITES ? (
-                            <MapLaneName lane="decisions">Prerequisites</MapLaneName>
-                        ) : b.lane === DECISIONS ? (
-                            <MapLaneName lane="decisions">{DECISIONS}</MapLaneName>
-                        ) : b.lane === home ? (
-                            <MapLaneName lane="builds">Builds</MapLaneName>
-                        ) : (
-                            <RepoIdentity repo={b.lane} data={data} />
-                        )}
-                    </MapBand>
-                ))}
-                <MapEdges
-                    width={m.width}
-                    height={m.height}
-                    markerId={marker}
-                    edges={m.edges.flatMap((e) => {
-                        const a = at.get(e.from),
-                            b = at.get(e.to);
-                        const d = edgeLine(m, a, b);
+            {compact && <CompactWorkMap map={m} width={width} check={check} data={data} home={home} />}
+            <MapCanvas
+                width={compact ? width : m.width}
+                height={compact ? (history.length ? GROUP_H + 16 : 0) : m.height}
+            >
+                {!compact &&
+                    m.bands.map((b, n) => (
+                        <MapBand
+                            key={b.lane}
+                            index={n}
+                            top={b.top}
+                            height={b.height}
+                            width={m.width}
+                            labelWidth={LABEL_W}
+                        >
+                            {b.lane === PREREQUISITES ? (
+                                <MapLaneName lane="decisions">Prerequisites</MapLaneName>
+                            ) : b.lane === DECISIONS ? (
+                                <MapLaneName lane="decisions">{DECISIONS}</MapLaneName>
+                            ) : b.lane === home ? (
+                                <MapLaneName lane="builds">Builds</MapLaneName>
+                            ) : (
+                                <RepoIdentity repo={b.lane} data={data} />
+                            )}
+                        </MapBand>
+                    ))}
+                {!compact && (
+                    <MapEdges
+                        width={m.width}
+                        height={m.height}
+                        markerId={marker}
+                        edges={m.edges.flatMap((e) => {
+                            const a = at.get(e.from),
+                                b = at.get(e.to);
+                            const d = edgeLine(m, a, b);
 
-                        if (!d) return [];
+                            if (!d) return [];
 
-                        const lit = !!hover && (e.from === hover || e.to === hover);
+                            const lit = !!hover && (e.from === hover || e.to === hover);
 
-                        return [
-                            {
-                                key: `${e.from} ${e.to}`,
-                                d,
-                                kind: e.kind,
-                                done:
-                                    e.from === HISTORY ||
-                                    (!!a?.part && isDone(a.part.item)) ||
-                                    a?.prerequisite?.blocker.state === 'closed',
-                                lit,
-                                dim: !!hover && !lit,
-                            },
-                        ];
+                            return [
+                                {
+                                    key: `${e.from} ${e.to}`,
+                                    d,
+                                    kind: e.kind,
+                                    done:
+                                        e.from === HISTORY ||
+                                        (!!a?.part && isDone(a.part.item)) ||
+                                        a?.prerequisite?.blocker.state === 'closed',
+                                    lit,
+                                    dim: !!hover && !lit,
+                                },
+                            ];
+                        })}
+                    />
+                )}
+                {!compact &&
+                    m.edges.map((e) => {
+                        if (!e.label) return null;
+
+                        const to = at.get(e.to),
+                            from = at.get(e.from);
+                        const place = to
+                            ? // In the gap over the node it leads to, 8px from each node.
+                              { left: to.x, top: to.y - GAP + 8, width: m.nodeW }
+                            : from
+                              ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 }
+                              : null;
+
+                        return (
+                            place && (
+                                <MapEdgeLabel
+                                    key={`${e.from}-${e.to}`}
+                                    edge={`${e.from} ${e.to}`}
+                                    label={e.label}
+                                    names={e.names ?? ''}
+                                    left={place.left}
+                                    top={place.top}
+                                    maxWidth={place.width}
+                                    onOpen={() => setShowHistory(true)}
+                                />
+                            )
+                        );
                     })}
-                />
-                {m.edges.map((e) => {
-                    if (!e.label) return null;
-
-                    const to = at.get(e.to),
-                        from = at.get(e.from);
-                    const place = to
-                        ? // In the gap over the node it leads to, 8px from each node.
-                          { left: to.x, top: to.y - GAP + 8, width: m.nodeW }
-                        : from
-                          ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 }
-                          : null;
-
-                    return (
-                        place && (
-                            <MapEdgeLabel
-                                key={`${e.from}-${e.to}`}
-                                edge={`${e.from} ${e.to}`}
-                                label={e.label}
-                                names={e.names ?? ''}
-                                left={place.left}
-                                top={place.top}
-                                maxWidth={place.width}
-                                onOpen={() => setShowHistory(true)}
-                            />
-                        )
-                    );
-                })}
-                {m.placed.map((p) => (
-                    <MapNode
-                        key={p.key}
-                        left={p.x}
-                        top={p.y}
-                        dim={!near(p.key)}
-                        onHover={(on) => setHover(on ? p.key : null)}
-                    >
-                        {p.prerequisite ? (
-                            <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} />
-                        ) : p.part ? (
-                            <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
-                        ) : (
-                            check && <CheckNode check={check} width={m.nodeW} after={builds} />
-                        )}
-                    </MapNode>
-                ))}
+                {!compact &&
+                    m.placed.map((p) => (
+                        <MapNode
+                            key={p.key}
+                            left={p.x}
+                            top={p.y}
+                            dim={!near(p.key)}
+                            onHover={(on) => setHover(on ? p.key : null)}
+                        >
+                            {p.prerequisite ? (
+                                <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} />
+                            ) : p.part ? (
+                                <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
+                            ) : (
+                                check && <CheckNode check={check} width={m.nodeW} after={builds} />
+                            )}
+                        </MapNode>
+                    ))}
                 {history.length > 0 && (
                     <MapHistoryGroup
                         open={showHistory}
-                        top={m.groupY}
+                        top={compact ? 8 : m.groupY}
                         height={GROUP_H}
                         dim={!near(HISTORY)}
                         glyph={<StatusGlyph status="Done" />}

@@ -257,3 +257,62 @@ test('the concept shows active builds, total progress and an explicit capacity w
     expect($('[data-concept-build-run]')!.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(text($('[data-concept-parts]'))).toContain('Waiting for shared build capacity.');
 });
+
+test.each([
+    { auto: true, state: null, waiting: true, label: null },
+    { auto: false, state: null, waiting: false, label: null },
+    { auto: false, state: null, waiting: true, label: 'Start remaining concept builds' },
+    { auto: true, state: 'paused', waiting: true, label: 'Start remaining concept builds' },
+    { auto: true, state: 'running', waiting: true, label: 'Pause concept builds' },
+] as const)('concept action adds work for %j', async ({ auto, state, waiting, label }) => {
+    const parent = sample.items.find((item) => item.kind === 'concept')!;
+    const base = sample.items.find((item) => item.kind !== 'concept')!;
+    const parts: Item[] = [false, false, ...(waiting ? [true] : [])].map((ready, index) => ({
+        ...base,
+        id: `part-${index}`,
+        title: `Part ${index}`,
+        kind: 'build',
+        parentId: parent.id,
+        parent: null,
+        status: ready ? 'Ready' : 'In progress',
+        threads: [],
+        blockers: [],
+    }));
+    const data: BoardData = {
+        ...sample,
+        autoBuild: { on: auto },
+        items: [
+            {
+                ...parent,
+                conceptBuild: {
+                    run: state ? { state, startedAt: '2026-01-01', prepared: {} } : null,
+                    holds: [],
+                    members: parts.map((item) => ({
+                        workId: item.id,
+                        title: item.title,
+                        repository: item.repo,
+                        kind: item.kind,
+                        status: item.status,
+                        waits: [],
+                        complete: false,
+                    })),
+                },
+            },
+            ...parts,
+        ],
+    };
+
+    holdPosts(data);
+    await mountPage(data);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(parent.id));
+
+    const actions = [...$('[data-concept-build-run]')!.querySelectorAll('button')].map(text);
+
+    expect(actions).toEqual(label ? [label] : []);
+    expect(text($('[data-concept-build-progress]'))).toContain(`2 building · ${waiting ? 1 : 0} waiting`);
+
+    if (!label) expect($('[data-concept-build-action]')).toBeNull();
+});

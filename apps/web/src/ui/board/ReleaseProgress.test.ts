@@ -87,10 +87,37 @@ test('ships-with links and delivery holds identify the affected parts by name', 
         }),
     );
     expect(root.textContent).toContain('Ships with: Update server links + Read invitation links in the app');
-    expect(root.textContent).toContain('Read invitation links in the app is not done.');
-    expect(root.textContent).toContain('Open questions remain.');
+    expect(root.querySelector('summary')?.textContent).toContain('1 part not built yet');
+    expect(root.querySelector('details')?.open).toBe(false);
+    expect(root.querySelector('details li')?.textContent).toBe('Read invitation links in the app');
+    expect(root.textContent).toContain('Open questions still need answers.');
     expect(root.textContent).not.toContain('Fog');
     expect(root.textContent).toContain('Pedro · Pending');
     expect(root.textContent).not.toContain(app);
     expect(root.textContent).not.toContain(server);
+});
+
+test('ten unfinished builds fold into one summary beside the questions, release and Outcome holds', () => {
+    const root = document.createElement('div');
+
+    root.innerHTML = renderToStaticMarkup(
+        createElement(ReleaseProgress, {
+            plan: {
+                steps: [{ id: 'ship', who: 'Pedro', what: 'Ship together', done: null }],
+                outcomeCheck: { what: 'Links open', result: 'pending', evidence: null },
+            },
+            remaining: [
+                "Its Fog isn't gone.",
+                'Release step ship: Pedro must Ship together',
+                'Outcome check pending: Links open',
+                ...Array.from({ length: 10 }, (_, i) => `Its build part-${i} isn't Done.`),
+            ],
+            name: (id) => id,
+        }),
+    );
+    expect(root.querySelector('summary')?.textContent).toContain('10 parts not built yet');
+    expect(root.querySelectorAll('details li')).toHaveLength(10);
+    expect(root.querySelectorAll('ul[aria-label="What\'s left"] > li')).toHaveLength(4);
+    expect(root.textContent).toContain('Ship together · Pedro');
+    expect(root.textContent).toContain('Outcome check pending: Links open');
 });

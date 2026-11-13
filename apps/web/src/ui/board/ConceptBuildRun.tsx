@@ -3,6 +3,7 @@ import { Button, Disclosure, Text } from '@lar-works/design-system';
 
 import { buttonKind } from './ButtonKinds';
 import { DetailsSection } from './ItemDetailSections';
+import { workHoldReason } from './work-hold-reason';
 
 /** A concept's authorization and complete preflight, separate from its shaping action. */
 export function ConceptBuildRun({
@@ -34,14 +35,14 @@ export function ConceptBuildRun({
             {...buttonKind('main')}
             loading={pending}
             disabled={!running && plan.holds.length > 0}
-            title={plan.holds.map((hold) => hold.reason).join(' ')}
+            title={plan.holds.map((hold) => workHoldReason(hold.reason)).join(' ')}
             onClick={() => onChange(running ? 'paused' : 'running')}
         >
             {running ? 'Pause concept builds' : startLabel}
         </Button>
     );
 
-    if (compact && finished) return null;
+    if (compact && (finished || !showAction)) return null;
 
     if (compact)
         return (
@@ -54,7 +55,7 @@ export function ConceptBuildRun({
                             aria-label="Concept build holds"
                         >
                             {plan.holds.map((hold, index) => (
-                                <li key={`${hold.workId}-${index}`}>{hold.reason}</li>
+                                <li key={`${hold.workId}-${index}`}>{workHoldReason(hold.reason)}</li>
                             ))}
                         </ul>
                     </Disclosure>
@@ -89,7 +90,7 @@ export function ConceptBuildRun({
             {plan.holds.length > 0 && (
                 <ul className="m-0 grid list-disc gap-1 pl-4 text-left text-sm" aria-label="Concept build holds">
                     {plan.holds.map((hold, index) => (
-                        <li key={`${hold.workId}-${index}`}>{hold.reason}</li>
+                        <li key={`${hold.workId}-${index}`}>{workHoldReason(hold.reason)}</li>
                     ))}
                 </ul>
             )}

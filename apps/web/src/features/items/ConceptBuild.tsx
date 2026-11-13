@@ -1,4 +1,4 @@
-import { groupCapacityWait, startActionChoice } from '@lar-factory/shared';
+import { groupCapacityWait } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { useState } from 'react';
 
@@ -21,6 +21,14 @@ export function ConceptBuild({
     const [error, setError] = useState<string | null>(null);
 
     if (!item.conceptBuild) return null;
+
+    const progress = conceptBuildProgress(item, data);
+    const running = item.conceptBuild.run?.state === 'running';
+    const paused = item.conceptBuild.run?.state === 'paused';
+    // Auto-build already schedules these parts. Play adds work only when it authorizes a waiting run.
+    const addsWork = (!data.autoBuild?.on || paused) && (!progress.total || progress.waiting > progress.outside);
+    const startLabel =
+        progress.building || progress.complete ? 'Start remaining concept builds' : 'Start concept builds';
 
     const change = async (state: 'running' | 'paused') => {
         setPending(true);
@@ -45,9 +53,9 @@ export function ConceptBuild({
             plan={item.conceptBuild}
             compact={compact}
             capacity={groupCapacityWait(item, data)}
-            showAction={showAction}
-            startLabel={startActionChoice(item, 'build').label}
-            progress={conceptBuildProgress(item, data)}
+            showAction={showAction && (running || addsWork)}
+            startLabel={startLabel}
+            progress={progress}
             pending={pending}
             error={error}
             onChange={(state) => void change(state)}

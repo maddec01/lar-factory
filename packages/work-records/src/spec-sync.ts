@@ -1,5 +1,7 @@
 import {
     formatTicketSpec,
+    markSpecFreshness,
+    withoutSpecFreshness,
     readTicketSpec,
     readTrackerStructure,
     stripTrackerStructure,
@@ -38,7 +40,7 @@ const checkpoint = (ticket: StructureTicket): SpecRemote => ({
     body: ticket.body,
     title: ticket.title ?? '',
     version: ticket.version,
-    digest: sha(JSON.stringify([stripTrackerStructure(ticket.body), ticket.title ?? ''])),
+    digest: sha(JSON.stringify([withoutSpecFreshness(stripTrackerStructure(ticket.body)), ticket.title ?? ''])),
     editorWrite: ticket.editorWrite,
     titleEditorWrite: ticket.titleEditorWrite,
 });
@@ -135,18 +137,19 @@ async function readFresh(
     options: SpecSyncOptions,
     provider: StructureProvider,
 ): Promise<StructureTicket | null> {
-    if (!records.specEligible(workId)) return null;
-
     const record = records.read(workId);
+
+    if (!record.ticket || record.kind === 'slice') return null;
+
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
 
-    if (!allowed(setup)) return null;
-
     const before = records.specState(workId);
 
-    if (!before.active && before.pending === null && !options.initialize) return null;
+    if (!setup || (!allowed(setup) && (before.active || before.pending !== null))) return null;
+
+    // Starting requests are refreshed too, before the first approved Spec exists.
 
     try {
         if (!provider.readSpec) throw Error('The provider cannot read ticket Specs.');
@@ -162,7 +165,64 @@ async function readFresh(
 
         if (records.specState(workId).generation !== before.generation) return null;
 
-        if (!before.base || (!before.active && before.pending === null)) {
+        if (!before.active && before.pending === null) {
+            const parsed = content(ticket);
+            const startingContext = toMarkdown(parsed.original ?? parsed.spec, record.repository);
+
+            if (remote.digest === before.base?.digest) {
+                if (before.failure === 'read' && before.error)
+                    save(records, workId, { ...before, error: null, warning: null });
+
+                return ticket;
+            }
+
+            const bodyChanged = startingContext !== records.initialContext(workId);
+            const titleChanged = remote.title !== record.title;
+
+            if (
+                !azure(record.repository) &&
+                ((bodyChanged && remote.editorWrite !== true) || (titleChanged && remote.titleEditorWrite !== true))
+            ) {
+                if (before.held?.digest !== remote.digest)
+                    save(records, workId, {
+                        ...before,
+                        held: remote,
+                        error: null,
+                        warning:
+                            'A starting ticket edit has unknown or non-write provenance. Accept or reject it before using its text.',
+                    });
+
+                return null;
+            }
+
+            save(
+                records,
+                workId,
+                {
+                    ...before,
+                    base: remote,
+                    startingContext,
+                    original: before.original ?? records.initialContext(workId),
+                    held: null,
+                    error: null,
+                    warning: null,
+                },
+                bodyChanged || titleChanged
+                    ? {
+                          text: startingContext,
+                          contextOnly: true,
+                          title: remote.title,
+                          source: 'tracker',
+                          identity: 'tracker',
+                          evidence: 'Trusted starting ticket request refreshed.',
+                      }
+                    : undefined,
+            );
+
+            return ticket;
+        }
+
+        if (!before.base) {
             save(records, workId, {
                 ...before,
                 base: remote,
@@ -292,7 +352,7 @@ export async function refreshSpecs(records: WorkRecords, options: SpecSyncOption
               .filter((record) => {
                   const state = records.specState(record.workId);
 
-                  return state.active || state.pending !== null;
+                  return state.active || state.pending !== null || (Boolean(record.ticket) && record.kind !== 'slice');
               })
               .map((record) => record.workId));
 
@@ -327,12 +387,31 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
         await lease.assertOwned();
         await syncTitles(records, provider, setups, options.workId, () => lease.assertOwned());
 
-        for (const workId of options.workId ? [options.workId] : records.specPending()) {
+        for (const workId of options.workId
+            ? [options.workId]
+            : [
+                  ...new Set([
+                      ...records.specPending(),
+                      ...records
+                          .list({})
+                          .filter((r) => records.specState(r.workId).active)
+                          .map((r) => r.workId),
+                  ]),
+              ]) {
             if (!records.specEligible(workId)) continue;
 
             let state = records.specState(workId);
 
-            if (state.pending === null || state.held || (!options.workId && (state.retryAfter ?? 0) > Date.now()))
+            const freshnessChanged =
+                state.active &&
+                state.base &&
+                (state.base.body !== withoutSpecFreshness(state.base.body)) !== !records.gate(workId).current;
+
+            if (
+                (state.pending === null && !freshnessChanged) ||
+                state.held ||
+                (!options.workId && (state.retryAfter ?? 0) > Date.now())
+            )
                 continue;
 
             const record = records.read(workId);
@@ -358,9 +437,9 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
 
                 state = records.specState(workId);
 
-                if (!ticket || state.pending === null || state.held) continue;
+                if (!ticket || (state.pending === null && !state.active) || state.held) continue;
 
-                if (records.body(workId, 'brief') !== state.pending) {
+                if (state.pending !== null && records.body(workId, 'brief') !== state.pending) {
                     save(records, workId, {
                         ...state,
                         pending: null,
@@ -371,14 +450,20 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
 
                 if (!provider.replaceSpec) throw Error('The provider cannot write ticket Specs.');
 
-                const body = outgoing(ticket, state.pending, state.original);
+                const publishedSpec = state.pending ?? content(ticket).spec;
+                const body = markSpecFreshness(
+                    state.pending === null ? ticket.body : outgoing(ticket, state.pending, state.original),
+                    !records.gate(workId).current,
+                );
+
+                if (body === ticket.body) continue;
 
                 await lease.assertOwned();
 
                 if (records.specState(workId).generation !== state.generation) continue;
 
                 if (
-                    !save(records, workId, { ...state, sent: { body, title: ticket.title ?? '', spec: state.pending } })
+                    !save(records, workId, { ...state, sent: { body, title: ticket.title ?? '', spec: publishedSpec } })
                 )
                     continue;
 
@@ -405,7 +490,7 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                         original,
                         base: checkpoint(written),
                         error: null,
-                        warning: null,
+                        warning: state.pending === null ? state.warning : null,
                     });
                 else if (latest.ticket === state.ticket && latest.base?.digest === state.base?.digest) {
                     // A newer gate queued while our authorized write was in flight. It remains pending against our own write.
@@ -455,7 +540,8 @@ export async function resolveSpecEdit(
         sameRepo(setup.repo, record.repository),
     );
 
-    if (!allowed(setup)) throw Error('Spec sync is off for this repository.');
+    if (!setup || (!allowed(setup) && (records.specState(workId).active || records.specState(workId).pending !== null)))
+        throw Error('Spec sync is off for this repository.');
 
     const state = records.specState(workId);
 
@@ -466,10 +552,14 @@ export async function resolveSpecEdit(
 
     const remote = state.held;
     const accepted = choice === 'accept';
+    const contextOnly = !state.active && state.pending === null;
+    const parsed = content(remote);
+    const context = toMarkdown(parsed.original ?? parsed.spec, record.repository);
     const next = {
         ...state,
+        ...(contextOnly && accepted ? { startingContext: context } : {}),
         sent: undefined,
-        active: accepted || state.active,
+        active: (!contextOnly && accepted) || state.active,
         base: remote,
         held: null,
         error: null,
@@ -484,7 +574,10 @@ export async function resolveSpecEdit(
             next,
             accepted
                 ? {
-                      text: toMarkdown(readTicketSpec(stripTrackerStructure(remote.body)).spec, record.repository),
+                      text: contextOnly
+                          ? context
+                          : toMarkdown(readTicketSpec(stripTrackerStructure(remote.body)).spec, record.repository),
+                      contextOnly,
                       title: remote.title,
                       source: 'user',
                       identity,
@@ -553,18 +646,18 @@ export async function editSpec(
 
 /** Only already-synced, enabled Specs replace the details' ordinary tracker view. */
 export function activeSpecState(records: WorkRecords, workId: string, options: SpecSyncOptions = {}): SpecState | null {
-    if (!records.specEligible(workId)) return null;
+    if (!records.read(workId).ticket || records.read(workId).kind === 'slice') return null;
 
     const state = records.specState(workId);
 
-    if (!state.active && state.pending === null) return null;
+    if (!state.active && state.pending === null && !state.held && !state.warning) return null;
 
     const record = records.read(workId);
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
 
-    return allowed(setup) ? state : null;
+    return allowed(setup) || (Boolean(setup) && !state.active && state.pending === null) ? state : null;
 }
 
 /** A successful local conversion already wrote a gated Spec through the shared create machinery. */

@@ -432,7 +432,8 @@ redundant blocker paths, unincorporated answers, stale approved gates, held tick
 edits, ticket title/Spec mismatches and pending/failed approved writes. The group
 shows **Out of date: N items** immediately after a recorded change, including
 changes read from a ticket. Compact summaries group the work to re-check with
-expandable item names; full instructions remain in the thread checklist. No tracker request runs inside this command.
+expandable item names; full instructions remain in the thread checklist.
+No tracker request runs inside this command.
 
 The owning thread repairs affected records, re-gates changed briefs through Doubt
 and Pedro's board approval. It records each
@@ -460,6 +461,13 @@ Changed ungated text stays local until approved. The ticket keeps the last
 approved Spec and the group shows Out-of-date Spec. Preparing the group for
 Build includes gating those changes.
 No view claims an ungated ticket already contains the new approved scope.
+The tracker keeps the approved bytes and Original, adding a visible Out-of-date
+Spec notice outside them. That notice is removed after renewed approval and sync;
+failed writes retain a visible retry state. Before a Spec exists, trusted ticket
+body/title edits refresh the starting request in the record and pick-up/details,
+without creating a brief or gate. Unknown GitHub provenance uses the same held-edit
+accept/reject path. Read failures retain the last trusted request with a warning;
+a running build keeps the starting request frozen in its launch input.
 
 Linked work uses the same operations and blocker graph across Projects. Each
 delivery build changes one repository. Work in an onboarded repository becomes

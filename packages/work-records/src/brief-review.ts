@@ -54,6 +54,7 @@ export interface DoubtReview {
 interface ReviewSource {
     workId: string;
     title: string;
+    request: string;
     repository: string;
     kind: string;
     parentId: string | null;
@@ -113,6 +114,13 @@ export function briefReviewRecords(
         return {
             workId: record.workId,
             title: record.title,
+            request: String(
+                db
+                    .prepare(
+                        "SELECT coalesce((SELECT json_extract(state, '$.startingContext') FROM ticket_specs WHERE work_id = ?), initial_context) AS request FROM work_records WHERE work_id = ?",
+                    )
+                    .get(record.workId, record.workId)?.request ?? '',
+            ),
             repository: record.repository,
             kind: record.kind,
             parentId: record.parentId,

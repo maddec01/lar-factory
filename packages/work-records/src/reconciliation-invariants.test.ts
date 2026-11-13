@@ -124,3 +124,67 @@ function setSteps(
 
     return records.releaseSteps(id);
 }
+
+test('changed starting tickets reach the group checklist and Doubt; unknown edits remain mechanical holds', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'reconcile-ticket-'));
+    const records = await openWorkRecords(join(dir, 'records.db'));
+
+    try {
+        const g = records.create({ title: 'Group', repository: 'fake/api', kind: 'concept' });
+        let b = records.createPart({
+            title: 'Read request',
+            repository: 'fake/api',
+            parentId: g.workId,
+            parentRevision: records.read(g.workId).revision,
+            kind: 'build',
+            body: 'Implement reconnect.',
+            blockerIds: [],
+        });
+
+        b = records.attachTicket(b.workId, b.revision, 'fake/api#7');
+
+        const initial = records.doubtPackage(b.workId).packageDigest;
+        const state = records.specState(b.workId);
+        const base = {
+            body: 'Pedro changed the request.',
+            title: 'Reconnect after address changes',
+            version: '2',
+            digest: 'new-ticket',
+        };
+
+        records.saveSpecState(
+            b.workId,
+            state.generation,
+            { ...state, startingContext: base.body, base },
+            {
+                text: base.body,
+                title: base.title,
+                contextOnly: true,
+                source: 'tracker',
+                identity: 'tracker',
+                evidence: 'Trusted ticket read.',
+            },
+        );
+        expect(records.doubtPackage(b.workId).packageDigest).not.toBe(initial);
+        expect(records.doubtPackage(b.workId).source.request).toBe(base.body);
+        expect(records.reconcile(g.workId).items).toContainEqual(
+            expect.objectContaining({
+                key: `map:${b.workId}`,
+                after: expect.objectContaining({ startingContext: base.body, title: base.title }),
+            }),
+        );
+
+        const latest = records.specState(b.workId);
+
+        records.saveSpecState(b.workId, latest.generation, {
+            ...latest,
+            held: { ...base, body: 'Unknown edit.', digest: 'held' },
+        });
+        expect(records.reconcile(g.workId).items).toContainEqual(
+            expect.objectContaining({ key: `ticket:${b.workId}`, kind: 'ticket', requiresFix: true }),
+        );
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

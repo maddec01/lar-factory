@@ -1,7 +1,8 @@
+import './sample/sample-data-dir.ts';
+
 import {
     ACTIVITY_STALE_MS,
     GH_FLOOR,
-    SETTLED_FIRST_READ,
     SLOW_CHECKS_MS,
     ghBlocksRead,
     itemSource,
@@ -22,7 +23,6 @@ import {
     type Status,
     type ToolChecks,
     type ToolProgress,
-    sampleActivityFrom,
 } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
@@ -54,7 +54,7 @@ import { changeRepositorySettings, readOnboardedConfigs } from './config/reposit
 import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
 import { prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
-import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
+import { createItemDetails } from './item-details/item-details.ts';
 import { createCapture } from './items/capture.ts';
 import { deletedThreadNotice } from './items/deleted-thread-notice.ts';
 import { createItemCommands } from './items/item-commands.ts';
@@ -80,6 +80,7 @@ import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
+import { createSampleBoard } from './sample/sample-board.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
@@ -126,8 +127,6 @@ if (settings.problem) log(`using the default settings: ${settings.problem}`);
 const stopMemorySampler = startMemorySampler();
 const fixture = process.env.BOARD_DATA_FILE;
 const sampleData = fixture ? (JSON.parse(readFileSync(fixture, 'utf8')) as BoardData) : null;
-const sampleLoadedAt = Date.now();
-const sampleTimeShiftMs = sampleData?.fetchedAt ? sampleLoadedAt - Date.parse(sampleData.fetchedAt) : 0;
 /** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
 
@@ -1491,6 +1490,7 @@ const autoBuildRun = createAutoBuild({
 });
 // Sample mode asks T3 for nothing, so its boards show toned initials, unless it reads T3.
 const projectIcons = fixture && !sampleT3 ? null : createProjectIcons(board);
+const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
 const { server, endStreams } = createBoardServer({
     board,
     commands,
@@ -1514,7 +1514,7 @@ const { server, endStreams } = createBoardServer({
         if (read.availability !== 'available') throw new Error('T3 unavailable');
     },
     recheck: (options) => recheckTools(true, options),
-    itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records, sampleTimeShiftMs }),
+    itemDetails: createItemDetails(null, ticketOf, { records }),
     showLabelChange,
     showTicketType,
     readSoon,
@@ -1527,6 +1527,7 @@ const { server, endStreams } = createBoardServer({
     saveSetup: (input) => saveSetup(input),
     changeRepositorySettings: (input) => changeRepositorySettings(input),
     changeRepositoryLabels: (input) => changeRepositoryLabels(input),
+    ...sample,
 });
 
 /** Logs why the board can't start and exits. */
@@ -1570,17 +1571,13 @@ if (!fixture) firstGhCheck = new Promise((resolve, reject) => void recheckTools(
 // Onboarding progress shows before the first read, which waits for the tool lookup.
 if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
 
-// BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
-// trying the layout, e.g. with packages/shared/test/sample.json).
-if (fixture) {
-    board.update({
-        ...sampleActivityFrom(sampleData!, sampleLoadedAt),
-        capture,
-        firstRead: SETTLED_FIRST_READ,
-        ...(sampleT3 ? { projectIcons: {} } : {}),
-    });
+// The sample composition owns its fake tracker and disposable settings.
+if (sample) {
+    if (sampleT3) board.update({ projectIcons: {} });
+
     offerModelChoices();
-    log(`serving ${fixture} instead of GitHub`);
+    log(`serving ${fixture} with a writable fake tracker`);
+    log(`sample data folder: ${boardDataDir()}`);
 
     if (sampleT3) showT3Availability();
 }
@@ -1617,6 +1614,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
         clearInterval(timer);
         clearInterval(localTimer);
         stopMemorySampler();
+        sample?.close();
         activityDatabase.close();
         clearTimeout(toolRetry);
         stopProjectIcons?.();

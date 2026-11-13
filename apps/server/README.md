@@ -24,7 +24,7 @@ pnpm start
 `pnpm run dev` rebuilds the page and restarts the server on changes.
 `pnpm run sample` uses fixtures without provider calls. `pnpm run sample:t3` adds
 real T3 reads for the project list, project icons and T3 availability, with its own
-session held in memory, and refuses the same writes. Choose a free port for a
+session held in memory, and permits only the same fake tracker writes. Choose a free port for a
 second instance with `BOARD_PORT`. The app normally uses the first free port
 between 4317 and 4416; `BOARD_PORT=0` asks the OS for one.
 
@@ -138,3 +138,52 @@ in Settings > Skills.
 `pnpm test` in this folder runs server tests. Unit tests sit beside their source
 files; tests in `test/` start the server with fixtures. Web tests live in
 `apps/web`. See the root `AGENTS.md` for checks required by a change.
+
+## Writable sample tracker
+
+`pnpm run sample` seeds an in-memory tracker for `lar-factory-sample/lar-server`
+and `lar-factory-sample/lar-apple`. Settings Labels and kind mappings, item labels,
+descriptions (including concept maps), kind changes, issue capture, conversion,
+and ticket picking use the normal request handlers. Settings and capture records
+live in a fresh temporary folder, removed on normal exit; even a supplied
+`LAR_FACTORY_DATA_DIR` is ignored. Restart restores the bundled seed.
+
+`pnpm run sample:t3` permits the same fake writes and retains read-only T3 project,
+icon and availability reads. Both modes refuse onboarding, access rechecks,
+installs, local exports, scheduling, queue/progress operations, cleanup, merges,
+real tracker writes and all T3 launches. No sample PR/check/thread is delivery
+proof. The fake adapter accepts only its two exact repository names.
+
+The sample-only `POST /api/sample` control uses the board's normal Host, Origin,
+JSON-size and app-secret guards. For a server started on a free port 4429, inject
+one label-list failure:
+
+```sh
+curl http://127.0.0.1:4429/api/sample \
+  -H 'Origin: http://127.0.0.1:4429' -H 'Content-Type: application/json' \
+  -d '{"action":"failure","operation":"labels.list","rule":{"fail":"next","message":"Sample label read failed"}}'
+```
+
+Open Settings → Projects → a sample project, or reopen an item's label picker,
+and use its normal Retry control. `fail` also accepts `always`; omit it and set
+`latencyMs` (0–30000) for a slow response. Set `rule` to `null` to remove that
+operation's rule, or send `{"action":"clear-failures"}` to clear all. Operations
+are listed in `src/sample/fake-failures.ts`; useful writes include `labels.create`,
+`labels.update`, `labels.addToTicket`, `issues.create` and `issues.edit`.
+
+Relationships have no board editing control yet. To grow a concept's parts or
+exercise linked-work reads, send the same endpoint a fake relationship change:
+
+```json
+{
+    "action": "link",
+    "kind": "parent",
+    "from": { "repo": "lar-factory-sample/lar-server", "number": 140 },
+    "to": { "repo": "lar-factory-sample/lar-server", "number": 200 }
+}
+```
+
+`kind` accepts `parent`, `related` and `blocked-by`. Use `to: null` to clear a
+parent, or `present: false` to remove another link. Edit the concept or linked
+item's description through its normal dialog. Controls are absent on live boards.
+Screenshots from sample sessions stay local, outside commits and PRs.

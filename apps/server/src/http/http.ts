@@ -55,10 +55,11 @@ export interface HttpDeps {
     page: BuiltPage;
     /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
     appSecret: string | null;
-    /** Sample mode serves a fixed file: it writes nothing and reads no provider. */
+    /** Sample mode permits only explicitly classified fake writes, and reads no real tracker. */
     sample: boolean;
     /** A sample board that reads T3 also answers with T3's projects for onboarding. */
     sampleReadsT3: boolean;
+    sampleControl?: (input: Record<string, unknown>) => Promise<Reply>;
     /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
     reauthorizeT3?: () => Promise<void>;
     recheck: (options?: { gh?: boolean; az?: boolean }) => Promise<void>;
@@ -108,6 +109,8 @@ interface Write {
     /** The refusal in sample mode, before the body is read. */
     disabled?: string;
     disabledCode?: 'sample-mode';
+    /** Only a composed fake tracker may opt into these writes. All other writes fail closed. */
+    sampleWrite: 'fake' | 'refuse';
     /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
     restarted?: () => object;
     run(input: Record<string, unknown>): Promise<Reply>;
@@ -218,6 +221,7 @@ export function createBoardServer({
     appSecret,
     sample,
     sampleReadsT3,
+    sampleControl,
     recheck,
     reauthorizeT3,
     itemDetails,
@@ -281,17 +285,29 @@ export function createBoardServer({
 
     /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
     const WRITES: Record<string, Write> = {
+        ...(sample && sampleControl
+            ? {
+                  '/api/sample': {
+                      what: 'the sample control',
+                      sampleWrite: 'fake',
+                      run: sampleControl,
+                  },
+              }
+            : {}),
         '/api/inspect-merge': {
+            sampleWrite: 'refuse',
             what: 'the recorded delivery PR',
             disabled: 'Merge readiness is unavailable in sample mode.',
             run: forItem('Name the item to inspect.', (itemId) => commands.inspectMerge(itemId)),
         },
         '/api/merge-pr': {
+            sampleWrite: 'refuse',
             what: 'the confirmed delivery PR',
             disabled: 'Merging is disabled in sample mode.',
             run: forItem('Name the item to merge.', (itemId, input) => commands.mergePr(itemId, input)),
         },
         '/api/pr-readiness': {
+            sampleWrite: 'refuse',
             what: 'the linked PR to read',
             disabled: 'Azure readiness is unavailable in sample mode.',
             async run({ itemId, number }) {
@@ -337,16 +353,19 @@ export function createBoardServer({
             },
         },
         '/api/items': {
+            sampleWrite: 'fake',
             what: 'item details',
             disabled: 'Adding items is disabled in sample mode.',
             run: (input) => capture.capture(input),
         },
         '/api/pick-ticket': {
+            sampleWrite: 'fake',
             what: 'the Project and the ticket to pick',
             disabled: 'Picking tickets is disabled in sample mode.',
             run: (input) => capture.pick(input),
         },
         '/api/create-ticket': {
+            sampleWrite: 'fake',
             what: 'the item to create an issue for',
             disabled: 'Creating issues is disabled in sample mode.',
             run: forItem('Name the item to create an issue for.', (itemId, input) =>
@@ -354,6 +373,7 @@ export function createBoardServer({
             ),
         },
         '/api/attach-ticket': {
+            sampleWrite: 'fake',
             what: 'the item and the ticket to attach',
             disabled: 'Attaching tickets is disabled in sample mode.',
             run: forItem('Name the item to attach a ticket to.', (itemId, input) =>
@@ -361,27 +381,32 @@ export function createBoardServer({
             ),
         },
         '/api/queue': {
+            sampleWrite: 'refuse',
             what: 'the item to queue',
             disabled: 'Queuing is disabled in sample mode.',
             run: forItem('Name the item to queue.', (itemId) => commands.queue(itemId)),
         },
         '/api/back-to-list': {
+            sampleWrite: 'refuse',
             what: 'the item to move back to List',
             disabled: 'Moving items back to List is disabled in sample mode.',
             run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
         },
         '/api/start': {
+            sampleWrite: 'refuse',
             what: 'the item to start',
             disabled: 'Starting threads is disabled in sample mode.',
             restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
             run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
         },
         '/api/inspect-owned-cleanup': {
+            sampleWrite: 'refuse',
             what: 'the item to inspect',
             disabled: 'Cleanup is disabled in sample mode.',
             run: forItem('Name the item to inspect.', (itemId) => commands.inspectOwnedCleanup(itemId)),
         },
         '/api/execute-owned-cleanup': {
+            sampleWrite: 'refuse',
             what: 'the item to clean up',
             disabled: 'Cleanup is disabled in sample mode.',
             run: forItem('Name the item to clean up.', (itemId, input) =>
@@ -389,11 +414,13 @@ export function createBoardServer({
             ),
         },
         '/api/inspect-recovery': {
+            sampleWrite: 'refuse',
             what: 'the item to inspect',
             disabled: 'Recovery is disabled in sample mode.',
             run: forItem('Name the item to inspect.', (itemId) => commands.inspectRecovery(itemId)),
         },
         '/api/start-again': {
+            sampleWrite: 'refuse',
             what: 'the item to start again',
             disabled: 'Recovery is disabled in sample mode.',
             run: forItem('Name the item to start again.', (itemId, input) =>
@@ -401,6 +428,7 @@ export function createBoardServer({
             ),
         },
         '/api/start-build': {
+            sampleWrite: 'refuse',
             what: 'the build to start',
             disabled: 'Starting builds is disabled in sample mode.',
             restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
@@ -409,6 +437,7 @@ export function createBoardServer({
             ),
         },
         '/api/dismiss-start-error': {
+            sampleWrite: 'refuse',
             what: 'the start error to dismiss',
             disabled: 'Starting threads is disabled in sample mode.',
             run: forItem('Name the item whose start error to dismiss.', async (itemId, input) =>
@@ -416,6 +445,7 @@ export function createBoardServer({
             ),
         },
         '/api/arm': {
+            sampleWrite: 'refuse',
             what: 'the item to start after its blockers',
             disabled: 'Start after is disabled in sample mode.',
             restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),
@@ -424,32 +454,38 @@ export function createBoardServer({
             ),
         },
         '/api/disarm': {
+            sampleWrite: 'refuse',
             what: 'the item to disarm',
             disabled: 'Start after is disabled in sample mode.',
             run: forItem('Name the item to disarm.', async (itemId) => startAfter.disarm(itemId)),
         },
         '/api/abandon': {
+            sampleWrite: 'refuse',
             what: 'the item to abandon',
             disabled: 'Abandoning is disabled in sample mode.',
             restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
             run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
         },
         '/api/abandon-and-close': {
+            sampleWrite: 'refuse',
             what: 'the item to abandon and close',
             disabled: 'Abandoning is disabled in sample mode.',
             run: forItem('Name the item to abandon.', (itemId) => commands.abandonAndClose(itemId)),
         },
         '/api/close-ticket': {
+            sampleWrite: 'refuse',
             what: 'the abandoned item whose ticket to close',
             disabled: 'Closing tickets is disabled in sample mode.',
             run: forItem('Name the item whose ticket to close.', (itemId) => commands.closeTicket(itemId)),
         },
         '/api/restore': {
+            sampleWrite: 'refuse',
             what: 'the set-aside item to restore',
             disabled: 'Restoring is disabled in sample mode.',
             run: forItem('Name the item to restore.', (itemId) => commands.restore(itemId)),
         },
         '/api/retention': {
+            sampleWrite: 'refuse',
             what: 'the retention setting',
             disabled: 'Retention is disabled in sample mode.',
             async run(input) {
@@ -459,6 +495,7 @@ export function createBoardServer({
             },
         },
         '/api/shaping-thread-cleanup': {
+            sampleWrite: 'refuse',
             what: 'the shaping thread cleanup setting',
             disabled: 'Shaping thread cleanup is disabled in sample mode.',
             async run(input) {
@@ -468,6 +505,7 @@ export function createBoardServer({
             },
         },
         '/api/heavy-command-limit': {
+            sampleWrite: 'refuse',
             what: 'the heavy command limit',
             disabled: 'The heavy command limit is disabled in sample mode.',
             async run(input) {
@@ -477,6 +515,7 @@ export function createBoardServer({
             },
         },
         '/api/build-limit': {
+            sampleWrite: 'refuse',
             what: 'the build limit',
             disabled: 'The build limit is disabled in sample mode.',
             async run(input) {
@@ -486,6 +525,7 @@ export function createBoardServer({
             },
         },
         '/api/auto-build': {
+            sampleWrite: 'refuse',
             what: 'the Auto-build setting',
             disabled: 'Auto-build is disabled in sample mode.',
             async run(input) {
@@ -495,6 +535,7 @@ export function createBoardServer({
             },
         },
         '/api/needs-you': {
+            sampleWrite: 'refuse',
             what: 'the item that needs you and the choice',
             disabled: 'Acting on Needs you is disabled in sample mode.',
             run: forItem('Name the item that needs you.', (itemId, input) =>
@@ -502,6 +543,7 @@ export function createBoardServer({
             ),
         },
         '/api/dependency-met': {
+            sampleWrite: 'refuse',
             what: 'the Dependency to mark',
             disabled: 'Marking a Dependency met is disabled in sample mode.',
             run: forItem('Name the item the Dependency holds.', async (itemId, input) => {
@@ -514,6 +556,7 @@ export function createBoardServer({
             }),
         },
         '/api/item-spec': {
+            sampleWrite: 'refuse',
             what: 'the Spec action and its item',
             disabled: 'Spec sync is disabled in sample mode.',
             async run({ itemId, generation, action }) {
@@ -541,6 +584,7 @@ export function createBoardServer({
             },
         },
         '/api/item-description': {
+            sampleWrite: 'fake',
             what: 'the description and its item',
             disabled: 'Saving descriptions is disabled in sample mode.',
             async run({ itemId, body, bodyField, revision }) {
@@ -584,6 +628,7 @@ export function createBoardServer({
             },
         },
         '/api/item-labels': {
+            sampleWrite: 'fake',
             what: 'the label to change and its item',
             disabled: 'Changing labels is disabled in sample mode.',
             async run({ itemId, label, action }) {
@@ -632,6 +677,7 @@ export function createBoardServer({
             },
         },
         '/api/item-kind': {
+            sampleWrite: 'fake',
             what: 'the kind and its item',
             disabled: 'Changing kinds is disabled in sample mode.',
             async run({ itemId, kind }) {
@@ -652,6 +698,7 @@ export function createBoardServer({
             },
         },
         '/api/item-kind-answer': {
+            sampleWrite: 'fake',
             what: 'the item and the answer',
             disabled: 'Answering is disabled in sample mode.',
             run: forItem('Name the item and the answer.', (itemId, { answer, ticketKind }) =>
@@ -659,6 +706,7 @@ export function createBoardServer({
             ),
         },
         '/api/item-export': {
+            sampleWrite: 'refuse',
             what: 'the item to export',
             disabled: 'Exporting is disabled in sample mode.',
             run: forItem('Name the item to export.', async (itemId) => {
@@ -675,6 +723,7 @@ export function createBoardServer({
             }),
         },
         '/api/onboarding/projects': {
+            sampleWrite: 'refuse',
             what: 'the folder to add',
             disabled: 'Sample mode onboards no Project.',
             disabledCode: 'sample-mode',
@@ -687,6 +736,7 @@ export function createBoardServer({
             },
         },
         '/api/onboarding/repositories': {
+            sampleWrite: 'refuse',
             what: 'the onboarding to keep',
             disabled: 'Sample mode onboards no Project.',
             disabledCode: 'sample-mode',
@@ -702,6 +752,7 @@ export function createBoardServer({
             },
         },
         '/api/onboarding/vocabulary': {
+            sampleWrite: 'refuse',
             what: 'the Project vocabulary to discover',
             disabled: 'Sample mode onboards no Project.',
             disabledCode: 'sample-mode',
@@ -716,6 +767,7 @@ export function createBoardServer({
             },
         },
         '/api/onboarding/detect': {
+            sampleWrite: 'refuse',
             what: 'the Project whose setup to detect',
             disabled: 'Sample mode onboards no Project.',
             disabledCode: 'sample-mode',
@@ -729,6 +781,7 @@ export function createBoardServer({
         },
         // The repository goes on the board with its local settings, and the next read loads its items.
         '/api/onboarding/setup': {
+            sampleWrite: 'refuse',
             what: 'the answers to save',
             disabled: 'Sample mode onboards no Project.',
             disabledCode: 'sample-mode',
@@ -746,6 +799,7 @@ export function createBoardServer({
         },
         // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
         '/api/repositories/settings': {
+            sampleWrite: 'fake',
             what: 'the Project and the change to its settings',
             disabled: 'Sample mode changes no Project settings.',
             async run(input) {
@@ -761,6 +815,7 @@ export function createBoardServer({
         },
         // The tracker holds the labels, so a change shows on rows at the read it starts.
         '/api/repositories/labels': {
+            sampleWrite: 'fake',
             what: 'the Project and the change to its labels',
             disabled: 'Sample mode reads and changes no labels.',
             async run(input) {
@@ -778,6 +833,8 @@ export function createBoardServer({
         },
         // Looks the tools up again for the notices' Recheck button and onboarding's detection.
         '/api/t3/reauthorize': {
+            sampleWrite: 'refuse',
+            disabled: 'T3 reauthorization is unavailable here.',
             what: 'the T3 reauthorization request',
             async run() {
                 if (sample || !reauthorizeT3)
@@ -796,6 +853,8 @@ export function createBoardServer({
             },
         },
         '/api/recheck': {
+            sampleWrite: 'refuse',
+            disabled: 'Sample mode looks no tools up.',
             what: 'the recheck request',
             async run(input) {
                 if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
@@ -813,8 +872,11 @@ export function createBoardServer({
         res: ServerResponse,
         write: Write,
     ): Promise<Record<string, unknown> | null> {
-        if (sample && write.disabled) {
-            json(res, 403, { error: write.disabled, ...(write.disabledCode && { code: write.disabledCode }) });
+        if (sample && !(sampleControl && write.sampleWrite === 'fake')) {
+            json(res, 403, {
+                error: write.disabled ?? 'This operation is disabled in sample mode.',
+                ...(write.disabledCode && { code: write.disabledCode }),
+            });
 
             return null;
         }
@@ -868,7 +930,11 @@ export function createBoardServer({
 
         if (!body) return;
 
-        if (sample) return json(res, 200, {});
+        if (sample) {
+            readSoon();
+
+            return json(res, 200, {});
+        }
 
         readSoon(typeof body.url === 'string' ? body.url : undefined);
         json(res, 202, {});
@@ -951,7 +1017,7 @@ export function createBoardServer({
 
     /** Answers the ticket picker's search of a repository's open tickets. */
     async function ticketsRequest(url: URL, res: ServerResponse): Promise<void> {
-        if (sample) return json(res, 403, { error: 'Sample mode searches no tickets.' });
+        if (sample && !sampleControl) return json(res, 403, { error: 'Sample mode searches no tickets.' });
 
         const { status, body } = await capture.searchTickets({
             repo: url.searchParams.get('repo'),
@@ -1076,7 +1142,8 @@ export function createBoardServer({
         if (path === '/api/item-labels') return itemLabelsRequest(url, res);
 
         if (path === '/api/ticket-preview') {
-            if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
+            if (sample && !sampleControl)
+                return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
 
             const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');
 
@@ -1084,7 +1151,7 @@ export function createBoardServer({
         }
 
         if (path === '/api/ticket-options') {
-            if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
+            if (sample && !sampleControl) return json(res, 403, { error: 'Sample mode reads no issue options.' });
 
             const result = await capture.options(url.searchParams.get('repo'));
 

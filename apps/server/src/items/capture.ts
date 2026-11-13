@@ -1,5 +1,5 @@
 // Add item captures local work or creates a tracker ticket, then imports it into List.
-import type { TicketCreationOptions, RepoConfig, TicketMatch } from '@lar-factory/shared';
+import type { TicketCreationOptions, RepoConfig, TicketMatch, TrackerLabels } from '@lar-factory/shared';
 import { discoverTicketOptions } from '@lar-factory/shared/publication-settings';
 import { WorkRecordError, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 import { captureWork, createRecordTicket, recordTicketPreview } from '@lar-factory/work-records/create-ticket';
@@ -26,6 +26,7 @@ export interface Capture {
 
 export interface CaptureDeps {
     provider?: StructureProvider;
+    labels?: (repo: string) => TrackerLabels;
     discoverOptions?: (repo: RepoConfig) => Promise<TicketCreationOptions>;
     board: BoardState;
     /** Where the commands search and read tickets. */
@@ -54,6 +55,7 @@ export function createCapture({
     repos,
     provider = structureProvider(),
     discoverOptions = discoverTicketOptions,
+    labels,
 }: CaptureDeps): Capture {
     const withBoard = (status: number, body: object): Reply => reply(status, { ...body, board: board.snapshot() });
     const repoOf = (value: unknown) => repos().find((r) => r.repo === value);
@@ -75,7 +77,7 @@ export function createCapture({
         async capture(input) {
             if (!records) return reply(409, { error: NO_RECORDS });
 
-            const result = await captureWork(input, { records, repos, provider, discoverOptions });
+            const result = await captureWork(input, { records, repos, provider, discoverOptions, labels });
 
             return result.body.record ? shown(result.body.record.workId) : result;
         },
@@ -87,7 +89,7 @@ export function createCapture({
                 const result = await createRecordTicket(
                     itemId,
                     { ...input, retro: false },
-                    { records, repos, provider, discoverOptions },
+                    { records, repos, provider, discoverOptions, labels },
                 );
 
                 return result.body.record ? shown(result.body.record.workId) : result;

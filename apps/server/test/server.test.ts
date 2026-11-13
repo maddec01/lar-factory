@@ -131,8 +131,8 @@ test('the page holds its first paint for its one script, served from the board, 
 test('sample mode never writes through the local GitHub login', async (t) => {
     const board = await startBoard(t, {}, true);
 
-    assert.equal((await board.post({})).status, 403);
-    assert.equal((await board.board()).capture.enabled, false);
+    assert.equal((await board.post({})).status, 400);
+    assert.equal((await board.board()).capture.enabled, true);
     assert.equal((await board.calls()).length, 0);
 });
 

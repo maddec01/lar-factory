@@ -86,6 +86,7 @@ export function newFakeIssue(repo: string, number: number, draft: Omit<FakeIssue
             closedAs: null,
             parent: null,
             parentId: null,
+            flow: 'single',
             subIssues: { total: 0, completed: 0 },
             blockers: [],
             updatedAt: FAKE_TIME,

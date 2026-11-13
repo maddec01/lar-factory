@@ -12,6 +12,7 @@ const item = (id: string, status: Status): Item => ({
     revision: 0,
     kind: 'issue',
     parentId: null,
+    flow: 'single',
     number: 1,
     title: id,
     url: null,

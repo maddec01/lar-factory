@@ -1,4 +1,4 @@
-// What the dock's dossiers hold: every open concept, and every open item with sub-issues on the board, with its parts
+// What the dock's dossiers hold: explicitly grouped work, including parts whose parents are off-board, with its parts
 // in the order they run. Each part's kind comes from its local record, what it waits on from its blockers, and its
 // thread is its newest item thread.
 
@@ -165,7 +165,7 @@ export const openWaits = (part: Part): Blocker[] => (started(part.item) ? [] : o
 export const waitText = (item: Item, blockers: readonly Blocker[]) =>
     blockers.map((b) => blockerRef(item, b, true)).join(', ');
 
-/** Every open concept and open item with sub-issues on the board, as a dossier, where it or a part is in `items`, the main area's scope. */
+/** Group roots and off-board parents' parts, where the root or a part is in the main area's scope. */
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {
     const shown = new Set(items.map((i) => i.id));
 

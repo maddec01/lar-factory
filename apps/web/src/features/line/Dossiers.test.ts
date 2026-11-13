@@ -68,6 +68,7 @@ const decision = (blockers: Item['blockers'] = []): Item => ({
     repo: c200.repo,
     parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' },
     parentId: c200.id,
+    flow: 'linked',
     blockers,
 });
 const withDecision = (blockers?: Item['blockers']) =>
@@ -842,4 +843,51 @@ test('decision map and attention actions use answer wording only for a current q
     expect(attentionAction().getAttribute('aria-label')).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
     expect(text(attentionAction())).toBe('Answer in T3');
+});
+
+test('queued empty concepts and parts with off-board parents stay in the dock and keep their desk waits', async () => {
+    const concept = { ...c200, status: 'Queued' as const, subIssues: { total: 0, completed: 0 } };
+    const part = sample.items.find((item) => item.number === 23)!;
+
+    await mountPage({ ...sample, items: [concept, part] });
+    expect(dossier(concept.id)).not.toBeNull();
+    expect(dossier(part.id)).not.toBeNull();
+    expect($(`[data-stage]:not([data-stage="dock"]) li[data-item="${part.id}"]`)).toBeNull();
+    expect($(`[data-stage]:not([data-stage="dock"]) li[data-item="${concept.id}"]`)).toBeNull();
+    expect($(`section.desk [data-item="${part.id}"]`)).not.toBeNull();
+    expect(text(header(concept.id))).toContain('No parts yet');
+    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
+    expect(text(header(part.id))).not.toContain('0/0 parts');
+    expect(text(header(part.id))).not.toContain('Linked work');
+    expect(opener(part.id)).toBeNull();
+    await press(header(part.id).querySelector('[data-title]')!);
+    expect(dialogTitle()).toContain('Faster library sync');
+});
+
+test('a working off-board part keeps its stage, newest action and progress in the dock', async () => {
+    const part = fresh().items.find((item) => item.number === 22)!;
+
+    await mountPage({ ...fresh(), items: [part] });
+    expect(text(header(part.id))).toContain('Shaping · Working');
+    expect(text(header(part.id))).toContain('Edit ContinueWatchingRow.swift');
+    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
+    expect(header(part.id).querySelector('[data-activity-track="running"]')).not.toBeNull();
+    expect(text(header(part.id))).not.toContain('0/0 parts');
+    expect(text(header(part.id))).not.toContain('Nothing waits on you');
+    expect($('[data-stage="shaping"] [data-item]')).toBeNull();
+});
+
+test('an explicitly linked empty parent keeps its own activity and says No parts yet', async () => {
+    const part = fresh().items.find((item) => item.number === 22)!;
+    const parent = { ...part, parent: null, parentId: null, flow: 'linked' as const };
+
+    await mountPage({ ...fresh(), items: [parent] });
+    expect(text(header(parent.id))).toContain('Linked work');
+    expect(text(header(parent.id))).toContain('No parts yet');
+    expect(text(header(parent.id))).toContain('Shaping · Working');
+    expect(text(header(parent.id))).toContain('Edit ContinueWatchingRow.swift');
+    expect(header(parent.id).querySelector('[data-activity-track="running"]')).not.toBeNull();
+    await receive({ ...fresh(), items: [{ ...parent, flow: 'single' }] });
+    expect(dossier(parent.id)).toBeNull();
+    expect($(`[data-stage="shaping"] [data-item="${parent.id}"]`)).not.toBeNull();
 });

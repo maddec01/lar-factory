@@ -47,22 +47,29 @@ const decision = (id: string, parent: number): Item => ({
     title: `Decide under #${parent}`,
     labels: ['decision-grill'],
     parent: { number: parent, repo: sample05.repo!, title: 'Parent', url: 'https://github.com/x', state: 'open' },
+    flow: 'linked',
     parentId: sample.items.find((i) => i.number === parent)?.id ?? null,
 });
 
 beforeEach(() => localStorage.clear());
 
-test('a dossier’s parts are left out and show in the dossier; a Queued parent stays in its dossier, and an item whose parent isn’t on the board stays', async () => {
+test('a dossier’s parts are left out and show in the dossier; a Queued parent stays in its dossier, including a part whose parent is off-board', async () => {
     for (const id of ['I_sample05', 'I_sample09']) localStorage.setItem(`lar-board:dossier-view:${id}`, 'list');
     await mountPage({
         ...sample,
-        items: [...sample.items, decision('I_d200', 200), decision('I_d129', 129), decision('I_d999', 999)],
+        items: [
+            ...sample.items.map((item) => (item.id === 'I_sample05' ? { ...item, flow: 'linked' as const } : item)),
+            decision('I_d200', 200),
+            decision('I_d129', 129),
+            decision('I_d999', 999),
+        ],
     });
-    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21', 'I_d999']);
+    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21']);
 
     const openDossier = (id: string) =>
         settle(() => $<HTMLButtonElement>(`[data-dossier="${id}"] [data-dossier-open]`)!.click());
 
+    expect($('[data-dossier="I_d999"]')).not.toBeNull();
     await openDossier('I_sample05');
     expect($('[data-dossier="I_sample05"] [data-part="I_d129"]'), '#129’s sub-issue, in its dossier').not.toBeNull();
     await openDossier('I_sample09');

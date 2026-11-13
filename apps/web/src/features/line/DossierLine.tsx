@@ -1,11 +1,12 @@
 // A dossier's one line in the dock: its identity, first chip and Start, then its parts bar, what's next and figures.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { itemActivityStill, itemName } from '@lar-factory/shared';
+import { deskParentName, itemActivityStill, itemName } from '@lar-factory/shared';
 import { Badge } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Figures, RowSecondLine } from './Columns';
+import { DossierActivity, DossierState } from './DossierActivity';
 import { open, usePicked } from './DossierHelpers';
 import type { Part } from './DossierParts';
 import { isDone, threadsOf } from './DossierParts';
@@ -24,6 +25,8 @@ import {
     DossierLine as Line,
     DossierNext,
     DossierNote,
+    DossierParentContext,
+    DossierStates,
     DossierRepos,
     DossierTitle,
     DossierTitleCell,
@@ -125,6 +128,12 @@ export function DossierLine({
     const chips = chipsOf(parent, m);
     const n = nextOf(m, parent);
     const repos = otherRepos(parent, m, data);
+    const partOf = deskParentName(parent, data.items);
+    const hasParent = !!(parent.parentId || parent.parent);
+    const parentOutside = hasParent && !data.items.some((item) => item.id === parent.parentId);
+    const parentContext = hasParent
+        ? `Part of ${partOf ?? 'a parent outside the board'}${parentOutside ? ' · Parent is outside the board' : ''}`
+        : undefined;
 
     return (
         <Line item={parent.id} picked={isPicked} title={rowTooltip(chips, threads)} onClick={onClick}>
@@ -133,10 +142,10 @@ export function DossierLine({
                     {lead}
                     <RowSource item={parent} />
                     <RowKindCell>
-                        {parent.kind === 'concept' ? (
+                        {parent.kind === 'concept' || hasParent ? (
                             <RowKind item={parent} />
                         ) : (
-                            <Badge tone="neutral">Coupled work</Badge>
+                            <Badge tone="neutral">Linked work</Badge>
                         )}
                     </RowKindCell>
                     <DossierTitleCell>
@@ -151,7 +160,10 @@ export function DossierLine({
                     </DossierTitleCell>
                     {/* The first chip keeps its full width; the rest of the chips wait in the tooltip. */}
                     <RowStateCell clips={false}>
-                        <Chips chips={chips} />
+                        <DossierStates>
+                            <DossierState item={parent} />
+                            <Chips chips={chips} />
+                        </DossierStates>
                     </RowStateCell>
                 </RowCells>
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
@@ -161,16 +173,23 @@ export function DossierLine({
                 </RowSide>
             </RowFirst>
             <RowSecondLine
-                bar={<PartsBar m={m} />}
+                bar={m.count > 0 && <PartsBar m={m} />}
                 figures={<Figures s={figuresOf(parent, data, true)} item={parent} total />}
                 count={
-                    <RowCount title={`${m.done}/${m.count} parts done`}>
-                        {m.done}/{m.count} parts
-                    </RowCount>
+                    (m.count > 0 || !hasParent || parent.kind === 'concept') && (
+                        <RowCount title={m.count ? `${m.done}/${m.count} parts done` : undefined}>
+                            {m.count ? `${m.done}/${m.count} parts` : 'No parts yet'}
+                        </RowCount>
+                    )
                 }
             >
-                <Next n={n} badged={m.needsYou.length > 0} />
+                {parentContext ? (
+                    <DossierParentContext>{parentContext}</DossierParentContext>
+                ) : (
+                    <Next n={n} badged={m.needsYou.length > 0} />
+                )}
             </RowSecondLine>
+            <DossierActivity item={parent} />
         </Line>
     );
 }

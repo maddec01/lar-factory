@@ -537,6 +537,8 @@ export function azureItems(
                 sync = { state: 'error', message: (error as Error).message };
             }
 
+            const kind = tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType'));
+
             return {
                 id: itemId(raw.id),
                 ...(currentSprint &&
@@ -549,9 +551,10 @@ export function azureItems(
                 revision: 0,
                 status: closed ? 'Done' : (statuses[0] ?? 'List'),
                 statuses,
-                kind: tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType')),
+                kind,
                 ...(tracker && { tracker, ...(tracker.map && { map: parseConceptMap(tracker.map) }) }),
                 ...(sync && { sync }),
+                flow: parent || children.length > 0 || kind === 'concept' ? 'linked' : 'single',
                 content: 'ticket',
                 number: raw.id,
                 title: field(raw, 'System.Title'),

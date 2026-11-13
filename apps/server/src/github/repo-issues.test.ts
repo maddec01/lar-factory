@@ -14,6 +14,7 @@ const item = (statuses: Status[]): Item => ({
     revision: 0,
     kind: 'issue',
     parentId: null,
+    flow: 'single',
     number: 7,
     title: 'Seek',
     url: `https://github.com/${REPO}/issues/7`,

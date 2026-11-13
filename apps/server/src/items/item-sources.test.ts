@@ -15,6 +15,7 @@ const item = (id: string, repo: string, status: Status = 'List'): Item => ({
     revision: 0,
     kind: 'issue',
     parentId: null,
+    flow: 'single',
     number: Number(id.slice(2)),
     title: id,
     url: `https://github.com/${repo}/issues/${id.slice(2)}`,

@@ -14,7 +14,7 @@ import { Text } from '@lar-works/design-system';
 import type { MouseEvent } from 'react';
 
 import { Attention } from './Attention';
-import type { FindRef } from './DossierHelpers';
+import { open, type FindRef } from './DossierHelpers';
 import { DossierLine } from './DossierLine';
 import { unreadParts, unreadPartsText } from './DossierParts';
 import type { DossierItems, Part } from './DossierParts';
@@ -25,9 +25,9 @@ import { PartsList } from './PartsList';
 import { OPEN, VIEW, useStored } from './useStored';
 import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
-import { StructureSync } from '@/features/items';
+import { ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle } from '@/ui/board';
+import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle, RowGlyph } from '@/ui/board';
 
 /** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
 const ABOVE_MAP = ['you'];
@@ -74,6 +74,8 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
 function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data: BoardData }) {
     const [on, setOn] = useStored(OPEN, parent);
     const [view, setView] = useStored(VIEW, parent);
+    const orphanPart =
+        parent.kind !== 'concept' && !!(parent.parentId || parent.parent) && !parts.length && !parent.subIssues.total;
     // Letting go of a drag that selected text in the line leaves it as it was; a selection elsewhere on the page still toggles it.
     const toggle = (e: MouseEvent<HTMLDivElement>) => {
         const selection = window.getSelection();
@@ -96,12 +98,26 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
                 parent={parent}
                 parts={parts}
                 data={data}
-                lead={lead}
-                onClick={toggle}
-                note={on && <LocalPlanning item={parent} />}
-                tools={on && <ViewToggle view={view} onView={setView} />}
+                lead={
+                    orphanPart ? (
+                        <RowGlyph>
+                            <ItemStatusGlyph item={parent} />
+                        </RowGlyph>
+                    ) : (
+                        lead
+                    )
+                }
+                onClick={orphanPart ? () => open(parent) : toggle}
+                note={!orphanPart && on && <LocalPlanning item={parent} />}
+                tools={
+                    orphanPart ? (
+                        <OpenThread item={parent} data={data} />
+                    ) : (
+                        on && <ViewToggle view={view} onView={setView} />
+                    )
+                }
             />
-            {on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
+            {!orphanPart && on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
         </Row>
     );
 }

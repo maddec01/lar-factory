@@ -1,6 +1,7 @@
 // The board's items: the work records of the onboarded repositories, each with its ticket's context when an item source
 // read the ticket. The record owns Status, kind, title, structure, blockers, Dependencies and slices; the ticket adds its URL, labels,
-// PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
+// PRs and provider fields. Board grouping can also use tracker links without writing local ownership.
+// Spec sync can update title and brief; it never moves, restructures or blocks work.
 
 import {
     kindDisagreement,
@@ -157,6 +158,9 @@ export function agreedKind(
 function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly RecordSetup[] = []) {
     const byTicket = ticketsByReference(tickets);
     const trackerState = records.trackerStates();
+    const byReference = new Map(
+        records.list({}).flatMap((record) => (record.ticket ? [[record.ticket.toLowerCase(), record] as const] : [])),
+    );
     const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
     const completionOf = (record: WorkRecord) => {
         let completion = completions.get(record.workId);
@@ -179,7 +183,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const toItem = (record: WorkRecord): Item => {
         const ticket = ticketOf(record);
         const attachment = records.publicationAttachment(record.workId);
-        const parent = record.parentId ? records.read(record.parentId) : null;
+        const parent = record.parentId
+            ? records.read(record.parentId)
+            : ticket?.parent
+              ? byReference.get(refKey(ticket.parent.repo, ticket.parent.number).toLowerCase())
+              : undefined;
         const children = records.children(record.workId).filter((c) => !c.setAside);
         // A blocker holds the work until its local facts complete it; its Status, its ticket closing and its thread ending never do.
         const blockers = records
@@ -238,6 +246,13 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             status: record.status,
             statuses: done ? [] : [record.status],
             kind: record.kind === 'slice' ? 'issue' : record.kind,
+            flow:
+                record.kind === 'concept' ||
+                (record.kind !== 'slice' && !!parent) ||
+                work.length > 0 ||
+                ticket?.flow === 'linked'
+                    ? 'linked'
+                    : 'single',
             ...(record.kind === 'decision'
                 ? { decisionMethod: parseDecisionMethod(records.body(record.workId, 'decision') ?? '') }
                 : {}),
@@ -248,7 +263,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             state: state(record),
             closedAs: done ? 'done' : null,
             parent: parent ? ref(parent) : (ticket?.parent ?? null),
-            parentId: record.parentId,
+            parentId: parent?.workId ?? null,
             subIssues: { total: work.length, completed: work.filter((child) => completionOf(child).complete).length },
             blockers,
             updatedAt: [record.updatedAt, spec?.changedAt ?? ''].sort().at(-1)!,

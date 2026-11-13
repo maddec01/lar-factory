@@ -325,6 +325,8 @@ export interface Item {
     statuses: Status[];
     /** Its work record's kind, or on an item source's read the kind its labels give. */
     kind: Kind;
+    /** Board flow, projected from typed work relationships; private build slices never make it linked. */
+    flow: 'single' | 'linked';
     /** The method in a local decision's body; null when no recognized method is written. */
     decisionMethod?: 'grill' | 'prototype' | 'research' | 'task' | null;
     /** A ticket is a repository issue or an Azure work item. */
@@ -361,7 +363,7 @@ export interface Item {
     /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */
     closedAs: 'done' | 'not-planned' | null;
     parent: IssueRef | null;
-    /** The work ID of the record that owns it, or null while it has no parent. */
+    /** Its local parent’s work ID, falling back to a tracker parent’s local record; null when no parent is on this machine. */
     parentId: string | null;
     /** Its child work's counts; on an item source's read, GitHub's sub-issue counts, a build counting only its `build` sub-issues. */
     subIssues: { total: number; completed: number };

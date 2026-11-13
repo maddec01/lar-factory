@@ -16,18 +16,19 @@ import type { BoardState } from '../board/board-state.ts';
 import { prUrl } from '../config/pr-host.ts';
 import { mergeProvider, type MergeProvider } from '../config/pr-merge.ts';
 import type { Reply } from './item-commands.ts';
-import { observePullRequest } from './observe-records.ts';
+import { observePullRequest, type ObserveReads } from './observe-records.ts';
 
 interface Dependencies {
     board: BoardState;
     records: WorkRecords | null;
     reread: () => void;
     busy?: (itemId: string) => string | null;
+    readTicket?: ObserveReads['ticket'];
     provider?: (repo: string) => MergeProvider;
 }
 
 /** Server-owned confirmations and a PR-wide request guard shared by every board client. */
-export function createPrMerge({ board, records, reread, busy, provider = mergeProvider }: Dependencies) {
+export function createPrMerge({ board, records, reread, busy, readTicket, provider = mergeProvider }: Dependencies) {
     const confirmations = new Map<string, MergeConfirmation & { itemId: string; reference: string; expires: number }>();
     const running = new Set<string>();
     const reply = (status: number, body: object): Reply => ({ status, body: { ...body, board: board.snapshot() } });
@@ -100,7 +101,7 @@ export function createPrMerge({ board, records, reread, busy, provider = mergePr
         return { ...resolved, evidence };
     };
     const observe = async (itemId: string, state: 'open' | 'closed' | 'merged') => {
-        await observePullRequest(records!, itemId, async () => state);
+        await observePullRequest(records!, itemId, async () => state, readTicket);
         reread();
     };
 

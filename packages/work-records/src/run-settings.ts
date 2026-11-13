@@ -9,6 +9,7 @@ import type {
 
 import { WorkRecordError, type Database } from './database.ts';
 import { readFactorySettings } from './factory-settings.ts';
+import { recordRolePhase } from './role-phases.ts';
 import { captureRunSettings, executionSettings, invalidRun, runObject, runText } from './run-settings-input.ts';
 import type { WorkRecord } from './work-records.ts';
 
@@ -194,6 +195,9 @@ export function runSettingsRecords(
                     executionId,
                     JSON.stringify(run),
                 );
+
+                if (snapshot.kind === 'build') recordRolePhase(database, read(workId), role);
+
                 bump(workId);
 
                 return run;
@@ -253,6 +257,10 @@ export function runSettingsRecords(
                     workId,
                     old.executionId,
                 );
+
+                if (input.result === 'completed' && savedRun(database, workId, old.runId).kind === 'build')
+                    recordRolePhase(database, read(workId), old.role, true);
+
                 bump(workId);
 
                 return run;

@@ -103,6 +103,7 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
                     },
                 };
 
+                db.prepare("UPDATE work_records SET build_phase='retro' WHERE work_id=?").run(id);
                 save(id, retro);
 
                 return retro;
@@ -135,7 +136,6 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
                     invalid('Retro suggestions are already recorded.');
                 }
 
-                db.prepare("UPDATE work_records SET build_phase='retro' WHERE work_id=?").run(id);
                 retro.delivery.sent = true;
                 retro.delivery.error = null;
                 retro.suggestions = suggestions;

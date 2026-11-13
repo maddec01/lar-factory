@@ -15,7 +15,7 @@ Keep the supplied branch, uncommitted work, slices and open PR. Read that PR
 before changing it. A fresh attempt with no phase/slices starts at Plan. A Small
 build handoff retains that route and whether implementation finished.
 
-Set each reached phase with `lar-work set-phase ID --revision N --phase PHASE`.
+Start build and role commands record phases; `select-reviewers` starts Review.
 Load only its file; completed phases stay completed:
 
 | Phase | Stage | Saved result |

@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
+import { refreshBoards } from './board-refresh.ts';
 import { readFactorySettings } from './factory-settings.ts';
 import { readReviewerDiff } from './reviewer-diff.ts';
 import { selectReviewers } from './reviewer-selection.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
-/** Read-only selection: no tracker sync, review-history writes or provider access. Run in the build checkout. */
+/** Starts Review atomically after selection succeeds; no tracker sync or provider access. */
 export async function selectReviewersCommand(args: string[]): Promise<number> {
     let parsed;
 
@@ -63,6 +64,10 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
                 ? { ...reviewer, instructions: frozen.instructions, target: snapshot!.roles[`reviewer:${reviewer.id}`] }
                 : reviewer;
         });
+
+        records.setBuildPhase(workId, records.read(workId).revision, 'review');
+
+        await refreshBoards(workId, parsed.values['data-dir']);
 
         if (problem) process.stderr.write(`lar-work: ${problem}\n`);
 

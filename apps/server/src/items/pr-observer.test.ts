@@ -275,3 +275,33 @@ test('a build without a ticket uses current board activity for prompt polling', 
     await observer.poll(30_000);
     expect(read).toHaveBeenCalledTimes(2);
 });
+
+test.each(['poll', 'known'] as const)(
+    '%s merge confirmation refreshes the saved ticket before publishing Done',
+    async (method) => {
+        const { records, record, options, read, changed } = await fixture();
+
+        records.attachTicket(record.workId, records.read(record.workId).revision, `${repo}#12`);
+        records.observe(record.workId, records.read(record.workId).revision, { of: 'ticket', state: 'open' });
+        read.mockResolvedValue('merged');
+
+        const readTicket = vi.fn(async () => ({ state: 'closed' as const }));
+        const observer = createPrObserver(records, { ...options, readTicket });
+
+        changed.mockImplementation(() => {
+            expect(records.observations(record.workId)).toContainEqual(
+                expect.objectContaining({ of: 'ticket', state: 'closed' }),
+            );
+        });
+
+        if (method === 'poll') await observer.poll(0);
+        else
+            await observer.known(
+                [{ linkedPrs: [{ url: `https://github.com/${repo}/pull/4`, state: 'merged' }] } as Item],
+                0,
+            );
+
+        expect(readTicket).toHaveBeenCalledWith(repo, 12);
+        expect(records.read(record.workId)).toMatchObject({ status: 'Done', needsYouCauses: [] });
+    },
+);

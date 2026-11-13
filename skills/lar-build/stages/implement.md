@@ -1,7 +1,7 @@
 # Implement and integrate
 
 Input: Small build route or saved slices/blockers and build branch. Output:
-committed change or integrated and finished slices. Set phase `implement`.
+committed change or integrated and finished slices.
 
 ## Small build
 

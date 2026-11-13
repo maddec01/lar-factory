@@ -3,7 +3,7 @@ import { currentBuildThread, delegatedWorkRunning, sameRepo, type Item, type Lin
 import type { PullRequestState, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 
 import { prUrl } from '../config/pr-host.ts';
-import { observePullRequest } from './observe-records.ts';
+import { observePullRequest, type ObserveReads } from './observe-records.ts';
 import { createPrProgressReader } from './pr-progress.ts';
 
 const PR_READ_MS = 15_000;
@@ -15,6 +15,7 @@ interface PrObserverOptions {
     waits(repo: string): boolean;
     changed: () => void;
     currentItems?: () => readonly Item[];
+    readTicket?: ObserveReads['ticket'];
     read?: (repo: string, number: number) => Promise<PullRequestState | LinkedPr>;
 }
 
@@ -70,7 +71,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
         // Batched results belong to the PR selected when the poll started.
         if (records.read(record.workId).pullRequest !== record.pullRequest) return;
 
-        await observePullRequest(records, record.workId, async () => {
+        const read = async () => {
             let next: PullRequestState | LinkedPr;
 
             try {
@@ -133,7 +134,9 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
             }
 
             return next.state;
-        });
+        };
+
+        await observePullRequest(records, record.workId, read, options.readTicket);
         options.changed();
     };
 

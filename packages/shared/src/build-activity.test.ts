@@ -123,7 +123,7 @@ it('a failed start leaves the row as it was', () => {
     expect(buildActivity(item, false, { phase: 'failed', message: 'No' })).toEqual(buildActivity(item));
 });
 
-it('offers a retry only for a stopped build thread with no recorded phase', () => {
+it('offers a retry for a stopped build in its system-recorded plan before slices or implementation', () => {
     const stopped = {
         status: 'In progress',
         buildPhase: null,
@@ -131,7 +131,12 @@ it('offers a retry only for a stopped build thread with no recorded phase', () =
     } as unknown as Item;
 
     expect(canRetryBuild(stopped)).toBe(true);
-    expect(canRetryBuild({ ...stopped, buildPhase: 'plan' })).toBe(false);
+    expect(canRetryBuild({ ...stopped, buildPhase: 'plan' })).toBe(true);
+    expect(canRetryBuild({ ...stopped, buildPhase: 'implement' })).toBe(false);
+    expect(
+        canRetryBuild({ ...stopped, buildPhase: 'plan', slices: [{ progress: 'waiting' }] } as unknown as Item),
+    ).toBe(false);
+    expect(canRetryBuild({ ...stopped, buildPhase: 'plan', linkedPrs: [{}] } as unknown as Item)).toBe(false);
     expect(canRetryBuild({ ...stopped, status: 'Review' })).toBe(false);
     expect(canRetryBuild({ ...stopped, threads: [{ purpose: 'build', state: 'running' }] } as unknown as Item)).toBe(
         false,

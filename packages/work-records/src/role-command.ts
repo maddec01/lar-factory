@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { agentWrites } from './agent-writes.ts';
+import { refreshBoards } from './board-refresh.ts';
 import { roleCapabilities, roleFinish } from './role-evidence.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
@@ -122,6 +123,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
 
             if (finish.failure) return hold(finish.failure);
 
+            await refreshBoards(workId, values['data-dir']);
             process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 
             return 0;
@@ -149,6 +151,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
 
             if (attempt.endedAt !== null) throw new Error('This attempt already finished; use a new execution ID.');
 
+            await refreshBoards(workId, values['data-dir']);
             process.stdout.write(
                 `${JSON.stringify(
                     {

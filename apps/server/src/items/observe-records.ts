@@ -99,12 +99,23 @@ async function observeOne(
     read: () => Promise<NewObservation>,
 ): Promise<void> {
     const previous = records.observations(workId).find((o) => o.of === of);
-    const reference = of === 'ticket' ? records.read(workId).ticket : records.read(workId).pullRequest;
+    const initial = records.read(workId);
+    const reference = of === 'ticket' ? initial.ticket : initial.pullRequest;
+    const stillCurrent = () => {
+        const current = records.read(workId);
+
+        return (
+            (of === 'ticket' ? current.ticket : current.pullRequest) === reference &&
+            (of !== 'ticket' || current.finishedAt === initial.finishedAt)
+        );
+    };
     let next: NewObservation;
 
     try {
         next = await read();
     } catch (err) {
+        if (!stillCurrent()) return;
+
         records.recordReadFailure(
             workId,
             records.read(workId).revision,
@@ -117,8 +128,8 @@ async function observeOne(
 
     const before = records.read(workId);
 
-    // A PR replaced during the read was not the one it read.
-    if ((of === 'ticket' ? before.ticket : before.pullRequest) !== reference) return;
+    // A replaced reference or a ticket read begun before merge no longer describes this state.
+    if (!stillCurrent()) return;
 
     // A slice is not on the board, so what a read shows on one stays free text.
     const slice = before.kind === 'slice';
@@ -148,8 +159,23 @@ export async function observePullRequest(
     records: WorkRecords,
     workId: string,
     read: () => Promise<PullRequestState>,
+    readTicket?: ObserveReads['ticket'],
 ): Promise<void> {
     await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await read() }));
+
+    const record = records.read(workId);
+
+    if (
+        readTicket &&
+        record.ticket &&
+        !record.setAside &&
+        records.observations(workId).some((o) => o.of === 'pr' && o.state === 'merged')
+    ) {
+        await observeOne(records, workId, 'ticket', async () => ({
+            of: 'ticket',
+            ...(await readTicket(record.repository, numberOf(record.ticket!))),
+        }));
+    }
 }
 
 /** The kinds a ticket or PR read open again was last read as, which make it reopened. */
@@ -226,7 +252,8 @@ export async function observeWork(
 
         await observeOne(records, workId, 'ticket', async () => ({
             of: 'ticket',
-            ...(reads.known?.(repository, number) ?? (await reads.ticket(repository, number))),
+            ...((!records.read(workId).finishedAt && reads.known?.(repository, number)) ||
+                (await reads.ticket(repository, number))),
         })).finally(changed);
         noteAgreement(records, workId, reads);
     }

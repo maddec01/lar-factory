@@ -826,3 +826,61 @@ test('a linked parent finishes from its parts and release evidence without a par
     assert.ok(records.read(parent.workId).finishedAt);
     assert.equal(records.read(parent.workId).pullRequest, null);
 });
+
+test('a merge bypasses a cached open ticket, including later reads of Done work', async () => {
+    const records = await open();
+    const { workId } = build(records);
+    const { reads, asked } = provider({ pr: 'merged', ticket: { state: 'closed', assignee: 'pedro' } });
+    const cached = { ...reads, known: () => ({ state: 'open' as const }) };
+
+    await observeRecords(records, [REPO], cached);
+    await observeRecords(records, [REPO], cached);
+    assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
+    assert.deepEqual(asked, [`pr ${REPO}#40`, `ticket ${REPO}#12`, `ticket ${REPO}#12`]);
+    assert.deepEqual(records.read(workId).needsYouCauses, []);
+});
+
+test('a ticket read failure after merge preserves its last state and records the failure without reopening work', async () => {
+    const records = await open();
+    const { workId } = build(records);
+
+    records.observe(workId, records.read(workId).revision, { of: 'ticket', state: 'open' });
+    await observeRecords(records, [REPO], {
+        pr: async () => 'merged',
+        known: () => ({ state: 'open' }),
+        ticket: async () => {
+            throw new Error('Ticket unavailable');
+        },
+    });
+    assert.equal(records.read(workId).status, 'Done');
+    assert.deepEqual(records.read(workId).needsYouCauses, []);
+    assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.failure, 'Ticket unavailable');
+});
+
+test('an open ticket read begun before merge cannot overwrite the merge-time refresh', async () => {
+    const records = await open();
+    const { workId } = build(records);
+    let release!: (ticket: TicketObservation) => void;
+    let started!: () => void;
+    const reading = new Promise<void>((resolve) => {
+        started = resolve;
+    });
+    const stale = observeRecords(records, [REPO], {
+        pr: async () => 'open',
+        ticket: () => {
+            started();
+
+            return new Promise<TicketObservation>((resolve) => {
+                release = resolve;
+            });
+        },
+    });
+
+    await reading;
+    records.observe(workId, records.read(workId).revision, { of: 'pr', state: 'merged' });
+    records.update(workId, records.read(workId).revision, { status: 'Done' });
+    records.observe(workId, records.read(workId).revision, { of: 'ticket', state: 'closed' });
+    release({ state: 'open' });
+    await stale;
+    assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
+});

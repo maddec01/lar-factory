@@ -3,8 +3,6 @@
 Input: final reviews, validation, rejected/open findings and unreviewed fixes.
 Output: recorded PR, assessment and recommendation, or a saved delivery hold.
 
-Set phase `approve`.
-
 Start the **Approver subagent** with [Approver](../agents/approver.md),
 `<lar-build>/project-rules.md`, the build's work ID, the repo path, every reviewer's final result,
 your rejected findings, the findings still

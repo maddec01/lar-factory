@@ -360,3 +360,28 @@ test('separate work records for the same PR share the server merge guard', async
     expect((await pending).status).toBe(200);
     expect(s.merge).toHaveBeenCalledTimes(1);
 });
+
+test('the board merge refreshes its ticket observation without assuming the merge closed it', async () => {
+    const s = await setup();
+
+    s.records.attachTicket(s.item.id, s.records.read(s.item.id).revision, 'owner/repo#12');
+    s.records.observe(s.item.id, s.records.read(s.item.id).revision, { of: 'ticket', state: 'open' });
+
+    const readTicket = vi.fn(async () => ({ state: 'closed' as const, assignee: 'pedro' }));
+    const commands = createPrMerge({
+        board: s.board,
+        records: s.records,
+        reread: vi.fn(),
+        provider: () => ({ read: s.read, merge: s.merge }),
+        readTicket,
+    });
+    const inspected = (await commands.inspectMerge(s.item.id)).body as { confirmation: { token: string } };
+
+    expect((await commands.mergePr(s.item.id, { token: inspected.confirmation.token, method: 'squash' })).status).toBe(
+        200,
+    );
+    expect(readTicket).toHaveBeenCalledWith('owner/repo', 12);
+    expect(s.records.observations(s.item.id)).toContainEqual(
+        expect.objectContaining({ of: 'ticket', state: 'closed', assignee: 'pedro' }),
+    );
+});

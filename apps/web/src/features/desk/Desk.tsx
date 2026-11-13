@@ -19,34 +19,22 @@ import {
     prReadiness,
 } from '@lar-factory/shared';
 import type { BoardData, Item, Checks } from '@lar-factory/shared';
-import { Button, Loading } from '@lar-works/design-system';
+import { Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
+    HumanWaitAction,
     Age,
     AzureFields,
     ItemTitle,
     useActivityUnavailable,
-    OpenThread,
-    PrAction,
     ItemStatusGlyph,
     useShownStatus,
-    StartBuild,
-    StartOrAfter,
-    StartAgain,
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import {
-    boardStatusState,
-    DeskCard as Card,
-    DeskPrProgress,
-    DeskHint,
-    DeskSection,
-    buttonKind,
-    noteBoardPlaces,
-} from '@/ui/board';
+import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -112,33 +100,6 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
     );
 }
 
-/** The card's action, and Open thread as a square icon in the right corner unless it is the action. */
-function Actions({ item, data }: { item: Item; data: BoardData }) {
-    const action = deskWait(item, useActivityUnavailable(), data.items).action;
-
-    if (action?.kind === 'start-again') return <StartAgain item={item} data={data} />;
-
-    if (action?.kind === 'retry-build') return <StartBuild item={item} data={data} />;
-
-    if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} />;
-
-    if ((item.status === 'Verify' && item.verification?.required) || action?.kind === 'details')
-        return (
-            <Button {...buttonKind('next')} onClick={() => useItemDialogStore.getState().open(item.id)}>
-                {item.status === 'Verify' ? 'Verify build' : action?.label}
-            </Button>
-        );
-
-    return action?.kind === 'thread' ? (
-        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next />
-    ) : (
-        <>
-            <PrAction item={item} label={action?.label ?? 'Open PR'} next />
-            <OpenThread item={item} data={data} iconOnly />
-        </>
-    );
-}
-
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
     const wait = deskWait(item, useActivityUnavailable(), data.items);
@@ -165,7 +126,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             status={wait.label}
             statusState={shown.state ?? boardStatusState[shown.glyph]}
             next={<NextStep item={item} />}
-            actions={<Actions item={item} data={data} />}
+            actions={<HumanWaitAction item={item} data={data} />}
         />
     );
 }

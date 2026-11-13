@@ -3,7 +3,7 @@
 // written its environment id, or the thread is archived, whose link T3 opens as New thread.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { needsAnswer, openQuestionThread, questionOwnerConcept, threadLink } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, questionOwnerParent, threadLink } from '@lar-factory/shared';
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
@@ -16,11 +16,11 @@ function latestThread(
     item: Item,
     data: BoardData,
     threadId?: string,
-): { link: string; question: boolean; conceptQuestion: boolean } | { reason: string } {
+): { link: string; question: boolean; inheritedLabel: 'concept' | 'parent' | null } | { reason: string } {
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
-    const owner = questionOwnerConcept(item, data.items);
+    const owner = questionOwnerParent(item, data.items);
     const concept = owner
         ? (openQuestionThread(owner) ??
           (Array.isArray(owner.threads) ? owner.threads.find((thread) => thread.state === 'running') : undefined))
@@ -42,9 +42,12 @@ function latestThread(
     const question = (latest.state === 'needs you' || !!latest.pendingRequest) && !latest.observedAt;
 
     return {
-        link: threadLink(data.t3EnvironmentId, requestOwner ? threadId! : inherited && threadId ? threadId : latest.id),
+        link: threadLink(
+            data.t3EnvironmentId,
+            requestOwner ? threadId! : question ? (latest.pendingRequest?.threadId ?? latest.id) : latest.id,
+        ),
         question,
-        conceptQuestion: !!inherited && question,
+        inheritedLabel: inherited && question ? (owner?.kind === 'concept' ? 'concept' : 'parent') : null,
     };
 }
 
@@ -80,8 +83,8 @@ export function OpenThread({
     const unavailable = useActivityUnavailable();
     const question = !unavailable && 'link' in thread && thread.question;
     const actionLabel =
-        question && thread.conceptQuestion && ['Answer in T3', 'Open thread'].includes(label)
-            ? 'Answer in concept thread'
+        question && thread.inheritedLabel && ['Answer in T3', 'Open thread'].includes(label)
+            ? `Answer in ${thread.inheritedLabel} thread`
             : ['Answer in T3', 'Approve brief', 'Resolve approval'].includes(label) && !question
               ? 'Open thread'
               : label;

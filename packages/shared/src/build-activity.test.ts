@@ -225,3 +225,31 @@ it('a limit allows its number, or what Automatic gives', () => {
     expect(limitNumber({ limit: 'automatic', automatic: 3 })).toBe(3);
     expect(limitNumber({ limit: 5, automatic: 3 })).toBe(5);
 });
+
+it('excludes a coordinating linked parent while counting real child builds and explicit parent build evidence', () => {
+    const parent = {
+        id: 'parent',
+        kind: 'feature',
+        flow: 'linked',
+        status: 'In progress',
+        subIssues: { total: 1, completed: 0 },
+        threads: [],
+        linkedPrs: [],
+    } as unknown as Item;
+    const child = {
+        ...parent,
+        id: 'child',
+        kind: 'build',
+        parentId: parent.id,
+        subIssues: { total: 0, completed: 0 },
+    } as Item;
+    const counted = (change: Partial<Item> = {}, startProgress = {}) =>
+        buildsAtWork({ items: [{ ...parent, ...change }, child], startProgress }).map((work) => work.id);
+
+    expect(counted()).toEqual(['child']);
+    expect(counted({ status: 'Review' })).toEqual(['child']);
+    expect(counted({}, { parent: { build: { phase: 'starting' } } })).toEqual(['parent', 'child']);
+    expect(
+        counted({ threads: [{ id: 'build', purpose: 'build', state: 'running', updated: 'now', title: 'Build' }] }),
+    ).toEqual(['parent', 'child']);
+});

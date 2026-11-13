@@ -1,6 +1,6 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
-import { questionOwnerConcept, questionThreadAction } from './question-thread.ts';
+import { questionOwnerParent, questionThreadAction } from './question-thread.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
 
 /** The desk names the human wait independently of the recorded workflow stage. */
@@ -8,7 +8,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.briefApproval)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
 
-    const concept = unavailable ? undefined : questionOwnerConcept(item, all);
+    const concept = unavailable ? undefined : questionOwnerParent(item, all);
     const question = unavailable ? undefined : (openQuestionThread(item) ?? (concept && openQuestionThread(concept)));
     const request = question?.pendingRequest;
     const stopped = !unavailable && stoppedRunThread(item);

@@ -1,7 +1,7 @@
 // A dossier's reading for its line: its parts done and counted, its chips, what's next and its threads.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { itemName, needsAnswer, plural, repoKey, repoName, workingAgain } from '@lar-factory/shared';
+import { humanWait, itemName, needsAnswer, plural, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import { Ban, CircleHelp, MessagesSquare } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -17,6 +17,7 @@ type Slice = Item['slices'][number];
 /** A dossier's reading for its header: parts done and counted, and the parts each chip and "what's next" name.
  *  `needsYou` holds the parts in Needs you; `yours` adds those in Verify or Ready to merge. */
 export interface Moving {
+    parentWait: ReturnType<typeof humanWait>;
     parts: Part[];
     done: number;
     count: number;
@@ -33,11 +34,14 @@ export function moving(parent: Item, parts: Part[], unavailable: boolean): Movin
     const ahead = parts.filter((p) => !isDone(p.item));
 
     return {
+        parentWait: humanWait(parent, unavailable),
         parts,
         done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
         count: Math.max(parent.subIssues.total, parts.length),
-        needsYou: ahead.filter((p) => needsAnswer(p.item)),
-        yours: ahead.filter((p) => YOURS.includes(p.item.status) && !workingAgain(p.item, unavailable)),
+        needsYou: ahead.filter(
+            (p) => !['Verify', 'Ready to merge'].includes(p.item.status) && humanWait(p.item, unavailable),
+        ),
+        yours: ahead.filter((p) => YOURS.includes(p.item.status) && humanWait(p.item, unavailable)),
         decisions: ahead.filter((p) => DECISION_KINDS.includes(p.kind)),
         blockedSlices: ahead.flatMap((part) =>
             part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })),
@@ -68,12 +72,13 @@ export const otherRepos = (parent: Item, m: Moving, data: BoardData) =>
 export function nextOf(
     m: Moving,
     parent: Item,
-): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
-    if (needsAnswer(parent)) return { tone: 'you', text: itemName(parent) };
+): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string; waitLabel?: string } {
+    if (m.parentWait) return { tone: 'you', text: itemName(parent), waitLabel: m.parentWait.label };
 
     const yours = m.needsYou[0] ?? m.yours[0];
 
-    if (yours) return { tone: 'you', part: yours, text: `${itemName(yours.item)}` };
+    if (yours)
+        return { tone: 'you', part: yours, text: `${itemName(yours.item)}`, waitLabel: humanWait(yours.item)?.label };
 
     if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${itemName(m.ready[0].item)}` };
 

@@ -83,7 +83,13 @@ export function prepareBuildClaim(
                     row.kind !== 'concept' &&
                     row.kind !== 'decision' &&
                     row.kind !== 'slice' &&
-                    ['In progress', 'Review'].includes(row.status),
+                    ['In progress', 'Review'].includes(row.status) &&
+                    !(
+                        records.children(row.workId).some((child) => child.kind !== 'slice') &&
+                        !row.buildBranch &&
+                        !row.pullRequest &&
+                        !records.threads(row.workId).some((thread) => thread.purpose === 'build')
+                    ),
             )
             .map((row) => row.workId),
     );

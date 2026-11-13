@@ -2,6 +2,7 @@
 // Abandon, the ticket close after it and a Needs you choice ask.
 
 import { slug } from './format.ts';
+import { humanWait } from './human-wait.ts';
 import {
     STATUSES,
     activityUnavailable,
@@ -10,12 +11,9 @@ import {
     onAzure,
     itemName,
     openQuestionThread,
-    prReadiness,
     repoKey,
     repoName,
     sameRepo,
-    workingAgain,
-    stoppedRunThread,
 } from './model.ts';
 import type { BoardData, Item, LinkedPr, NeedsYouOffer, StartProgress, StartPurpose, Status } from './model.ts';
 
@@ -109,18 +107,6 @@ const inFlight = (start: StartProgress | undefined) => !!start && start.phase !=
 const hasBuildThread = (item: Item) =>
     Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build');
 
-/** Whether the item waits on the user's answer, verification or merge. */
-const onDesk = (item: Item, unavailable: boolean) =>
-    needsAnswer(item) ||
-    (!unavailable && !!stoppedRunThread(item)) ||
-    !!item.needsYou ||
-    (item.status !== 'Done' &&
-        Array.isArray(item.threads) &&
-        item.threads.some((thread) => thread.childNeedsYou && !thread.observedAt)) ||
-    ((item.status === 'Verify' || item.status === 'Ready to merge') &&
-        !workingAgain(item, unavailable) &&
-        prReadiness(item)?.state !== 'active');
-
 /** Only single-flow work has an ordinary stage row. */
 function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
     const shaping = inFlight(starts?.shape);
@@ -162,7 +148,7 @@ export function placementOf(item: Item, { starts, unavailable, all }: PlacementF
 
     return {
         sections: [
-            ...(onDesk(item, unavailable) ? ['desk' as const] : []),
+            ...(humanWait(item, unavailable, all) ? ['desk' as const] : []),
             ...(dock ? ['dock' as const] : stage ? [stage] : []),
         ],
     };

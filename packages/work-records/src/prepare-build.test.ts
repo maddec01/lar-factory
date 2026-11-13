@@ -152,3 +152,34 @@ it('keeps explicit recovery available at later build stages through the shared c
         expect(() => records.buildReadiness(id, capacity)).toThrow('Only Ready');
     }
 });
+
+it('a linked parent without its own build does not consume a shared capacity slot', async () => {
+    const { records, rev, ready } = await fixture();
+    const parent = records.create({
+        title: 'Linked delivery',
+        repository: 'example/a',
+        kind: 'feature',
+        status: 'In progress',
+    });
+    const child = records.createPart({
+        parentId: parent.workId,
+        parentRevision: rev(parent.workId),
+        title: 'First child',
+        repository: 'example/a',
+        kind: 'build',
+        body: 'Exact first child',
+        blockerIds: [],
+    }).workId;
+
+    records.recordGate(child, rev(child), {
+        briefDigest: records.gate(child).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes',
+    });
+    records.update(child, rev(child), { status: 'Ready' });
+    expect(records.prepareBuild(child, rev(child), capacity).intent.workId).toBe(child);
+
+    const other = ready('Other');
+
+    expect(() => records.prepareBuild(other, rev(other), capacity)).toThrow(/capacity/);
+});

@@ -19,8 +19,8 @@ export function questionThreadAction(thread: ItemThread | undefined) {
     };
 }
 
-/** An unstarted part may use its nearest concept's current threads without inheriting their association or usage. */
-export function questionOwnerConcept(item: Item, all: readonly Item[]): Item | undefined {
+/** An unstarted part may use its nearest concept or linked parent's current threads without inheriting their association or usage. */
+export function questionOwnerParent(item: Item, all: readonly Item[]): Item | undefined {
     if (item.status !== 'Needs you' || item.threads === 'unavailable' || item.threads?.length) return undefined;
 
     const seen = new Set([item.id]);
@@ -33,7 +33,7 @@ export function questionOwnerConcept(item: Item, all: readonly Item[]): Item | u
 
         if (!parent) return undefined;
 
-        if (parent.kind === 'concept') {
+        if (parent.kind === 'concept' || (parent.kind !== 'decision' && parent.flow === 'linked')) {
             if (!Array.isArray(parent.threads) || parent.threads.some((thread) => thread.observedAt)) return undefined;
 
             return parent;

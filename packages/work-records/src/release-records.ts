@@ -23,12 +23,15 @@ const text = (value: unknown, limit = 4000): string =>
     typeof value === 'string' && value.trim() && value.length <= limit && !value.includes('\0')
         ? value.trim()
         : invalid('Release text must be nonempty and within its length limit.');
-const object = (value: unknown, keys: string[]): Record<string, unknown> => {
+const object = (value: unknown, keys: string[], optional: string[] = []): Record<string, unknown> => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return invalid('Expected a release plan object.');
 
     const result = value as Record<string, unknown>;
 
-    if (Object.keys(result).length !== keys.length || keys.some((key) => !Object.hasOwn(result, key)))
+    if (
+        Object.keys(result).some((key) => ![...keys, ...optional].includes(key)) ||
+        keys.some((key) => !Object.hasOwn(result, key))
+    )
         invalid(`Expected release fields: ${keys.join(', ')}.`);
 
     return result;
@@ -40,6 +43,21 @@ export function storedRelease(database: Database, id: string): ReleasePlan | nul
         .get(id);
 
     return row ? (JSON.parse(String(row.content)) as ReleasePlan) : null;
+}
+/** Release evidence cannot complete a plan whose delivery members were removed or retired. */
+export function releaseMemberHolds(database: Database, id: string): string[] {
+    return (storedRelease(database, id)?.steps ?? [])
+        .filter((step) =>
+            step.shipsWith?.some(
+                (member) =>
+                    !database.db
+                        .prepare(
+                            "SELECT 1 FROM work_records WHERE work_id = ? AND parent_id = ? AND kind = 'build' AND set_aside_at IS NULL",
+                        )
+                        .get(member, id),
+            ),
+        )
+        .map((step) => `Release step ${step.id}: reconcile removed or set-aside ships-with members.`);
 }
 export function releaseRecords(database: Database, read: (id: string) => WorkRecord): ReleaseRecords {
     const { db } = database;
@@ -103,9 +121,32 @@ export function releaseRecords(database: Database, read: (id: string) => WorkRec
                     invalid('Release steps must be an ordered list of at most 100 entries.');
 
                 const steps = (value.steps as unknown[]).map((entry) => {
-                    const step = object(entry, ['id', 'who', 'what']);
+                    const step = object(entry, ['id', 'who', 'what'], ['shipsWith']);
 
-                    return { id: text(step.id, 100), who: text(step.who, 200), what: text(step.what), done: null };
+                    if (
+                        step.shipsWith !== undefined &&
+                        (!Array.isArray(step.shipsWith) ||
+                            step.shipsWith.length < 2 ||
+                            new Set(step.shipsWith).size !== step.shipsWith.length ||
+                            step.shipsWith.some(
+                                (member) =>
+                                    typeof member !== 'string' ||
+                                    !db
+                                        .prepare(
+                                            "SELECT 1 FROM work_records WHERE work_id = ? AND parent_id = ? AND kind = 'build' AND set_aside_at IS NULL",
+                                        )
+                                        .get(member, id),
+                            ))
+                    )
+                        invalid('A ships-with release step needs at least two active delivery members of this group.');
+
+                    return {
+                        id: text(step.id, 100),
+                        who: text(step.who, 200),
+                        what: text(step.what),
+                        done: null,
+                        ...(step.shipsWith === undefined ? {} : { shipsWith: step.shipsWith as string[] }),
+                    };
                 });
 
                 if (new Set(steps.map((step) => step.id)).size !== steps.length)
@@ -134,6 +175,18 @@ export function releaseRecords(database: Database, read: (id: string) => WorkRec
                 if (plan.steps.slice(0, index).some((step) => !step.done))
                     invalid('Complete preceding release steps first.');
 
+                if (
+                    plan.steps[index]!.shipsWith?.some(
+                        (member) =>
+                            !db
+                                .prepare(
+                                    "SELECT 1 FROM work_records WHERE work_id = ? AND parent_id = ? AND kind = 'build' AND set_aside_at IS NULL",
+                                )
+                                .get(member, id),
+                    )
+                )
+                    invalid('Reconcile removed release members before recording release evidence.');
+
                 const done = evidence(by, proof);
 
                 plan.steps[index]!.done = done;
@@ -145,6 +198,9 @@ export function releaseRecords(database: Database, read: (id: string) => WorkRec
         recordOutcomeCheck: (id, revision, result, by, proof) =>
             save(id, revision, (current) => {
                 const plan = required(current);
+
+                if (releaseMemberHolds(database, id).length)
+                    invalid('Reconcile removed release members before checking the Outcome.');
 
                 if (!['passed', 'failed'].includes(result)) invalid('Outcome check result must be passed or failed.');
 

@@ -1,0 +1,174 @@
+import { readTicketSpec } from '@lar-factory/shared';
+import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
+
+import type { WorkRecord, WorkRecords } from './work-records.ts';
+
+type Check = Omit<ReconcileItem, 'digest'>;
+/** Mechanical holds are re-derived, never dismissed by a checklist acknowledgement. */
+export function reconciliationChecks(records: WorkRecords, groupId: string): Check[] {
+    const items: Check[] = [];
+    const add = (kind: Check['kind'], key: string, workId: string, summary: string, changes: string[]) =>
+        items.push({ kind, key, workId, summary, changes, requiresFix: true });
+    const all = (id: string): WorkRecord[] =>
+        records
+            .children(id)
+            .filter((r) => r.kind !== 'slice')
+            .flatMap((r) => [r, ...all(r.workId)]);
+    const members = all(groupId);
+    const route = (start: string, end: string, skip?: string): boolean => {
+        const queue = [start],
+            seen = new Set<string>();
+
+        for (const id of queue) {
+            if (seen.has(id)) continue;
+
+            seen.add(id);
+            for (const b of records.blockers(id)) {
+                if (`${id}:${b.workId}` === skip) continue;
+
+                if (b.workId === end) return true;
+
+                queue.push(b.workId);
+            }
+        }
+
+        return false;
+    };
+    const pairs = new Set<string>();
+
+    for (const r of [records.read(groupId), ...members].filter((member) => !member.setAside)) {
+        const id = r.workId;
+        const gate = records.gate(id);
+
+        if (id !== groupId && !['concept', 'decision', 'slice'].includes(r.kind)) {
+            const brief = records.body(id, 'brief');
+            const review = brief?.trim() ? records.currentDoubt(id) : null;
+
+            if (!brief?.trim()) add('brief', `brief:${id}`, id, `${r.title}: write the missing brief.`, ['brief']);
+            else {
+                const input = records.doubtPackage(id);
+
+                if (!review && !r.finishedAt)
+                    add(
+                        'brief',
+                        `doubt:${id}`,
+                        id,
+                        `${r.title}: review current answers, sibling endpoints/fields and removed contracts in Doubt; repair the brief and rerun the review.`,
+                        [input.packageDigest],
+                    );
+
+                for (const overlap of input.overlaps.filter(
+                    (o) => !o.ordered && !review?.ordering.some((o2) => o2.otherWorkId === o.otherWorkId),
+                )) {
+                    const pair = [id, overlap.otherWorkId].sort().join(':');
+
+                    if (pairs.has(pair)) continue;
+
+                    pairs.add(pair);
+                    add(
+                        'overlap',
+                        `overlap:${pair}`,
+                        id,
+                        `${r.title}: record ordering with ${records.read(overlap.otherWorkId).title}, or a current Doubt explanation.`,
+                        [...overlap.files, ...overlap.contracts],
+                    );
+                }
+            }
+
+            if (
+                (!gate.current || !review || gate.passing?.reviewDigest !== review.packageDigest) &&
+                gate.evidence.some((e) => ['gate', 'user'].includes(e.source ?? 'gate')) &&
+                !r.finishedAt
+            )
+                add(
+                    'gate',
+                    `gate:${id}`,
+                    id,
+                    `${r.title}: approved gate is stale; rerun Doubt and request approval on the board.`,
+                    [
+                        gate.briefDigest ?? '',
+                        records.body(id, 'brief') ? records.doubtPackage(id).packageDigest : 'missing brief',
+                    ],
+                );
+        }
+
+        if (r.ticket) {
+            const spec = records.specState(id);
+
+            if (spec.held || spec.error || spec.pending !== null || (spec.active && !gate.current))
+                add(
+                    'ticket',
+                    `ticket:${id}`,
+                    id,
+                    `${r.title}: ${spec.held ? 'resolve held ticket edit' : (spec.error ?? (spec.pending !== null ? 'approved Spec write is pending' : 'Out-of-date Spec; retain it until the new gate is approved'))}.`,
+                    [JSON.stringify(spec)],
+                );
+
+            if (
+                spec.base &&
+                (spec.base.title !== r.title ||
+                    (gate.current && spec.active && readTicketSpec(spec.base.body).spec !== records.body(id, 'brief')))
+            )
+                add(
+                    'ticket',
+                    `projection:${id}`,
+                    id,
+                    `${r.title}: ticket title or Spec differs from the record; sync the approved projection.`,
+                    [spec.base.digest, r.title, gate.briefDigest ?? ''],
+                );
+        }
+
+        if (r.kind === 'decision' && records.decisionAnswer(id).current && !records.completion(id).complete)
+            add(
+                'map',
+                `incorporate:${id}`,
+                id,
+                `${r.title}: incorporate the current answer and domain drafts into the map.`,
+                records.completion(id).reasons,
+            );
+
+        for (const blocker of records.blockers(id)) {
+            const key = `${id}:${blocker.workId}`;
+
+            if (route(id, blocker.workId, key))
+                add(
+                    'blocker',
+                    `redundant:${key}`,
+                    id,
+                    `${r.title}: remove redundant blocker on ${blocker.title}; another recorded path already orders it.`,
+                    [key],
+                );
+        }
+        for (const d of records.dependencies(id))
+            if (d.needsReview)
+                add(
+                    'dependency',
+                    `dependency-review:${d.dependencyId}`,
+                    id,
+                    `${d.need}: review changed Dependency evidence.`,
+                    [String(d.revision)],
+                );
+    }
+    for (const step of records.releaseSteps(groupId)) {
+        const invalid = step.workIds.filter((id) => !members.some((r) => r.workId === id && !r.setAside));
+
+        if (invalid.length)
+            add(
+                'release',
+                `release-members:${step.id}`,
+                groupId,
+                `${step.title}: replace removed or set-aside release members.`,
+                invalid,
+            );
+        else if (!step.evidence && step.workIds.length && step.workIds.every((id) => records.read(id).finishedAt))
+            add(
+                'release',
+                `release-evidence:${step.id}`,
+                groupId,
+                `${step.title}: PRs merged; record release evidence${step.kind === 'ships-with' ? ' that these parts shipped together' : ''}.`,
+                step.workIds,
+            );
+    }
+
+    return items;
+}

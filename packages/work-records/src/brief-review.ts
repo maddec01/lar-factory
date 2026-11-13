@@ -143,8 +143,20 @@ export function briefReviewRecords(
         return false;
     };
     const buildPackage = (workId: string): DoubtPackage => {
+        const sources = new Map<string, ReviewSource>();
+        const sourceOf = (record: WorkRecord): ReviewSource => {
+            const prior = sources.get(record.workId);
+
+            if (prior) return prior;
+
+            const value = source(record);
+
+            sources.set(record.workId, value);
+
+            return value;
+        };
         const record = read(workId);
-        const own = source(record);
+        const own = sourceOf(record);
         const brief = own.bodies.find((body) => body.body === 'brief')?.markdown;
 
         if (!brief?.trim()) invalid('Doubt needs a saved brief.');
@@ -171,7 +183,17 @@ export function briefReviewRecords(
         for (const candidate of active) {
             if (candidate.workId === workId || ['concept', 'decision'].includes(candidate.kind)) continue;
 
-            const other = source(candidate);
+            // A linked-work parent describes the group, not an extra delivery changing its children's files.
+            if (
+                db
+                    .prepare(
+                        "SELECT 1 FROM work_records WHERE parent_id = ? AND kind <> 'slice' AND set_aside_at IS NULL",
+                    )
+                    .get(candidate.workId)
+            )
+                continue;
+
+            const other = sourceOf(candidate);
             const files =
                 own.repository.toLowerCase() === other.repository.toLowerCase()
                     ? own.named.files.filter((file) => other.named.files.includes(file))
@@ -196,7 +218,7 @@ export function briefReviewRecords(
         }
 
         const map =
-            root.kind === 'concept' ? (source(root).bodies.find((body) => body.body === 'map')?.markdown ?? '') : '';
+            root.kind === 'concept' ? (sourceOf(root).bodies.find((body) => body.body === 'map')?.markdown ?? '') : '';
         const section = (heading: string) =>
             map
                 .split(/^##\s+/m)
@@ -209,12 +231,12 @@ export function briefReviewRecords(
             destination: section('Destination'),
             releaseConstraints: section('Release constraints'),
             releasePlan: storedRelease(database, root.workId),
-            concept: root.kind === 'concept' ? source(root) : null,
-            decisions: related.filter((item) => item.kind === 'decision').map(source),
-            siblings: related.filter((item) => !['concept', 'decision'].includes(item.kind)).map(source),
+            concept: root.kind === 'concept' ? sourceOf(root) : null,
+            decisions: related.filter((item) => item.kind === 'decision').map(sourceOf),
+            siblings: related.filter((item) => !['concept', 'decision'].includes(item.kind)).map(sourceOf),
             overlapping,
             source: own,
-            blockers: own.blockers.map((id) => source(read(id))),
+            blockers: own.blockers.map((id) => sourceOf(read(id))),
             dependencies: dependencies.blockingDependencies(workId),
             overlaps,
         };

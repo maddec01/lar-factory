@@ -7,6 +7,7 @@
     "exports": {
         ".": "./src/index.ts",
         "./publication": "./src/publication.ts",
+        "./group-reconciliation": "./src/group-reconciliation.ts",
         "./vocabulary": "./src/vocabulary.ts",
         "./provider-command": "./src/provider-command.ts",
         "./azure-safety": "./src/azure-safety.ts",

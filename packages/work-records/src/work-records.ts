@@ -40,7 +40,9 @@ import { gateRecords, type GateRecords } from './gate-records.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
-import { releaseRecords, storedRelease, type ReleaseRecords } from './release-records.ts';
+import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
+import { releaseRecords, releaseMemberHolds, storedRelease, type ReleaseRecords } from './release-records.ts';
+import { releaseStepRecords, type ReleaseStepRecords } from './release-steps.ts';
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { retroRecords, type RetroRecords } from './retro-records.ts';
@@ -376,6 +378,8 @@ export interface CaptureSubmission {
 
 export interface WorkRecords
     extends
+        ReleaseStepRecords,
+        ReconciliationRecords,
         ScopeRecords,
         RetroRecords,
         ConceptRunRecords,
@@ -1162,7 +1166,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             if (row.needs_you) reasons.push(`Needs you: ${row.needs_you}`);
 
-            reasons.push(...releaseHolds(storedRelease(database, row.work_id)));
+            reasons.push(
+                ...releaseHolds(storedRelease(database, row.work_id)),
+                ...releaseMemberHolds(database, row.work_id),
+            );
             reasons.push(
                 ...unmet(row.work_id).map(
                     ({ dependencyId, owner }) => `Its Dependency ${dependencyId} on ${owner} isn't met.`,
@@ -1275,6 +1282,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
     const records: WorkRecords = {
         ...releaseRecords(database, (id) => fromRow(find(id))),
+        ...releaseStepRecords(() => records),
+        ...reconciliationRecords(database, () => records),
         ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
         ...retroRecords(database, (id) => fromRow(find(id))),

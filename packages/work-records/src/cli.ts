@@ -153,6 +153,15 @@ Run settings, local only
   finish-role-run <work-id> --revision N --file F
                                     Record actual settings from a T3 report and the result.
 
+Group upkeep, local and deterministic (no tracker reads)
+  reconcile <group-id>              List changed sources and mechanical holds as a fingerprinted checklist.
+  resolve-reconcile <group-id> --item KEY --digest H --evidence TEXT
+                                    Record a source-change review. Mechanical holds require their fix.
+  release-steps <group-id>           Read release steps and ships-with pairs.
+  set-release-plan <group-id> --revision N --file F
+                                    Use canonical {steps:[{id,who,what,shipsWith?:[work IDs]}],outcomeCheck:text}.
+
+
 Reads
   select-reviewers <work-id> --base SHA --head SHA [--run-id ID]
                    [--escalations F]
@@ -517,6 +526,9 @@ const TAKES_WORK_ID = [
     'refinement',
     'waiting-on',
     'work-order',
+    'reconcile',
+    'resolve-reconcile',
+    'release-steps',
     'concept-build-plan',
     'set-build-run',
     'set-fog',
@@ -579,6 +591,7 @@ const COMMANDS = [
 ];
 
 const OPTIONS = {
+    item: { type: 'string' },
     json: { type: 'boolean' },
     'confirmed-missing-issue': { type: 'string' },
     plan: { type: 'string' },
@@ -749,6 +762,17 @@ async function run(
         case 'resolve-failure':
             return records.resolveFailure(workId!, need(values, 'reason'));
 
+        case 'reconcile':
+            return records.reconcile(workId!);
+        case 'resolve-reconcile':
+            return records.resolveReconcile(
+                workId!,
+                need(values, 'item'),
+                need(values, 'digest'),
+                need(values, 'evidence'),
+            );
+        case 'release-steps':
+            return records.releaseSteps(workId!);
         case 'sync-structure':
             throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
         case 'gate-batch': {
@@ -1172,9 +1196,13 @@ async function main(args: string[]): Promise<number> {
 
         const result = await run(records, command, workId, values);
 
-        if (command === 'set-phase' || command === 'set-build-run') await refreshBoards(workId!, values['data-dir']);
+        if (['set-phase', 'set-build-run', 'reconcile', 'resolve-reconcile'].includes(command))
+            await refreshBoards(workId!, values['data-dir']);
 
         const validationCommand = [
+            'reconcile',
+            'resolve-reconcile',
+            'release-steps',
             'set-check-list',
             'checks',
             'describe-failure',

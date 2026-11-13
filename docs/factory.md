@@ -295,7 +295,10 @@ builds can find the work they must account for.
 Domain docs OFF means no drafts and `none`. ON means draft glossary entries and
 ADRs in the record for the build PR. Shaping writes no product glossary or ADR
 files. Editing a brief invalidates its gate. The stage ends with a saved digest
-ready for Doubt, shown as Awaiting gate inside Shaping or the group.
+ready for Doubt, shown as Awaiting gate inside Shaping or the group. Decision
+threads use this same route for every draft build. A decision answer or a Ready
+status alone cannot authorize a proposed child build; Start build rechecks its
+current gate before recording a launch intent.
 
 ### Gate with Doubt
 

@@ -2047,6 +2047,20 @@ export function createItemCommands({
                         if (records) {
                             await refreshSpecs(records, { workId: item.id });
                             reread();
+
+                            const proposed = records.read(item.id);
+
+                            if (
+                                proposed.parentId &&
+                                proposed.status !== 'In progress' &&
+                                !records.gate(item.id).current
+                            )
+                                return {
+                                    thread: null,
+                                    error: 'This proposed build needs Brief, code evidence, Doubt and a current passing gate before Start build.',
+                                    refused: true,
+                                    hold: true,
+                                };
                         }
 
                         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.

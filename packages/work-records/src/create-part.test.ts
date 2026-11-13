@@ -65,6 +65,13 @@ describe('createPart', () => {
             expect(records.body(record.workId, kind === 'decision' ? 'decision' : 'brief')).toBe(input.body);
             expect(records.blockers(record.workId).map((item) => item.workId)).toEqual([blocker.workId]);
             expect(records.read(record.workId)).toEqual(record);
+
+            if (kind === 'build') {
+                expect(records.gate(record.workId).current).toBe(false);
+                expect(() => records.recordLaunchIntent(record.workId, record.revision, 'build')).toThrow(
+                    /current passing gate/,
+                );
+            }
         }
         expect(records.read(parent.workId).revision).toBe(3);
         expect(records.read(blocker.workId).revision).toBe(3);

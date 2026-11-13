@@ -330,7 +330,7 @@ test('the work message for ticketless work names the thread with its title alone
 test('a decision launched through shaping is named for shaping', () => {
     const work = item('Queued', ['decision-architecture'], { id: 'w1', number: 12, title: 'Pick a store' });
 
-    assert.equal(workMessage(work), 'Shaping #12 Pick a store\n$lar-shape w1');
+    assert.ok(workMessage(work).startsWith('Shaping #12 Pick a store\n$lar-shape w1\n'));
 });
 
 test('an Azure work item is named by its number as a GitHub ticket is', () => {
@@ -1015,4 +1015,12 @@ test('a Project default in T3 stored with no options, as T3 stores a model defau
         t3DefaultDetail(MODEL_GROUPS, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }),
         'Personal Claude Opus 5.5',
     );
+});
+
+test('decision launch inputs route draft builds through the canonical gate', () => {
+    const work = item('Queued', [], { id: 'decision', kind: 'decision' });
+    const message = workMessage(work);
+
+    assert.ok(message.includes('Brief → code evidence → Doubt → gate → Ready'));
+    assert.ok(message.includes('do not implement during shaping'));
 });

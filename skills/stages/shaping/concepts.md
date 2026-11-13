@@ -75,8 +75,11 @@ roles use the foreground with their tool's longest timeout, per
    the destination is fully decided, make a build record for it
    (`slice.sh <concept work ID> "<title>" <brief file> --kind build --repository <owner/repo> [--blocked-by <work ID>]...`) with a
    brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
-   build needs. New builds start Queued and can remain ungated. Run the [gate](gate.md)
-   and set a build Ready when preparing it for implementation.
+   build needs. These are drafts in Queued. After saving the map below, follow
+   [Brief](brief.md), check code evidence, run Doubt and the [gate](gate.md) for
+   each, then set Ready. Decision
+   answers, prose dependencies and decision completion never approve a brief.
+   Record ordering with `lar-work add-blocker`; use Dependencies for other teams.
 3. Save the concept's map. Put only results needed to explain parts or
    relationships in Decisions so far; keep the full answer in the decision
    record. Copy its drafts into Domain docs, remove cleared fog and update the
@@ -84,7 +87,10 @@ roles use the foreground with their tool's longest timeout, per
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision at once, as in step 3; every other new decision
-waits in Queued as in step 4. Builds remain Queued for shaping until gated
+waits in Queued as in step 4. Adjust proposed builds within the approved destination;
+ask only for expanded scope, new decisions or changes to active builds. Changed
+briefs need Doubt and a fresh gate; retain the last approved ticket Spec meanwhile.
+Builds remain Queued for shaping until gated
 and moved to Ready for the board to start
 ([5. Start the build](start-build.md)). `lar-work completion` on this decision
 should now print it complete; fix what its reasons name. Map builds follow the

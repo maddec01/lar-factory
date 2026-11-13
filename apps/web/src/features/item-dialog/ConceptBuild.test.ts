@@ -177,13 +177,15 @@ test.each(['running', 'paused'] as const)(
 
         holdPosts(data);
         await mountPage(data);
-        expect(text($('[data-ready-build-controls]'))).toContain('3 of 4 building');
+        expect(text($('[data-ready-build-controls]'))).toContain('3 building · limit 4');
         expect($('[data-ready-build-controls]')!.getAttribute('title') ?? '').not.toContain('exceed');
 
         const { useItemDialogStore } = await import('./ItemDialogStore');
 
         await settle(() => useItemDialogStore.getState().open(concept.id));
-        expect(text($('[data-item-dialog] [data-shared-build-capacity]'))).toBe('3 of 4 building: 2 from this concept');
+        expect(text($('[data-item-dialog] [data-shared-build-capacity]'))).toBe(
+            '3 building · limit 4: 2 from this concept',
+        );
     },
 );
 test('the concept shows active builds, total progress and an explicit capacity wait', async () => {

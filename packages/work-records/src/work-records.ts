@@ -43,6 +43,7 @@ import { publicationRecords, type PublicationRecords } from './publication-recor
 import { releaseRecords, storedRelease, type ReleaseRecords } from './release-records.ts';
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
+import { retroRecords, type RetroRecords } from './retro-records.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { reviewSelection } from './run-settings-input.ts';
 import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
@@ -376,6 +377,7 @@ export interface CaptureSubmission {
 export interface WorkRecords
     extends
         ScopeRecords,
+        RetroRecords,
         ConceptRunRecords,
         ReleaseRecords,
         RetitleRecords,
@@ -1275,6 +1277,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...releaseRecords(database, (id) => fromRow(find(id))),
         ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
+        ...retroRecords(database, (id) => fromRow(find(id))),
         ...conceptRunRecords(database, () => records),
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
@@ -1768,7 +1771,23 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         setBuildPhase: (workId, revision, phase) => {
             const checked = checkOneOf(BUILD_PHASES, phase, 'build phase');
 
-            return change(workId, revision, (row) => (checkBuilt(row.kind), { build_phase: checked }));
+            return change(workId, revision, (row) => {
+                checkBuilt(row.kind);
+
+                if (
+                    checked === 'retro' &&
+                    (row.status !== 'Done' ||
+                        !row.finished_at ||
+                        !db
+                            .prepare(
+                                "SELECT 1 FROM observations WHERE work_id=? AND observed='pr' AND subject=? AND state='merged'",
+                            )
+                            .get(workId, row.pull_request))
+                )
+                    throw invalid('Retro requires Done and a confirmed merge of the delivery PR.');
+
+                return { build_phase: checked };
+            });
         },
         setPullRequest: (workId, revision, pullRequest) => {
             const reference = checkReference(pullRequest, 'PR');
@@ -2323,7 +2342,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         hidden: (retention, now = new Date()) => {
             const days = checkDays(retention?.hideAfterDays, 'days before hiding');
 
-            return database.read(() => dueRows(retiredRows.all() as unknown as Row[], days, now).map(fromRow));
+            return database.read(() =>
+                dueRows(retiredRows.all() as unknown as Row[], days, now)
+                    .filter((row) => !records.retroPending(row.work_id))
+                    .map(fromRow),
+            );
         },
         deleteExpired: (retention, now = new Date()) => {
             if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
@@ -2335,6 +2358,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     dueRows(retiredRows.all() as unknown as Row[], days, now).map((row) => [row.work_id, row]),
                 );
                 const kept: Expired['kept'] = [];
+
+                for (const [id] of due) {
+                    if (records.retroPending(id)) {
+                        due.delete(id);
+                        kept.push({ workId: id, reason: 'The post-merge retro is unfinished.' });
+                    }
+                }
+
                 const journals = db
                     .prepare('SELECT plan_id, work_id, content, superseded_by FROM publication_plans')
                     .all();

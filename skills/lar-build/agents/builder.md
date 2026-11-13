@@ -324,7 +324,7 @@ with `configuration.isBlocking` true is a required check whose `status` is
 or `running` while it runs. Then:
 
 - **Required checks green**: after a failed Verify, return to **Verify** on this same PR; only Pedro records the head-bound pass in the board. A status write never substitutes for that result. Run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
-  `unwatch_pull_request`, go to **Retro**.
+  `unwatch_pull_request`, end the turn. The board resumes this thread for **Retro** only after the delivery PR is confirmed merged and the record is **Done**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with `ci-fixer.md`, the build's work ID, repo path, PR URL and
   the failing check (or "merge conflict"). The watch stays. If the fix or conflict resolution changed the final tree,
@@ -343,20 +343,16 @@ run counts, merge conflicts included). Tell the user the failing job's name
 and run link (or "merge conflict") and the CI fixer's report,
 `unwatch_pull_request`, and ask how to go on (rerun the job, start a CI
 fixer, or stop). When they answer, set **Review**, do it, `watch_pull_request`
-and restart **Checks**. If they say stop, set **Needs you** and go to
-**Retro**.
+and restart **Checks**. If they say stop, set **Needs you** and end the turn.
 
 ## Retro
 
-Run once, last, after the final status is set and the PR is unwatched. Show the
-UI reviewer's screenshots with captions and absolute file paths, beside the PR
-link. Follow `<lar-build>/review-session.md` for this
-thread. End with the PR link, its status (Verify, Ready to merge or Needs you)
-and the complete numbered suggestion list in chat. Collect picks and any
-clarifications in chat per [Retro picks](../shared/questions.md#retro-picks).
-
-Follow [Retro capture](../shared/retro-capture.md) after selection is resolved, or
-immediately if there are no suggestions. Make or reuse follow-up records only
-for explicit picks, and report their work IDs and any pending failures. Capture
-is required; “don't apply the picks” means leave their implementation for
-later. Keep the final status through capture and retries.
+Run once after the board confirms the delivery PR merged and the record is **Done**.
+Keep **Done**. Show the UI reviewer's screenshots with captions and absolute paths
+beside the PR link. Follow `<lar-build>/review-session.md` for this thread.
+Save every suggestion together with `lar-work propose-retro <work ID> --revision N
+--file F`: a JSON array of `{title,description,repository,kind}`; kind is `bug`,
+`feature` or `improvement`, repository is the owning onboarded repository.
+Save `[]` if none. End the turn: the board's **Choose follow-ups** card collects
+and records the selection and creates the chosen List records/tickets using each
+destination's retro setting. Never ask for picks in chat or create them yourself.

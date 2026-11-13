@@ -90,6 +90,7 @@ import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
 import { createPrMerge } from './pr-merge.ts';
+import { createRetro } from './retro.ts';
 import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
 import { createVerification } from './verification.ts';
 import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
@@ -104,6 +105,8 @@ export interface Reply {
 export interface ItemCommands {
     inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    retryRetro(itemId: string): Promise<Reply>;
     inspectVerification(itemId: string): Promise<Reply>;
     recordVerification(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryVerification(itemId: string): Promise<Reply>;
@@ -225,6 +228,7 @@ export interface ItemCommandsDeps {
     /** Starts a T3 thread; tests stand in for t3. */
     startThread?: typeof startThread;
     resumeLaunch?: typeof resumeLaunch;
+    retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity'>;
     showThread?: typeof lookupThread;
@@ -391,11 +395,13 @@ export function createItemCommands({
     runLaunchDeps,
     verificationDeps,
     briefApprovalDeps,
+    retroDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
     const gating = createBriefApproval({ board, records, reread, ...briefApprovalDeps });
+    const retros = createRetro({ board, records, reread, ...retroDeps });
     const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
         board,
@@ -1394,11 +1400,14 @@ export function createItemCommands({
     return {
         ...gating,
         ...verifying,
+        chooseRetro: retros.chooseRetro,
+        retryRetro: retros.retryRetro,
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
             pushStarts();
             await verifying.reconcileVerificationFixes();
+            await retros.reconcileRetros();
 
             const warnings = { ...board.snapshot().startCheckFailures };
 

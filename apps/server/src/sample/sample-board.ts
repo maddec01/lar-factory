@@ -26,6 +26,7 @@ import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
 import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
+import { sampleRetro } from './sample-retro.ts';
 import { sampleVerification } from './sample-verification.ts';
 
 /** All writable sample dependencies live here. No real source, tracker or T3 command is reachable from them. */
@@ -122,6 +123,11 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             refresh: (id) => refreshSpecs(records, { provider, dir, workId: id }),
             sync: () => syncSpecs(records, { provider, dir }),
             identity: () => 'Sample Pedro',
+        },
+        retroDeps: {
+            send: verification.dependencies.send,
+            identity: verification.dependencies.identity,
+            capture: { provider, labels: tracker.labels },
         },
         kindTracker: (repo) => ({ labels: tracker.labels(repo), kinds: tracker.kinds(repo) }),
     });
@@ -227,6 +233,8 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
 
                 return { status: 200, body: { workId, error: null } };
             }
+
+            if (input.action === 'retro') return sampleRetro(records, repos, reread, input);
 
             if (input.action !== 'verification') return sampleControls(tracker, refresh)(input);
 

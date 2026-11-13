@@ -56,6 +56,6 @@ export function useBuilds(): {
         running: shown.filter((state) => state.running).length,
         limit,
         text: buildsAgainstLimit(shown, limit),
-        occupancy: `${items.length}${limit === undefined ? '' : ` of ${limit}`} building`,
+        occupancy: `${items.length} building${limit === undefined ? '' : ` · limit ${limit}`}`,
     };
 }

@@ -7,6 +7,7 @@ import {
     readBuilds,
     refKey,
     workMessage,
+    runSettingsMessage,
 } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
@@ -40,6 +41,12 @@ async function readCalls(file: string): Promise<string[][]> {
 
 /** The board data sample mode serves. */
 export const SAMPLE_DATA = fileURLToPath(import.meta.resolve('@lar-factory/shared/test/sample.json'));
+
+export const DEFAULT_SELECTION = {
+    instanceId: 'codex',
+    model: 'gpt-6.1-sol',
+    options: [{ id: 'reasoningEffort', value: 'high' }],
+};
 
 /** Sample mode's T3 settings and model list, so the Start menu can be tried without T3. */
 export const SAMPLE_MODELS = {
@@ -282,7 +289,12 @@ export async function startBoard(
     await writeFile(
         settingsFile,
         JSON.stringify({
+            projectSettingsFolded: true,
+            defaultModelSelection: DEFAULT_SELECTION,
             providerInstances: { claudeAgent: { driver: 'claudeAgent', config: { homePath: join(dir, 'no-claude') } } },
+            ...(env.T3_SETTINGS || fixture
+                ? JSON.parse(await readFile(env.T3_SETTINGS ?? SAMPLE_MODELS.T3_SETTINGS, 'utf8'))
+                : {}),
         }),
     );
 
@@ -296,6 +308,15 @@ export async function startBoard(
 
     // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
     const home = env.HOME ?? dir;
+
+    if (!fixture) {
+        const agents = join(home, '.agents/skills/lar-build/agents');
+
+        mkdirSync(agents, { recursive: true });
+        for (const role of ['code', 'security', 'ui', 'performance'])
+            writeFileSync(join(agents, `reviewer-${role}.md`), `Fixture ${role} instructions.`);
+    }
+
     const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
 
     if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json')))
@@ -360,11 +381,11 @@ export async function startBoard(
                 SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
                 FAKE_GH_STATE: stateFile,
                 T3_STATE_DB: join(dir, 'no-t3.sqlite'),
-                T3_SETTINGS: settingsFile,
                 T3_SERVER_RUNTIME: runtimeFile,
                 BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
                 ...(fixture ? SAMPLE_MODELS : {}),
                 ...env,
+                T3_SETTINGS: settingsFile,
             },
             stdio: skillCheck ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
             // The board leads its own process group, which the gh it runs joins.
@@ -634,10 +655,26 @@ export const testFactoryContext = (home: string) => ({
     dataDir: boardDataDir(home, {}),
     bin: join(home, '.local/bin'),
     shapeSkill: join(home, '.agents/skills/lar-shape/SKILL.md'),
+    buildSkill: join(home, '.agents/skills/lar-build/SKILL.md'),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
+export async function withRunPrompt(dataDir: string, id: string, message: string) {
+    const records = await openWorkRecords(workRecordsPath(dataDir));
+
+    try {
+        const snapshot = records.runSettings(id).runs.at(-1);
+
+        return snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message;
+    } finally {
+        records.close();
+    }
+}
 export const shapePrompt = (board: Board, title: string, id: string) =>
-    workMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir)))));
+    withRunPrompt(
+        board.dataDir,
+        id,
+        workMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir))))),
+    );
 /** The shaping message a board sent before threads took their phase in their name. */
 export const earlierShapePrompt = (board: Board, title: string, id: string) =>
     earlierWorkMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir)))));

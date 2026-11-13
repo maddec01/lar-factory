@@ -67,12 +67,17 @@ const main = async () => {
                 .trim()
                 .split('\n')
                 .map((line) => JSON.parse(line))
-                .find((call) => call[1] === 'start');
+                .find((call) => call[1] === 'start' || call[0] === 'launch');
 
             process.stdout.write(
                 JSON.stringify({
                     thread: { threadId: 'thread-1' },
-                    messages: [{ role: 'user', text: options.firstMessage ?? started?.[3] ?? '' }],
+                    messages: [
+                        {
+                            role: 'user',
+                            text: options.firstMessage ?? (started?.[0] === 'launch' ? started[2] : started?.[3]) ?? '',
+                        },
+                    ],
                 }),
             );
         }

@@ -13,6 +13,8 @@ import { testEnv } from './repo-support.ts';
 import {
     changeRecords,
     testFactoryContext,
+    withRunPrompt,
+    DEFAULT_SELECTION,
     recordBlockers,
     SAMPLE_MODELS,
     settleDecisions,
@@ -61,10 +63,14 @@ const originTip = (home: string) =>
     }).trim();
 
 const message = (home: string, workId: string, dataDir?: string) =>
-    buildMessage({ id: workId, number: 12, title: 'Issue 12' } as Item, `${home}/.agents/skills/lar-build`, {
-        ...testFactoryContext(home),
-        ...(dataDir ? { dataDir } : {}),
-    });
+    withRunPrompt(
+        dataDir ?? testFactoryContext(home).dataDir,
+        workId,
+        buildMessage({ id: workId, number: 12, title: 'Issue 12' } as Item, `${home}/.agents/skills/lar-build`, {
+            ...testFactoryContext(home),
+            ...(dataDir ? { dataDir } : {}),
+        }),
+    );
 
 /** The issue edits Start build might make, which it never does: its work records hold the moves. */
 const writes = async (board: Board) =>
@@ -96,15 +102,12 @@ test("Start build moves its concept's work record to In progress, writes nothing
     assert.deepEqual(await writes(board), []);
     assert.deepEqual(await board.t3Calls(), [
         [
-            'thread',
-            'start',
+            'launch',
             'project-factory',
-            message(home, board.id(12)),
-            '--worktree',
-            originTip(home),
-            '--branch',
-            'chore/12-issue-12',
-            '--json',
+            await message(home, board.id(12)),
+            DEFAULT_SELECTION,
+            { type: 'worktree', baseRef: originTip(home), branch: 'chore/12-issue-12' },
+            'full-access',
         ],
     ]);
 });
@@ -125,7 +128,7 @@ test('a fetch that fails refuses Start build, starts no thread and lets a retry 
     assert.deepEqual(await board.t3Calls(), []);
     renameSync(`${origin}.away`, origin);
     assert.equal((await startBuild(board, board.id(12))).status, 200);
-    assert.equal((await board.t3Calls())[0]![5], originTip(home));
+    assert.equal(((await board.t3Calls())[0]![4] as unknown as { baseRef: string }).baseRef, originTip(home));
 });
 
 test('a refused skill check refuses Start build with its reason, writes nothing to GitHub and runs no t3', async (t) => {
@@ -176,8 +179,8 @@ test('Drift asks for a choice before Start build writes anything, then starts on
     assert.equal((await startBuild(board, board.id(12), undefined, board.url, 'keep')).status, 200);
     assert.deepEqual(choices, [undefined, 'keep']);
     assert.deepEqual(
-        (await board.t3Calls()).map((args) => args[3]),
-        [message(home, board.id(12))],
+        (await board.t3Calls()).map((args) => args[2]),
+        [await message(home, board.id(12))],
     );
 });
 
@@ -193,8 +196,8 @@ test('Start build runs the thread on the picked model choice', async (t) => {
         [
             'launch',
             'project-factory',
-            message(home, board.id(12)),
-            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' },
+            await message(home, board.id(12)),
+            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5', options: [] },
             { type: 'worktree', baseRef: originTip(home), branch: 'fix/12-issue-12' },
             'full-access',
         ],
@@ -444,7 +447,7 @@ for (const fail of ['killed', 'garbage']) {
 
         assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
         assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
-        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start').length, 1);
+        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
     });
 }
 

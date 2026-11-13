@@ -1,3 +1,4 @@
+import { executionMismatch, executionSettingsOf } from '@lar-factory/shared/execution-target';
 import type {
     RoleRun,
     RoleRunFinish,
@@ -115,7 +116,7 @@ export function runSettingsRecords(
         startRoleRun: (workId, revision, input) =>
             database.write(() => {
                 expected(workId, revision);
-                runObject(input, ['runId', 'executionId', 'role', 'threadId', 'taskId']);
+                runObject(input, ['runId', 'executionId', 'role', 'threadId', 'taskId', 'launchOptions']);
 
                 const executionId = runText(input.executionId);
                 const snapshot = savedRun(database, workId, input.runId);
@@ -129,6 +130,28 @@ export function runSettingsRecords(
 
                 if (!requested) invalidRun(`Unknown run role: ${role}.`);
 
+                const launchOptions =
+                    input.launchOptions === undefined
+                        ? undefined
+                        : executionSettings({
+                              model: requested!.model,
+                              effort: requested!.effort,
+                              options: input.launchOptions,
+                          }).options;
+
+                if (
+                    launchOptions &&
+                    (!requested!.model ||
+                        executionMismatch(
+                            requested!,
+                            executionSettingsOf({
+                                ...requested!.model!,
+                                options: launchOptions,
+                            }),
+                        ))
+                )
+                    invalidRun('Launch options must match the frozen requested settings.');
+
                 const identity = {
                     workId,
                     runId: snapshot.runId,
@@ -136,14 +159,18 @@ export function runSettingsRecords(
                     role,
                     ...(input.threadId === undefined ? {} : { threadId: runText(input.threadId) }),
                     ...(input.taskId === undefined ? {} : { taskId: runText(input.taskId) }),
+                    ...(launchOptions === undefined ? {} : { launchOptions }),
                 };
                 const old = execution(workId, executionId);
 
                 if (old) {
                     if (
-                        Object.entries(identity).some(([key, value]) => old[key as keyof RoleRun] !== value) ||
+                        Object.entries(identity).some(
+                            ([key, value]) => JSON.stringify(old[key as keyof RoleRun]) !== JSON.stringify(value),
+                        ) ||
                         old.threadId !== identity.threadId ||
-                        old.taskId !== identity.taskId
+                        old.taskId !== identity.taskId ||
+                        JSON.stringify(old.launchOptions) !== JSON.stringify(identity.launchOptions)
                     )
                         invalidRun('An execution ID cannot be reused for another attempt.');
 

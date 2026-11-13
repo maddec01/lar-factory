@@ -392,3 +392,24 @@ test('a launch that lost its answer recovers from the thread list, and starts no
     assert.equal((await startThread('p', 'Other\nissue', OPUS, undefined, found, defaults, lost)).uncertain, true);
     assert.equal(launched, 2, 'one launch per start');
 });
+
+test('a frozen selection preserves explicit options and an explicit empty option list', async () => {
+    const { startThread } = await import('./t3.ts');
+    const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
+    const { run } = t3With({});
+
+    await startThread(
+        'p',
+        'Frozen',
+        { ...OPUS, options: [{ id: 'effort', value: 'high' }] },
+        undefined,
+        run,
+        defaults,
+        launch,
+    );
+    await startThread('p', 'Empty', { ...OPUS, options: [] }, undefined, run, defaults, launch);
+    assert.deepEqual(
+        sent.map((entry) => entry.selection.options),
+        [[{ id: 'effort', value: 'high' }], []],
+    );
+});

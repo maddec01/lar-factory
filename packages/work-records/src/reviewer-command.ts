@@ -19,6 +19,7 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
                 head: { type: 'string' },
                 'data-dir': { type: 'string' },
                 escalations: { type: 'string' },
+                'run-id': { type: 'string' },
             },
         });
 
@@ -41,15 +42,32 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
         records = await openWorkRecords(workRecordsPath(parsed.values['data-dir']));
         records.read(workId);
 
-        const { settings, problem } = readFactorySettings(parsed.values['data-dir']);
+        const runId = parsed.values['run-id'];
+        const runs = records.runSettings(workId, runId).runs;
+
+        if (!runId && runs.length) throw new Error('This work has run settings; select-reviewers requires --run-id.');
+
+        const snapshot = runId ? runs[0] : undefined;
+
+        if (snapshot && snapshot.kind !== 'build') throw new Error('Reviewer selection needs a build run.');
+
+        const { settings, problem } = snapshot
+            ? { settings: snapshot.settings, problem: null }
+            : readFactorySettings(parsed.values['data-dir']);
         const { root, diff } = readReviewerDiff(base!, head!);
         const requests = parsed.values.escalations ? JSON.parse(readFileSync(parsed.values.escalations, 'utf8')) : [];
-        const reviewers = selectReviewers(settings, diff, requests);
+        const reviewers = selectReviewers(settings, diff, requests).map((reviewer) => {
+            const frozen = snapshot?.reviewers.find((entry) => entry.id === reviewer.id);
+
+            return frozen
+                ? { ...reviewer, instructions: frozen.instructions, target: snapshot!.roles[`reviewer:${reviewer.id}`] }
+                : reviewer;
+        });
 
         if (problem) process.stderr.write(`lar-work: ${problem}\n`);
 
         process.stdout.write(
-            `${JSON.stringify({ workId, base, head, root, triggerVersion: 1, complete: diff.complete, reviewers }, null, 2)}\n`,
+            `${JSON.stringify({ workId, ...(runId && { runId }), base, head, root, triggerVersion: 1, complete: diff.complete, reviewers }, null, 2)}\n`,
         );
 
         return 0;

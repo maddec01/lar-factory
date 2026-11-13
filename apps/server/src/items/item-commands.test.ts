@@ -2654,3 +2654,99 @@ test('a failure cleared by a dismissal, a move or Start after stays cleared acro
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+for (const kind of ['issue', 'concept', 'decision', 'build'] as const)
+    test(`board launch uses the frozen ${kind} target and passes role settings`, async () => {
+        const { defaultFactorySettings } = await import('@lar-factory/shared/factory-settings');
+        const { writeFactorySettings } = await import('@lar-factory/work-records/factory-settings');
+        const { executionSettingsOf } = await import('@lar-factory/shared/execution-target');
+        const records = await openRecords();
+        const dir = opened.at(-1)!.dir;
+        const record = records.importTicket({
+            title: 'Configured',
+            repository: WEB,
+            kind,
+            status: kind === 'build' ? 'Ready' : 'Queued',
+            ticket: `${WEB}#5`,
+        }).record;
+        const settings = defaultFactorySettings();
+
+        settings.threadKinds[kind === 'issue' ? 'shaping' : kind] = {
+            model: { instanceId: 'claude', model: 'opus' },
+            effort: 'high',
+        };
+        settings.roles.planner = { effort: 'low' };
+        writeFactorySettings(settings, dir);
+
+        const start = vi.fn<NonNullable<ItemCommandsDeps['startThread']>>(async (_project, _message, selection) => ({
+            thread: { threadId: 'configured', title: 'Configured' },
+            error: null,
+            executionReport: { source: 't3', reference: 'configured', actual: executionSettingsOf(selection!) },
+        }));
+        let available = false;
+        const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
+            factoryContext: {
+                dataDir: dir,
+                bin: '/fixture/bin',
+                shapeSkill: '/fixture/lar-shape/SKILL.md',
+                buildSkill: '/fixture/lar-build/SKILL.md',
+            },
+            skillsOf: () => [],
+            runLaunchDeps: {
+                defaults: () => ({ selection: null, runtimeMode: 'full-access' }),
+                models: async () =>
+                    available
+                        ? [
+                              {
+                                  instanceId: 'claude',
+                                  model: 'opus',
+                                  options: [{ id: 'effort', values: ['low', 'high'] }],
+                              },
+                          ]
+                        : [],
+                packaged: () => ({
+                    version: 'fixture',
+                    reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+                }),
+            },
+            startThread: start,
+        });
+        const held =
+            kind === 'build'
+                ? await commands.startBuild(record.workId, undefined)
+                : await commands.start(record.workId, undefined);
+
+        assert.equal((held.body as StartResult).hold, true);
+        assert.match((held.body as StartResult).error!, /unavailable/);
+        assert.equal(start.mock.calls.length, 0);
+
+        const runId = records.runSettings(record.workId).runs[0]!.runId;
+
+        available = true;
+
+        const response =
+            kind === 'build'
+                ? await commands.startBuild(record.workId, undefined)
+                : await commands.start(record.workId, undefined);
+
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        assert.equal(start.mock.calls.length, 1);
+        assert.deepEqual(start.mock.calls[0]![2], {
+            instanceId: 'claude',
+            model: 'opus',
+            options: [{ id: 'effort', value: 'high' }],
+        });
+
+        const { runs, roleRuns } = records.runSettings(record.workId);
+
+        assert.match(start.mock.calls[0]![1], new RegExp(runs[0]!.runId));
+        assert.ok(
+            start.mock.calls[0]![1].includes(JSON.stringify(runs[0]!.roles)),
+            'all frozen roles reach the thread',
+        );
+        assert.equal(runs[0]!.roles.planner.effort, 'low');
+        assert.equal(runs[0]!.runId, runId);
+        assert.equal(roleRuns[0]!.result, 'failed');
+        assert.equal(roleRuns.at(-1)!.result, 'completed');
+        assert.deepEqual(roleRuns.at(-1)!.requested, roleRuns.at(-1)!.actual);
+    });

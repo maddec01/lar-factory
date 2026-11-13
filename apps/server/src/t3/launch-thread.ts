@@ -1,7 +1,9 @@
 import { isRecord, type ModelSelection, type StartResult } from '@lar-factory/shared';
+import { executionSettingsOf } from '@lar-factory/shared/execution-target';
 import { randomUUID } from 'node:crypto';
 
 import { boardSessionAuthority } from './board-session.ts';
+import { verifyExecution } from './execution-report.ts';
 import { subscribeProjects } from './project-subscription.ts';
 import { serverRuntimeOrigin } from './t3-settings.ts';
 import { rejectionReason } from './thread-commands.ts';
@@ -85,10 +87,24 @@ export async function launchThread(
 
                             clearTimeout(timer);
                             stop?.();
-                            resolve({
-                                thread: { threadId: value.threadId, title: text.split('\n')[0] ?? text },
-                                error: null,
-                            });
+
+                            const thread = { threadId: value.threadId, title: text.split('\n')[0] ?? text };
+
+                            void verifyExecution(value.projection, value.threadId, executionSettingsOf(selection)).then(
+                                ({ report, failure }) =>
+                                    resolve({
+                                        executionReport: report,
+                                        thread,
+                                        error: failure,
+                                        ...(failure && { hold: true as const }),
+                                    }),
+                                () =>
+                                    resolve({
+                                        thread,
+                                        error: 'T3 execution verification failed. Hold this run.',
+                                        hold: true,
+                                    }),
+                            );
                         },
                         // Only T3's own refusal says no thread started. Any other exit, such as T3 stopping, says no more than a lost answer.
                         reject(exit) {

@@ -6,11 +6,10 @@ import { subscribeProjects } from './project-subscription.ts';
 import { serverRuntimeOrigin } from './t3-settings.ts';
 
 /** After a lost answer, retry with the same commandId, which T3 answers from its receipt. T3 answers a rejected commandId with that rejection every time, so a retry after a rejection needs a new one. */
-export interface ThreadCommand {
-    type: 'thread.settle' | 'thread.archive' | 'thread.delete';
+export type ThreadCommand = {
     commandId: string;
     threadId: string;
-}
+} & ({ type: 'thread.settle' | 'thread.archive' | 'thread.delete' } | { type: 'run.interrupt'; runId: string });
 /** Callers treat rejected and unconfirmed as failures to retry, and only unconfirmed keeps its commandId. */
 export type ThreadCommandResult =
     | { outcome: 'accepted'; sequence: number }
@@ -51,7 +50,7 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
                     () => finish(unconfirmed(`The T3 connection failed before T3 answered ${command.type}.`)),
                     {
                         tag: 'orchestration.dispatchCommand',
-                        payload: { type: command.type, commandId: command.commandId, threadId: command.threadId },
+                        payload: { ...command },
                         accept(value) {
                             finish(
                                 isRecord(value) && Number.isInteger(value.sequence) && Number(value.sequence) >= 0

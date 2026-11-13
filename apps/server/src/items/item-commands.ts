@@ -1,3 +1,8 @@
+// The commands the board's buttons send: queue, back to List, start, start build, abandon, close an
+// abandoned item's ticket, restore set-aside work and act on Needs you.
+// Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
+// commands in flight are private here, so every rule about which command blocks which lives in this file.
+
 import {
     readTicketSpec,
     stripTrackerStructure,
@@ -18,11 +23,8 @@ import {
     kindCanChange,
     sameRepo,
     workMessage,
+    runSettingsMessage,
 } from '@lar-factory/shared';
-// The commands the board's buttons send: queue, back to List, start, start build, abandon, close an
-// abandoned item's ticket, restore set-aside work and act on Needs you.
-// Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
-// commands in flight are private here, so every rule about which command blocks which lives in this file.
 import type {
     BoardData,
     DriftChoice,
@@ -30,6 +32,7 @@ import type {
     Item,
     LabelChange,
     ModelChoice,
+    ModelSelection,
     ModelGroup,
     OperationAccess,
     PickedTicket,
@@ -44,6 +47,7 @@ import type {
 } from '@lar-factory/shared';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
+import { executionMismatch } from '@lar-factory/shared/execution-target';
 import {
     readShapingThreadCleanup,
     WorkRecordError,
@@ -69,6 +73,7 @@ import { log } from '../log.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { factorySkillDir } from '../skills/factory-skill-dir.ts';
 import { developmentModel } from '../t3/development-model.ts';
+import { verifyRecoveredExecution } from '../t3/execution-report.ts';
 import { liveWorktreePaths, protocolStartedThread } from '../t3/item-execution.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
@@ -81,6 +86,7 @@ import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
 import { createPrMerge } from './pr-merge.ts';
+import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
 import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 
@@ -169,6 +175,8 @@ export interface ItemCommandsDeps {
     inspectWorkRecovery?: typeof inspectWorkRecovery;
     checkoutOf?: (projectId: string) => Promise<string>;
     factoryContext?: FactoryThreadContext | null;
+    runLaunchDeps?: RunLaunchDeps;
+    verifyRecoveredExecution?: typeof verifyRecoveredExecution;
     board: BoardState;
     /** The file that names the failed starts already cleared; none keeps them for this board run only. */
     clearedFailuresFile?: string | null;
@@ -271,6 +279,7 @@ const currentFactoryContext = (): FactoryThreadContext => ({
     dataDir: boardDataDir(),
     bin: join(installHome(), '.local/bin'),
     shapeSkill: join(factorySkillDir('lar-shape'), 'SKILL.md'),
+    buildSkill: join(factorySkillDir('lar-build'), 'SKILL.md'),
     delegationModel: developmentModel(),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
@@ -358,6 +367,8 @@ export function createItemCommands({
     shapingThreadCleanupChoice = readShapingThreadCleanup,
     skillsOf = selectedSkills,
     factoryContext = currentFactoryContext(),
+    runLaunchDeps,
+    verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
@@ -794,6 +805,17 @@ export function createItemCommands({
                       earlierBuildMessage(item, larBuild(), factoryContext),
                   ]
                 : [workMessage(item, factoryContext), earlierWorkMessage(item, factoryContext)];
+        const evidence = records!.runSettings(item.id).roleRuns.find((run) => run.executionId === intent.intentId);
+
+        if (evidence) {
+            const snapshot = records!.runSettings(item.id, evidence.runId).runs[0]!;
+
+            messages.splice(
+                0,
+                messages.length,
+                ...messages.map((message) => `${message}\n\n${runSettingsMessage(snapshot)}`),
+            );
+        }
 
         return track(
             settling,
@@ -813,6 +835,20 @@ export function createItemCommands({
                 }
 
                 if (typeof found === 'object') {
+                    let executionFailure: string | null = null;
+
+                    if (evidence && evidence.result === 'running') {
+                        const { report, failure } = await verifyRecovered(found.threadId, evidence.requested);
+
+                        executionFailure = failure;
+                        records!.finishRoleRun(item.id, records!.read(item.id).revision, {
+                            executionId: evidence.executionId,
+                            report,
+                            result: failure ? 'failed' : 'completed',
+                            ...(failure && { failure }),
+                        });
+                    }
+
                     write(item.id, (revision) =>
                         records!.resolveLaunchIntent(item.id, revision, intent.intentId, { threadId: found.threadId }),
                     );
@@ -829,10 +865,21 @@ export function createItemCommands({
                             ),
                         );
 
-                    return { thread: found, error: null };
+                    if (executionFailure)
+                        write(item.id, (revision) => records!.setNeedsYou(item.id, revision, executionFailure!));
+
+                    return { thread: found, error: executionFailure, ...(executionFailure && { hold: true as const }) };
                 }
 
                 if (found === 'absent' && Date.now() - Date.parse(intent.requestedAt) >= SHOW_GRACE_MS) {
+                    if (evidence && evidence.result === 'running')
+                        records!.finishRoleRun(item.id, records!.read(item.id).revision, {
+                            executionId: evidence.executionId,
+                            report: null,
+                            result: 'failed',
+                            failure: NO_THREAD,
+                        });
+
                     write(item.id, (revision) =>
                         records!.resolveLaunchIntent(item.id, revision, intent.intentId, { failure: NO_THREAD }),
                     );
@@ -900,12 +947,13 @@ export function createItemCommands({
         record: StartRecord,
         projectId: string,
         message: string,
-        ask: () => Promise<StartResult>,
+        choice: ModelChoice | undefined,
+        ask: (message: string, selection?: ModelSelection) => Promise<StartResult>,
         prepare: () => void = () => {},
         recovery = false,
         stagedRecovery?: { branch: string; reset: boolean; message?: string },
     ): Promise<Start> {
-        if (!records) return ask();
+        if (!records) return ask(message, choice);
 
         const purpose = PURPOSES[record];
         const unresolved = records
@@ -928,6 +976,31 @@ export function createItemCommands({
 
         if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
 
+        let run: Awaited<ReturnType<typeof prepareRunLaunch>> | undefined;
+
+        if (factoryContext) {
+            try {
+                run = await prepareRunLaunch(
+                    records,
+                    item,
+                    record === 'startedBuilds',
+                    projectId,
+                    choice,
+                    factoryContext,
+                    larBuild(),
+                    () => records.read(item.id).skills ?? skillsOf(item.repo),
+                    runLaunchDeps,
+                );
+                message += `\n\n${run.message}`;
+
+                if (stagedRecovery) stagedRecovery = { ...stagedRecovery, message };
+            } catch (error) {
+                reread();
+
+                return { thread: null, error: (error as Error).message, refused: true, hold: true };
+            }
+        }
+
         prepare();
 
         const cleanup = record === 'startedBuilds' ? savedShapingThreadCleanup() : undefined;
@@ -935,9 +1008,45 @@ export function createItemCommands({
             records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery, cleanup),
         );
 
+        if (run)
+            records.startRoleRun(item.id, records.read(item.id).revision, {
+                runId: run.snapshot.runId,
+                executionId: intent.intentId,
+                role: 'thread',
+            });
+
         asking.add(intent.intentId);
 
-        const result = await ask().finally(() => asking.delete(intent.intentId));
+        const result = await ask(message, run?.selection ?? choice).finally(() => asking.delete(intent.intentId));
+
+        if (run && !result.uncertain) {
+            if (result.thread && result.executionReport === undefined) {
+                const verified = await verifyRecovered(result.thread.threadId, run.snapshot.thread);
+
+                result.executionReport = verified.report;
+                result.error = verified.failure;
+            }
+
+            const report = result.executionReport ?? null;
+            const failure =
+                result.error ??
+                (report
+                    ? executionMismatch(run.snapshot.thread, report.actual)
+                    : 'T3 did not report the launched model and options. Hold until the thread selection can be verified.');
+
+            records.finishRoleRun(item.id, records.read(item.id).revision, {
+                executionId: intent.intentId,
+                report,
+                result: failure ? 'failed' : 'completed',
+                ...(failure && { failure }),
+            });
+
+            if (failure) {
+                result.error = failure;
+                result.hold = true;
+            }
+        }
+
         const outcome = result.thread
             ? { threadId: result.thread.threadId }
             : !result.uncertain
@@ -952,8 +1061,11 @@ export function createItemCommands({
                 /* settled later */
             }
 
-        if (recovery && result.thread)
+        if (recovery && result.thread && !result.error)
             write(item.id, (revision) => records.setNeedsYouCauses(item.id, revision, [], { clearReason: true }));
+
+        if (run && result.thread && result.error)
+            write(item.id, (revision) => records.setNeedsYou(item.id, revision, result.error!));
 
         return result;
     }
@@ -1489,8 +1601,8 @@ export function createItemCommands({
                         const current = board.find(item.id) ?? item;
                         const message = workMessage(current, factoryContext);
 
-                        return launch(current, 'started', repoProject.projectId, message, () =>
-                            startIn(repoProject.projectId, message, choice),
+                        return launch(current, 'started', repoProject.projectId, message, choice, (text, selection) =>
+                            startIn(repoProject.projectId, text, selection),
                         );
                     };
                 }),
@@ -1680,7 +1792,8 @@ export function createItemCommands({
                                     'started',
                                     project.projectId,
                                     workMessage(item, factoryContext),
-                                    () => startIn(project.projectId, workMessage(item, factoryContext), choice),
+                                    choice,
+                                    (text, selection) => startIn(project.projectId, text, selection),
                                     undefined,
                                     true,
                                 );
@@ -1708,7 +1821,7 @@ export function createItemCommands({
 
                             if (accessProblem) return { thread: null, error: accessProblem, refused: true };
 
-                            if (continuing && inspection.worktreePath && !choice)
+                            if (continuing && inspection.worktreePath && !choice && !factoryContext)
                                 return {
                                     thread: null,
                                     error: 'Choose a model before continuing in an existing worktree.',
@@ -1745,7 +1858,8 @@ export function createItemCommands({
                                 'startedBuilds',
                                 project.projectId,
                                 message,
-                                () => startIn(project.projectId, message, choice, workspace),
+                                choice,
+                                (text, selection) => startIn(project.projectId, text, selection, workspace),
                                 () => {
                                     if (!continuing) {
                                         write(itemId, (revision) =>
@@ -1893,7 +2007,8 @@ export function createItemCommands({
                             'startedBuilds',
                             repoProject.projectId,
                             message,
-                            () => startIn(repoProject.projectId, message, choice, { base, branch }),
+                            choice,
+                            (text, selection) => startIn(repoProject.projectId, text, selection, { base, branch }),
                             () => {
                                 snapshot();
 

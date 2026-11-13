@@ -341,7 +341,7 @@ test('the messages before the phase names are kept for a launch still unresolved
     assert.equal(earlierWorkMessage(work), '#7 T\n$lar-shape w1');
     assert.equal(earlierBuildMessage(work, '/l'), 'Build w1. Read /l/agents/builder.md and follow it.');
 
-    const context = { dataDir: '/d', bin: '/b', shapeSkill: '/s/SKILL.md' };
+    const context = { dataDir: '/d', bin: '/b', shapeSkill: '/s/SKILL.md', buildSkill: '/l/SKILL.md' };
 
     assert.equal(earlierWorkMessage(work, context), workMessage(work, context).replace('Shaping ', ''));
     assert.equal(
@@ -921,6 +921,7 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
         dataDir: "/tmp/O'Brien $(literal)/data",
         bin: '/tmp/factory home/.local/bin',
         shapeSkill: '/tmp/factory home/.agents/skills/lar-shape/SKILL.md',
+        buildSkill: '/tmp/factory home/.agents/skills/lar-build/SKILL.md',
         azureReadOnly: true,
     };
     const work = item('Queued', [], { id: 'w-safe' });
@@ -929,8 +930,11 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
     assert.ok(message.includes("Read '/tmp/factory home/.agents/skills/lar-shape/SKILL.md'"));
     assert.ok(message.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
     assert.ok(message.includes('export PATH='));
+    assert.ok(message.includes("export LAR_FACTORY_BIN='/tmp/factory home/.local/bin'"));
+    assert.ok(message.includes("export LAR_FACTORY_SHAPE_SKILL='/tmp/factory home/.agents/skills/lar-shape/SKILL.md'"));
+    assert.ok(message.includes("export LAR_FACTORY_BUILD_SKILL='/tmp/factory home/.agents/skills/lar-build/SKILL.md'"));
     assert.ok(message.includes("export LAR_FACTORY_AZURE_READ_ONLY='1'"));
-    assert.ok(message.includes('every delegated task'));
+    assert.ok(message.includes('every child task prompt'));
     assert.ok(message.includes('Do not build'));
     assert.equal(workMessage(work, context), message, 'recovery uses a stable first message');
 

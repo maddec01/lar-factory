@@ -11,6 +11,7 @@ test('development launch prompts name the checkout bundle and preserve the isola
     const env = { NODE_ENV: 'development', BOARD_DEV_SKILLS_DIR: bundle };
     const context = {
         shapeSkill: join(factorySkillDir('lar-shape', env), 'SKILL.md'),
+        buildSkill: join(factorySkillDir('lar-build', env), 'SKILL.md'),
         bin: '/isolated/run/install/.local/bin',
         dataDir: '/isolated/run/data',
         delegationModel: {
@@ -29,7 +30,13 @@ test('development launch prompts name the checkout bundle and preserve the isola
         expect(message).toContain("export LAR_FACTORY_DATA_DIR='/isolated/run/data'");
         expect(message).toContain('export PATH=\'/isolated/run/install/.local/bin\':"$PATH"');
         expect(message).toContain("Use '/isolated/run/install/.local/bin/lar-work'");
-        expect(message).toContain('Pass these exact paths and environment to every delegated task.');
+        expect(message).toContain(
+            `Factory skill entries: ${JSON.stringify({ 'lar-shape': join(bundle, 'lar-shape/SKILL.md'), 'lar-build': join(bundle, 'lar-build/SKILL.md') })}`,
+        );
+        expect(message).toContain('verbatim in every child task prompt and handoff, including Explore and Approver');
+        expect(message).toContain('Children must read the supplied entry for their role first');
+        expect(message).toContain('never discover skills independently or read a global installation first');
+        expect(message).toContain('If a supplied entry is unavailable, hold and report its exact path.');
         expect(message).not.toContain('/.agents/skills/');
         expect(message).toContain(
             '"providerInstanceId":"codex","model":"gpt-6-astra","options":{"reasoningEffort":"high"}',

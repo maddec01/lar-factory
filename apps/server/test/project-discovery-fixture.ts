@@ -6,6 +6,9 @@ registerHooks({
         if (specifier.endsWith('/item-execution.ts') && !context.parentURL?.endsWith('/execution-observations.ts'))
             return { url: new URL('./execution-observations.ts', import.meta.url).href, shortCircuit: true };
 
+        if (specifier.endsWith('/execution-capabilities.ts'))
+            return { url: new URL('./run-model-observations.ts', import.meta.url).href, shortCircuit: true };
+
         if (specifier.endsWith('/launch-thread.ts'))
             return { url: new URL('./launch-observations.ts', import.meta.url).href, shortCircuit: true };
 

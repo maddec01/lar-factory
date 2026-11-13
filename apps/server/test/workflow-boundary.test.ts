@@ -8,7 +8,7 @@ import { test } from 'vite-plus/test';
 import { fakeAzRepos } from '../src/azure/fake-az.ts';
 import { detectReads, detectSetup } from '../src/onboarding/detect-setup.ts';
 import { checkouts } from './repo-support.ts';
-import { shapePrompt, larWork, startBoard, until, writesRepository } from './server-support.ts';
+import { shapePrompt, DEFAULT_SELECTION, larWork, startBoard, until, writesRepository } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import { AZURE_WITH_PROJECT_RULES, NO_FACTORY_FILES } from './workflow-fixtures.ts';
 
@@ -81,14 +81,15 @@ test(
 
         assert.equal(started.status, 200);
 
-        const [start] = (await board.t3Calls()).filter((args) => args[1] === 'start');
+        const [start] = (await board.t3Calls()).filter((args) => args[0] === 'launch');
 
         assert.deepEqual(start, [
-            'thread',
-            'start',
+            'launch',
             'lar-web',
-            shapePrompt(board, 'Dark mode', created.workId),
-            '--json',
+            await shapePrompt(board, 'Dark mode', created.workId),
+            DEFAULT_SELECTION,
+            { type: 'root' },
+            'full-access',
         ]);
         assert.equal(
             ((await board.board()) as BoardData).items.find((i) => i.id === created.workId)?.status,

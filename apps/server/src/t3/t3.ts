@@ -1,6 +1,6 @@
 // Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
-import { isRecord, type ModelChoice, type StartedThread, type StartResult } from '@lar-factory/shared';
+import { isRecord, type ModelSelection, type StartedThread, type StartResult } from '@lar-factory/shared';
 
 import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -28,7 +28,7 @@ export interface NewWorktree {
 export async function startThread(
     project: string,
     message: string,
-    choice?: ModelChoice,
+    choice?: ModelSelection,
     worktree?: NewWorktree | ExistingWorktree,
     run: T3Run = runT3,
     defaults: (project: string) => ProjectDefaults | null = projectDefaults,
@@ -47,7 +47,8 @@ export async function startThread(
 
         if (!found) return { thread: null, error: "Can't read T3 Code's settings. Check T3 Code, then start again." };
 
-        const selection = launchSelection(selected, development ?? found.selection);
+        const selection =
+            choice?.options !== undefined ? choice : launchSelection(selected, development ?? found.selection);
 
         // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
         if (existing) {

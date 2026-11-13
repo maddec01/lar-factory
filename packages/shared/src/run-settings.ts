@@ -52,6 +52,8 @@ export interface RoleRunInput {
     role: FactoryRole | 'thread';
     threadId?: string;
     taskId?: string;
+    /** Exact capability-resolved delegate options, retained for the command's finish comparison. */
+    launchOptions?: ModelSelectionOption[];
 }
 
 export interface RoleRunFinish {

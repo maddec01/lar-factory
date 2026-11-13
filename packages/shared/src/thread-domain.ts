@@ -1,7 +1,7 @@
-// Project settings and onboarding contracts.
-
 import { type BoardData } from './board-domain.ts';
+// Project settings and onboarding contracts.
 import { type Item } from './item-domain.ts';
+import type { RoleRunFinish } from './run-settings.ts';
 import type { ThreadActivity } from './thread-activity.ts';
 
 /** What the board offers for work that needs you. */
@@ -143,6 +143,8 @@ export const startProgressOf = (
 
 /** What starting a thread answered: the thread, or why it did not start. */
 export interface StartResult {
+    /** Selection reported by T3, never reconstructed from the request. */
+    executionReport?: RoleRunFinish['report'];
     thread: StartedThread | null;
     error: string | null;
     /** The thread may have started; starting again could make a second one. */

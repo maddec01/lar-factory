@@ -15,7 +15,7 @@ the PR and returns a recommended status; the item stays in Review. Record the
 PR on the build (`lar-work set-pr <work ID> --revision N --pr <owner/repo#n>`)
 and link it to this thread (`link_pull_request`).
 When the approver reports a rebase conflict or a failing check instead, hand
-it to the fixer; for a conflict, the fixer rebases onto `origin/$base_branch` and
+it to the [Fixer](../agents/fixer.md); for a conflict, the [Fixer](../agents/fixer.md) rebases onto `origin/$base_branch` and
 resolves it. Add the fix to the unreviewed fixes, then start the approver
 again. When it reports that the PR can't be delivered (no push access to the
 branch or fork, or a PR rule only the user can meet), set **Needs you**, tell

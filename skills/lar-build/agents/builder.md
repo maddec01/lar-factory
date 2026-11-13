@@ -1,256 +1,69 @@
 # Builder
 
-You deliver one lar build in your own worktree from its brief alone, never the
-shaping conversation, then run its review. You orchestrate: subagents explore,
-edit code, run checks and drive the browser; you hold their reports and merge
-slices. A Small build is the exception: you implement it yourself.
+Deliver one approved build from its brief in the existing build worktree, never
+from the shaping conversation. `<lar-build>` is this file's parent's parent.
+Read [entry rules](../SKILL.md), [project rules](../project-rules.md) and
+[work records](../shared/issue-tracker/work-records.md) once. The user merges.
+Every Needs you stop uses `lar-work set-needs-you ID --revision N --reason X`;
+save the current Status and resume with `lar-work clear-needs-you ID --revision N
+--status "<saved Status>"`.
 
-`<lar-build>` is the installed skill folder holding this file's parent. The
-build is a work record, named by the work ID in your `Build <work ID>` message.
-Read and change it with `lar-work` per
-`<lar-build>/shared/issue-tracker/work-records.md`, and set its Status with
-`bash <lar-build>/shared/scripts/status.sh <work ID> "<Status>"`. Factory
-progress stays in the record. Every Needs you stop uses `lar-work set-needs-you
-<work ID> --revision N --reason X`; save the current Status and resume with
-`lar-work clear-needs-you <work ID> --revision N --status "<saved Status>"`. Whole gated Specs and structural sync follow the
-saved settings per [work records](../shared/issue-tracker/work-records.md).
-Call the tools named here. Skip browsing the tool catalogue; load a named tool's
-schema by its exact name when needed. Read each file or skill a step names only
-when that step runs.
+## Resume and route
 
-Record each phase as you reach it with
-`lar-work set-phase <work ID> --revision N --phase <phase>`: `plan`,
-`implement`, `domain-docs` and `full-checks` for **Build** steps 2, 3, 5 and 6,
-then `review`, `approve`, `checks` and `retro` for those sections.
+Read the record, phase, children, checks and recorded PR before choosing a stage.
+Keep the supplied branch, uncommitted work, slices and open PR. Read that PR
+before changing it. A fresh attempt with no phase/slices starts at Plan. A Small
+build handoff retains that route and whether implementation finished.
 
-Read the prose rules once as `<lar-build>/SKILL.md` says, also in a fresh
-thread resuming after a handoff, and pass them in every subagent's brief.
+Set each reached phase with `lar-work set-phase ID --revision N --phase PHASE`.
+Load only its file; completed phases stay completed:
 
-## Resume from the record
+| Phase | Stage | Saved result |
+| --- | --- | --- |
+| `plan` | [Plan](../stages/plan.md) | Small build route or slices/blockers |
+| `implement` | [Implement/integrate](../stages/implement.md) | commits and finished slices |
+| `domain-docs` | [Domain docs](../stages/domain-docs.md) | docs commit and review list |
+| `full-checks` | [Full checks](../stages/full-checks.md) | validation record and pushed branch |
+| `review` | [Review](../stages/review.md) | at most two recorded rounds |
+| `approve` | [Approve](../stages/approve.md) | recorded PR and recommendation |
+| `checks` | [CI](../stages/ci.md) | required checks and handback Status |
+| `retro` | [Retro](../stages/retro.md) | explicit picks and captures |
 
-When Start again opens this thread without a handoff, read the build record,
-its phase, children and recorded PR before choosing a step. Continue on the
-branch and worktree supplied by the board, keeping uncommitted work. Resume
-the recorded phase and reuse its slices and open PR. Read the PR before
-changing it so existing commits and review findings guide the remaining work.
-If the board started a new branch, the phase and slices are empty. Begin at
-Build step 1 and plan from the brief.
+Stage-event contract (not implemented): `lar-work record-stage ID --revision N --file F` records each stage's input revisions, outputs and exit/wait; use existing bodies, phase, validation and review records today.
 
-## Subagents
+## Delegation and exceptions
 
-- **Spawn**: a native subagent or a child task, per
-  `<lar-build>/shared/orchestration.md`. Every prompt carries that path and
-  the instruction to apply **Wait for delegated work**. Check completion by
-  that section before acting on any role's result. Keep each running child
-  task's `taskId`.
-- **Report**: every prompt names the build's work ID and carries the factory
-  report rule: ≤300 words, no whole files, logs or screenshots; check runs
-  report pass/fail and only the failures that matter.
-- **Project rules**: every prompt carries `<lar-build>/project-rules.md`.
-- **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
-  (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`. It follows Checks in `<lar-build>/project-rules.md`,
-  uses focused tests for its change and reruns the
-  failed check through `run-check`, even when broad. It does not rerun other
-  broad checks merely because their files or layers changed. Follow
-  `project-rules.md#validation-record` for recording and diagnosing failures.
-  Its prompt carries
-  `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
+You orchestrate; roles explore, edit, check and drive the app. Small builds are
+the implementation exception. Before delegating read
+[Orchestration](../shared/orchestration.md). Give each role its instruction path,
+work ID, repository, exact data folder/CLI, relevant evidence, project rules and
+[prose](../shared/prose.md); include **Wait for delegated work** and the report
+rule. Keep child task IDs and act only on completed work. Role instructions are
+for the child; the parent need not load them to assign a role.
 
-## Build
+Pass these exact paths relative to `<lar-build>`, including sections.
+Selected/frozen reviewer instructions take precedence; shaping roles use
+`<lar-shape>/SKILL.md`.
 
-1. Set **In progress**, unless a handoff resumes past **Build**. Read the
-   ticket Spec through `lar-work gate <work ID>`, then its brief
-   (`lar-work body <work ID> --body brief`) and record (`lar-work read`),
-   its initial context (`lar-work context`), the prototype or research branches
-   the brief names, existing project instructions when present and `<lar-build>/project-rules.md`;
-   follow existing worktree instructions if present. When no instructions exist,
-   infer setup and checks from package scripts, manifests, CI and nearby code.
-   Missing factory setup or agent instruction files never block a build.
-   Inspect the gate's Spec sync warnings. If the ticket read failed, report
-   that this build uses the last local copy. Held GitHub edits need the user's
-   Accept or Reject in details before use. Later tracker edits update the
-   record and leave the running build as it started.
-2. **Plan.** On a resume, a handoff that says `Small build` skips **Plan**:
-   if the handoff says the change isn't done, finish it as below and go to
-   step 5; otherwise go to the step the handoff names. A build that already
-   has slices (`lar-work children <work ID>`) starts a re-slice planner if any
-   unfinished slice is blocked, and goes to **Implement**.
-   Otherwise decide whether this is a **Small build**: one change, or every
-   part touches the same files. Set phase `implement`, then implement a Small build yourself in this
-   worktree, test first per `<lar-build>/test-first.md`, with no planner,
-   slices or slice worktrees, using `<lar-build>/coding-style.md`,
-   plus `<lar-build>/design-modules.md` when a module's shape changes. Commit
-   per the repo's commit rules, follow Checks in `<lar-build>/project-rules.md`, then go to step 5. Any other build starts a **planner**
-   subagent with `planner.md`, the build's work ID and the repo path; it
-   returns the slice list.
-3. **Implement.** Follow **Launch reporting and recovery** in
-   `<lar-build>/shared/issue-tracker/slices.md`: reconcile before launch or
-   resume, confirm phase `implement` before launching, and confirm each child's
-   association before yielding. Handle failed writes there without redelegating.
+| Role | Instructions |
+| --- | --- |
+| planner / re-slice planner | `agents/planner.md` |
+| implementer | `agents/implementer.md` |
+| checks | `project-rules.md#validation-record` |
+| domain-docs | `stages/domain-docs.md`, `shared/domain-docs.md` |
+| rebase helper | `stages/implement.md#integrate`, `project-rules.md#checks` |
+| fixer | `agents/fixer.md` |
+| approver | `agents/approver.md` |
+| ci-fixer | `agents/ci-fixer.md` |
+| reviewer:code | `agents/reviewer-code.md` |
+| reviewer:security | `agents/reviewer-security.md` |
+| reviewer:ui | `agents/reviewer-ui.md` |
+| reviewer:performance | `agents/reviewer-performance.md` |
+| `reviewer:<custom>` | selected frozen text |
 
-   In parallel, start an **implementer** child task for each
-   ready slice (the ready-slices command in **Slices**) not already running,
-   while no planner runs, per **Implementer** in
-   `<lar-build>/shared/orchestration.md`, and track it by its `taskId`. Give it
-   `implementer.md`, the slice's work ID, its brief
-   (`lar-work body <slice> --body brief`), the build branch and the full slice
-   branch name. Derive the name from the slice work ID's first 8 characters `<id>` and a slug of the
-   slice title. The first attempt uses `slice/<id>-<slug>`. When
-   `git branch --list 'slice/<id>-*'` finds a branch, a restart (after a
-   handoff, a re-slice or a retry) uses `slice/<id>-<slug>-<k>`, where `k`
-   is the lowest number from 2 up for which that branch does not exist.
-   A **re-slice planner** is a planner also given one blocked slice's work
-   ID; run one at a time. When it returns its outcome, start one for
-   another blocked slice if any, and run **Implement** again. If it fails
-   (errors or returns no outcome), record the slice blocked again with its
-   reason, start no planner for that slice again, and follow the stop rule
-   below.
-4. **Merge.** As each implementer reports, merge its reported slice branch and
-   finish its slice work ID here with this one command. It reads the revision
-   when it runs and finishes the slice only after the merge exits 0:
-
-   ```sh
-   git merge --ff-only <slice branch> && lar-work finish <slice work ID> --revision "$(lar-work read <slice work ID> | jq -r .revision)"
-   ```
-
-   A parallel slice that rebased before another slice merged will fail to
-   fast-forward. That failure is expected. When the command exits non-zero,
-   read the error:
-
-   - "Not possible to fast-forward": send a subagent to the implementer's
-     reported worktree path to rebase onto the build branch tip, then run the
-     same command again. It resolves rebase conflicts for the intent of both
-     sides and runs focused tests on the conflicted code. If it can't resolve
-     a conflict, it aborts the rebase and you follow the stop rule below.
-     A rebase conflict never starts a re-slice planner.
-   - The merge landed and the finish failed: run the same command again,
-     without a rebase.
-   - "is already finished": the slice is done, so carry on.
-   - Any other failure, such as a dirty tree or an unknown branch: follow the
-     stop rule below.
-
-   After the slice is finished, run **Remove worktrees**, then **Implement**
-   again. A slice reported
-   blocked gets the blocked-slice command in **Slices**, and a
-   re-slice planner if none runs. A wrong brief follows the stop rule below.
-   Done when every slice is finished or set aside.
-5. Read where the repository keeps domain docs (**Where domain docs live** in
-   `<lar-build>/shared/domain-docs.md`). When they live in the repository, a
-   subagent writes the brief's **Domain docs** to those paths in its own
-   commit, following that file's glossary and ADR formats and next ADR number,
-   creating the glossary or ADR folder only for their first entry. A doc that
-   cites its origin names the record's ticket when it has one, otherwise the
-   build PR, never a work ID or local path. Its prompt carries
-   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
-   With domain docs OFF, this step does nothing, creates no drafts and leaves
-   the brief's Domain docs as "none". A saved private value also means OFF.
-   With domain docs ON, add a new term or ADR-worthy decision settled during
-   the build the same way, using the fixer during review without stopping.
-   Each ADR must meet all three conditions in the domain-doc guide.
-   Keep a list of each, headed **Domain docs added by the build**,
-   current through review fixes, for the reviewers and approver. With domain
-   docs OFF, leave this list empty and offer no later publication.
-6. A check subagent reads `project-rules.md#validation-record` and saves the
-   applicable checks with `lar-work set-check-list <work ID> --file <file>`.
-   The JSON list contains each command and folder, selected from project rules
-   and the diff, leaving out suites the diff cannot reach. It runs every listed
-   check for real once on the integrated branch through `run-check`, reusing
-   only results from the identical tree. It names failures before retries.
-   You own every open failure and make one diagnosis attempt, through the
-   Fixer when helpful. The Fixer reruns the failed check after a fix; it does
-   not repeat unrelated suites. Close failures with their cause or fix.
-   All checks must pass; an unexplained failure that later passed stays open.
-
-   An interrupted or unfinished run leaves its check missing, never passed or
-   failed. After the check subagent reports, read `lar-work checks <work ID>`.
-   Once its runs have ended, start one new check subagent for the missing
-   checks, or for this whole step if no list was saved. If anything is still
-   missing, set **Needs you**, naming it and recommending one more run over
-   waiting while the user looks into it. Then continue from this step.
-7. Run **Remove worktrees**, then push the branch. Don't open the PR yet.
-
-Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,
-`AskUserQuestion`, answers kept for the record, status back. Retro picks and their
-clarifications use chat and preserve the final status, per the same guide.
-
-Past about 150k tokens, while work before the PR step remains, start no new
-implementers or planners, wait for any running planner to return (a native
-subagent outlives a handoff), and merge or `task_cancel` every running
-child task: task IDs work only in the thread that created them, so the
-handoff carries none. Then write a handoff per
-`<lar-build>/shared/handoff-content.md` and relaunch with `t3_thread_launch`:
-message `Build <work ID>. Read <lar-build>/agents/builder.md and follow it.`
-followed by the handoff,
-`workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
-The handoff names the step and review round to resume at. For a Small build
-it says `Small build` and whether the change is done, so the next thread skips
-**Plan** instead of reading no slices as not planned. It carries the
-**Domain docs added by the build**
-list and the latest **Remove worktrees** lines. At a review round,
-`lar-work review-rounds` already holds each round's base, verdicts and findings; the handoff adds the unreviewed fixes so far,
-each as the line **Approve** describes, and every UI app report so far,
-whose processes the next thread stops when review ends. Otherwise finish in
-place.
-
-Work in another repository (a planner or implementer `needs <owner/repo>`, a
-failed check or a failed Verify) is routed per **Other repositories** in
-`<lar-build>/shared/issue-tracker/work-records.md`. Tell the user in chat what
-that repository needs and offer the choices that section gives for it: a build
-there within the user's authorized scope, or onboarding or a
-Dependency for a repository that is not onboarded. List the build or
-Dependency they choose in the PR body's out-of-scope notes. This build carries
-on when it can work without it; otherwise follow the stop rule below. A slice holding that work is
-set aside (`lar-work set-aside`). A failed Verify is fixed in this build; a
-merged build is never reopened.
-
-If the brief is wrong or a decision is missing, stop: set **Needs you**, tell
-the user what you found and your recommendation per
-`<lar-build>/shared/questions.md`, save the corrected brief
-(`lar-work set-body <work ID> --revision N --body brief --file <file>`) once
-they answer, and continue. A Clash stops the build the same way
-(`<lar-build>/project-rules.md`).
-
-## Remove worktrees
-
-A pass covers every finished slice of the build (`lar-work children <work ID>`
-with `finishedAt` set) and each of its implement threads
-(`lar-work threads <slice>` with purpose `implement`). For each thread, gather
-T3's facts:
-
-- **Path.** `worktreePath` from `t3_thread_read`, with `limit` 1. Use an empty
-  path when T3 can't read the thread.
-- **Activity.** `inactive` when `activeRunId` is null, `pendingRequestCount` is
-  0 and no running thread descends from it. Find those with `t3_thread_list`,
-  using `allProjects`, `includeSubagents` and the statuses `preparing`, `queued`,
-  `starting`, `running` and `waiting`, reading every page through `nextCursor`,
-  and follow each result's `parentThreadId` up to this thread. Otherwise pass the
-  reason, such as `T3 shows an active run` or `T3 is unavailable`. A page that
-  fails counts as `T3 is unavailable`.
-
-Then run the script from the build worktree:
-
-```sh
-bash <lar-build>/shared/scripts/remove-slice-worktree.sh <build work ID> <slice work ID> <thread ID> <build worktree> "<path>" "<activity>"
-```
-
-The script makes every other check and does the removal. Write each line it
-prints in this thread. A kept worktree leaves the build running and its status
-unchanged, and each later pass retries it. Done when every implement thread of
-every finished slice has had its run.
-
-## Review
-
-Follow [Review](../stages/review.md), then Approve.
-
-## Approve
-
-Follow [Approve](../stages/approve.md).
-
-## Checks
-
-Follow [Checks](../stages/ci.md).
-
-## Retro
-
-Follow [Retro](../stages/retro.md).
+Accepted findings or failed checks load [Fixer](fixer.md).
+Wrong scope, conflicts, another repository or failed Verify load
+[Recovery](../stages/recovery.md). Questions load
+[Questions](../shared/questions.md). Past about 150k tokens load
+[Build handoff](../stages/handoff.md). After integrating slices and before pushing,
+load [Remove worktrees](../stages/remove-worktrees.md).

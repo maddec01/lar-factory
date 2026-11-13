@@ -188,9 +188,10 @@ Changes
   set-aside-history <work-id>        Read the retained dependent dispositions.
   restore <work-id> --revision N    Bring a set-aside record back.
   set-needs-you <work-id> --revision N --reason X
-                                    Record why the work waits on you, such as a
-                                    closed unmerged PR. Its Status stays.
-  clear-needs-you <work-id> --revision N
+                                    Set Status to Needs you and save its reason atomically.
+  clear-needs-you <work-id> --revision N --status S
+                                    Clear the reason and restore the saved Status atomically.
+                                    S cannot be Needs you or Done.
   snapshot-skills <work-id> --revision N [--skill S]...
                                     Record the project skills selected as the build
                                     starts; give none for an empty selection. A
@@ -837,9 +838,9 @@ async function run(
         case 'restore':
             return records.restore(workId!, revision());
         case 'set-needs-you':
-            return records.setNeedsYou(workId!, revision(), need(values, 'reason'));
+            return records.waitForUser(workId!, revision(), need(values, 'reason'));
         case 'clear-needs-you':
-            return records.clearNeedsYou(workId!, revision());
+            return records.resumeFromUser(workId!, revision(), need(values, 'status') as Status);
         case 'snapshot-skills':
             return records.snapshotSkills(workId!, revision(), values.skill ?? []);
         case 'set-parent':

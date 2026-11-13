@@ -21,7 +21,8 @@ question text shown to the user.
 
 Every ordinary question batch runs these once, however many calls it takes:
 
-1. Set **Needs you**, then make the calls. Wait for the answers before continuing,
+1. Keep the step's resume Status. Run `lar-work set-needs-you <work ID> --revision N
+   --reason "<question or decision needed>"` (reason and Status together), then make the calls. Wait for the answers before continuing,
    including when the tool returns asynchronously. Silence never grants approval.
 2. After the last call, keep the answers for the record: a decision's answer
    body, or the brief's or map's **Confirmed** when you write them. Include
@@ -32,8 +33,8 @@ Every ordinary question batch runs these once, however many calls it takes:
    approved digest, per lar-shape's Gate step. Keep the response in the
    thread until recording that gate; do not append it to Confirmed or otherwise
    edit the approved brief to store the answer.
-3. Set the status back to the step's: Shaping while shaping, In progress or
-   Review in a build.
+3. Run `lar-work clear-needs-you <work ID> --revision N --status "<resume Status>"`
+   to clear the reason and restore Shaping, In progress or Review together.
 
 Use this format for the call:
 

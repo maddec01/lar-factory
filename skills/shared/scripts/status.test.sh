@@ -231,7 +231,7 @@ fi
 set_status() {
     : >"$log"
     status=0
-    output=$(FAKE_CURL_OFF=1 bash "$status_sh" "$1" "$2" 2>"$bin/err") || status=$?
+    output=$(FAKE_CURL_OFF=1 bash "$status_sh" "$@" 2>"$bin/err") || status=$?
     errors=$(cat "$bin/err")
 }
 no_provider() { ! grep -q '^gh \|^az ' "$log"; }
@@ -262,8 +262,24 @@ id=$(make maddec01/lar-factory#8)
 set_status maddec01/lar-factory#8 Queued
 sets "a picked ticket sets its record's Status" "$id" Queued
 
-set_status https://github.com/maddec01/lar-factory/issues/8 "Needs you"
+set_status https://github.com/maddec01/lar-factory/issues/8 "Needs you" --reason "Approve the brief."
 sets "a picked ticket's issue URL sets its record's Status" "$id" "Needs you"
+
+if [[ $(lar-work read "$id" | jq -r .needsYou) == "Approve the brief." ]]; then
+    pass "Needs you saves the reason with the Status"
+else
+    fail "Needs you saves the reason with the Status"
+fi
+set_status "$id" Shaping
+sets "resuming restores the workflow Status" "$id" Shaping
+if [[ $(lar-work read "$id" | jq -r .needsYou) == null ]]; then
+    pass "resuming clears the reason with the Status"
+else
+    fail "resuming clears the reason with the Status"
+fi
+id=$(make "")
+set_status "$id" "Needs you"
+refuses "Needs you without a reason writes nothing" "Needs you requires --reason" "$id"
 
 id=$(make contoso/Fabrikam/web#42 contoso/Fabrikam/web)
 make contoso/Fabrikam/other#43 contoso/Fabrikam/other >/dev/null
@@ -366,7 +382,7 @@ mkdir -p "$assembled" "$bin/factory checkout/packages/work-records/src"
 cp "$here/"{status,work,boards,azure}.sh "$assembled/"
 ln -s "$root/packages/work-records/src/cli.ts" "$bin/factory checkout/packages/work-records/src/cli.ts"
 status=0
-output=$(PATH="$hostile:$checkout_bin" FAKE_CURL_OFF=1 bash "$assembled/status.sh" "$id" "Needs you" 2>"$bin/err") || status=$?
+output=$(PATH="$hostile:$checkout_bin" FAKE_CURL_OFF=1 bash "$assembled/status.sh" "$id" "Needs you" --reason "Approve the brief." 2>"$bin/err") || status=$?
 errors=$(cat "$bin/err")
 sets "assembled checkout scripts resolve their own CLI and preserve arguments" "$id" "Needs you"
 

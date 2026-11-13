@@ -422,6 +422,10 @@ export interface WorkRecords
     /** Records why the work waits on the user, replacing an earlier reason. */
     setNeedsYou(workId: string, revision: number, reason: string): WorkRecord;
     clearNeedsYou(workId: string, revision: number): WorkRecord;
+    /** Sets both the waiting Status and reason in one revision. */
+    waitForUser(workId: string, revision: number, reason: string): WorkRecord;
+    /** Clears the waiting reason and restores the caller's saved workflow Status atomically. */
+    resumeFromUser(workId: string, revision: number, status: Status): WorkRecord;
     /** Replaces the causes the work waits on the user for. `clearReason` also clears the free text, and `status` moves the work, in the same write. */
     setNeedsYouCauses(
         workId: string,
@@ -1495,6 +1499,31 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         },
         clearNeedsYou: (workId, revision) =>
             change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
+        waitForUser: (workId, revision, reason) => {
+            const why = checkFilled(reason, 'Needs you reason');
+
+            return change(workId, revision, (row) =>
+                row.needs_you === why && row.status === 'Needs you'
+                    ? null
+                    : { needs_you: why, status: 'Needs you', queue_order: null },
+            );
+        },
+        resumeFromUser: (workId, revision, status) => {
+            const moved = checkStatus(status);
+
+            if (moved === 'Needs you' || moved === 'Done')
+                throw invalid('Resume Status must leave Needs you; Done is decided by completion.');
+
+            return change(workId, revision, (row) =>
+                row.needs_you === null && row.status === moved
+                    ? null
+                    : {
+                          needs_you: null,
+                          status: moved,
+                          queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),
+                      },
+            );
+        },
         setNeedsYouCauses: (workId, revision, causes, { clearReason = false, status } = {}) => {
             const saved = causes.length ? JSON.stringify(causes) : null;
             const moved = status === undefined ? undefined : checkStatus(status);

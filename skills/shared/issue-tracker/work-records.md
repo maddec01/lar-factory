@@ -153,6 +153,11 @@ Verify, Ready to merge and Done. Move work with
 `bash <this skill>/shared/scripts/status.sh <work ID> "<Status>"` as the
 workflow directs. It writes only the record, then asks a running board to read
 it. It refuses Done, which completion decides, and a PR, which has no Status.
+Every wait on the user uses `lar-work set-needs-you ID --revision N --reason X`:
+Status and reason change together. Save the current Status before waiting; resume
+with `lar-work clear-needs-you ID --revision N --status "<saved Status>"`.
+`status.sh ID "Needs you" --reason X` uses the same command; moving out of Needs
+you through `status.sh` clears the reason in the same write.
 
 ## Structure
 

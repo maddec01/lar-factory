@@ -835,7 +835,7 @@ throw Error('Local exploration must not call a tracker');
         ).toMatchObject({ code: 2, stderr: expect.stringContaining('--thread or --failure') });
     });
 
-    it('sets and clears a Needs you reason and snapshots skills with no board running', async () => {
+    it('moves into and out of Needs you atomically and snapshots skills with no board running', async () => {
         const data = tempDir();
         const { workId } = (
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
@@ -853,8 +853,20 @@ throw Error('Local exploration must not call a tracker');
                     'Its PR closed without merging.',
                 )
             ).record,
-        ).toMatchObject({ needsYou: 'Its PR closed without merging.' });
-        expect((await larWork(data, 'clear-needs-you', workId, '--revision', '2')).record).toMatchObject({
+        ).toMatchObject({ needsYou: 'Its PR closed without merging.', status: 'Needs you', revision: 2 });
+        for (const args of [[], ['--status', 'Needs you'], ['--status', 'Done'], ['--status', 'Nowhere']]) {
+            expect((await larWork(data, 'clear-needs-you', workId, '--revision', '2', ...args)).code).not.toBe(0);
+            expect((await larWork(data, 'read', workId)).record).toMatchObject({
+                needsYou: 'Its PR closed without merging.',
+                status: 'Needs you',
+                revision: 2,
+            });
+        }
+        expect((await larWork(data, 'clear-needs-you', workId, '--revision', '1', '--status', 'Shaping')).code).toBe(1);
+        expect(
+            (await larWork(data, 'clear-needs-you', workId, '--revision', '2', '--status', 'Shaping')).record,
+        ).toMatchObject({
+            status: 'Shaping',
             needsYou: null,
             revision: 3,
         });

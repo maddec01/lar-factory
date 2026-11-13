@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: status.sh <work ID | ticket> <Status>
+# Usage: status.sh <work ID | ticket> <Status> [--reason <waiting reason>]
 # Sets the work record's Status through lar-work, which writes only this machine's
 # work-record database and never a ticket, label, tag or Azure State. <ticket> is a
 # picked ticket, as work.sh takes it. A pull request has no board status; set the
@@ -28,7 +28,18 @@ fi
 record=$(work_record "$ref")
 work_id=$(jq -r .workId <<<"$record")
 # lar-work names an unknown Status, or a record that changed since the read, on stderr.
-work_cli update "$work_id" --revision "$(jq -r .revision <<<"$record")" --status "$status" >/dev/null
+revision=$(jq -r .revision <<<"$record")
+if [[ $status == "Needs you" ]]; then
+    if [[ ${3:-} != --reason || -z ${4:-} || $# != 4 ]]; then
+        echo 'Needs you requires --reason <waiting reason>.' >&2
+        exit 1
+    fi
+    work_cli set-needs-you "$work_id" --revision "$revision" --reason "$4" >/dev/null
+elif [[ $(jq -r .needsYou <<<"$record") != null || $(jq -r .status <<<"$record") == "Needs you" ]]; then
+    work_cli clear-needs-you "$work_id" --revision "$revision" --status "$status" >/dev/null
+else
+    work_cli update "$work_id" --revision "$revision" --status "$status" >/dev/null
+fi
 echo "$work_id → $status"
 
 ask_boards_to_read "$work_id"

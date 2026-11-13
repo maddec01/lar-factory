@@ -10,7 +10,9 @@ build is a work record, named by the work ID in your `Build <work ID>` message.
 Read and change it with `lar-work` per
 `<lar-build>/shared/issue-tracker/work-records.md`, and set its Status with
 `bash <lar-build>/shared/scripts/status.sh <work ID> "<Status>"`. Factory
-progress stays in the record. Whole gated Specs and structural sync follow the
+progress stays in the record. Every Needs you stop uses `lar-work set-needs-you
+<work ID> --revision N --reason X`; save the current Status and resume with
+`lar-work clear-needs-you <work ID> --revision N --status "<saved Status>"`. Whole gated Specs and structural sync follow the
 saved settings per [work records](../shared/issue-tracker/work-records.md).
 Call the tools named here. Skip browsing the tool catalogue; load a named tool's
 schema by its exact name when needed. Read each file or skill a step names only

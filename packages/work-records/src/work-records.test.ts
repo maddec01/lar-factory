@@ -978,6 +978,51 @@ describe('work-record facts the board sets', () => {
         expect(reopened.clearNeedsYou(build.workId, 4)).toMatchObject({ revision: 4 });
     });
 
+    it('waits and resumes atomically, preserves causes and rejects stale or invalid writes', async () => {
+        const path = join(tempDir(), 'work-records.db');
+        const first = await openWorkRecords(path);
+        const build = first.create({ title: 'Work', repository: 'maddec01/lar', kind: 'build', status: 'Queued' });
+
+        first.setNeedsYouCauses(build.workId, 1, [{ type: 'pr-closed' }]);
+        expect(() => first.waitForUser(build.workId, 2, ' ')).toThrow(/reason/);
+        expect(() => first.waitForUser(build.workId, 1, 'Approve the brief.')).toThrow(/revision/i);
+        expect(first.read(build.workId)).toMatchObject({ status: 'Queued', needsYou: null, revision: 2 });
+        expect(first.waitForUser(build.workId, 2, 'Approve the brief.')).toMatchObject({
+            status: 'Needs you',
+            needsYou: 'Approve the brief.',
+            queueOrder: null,
+            revision: 3,
+        });
+        expect(first.waitForUser(build.workId, 3, 'Approve the brief.').revision).toBe(3);
+        first.close();
+
+        const reopened = await open(path);
+
+        expect(reopened.read(build.workId)).toMatchObject({ status: 'Needs you', needsYou: 'Approve the brief.' });
+        for (const status of ['Needs you', 'Done', 'Nowhere'])
+            expect(() => reopened.resumeFromUser(build.workId, 3, status as never)).toThrow(/Status/);
+        expect(() => reopened.resumeFromUser(build.workId, 2, 'Shaping')).toThrow(/revision/i);
+        expect(reopened.read(build.workId)).toMatchObject({
+            status: 'Needs you',
+            needsYou: 'Approve the brief.',
+            revision: 3,
+        });
+        expect(reopened.resumeFromUser(build.workId, 3, 'Queued')).toMatchObject({
+            status: 'Queued',
+            needsYou: null,
+            needsYouCauses: [{ type: 'pr-closed' }],
+            queueOrder: expect.any(Number),
+            revision: 4,
+        });
+        expect(reopened.resumeFromUser(build.workId, 4, 'Queued').revision).toBe(4);
+        expect(reopened.waitForUser(build.workId, 4, 'Approve the brief.').revision).toBe(5);
+        expect(reopened.resumeFromUser(build.workId, 5, 'Review')).toMatchObject({
+            status: 'Review',
+            needsYou: null,
+            revision: 6,
+        });
+    });
+
     it('keeps Needs you causes apart from the free text, across a reopen', async () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);

@@ -46,6 +46,10 @@ export function agentWrites(records: WorkRecords): WorkRecords {
         setNeedsYou: (id, rev, reason) =>
             apply(id, rev, [...active, 'needsYou'], (r) => records.setNeedsYou(id, r, reason)),
         clearNeedsYou: (id, rev) => apply(id, rev, [...active, 'needsYou'], (r) => records.clearNeedsYou(id, r)),
+        waitForUser: (id, rev, reason) =>
+            apply(id, rev, [...active, 'status', 'needsYou'], (r) => records.waitForUser(id, r, reason)),
+        resumeFromUser: (id, rev, status) =>
+            apply(id, rev, [...active, 'status', 'needsYou'], (r) => records.resumeFromUser(id, r, status)),
         snapshotSkills: (id, rev, skills) =>
             apply(id, rev, [...build, 'skills'], (r) => records.snapshotSkills(id, r, skills)),
         setParent: (id, rev, parent) =>

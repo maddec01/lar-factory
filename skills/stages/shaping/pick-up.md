@@ -27,7 +27,8 @@ Send it through Gate again with new final confirmation before marking it Ready. 
 ## Explore
 
 Read existing project instructions when present,
-neighboring code conventions, its glossary and relevant ADRs ([where domain docs live](shared/domain-docs-setting.md)),
+neighboring code conventions, its glossary and relevant ADRs at the paths
+supplied from local Project settings,
   and the code this work touches, and returns ≤300 words in
   the project's vocabulary: what exists, where, and
   what the work would change. By default it runs no test suite, build, typecheck

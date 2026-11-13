@@ -27,16 +27,14 @@ Load only its file; completed phases stay completed:
 | `review` | [Review](../stages/review.md) | at most two recorded rounds |
 | `approve` | [Approve](../stages/approve.md) | recorded PR and recommendation |
 | `checks` | [CI](../stages/ci.md) | required checks and handback Status |
-| `retro` | [Retro](../stages/retro.md) | explicit picks and captures |
+| `retro` | [Retro](../stages/retro.md) | saved suggestions; board collects picks after merge |
 
 ## Delegation and exceptions
 
 You orchestrate; roles explore, edit, check and drive the app. Small builds are
 the implementation exception. Before delegating read
 [Orchestration](../shared/orchestration.md). Give each role its instruction path,
-work ID, repository, exact data folder/CLI, relevant evidence, project rules and
-[prose](../shared/prose.md); include **Wait for delegated work** and the report
-rule. Keep child task IDs and act only on completed work. Role instructions are
+work ID, repository, exact data folder/CLI, relevant evidence, resolved domain-doc setting/paths and project rules; include orchestration's **Wait for delegated work** and concise report rules. Keep child task IDs and act only on completed work. Role instructions are
 for the child; the parent need not load them to assign a role.
 
 Pass these exact paths relative to `<lar-build>`, including sections.

@@ -19,7 +19,7 @@ recorded Small build route or planner's private slices/blockers. Set phase `plan
 
 Require explicit approval of the current brief digest before implementation.
 A changed or unapproved brief follows [Recovery](recovery.md).
-Build input/settings snapshots are proposed commands: `prepare-build` and `snapshot-run`; until available, retain the starting brief and settings through handoff.
+Retain the starting brief and frozen `lar-work run-settings <work ID> --run-id RUN_ID` through retries/handoff. `prepare-build` remains unavailable.
 
 2. **Plan.** On a resume, a handoff that says `Small build` skips **Plan**:
    if the handoff says the change isn't done, finish it through [Implement](implement.md); otherwise go to the step the handoff names. A build that already

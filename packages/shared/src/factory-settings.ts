@@ -3,7 +3,20 @@ import type { ModelChoice } from './board-domain.ts';
 
 export const THREAD_KINDS = ['shaping', 'concept', 'decision', 'build'] as const;
 export type ThreadKind = (typeof THREAD_KINDS)[number];
-export const FACTORY_ROLES = ['planner', 'implementer', 'approver', 'ci-fixer', 'doubt'] as const;
+export const FACTORY_ROLES = [
+    'explore',
+    'diagnose',
+    'research',
+    'prototype',
+    'planner',
+    'implementer',
+    'checks',
+    'domain-docs',
+    'fixer',
+    'approver',
+    'ci-fixer',
+    'doubt',
+] as const;
 export type FactoryRole = (typeof FACTORY_ROLES)[number] | `reviewer:${string}`;
 export const BUILTIN_REVIEWERS = ['code', 'security', 'ui', 'performance'] as const;
 export type BuiltinReviewer = (typeof BUILTIN_REVIEWERS)[number];

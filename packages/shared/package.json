@@ -19,6 +19,7 @@
         "./repository-settings": "./src/repository-settings.ts",
         "./publication-settings": "./src/publication-settings.ts",
         "./tracker-labels": "./src/tracker-labels.ts",
+        "./run-settings": "./src/run-settings.ts",
         "./factory-settings": "./src/factory-settings-api.ts"
     },
     "scripts": {

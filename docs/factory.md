@@ -36,9 +36,10 @@ and some Dependency operations have their own revision rules. Use
 for Status and Kind, normally through `skills/shared/scripts/status.sh`, which
 also asks the board to refresh. Status alone never proves completion.
 
-These additional fields and commands are proposed contracts, not commands an
-agent can run today. They give later implementation and simulation work a named
-input and output. Their CLI spelling may change only with this document.
+Except for the implemented run settings commands described below, these
+additional fields and commands are proposed contracts, not commands an agent can
+run today. They give later implementation and simulation work a named input and
+output. Their CLI spelling may change only with this document.
 
 | Proposed command                                                 | Reads and writes                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,8 +73,8 @@ file. Checks live in `skills/lar-build/project-rules.md`; handoff lives in
 `skills/shared/reconcile-group.md`. A caller links to a shared stage rather than repeating
 its rules. Build-time brief corrections use the same brief and gate stages.
 
-Today: build phases and review rounds are recorded, but shaping checkpoints and
-run settings lack these structured contracts. Some stage text is repeated across
+Today: build phases, review rounds and run settings have record contracts, but
+shaping checkpoints still lack them and starts do not yet capture run settings. Some stage text is repeated across
 skills. `lar-work` has no atomic group amendment, compact work order, build
 reservation or batch gate command.
 
@@ -125,6 +126,10 @@ excluding it from the desk. A Queued concept can appear in Queue. The glossary's
 Your desk definition excludes grouped work; it must change with that behavior.
 
 ## Settings and roles
+
+The records-only [run settings contract](run-settings.md) implements `snapshot-run`,
+`run-settings`, role execution evidence and snapshot-linked review rounds. Launch
+wiring is a separate step; these commands do not start threads or roles.
 
 Settings has machine-wide defaults for reviewers, models and effort. It offers
 model and effort per thread kind: shaping, concept, decision and

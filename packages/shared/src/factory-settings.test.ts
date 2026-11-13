@@ -143,7 +143,7 @@ describe('invalid settings are refused instead of silently changing the selected
         { version: 1, reviewers: null },
         { version: 1, threadKinds: null },
         { version: 1, threadKinds: { gate: {} } },
-        { version: 1, roles: { fixer: {} } },
+        { version: 1, roles: { unknown: {} } },
         { version: 1, roles: { 'reviewer:unknown': {} } },
         { version: 1, threadKinds: { build: { effort: '' } } },
         { version: 1, threadKinds: { build: { model: { instanceId: 'codex' } } } },

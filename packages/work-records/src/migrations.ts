@@ -457,4 +457,26 @@ export const MIGRATIONS: readonly Migration[] = [
     // Fence legacy structural writers without changing their journals or settings.
     () => {},
     (db) => db.exec('ALTER TABLE review_axes ADD COLUMN escalation TEXT'),
+    (db) =>
+        db.exec(`
+    CREATE TABLE run_settings (
+      work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,
+      run_id TEXT NOT NULL, content TEXT NOT NULL,
+      PRIMARY KEY(work_id, run_id)
+    ) STRICT;
+    CREATE TABLE role_runs (
+      work_id TEXT NOT NULL, run_id TEXT NOT NULL, execution_id TEXT NOT NULL, content TEXT NOT NULL,
+      PRIMARY KEY(work_id, execution_id),
+      FOREIGN KEY(work_id, run_id) REFERENCES run_settings(work_id, run_id) ON DELETE CASCADE
+    ) STRICT;
+    CREATE TRIGGER immutable_run_settings BEFORE UPDATE ON run_settings BEGIN
+      SELECT RAISE(ABORT, 'Run settings are immutable');
+    END;
+    ALTER TABLE review_rounds ADD COLUMN run_id TEXT;
+    ALTER TABLE review_axes ADD COLUMN selection TEXT;
+    CREATE TRIGGER review_run_owner BEFORE INSERT ON review_rounds WHEN NEW.run_id IS NOT NULL BEGIN
+      SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM run_settings WHERE work_id=NEW.work_id AND run_id=NEW.run_id)
+        THEN RAISE(ABORT, 'Review snapshot must belong to the work record') END;
+    END;
+  `),
 ];

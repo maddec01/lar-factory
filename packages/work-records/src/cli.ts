@@ -21,6 +21,7 @@ import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
+import { verificationCommand } from './verification-command.ts';
 import {
     openWorkRecords,
     readRetention,
@@ -285,6 +286,15 @@ Content
                   --disposition D [--reason X]
                                     Change what became of the axis's Kth finding.
   review-rounds <work-id>           Print the build's review rounds.
+
+Verify evidence, local only
+  verification <work-id>            Print the current head, result and fix handoff.
+  verification-head <work-id> --pr owner/name#N --head SHA
+                                    Record a fresh provider head; a push invalidates a pass.
+  record-verification <work-id> --revision N --file F
+                                    JSON: {pr,head,result: pass|fail,by,testSteps,note}.
+                                    A failure needs a short note and resumes the same build
+                                    through the board. Agents never invent Pedro's result.
 
 Brief gate
   gate <work-id>                    Reread the ticket Spec, then print the brief digest,
@@ -1008,6 +1018,9 @@ async function main(args: string[]): Promise<number> {
 
     if (['run-settings', 'snapshot-run', 'start-role-run', 'finish-role-run'].includes(args[0]!))
         return runSettingsCommand(args[0]!, args.slice(1));
+
+    if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
+        return verificationCommand(args[0]!, args.slice(1));
 
     if (args[0] === 'heavy') return heavyCommand(args);
 

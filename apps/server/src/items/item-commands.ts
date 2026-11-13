@@ -88,6 +88,7 @@ import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts'
 import { observeWork } from './observe-records.ts';
 import { createPrMerge } from './pr-merge.ts';
 import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
+import { createVerification } from './verification.ts';
 import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 
@@ -98,6 +99,9 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    inspectVerification(itemId: string): Promise<Reply>;
+    recordVerification(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    retryVerification(itemId: string): Promise<Reply>;
     inspectMerge(itemId: string): Promise<Reply>;
     mergePr(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     /**
@@ -209,6 +213,7 @@ export interface ItemCommandsDeps {
     /** Starts a T3 thread; tests stand in for t3. */
     startThread?: typeof startThread;
     resumeLaunch?: typeof resumeLaunch;
+    verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     showThread?: typeof lookupThread;
     /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
     recoverThread?: (
@@ -371,10 +376,12 @@ export function createItemCommands({
     skillsOf = selectedSkills,
     factoryContext = currentFactoryContext(),
     runLaunchDeps,
+    verificationDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
+    const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
         board,
         records,
@@ -1334,10 +1341,12 @@ export function createItemCommands({
     }
 
     return {
+        ...verifying,
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
             pushStarts();
+            await verifying.reconcileVerificationFixes();
 
             const warnings = { ...board.snapshot().startCheckFailures };
 

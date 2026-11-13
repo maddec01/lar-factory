@@ -1,5 +1,6 @@
 import {
     activityUnavailable,
+    verificationProblem,
     mergeStageProblem,
     mergePrProblems,
     onAzure,
@@ -85,6 +86,16 @@ export function createPrMerge({ board, records, reread, busy, provider = mergePr
             evidence.pr.url.toLowerCase() !== resolved.item.linkedPrs[0]!.url.toLowerCase()
         )
             throw new Error('The provider returned a different PR.');
+
+        const verify = verificationProblem({ verification: records!.verification(itemId) }, evidence.pr.sourceRevision);
+
+        if (evidence.pr.state === 'open' && verify) {
+            if (evidence.pr.sourceRevision)
+                records!.observeVerificationHead(itemId, resolved.reference, evidence.pr.sourceRevision);
+
+            reread();
+            throw new Error(verify);
+        }
 
         return { ...resolved, evidence };
     };

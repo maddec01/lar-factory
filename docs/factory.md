@@ -667,8 +667,8 @@ Verify/Ready to merge, or an explicit Needs you hold.
 ### Verify, merge and handback
 
 Verify puts the PR and Test steps on the desk and keeps the item in Build or its
-group. Proposed `verification` stores the tested head, result, identity and
-evidence. A failed Verify returns to this build, preserving its PR; fix, checks
+group. `verification` stores the tested head, result, local operator identity, time and
+PR Test steps. Pass and Fail Verify are available on the desk and in item details; a failure requires a short note. A failed Verify returns to this build, preserving its PR; fix, checks
 and reassessment follow the same rules. A pass permits Ready to merge. A later
 head change invalidates that verification. An already merged build is never
 reopened; new work gets a new record.

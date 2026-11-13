@@ -9,7 +9,19 @@ import { serverRuntimeOrigin } from './t3-settings.ts';
 export type ThreadCommand = {
     commandId: string;
     threadId: string;
-} & ({ type: 'thread.settle' | 'thread.archive' | 'thread.delete' } | { type: 'run.interrupt'; runId: string });
+} & (
+    | { type: 'thread.settle' | 'thread.archive' | 'thread.delete' }
+    | { type: 'run.interrupt'; runId: string }
+    | {
+          type: 'message.dispatch';
+          createdBy: 'user';
+          creationSource: 'web';
+          messageId: string;
+          text: string;
+          attachments: [];
+          dispatchMode: { type: 'queue_after_active' };
+      }
+);
 /** Callers treat rejected and unconfirmed as failures to retry, and only unconfirmed keeps its commandId. */
 export type ThreadCommandResult =
     | { outcome: 'accepted'; sequence: number }

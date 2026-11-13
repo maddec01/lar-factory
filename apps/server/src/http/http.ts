@@ -309,6 +309,21 @@ export function createBoardServer({
                 return factorySettings?.save(input) ?? { status: 503, body: { error: 'Settings are unavailable.' } };
             },
         },
+        '/api/inspect-verification': {
+            sampleWrite: 'fake',
+            what: 'the recorded Verify head',
+            run: forItem('Name the item to verify.', (id) => commands.inspectVerification(id)),
+        },
+        '/api/record-verification': {
+            sampleWrite: 'fake',
+            what: 'the Verify result',
+            run: forItem('Name the item to verify.', (id, input) => commands.recordVerification(id, input)),
+        },
+        '/api/retry-verification': {
+            sampleWrite: 'fake',
+            what: 'the same build fix request',
+            run: forItem('Name the build to resume.', (id) => commands.retryVerification(id)),
+        },
         '/api/inspect-merge': {
             sampleWrite: 'refuse',
             what: 'the recorded delivery PR',

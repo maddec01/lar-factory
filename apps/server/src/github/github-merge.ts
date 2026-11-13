@@ -10,6 +10,7 @@ interface MergePr {
     state: string;
     isDraft: boolean;
     headRefOid: string;
+    body?: string;
     baseRefName: string;
     mergeStateStatus: string;
     isMergeQueueEnabled: boolean;
@@ -50,6 +51,7 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
                                 state
                                 isDraft
                                 headRefOid
+                                body
                                 baseRefName
                                 mergeStateStatus
                                 isMergeQueueEnabled
@@ -163,6 +165,7 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
                 number,
                 url: pr.url,
                 sourceRevision: pr.headRefOid,
+                body: pr.body,
                 state: pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : 'open',
                 isDraft: pr.isDraft,
                 checks: null,

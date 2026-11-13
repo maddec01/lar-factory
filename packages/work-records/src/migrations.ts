@@ -508,4 +508,16 @@ export const MIGRATIONS: readonly Migration[] = [
             .all())
             save.run(parseDecisionMethod(String(row.markdown)) ?? null, String(row.work_id));
     },
+    (db) =>
+        db.exec(`
+        CREATE TABLE verification (work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,
+          head TEXT, latest TEXT, resume TEXT, invalidated INTEGER NOT NULL DEFAULT 0) STRICT;
+        INSERT INTO verification(work_id) SELECT work_id FROM work_records WHERE status='Verify';
+        CREATE TRIGGER verification_required_insert AFTER INSERT ON work_records WHEN NEW.status='Verify' BEGIN
+          INSERT OR IGNORE INTO verification(work_id) VALUES(NEW.work_id);
+        END;
+        CREATE TRIGGER verification_required_update AFTER UPDATE OF status ON work_records WHEN NEW.status='Verify' BEGIN
+          INSERT OR IGNORE INTO verification(work_id) VALUES(NEW.work_id);
+        END;
+    `),
 ];

@@ -224,6 +224,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             id: record.workId,
             recorded: true,
             buildPhase: record.buildPhase,
+            verification: records.verification(record.workId),
             completion: completionOf(record),
             ...(record.kind === 'concept' ? { refinement: records.refinement(record.workId) } : {}),
             ...(ticket?.tracker && { tracker: ticket.tracker }),

@@ -27,6 +27,7 @@ export { useShownLabels } from './useShownLabels';
 export { NeedsYou, StartAgain } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
+export { VerifyBuild } from './VerifyBuild';
 export { PrAction } from './PrLink';
 export { PrList } from './PrList';
 export { RowActions } from './RowActions';

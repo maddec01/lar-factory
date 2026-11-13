@@ -298,6 +298,7 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
+    verification?: import('./verification.ts').Verification;
     /** Local completion facts, independent of the board Status and absent on provider-only items. Never published. */
     completion?: { complete: boolean; reasons: string[] };
     refinement?: { complete: boolean; reasons: string[] };

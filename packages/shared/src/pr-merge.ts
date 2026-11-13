@@ -1,4 +1,5 @@
 import { openQuestionThread, workingAgain, type Item, type LinkedPr } from './model.ts';
+import { verificationProblem } from './verification.ts';
 
 export const MERGE_METHODS = {
     merge: 'Merge commit',
@@ -19,6 +20,10 @@ export interface MergeConfirmation {
 /** A recorded stage is required independently of provider checks and permissions. */
 export function mergeStageProblem(item: Item): string | undefined {
     if (item.status !== 'Ready to merge') return 'Finish the required verification and reach Ready to merge first.';
+
+    const verify = verificationProblem(item, item.linkedPrs[0]?.sourceRevision);
+
+    if (verify) return verify;
 
     if (item.paused || item.archived || item.needsYou || openQuestionThread(item))
         return 'Resolve the question or notice before merging.';

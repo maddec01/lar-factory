@@ -205,3 +205,24 @@ it('reports an unreadable or non-local T3 origin and revokes the session', async
     });
     expect(revoke).toHaveBeenCalledTimes(2);
 });
+
+it('dispatches a Verify fix to the same thread with the required actor and stable receipt IDs', async () => {
+    const fix = {
+        type: 'message.dispatch' as const,
+        createdBy: 'user' as const,
+        creationSource: 'web' as const,
+        commandId: 'verify-command',
+        messageId: 'verify-message',
+        threadId: 'existing-build',
+        text: 'Fix failed Verify on the same branch and PR.',
+        attachments: [] as [],
+        dispatchMode: { type: 'queue_after_active' as const },
+    };
+    const result = sendThreadCommand(fix);
+    const socket = await opened();
+
+    expect(socket.requests()[0]).toMatchObject({ tag: 'orchestration.dispatchCommand', payload: fix });
+    socket.answer({ _tag: 'Exit', requestId: '1', exit: { _tag: 'Success', value: { sequence: 42 } } });
+    expect(await result).toEqual({ outcome: 'accepted', sequence: 42 });
+    expect(socket.requests()).toHaveLength(1);
+});

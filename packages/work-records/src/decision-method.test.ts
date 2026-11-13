@@ -57,7 +57,8 @@ test('a saved method survives rewrites, reopening and explicit clearing, with re
 test('migration imports existing method headers once without changing bodies or revisions', async () => {
     const entry = folder();
     const path = join(entry.dir, 'work-records.db');
-    const legacy = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+    // Schema 32 predates durable decision methods; later migrations must not move this fixture.
+    const legacy = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 32) });
     const body = 'Method: Task\nStage the release.';
 
     legacy.db

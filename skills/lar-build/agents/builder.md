@@ -323,7 +323,7 @@ with `configuration.isBlocking` true is a required check whose `status` is
 `approved` or `notApplicable` when green, `rejected` when failed, and `queued`
 or `running` while it runs. Then:
 
-- **Required checks green**: run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
+- **Required checks green**: after a failed Verify, return to **Verify** on this same PR; only Pedro records the head-bound pass in the board. A status write never substitutes for that result. Run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
   `unwatch_pull_request`, go to **Retro**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with `ci-fixer.md`, the build's work ID, repo path, PR URL and

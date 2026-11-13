@@ -40,7 +40,7 @@ export interface ListGroup {
 }
 
 export interface BoardSections {
-    /** Your desk: standalone items waiting on the user's answer, verification or merge. */
+    /** Your desk: all items waiting on the user's answer, verification or merge. */
     needsYou: Item[];
     concepts: Item[];
     /** What the board's Shaping section holds, across every repository. */
@@ -68,13 +68,7 @@ export function noneOnboarded(data: BoardData): boolean {
 
 /** Whether this item's own question or status asks for an answer. */
 export function needsAnswer(item: Item): boolean {
-    return (
-        item.status === 'Needs you' ||
-        Boolean(
-            openQuestionThread(item) &&
-            (item.kind === 'concept' ? !['List', 'Queued', 'Done'].includes(item.status) : item.status === 'Shaping'),
-        )
-    );
+    return item.status === 'Needs you' || (item.status !== 'Done' && !!openQuestionThread(item));
 }
 
 /** A section of the board's main area. `ready` is Ready to build, its own section; `dock` is Concepts and linked work. */
@@ -111,10 +105,13 @@ const hasBuildThread = (item: Item) =>
 /** Whether the item waits on the user's answer, verification or merge. */
 const onDesk = (item: Item, unavailable: boolean) =>
     needsAnswer(item) ||
-    (item.kind !== 'concept' &&
-        (item.status === 'Verify' || item.status === 'Ready to merge') &&
+    !!item.needsYou ||
+    (item.status !== 'Done' &&
+        Array.isArray(item.threads) &&
+        item.threads.some((thread) => thread.childNeedsYou && !thread.observedAt)) ||
+    ((item.status === 'Verify' || item.status === 'Ready to merge') &&
         !workingAgain(item, unavailable) &&
-        (!!item.needsYou || !!openQuestionThread(item) || prReadiness(item)?.state !== 'active'));
+        prReadiness(item)?.state !== 'active');
 
 /** The one stage section an item's row belongs in. A concept builds nothing itself, so it only ever queues or refines. */
 function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
@@ -162,11 +159,19 @@ export function placementOf(item: Item, { starts, unavailable, all }: PlacementF
     const dock =
         part || (stillOpen(item) && (hasChildren(item, all) || (item.kind === 'concept' && stage !== 'queue')));
 
-    if (dock) return { sections: ['dock'] };
-
     return {
-        sections: [...(onDesk(item, unavailable) ? ['desk' as const] : []), ...(stage ? [stage] : [])],
+        sections: [
+            ...(onDesk(item, unavailable) ? ['desk' as const] : []),
+            ...(dock ? ['dock' as const] : stage ? [stage] : []),
+        ],
     };
+}
+
+/** The parent name on a desk card, including a parent outside the board's scope or known only from its ticket. */
+export function deskParentName(item: Item, all: readonly Item[]): string | undefined {
+    const parent = all.find((other) => other.id === item.parentId && other.id !== item.id) ?? item.parent;
+
+    return parent ? itemName(parent) : undefined;
 }
 
 /** `items` in their order, keeping those placed in `section`. */

@@ -113,7 +113,7 @@ const openInstead = (id: string) => press(opener(id));
 const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
 const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
 
-test('a grouped child stays out of the desk when Projects shows its repository without its parent', async () => {
+test('a grouped child reaches the desk with parent context when Projects shows its repository without its parent', async () => {
     localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
 
     const data = withItem('I_sample13', {
@@ -126,7 +126,9 @@ test('a grouped child stays out of the desk when Projects shows its repository w
 
     await mountOpen(data);
     expect(step('I_sample13')).not.toBeNull();
-    expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+    expect(text($('.desk-card[data-item="I_sample13"]'))).toContain(
+        'Part of #200 lar cloud: sign-in and direct connections',
+    );
     expect(text(step('I_sample13'))).toContain('Open item details');
 });
 
@@ -147,7 +149,9 @@ test('live status changes keep linked work in its group with details, thread and
         await receive(withItem('I_sample13', { status }, data));
         expect(step('I_sample13')).not.toBeNull();
         expect($(`[data-stage]:not([data-stage="dock"]) [data-item="I_sample13"]`)).toBeNull();
-        expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+        expect(!!$('.desk-card[data-item="I_sample13"]')).toBe(
+            ['Needs you', 'Verify', 'Ready to merge'].includes(status),
+        );
         expect($('[data-stage="shaping"] [data-item="I_sample09"]')).toBeNull();
     }
     await press(button(step('I_sample13'), 'Open item details'));
@@ -283,7 +287,7 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
         [title.getAttribute('title'), title.className.split(' ').includes('truncate')],
         'the next step cuts off, with its full text in its tooltip',
     ).toEqual(['#202 Sign-in screen', true]);
-    await receive(withItem('I_sample12', { status: 'Verify' }, withItem(C200, refined)));
+    await receive(withItem('I_sample12', { status: 'Verify', threads: [] }, withItem(C200, refined)));
     expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
     await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
     expect(chips(), 'Refined over fog').toEqual(['Refined']);

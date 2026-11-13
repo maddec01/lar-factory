@@ -8,6 +8,7 @@
 
 import {
     deskItems,
+    deskParentName,
     needsAnswer,
     nextAction,
     checksPhrase,
@@ -126,6 +127,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             age={<Age at={item.updatedAt} />}
             title={<ItemTitle item={item} />}
             name={itemName(item)}
+            parentName={deskParentName(item, data.items)}
             details={
                 <>
                     <AzureFields azure={item.azure} />

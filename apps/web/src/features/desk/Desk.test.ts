@@ -71,7 +71,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
         expect(text($('#desk-h')!.parentElement)).toBe('Your desk1');
-        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 5');
+        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 6');
     });
 
     test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {
@@ -148,8 +148,10 @@ test('a decision with no thread answers in its concept thread without inheriting
 
     expect(child.threads).toEqual([]);
     expect(child.stats).toBeUndefined();
-    expect(card('I_sample09')).toBeNull();
-    expect(card('I_sample12')).toBeNull();
+    expect(card('I_sample09')).not.toBeNull();
+    expect(card('I_sample12')).not.toBeNull();
+    expect(card('I_sample12').querySelector('[data-open-thread]')?.getAttribute('href')).toBe(action.href);
+    expect(text(card('I_sample12'))).toContain('Part of #200 lar cloud: sign-in and direct connections');
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
 
@@ -273,7 +275,9 @@ test('a child opens a running concept thread and answers only a later question i
         'Open thread',
         't3code://threads/sample-environment/concept-running',
     ]);
-    expect(card('I_sample12')).toBeNull();
+    expect(card('I_sample12')).not.toBeNull();
+    expect(card('I_sample12').querySelector('[data-open-thread]')?.getAttribute('href')).toBe(action().href);
+    expect(text(card('I_sample12'))).toContain('Part of #200 lar cloud: sign-in and direct connections');
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');

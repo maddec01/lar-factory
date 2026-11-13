@@ -6,6 +6,7 @@ import { WorkRecordError, type WorkRecords } from './work-records.ts';
 const active = ['kind', 'setAsideAt', 'finishedAt'];
 const build = [...active, 'buildBranch'];
 const review = [...build, 'pullRequest', 'body.brief', 'reviewRounds', 'runSettings'];
+const gateFields = [...active, 'body.brief', 'gate', 'ticket', 'confirmedScope'];
 
 /** Command adapter: preserve each intent and let the strict store reject a race during reapplication. */
 export function agentWrites(records: WorkRecords): WorkRecords {
@@ -40,6 +41,10 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 (r) => records.update(id, r, patch),
             ),
         retitle: (id, rev, title) => apply(id, rev, ['title'], (r) => records.retitle(id, r, title)),
+        confirmScope: (id, rev, scope, by, response) =>
+            apply(id, rev, [...active, 'title', 'confirmedScope', 'gate'], (r) =>
+                records.confirmScope(id, r, scope, by, response),
+            ),
         recordKindAnswer: (id, rev, answer) =>
             apply(id, rev, ['kind', 'kindAnswer', 'ticket'], (r) => records.recordKindAnswer(id, r, answer)),
         attachTicket: (id, rev, ticket) => apply(id, rev, ['ticket'], (r) => records.attachTicket(id, r, ticket)),
@@ -137,7 +142,7 @@ export function agentWrites(records: WorkRecords): WorkRecords {
             ),
         setFogGone: (id, rev, gone) => apply(id, rev, [...active, 'fogGoneAt'], (r) => records.setFogGone(id, r, gone)),
         recordDisplayedGate: (display, approved, identity, evidence) =>
-            apply(display.workId, display.sourceRevision, [...active, 'body.brief', 'gate', 'ticket'], (r) => {
+            apply(display.workId, display.sourceRevision, gateFields, (r) => {
                 const current = records.displayGate(display.workId);
 
                 verifyGateDisplay(
@@ -162,8 +167,7 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                     evidence,
                 });
             }),
-        recordGate: (id, rev, gate) =>
-            apply(id, rev, [...active, 'body.brief', 'gate', 'ticket'], (r) => records.recordGate(id, r, gate)),
+        recordGate: (id, rev, gate) => apply(id, rev, gateFields, (r) => records.recordGate(id, r, gate)),
         snapshotRun: (id, rev, input) =>
             apply(id, rev, [...active, `runSettings.${input.runId}`], (r) => records.snapshotRun(id, r, input)),
         startRoleRun: (id, rev, input) =>

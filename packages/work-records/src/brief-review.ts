@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+import { briefScopeClaims, type BriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { DecisionAnswers } from './decision-answers.ts';
 import type { DependencyRecords } from './dependencies.ts';
+import { storedScope } from './scope-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -22,7 +24,9 @@ export function namedWork(brief: string): { files: string[]; contracts: string[]
         );
 
     return {
-        files: [...new Set(names('Files').map((name) => name.replace(/^\.\//, '')))].sort(),
+        files: [
+            ...new Set((briefScopeClaims(brief).get('scope.files') ?? []).map((name) => name.replace(/^\.\//, ''))),
+        ].sort(),
         contracts: [...new Set(names('Contracts'))].sort(),
     };
 }
@@ -55,6 +59,7 @@ interface ReviewSource {
     bodies: { body: string; markdown: string; written: number }[];
     answer: ReturnType<DecisionAnswers['decisionAnswer']> | null;
     named: ReturnType<typeof namedWork>;
+    confirmedScope: BriefScope | null;
     blockers: string[];
     dependencies: ReturnType<DependencyRecords['dependencies']>;
 }
@@ -110,6 +115,7 @@ export function briefReviewRecords(
             parentId: record.parentId,
             bodies: content,
             answer,
+            confirmedScope: storedScope(database, record.workId)?.scope ?? null,
             named: namedWork(content.find((body) => body.body === 'brief')?.markdown ?? ''),
             blockers: edges.all(record.workId).map((row) => String(row.blocker_id)),
             dependencies: dependencies.dependencies(record.workId),

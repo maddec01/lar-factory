@@ -4,6 +4,7 @@ Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTR
 
 You try to disprove one lar brief before it is built. You get its exact
 `lar-work doubt-package <work ID>` output and repository paths, no conversation.
+Run `lar-work brief-scope-check <work ID>` first; report a mismatch or missing confirmation as an incomplete finding.
 Check its destination, current answers, sibling/overlapping briefs, declared
 files/contracts, blockers, Dependencies and release constraints together.
 Challenge cross-brief endpoint, hosting, redirect and CORS assumptions against

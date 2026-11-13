@@ -41,6 +41,7 @@ import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { reviewSelection } from './run-settings-input.ts';
 import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
+import { scopeRecords, type ScopeRecords } from './scope-records.ts';
 import { setAsideRecords, type SetAsideRecords } from './set-aside.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
@@ -367,6 +368,7 @@ export interface CaptureSubmission {
 
 export interface WorkRecords
     extends
+        ScopeRecords,
         RetitleRecords,
         DecisionAnswers,
         MergeBuildRecords,
@@ -1237,6 +1239,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, reviews);
 
     return {
+        ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),

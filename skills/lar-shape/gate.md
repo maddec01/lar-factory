@@ -13,7 +13,7 @@
    or changes to active builds. Rerun Doubt after brief or affected-work edits.
    Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>" [--file <ordering reasons.json>]`.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
-4. After the final edit, run `lar-work gate <work ID>` again. Save its `display`
+4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
    verbatim; ask whether this exact brief may be Ready. Wait in Needs you for
    explicit approval via Questions, including its wait/resume commands. Feedback
@@ -21,7 +21,7 @@
    Record with `lar-work record-gate <work ID> --file display.json --digest <approved approvalDigest> --identity <approver> --evidence "<response reference, Doubt result and confirmed assumptions>"`.
    The command refreshes the ticket and checks displayed text, source revision
    and approval digest together. A mismatch requires renewed review and approval.
-   For several builds, save a JSON array of IDs and run
+   For several builds, require the scope check to pass for every member, save a JSON array of IDs and run
    `lar-work gate-batch --file ids.json > manifest.json`. Display every complete
    brief, its digests, source revision and Doubt result/identity, plus the manifest
    `digest`. One explicit yes approves that manifest. Record it atomically with

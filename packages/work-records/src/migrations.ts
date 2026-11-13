@@ -529,4 +529,12 @@ export const MIGRATIONS: readonly Migration[] = [
         ALTER TABLE brief_gates ADD COLUMN review_digest TEXT;
     `),
     (db) => db.exec('ALTER TABLE brief_gates ADD COLUMN batch_digest TEXT'),
+    (db) =>
+        db.exec(`
+        CREATE TABLE confirmed_scopes(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL, content TEXT NOT NULL, PRIMARY KEY(work_id,revision)) STRICT;
+        CREATE TRIGGER journal_confirmed_scope AFTER INSERT ON confirmed_scopes BEGIN
+          INSERT INTO write_dirty VALUES('work',NEW.work_id,'confirmedScope') ON CONFLICT DO NOTHING;
+        END;
+    `),
 ];

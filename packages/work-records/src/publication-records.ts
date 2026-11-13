@@ -18,6 +18,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { agentRevision } from './agent-revision.ts';
 import type { BriefReviewRecords } from './brief-review.ts';
+import { checkBriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import {
     gateManifest,
@@ -27,6 +28,7 @@ import {
     type GateBatchEvidence,
 } from './gate-batch.ts';
 import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval } from './gate-display.ts';
+import { storedScope } from './scope-records.ts';
 import { queueTicketSpec } from './spec-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
@@ -245,10 +247,12 @@ export function publicationRecords(
                 "SELECT gate_id, review_digest FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1",
             )
             .get(workId, briefDigest);
+        const scope = storedScope(database, workId);
+        const matchesScope = !scope || checkBriefScope(scope.scope, brief ?? null).ok;
+        const matchesReview =
+            !passed?.review_digest || reviews?.currentDoubt(workId)?.packageDigest === passed.review_digest;
         const passing =
-            passed?.review_digest && reviews?.currentDoubt(workId)?.packageDigest !== passed.review_digest
-                ? null
-                : (evidence.find((item) => item.gateId === passed?.gate_id) ?? null);
+            matchesScope && matchesReview ? (evidence.find((item) => item.gateId === passed?.gate_id) ?? null) : null;
 
         return { briefDigest, current: passing !== null, passing, evidence };
     };
@@ -1070,6 +1074,11 @@ export function publicationRecords(
         if (value.reviewDigest !== undefined && value.reviewDigest !== review?.packageDigest)
             invalid('The affected-work package changed; rerun Doubt before approval.');
 
+        const scope = storedScope(database, workId);
+
+        if (scope && !checkBriefScope(scope.scope, body(workId, 'brief') ?? null).ok)
+            invalid('The brief differs from confirmed scope. Run brief-scope-check before presenting its gate.');
+
         const item: GateEvidence = {
             ...(review ? { reviewDigest: review.packageDigest, doubtReviewId: review.reviewId } : {}),
             ...(value.approvalDigest ? { approvalDigest: value.approvalDigest } : {}),
@@ -1109,6 +1118,11 @@ export function publicationRecords(
         const brief = body(workId, 'brief');
 
         if (!brief?.trim()) invalid('A gate needs a complete brief.');
+
+        const scope = storedScope(database, workId);
+
+        if (scope && !checkBriefScope(scope.scope, brief ?? null).ok)
+            invalid('The brief differs from confirmed scope. Run brief-scope-check before presenting its gate.');
 
         return makeGateDisplay(workId, record.revision, brief!);
     };
@@ -1157,6 +1171,7 @@ export function publicationRecords(
                         'body.brief',
                         'gate',
                         'ticket',
+                        'confirmedScope',
                     ]),
                 );
                 const current = gateBatch(displayed.members.map((member) => member.display.workId));

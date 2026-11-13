@@ -408,7 +408,8 @@ test('an answer can say the ticket has no kind, and refuses anything else', asyn
 test('a record from before the migration has no agreed kind or answer, and keeps its kind', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'change-kind-'));
     const path = join(dir, 'work-records.db');
-    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+    // Schema 19 predates agreed ticket kinds; later migrations must not move this fixture.
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 19) });
 
     old.db
         .prepare(`INSERT INTO work_records (work_id, title, initial_context, repository, kind, status, revision, created_at, updated_at)

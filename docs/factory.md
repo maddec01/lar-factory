@@ -73,10 +73,10 @@ file. Checks live in `skills/lar-build/project-rules.md`; handoff lives in
 `skills/shared/reconcile-group.md`. A caller links to a shared stage rather than repeating
 its rules. Build-time brief corrections use the same brief and gate stages.
 
-Today: build phases, review rounds and run settings have record contracts, but
-shaping checkpoints still lack them and starts do not yet capture run settings. Some stage text is repeated across
+Today: build phases, review rounds, run settings and confirmed scope have record
+contracts; other shaping checkpoints still lack them and starts do not yet capture run settings. Some stage text is repeated across
 skills. `lar-work` has no atomic group amendment, compact work order, build
-reservation or batch gate command.
+reservation.
 
 ## What the board shows
 
@@ -232,8 +232,13 @@ an actionable error and launches no replacement record.
 After exploration, the owner presents the outcome, affected repositories, open
 questions and proposed route. It waits in Needs you for Pedro's explicit
 confirmation, even for a detailed issue. The desk says Confirm understanding.
-`record-stage` keeps the proposed understanding and response together. Reuse
-confirmation only when that understanding is unchanged.
+`confirm-scope ID --revision N --file F --identity person --evidence response`
+keeps the stated files, named tests, behaviour, exclusions, size and Verify decision
+as structured local data alongside the item's title, original context and explicit
+understanding response. Empty lists and null size leave unstated constraints open.
+Verify is only for visible UI behaviour a person must check, not routine CLI output.
+`confirmed-scope ID` reuses this capture; an explicit amendment saves a new version
+and invalidates prior gates. Reuse confirmation only when that understanding is unchanged.
 
 The owner records Kind with `update --kind`, then runs `kind-disagreement`.
 Only Pedro's yes permits `change-kind`; a no uses `record-kind-answer`.
@@ -287,10 +292,17 @@ evidence or a saved question, not with a product commit.
 Settled work starts brief drafting. The owner reads accepted answers, evidence,
 affected sibling contracts and the Project's `domainDocs` setting. It saves
 `brief` with What, Done when, Confirmed, essential Notes for the builder,
-Domain docs and Verify. Acceptance criteria describe observable outcomes.
+Domain docs and Verify. `confirmed-scope ID --markdown` renders the authoritative
+Done when, Scope and Verify sections. `brief-scope-check ID` compares their claims
+with the confirmed scope, reports missing/extra claims and exits nonzero on a
+mismatch or absent confirmation. Brief drafting, Doubt (given the work ID) and the
+final pre-presentation gate check all run it. A captured scope also fences
+`gate` display and `record-gate`, including every batch member; legacy records without a capture retain their existing gates.
+Other prose and semantic consistency still require Doubt's judgment.
+Acceptance criteria describe observable outcomes.
 The brief contains everything a builder needs without the shaping conversation.
-Its Notes name affected files and shared contracts so overlap checks and other
-builds can find the work they must account for.
+Scope names affected files and Notes name essential shared contracts so overlap
+checks and other builds can find the work they must account for.
 
 Domain docs OFF means no drafts and `none`. ON means draft glossary entries and
 ADRs in the record for the build PR. Shaping writes no product glossary or ADR

@@ -1,27 +1,10 @@
 import { needsAnswer } from './board-view.ts';
 import { openQuestionThread, prReadiness, workingAgain, currentBuildThread, type Item } from './model.ts';
+import { questionThreadAction } from './question-thread.ts';
 
 /** The next step shared by the desk and item dialog, derived from current PR evidence. */
 export function nextAction(item: Item): { kind: 'thread' | 'pr'; label: string; threadId?: string | undefined } | null {
-    if (needsAnswer(item)) {
-        const question = openQuestionThread(item);
-
-        return {
-            kind: 'thread',
-            label:
-                question?.pendingRequest?.kind === 'tool-approval'
-                    ? 'Resolve approval'
-                    : question?.pendingRequest?.kind === 'brief-approval'
-                      ? 'Approve brief'
-                      : question
-                        ? 'Answer in T3'
-                        : 'Open thread',
-            threadId: question?.pendingRequest?.threadId ?? question?.id,
-        };
-    }
-
-    if (['Verify', 'Ready to merge'].includes(item.status) && openQuestionThread(item))
-        return { kind: 'thread', label: 'Answer in T3', threadId: openQuestionThread(item)?.id };
+    if (needsAnswer(item)) return questionThreadAction(openQuestionThread(item));
 
     if (workingAgain(item)) return { kind: 'thread', label: 'Open thread', threadId: currentBuildThread(item)?.id };
 

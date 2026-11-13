@@ -2,41 +2,14 @@
 // title says why it can't: the item has no thread yet, T3's database can't be read, T3 hasn't
 // written its environment id, or the thread is archived, whose link T3 opens as New thread.
 
-import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, questionOwnerConcept, threadLink } from '@lar-factory/shared';
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
 import { useOnRow } from './RowContext';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { EarlierThread, EarlierThreadList, useButtonKind } from '@/ui/board';
-
-/** A child question may belong to its nearest concept's thread before it has a thread of its own. */
-function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
-    if (item.status !== 'Needs you') return undefined;
-
-    const byId = new Map(data.items.map((candidate) => [candidate.id, candidate]));
-    const seen = new Set([item.id]);
-    let parentId = item.parentId;
-
-    while (parentId && !seen.has(parentId)) {
-        seen.add(parentId);
-
-        const parent = byId.get(parentId);
-
-        if (!parent) return undefined;
-
-        if (parent.kind === 'concept') {
-            if (!Array.isArray(parent.threads) || parent.threads.some((thread) => thread.observedAt)) return undefined;
-
-            return openQuestionThread(parent) ?? parent.threads.find((thread) => thread.state === 'running');
-        }
-
-        parentId = parent.parentId;
-    }
-
-    return undefined;
-}
 
 /** The link stays a view of the question owner. It gives the child no thread association or usage. */
 function latestThread(
@@ -47,7 +20,11 @@ function latestThread(
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database couldn’t be read' };
 
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
-    const concept = !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
+    const owner = questionOwnerConcept(item, data.items);
+    const concept = owner
+        ? (openQuestionThread(owner) ??
+          (Array.isArray(owner.threads) ? owner.threads.find((thread) => thread.state === 'running') : undefined))
+        : undefined;
     const inherited =
         concept && (!threadId || concept.id === threadId || concept.pendingRequest?.threadId === threadId)
             ? concept

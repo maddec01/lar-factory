@@ -44,12 +44,17 @@ Assume the author is overconfident. Hunt for:
   no drafts. With it ON, every term the brief uses matches the glossary, or
   **Domain docs** adds or changes it as a `glossary-format.md` entry. Nothing
   contradicts an ADR without superseding it. Every ADR draft meets
-  `domain-docs.md`'s three conditions: hard to reverse, surprising without
+  these three conditions: hard to reverse, surprising without
   context, the result of a real trade-off. A draft that cites its origin names
   a published ticket or the build PR, never a work ID or local path.
 
-Read [domain-doc setting](shared/domain-docs-setting.md); load
-[Domain modeling](shared/domain-docs.md) only when checking drafts.
+Use the supplied domain-doc setting and paths, not an authoring guide. Check
+terms define project concepts in one or two sentences, with one canonical name
+and avoided synonyms, without implementation details. ADRs state context,
+decision and reason; existing decisions are superseded explicitly. Read the
+[glossary](shared/glossary-format.md) or [ADR](shared/adr-format.md) format only
+when a draft's structure is uncertain. Return missing setting/evidence as
+not checked; never infer approval or write drafts yourself.
 
 Output: findings tied to the supplied brief/package revisions, for the owner
 to save with gate evidence. Report findings only; name each category a thorough pass found clean.

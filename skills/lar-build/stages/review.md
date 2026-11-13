@@ -3,55 +3,40 @@
 Input: integrated branch and passing validation record. Output: `review-rounds`,
 fixed/rejected/open findings, unreviewed fixes and UI process ownership.
 
-Set phase `review` and **Review**. Review runs in review rounds, at most two.
+Set phase `review` and **Review**. At most two rounds.
 
 Round 1: in the build checkout, pin `head=$(git rev-parse HEAD)` and
 `base=$(git merge-base origin/$base_branch "$head")`, then run
 `lar-work select-reviewers <work ID> --base "$base" --head "$head"`.
-Use its run/skip decisions and reasons, including uncertain matches. In
-parallel, start one **reviewer subagent** for each selected reviewer, using
-its returned instruction path (under the installed lar-build skill) or saved
-instruction text. UI returns screenshot paths and an app report: the commit,
-how to reach the app, and each process it started with a recheckable port or
-other ownership evidence.
+With a supplied run ID, add `--run-id RUN_ID`. Use returned decisions/reasons,
+including uncertain matches; report skips in chat. In parallel, start each
+selected reviewer with its returned instruction path (under installed lar-build)
+or frozen text, work ID, repo path, `<lar-build>/project-rules.md`, saved domain-doc
+setting/paths and `<lar-build>/shared/orchestration.md`, including its report and
+**Wait for delegated work** rules. Supply `git diff <base SHA> <head SHA>`.
+UI returns screenshot paths and an app report: commit, access instructions and
+each started process with recheckable ownership evidence such as its port.
 
-Give each only the prose rules, `<lar-build>/project-rules.md`,
-`<lar-build>/shared/orchestration.md` with the instruction to apply **Wait for
-delegated work**, its selected instructions, the build's work ID, the repo path and the
-diff command `git diff <base SHA> <head SHA>` from selection. Note each reviewer you skip with a reason, and
-say so in chat.
+Give Code the selection. For its `escalations`, repeat the pinned selection with
+`--escalations <json file>`; launch each newly selected reviewer once on the same
+diff before fixing. `never` wins. Preserve each returned `escalation` (requester
+and reason) in that reviewer's round-1 record.
 
-Give Code the selection too. For its `escalations`, rerun the same pinned selection with
-`--escalations <json file>`; start each newly escalated reviewer once on that same diff,
-before fixing findings. Never overrides requests. Copy each returned `escalation`
-(requesting reviewer and reason) into that reviewer's round-1 record.
+Each returns verdict (`approve` or `changes`), findings and not-checked evidence.
+Explain rejected findings. Before assigning accepted findings to the
+[Fixer](../agents/fixer.md), save HEAD as the round base and call
+`lar-work record-review-round <work ID> --revision N --file <json>` with base,
+runId when supplied, selection evidence, reviewer verdicts (`skipped` with reason
+in `notChecked` for skips), unchecked evidence and findings (`open`, or `rejected`
+with reason). Mark fixes with `lar-work set-disposition ... --disposition fixed`.
 
-Each returns a verdict (`approve` or `changes`), findings and what it couldn't
-check. Give each finding you reject a reason. Before handing the ones you
-agree with to the [Fixer](../agents/fixer.md), note HEAD (`git rev-parse HEAD`) as this round's
-base, and record the round with
-`lar-work record-review-round <work ID> --revision N --file <json>`: the base,
-each reviewer's verdict (`skipped`, with its reason as `notChecked`, for one
-you skipped), what it couldn't check and its findings, each `open`, or
-`rejected` with your reason. As the [Fixer](../agents/fixer.md) fixes one, mark it with
-`lar-work set-disposition ... --disposition fixed`.
+Round 2: rerun only reviewers with fixed findings, in parallel, with the same
+inputs/instructions, their fixed findings and `git diff <round base>..HEAD`:
+every round-1 fix, never the whole branch. UI also gets its earlier app report
+for reuse. Findings stay within that fix diff. Reject, record and fix as above;
+no further review. Accepted unfixed findings stay open. Send them and round-2
+fixes (unreviewed) to Approve; each reviewer's latest round is its final result.
 
-Round 2: rerun, in parallel, only the reviewers with a fixed finding. Give
-each the prose rules, `<lar-build>/project-rules.md`,
-`<lar-build>/shared/orchestration.md` with the instruction to apply **Wait for
-delegated work**, its file's path, the build's work ID, the repo path, the
-diff command `git diff <round base>..HEAD` (every fixup of round 1, not only
-its own) and the list of its findings that were fixed; never the whole-branch
-diff. The UI reviewer also gets round 1's app report, to reuse the app it left
-running. Its findings stay within that fix diff. Reply to the ones you reject
-as in round 1, record the round the same way, and hand the ones you agree
-with to the [Fixer](../agents/fixer.md), with no further review. A finding you agree with that the [Fixer](../agents/fixer.md) leaves unfixed in either round
-is still open after round 2, and goes to the approver for the PR body. A
-reviewer's final result is its latest round's.
-
-Review ends when round 1 fixed no finding, or after round 2. When review
-ends, stop the processes listed in every UI app report of the build. Whoever
-stops them, now or in a later thread, first confirms each one still holds
-what its report names and stops only the ones that do.
-
-On completion continue to [Approve](approve.md).
+End after round 1 if nothing was fixed, otherwise after round 2. Stop every
+reported UI process only after confirming it still holds its ownership evidence,
+even when a later thread does the cleanup. Continue to [Approve](approve.md).

@@ -11,7 +11,8 @@ and board-recorded approval, or a Needs you wait.
    ordering with `lar-work add-blocker`, or save reasons as
    `[ {"otherWorkId":"ID","reason":"why no ordering is needed"} ]`.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
-   gets that exact package, repository paths, [Doubt](doubt.md)
+   gets that exact package, repository paths, resolved domain-doc setting/paths,
+   [Doubt](doubt.md)
    and the orchestration guide's **Wait for delegated work**, no conversation.
    Fix findings within the approved destination; ask for new scope, decisions
    or changes to active builds. Rerun Doubt after brief or affected-work edits.

@@ -25,9 +25,13 @@ this build lacks. Show both requirements with their sources and a concrete way
 forward per [questions](shared/questions.md). Do not repeat an approval already
 given in the session.
 
-Read the local domain-doc setting per
-[domain-doc setting](shared/domain-docs-setting.md). When writing or reviewing
-domain drafts, load [Domain modeling](shared/domain-docs.md).
+Read existing glossary/ADRs for context. Domain-draft authors load
+[Domain modeling](shared/domain-docs.md) and its setting. Reviewers get the
+saved setting and drafts from the builder: OFF requires "none"; ON requires
+consistent terms and ADRs only for hard-to-reverse, surprising, real trade-offs.
+Load [glossary](shared/glossary-format.md) or [ADR](shared/adr-format.md) formats
+only to check those drafts. Planner and implementer leave brief domain drafts
+to the builder's domain-doc role.
 
 ## Checks
 

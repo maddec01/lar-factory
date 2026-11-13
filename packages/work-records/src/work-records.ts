@@ -28,6 +28,7 @@ import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { reviewSelection } from './run-settings-input.ts';
 import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
+import { setAsideRecords, type SetAsideRecords } from './set-aside.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
@@ -347,6 +348,7 @@ export interface CaptureSubmission {
 export interface WorkRecords
     extends
         RetitleRecords,
+        SetAsideRecords,
         RunSettingsRecords,
         ValidationRecords,
         TrackerCache,
@@ -390,7 +392,6 @@ export interface WorkRecords
     attachTicket(workId: string, revision: number, ticket: string): WorkRecord;
     /** The record holding `ticket`, made first when none does yet. An existing record keeps its title and context. */
     importTicket(record: NewWorkRecord & { ticket: string }): { record: WorkRecord; created: boolean };
-    setAside(workId: string, revision: number): WorkRecord;
     /** Records why the work waits on the user, replacing an earlier reason. */
     setNeedsYou(workId: string, revision: number, reason: string): WorkRecord;
     clearNeedsYou(workId: string, revision: number): WorkRecord;
@@ -1057,6 +1058,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const prState = db.prepare(`SELECT state FROM observations WHERE work_id = ? AND observed = 'pr'`);
     /** Each reason the work in `row` isn't complete; none once it is. */
     const incomplete = (row: Row): string[] => {
+        if (row.set_aside_at) return ['It is set aside; resolve its prerequisite or restore it.'];
+
         if (row.kind === 'slice') return row.finished_at ? [] : ["It isn't finished."];
 
         if (row.kind === 'decision') {
@@ -1178,6 +1181,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...runSettingsRecords(database, (id) => fromRow(find(id)), dataDir),
         ...trackerCache(database),
         ...retitleRecords(database, (workId) => fromRow(find(workId))),
+        ...setAsideRecords(database, (id) => fromRow(find(id))),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
         ...dependencyChanges,
@@ -1412,12 +1416,6 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             });
         },
         importTicket: (record) => database.write(() => importTicket(record)),
-        setAside: (workId, revision) =>
-            change(workId, revision, (row) => {
-                if (row.set_aside_at) throw invalid(`The work record ${workId} is already set aside.`);
-
-                return { set_aside_at: new Date().toISOString() };
-            }),
         restore: (workId, revision) =>
             change(workId, revision, (row) => {
                 if (!row.set_aside_at) throw invalid(`The work record ${workId} isn't set aside.`);

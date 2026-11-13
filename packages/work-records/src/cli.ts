@@ -171,7 +171,11 @@ Changes
                                     A failed create leaves the record local.
   retitle <work ID> --revision N --title X
   title-history <work ID>
-  set-aside <work-id> --revision N  Set the record aside. Its Status stays.
+  set-aside <work-id> --revision N [--file F]
+                                    Resolve every dependent atomically. F is JSON:
+                                    [{workId,revision,action,reason,blockerId?,blockerRevision?}]
+                                    action: replace, remove or hold.
+  set-aside-history <work-id>        Read the retained dependent dispositions.
   restore <work-id> --revision N    Bring a set-aside record back.
   set-needs-you <work-id> --revision N --reason X
                                     Record why the work waits on you, such as a
@@ -422,6 +426,7 @@ const TAKES_WORK_ID = [
     'retitle',
     'title-history',
     'set-aside',
+    'set-aside-history',
     'restore',
     'set-needs-you',
     'clear-needs-you',
@@ -774,7 +779,15 @@ async function run(
         case 'title-history':
             return records.titleHistory(workId!);
         case 'set-aside':
-            return records.setAside(workId!, revision());
+            return records.setAside(
+                workId!,
+                revision(),
+                values.file === undefined
+                    ? []
+                    : (readJson(values, 'dependent resolutions') as import('./set-aside.ts').DependentResolution[]),
+            );
+        case 'set-aside-history':
+            return records.setAsideHistory(workId!);
         case 'restore':
             return records.restore(workId!, revision());
         case 'set-needs-you':

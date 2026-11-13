@@ -180,6 +180,11 @@ Record a later blocker with `lar-work add-blocker <work ID> --revision N
 redundant edges are refused; read the implying path and keep only necessary
 edges. `children`, `blockers` and `dependents` read the structure.
 
+Set aside with `lar-work set-aside ID --revision N --file F`. F lists every
+dependent `{workId,revision,action,reason}`; action is `remove`, `hold` or
+`replace` (also `blockerId,blockerRevision`). A stale record aborts all writes.
+Use `set-aside-history ID` for the retained reasons.
+
 ## Other repositories
 
 Route each part of the work that another repository needs by that repository.

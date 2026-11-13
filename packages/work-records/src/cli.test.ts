@@ -1143,15 +1143,44 @@ it('keeps the brief gate local and refuses removed refinement publication comman
     const gate = await larWork(data, 'gate', work.workId);
 
     expect(gate.record).toMatchObject({ current: false, briefDigest: expect.any(String) });
+
+    const displayFile = join(data, 'display.json');
+
+    writeFileSync(displayFile, JSON.stringify(gate.record.display));
+
+    const waiting = await larWork(
+        data,
+        'set-needs-you',
+        work.workId,
+        '--revision',
+        String(work.revision),
+        '--reason',
+        'Approve this brief',
+    );
+
+    expect(waiting.code).toBe(0);
+    expect(
+        (
+            await larWork(
+                data,
+                'clear-needs-you',
+                work.workId,
+                '--revision',
+                String(waiting.record.revision),
+                '--status',
+                'Shaping',
+            )
+        ).code,
+    ).toBe(0);
     expect(
         await larWork(
             data,
             'record-gate',
             work.workId,
-            '--revision',
-            String(work.revision),
+            '--file',
+            displayFile,
             '--digest',
-            gate.record.briefDigest,
+            gate.record.display.approvalDigest,
             '--identity',
             'reviewer',
             '--evidence',

@@ -319,8 +319,11 @@ When the brief is final, the owner displays its complete text and exact digest,
 asks Approve brief and waits on the desk. A batch displays every complete brief
 and an ID/digest manifest; one yes covers exactly that manifest.
 
-After explicit approval, `record-gate ID --revision N --digest H --identity I
---evidence E` rereads the ticket and rejects stale evidence. The batch command
+The `gate ID` command returns `display`: complete brief, source revision, brief
+digest and approval digest. Save that object, display its text and approval
+digest verbatim, then record explicit approval with `record-gate ID --file
+display.json --digest H --identity I --evidence E`. The command rereads the
+ticket and rejects changed displayed text, source revision or approval digest. The batch command
 rechecks every revision and digest, then records all gates atomically. Any
 mismatch records none. Changed text requires renewed review and approval.
 Successful gates move builds to `Ready`. They stay blocked if `waiting-on` is

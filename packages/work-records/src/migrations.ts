@@ -520,4 +520,5 @@ export const MIGRATIONS: readonly Migration[] = [
           INSERT OR IGNORE INTO verification(work_id) VALUES(NEW.work_id);
         END;
     `),
+    (db) => db.exec('ALTER TABLE brief_gates ADD COLUMN approval_digest TEXT'),
 ];

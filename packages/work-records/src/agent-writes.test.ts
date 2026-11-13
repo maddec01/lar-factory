@@ -325,3 +325,30 @@ it('requires a fresh decision when delivery or the approved brief changed', asyn
     expect(() => agent.setBuildPhase(record.workId, beforeMerge.revision, 'checks')).toThrow(/finishedAt/);
     expect(records.read(record.workId).buildPhase).toBeNull();
 });
+
+it('keeps displayed approval through the Needs you round trip and unrelated observations', async () => {
+    const { records, other, record, agent } = await fixture();
+    const display = agent.displayGate(record.workId);
+    const waiting = agent.waitForUser(record.workId, record.revision, 'Approve this exact brief');
+    const observed = other.observe(record.workId, waiting.revision, { of: 'pr', state: 'open' });
+
+    agent.resumeFromUser(record.workId, observed.revision, 'Shaping');
+    expect(() =>
+        agent.recordDisplayedGate({ ...display, brief: 'Forged' }, display.approvalDigest, 'Pedro', 'Yes'),
+    ).toThrow(/displayed brief/);
+
+    const approval = agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes');
+
+    expect(approval.approvalDigest).toBe(display.approvalDigest);
+    expect(records.gate(record.workId).passing).toMatchObject(approval);
+});
+
+it('rejects a displayed approval after a brief edit and restoration', async () => {
+    const { records, other, record, agent } = await fixture();
+    const display = agent.displayGate(record.workId);
+    const changed = other.setBody(record.workId, record.revision, 'brief', 'Changed scope');
+
+    other.setBody(record.workId, changed.revision, 'brief', display.brief);
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/body.brief/);
+    expect(records.gate(record.workId).evidence).toEqual([]);
+});

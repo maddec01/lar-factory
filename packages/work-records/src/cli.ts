@@ -300,7 +300,7 @@ Brief gate
   gate <work-id>                    Reread the ticket Spec, then print the brief digest,
                                     gate history and specSync warnings or held edits.
                                     Review the refreshed brief and revision before gating.
-  record-gate <work-id> --revision N --digest H --identity I --evidence E
+  record-gate <work-id> --file display.json --digest H --identity I --evidence E
                                     Attest that this exact brief passed its gate.
                                     Rereads again; stale revisions or digests fail.
                                     Eligible tickets queue a durable Spec write. A
@@ -699,6 +699,7 @@ async function run(
 
             return {
                 ...records.gate(workId!),
+                display: records.displayGate(workId!),
                 specSync: {
                     pending: state.pending !== null,
                     error: state.error,
@@ -716,11 +717,19 @@ async function run(
                     'Accept or reject the held GitHub edit in item details before recording a later gate.',
                 );
 
-            return records.recordGate(workId!, revision(), {
-                briefDigest: need(values, 'digest'),
-                approvedBy: need(values, 'identity'),
-                evidence: need(values, 'evidence'),
-            });
+            {
+                const display = readJson(values, 'displayed gate') as import('./gate-display.ts').GateDisplay;
+
+                if (display?.workId !== workId)
+                    throw new WorkRecordError('invalid', 'The displayed gate belongs to another work record.');
+
+                return records.recordDisplayedGate(
+                    display,
+                    need(values, 'digest'),
+                    need(values, 'identity'),
+                    need(values, 'evidence'),
+                );
+            }
         case 'create-part':
             return records.createPart({
                 title: need(values, 'title'),

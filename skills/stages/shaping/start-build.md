@@ -1,45 +1,23 @@
 # Start a build later
 
-Input: approved brief and saved eligibility facts. Output: board-recorded launch intent/thread or exact refusal; agents do not duplicate the launch.
+Input: approved brief. Output: board-recorded launch or exact refusal.
 
-Reshape keeps the brief text and requires a new passing gate before Ready.
+Use the board's Start build, Start after or enabled Auto-build. Agents do not
+launch a duplicate thread. Read [Completion](shared/issue-tracker/completion.md)
+for waits. Reshape or a local brief edit needs a fresh gate. Concept refinement
+is distinct from delivery; Auto-build waits for refinement and all blockers.
+A missing T3 repository project requires adding that project.
 
-Shaping marks Ready after a passing gate. A later agent edit to the local brief
-needs a fresh gate. Trusted tracker edits keep Status; a details Save records
-the user's approval of that exact Spec. Concept refinement is independent of
-delivery. Group readiness uses the shared eligibility contract below.
+The board owns ticket refresh, held-edit checks, the default-branch fetch,
+project-skill snapshot, launch intent, branch/worktree/thread creation and saved
+shaping-thread cleanup. Fetch failure or a two-minute timeout refuses launch.
+The base is the fetched remote tip, never unpublished local default commits.
+A ticket read failure uses the last gated copy with a warning; held text cannot
+be used. Later edits leave a running build's starting snapshot unchanged.
+Report the launch result/refusal; preserve an uncertain intent for recovery.
 
-The board's **Start build** on a Ready build is the user's Go. The exception is
-**Auto-build**. With this machine's Auto-build switch on, the board starts
-eligible Ready builds by itself, up to the build limit. Auto-build starts a
-build under a concept only once the concept's Refinement is complete. A build
-blocked by other work starts only once that work is complete
-([Completion](shared/issue-tracker/completion.md)), by hand,
-through the board's **Start after** or through Auto-build. With no repository
-project for the build's repo, Start build stays disabled until the user adds the
-project in T3. Start build:
-
-1. rereads the ticket Spec before launch. The build uses that text, or the last
-   local copy with a warning if the read fails. Held GitHub edits stay out until
-   accepted in item details. Later edits update the record without changing an
-   already running build;
-2. fetches the repository's default branch from origin. If the fetch fails or
-   takes over 2 minutes, the board refuses the start, shows the error and skips
-   the steps below;
-3. records the project skills selected for the repository on the build's record,
-   so later selections change only future builds;
-4. sets a parent concept to In progress, where it stays until the concept is
-   complete;
-5. records a launch intent, so a restart finds the start instead of making a
-   second thread;
-6. starts the build thread in the build's repository project, in a new
-   worktree on a branch named from the build's kind and title
-   (`fix` for a `bug`, `feat` for a `feature` or `improvement`, else `chore`),
-   with the message
-   `Build <work ID>. Read <installed lar-build>/agents/builder.md and follow it.`,
-   where `<installed lar-build>` is this skill's absolute path, and records the
-   thread on the build. The branch starts from the fetched remote tip, whatever
-   the local default branch holds, and has no upstream. The board then applies
-   the machine's Shaping thread cleanup setting to the item's shaping threads.
-
-Eligibility/capacity and group-run contracts (not implemented): `lar-work prepare-build ID --revision N` and `lar-work set-build-run ID --revision N --state running|paused`; do not simulate reservations or scheduling in prose.
+Eligibility/capacity and group-run contracts remain unavailable:
+`lar-work prepare-build ID --revision N` and
+`lar-work set-build-run ID --revision N --state running|paused`. Do not simulate
+reservations or scheduling in prose. A passing gate alone starts nothing;
+only a user start or an already enabled automatic policy does.

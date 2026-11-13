@@ -236,6 +236,8 @@ build is the user's choice and needs their approval of the plan. Once they
 approve, make the build as above and run
 `lar-work replace-dependency <Dependency ID> --revision N --build <work ID>`.
 
+After set-aside, merge-build, answer/scope changes or an observed merged PR in a group, run [Reconcile the group](../reconcile-group.md).
+
 ## Completion
 
 Completion comes from the records. `lar-work completion <work ID>` prints

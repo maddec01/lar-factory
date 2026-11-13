@@ -90,6 +90,8 @@ If this answer supersedes another, use `supersede-answer` per
    Once no Fog is left, record it with
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
+Run [Reconcile the group](shared/reconcile-group.md) after these changes, before ending.
+
 Start each new research decision at once, as in step 3; every other new decision
 waits in Queued as in step 4. Adjust proposed builds within the approved destination;
 ask only for expanded scope, new decisions or changes to active builds. Changed

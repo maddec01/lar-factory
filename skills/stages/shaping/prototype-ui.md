@@ -2,6 +2,8 @@ Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
 
 # UI Prototype
 
+Input: isolated question and prototype worktree. Output: variant commands/paths and branch for the owner to record with the accepted pick.
+
 Generate **several radically different UI variations** on a single route, switchable from a floating bottom bar. The user flips between variants in the browser, picks one (or steals bits from each), then throws the rest away.
 
 If the question is about logic/state rather than what something looks like, this is the wrong branch. Use [prototype-logic.md](prototype-logic.md).

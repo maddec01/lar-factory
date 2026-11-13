@@ -1,5 +1,7 @@
 # Grilling with docs
 
+Input: unsettled questions and domain-doc setting. Output: accepted vocabulary/answers and enabled domain drafts in the record.
+
 
 Wherever this skill grills (open questions in **2. Size up**,
 [Concepts](concepts.md) step 1, grill decisions), load [Grill](grill.md) and

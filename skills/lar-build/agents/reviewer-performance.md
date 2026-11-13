@@ -2,12 +2,7 @@
 
 `<lar-build>` is this file's parent folder's parent.
 
-You review one lar change for performance. You get the build's work ID, the
-repo path and a diff command. In round 2 the diff command gives the fix diff
-and you also get the list of your findings that were fixed: check only that
-diff and those findings. Read the build's brief
-(`lar-work body <work ID> --body brief`), existing project instructions when present, `<lar-build>/project-rules.md`
-and the diff.
+Read [Review input and result](review-result.md).
 
 Load `<lar-build>/references/performance-checklist.md` and check every item
 that applies to what the diff touches: rendering, polling, queries, loops over
@@ -25,12 +20,4 @@ Overrides replace parts of that Copy:
 Follow `project-rules.md#reviewer-checks` for validation-record reads and
 permitted broad checks.
 
-Return:
-
-```
-verdict: approve | changes
-findings:
-- [blocker|should|nit] path:line: problem. Fix: <suggestion>. Confidence: high|medium|low
-not checked:
-- <anything you couldn't verify, and why>
-```
+Return the shared review result.

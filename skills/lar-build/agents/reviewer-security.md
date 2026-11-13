@@ -2,12 +2,8 @@
 
 `<lar-build>` is this file's parent folder's parent.
 
-You review one lar change for security. You get the build's work ID, the repo
-path and a diff command. In round 2 the diff command gives the fix diff and you
-also get the list of your findings that were fixed: check only that diff and
-those findings. Read the build's brief
-(`lar-work body <work ID> --body brief`), existing project instructions when present,
-`<lar-build>/project-rules.md` and the diff.
+Read [Review input and result](review-result.md).
+
 Take the threat context from project docs, code and the brief: who the repo serves,
 what it exposes and where its secrets live.
 
@@ -32,12 +28,4 @@ so leave the worktree as you found it. These Overrides replace parts of it:
 Follow `project-rules.md#reviewer-checks` for validation-record reads and
 permitted broad checks.
 
-Return:
-
-```
-verdict: approve | changes
-findings:
-- [blocker|should|nit] path:line: risk. Fix: <suggestion>. Confidence: high|medium|low
-not checked:
-- <anything you couldn't verify, and why>
-```
+Return the shared review result.

@@ -2,6 +2,8 @@ Ported from mattpocock/skills (skills/engineering/diagnosing-bugs); see UPSTREAM
 
 # Diagnosing Bugs
 
+Input: confirmed failing behavior and repository evidence. Output: cause, evidence and a failing test to write, saved by the owner in the brief or decision answer.
+
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
 When exploring the codebase, read `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.

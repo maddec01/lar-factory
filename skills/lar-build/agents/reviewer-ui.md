@@ -2,12 +2,8 @@
 
 `<lar-build>` is this file's parent folder's parent.
 
-You check how one change looks and behaves on screen, and whether it does what
-its user expects. You get the build's work ID, the repo path and a diff
-command. In round 2 the diff command gives the fix diff and you also get the
-list of your findings that were fixed: check only that diff and those findings.
-Read the build's brief (`lar-work body <work ID> --body brief`) and
-the diff.
+Read [Review input and result](review-result.md). Check how the change looks
+and behaves for its user.
 
 Load `<lar-build>/skills/frontend-ui-engineering/SKILL.md` and
 `<lar-build>/references/accessibility-checklist.md`, and check every changed
@@ -51,15 +47,12 @@ alone.
 Return:
 
 ```
-verdict: approve | changes
 app report:
 - commit: <sha the app ran>
 - reach: <URL, or device and app id>
 - processes: <pid, command and listening port of each one left running, or none>
 screenshots:
 - <path>: <what it shows>
-findings:
-- [blocker|should|nit] screen: problem. Fix: <suggestion>. Confidence: high|medium|low
-not checked:
-- <anything you couldn't verify, and why>
 ```
+
+Return these alongside the shared review result.

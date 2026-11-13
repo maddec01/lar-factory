@@ -15,6 +15,11 @@ recorded Small build route or planner's private slices/blockers. Set phase `plan
    that this build uses the last local copy. Held GitHub edits need the user's
    Accept or Reject in details before use. Later tracker edits update the
    record and leave the running build as it started.
+Require explicit approval of the current brief digest before implementation.
+A changed or unapproved brief follows [Recovery](recovery.md).
+Build input/settings snapshots are proposed commands: `prepare-build` and `snapshot-run`; until available, retain the starting brief and settings through handoff.
+
+
 2. **Plan.** On a resume, a handoff that says `Small build` skips **Plan**:
    if the handoff says the change isn't done, finish it through [Implement](implement.md); otherwise go to the step the handoff names. A build that already
    has slices (`lar-work children <work ID>`) starts a re-slice planner if any
@@ -24,8 +29,4 @@ recorded Small build route or planner's private slices/blockers. Set phase `plan
    Small builds set phase `implement` and go to [Implement](implement.md) without a planner or slices.
    Other builds start [Planner](../agents/planner.md) with the work ID and repo
    path; its saved slice list goes to Implement.
-
-Require explicit approval of the current brief digest before implementation.
-A changed or unapproved brief follows [Recovery](recovery.md).
-Build input/settings snapshots are proposed commands: `prepare-build` and `snapshot-run`; until available, retain the starting brief and settings through handoff.
 

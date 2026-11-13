@@ -75,8 +75,6 @@ jobs:
         name: Web, packages and script tests
         runs-on: ubuntu-latest
         timeout-minutes: 15
-        # The script tests need bash, git, jq and Node. The shared scripts run lar-work,
-        # which needs the workspace installed.
         steps:
             - name: Set git's default branch
               run: git config --global init.defaultBranch main
@@ -100,6 +98,36 @@ jobs:
               working-directory: packages/shared
               run: pnpm test
 
+            - name: skill-sync tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: for test in .agents/skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
+
+            - name: Release plan tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: node --test --test-reporter=spec .github/scripts/release-plan.test.cjs
+
+            - name: Release secrets wizard tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: bash scripts/release-secrets.test.sh
+
+    work-records:
+        name: Work-records and shared script tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        # The shared scripts run lar-work, so this lane needs the installed workspace.
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
+
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - name: Set up workspace
+              id: install
+              uses: ./.github/actions/setup-workspace
+
             - name: Work-records tests
               if: ${{ !cancelled() && steps.install.outcome == 'success' }}
               working-directory: packages/work-records
@@ -120,18 +148,6 @@ jobs:
             - name: Shared repo config tests
               if: ${{ !cancelled() && steps.install.outcome == 'success' }}
               run: bash skills/shared/scripts/repo-config.test.sh
-
-            - name: skill-sync tests
-              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-              run: for test in .agents/skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
-
-            - name: Release plan tests
-              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-              run: node --test --test-reporter=spec .github/scripts/release-plan.test.cjs
-
-            - name: Release secrets wizard tests
-              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-              run: bash scripts/release-secrets.test.sh
 
     macos:
         name: macOS tests
@@ -163,7 +179,7 @@ jobs:
 
     tests:
         name: Tests
-        needs: [checks, server, unit, macos]
+        needs: [checks, server, unit, work-records, macos]
         if: ${{ always() }}
         runs-on: ubuntu-latest
         timeout-minutes: 5

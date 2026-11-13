@@ -1,3 +1,4 @@
+import { validateBlockers } from './blocker-graph.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { Body, NewWorkRecord, WorkRecord } from './work-records.ts';
 
@@ -71,6 +72,7 @@ export function partCreator(database: Database, storage: PartStorage): (part: Ne
                 // The fresh ID has no incoming edges, so its prerequisites cannot introduce a cycle.
                 block.run(record.workId, blockerId);
             }
+            validateBlockers(db);
             for (const id of new Set([parent.workId, ...part.blockerIds])) bump.run(record.updatedAt, id);
 
             return storage.read(record.workId);

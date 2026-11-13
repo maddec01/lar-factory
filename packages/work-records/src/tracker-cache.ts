@@ -3,6 +3,7 @@ import { trackerPullRequestReference, trackerIssueUrl, trackerPullRequestUrl } f
 // Structural snapshots exclude queue order, Status, briefs, decision answers, slices and thread progress.
 import { createHash, randomUUID } from 'node:crypto';
 
+import { validateBlockers } from './blocker-graph.ts';
 import type { Database } from './database.ts';
 import { WorkRecordError } from './database.ts';
 import { validateTrackerSnapshot } from './tracker-snapshot.ts';
@@ -485,6 +486,8 @@ export function trackerCache(database: Database): TrackerCache {
                             mapping.get(blocker)!,
                         );
                 }
+
+                validateBlockers(db);
 
                 const asReference = (url: string, pr = false) => {
                     if (pr) {

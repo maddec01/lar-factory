@@ -17,6 +17,7 @@ import { rmSync, lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { StatementSync } from 'node:sqlite';
 
+import { validateBlockers } from './blocker-graph.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
@@ -1497,6 +1498,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     );
 
                 insertBlocker.run(workId, blockerId);
+                validateBlockers(db);
                 touched.push(blockerId);
 
                 return {};
@@ -1554,6 +1556,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         );
 
                     insertBlocker.run(workId, blockerId);
+                    validateBlockers(db);
 
                     if (!touched.includes(blockerId)) touched.push(blockerId);
                 }

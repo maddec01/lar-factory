@@ -172,8 +172,9 @@ Buildable work, including bugs, features, improvements and issues, owns private
 slices. Call `slice.sh` without `--kind` or `--repository` for these: they stay in
 the parent's repository and are private implementation records, not delivery parts.
 Record a later blocker with `lar-work add-blocker <work ID> --revision N
---blocker <work ID>`, and drop one with `remove-blocker`. `children`, `blockers`
-and `dependents` read the structure.
+--blocker <work ID>`, and drop one with `remove-blocker`. Self, cycle and
+redundant edges are refused; read the implying path and keep only necessary
+edges. `children`, `blockers` and `dependents` read the structure.
 
 ## Other repositories
 

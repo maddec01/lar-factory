@@ -1,0 +1,77 @@
+import { Alert, Button, Disclosure, RichText, Stack, Text } from '@lar-works/design-system';
+import { useState } from 'react';
+
+import { postAction, receive } from '@/services/board/board.service';
+import { forgetItemDetails } from '@/services/items/items.hooks';
+import { buttonKind } from '@/ui/board';
+
+interface Approval {
+    requestId: string;
+    digest: string;
+    briefs: { workId: string; title: string; brief: string; approvalDigest: string }[];
+}
+
+/** Approval is a separate human action after the board displays the complete current brief. */
+export function ApproveBrief({
+    itemId,
+    workIds,
+    onApproved,
+}: {
+    itemId: string;
+    workIds?: string[];
+    onApproved?: () => Promise<unknown>;
+}) {
+    const [approval, setApproval] = useState<Approval>();
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>();
+    const act = async () => {
+        setPending(true);
+
+        const result = approval
+            ? await postAction('/api/approve-brief', { itemId, requestId: approval.requestId, digest: approval.digest })
+            : await postAction<{ approval: Approval }>('/api/inspect-brief', { itemId, ...(workIds && { workIds }) });
+
+        receive(result);
+        setError(result.error);
+
+        if (approval) {
+            setApproval(undefined);
+
+            if (!result.error) {
+                for (const id of workIds ?? [itemId]) forgetItemDetails(id);
+                await onApproved?.();
+            }
+        } else setApproval('approval' in result ? (result.approval as Approval) : undefined);
+
+        setPending(false);
+    };
+
+    return (
+        <Stack space="tight">
+            {error && <Alert tone="danger">{error}</Alert>}
+            {approval && (
+                <Disclosure label="Brief to approve" presentation="section" defaultOpen>
+                    {approval.briefs.map((brief) => (
+                        <Stack key={brief.workId} space="tight">
+                            <Text>{brief.title}</Text>
+                            <RichText text={brief.brief} format="markdown" />
+                            <Text variant="caption" breaks>
+                                Approval digest: {brief.approvalDigest}
+                            </Text>
+                        </Stack>
+                    ))}
+                    <Text variant="caption" breaks>
+                        Batch digest: {approval.digest}
+                    </Text>
+                </Disclosure>
+            )}
+            <Button {...buttonKind('main')} disabled={pending} onClick={() => void act()}>
+                {approval
+                    ? 'Approve displayed brief'
+                    : workIds && workIds.length > 1
+                      ? 'Approve briefs'
+                      : 'Approve brief'}
+            </Button>
+        </Stack>
+    );
+}

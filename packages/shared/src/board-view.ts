@@ -69,7 +69,9 @@ export function noneOnboarded(data: BoardData): boolean {
 
 /** Whether this item's own question or status asks for an answer. */
 export function needsAnswer(item: Item): boolean {
-    return item.status === 'Needs you' || (item.status !== 'Done' && !!openQuestionThread(item));
+    return (
+        !!item.briefApproval || item.status === 'Needs you' || (item.status !== 'Done' && !!openQuestionThread(item))
+    );
 }
 
 /** A section of the board's main area. `ready` is Ready to build, its own section; `dock` is Concepts and linked work. */
@@ -126,7 +128,8 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
 
     if (item.status === 'Done' || grouped(item)) return null;
 
-    if (building) return 'build';
+    if (building || (item.briefApproval && (item.buildPhase || item.linkedPrs.length || hasBuildThread(item))))
+        return 'build';
 
     if (shaping) return 'shaping';
 

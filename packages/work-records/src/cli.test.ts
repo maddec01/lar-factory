@@ -1142,7 +1142,7 @@ it('keeps the brief gate local and refuses removed refinement publication comman
 
     expect(await larWork(data, 'record-gate', work.workId)).toMatchObject({
         code: 1,
-        stderr: expect.stringContaining('Run Doubt'),
+        stderr: expect.stringContaining('requires Pedro'),
     });
 
     const input = await larWork(data, 'doubt-package', work.workId);
@@ -1222,8 +1222,8 @@ it('keeps the brief gate local and refuses removed refinement publication comman
             '--evidence',
             'Passed.',
         ),
-    ).toMatchObject({ code: 0 });
-    expect((await larWork(data, 'gate', work.workId)).record.current).toBe(true);
+    ).toMatchObject({ code: 1, stderr: expect.stringContaining('set-needs-you') });
+    expect((await larWork(data, 'gate', work.workId)).record.current).toBe(false);
     expect(await larWork(data, 'execute-publication', work.workId)).toMatchObject({
         code: 2,
         stderr: expect.stringContaining('Unknown command'),
@@ -1493,7 +1493,7 @@ it('reads versioned current decision answers through the CLI', async () => {
 }, 30_000);
 
 it(
-    'approves a displayed batch once through the CLI and records none after a stale member',
+    'refuses agent-authored batch approvals, including a fresh manifest and alleged human evidence',
     { timeout: 30_000 },
     async () => {
         const data = tempDir();
@@ -1543,7 +1543,7 @@ it(
 
             expect(await approve(displayed.record.digest)).toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining('conflicting fields: body.brief'),
+                stderr: expect.stringContaining('requires Pedro'),
             });
             expect(ids.every((id) => records.gate(id).evidence.length === 0)).toBe(true);
 
@@ -1582,9 +1582,8 @@ it(
 
             const result = await approve(renewed.record.digest);
 
-            expect(result.code).toBe(0);
-            expect(result.record.gates).toHaveLength(2);
-            expect(ids.every((id) => records.gate(id).passing?.batchDigest === renewed.record.digest)).toBe(true);
+            expect(result).toMatchObject({ code: 1, stderr: expect.stringContaining('set-needs-you') });
+            expect(ids.every((id) => records.gate(id).evidence.length === 0)).toBe(true);
         } finally {
             records.close();
         }

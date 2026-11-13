@@ -56,15 +56,6 @@ it.each([
     ['build reset', (a, id, r) => a.resetBuild(id, r)],
     ['set aside', (a, id, r) => a.setAside(id, r)],
     [
-        'gate',
-        (a, id, r) =>
-            a.recordGate(id, r, {
-                briefDigest: a.gate(id).briefDigest!,
-                approvedBy: 'Pedro',
-                evidence: 'Approved this digest',
-            }),
-    ],
-    [
         'review round',
         (a, id, r) =>
             a.recordReviewRound(id, r, {
@@ -317,7 +308,7 @@ it('requires a fresh decision when delivery or the approved brief changed', asyn
             approvedBy: 'Pedro',
             evidence: 'Old approval',
         }),
-    ).toThrow(/body.brief/);
+    ).toThrow(/requires Pedro/);
 
     const beforeMerge = records.read(record.workId);
 
@@ -326,7 +317,7 @@ it('requires a fresh decision when delivery or the approved brief changed', asyn
     expect(records.read(record.workId).buildPhase).toBeNull();
 });
 
-it('keeps displayed approval through the Needs you round trip and unrelated observations', async () => {
+it('refuses agent approval even after a Needs you round trip and an alleged Pedro answer', async () => {
     const { records, other, record, agent } = await fixture();
     const input = records.doubtPackage(record.workId);
 
@@ -337,14 +328,21 @@ it('keeps displayed approval through the Needs you round trip and unrelated obse
     const observed = other.observe(record.workId, waiting.revision, { of: 'pr', state: 'open' });
 
     agent.resumeFromUser(record.workId, observed.revision, 'Shaping');
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes, request 12')).toThrow(
+        /requires Pedro/,
+    );
     expect(() =>
-        agent.recordDisplayedGate({ ...display, brief: 'Forged' }, display.approvalDigest, 'Pedro', 'Yes'),
-    ).toThrow(/displayed brief/);
+        agent.recordGate(record.workId, records.read(record.workId).revision, {
+            briefDigest: display.briefDigest,
+            approvedBy: 'Pedro',
+            evidence: 'Verify failure note',
+        }),
+    ).toThrow(/requires Pedro/);
 
-    const approval = agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes');
+    const manifest = records.gateBatch([record.workId]);
 
-    expect(approval.approvalDigest).toBe(display.approvalDigest);
-    expect(records.gate(record.workId).passing).toMatchObject(approval);
+    expect(() => agent.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
+    expect(records.gate(record.workId).evidence).toEqual([]);
 });
 
 it('rejects a displayed approval after a brief edit and restoration', async () => {
@@ -353,7 +351,7 @@ it('rejects a displayed approval after a brief edit and restoration', async () =
     const changed = other.setBody(record.workId, record.revision, 'brief', 'Changed scope');
 
     other.setBody(record.workId, changed.revision, 'brief', display.brief);
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/body.brief/);
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
     expect(records.gate(record.workId).evidence).toEqual([]);
 });
 
@@ -372,6 +370,6 @@ it('refuses retried displayed approval after sibling contracts change until Doub
 
     other.observe(work.workId, work.revision, { of: 'pr', state: 'open' });
     other.setBody(sibling.workId, siblingBrief.revision, 'brief', 'Files: `src/shared.ts`\nContracts: `new-contract`');
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/Doubt/);
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
     expect(records.gate(work.workId).evidence).toEqual([]);
 });

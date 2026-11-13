@@ -1,8 +1,7 @@
-import type { VerificationResult } from '@lar-factory/shared';
-import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { refreshBoards } from './board-refresh.ts';
+import { requireHumanAction } from './human-action.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
 /** Direct local evidence; never changes a tracker or starts a second build. */
@@ -28,19 +27,8 @@ export async function verificationCommand(command: string, args: string[]): Prom
 
         records = await openWorkRecords(workRecordsPath(values['data-dir']));
 
-        if (command === 'record-verification') {
-            if (!values.file || !values.revision)
-                throw new Error('Use --revision N --file F with {pr,head,result,by,note,testSteps}.');
-
-            records.recordVerification(
-                id,
-                Number(values.revision),
-                JSON.parse(readFileSync(values.file === '-' ? 0 : values.file, 'utf8')) as Omit<
-                    VerificationResult,
-                    'id' | 'at'
-                >,
-            );
-        } else if (command === 'verification-head') {
+        if (command === 'record-verification') requireHumanAction('Record Verify');
+        else if (command === 'verification-head') {
             if (!values.pr || !values.head)
                 throw new Error('Use --pr owner/name#N --head SHA from a fresh provider read.');
 

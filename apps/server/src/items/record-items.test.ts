@@ -1058,3 +1058,23 @@ test('flow is projected from typed records and tracker links, independently of v
     assert.equal(shown(child.workId).flow, 'linked');
     assert.equal(shown(child.workId).parentId, parent.workId);
 });
+
+test('a changed approved brief during Build carries a brief approval reason instead of a generic question', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'In progress' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', 'Approved D1.');
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    work = records.setBuildBranch(work.workId, work.revision, 'build/same');
+    work = records.setBody(work.workId, work.revision, 'brief', 'Proposed D2.');
+    records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
+
+    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+    assert.equal(item.passingBrief, false);
+    assert.match(item.briefApproval!.reason, /changed during Build/);
+});

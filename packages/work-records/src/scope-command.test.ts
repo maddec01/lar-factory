@@ -163,7 +163,10 @@ it('fails closed without confirmation and reports missing/extra scope with a fai
                 'Approved corrected scope.',
             )
         ).code,
-    ).toBe(0);
+    ).toBe(1);
+    expect(f.records.gate(f.id).current).toBe(false);
+    f.records.recordDisplayedGate(displayed, displayed.approvalDigest, 'Pedro', 'Board approval.');
+    expect(f.records.gate(f.id).current).toBe(true);
 }, 15000);
 
 it('reapplies CLI scope confirmation after unrelated progress without replacing a newer confirmation', async () => {

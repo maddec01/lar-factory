@@ -83,6 +83,7 @@ import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { fetchBaseCommit } from './base-commit.ts';
+import { createBriefApproval } from './brief-approval.ts';
 import { buildPreparation, type BuildStartSource } from './build-preparation.ts';
 import { importPickedTicket } from './import-ticket.ts';
 import type { ItemSource } from './item-source.ts';
@@ -101,6 +102,8 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     inspectVerification(itemId: string): Promise<Reply>;
     recordVerification(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryVerification(itemId: string): Promise<Reply>;
@@ -223,6 +226,7 @@ export interface ItemCommandsDeps {
     startThread?: typeof startThread;
     resumeLaunch?: typeof resumeLaunch;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
+    briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity'>;
     showThread?: typeof lookupThread;
     /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
     recoverThread?: (
@@ -386,10 +390,12 @@ export function createItemCommands({
     factoryContext = currentFactoryContext(),
     runLaunchDeps,
     verificationDeps,
+    briefApprovalDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
+    const gating = createBriefApproval({ board, records, reread, ...briefApprovalDeps });
     const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
         board,
@@ -1386,6 +1392,7 @@ export function createItemCommands({
     }
 
     return {
+        ...gating,
         ...verifying,
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,

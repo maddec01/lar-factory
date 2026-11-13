@@ -247,13 +247,18 @@ export function createItemDetails(
         if (state) {
             const details = 'error' in read ? NO_DETAILS : read;
             const parsed = readTicketSpec(stripTrackerStructure(details.body));
+            const outdated = state.active && !records!.gate(work.id).current;
+            const approvedSpec =
+                state.sent?.spec ??
+                (state.base ? readTicketSpec(stripTrackerStructure(state.base.body)).spec : parsed.spec);
 
             return {
                 ...details,
-                body: record!.body,
+                body: outdated ? approvedSpec : record!.body,
                 format: 'markdown',
                 record,
                 spec: {
+                    outdated,
                     generation: state.generation,
                     pending: state.pending !== null,
                     error: state.error,

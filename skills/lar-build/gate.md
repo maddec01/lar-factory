@@ -15,20 +15,16 @@
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
 4. After the final edit, run `lar-work gate <work ID>` again. Save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
-   verbatim; ask whether this exact brief may be Ready. Wait in Needs you for
-   explicit approval via Questions, including its wait/resume commands. Feedback
+   verbatim; ask Pedro to use Approve brief in the board. Wait in Needs you
+   using the single wait command in Questions. Feedback
    returns to Shaping and Doubt. Reshape always requires renewed approval. Keep approval in gate evidence, never Confirmed.
-   Record with `lar-work record-gate <work ID> --file display.json --digest <approved approvalDigest> --identity <approver> --evidence "<response reference, Doubt result and confirmed assumptions>"`.
-   The command refreshes the ticket and checks displayed text, source revision
-   and approval digest together. A mismatch requires renewed review and approval.
-   For several builds, save a JSON array of IDs and run
-   `lar-work gate-batch --file ids.json > manifest.json`. Display every complete
-   brief, its digests, source revision and Doubt result/identity, plus the manifest
-   `digest`. One explicit yes approves that manifest. Record it atomically with
-   `lar-work record-gate-batch --file manifest.json --digest <approved manifest digest> --identity <approver> --evidence "<response reference>"`.
-   Any stale member rejects all; renew review and approval for a fresh manifest.
+   Only Pedro's **Approve brief** action in the board records approval. For a concept,
+   **Approve briefs** displays and approves its complete batch atomically. Agent
+   `record-gate` and `record-gate-batch` calls refuse: use the one Needs you wait
+   command in Questions, ask Pedro to approve in the board, and stop. A Verify note,
+   an approver name or agent-written response reference never grants approval.
    If this gate supersedes an answer, run `lar-work supersede-answer`, reconcile
    affected briefs and save the map. Rerun Doubt and approval for changed packages.
-5. Set **Ready** on gated builds. Report `lar-work waiting-on` for each. Eligible
+5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.
    Builds wait for Start build, or enabled Auto-build after concept refinement.

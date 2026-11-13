@@ -1,5 +1,4 @@
-// The item dialog's description: the loading state or the error that stands in for it, the Spec's sync notice, and
-// the description editor with Save and Cancel under it once Edit opens it.
+// Ticket description, Spec sync notice and description editor.
 
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
 import {
@@ -122,8 +121,10 @@ function SpecNotice({
     return (
         <SpecSync
             status={
-                spec.error || spec.warning || spec.pending
-                    ? (spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.')
+                spec.outdated || spec.error || spec.warning || spec.pending
+                    ? spec.outdated
+                        ? 'The brief changed. The ticket keeps the last approved Spec until you approve the new brief.'
+                        : (spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.')
                     : undefined
             }
             error={error}
@@ -156,9 +157,6 @@ function SpecNotice({
     );
 }
 
-const RELOAD_FAILED = 'Saved; couldn’t reload the details';
-
-/** Retry belongs to the failed region, so the item and its board fields stay on screen. */
 function DetailsLoadError({ error, refresh }: { error: string; refresh: () => Promise<boolean> }) {
     const [retrying, setRetrying] = useState(false);
 
@@ -225,12 +223,20 @@ export function ItemDescription({
             fill={fill}
             header={
                 <SectionHeader
-                    heading={read.details.spec ? 'Spec' : ticketContext ? 'Ticket description' : 'Description'}
+                    heading={
+                        read.details.spec?.outdated
+                            ? 'Out-of-date Spec'
+                            : read.details.spec
+                              ? 'Spec'
+                              : ticketContext
+                                ? 'Ticket description'
+                                : 'Description'
+                    }
                     empty={!edit.editing && !body && 'No description.'}
                 >
                     {!edit.editing && (
                         <>
-                            {edit.saved !== null && <HeaderStatus>{RELOAD_FAILED}</HeaderStatus>}
+                            {edit.saved !== null && <HeaderStatus>{'Saved; couldn’t reload the details'}</HeaderStatus>}
                             {editable && (
                                 <Button {...buttonKind('other')} leftIcon={<Pencil />} onClick={edit.start}>
                                     Edit

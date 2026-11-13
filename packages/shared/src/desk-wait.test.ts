@@ -140,3 +140,16 @@ test('a brief gate gets a short notice while ordinary questions retain their que
     work.threads = [{ ...stopped, state: 'needs you', questionSummary: 'Which account should own it?' }];
     expect(questionWaitReason(work)).toBe('Which account should own it?');
 });
+
+test('a changed brief names its board approval and keeps the active build in Build', () => {
+    const work = item({
+        status: 'Needs you',
+        buildPhase: 'implement',
+        briefApproval: { reason: 'The brief changed during Build.' },
+        threads: [{ ...stopped, state: 'needs you', pendingRequest: { id: 'q', threadId: 'build', kind: 'question' } }],
+    });
+
+    expect(deskWait(work)).toEqual({ label: 'Approve brief', action: { kind: 'details', label: 'Approve brief' } });
+    expect(questionWaitReason(work)).toBe('The brief changed during Build.');
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).toEqual(['desk', 'build']);
+});

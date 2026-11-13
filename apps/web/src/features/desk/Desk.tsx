@@ -53,6 +53,8 @@ import {
  * leave out a zero count other than passed.
  */
 function NextStep({ item }: { item: Item }) {
+    if (item.briefApproval) return <DeskHint>{item.briefApproval.reason}</DeskHint>;
+
     if (needsAnswer(item)) return null;
 
     if (prReadiness(item)) return <DeskHint>{prReadiness(item)?.word}</DeskHint>;

@@ -407,3 +407,55 @@ test('checks reads the validation record separately from ordinary details', asyn
     assert.equal('checks' in (await reader.details(boardItem(build.workId))), false);
     records.close();
 });
+
+test('a changed brief labels the ticket Spec outdated and retains the last approved Spec', async () => {
+    const { records } = await recordsOn();
+    const repository = 'fake/app';
+    const setup = {
+        repo: repository,
+        writeRefinedSpec: true,
+        access: { 'edit-ticket': 'allowed' },
+    } as unknown as RepositorySetup;
+    let body = 'Original request.';
+    const provider = {
+        readSpec: async () => ({ repository, number: 7, title: 'Work', body, version: '1', editorWrite: true }),
+        replaceSpec: async (_ticket: unknown, next: string) => {
+            body = next;
+
+            return { repository, number: 7, title: 'Work', body, version: '2' };
+        },
+    } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+    const specSync = { setups: [setup], provider };
+    const { syncSpecs } = await import('@lar-factory/work-records/spec-sync');
+    let work = records.create({
+        title: 'Work',
+        kind: 'build',
+        repository,
+        ticket: `${repository}#7`,
+        status: 'In progress',
+    });
+
+    work = records.setBody(work.workId, work.revision, 'brief', 'Approved D1.');
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    await syncSpecs(records, specSync);
+    work = records.read(work.workId);
+    records.setBody(work.workId, work.revision, 'brief', 'Proposed D2.');
+
+    const read = await createItemDetails(null, () => undefined, { records, specSync }).details({
+        ...boardItem(work.workId),
+        repo: repository,
+        number: 7,
+    });
+
+    if ('error' in read) throw Error(read.error);
+
+    assert.equal(read.spec?.outdated, true);
+    assert.equal(read.body, 'Approved D1.');
+    assert.equal(read.record?.body, 'Proposed D2.');
+    assert.match(body, /Approved D1/);
+    assert.doesNotMatch(body, /Proposed D2/);
+});

@@ -10,6 +10,7 @@ import {
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { discoverTicketOptions } from '@lar-factory/shared/publication-settings';
 import { openWorkRecords } from '@lar-factory/work-records';
+import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 
 import type { BoardState } from '../board/board-state.ts';
@@ -23,6 +24,7 @@ import { recordItems } from '../items/record-items.ts';
 import { fakeItemSource } from './fake-item-source.ts';
 import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
+import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
 import { sampleVerification } from './sample-verification.ts';
 
@@ -116,6 +118,11 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         offerModelChoices: () => board.snapshot().modelChoices,
         clearedFailuresFile: null,
         verificationDeps: verification.dependencies,
+        briefApprovalDeps: {
+            refresh: (id) => refreshSpecs(records, { provider, dir, workId: id }),
+            sync: () => syncSpecs(records, { provider, dir }),
+            identity: () => 'Sample Pedro',
+        },
         kindTracker: (repo) => ({ labels: tracker.labels(repo), kinds: tracker.kinds(repo) }),
     });
     const details = createItemDetails(
@@ -212,6 +219,15 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             );
         },
         sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action === 'brief-approval') {
+                const { workId } = await verification.control({ change: 'seed' });
+
+                await sampleBriefApproval(records, workId, { provider, dir });
+                await refresh();
+
+                return { status: 200, body: { workId, error: null } };
+            }
+
             if (input.action !== 'verification') return sampleControls(tracker, refresh)(input);
 
             try {

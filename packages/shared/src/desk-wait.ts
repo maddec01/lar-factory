@@ -5,6 +5,9 @@ import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread }
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    if (item.briefApproval)
+        return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
+
     const concept = unavailable ? undefined : questionOwnerConcept(item, all);
     const question = unavailable ? undefined : (openQuestionThread(item) ?? (concept && openQuestionThread(concept)));
     const request = question?.pendingRequest;
@@ -53,6 +56,8 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
 /** A gate's full brief belongs in the Brief section and T3, not a flattened wait notice. */
 export function questionWaitReason(item: Item): string {
+    if (item.briefApproval) return item.briefApproval.reason;
+
     const thread = openQuestionThread(item);
 
     return thread?.pendingRequest?.kind === 'brief-approval'

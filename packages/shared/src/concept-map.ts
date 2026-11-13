@@ -53,23 +53,7 @@ function endToEndCheck(lines: string[]): EndToEndCheck {
     return { title: STEP.test(first) ? '' : first, steps: matches(trimmed, STEP) };
 }
 
-/** The lines outside fenced code blocks, so a Mermaid flowchart's lines are left out. */
-function unfenced(lines: string[] = []): string[] {
-    let fenced = false;
-
-    return lines.filter((line) => {
-        if (!/^\s*```/.test(line)) return !fenced;
-
-        fenced = !fenced;
-
-        return false;
-    });
-}
-
-/**
- * Parses a concept's issue body; a missing section is empty, a body without an End-to-end check has no check, and a
- * Map listing no Dependencies has none.
- */
+/** Only narrative sections are read here. Relationships and live state come from work records. */
 export function parseConceptMap(body: string): ConceptMap {
     const found = sections(body);
     const map: ConceptMap = {
@@ -77,13 +61,26 @@ export function parseConceptMap(body: string): ConceptMap {
         decisions: bullets(found.get('decisions so far')),
         fog: bullets(found.get('fog')),
     };
+    const boundaries = bullets(found.get('out of scope'));
+
+    if (boundaries.length) map.boundaries = boundaries;
+
     const check = found.get('end-to-end check');
 
     if (check) map.check = endToEndCheck(check);
 
-    const dependencies = bullets(unfenced(found.get('map')));
-
-    if (dependencies.length) map.dependencies = dependencies;
-
     return map;
+}
+
+/** Narrative shown beside the generated graph; legacy hand-written graphs and status lists stay out. */
+export function conceptMapProse(body: string): string {
+    const found = sections(body);
+
+    return ['Destination', 'Decisions so far', 'Out of scope']
+        .flatMap((heading) => {
+            const text = found.get(heading.toLowerCase())?.join('\n').trim();
+
+            return text ? [`## ${heading}\n${text}`] : [];
+        })
+        .join('\n\n');
 }

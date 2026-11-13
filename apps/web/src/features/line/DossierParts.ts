@@ -12,7 +12,7 @@ import {
     openBlockers,
     openQuestionThread,
     plural,
-    refKey,
+    projectWorkMap,
 } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
@@ -95,8 +95,6 @@ const started = (item: Item) => STARTED.includes(item.status);
 export const isDone = (item: Item): boolean =>
     item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
 
-const childOf = (child: Item, parent: Item) => child.parentId === parent.id;
-
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 
 /** Local kind is authoritative. Legacy source labels can still name a decision method. */
@@ -116,12 +114,11 @@ export const partLabel = (kind: PartKind): string => (kind === 'build' ? 'Build'
 /** The parts each part waits on: a recorded blocker by its work ID, a ticket's blocker by its ticket, since ticketless parts share number 0. */
 export function upstreamOf(parts: readonly Part[]): (part: Part) => Part[] {
     const byId = new Map(parts.map((p) => [p.item.id, p]));
-    const byTicket = new Map(parts.filter((p) => p.item.number).map((p) => [refKey(p.item.repo, p.item.number), p]));
+    const graph = projectWorkMap(parts.map((p) => p.item));
 
     return (part) =>
-        part.waitsOn.flatMap(
-            (b) =>
-                (b.workId ? byId.get(b.workId) : b.number ? byTicket.get(refKey(b.repo, b.number)) : undefined) ?? [],
+        graph.edges.flatMap((edge) =>
+            edge.kind === 'blocker' && edge.to === part.item.id ? (byId.get(edge.from) ?? []) : [],
         );
 }
 
@@ -149,9 +146,8 @@ export function partWaves(parts: Part[]): Map<string, number> {
 
 /** The parent's sub-issues by dependency wave, then kind, in board order for ties. */
 export function partsOf(parent: Item, all: readonly Item[]): Part[] {
-    const parts = all
-        .filter((c) => childOf(c, parent))
-        .map((item) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
+    const parts = projectWorkMap(all, parent.id)
+        .nodes.map(({ item }) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
         .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
     const waves = partWaves(parts);
 

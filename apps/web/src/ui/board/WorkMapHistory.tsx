@@ -1,8 +1,8 @@
 import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-/** The group finished history folds into, across the map at `top`: a button with its `glyph` and `text` that shows or
- *  hides the finished parts, saying which it does. */
+/** The group finished history folds into at `top`: a button within the visible frame that shows or hides the
+ *  finished parts. The frame's container width and the sticky button keep its label beside the history as the map scrolls. */
 export function MapHistoryGroup({
     open,
     top,
@@ -37,49 +37,46 @@ export function MapHistoryGroup({
     onHover: (hovered: boolean) => void;
 }) {
     return (
-        <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            data-map-history
-            onMouseEnter={() => onHover(true)}
-            onMouseLeave={() => onHover(false)}
-            className={`border-line bg-surface-raised hover:bg-fill-hover focus-ring absolute flex items-center gap-2 rounded-lg border px-2.5 text-left text-xs shadow-(--shadow-raised) transition-opacity ${dim ? 'opacity-40' : ''}`}
-            style={{ left: 12, right: 12, top, height }}
-        >
-            {glyph}
-            <span className="min-w-0 truncate font-medium">{text}</span>
-            <span className="text-fg-muted inline-flex shrink-0 items-center gap-1">
-                {open ? (
-                    <>
-                        {hideLabel}
-                        <ChevronDownIcon className="size-3.5" />
-                    </>
-                ) : (
-                    <>
-                        {showLabel}
-                        <ChevronRightIcon className="size-3.5" />
-                    </>
-                )}
-            </span>
-        </button>
+        <div className="absolute inset-x-0" style={{ top, height }}>
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={onToggle}
+                data-map-history
+                onMouseEnter={() => onHover(true)}
+                onMouseLeave={() => onHover(false)}
+                className={`border-line bg-surface-raised hover:bg-fill-hover focus-ring sticky left-3 flex h-full w-[calc(100cqw-1.5rem)] items-center gap-2 rounded-lg border px-2.5 text-left text-xs shadow-(--shadow-raised) transition-opacity ${dim ? 'opacity-40' : ''}`}
+            >
+                {glyph}
+                <span className="min-w-0 truncate font-medium">{text}</span>
+                <span className="text-fg-muted inline-flex shrink-0 items-center gap-1">
+                    {open ? (
+                        <>
+                            {hideLabel}
+                            <ChevronDownIcon className="size-3.5" />
+                        </>
+                    ) : (
+                        <>
+                            {showLabel}
+                            <ChevronRightIcon className="size-3.5" />
+                        </>
+                    )}
+                </span>
+            </button>
+        </div>
     );
 }
 
-/** The finished parts under the map, `width` wide, one HistoryRow each. */
+/** Finished parts use the visible frame width even when the graph scrolls sideways. */
 export function MapHistoryList({
-    width,
     children,
 }: {
-    /** The list's width in pixels. */
-    width: number;
     /** The finished parts, one HistoryRow each. */
     children: ReactNode;
 }) {
     return (
         <ol
-            className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-x-4 gap-y-1 px-3 pb-3"
-            style={{ width }}
+            className="bg-surface-page sticky left-0 m-0 grid w-full list-none grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-x-4 gap-y-1 px-3 pb-3"
             data-map-history-parts
         >
             {children}
@@ -121,25 +118,25 @@ export function HistoryRow({
 }) {
     return (
         <li
-            className="hover:bg-fill-hover flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3 text-sm"
+            className="hover:bg-fill-hover grid min-h-12 min-w-0 grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 rounded-md px-3 py-2 text-sm"
             data-history-part={id}
         >
             {glyph}
-            <span className="w-22 shrink-0">{kind}</span>
+            <span className="min-w-0">{kind}</span>
             <button
                 type="button"
                 onClick={onOpen}
                 title={name}
-                className="focus-ring min-w-0 truncate rounded-xs text-left hover:underline"
+                className="focus-ring col-span-2 min-w-0 rounded-xs text-left wrap-anywhere hover:underline"
             >
                 {title}
             </button>
             {after && (
-                <span className="text-fg-muted min-w-0 shrink-[1000] truncate text-xs" title={afterTitle}>
+                <span className="text-fg-muted col-span-2 min-w-0 text-xs wrap-anywhere" title={afterTitle}>
                     {after}
                 </span>
             )}
-            <span className="text-fg-muted ml-auto flex shrink-0 items-center gap-2 text-xs">{side}</span>
+            <span className="text-fg-muted col-span-2 flex min-w-0 flex-wrap items-center gap-2 text-xs">{side}</span>
         </li>
     );
 }

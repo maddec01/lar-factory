@@ -1,8 +1,9 @@
+import type { WorkMapPrerequisite } from '@lar-factory/shared';
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 /** Room for the action header, two title lines, status and slices; the graph uses the same height for its edges. */
-export const MAP_NODE_HEIGHT = 128;
+export const MAP_NODE_HEIGHT = 152;
 
 const NODE_ATTENTION = {
     default: 'border-line',
@@ -32,6 +33,8 @@ export function MapPartNode({
     glyph,
     facts,
     slices,
+    recordState,
+    waitReason,
 }: {
     /** The part's item, named as `data-item`. */
     id: string;
@@ -61,6 +64,10 @@ export function MapPartNode({
     glyph: ReactNode;
     /** Its facts on one line. */
     facts: string;
+    /** Queue and gate facts from the current work record. */
+    recordState: string;
+    /** Every current wait, available without truncation on hover. */
+    waitReason: string;
     /** Its slices, a SliceBar. */
     slices?: ReactNode;
 }) {
@@ -73,7 +80,7 @@ export function MapPartNode({
             <button
                 type="button"
                 aria-label={openLabel}
-                title={title}
+                title={[title, recordState, waitReason].filter(Boolean).join(' · ')}
                 onClick={onOpen}
                 className="focus-ring-inset hover:bg-fill-hover absolute inset-0 rounded-[inherit]"
             />
@@ -93,6 +100,9 @@ export function MapPartNode({
                 <span className="min-w-0 flex-1 truncate" data-map-facts>
                     {facts}
                 </span>
+            </span>
+            <span className="text-fg-muted pointer-events-none relative shrink-0 text-xs" data-map-record-state>
+                {recordState}
             </span>
             {slices && <span className="pointer-events-none relative shrink-0">{slices}</span>}
         </div>
@@ -142,6 +152,35 @@ export function MapCheckNode({
                     {steps}
                 </span>
             </span>
+        </div>
+    );
+}
+
+/** A recorded prerequisite outside the group, distinct from one of its parts. */
+export function MapPrerequisiteNode({ prerequisite, width }: { prerequisite: WorkMapPrerequisite; width: number }) {
+    const { blocker, kind, title, id } = prerequisite;
+    const state =
+        kind === 'dependency'
+            ? blocker.dependency?.met
+                ? 'Accepted as met'
+                : 'Waiting for acceptance as met'
+            : blocker.state === 'closed'
+              ? 'Complete'
+              : 'Waiting for completion';
+
+    return (
+        <div
+            data-map-prerequisite={id}
+            data-prerequisite-kind={kind}
+            className="border-line-strong bg-surface-card flex flex-col gap-2 rounded-xl border border-dashed px-2.5 py-2 text-sm"
+            style={{ width, height: MAP_NODE_HEIGHT }}
+            title={`${title} · ${state}`}
+        >
+            <span className="text-fg-muted text-xs">
+                {kind === 'dependency' ? 'Dependency' : 'Work outside this group'}
+            </span>
+            <span className="line-clamp-3 font-medium wrap-anywhere">{title}</span>
+            <span className="text-fg-muted mt-auto text-xs">{state}</span>
         </div>
     );
 }

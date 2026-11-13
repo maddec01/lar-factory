@@ -9,6 +9,7 @@ import {
     openQuestionThread,
     plural,
     prLabel,
+    projectWorkMap,
     ref,
     repoKey,
     repoName,
@@ -88,6 +89,13 @@ function partDetail({ item }: Part, { kind, thread }: PartActivity): string[] {
 
 export function PartNode({ part, data, width, home }: { part: Part; data: BoardData; width: number; home: string }) {
     const { item } = part;
+    const record = projectWorkMap([item]).nodes[0]!;
+    const recordState = [
+        record.queued ? (item.status === 'Queued' ? 'Queued' : null) : 'Not queued',
+        record.gate === 'not applicable' ? null : `Gate ${record.gate}`,
+    ]
+        .filter(Boolean)
+        .join(' · ');
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
     const open = openWaits(part);
     const complete = isDone(item);
@@ -162,6 +170,8 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             name={<ItemTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
+            recordState={recordState}
+            waitReason={record.waits.join(' · ')}
             slices={item.slices.length > 0 && <SliceBar item={item} />}
         />
     );

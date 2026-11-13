@@ -443,10 +443,11 @@ including for decisions; agents do not force Done with `status.sh`.
 An unmet release step or failed Outcome check keeps delivery incomplete after
 all PRs merge. It does not reopen completed builds or add a merge blocker.
 
-Today: the board draws record relationships but map prose can repeat them and
-drift. `children` is verbose JSON; there is no compact CLI view or dependency-aware
-queue order. `refinement`, `completion` and `waiting-on` exist. Release steps and
-Outcome check evidence do not participate in structured completion.
+Today: the board generates map parts, live status, queue membership, gate state
+and blocker/Dependency edges from the records. Map prose supplies destination,
+choices and boundaries, never graph facts or Dependencies. `children` is verbose
+JSON; there is no compact CLI view or dependency-aware queue order. `refinement`,
+`completion` and `waiting-on` exist. Release steps and Outcome check evidence do not participate in structured completion.
 
 ### One action, shared capacity and Auto-build
 

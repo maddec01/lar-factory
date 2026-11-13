@@ -891,3 +891,38 @@ test('an explicitly linked empty parent keeps its own activity and says No parts
     expect(dossier(parent.id)).toBeNull();
     expect($(`[data-stage="shaping"] [data-item="${parent.id}"]`)).not.toBeNull();
 });
+
+test('the live map follows recorded parts, blockers and gate changes while prose cannot invent Dependencies', async () => {
+    const first = workPart('W_first', { status: 'List', passingBrief: false });
+    const next = workPart('W_next', {
+        status: 'Queued',
+        blockers: [{ workId: first.id, number: 0, repo: first.repo, state: 'open' }],
+    });
+    const change = {
+        map: {
+            ...c200.map!,
+            check: undefined,
+            dependencies: ['No external Dependencies are recorded.', 'Invented prose Dependency'],
+        },
+    };
+    const map = await mapOpen(conceptOf([first, next], change));
+
+    expect(map.querySelector('path[data-edge="W_first W_next"]')).not.toBeNull();
+    expect(text(map.querySelector('[data-map-part="W_first"] [data-map-record-state]'))).toBe(
+        'Not queued · Gate not passed',
+    );
+    expect(text(dossier())).not.toContain('Invented prose Dependency');
+    await receive(
+        conceptOf(
+            [
+                { ...first, status: 'Ready', passingBrief: true },
+                { ...next, blockers: [] },
+            ],
+            change,
+        ),
+    );
+    expect(map.querySelector('path[data-edge="W_first W_next"]')).toBeNull();
+    expect(text(map.querySelector('[data-map-part="W_first"] [data-map-record-state]'))).toBe('Gate passed');
+    await receive(conceptOf([{ ...first, status: 'Ready', passingBrief: true }], change));
+    expect(map.querySelector('[data-map-part="W_next"]')).toBeNull();
+});

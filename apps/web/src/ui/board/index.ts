@@ -122,6 +122,7 @@ export {
     MapLaneName,
     MapNode,
     MapPartNode,
+    MapPrerequisiteNode,
     WorkMapFrame,
 } from './WorkMap';
 export {

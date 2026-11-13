@@ -38,3 +38,4 @@ export * from './sample-clock.ts';
 export * from './pr-merge.ts';
 
 export { deskWait } from './desk-wait.ts';
+export * from './work-map.ts';

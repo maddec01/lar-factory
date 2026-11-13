@@ -25,7 +25,7 @@ test.each([
     'a Verify card for %s says its merge state, then its checks leaving out zero counts other than passed',
     async (_what, id, line) => {
         await mountPage();
-        expect(nextLine(id)).toBe('');
+        expect(nextLine(id)).toBe(line);
         expect(text(card(id))).toContain(line);
     },
 );
@@ -71,7 +71,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
         expect(text($('#desk-h')!.parentElement)).toBe('Your desk1');
-        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 6');
+        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 7');
     });
 
     test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {

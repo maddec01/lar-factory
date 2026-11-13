@@ -2,7 +2,7 @@
 // first line in columns that line up down the whole board, one button that opens the item's details with the row's
 // action beside it, and under it a second line on the same columns.
 
-import { Loading } from '@lar-works/design-system';
+import { Tooltip, TooltipPopup, TooltipTrigger, Loading } from '@lar-works/design-system';
 import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
@@ -78,16 +78,28 @@ export function RowFirst({
 export function RowOpen({
     onOpen,
     children,
+    repository,
 }: {
+    /** The full repository name, available on row hover and keyboard focus. */
+    repository?: string;
     /** Called as the reader opens the item. */
     onOpen: () => void;
     /** The first line's cells. */
     children: ReactNode;
 }) {
-    return (
+    const button = (
         <button type="button" data-row-open data-meta onClick={onOpen} className={`row-cols ${ROW_OPENS}`}>
             {children}
         </button>
+    );
+
+    return repository ? (
+        <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipPopup>{repository}</TooltipPopup>
+        </Tooltip>
+    ) : (
+        button
     );
 }
 

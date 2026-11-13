@@ -83,7 +83,7 @@ test('once the first read settles, a saved repository not on the board shows as 
     await receive(sample);
     expect(scopeLabel()).toBe(ALL);
     expect($('[data-reading]')).toBeNull();
-    expect(deskCards(), 'the desk is the whole factory’s').toBe(6);
+    expect(deskCards(), 'the desk is the whole factory’s').toBe(7);
     expect(localStorage.getItem(SCOPE_KEY)).toBe(GONE);
     await reload();
     expect(scopeLabel()).toBe(ALL);

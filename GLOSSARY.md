@@ -29,7 +29,7 @@ The place for work that has not been queued, shown in the List modal. Capitalise
 _Avoid_: inbox, backlog as a name for this place.
 
 **Your desk**:
-The board's row of all work waiting on Pedro: questions, tool approvals, brief gate approvals, verification and PRs to merge, whatever its Kind or stage. Each card names its Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
+The board's row of all work waiting on Pedro: questions, tool approvals, brief gate approvals, verification, PRs to merge and failed starts or stopped runs needing a human retry, whatever its Kind or stage. Each card names its wait and action, Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
 _Avoid_: inbox, needs-you list.
 
 **Open question**:

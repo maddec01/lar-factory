@@ -1,0 +1,123 @@
+import { expect, test } from 'vite-plus/test';
+
+import sample from '../test/sample.json' with { type: 'json' };
+import { placementOf } from './board-view.ts';
+import { deskWait } from './desk-wait.ts';
+import type { Item, ItemThread } from './model.ts';
+
+const stopped: ItemThread = { id: 'build', title: 'Build', purpose: 'build', state: 'stopped', updated: '2026-11-13' };
+const item = (patch: Partial<Item> = {}): Item => ({
+    ...(sample.items[0] as Item),
+    status: 'In progress',
+    parentId: null,
+    flow: 'single',
+    linkedPrs: [
+        { state: 'open', mergeState: 'can merge', checks: { passed: 1, failed: 0, running: 0, total: 1, since: null } },
+    ] as Item['linkedPrs'],
+    threads: [],
+    ...patch,
+});
+
+test.each([
+    ['question', 'Question', 'Answer in T3'],
+    ['tool-approval', 'Tool approval', 'Resolve approval'],
+    ['brief-approval', 'Approve brief', 'Approve brief'],
+] as const)('%s names its wait and exact request owner', (kind, label, action) => {
+    const work = item({
+        threads: [{ ...stopped, state: 'needs you', pendingRequest: { id: 'request', threadId: 'owner', kind } }],
+    });
+
+    expect(deskWait(work)).toEqual({ label, action: { kind: 'thread', label: action, threadId: 'owner' } });
+});
+
+test.each([
+    ['Verify', 'Verify build', 'Verify build'],
+    ['Ready to merge', 'Merge PR', 'Merge PR'],
+] as const)('%s names its PR action', (status, label, action) => {
+    expect(deskWait(item({ status }))).toEqual({ label, action: { kind: 'pr', label: action } });
+});
+
+test.each(['single', 'linked'] as const)('a stopped %s build stays in its section and reaches the desk', (flow) => {
+    const work = item({ flow, threads: [stopped] });
+
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).toEqual([
+        'desk',
+        flow === 'linked' ? 'dock' : 'build',
+    ]);
+    expect(deskWait(work)).toEqual({ label: 'Run stopped', action: { kind: 'retry-build', label: 'Retry start' } });
+});
+
+test('a stopped build with recorded progress resumes its existing thread', () => {
+    expect(deskWait(item({ buildPhase: 'implement', threads: [stopped] })).action).toEqual({
+        kind: 'thread',
+        label: 'Resume in T3',
+        threadId: 'build',
+    });
+});
+
+test('stopped shaping offers the existing resume control', () => {
+    expect(deskWait(item({ status: 'Shaping', threads: [{ ...stopped, purpose: 'shape' }] })).action).toEqual({
+        kind: 'resume-shaping',
+        label: 'Resume shaping',
+    });
+});
+
+test.each([
+    { threads: [{ ...stopped, observedAt: '2026-11-13' }] },
+    { threads: [{ ...stopped, hasLiveChildren: true }] },
+    { threads: [{ ...stopped, hasRunningChildren: true }] },
+    { threads: [{ ...stopped, archived: true }] },
+    { threads: [{ ...stopped, state: 'done' }] },
+    { status: 'Ready', threads: [stopped] },
+    { threads: 'unavailable' },
+] satisfies Partial<Item>[])(
+    'retained, working and inactive observations do not become stopped desk waits: %j',
+    (patch) => {
+        const work = item(patch);
+
+        expect(placementOf(work, { all: [work], unavailable: false }).sections).not.toContain('desk');
+    },
+);
+
+test('unavailable activity cannot put a stopped run on the desk', () => {
+    const work = item({ threads: [stopped] });
+
+    expect(placementOf(work, { all: [work], unavailable: true }).sections).not.toContain('desk');
+});
+
+test.each([
+    ['brief-approval', 'Approve brief'],
+    ['tool-approval', 'Resolve approval'],
+    ['question', 'Answer in T3'],
+] as const)('an unstarted concept part resolves its inherited %s', (kind, label) => {
+    const parent = item({
+        id: 'concept',
+        kind: 'concept',
+        threads: [
+            { ...stopped, state: 'needs you', pendingRequest: { id: 'pending', threadId: 'concept-owner', kind } },
+        ],
+    });
+    const part = item({ parentId: parent.id, status: 'Needs you', threads: [] });
+
+    expect(deskWait(part, false, [parent, part]).action).toEqual({ kind: 'thread', label, threadId: 'concept-owner' });
+});
+
+test.each(['single', 'linked'] as const)('a failed %s launch reaches the desk and keeps its place', (flow) => {
+    const work = item({
+        flow,
+        status: 'Shaping',
+        needsYou: {
+            reason: 'T3 shows no thread',
+            offers: ['start-again'],
+            causes: [{ type: 'no-thread' }],
+            ticketOpen: true,
+            startAgainPurpose: 'shape',
+        },
+    });
+
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).toEqual([
+        'desk',
+        flow === 'linked' ? 'dock' : 'shaping',
+    ]);
+    expect(deskWait(work)).toEqual({ label: 'Start failed', action: { kind: 'start-again', label: 'Start again' } });
+});

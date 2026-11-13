@@ -15,6 +15,7 @@ import {
     repoName,
     sameRepo,
     workingAgain,
+    stoppedRunThread,
 } from './model.ts';
 import type { BoardData, Item, LinkedPr, NeedsYouOffer, StartProgress, StartPurpose, Status } from './model.ts';
 
@@ -109,6 +110,7 @@ const hasBuildThread = (item: Item) =>
 /** Whether the item waits on the user's answer, verification or merge. */
 const onDesk = (item: Item, unavailable: boolean) =>
     needsAnswer(item) ||
+    (!unavailable && !!stoppedRunThread(item)) ||
     !!item.needsYou ||
     (item.status !== 'Done' &&
         Array.isArray(item.threads) &&

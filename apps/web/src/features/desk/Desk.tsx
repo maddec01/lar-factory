@@ -10,7 +10,7 @@ import {
     deskItems,
     deskParentName,
     needsAnswer,
-    nextAction,
+    deskWait,
     checksPhrase,
     HINTS,
     itemPr,
@@ -19,7 +19,7 @@ import {
     prReadiness,
 } from '@lar-factory/shared';
 import type { BoardData, Item, Checks } from '@lar-factory/shared';
-import { Loading } from '@lar-works/design-system';
+import { Button, Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -32,10 +32,21 @@ import {
     PrAction,
     ItemStatusGlyph,
     useShownStatus,
+    StartBuild,
+    StartOrAfter,
+    StartAgain,
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
+import {
+    boardStatusState,
+    DeskCard as Card,
+    DeskPrProgress,
+    DeskHint,
+    DeskSection,
+    buttonKind,
+    noteBoardPlaces,
+} from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -44,7 +55,7 @@ import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSecti
 function NextStep({ item }: { item: Item }) {
     if (needsAnswer(item)) return null;
 
-    if (prReadiness(item)) return null;
+    if (prReadiness(item)) return <DeskHint>{prReadiness(item)?.word}</DeskHint>;
 
     const pipeline = itemPr(item)?.pipeline;
 
@@ -101,7 +112,20 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
 
 /** The card's action, and Open thread as a square icon in the right corner unless it is the action. */
 function Actions({ item, data }: { item: Item; data: BoardData }) {
-    const action = nextAction(item);
+    const action = deskWait(item, useActivityUnavailable(), data.items).action;
+
+    if (action?.kind === 'start-again') return <StartAgain item={item} data={data} />;
+
+    if (action?.kind === 'retry-build') return <StartBuild item={item} data={data} />;
+
+    if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} label="Resume shaping" />;
+
+    if (action?.kind === 'details')
+        return (
+            <Button {...buttonKind('next')} onClick={() => useItemDialogStore.getState().open(item.id)}>
+                {action.label}
+            </Button>
+        );
 
     return action?.kind === 'thread' ? (
         <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next />
@@ -115,6 +139,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
 
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
+    const wait = deskWait(item, useActivityUnavailable(), data.items);
     const picked = useItemDialogStore((state) => state.itemId === item.id);
 
     return (
@@ -135,7 +160,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
                 </>
             }
             statusIcon={<ItemStatusGlyph item={item} />}
-            status={shown.word}
+            status={wait.label}
             statusState={shown.state ?? boardStatusState[shown.glyph]}
             next={<NextStep item={item} />}
             actions={<Actions item={item} data={data} />}

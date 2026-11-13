@@ -40,7 +40,7 @@ const heading = (id: string) => [
     text($(`#${id}`)),
     text($(`#${id}`)!.parentElement!.querySelector('[data-slot="count"]')),
 ];
-const state = (id: string) => row(id).querySelector<HTMLElement>('[data-state]')!;
+const state = (id: string) => row(id).querySelector<HTMLElement>('[data-col=state] [data-state]')!;
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) =>

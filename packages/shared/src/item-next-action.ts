@@ -6,7 +6,18 @@ export function nextAction(item: Item): { kind: 'thread' | 'pr'; label: string; 
     if (needsAnswer(item)) {
         const question = openQuestionThread(item);
 
-        return { kind: 'thread', label: question ? 'Answer in T3' : 'Open thread', threadId: question?.id };
+        return {
+            kind: 'thread',
+            label:
+                question?.pendingRequest?.kind === 'tool-approval'
+                    ? 'Resolve approval'
+                    : question?.pendingRequest?.kind === 'brief-approval'
+                      ? 'Approve brief'
+                      : question
+                        ? 'Answer in T3'
+                        : 'Open thread',
+            threadId: question?.pendingRequest?.threadId ?? question?.id,
+        };
     }
 
     if (['Verify', 'Ready to merge'].includes(item.status) && openQuestionThread(item))

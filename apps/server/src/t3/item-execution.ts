@@ -13,6 +13,7 @@ import {
     type ThreadFamilyRead,
 } from './execution-protocol.ts';
 import { executionStats, statsProjection } from './execution-stats.ts';
+import { pendingRequest, type PendingRequest } from './pending-request.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 import { titledFrom } from './t3.ts';
 import type { ActivityFamily } from './thread-activity.ts';
@@ -77,7 +78,7 @@ function questionSummary(value: unknown): string | undefined {
  * every shell and finds the threads at work; a thread itself is built when a lookup first asks for it, as a board asks for
  * a few hundred of several thousand shells.
  */
-export function executionItemThreads(shells: Record<string, unknown>[]) {
+export function executionItemThreads(shells: Record<string, unknown>[], requests = new Map<string, PendingRequest>()) {
     const shellsById = new Map<string, Record<string, unknown>>();
     const lineages = new Map<unknown, Lineage>();
     const working: Record<string, unknown>[] = [];
@@ -144,10 +145,18 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
               : ['failed', 'interrupted', 'cancelled'].includes(status)
                 ? 'stopped'
                 : 'done';
+        const requestShell = shell.pendingRuntimeRequest
+            ? shell
+            : working.find((child) => child.pendingRuntimeRequest && ancestorsOf(String(child.id), lineages).has(id));
+        const basic = requestShell && pendingRequest(requestShell);
+        const detailed = basic && requests.get(basic.threadId);
+        const request = detailed?.id === basic?.id ? detailed : basic;
         const thread: ItemThread = {
             id,
             title: typeof shell.title === 'string' ? shell.title : id,
             state,
+            ...(request ? { pendingRequest: { id: request.id, threadId: request.threadId, kind: request.kind } } : {}),
+            ...(request?.summary ? { questionSummary: request.summary } : {}),
             ...(questionSummary(shell.pendingRuntimeRequest)
                 ? { questionSummary: questionSummary(shell.pendingRuntimeRequest) }
                 : {}),
@@ -313,6 +322,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
             const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
             const protocol = boardProjects(runtime.origin, version);
             const entries = new Map<string, ExecutionRead>();
+            const requests = new Map<string, PendingRequest>();
             const fingerprints = new Map<string, string>();
             const queued = new Map<string, Record<string, unknown>>();
             const active = new Set<string>();
@@ -342,6 +352,20 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                         .catch((): ExecutionRead => ({ availability: 'unavailable' }))
                         .then((result) => {
                             if (current !== state || epoch !== startedEpoch) return;
+
+                            const request =
+                                result.availability === 'available' &&
+                                result.observation &&
+                                pendingRequest(shell, result.observation.projection);
+
+                            const changed = request
+                                ? JSON.stringify(requests.get(id)) !== JSON.stringify(request)
+                                : requests.has(id);
+
+                            if (request) requests.set(id, request);
+                            else requests.delete(id);
+
+                            if (changed) state.lookup = executionItemThreads(state.shownShells ?? [], requests);
 
                             const observation = result.observation && {
                                 ...result.observation,
@@ -401,7 +425,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                 state.shownById = new Map();
                 for (const shell of state.shownShells)
                     if (!state.shownById.has(shell.id)) state.shownById.set(shell.id, shell);
-                state.lookup = executionItemThreads(state.shownShells);
+                state.lookup = executionItemThreads(state.shownShells, requests);
                 state.activityFamilies = undefined;
                 lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
             };

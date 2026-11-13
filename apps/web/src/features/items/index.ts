@@ -24,7 +24,7 @@ export {
 } from './ItemParts';
 export { KIND_BADGES } from './KindBadges';
 export { useShownLabels } from './useShownLabels';
-export { NeedsYou } from './NeedsYou';
+export { NeedsYou, StartAgain } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
 export { PrAction } from './PrLink';

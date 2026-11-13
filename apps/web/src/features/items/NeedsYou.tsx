@@ -89,3 +89,28 @@ function Notice({
         </NeedsYouNotice>
     );
 }
+
+/** The desk uses the same confirmed recovery as the notice in item details. */
+export function StartAgain({ item, data }: { item: Item; data: BoardData }) {
+    const [open, setOpen] = useState(false);
+    const state = writeState(data, useItemAction(item.id));
+
+    if (!item.needsYou?.offers.includes('start-again')) return null;
+
+    return (
+        <>
+            <Button {...buttonKind('next')} {...state} onClick={() => setOpen(true)}>
+                Start again
+            </Button>
+            {open && (
+                <NeedsYouDialog
+                    item={item}
+                    data={data}
+                    offer="start-again"
+                    label="Start again"
+                    onClose={() => setOpen(false)}
+                />
+            )}
+        </>
+    );
+}

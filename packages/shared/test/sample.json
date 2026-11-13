@@ -136,11 +136,21 @@
             "models": [
                 {
                     "slug": "claude-opus-5-5[1m]",
-                    "label": "Claude Opus 5.5 · 1M context"
+                    "label": "Claude Opus 5.5 · 1M context",
+                    "efforts": [
+                        { "value": "low", "label": "Low" },
+                        { "value": "medium", "label": "Medium" },
+                        { "value": "high", "label": "High" }
+                    ]
                 },
                 {
                     "slug": "claude-sonnet-5-5",
-                    "label": "Claude Sonnet 5.5"
+                    "label": "Claude Sonnet 5.5",
+                    "efforts": [
+                        { "value": "low", "label": "Low" },
+                        { "value": "medium", "label": "Medium" },
+                        { "value": "high", "label": "High" }
+                    ]
                 }
             ]
         },
@@ -150,11 +160,21 @@
             "models": [
                 {
                     "slug": "gpt-6.1-sol",
-                    "label": "GPT-6.1 Sol"
+                    "label": "GPT-6.1 Sol",
+                    "efforts": [
+                        { "value": "low", "label": "Low" },
+                        { "value": "medium", "label": "Medium" },
+                        { "value": "high", "label": "High" }
+                    ]
                 },
                 {
                     "slug": "gpt-6-astra",
-                    "label": "GPT-6 Astra"
+                    "label": "GPT-6 Astra",
+                    "efforts": [
+                        { "value": "low", "label": "Low" },
+                        { "value": "medium", "label": "Medium" },
+                        { "value": "high", "label": "High" }
+                    ]
                 }
             ]
         }

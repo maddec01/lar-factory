@@ -10,6 +10,8 @@ import { type StartedThread, type StartPurpose, type StartProgress } from './thr
 export interface ModelOption {
     slug: string;
     label: string;
+    /** Advertised reasoning choices, when T3 reports them. */
+    efforts?: { value: string; label: string }[];
 }
 
 /** An enabled T3 provider instance, named as T3's picker names it, and the models Start offers on it. */

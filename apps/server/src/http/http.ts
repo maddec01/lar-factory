@@ -14,6 +14,7 @@ import {
     type TrackerLabel,
     type SetupDetection,
 } from '@lar-factory/shared';
+import type { FactoryModelGroup } from '@lar-factory/shared/factory-settings';
 import { discoverVocabulary } from '@lar-factory/shared/publication-settings';
 // The board's HTTP side: serves the page and the board data on this machine only,
 // streams changes over /api/events, and routes the page's writes to the item commands.
@@ -36,11 +37,14 @@ import type { BoardRetention } from '../items/retention.ts';
 import type { BoardShapingThreadCleanup } from '../items/shaping-thread-cleanup.ts';
 import { log } from '../log.ts';
 import type { BuiltPage } from '../page/page.ts';
+import type { factorySettingsService } from '../settings/factory-settings.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
 import type { ProjectImage } from '../t3/project-icons.ts';
 
 export interface HttpDeps {
+    factorySettings?: ReturnType<typeof factorySettingsService>;
+    settingsModels?: () => Promise<FactoryModelGroup[]>;
     board: BoardState;
     commands: ItemCommands;
     capture: Capture;
@@ -207,6 +211,8 @@ function forItem(
 const RESEND_AFTER_WRITE_MS = 2_000;
 
 export function createBoardServer({
+    factorySettings,
+    settingsModels,
     board,
     commands,
     capture,
@@ -294,6 +300,15 @@ export function createBoardServer({
                   },
               }
             : {}),
+        '/api/factory-settings': {
+            sampleWrite: 'fake',
+            what: 'the reviewer and model settings',
+            async run(input) {
+                if (Array.isArray(input)) return { status: 400, body: { error: 'Send settings as a JSON object.' } };
+
+                return factorySettings?.save(input) ?? { status: 503, body: { error: 'Settings are unavailable.' } };
+            },
+        },
         '/api/inspect-merge': {
             sampleWrite: 'refuse',
             what: 'the recorded delivery PR',
@@ -1130,6 +1145,12 @@ export function createBoardServer({
         }
 
         if (path === '/api/events') return openStream(req, res);
+
+        if (path === '/api/factory-settings') {
+            if (!factorySettings) return json(res, 503, { error: 'Settings are unavailable.' });
+
+            return json(res, 200, factorySettings.read((await settingsModels?.()) ?? board.snapshot().modelChoices));
+        }
 
         if (path === '/api/onboarding/projects') return projectsRequest(res);
 

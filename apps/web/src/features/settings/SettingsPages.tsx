@@ -1,11 +1,11 @@
-// Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
-
 import { writeAccessProblem, shownRepo } from '@lar-factory/shared';
+// Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
 import { Button, EmptyState } from '@lar-works/design-system';
 import { Archive, FolderGit2, Plug, Sparkles } from '@lar-works/design-system/icons';
 
 import { ChannelChoice, UpdateAction, UpdateStatus, UpdatesNote } from './AppRows';
 import { archiveGroups } from './ArchiveRows';
+import { FactorySettingsSection } from './FactorySettings';
 import { generalGroups } from './GeneralSettings';
 import { repositoryGroup } from './ProjectRows';
 import { RunChecks } from './RunChecks';
@@ -50,6 +50,28 @@ export function pages(input: PagesInput): Page[] {
             icon: <conceptIcons.settings />,
             description: 'Manage the appearance, dialogs, threads, command limits and Auto-build on this Mac.',
             groups: generalGroups(data),
+        },
+        {
+            id: 'factory',
+            label: 'Reviewers and models',
+            keywords:
+                'instructions trigger effort planner implementer approver CI fixer Doubt shaping concept decision build',
+            icon: <conceptIcons.settings />,
+            description:
+                'Reviewers, models and effort for future runs on this Mac. Save changes to apply your choices.',
+            groups: [
+                {
+                    title: '',
+                    panel: false,
+                    rows: [
+                        {
+                            id: 'factory-settings',
+                            title: 'Reviewers, models and effort',
+                            control: { type: 'row', render: () => <FactorySettingsSection /> },
+                        },
+                    ],
+                },
+            ],
         },
         {
             id: 'projects',

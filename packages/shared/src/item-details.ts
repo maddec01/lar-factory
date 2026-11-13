@@ -2,9 +2,11 @@
 // and people, which the board-wide read leaves out. The item's labels, parent, linked PRs, slices, blockers and update
 // time stay on the board's `Item`.
 
+import type { FactoryRole, ReviewerMode, ThreadKind } from './factory-settings.ts';
 import type { KindTicketSwap } from './kind-disagreement.ts';
 import type { SwapKind } from './managed-labels.ts';
 import type { IssueRef } from './model.ts';
+import type { ExecutionSettings } from './run-settings.ts';
 
 /** How a body or comment is written: GitHub's are markdown, an Azure DevOps field is markdown or HTML. */
 export type TextFormat = 'markdown' | 'html';
@@ -36,6 +38,16 @@ export interface RecordReviewRound {
     reviewers: { axis: string; verdict: string; findings: number; open: number }[];
 }
 
+/** Frozen choices, projected without full instruction text/history or unrelated provider options. */
+export interface SavedRunChoices {
+    runId: string;
+    kind: ThreadKind;
+    capturedAt: string;
+    thread: Pick<ExecutionSettings, 'model' | 'effort'>;
+    roles: ({ role: FactoryRole } & Pick<ExecutionSettings, 'model' | 'effort'>)[];
+    reviewers: { id: string; name: string; mode: ReviewerMode['kind']; instructions: string }[];
+}
+
 /** The work record's text and local progress; trusted Spec edits can update its brief. */
 export interface RecordDetails {
     /** Which body the record holds: a concept's map, a decision's text, or any other record's brief. */
@@ -50,6 +62,7 @@ export interface RecordDetails {
     buildPhase: string | null;
     /** The build's review rounds, oldest first. */
     reviewRounds: RecordReviewRound[];
+    runSettings?: SavedRunChoices[];
 }
 
 export interface ItemDetails {

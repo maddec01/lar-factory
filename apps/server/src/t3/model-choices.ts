@@ -13,6 +13,7 @@ import { isRecord, offers } from '@lar-factory/shared';
 import type { ModelChoice, ModelGroup, ModelOption, ModelSelection, ModelSelectionOption } from '@lar-factory/shared';
 
 import { readJsonRecord } from '../json-file.ts';
+import { manifestEfforts } from './model-efforts.ts';
 import { projectDefaultSelection, readT3Db } from './t3-db.ts';
 import { statsDbPath, t3SettingsPath } from './t3-settings.ts';
 
@@ -253,7 +254,10 @@ function modelOption(
                     .replace(/^Gpt\b/, 'GPT')
                     .replace(/(\d)[ -](\d)/g, '$1.$2');
 
+    const efforts = manifestEfforts(provider, match);
+
     return {
+        ...(efforts.length ? { efforts } : {}),
         slug: canonical + (context ? `[${context.toLowerCase()}]` : ''),
         label: name + (context && !/context/i.test(name) ? ` · ${context.toUpperCase()} context` : ''),
     };

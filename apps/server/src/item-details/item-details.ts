@@ -47,6 +47,7 @@ import { saveAzureDescription } from '../azure/azure-writes.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import { readRepositorySetups } from '../config/repository-settings.ts';
 import { readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from '../github/github-details.ts';
+import { savedRunChoices } from './run-settings.ts';
 
 /** Reads one item's details, or says why it can't. */
 type ReadItemDetails = (item: Item) => Promise<ItemDetails | Refused>;
@@ -143,7 +144,7 @@ const bodyKindOf = (kind: string): RecordDetails['bodyKind'] =>
     kind === 'concept' ? 'map' : kind === 'decision' ? 'decision' : 'brief';
 
 /** The record's own text and progress, or undefined when it has none, such as an item read before its record was made. */
-function recordDetails(records: WorkRecords, workId: string): RecordDetails | undefined {
+export function recordDetails(records: WorkRecords, workId: string): RecordDetails | undefined {
     let record;
 
     try {
@@ -155,9 +156,11 @@ function recordDetails(records: WorkRecords, workId: string): RecordDetails | un
     }
 
     const bodyKind = bodyKindOf(record.kind);
+    const runs = savedRunChoices(records, workId);
 
     return {
         bodyKind,
+        ...(runs.length ? { runSettings: runs } : {}),
         body: records.body(workId, bodyKind) ?? '',
         ...(bodyKind === 'decision' ? { answer: records.body(workId, 'answer') ?? '' } : {}),
         context: records.initialContext(workId),

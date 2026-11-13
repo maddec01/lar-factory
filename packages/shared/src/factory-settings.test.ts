@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vite-plus/test';
 
-import { parseFactorySettings, reviseReviewerInstructions } from './factory-settings-parse.ts';
+import { parseFactorySettings } from './factory-settings-parse.ts';
 import { resolveFactorySettings, reviewerInstructions } from './factory-settings-resolve.ts';
+import { duplicateReviewer, reviseReviewerInstructions } from './factory-settings-reviewers.ts';
 import { defaultFactorySettings, FACTORY_ROLES, THREAD_KINDS } from './factory-settings.ts';
 
 const projectDefault = {
@@ -119,18 +120,30 @@ it('adds a stable custom reviewer, defaults it to always, retains trigger defini
     expect(resolveFactorySettings(settings, 'build', 'approver').model).toBeNull();
 });
 
-it('edits a built-in as append-only copies without mutating the original or its reference', () => {
+it('duplicates packaged instructions and trigger, and only edits the custom copy', () => {
     const original = defaultFactorySettings();
-    const first = reviseReviewerInstructions(original, 'code', 'Check the contract.');
-    const second = reviseReviewerInstructions(first, 'code', 'Check the contract and errors.');
+    const first = duplicateReviewer(original, 'security', 'security-copy', 'Packaged security text.');
+    const second = reviseReviewerInstructions(first, 'security-copy', 'Check the contract and errors.');
+    const copy = second.reviewers.find((entry) => entry.id === 'security-copy')!;
 
-    expect(reviewerInstructions(original.reviewers[0]!)).toHaveProperty('path');
-    expect(second.reviewers[0]!.revisions).toEqual([
-        { revision: 1, text: 'Check the contract.' },
+    expect(original.reviewers).toHaveLength(4);
+    expect(copy.name).toBe('Security (copy)');
+    expect(copy.mode).toEqual(original.reviewers[1]!.mode);
+    expect(copy.revisions).toEqual([
+        { revision: 1, text: 'Packaged security text.' },
         { revision: 2, text: 'Check the contract and errors.' },
     ]);
-    expect(reviewerInstructions(second.reviewers[0]!)).toEqual({ revision: 2, text: 'Check the contract and errors.' });
+    expect(reviewerInstructions(copy)).toEqual({ revision: 2, text: 'Check the contract and errors.' });
+    expect(() => reviseReviewerInstructions(first, 'security', 'text')).toThrow('Duplicate');
     expect(() => reviseReviewerInstructions(first, 'missing', 'text')).toThrow('known reviewer');
+    expect(() => duplicateReviewer(first, 'security', 'security-copy', 'text')).toThrow('new ID');
+    expect(second.reviewers[1]).not.toHaveProperty('revisions');
+    original.reviewers[1]!.mode = { kind: 'never' };
+
+    const disabled = duplicateReviewer(original, 'security', 'disabled-copy', 'Security text').reviewers.at(-1)!;
+
+    expect(disabled.mode).toEqual({ kind: 'never' });
+    expect(disabled.trigger).toEqual({ version: 1, kind: 'policy', policy: 'security' });
 });
 
 describe('invalid settings are refused instead of silently changing the selected policy', () => {
@@ -138,7 +151,7 @@ describe('invalid settings are refused instead of silently changing the selected
         null,
         [],
         {},
-        { version: 2 },
+        { version: 3 },
         { version: 1, roles: null },
         { version: 1, reviewers: null },
         { version: 1, threadKinds: null },

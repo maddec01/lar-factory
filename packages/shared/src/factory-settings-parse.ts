@@ -1,5 +1,7 @@
+import { migrateReviewerEdits, type LegacyReviewer } from './factory-settings-migrate.ts';
 import {
     BUILTIN_REVIEWERS,
+    builtinReviewerMode,
     FACTORY_ROLES,
     THREAD_KINDS,
     defaultFactorySettings,
@@ -63,10 +65,10 @@ function mode(value: unknown): value is ReviewerMode {
     );
 }
 
-function reviewer(value: unknown): ReviewerDefinition | null {
+function reviewer(value: unknown, legacy: boolean): LegacyReviewer | ReviewerDefinition | null {
     if (
         !isRecord(value) ||
-        !keys(value, ['id', 'name', 'mode', 'instructions', 'revisions']) ||
+        !keys(value, ['id', 'name', 'mode', 'instructions', 'revisions', 'trigger']) ||
         !id(value.id) ||
         !text(value.name)
     )
@@ -80,6 +82,7 @@ function reviewer(value: unknown): ReviewerDefinition | null {
 
     if (
         !mode(chosenMode) ||
+        (value.trigger !== undefined && !mode({ kind: 'on-trigger', trigger: value.trigger })) ||
         !Array.isArray(revisions) ||
         !revisions.every(
             (entry, index) =>
@@ -111,13 +114,44 @@ function reviewer(value: unknown): ReviewerDefinition | null {
             return null;
     } else return null;
 
+    if (!legacy && BUILTIN_REVIEWERS.includes(value.id as never)) {
+        const builtin = defaultFactorySettings().reviewers.find((entry) => entry.id === value.id)!;
+
+        if (
+            instruction.kind !== 'builtin' ||
+            value.revisions !== undefined ||
+            value.trigger !== undefined ||
+            value.name !== builtin.name
+        )
+            return null;
+
+        const packagedMode = builtinReviewerMode(value.id as never, chosenMode.kind);
+
+        if (chosenMode.kind === 'on-trigger') {
+            const trigger = chosenMode.trigger;
+
+            if (value.id === 'code') {
+                if (
+                    trigger.kind !== 'rules' ||
+                    trigger.any.length !== 1 ||
+                    trigger.any[0]!.target !== 'path-glob' ||
+                    trigger.any[0]!.pattern !== '**'
+                )
+                    return null;
+            } else if (trigger.kind !== 'policy' || trigger.policy !== value.id) return null;
+        }
+
+        return { ...builtin, mode: packagedMode };
+    }
+
     return {
         id: value.id,
         name: value.name,
         mode: chosenMode,
+        ...(value.trigger !== undefined ? { trigger: value.trigger } : {}),
         instructions: instruction,
         revisions,
-    } as ReviewerDefinition;
+    } as LegacyReviewer;
 }
 
 /** Missing pre-feature settings migrate to today's policy. Invalid supplied values throw; they never silently reset choices. */
@@ -126,10 +160,14 @@ export function parseFactorySettings(value: unknown): FactorySettings {
 
     const invalid = () =>
         new Error(
-            'Invalid factory settings: expected version 1, known kinds and roles, and valid reviewer definitions.',
+            'Invalid factory settings: expected version 2 (or legacy version 1), known kinds and roles, and valid reviewer definitions.',
         );
 
-    if (!isRecord(value) || !keys(value, ['version', 'threadKinds', 'roles', 'reviewers']) || value.version !== 1)
+    if (
+        !isRecord(value) ||
+        !keys(value, ['version', 'threadKinds', 'roles', 'reviewers']) ||
+        (value.version !== 1 && value.version !== 2)
+    )
         throw invalid();
 
     const kinds = value.threadKinds === undefined ? {} : value.threadKinds;
@@ -145,7 +183,7 @@ export function parseFactorySettings(value: unknown): FactorySettings {
     )
         throw invalid();
 
-    const parsed = supplied.map(reviewer);
+    const parsed = supplied.map((entry) => reviewer(entry, value.version === 1));
 
     if (parsed.some((entry) => entry === null)) throw invalid();
 
@@ -161,24 +199,7 @@ export function parseFactorySettings(value: unknown): FactorySettings {
 
     if (!keys(roles, roleNames) || !Object.values(roles).every(override)) throw invalid();
 
-    return structuredClone({ version: 1, threadKinds: kinds, roles, reviewers }) as FactorySettings;
-}
+    const settings = structuredClone({ version: 2, threadKinds: kinds, roles, reviewers }) as FactorySettings;
 
-/** Make an editable copy of instructions without changing the built-in file or any previous revision. */
-export function reviseReviewerInstructions(
-    settings: FactorySettings,
-    reviewerId: string,
-    instructions: string,
-): FactorySettings {
-    const next = parseFactorySettings(settings);
-    const target = next.reviewers.find((entry) => entry.id === reviewerId);
-
-    if (!target || !text(instructions)) throw new Error('A known reviewer and non-empty instructions are required.');
-
-    const revision = target.revisions.length + 1;
-
-    target.revisions.push({ revision, text: instructions });
-    target.instructions = { kind: 'revision', revision };
-
-    return next;
+    return value.version === 1 ? migrateReviewerEdits(settings) : settings;
 }

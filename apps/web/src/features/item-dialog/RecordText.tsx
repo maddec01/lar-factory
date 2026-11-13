@@ -6,6 +6,7 @@ import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory
 import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
+import { SavedRunSettings } from './SavedRunSettings';
 import { postAction } from '@/services/board/board.service';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import { buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
@@ -100,6 +101,7 @@ export function RecordText({ item, record, spec = false }: { spec?: boolean; ite
                     <MarkdownDiagrams text={body} />
                 </Disclosure>
             )}
+            {record.runSettings && <SavedRunSettings runs={record.runSettings} />}
             {record.buildPhase && (
                 <DetailFact label="Build phase" presentation="record" data-build-phase>
                     {record.buildPhase}

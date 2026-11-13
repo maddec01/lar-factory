@@ -1,6 +1,6 @@
 // Shared by the server and lar-work. This feature never reads repository configuration or opens the work database.
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { parseFactorySettings, type FactorySettings } from '@lar-factory/shared/factory-settings';
+import { BUILTIN_REVIEWERS, parseFactorySettings, type FactorySettings } from '@lar-factory/shared/factory-settings';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -68,7 +68,10 @@ export function writeFactorySettings(value: unknown, dir = boardDataDir()): Fact
     for (const old of previous.reviewers) {
         const reviewer = next.reviewers.find((entry) => entry.id === old.id);
 
-        if (old.revisions.some((entry, index) => reviewer?.revisions[index]?.text !== entry.text)) {
+        // Removing a custom reviewer changes future runs. Frozen run snapshots retain their own instructions.
+        if (!reviewer && !BUILTIN_REVIEWERS.some((id) => id === old.id)) continue;
+
+        if ((old.revisions ?? []).some((entry, index) => reviewer?.revisions?.[index]?.text !== entry.text)) {
             throw new Error(`Keep instruction revisions for reviewer ${old.id}; use never mode to disable it.`);
         }
     }

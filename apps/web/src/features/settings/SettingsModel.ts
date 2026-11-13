@@ -21,6 +21,8 @@ export interface Row {
     noteOnly?: true;
 }
 export interface Group {
+    /** A section with its own settings groups needs no enclosing row panel. */
+    panel?: boolean;
     title: string;
     help?: ReactNode;
     description?: string;

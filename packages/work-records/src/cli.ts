@@ -17,6 +17,7 @@ import type { OrderingReason } from './brief-review.ts';
 import { checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
 import { exportMarkdown } from './export.ts';
+import { gateWorkIds, readGateManifest } from './gate-batch.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
@@ -305,6 +306,9 @@ Brief gate
   build-overlap <work-id>           Propose ordering for declared Files/Contracts overlap.
   record-doubt <work-id> --digest H --identity I --evidence E [--file ordering.json]
                                     Bind Doubt to its package; explain unordered overlaps.
+  gate-batch --file work-ids.json   Print complete briefs, Doubt results and the batch digest.
+  record-gate-batch --file manifest.json --digest H --identity I --evidence E
+                                    Approve every displayed member atomically, or none.
   record-gate <work-id> --file display.json --digest H --identity I --evidence E
                                     Attest that this exact brief passed its gate.
                                     Rereads again; stale revisions or digests fail.
@@ -516,6 +520,8 @@ const TAKES_DEPENDENCY_ID = [
     'replace-dependency',
 ];
 const COMMANDS = [
+    'gate-batch',
+    'record-gate-batch',
     'create',
     'create-part',
     'import',
@@ -700,6 +706,48 @@ async function run(
 
         case 'sync-structure':
             throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
+        case 'gate-batch': {
+            const ids = gateWorkIds(readJson(values, 'work IDs'));
+
+            for (const id of ids) {
+                await refreshSpecs(records, { workId: id, dir: values['data-dir'], initialize: true });
+
+                if (records.specState(id).held)
+                    throw new WorkRecordError(
+                        'invalid',
+                        `Resolve the held Spec edit for ${id} before displaying the batch.`,
+                    );
+            }
+
+            return records.gateBatch(ids);
+        }
+        case 'record-gate-batch': {
+            const manifest = readGateManifest(readJson(values, 'displayed gate manifest'));
+            const approvedDigest = need(values, 'digest');
+
+            if (manifest.digest !== approvedDigest)
+                throw new WorkRecordError(
+                    'invalid',
+                    'The approved batch digest does not match the displayed manifest.',
+                );
+
+            for (const { display } of manifest.members) {
+                await refreshSpecs(records, { workId: display.workId, dir: values['data-dir'], initialize: true });
+
+                if (records.specState(display.workId).held)
+                    throw new WorkRecordError(
+                        'invalid',
+                        `Resolve the held Spec edit for ${display.workId} before approving this batch.`,
+                    );
+            }
+
+            return records.recordGateBatch(
+                manifest,
+                approvedDigest,
+                need(values, 'identity'),
+                need(values, 'evidence'),
+            );
+        }
         case 'doubt-package':
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
 

@@ -324,15 +324,19 @@ The owner fixes factual defects and records the result. Unresolved choices or
 findings go to Pedro through the question stage. Scope changes run group
 reconciliation before another gate. Doubt reruns on changed reviewed text.
 When the brief is final, the owner displays its complete text and exact digest,
-asks Approve brief and waits on the desk. A batch displays every complete brief
-and an ID/digest manifest; one yes covers exactly that manifest.
+asks Approve brief and waits on the desk. `gate-batch --file ids.json` produces a
+manifest of every complete brief, source revision, brief/approval digests and Doubt identity/result. Display it verbatim;
+one yes covers exactly its manifest digest.
 
 The `gate ID` command returns `display`: complete brief, source revision, brief
 digest and approval digest. Save that object, display its text and approval
 digest verbatim, then record explicit approval with `record-gate ID --file
 display.json --digest H --identity I --evidence E`. The command rereads the
-ticket and rejects changed displayed text, source revision or approval digest. The batch command
-rechecks every revision and digest, then records all gates atomically. Any
+ticket and rejects changed displayed text, source revision or approval digest.
+`record-gate-batch --file manifest.json --digest H --identity I --evidence E`
+refreshes every ticket, rejects held edits, and rechecks every source revision,
+brief/approval digest and current Doubt package/result inside one transaction.
+It records all gates and Spec outboxes atomically, with a shared batch digest. Any
 mismatch records none. Changed text requires renewed review and approval.
 Successful gates move builds to `Ready`. They stay blocked if `waiting-on` is
 nonempty. No build starts merely because shaping finished, except through an
@@ -346,8 +350,7 @@ Spec edits refresh the local copy without changing Status; unverified GitHub
 edits wait for Accept or Reject. A build keeps its starting snapshot if the
 tracker changes later.
 
-Today: batch approval and recording are manual. The current ticket sync path
-mostly covers already active Specs, so edits to starting ticket text also need
+Today: the current ticket sync path mostly covers already active Specs, so edits to starting ticket text also need
 coverage before pick-up. Build-start Spec reads can replace locally reviewed
 text; the target requires a current gate for the exact snapshot launched.
 

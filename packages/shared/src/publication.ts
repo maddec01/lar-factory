@@ -5,6 +5,8 @@ import type { VocabularyDiscovery } from './vocabulary.ts';
 // Browser-safe requests and results for the publication journal. Provider adapters execute only claimed operations.
 
 export interface GateEvidence {
+    /** One explicit approval shared by every member of this displayed manifest. */
+    batchDigest?: string;
     /** Digest of the complete displayed brief and its source revision. */
     approvalDigest?: string;
     /** Affected-work package reviewed by Doubt, including sibling contracts. */

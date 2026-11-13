@@ -1,36 +1,24 @@
-Ported from mattpocock/skills, `skills/engineering/tdd/SKILL.md`. See [UPSTREAM.md](../../UPSTREAM.md) for the Ports record.
+Ported from mattpocock/skills, `skills/engineering/tdd/SKILL.md`. See [UPSTREAM.md](../../UPSTREAM.md).
 
-# Test-Driven Development
+# Test first
 
-TDD is the red → green loop. This skill is the reference that makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns, and the rules of the loop. Every section applies on every cycle: consult them before and during the loop, not after.
+Apply these rules during every red/green cycle. Use existing glossary and ADRs
+for domain vocabulary and constraints. Test behavior through public interfaces
+so tests survive internal refactors and read as capability specifications.
+Read [examples](test-first-tests.md) when choosing assertions and
+[mocking](test-first-mocking.md) when choosing substitutes.
 
-When exploring the codebase, read `GLOSSARY.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
+Choose seams from the brief, existing tests and project conventions. State what
+tests cover and leave unchecked, reusing shaping decisions. A routine test plan
+needs no approval; ask only about unresolved behavior or scope. If the interface
+itself needs design, read [Design modules](design-modules.md) as reference.
 
-## What a good test is
+Avoid tests of private methods, internal collaborators, call order/counts or
+side channels such as querying the database instead of using the interface.
+Expected values come independently from the spec, a worked example or a known
+good literal, never by repeating the implementation's calculation.
 
-Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification: "user can checkout with valid cart" tells you exactly what capability exists, and it survives refactors because it doesn't care about internal structure.
-
-See [test examples](test-first-tests.md) for examples and [mocking guidance](test-first-mocking.md) for mocking guidelines.
-
-## Seams: where tests go
-
-A **seam** is the public boundary you test at: the interface where you observe behavior without reaching inside. Tests live at seams, never against internals.
-
-Choose public boundaries from the brief, existing tests and project conventions.
-State what each test checks and what it leaves unchecked, then proceed. Reuse any
-testing decisions already agreed in shaping. Ask only when the expected behavior
-or scope remains unresolved. A routine test plan needs no separate approval.
-
-When the shape of that interface is itself in question (how deep the module is, where the seam belongs, what the interface should expose), read `design-modules.md` for the vocabulary. It is the shared source of the module, interface, depth, seam, adapter, leverage and locality terms, and it is a reference to consult, not a session to run.
-
-## Anti-patterns
-
-- **Implementation-coupled**: mocks internal collaborators, tests private methods, or verifies through a side channel (querying the database instead of using the interface). The tell: the test breaks when you refactor but behavior hasn't changed.
-- **Tautological**: the assertion recomputes the expected value the way the code does (`expect(add(a, b)).toBe(a + b)`, a snapshot derived by hand the same way, a constant asserted equal to itself), so it passes by construction and can never disagree with the code. Expected values must come from an independent source of truth: a known-good literal, a worked example, the spec.
-- **Horizontal slicing**: writing all tests first, then all implementation. Bulk tests verify _imagined_ behavior: you test the _shape_ of things rather than user-facing behavior, the tests go insensitive to real changes, and you commit to test structure before understanding the implementation. Work in **vertical slices** instead: one test → one implementation → repeat, each test a **tracer bullet** that responds to what the last cycle taught you.
-
-## Rules of the loop
-
-- **Red before green.** Write the failing test first, then only enough code to pass it. Don't anticipate future tests or add speculative features.
-- **One slice at a time.** One seam, one test, one minimal implementation per cycle.
-- **Refactoring is not part of the loop.** It belongs to the review stage (see the `code-review` skill), not the red → green implementation cycle.
+Work vertically: one seam, one failing test, enough implementation to pass,
+then the next cycle informed by what you learned. Do not write all tests before
+all implementation, anticipate future tests or add speculative features.
+Refactoring belongs to review, outside this red/green cycle.

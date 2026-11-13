@@ -35,6 +35,7 @@ import {
 } from './decision-answers.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { readFactorySettings } from './factory-settings.ts';
+import { gateRecords, type GateRecords } from './gate-records.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -383,6 +384,7 @@ export interface WorkRecords
         ValidationRecords,
         TrackerCache,
         PublicationRecords,
+        GateRecords,
         BriefReviewRecords,
         DependencyRecords,
         SpecRecords {
@@ -1252,7 +1254,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         (id) => !incomplete(find(id)).length,
         answers,
     );
-    const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, reviews);
+    const gates = gateRecords(database, (id) => fromRow(find(id)), reviews);
+    const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, gates);
 
     const records: WorkRecords = {
         ...scopeRecords(database, (id) => fromRow(find(id))),
@@ -1272,6 +1275,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...setAsideRecords(database, (id) => fromRow(find(id))),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publications,
+        ...gates,
         ...reviews,
         ...dependencyChanges,
         captureSubmission: (requestId) =>
@@ -2114,7 +2118,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     db
                         .prepare('SELECT 1 FROM brief_gates WHERE work_id = ? AND review_digest IS NOT NULL')
                         .get(workId) &&
-                    !publications.gate(workId).current
+                    !gates.gate(workId).current
                 )
                     throw invalid('The affected-work review changed; rerun Doubt and gate before Start build.');
 

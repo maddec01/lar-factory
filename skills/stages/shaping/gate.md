@@ -1,5 +1,8 @@
 # 4. Gate
 
+Input: saved brief, confirmed scope and affected work. Output: current Doubt
+and board-recorded approval, or a Needs you wait.
+
 1. Run `lar-work gate <work ID>`. Resolve held edits in `specSync`; report read
    failures and warnings. Review its refreshed `display.brief` against code.
 2. Run `lar-work build-overlap <work ID>`. Review declared Files/Contracts and
@@ -7,7 +10,7 @@
    ordering with `lar-work add-blocker`, or save reasons as
    `[ {"otherWorkId":"ID","reason":"why no ordering is needed"} ]`.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
-   gets that exact package, repository paths, [`agents/doubt.md`](agents/doubt.md)
+   gets that exact package, repository paths, [Doubt](doubt.md)
    and the orchestration guide's **Wait for delegated work**, no conversation.
    Fix findings within the approved destination; ask for new scope, decisions
    or changes to active builds. Rerun Doubt after brief or affected-work edits.
@@ -29,4 +32,5 @@
    approved briefs queue as Specs under saved settings; report pending failures.
    Builds wait for Start build, or enabled Auto-build after concept refinement.
 
-For grouped work, run [Reconcile the group](shared/reconcile-group.md) after scope changes and after board approval, including batch approval.
+After group scope changes or board approval (single/batch), resume
+[Reconcile group](shared/reconcile-group.md).

@@ -5,37 +5,34 @@ argument-hint: "<work ID, owner/repo#n or ticket URL>"
 disable-model-invocation: true
 ---
 
-You run one Lar Factory item. The user answers questions, picks prototypes,
-verifies visible changes and merges every PR.
-
-## Rules
-
-Read [prose rules](shared/prose.md) before writing. Read each step and its
-linked references only when reached. The work record is the handover: keep its
-brief, map, decisions and blockers there through `lar-work` and the shared
-scripts, per [work records](shared/issue-tracker/work-records.md). That guide
-covers issue creation, whole gated Specs and tracker edits. Move Status locally
-at each step with `status.sh`.
-Facts are yours to find; decisions are the user's. Delegated work follows
-[orchestration](shared/orchestration.md), with reports of at most 300 words,
-without files, logs or screenshots. Every delegated prompt carries that guide's
-path and the instruction to apply **Wait for delegated work**. Check completion
-by that section before acting on any role's result. Ask ordinary questions per the
-[question guide](shared/questions.md). Retro picks stay in chat.
-Past about 150k tokens, follow [handoff](shared/handoff.md).
-Leave product changes for Build and keep prototypes on their prototype branch.
-Never merge or push to the repository's default branch. Follow its commit rules and
+You shape one work record. Read [prose](shared/prose.md) once and
+[work records](shared/issue-tracker/work-records.md). Read stages only as reached.
+Leave product changes for Build; keep prototypes on their branch. Never merge
+or push the default branch. Follow project commit rules and
 [cross-repository citations](shared/cross-repo-citations.md).
 
-## Steps
+- New or resumed work: [Pick up](pick-up.md), then its selected route.
+- Fresh shaping: [Size up](size-up.md); settled questions go to
+  [Brief](brief.md), then [Gate](gate.md). Shaping ends at Ready.
+- Concept: after confirming understanding, [Concepts](concepts.md).
+- Decision: pick-up routes to [Decisions](concepts.md#decisions), then only its method.
+- Gate-only with a resolved work ID and saved brief: [Gate](gate.md) directly.
+- Build-time correction uses the same Brief and Gate, then returns to the
+  paused build's recorded phase; it starts no second build.
+- Implementation requested later: [Start build](start-build.md).
 
-1. Read [Pick up](pick-up.md) and route the item.
-2. Read [Size up](size-up.md) for a new shaping item.
-3. Read [Brief](brief.md) once its questions are settled.
-4. Read [Gate](gate.md) before marking refinement Ready. Shaping ends here.
-5. Read [Start a build later](start-build.md) only when the user asks to implement.
+When asking, read [Questions](shared/questions.md). When delegating, read
+[Orchestration](shared/orchestration.md) and pass its path and **Wait for delegated
+work** instruction; act only on complete reports. Past about 150k tokens read
+[Handoff](shared/handoff.md). For a structural publication question, read
+[Publication](shared/issue-tracker/publication.md).
 
-For concept or multi-repository structural changes, follow
-[Structural publication suspended](shared/issue-tracker/publication.md).
-Ordinary non-concept gated briefs still use
-[Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs).
+Pass exact role paths, relative to this skill; sections are instructions too:
+
+| Role | Instructions |
+| --- | --- |
+| explore | `pick-up.md#explore` |
+| diagnose | `diagnose-bug.md` |
+| research | `research-question.md` |
+| prototype | `prototype-question.md` plus `prototype-ui.md` or `prototype-logic.md` |
+| doubt | `doubt.md` |

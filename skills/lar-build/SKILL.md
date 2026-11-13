@@ -4,14 +4,12 @@ description: Deliver a passing lar brief through implementation, review and PR c
 disable-model-invocation: true
 ---
 
-Read the prose rules once, before writing: [Write prose](shared/write-prose.md),
-plus [Write agent docs](shared/write-agent-docs.md) for skill files, `AGENTS.md`
-or `CLAUDE.md`. Pass them in every subagent's brief: their paths and the
-instruction to apply them while drafting all prose, not code. Subagent files
-don't repeat them. Read each step and its references when reached. The user
-verifies visible changes and merges PRs.
-Follow the repository's rules per [project rules](project-rules.md), and
+Read [prose](shared/prose.md) once and follow
+[Builder](agents/builder.md). Read each stage only when reached; pass a role its
+own instruction path, not the builder's stages. The user verifies changes and
+merges every PR. Follow [project rules](project-rules.md) and
 [cross-repository citations](shared/cross-repo-citations.md).
 
-1. Read [Builder](agents/builder.md) and follow its build, review, approval,
-   checks and retro steps. Load each agent file only when assigning that role.
+Shaping or correcting scope uses [Pick up](pick-up.md), [Size up](size-up.md),
+[Brief](brief.md) and [Gate](gate.md) only as that route requires. A passing build
+starts at Builder and does not repeat shaping.

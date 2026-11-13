@@ -31,8 +31,8 @@ on resume. A failed phase write blocks new launches.
 Record a **blocked slice** with
 `lar-work set-needs-you "$slice" --revision N --reason "Blocked: <reason>"`;
 a re-slice planner claims it with `lar-work clear-needs-you <slice ID> --revision N --status "In progress"`.
-Merge and finish a slice with the chained command in **Merge** in
-`<lar-build>/agents/builder.md`.
+Merge and finish a slice with the chained command in **Integrate** in
+`<lar-build>/stages/implement.md`.
 Select ready slices:
 
 ```sh

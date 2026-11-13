@@ -28,12 +28,12 @@ before fixing findings. Never overrides requests. Copy each returned `escalation
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
 check. Give each finding you reject a reason. Before handing the ones you
-agree with to the fixer, note HEAD (`git rev-parse HEAD`) as this round's
+agree with to the [Fixer](../agents/fixer.md), note HEAD (`git rev-parse HEAD`) as this round's
 base, and record the round with
 `lar-work record-review-round <work ID> --revision N --file <json>`: the base,
 each reviewer's verdict (`skipped`, with its reason as `notChecked`, for one
 you skipped), what it couldn't check and its findings, each `open`, or
-`rejected` with your reason. As the fixer fixes one, mark it with
+`rejected` with your reason. As the [Fixer](../agents/fixer.md) fixes one, mark it with
 `lar-work set-disposition ... --disposition fixed`.
 
 Round 2: rerun, in parallel, only the reviewers with a fixed finding. Give
@@ -45,7 +45,7 @@ its own) and the list of its findings that were fixed; never the whole-branch
 diff. The UI reviewer also gets round 1's app report, to reuse the app it left
 running. Its findings stay within that fix diff. Reply to the ones you reject
 as in round 1, record the round the same way, and hand the ones you agree
-with to the fixer, with no further review. A finding you agree with that the fixer leaves unfixed in either round
+with to the [Fixer](../agents/fixer.md), with no further review. A finding you agree with that the [Fixer](../agents/fixer.md) leaves unfixed in either round
 is still open after round 2, and goes to the approver for the PR body. A
 reviewer's final result is its latest round's.
 

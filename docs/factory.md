@@ -466,9 +466,16 @@ agents choose the order and check contracts. The graph includes other concepts
 and standalone builds, even when the conflicting contract spans repositories.
 Commands enforce those recorded edges. Every build has its own worktree. Builds
 in the same repository can run together when no blocker prevents it.
-A blocker means merged work, not released software. Proposed `releaseSteps`
-records name coordinated releases, DNS or portal tasks, their owner, evidence
-and completion. `outcomeCheck` stores the concept's final observable check.
+A blocker means merged work, not released software. `set-release-plan ID
+--revision N --file F` saves ordered `steps` with `id`, `who` and `what`, plus
+an `outcomeCheck` describing the final observable check. These records belong
+to a linked-work or concept parent. `complete-release-step` records the named
+step's done evidence and identity after preceding steps are done.
+`record-outcome-check` records passed or failed with evidence after all steps.
+A changed plan needs fresh evidence; previous versions remain in the database.
+Parent completion reads its parts, explicit human holds, unmet Dependencies, release steps and Outcome
+check. It does not require a parent PR. A concept also needs its Fog gone.
+The group and item details show the ordered steps, evidence and what remains.
 A release prerequisite uses an explicit hold, never an assumed PR merge.
 
 `refinement` completes when the map exists, open questions are recorded resolved

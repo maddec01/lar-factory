@@ -32,7 +32,15 @@ import {
 import { ItemAgents } from '@/features/line';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
-import { buttonKind, DialogActions, ItemDialogBody, ItemDialogColumns, MainColumnSlot, WarningNote } from '@/ui/board';
+import {
+    ReleaseProgress,
+    buttonKind,
+    DialogActions,
+    ItemDialogBody,
+    ItemDialogColumns,
+    MainColumnSlot,
+    WarningNote,
+} from '@/ui/board';
 
 interface ContentProps {
     item: Item;
@@ -99,6 +107,7 @@ export function ItemDialogContent({
                     <NeedsYou item={item} data={data} />
                     <VerifyBuild item={item} />
                     {item.kind === 'concept' && <ConceptBuild item={item} />}
+                    <ReleaseProgress plan={item.releasePlan} remaining={item.completion?.reasons} />
                     {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (

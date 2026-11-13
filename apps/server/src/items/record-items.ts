@@ -203,7 +203,15 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 : record.kind === 'concept'
                   ? (ticket?.map ?? parseConceptMap(''))
                   : ticket?.map;
-        const done = isDone(record);
+        const group = record.kind === 'concept' || work.length > 0;
+        const derivedStatus = group
+            ? completionOf(record).complete
+                ? 'Done'
+                : record.status === 'Done'
+                  ? 'In progress'
+                  : record.status
+            : record.status;
+        const done = derivedStatus === 'Done' || (isDone(record) && !group);
         const sync = trackerState(record.workId);
         const spec =
             setups.find((setup) => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false
@@ -234,6 +242,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             buildPhase: record.buildPhase,
             verification: records.verification(record.workId),
             completion: completionOf(record),
+            releasePlan: records.releasePlan(record.workId),
             ...(record.kind === 'concept'
                 ? {
                       refinement: records.refinement(record.workId),
@@ -256,8 +265,8 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                         : 'Review the complete brief before it becomes Ready.',
                 },
             }),
-            status: record.status,
-            statuses: done ? [] : [record.status],
+            status: derivedStatus,
+            statuses: done ? [] : [derivedStatus],
             kind: record.kind === 'slice' ? 'issue' : record.kind,
             flow:
                 record.kind === 'concept' ||
@@ -271,7 +280,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             title: record.title || ticket?.title || '',
             url: ticket?.url ?? attachment?.url ?? null,
             repo: record.repository,
-            state: state(record),
+            state: done ? 'closed' : group ? 'open' : state(record),
             closedAs: done ? 'done' : null,
             parent: parent ? ref(parent) : (ticket?.parent ?? null),
             parentId: parent?.workId ?? null,

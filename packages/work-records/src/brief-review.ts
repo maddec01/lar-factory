@@ -4,6 +4,7 @@ import { briefScopeClaims, type BriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { DecisionAnswers } from './decision-answers.ts';
 import type { DependencyRecords } from './dependencies.ts';
+import { storedRelease } from './release-records.ts';
 import { storedScope } from './scope-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
@@ -60,6 +61,7 @@ interface ReviewSource {
     answer: ReturnType<DecisionAnswers['decisionAnswer']> | null;
     named: ReturnType<typeof namedWork>;
     confirmedScope: BriefScope | null;
+    releasePlan: import('@lar-factory/shared').ReleasePlan | null;
     blockers: string[];
     dependencies: ReturnType<DependencyRecords['dependencies']>;
 }
@@ -68,6 +70,7 @@ interface DoubtPackage {
     brief: string;
     destination: string;
     releaseConstraints: string;
+    releasePlan: import('@lar-factory/shared').ReleasePlan | null;
     concept: ReviewSource | null;
     decisions: ReviewSource[];
     siblings: ReviewSource[];
@@ -115,6 +118,7 @@ export function briefReviewRecords(
             parentId: record.parentId,
             bodies: content,
             answer,
+            releasePlan: storedRelease(database, record.workId),
             confirmedScope: storedScope(database, record.workId)?.scope ?? null,
             named: namedWork(content.find((body) => body.body === 'brief')?.markdown ?? ''),
             blockers: edges.all(record.workId).map((row) => String(row.blocker_id)),
@@ -204,6 +208,7 @@ export function briefReviewRecords(
             brief: brief!,
             destination: section('Destination'),
             releaseConstraints: section('Release constraints'),
+            releasePlan: storedRelease(database, root.workId),
             concept: root.kind === 'concept' ? source(root) : null,
             decisions: related.filter((item) => item.kind === 'decision').map(source),
             siblings: related.filter((item) => !['concept', 'decision'].includes(item.kind)).map(source),
@@ -224,9 +229,16 @@ export function briefReviewRecords(
                     ),
                 ),
             );
-        const sourceSpec = (item: ReviewSource) => ({ ...item, dependencies: dependencySpecs(item.dependencies) });
+        const releaseSpec = (plan: import('@lar-factory/shared').ReleasePlan | null) =>
+            plan && { steps: plan.steps.map(({ done: _, ...step }) => step), outcomeCheck: plan.outcomeCheck.what };
+        const sourceSpec = (item: ReviewSource) => ({
+            ...item,
+            releasePlan: releaseSpec(item.releasePlan),
+            dependencies: dependencySpecs(item.dependencies),
+        });
         const reviewed = {
             ...content,
+            releasePlan: releaseSpec(content.releasePlan),
             concept: content.concept && sourceSpec(content.concept),
             source: sourceSpec(content.source),
             decisions: content.decisions.map(sourceSpec),

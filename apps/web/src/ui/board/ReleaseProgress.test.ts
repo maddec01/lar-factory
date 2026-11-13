@@ -60,3 +60,37 @@ test('shows ordered release ownership, done evidence, failed Outcome and remaini
     expect(root.querySelectorAll('ol[aria-label="Release steps"] li')).toHaveLength(2);
     expect(root.querySelector('[aria-label="Copy full release evidence"]')).not.toBeNull();
 });
+
+test('ships-with links and delivery holds identify the affected parts by name', () => {
+    const server = '11111111-1111-4111-8111-111111111111';
+    const app = '22222222-2222-4222-8222-222222222222';
+    const plan: ReleasePlan = {
+        steps: [
+            {
+                id: 'together',
+                who: 'Pedro',
+                what: 'Ship the invitation link contract',
+                shipsWith: [server, app],
+                done: null,
+            },
+        ],
+        outcomeCheck: { what: 'Invitations open the app.', result: 'pending', evidence: null },
+    };
+    const names = (id: string) => (id === server ? 'Update server links' : 'Read invitation links in the app');
+    const root = document.createElement('div');
+
+    root.innerHTML = renderToStaticMarkup(
+        createElement(ReleaseProgress, {
+            plan,
+            name: names,
+            remaining: ["Its Fog isn't gone.", `Its build ${app} isn't Done.`],
+        }),
+    );
+    expect(root.textContent).toContain('Ships with: Update server links + Read invitation links in the app');
+    expect(root.textContent).toContain('Read invitation links in the app is not done.');
+    expect(root.textContent).toContain('Open questions remain.');
+    expect(root.textContent).not.toContain('Fog');
+    expect(root.textContent).toContain('Pedro · Pending');
+    expect(root.textContent).not.toContain(app);
+    expect(root.textContent).not.toContain(server);
+});

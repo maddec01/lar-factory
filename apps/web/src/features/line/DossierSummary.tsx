@@ -128,6 +128,14 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         n ? [{ words: `${n} ${word}`, tone, icon }] : [];
 
     return [
+        ...(parent.reconciliation?.items.length
+            ? [
+                  {
+                      words: `Out of date: ${plural(parent.reconciliation.items.length, 'item')}`,
+                      tone: 'warning' as const,
+                  },
+              ]
+            : []),
         ...count(
             m.needsYou.length,
             m.needsYou.length === 1 ? 'needs you' : 'need you',

@@ -90,7 +90,11 @@ export function MapPartNode({
                 data-map-head
             >
                 {head}
-                {action && <span className="pointer-events-auto ml-auto shrink-0">{action}</span>}
+                {action && (
+                    <span className="pointer-events-auto ml-auto flex min-w-0 flex-1 justify-end [&_button]:max-w-full">
+                        {action}
+                    </span>
+                )}
             </span>
             <span className="pointer-events-none relative line-clamp-2 shrink-0 text-sm leading-5 font-medium wrap-anywhere">
                 {name}

@@ -228,6 +228,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
+            ...(!record.parentId && (record.kind === 'concept' || work.length > 0)
+                ? {
+                      reconciliation: records.reconciliation(record.workId),
+                  }
+                : {}),
             content: 'ticket',
             labels: [],
             linkedPrs: linkedPrs(records, record, ticket),

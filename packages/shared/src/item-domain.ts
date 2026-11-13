@@ -300,6 +300,7 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 export interface Item {
     releasePlan?: import('./release-plan.ts').ReleasePlan | null;
     retro?: import('./retro.ts').Retro | null;
+    reconciliation?: import('./group-reconciliation.ts').ReconcileReport;
     verification?: import('./verification.ts').Verification;
     /** Local completion facts, independent of the board Status and absent on provider-only items. Never published. */
     completion?: { complete: boolean; reasons: string[] };

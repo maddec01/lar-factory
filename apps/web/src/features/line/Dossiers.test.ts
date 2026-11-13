@@ -931,3 +931,49 @@ test('the live map follows recorded parts, blockers and gate changes while prose
     await receive(conceptOf([{ ...first, status: 'Ready', passingBrief: true }], change));
     expect(map.querySelector('[data-map-part="W_next"]')).toBeNull();
 });
+
+test('a group names its out-of-date checklist and ships-with release steps in map and list views', async () => {
+    const members = sample.items.filter((i) => i.parentId === C200).slice(0, 2);
+    const data = withItem(C200, {
+        reconciliation: {
+            groupId: C200,
+            digest: 'current',
+            completed: [],
+            items: [
+                {
+                    key: 'doubt:consumer',
+                    digest: 'changed',
+                    workId: members[0]!.id,
+                    kind: 'brief',
+                    summary: 'Consumer: rerun Doubt after /lookup was removed.',
+                    changes: ['contract'],
+                    requiresFix: true,
+                },
+            ],
+        },
+        releasePlan: {
+            steps: [
+                {
+                    id: 'invite',
+                    who: 'Pedro',
+                    what: 'Release invitation links together',
+                    shipsWith: members.map((m) => m.id),
+                    done: null,
+                },
+            ],
+            outcomeCheck: { what: 'Invitation links work.', result: 'pending', evidence: null },
+        },
+    });
+
+    await mountOpen(data);
+    expect(chips()).toContain('Out of date: 1 item');
+    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
+        '1 brief to re-check: answers or sibling contracts changed',
+    );
+    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Ships with:');
+    expect(text(dossier().querySelector('[data-release-steps]'))).toContain(members[0]!.title);
+    await press(dossier().querySelector('[data-reconciliation] summary')!);
+    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(members[0]!.title);
+    expect(text(dossier().querySelector('[data-reconciliation]'))).not.toContain('rerun Doubt');
+    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Pedro');
+});

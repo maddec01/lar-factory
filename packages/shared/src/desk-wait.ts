@@ -1,10 +1,12 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
+import { questionOwnerConcept, questionThreadAction } from './question-thread.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
-    const question = unavailable ? undefined : (openQuestionThread(item) ?? inheritedQuestion(item, all));
+    const concept = unavailable ? undefined : questionOwnerConcept(item, all);
+    const question = unavailable ? undefined : (openQuestionThread(item) ?? (concept && openQuestionThread(concept)));
     const request = question?.pendingRequest;
     const stopped = !unavailable && stoppedRunThread(item);
 
@@ -16,16 +18,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
                     : request?.kind === 'tool-approval'
                       ? 'Tool approval'
                       : 'Question',
-            action: {
-                kind: 'thread' as const,
-                label:
-                    request?.kind === 'brief-approval'
-                        ? 'Approve brief'
-                        : request?.kind === 'tool-approval'
-                          ? 'Resolve approval'
-                          : 'Answer in T3',
-                threadId: request?.threadId ?? question.id,
-            },
+            action: questionThreadAction(question),
         };
 
     if (stopped)
@@ -56,32 +49,6 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
                 : 'Needs you',
         action: nextAction(item),
     };
-}
-
-/** An unstarted part's saved question can be held in its nearest concept. */
-function inheritedQuestion(item: Item, all: readonly Item[]) {
-    if (item.status !== 'Needs you' || item.threads === 'unavailable' || item.threads?.length) return undefined;
-
-    const seen = new Set([item.id]);
-    let parentId = item.parentId;
-
-    while (parentId && !seen.has(parentId)) {
-        seen.add(parentId);
-
-        const parent = all.find((candidate) => candidate.id === parentId);
-
-        if (!parent) return undefined;
-
-        if (parent.kind === 'concept') {
-            if (!Array.isArray(parent.threads) || parent.threads.some((thread) => thread.observedAt)) return undefined;
-
-            return openQuestionThread(parent);
-        }
-
-        parentId = parent.parentId;
-    }
-
-    return undefined;
 }
 
 /** A gate's full brief belongs in the Brief section and T3, not a flattened wait notice. */

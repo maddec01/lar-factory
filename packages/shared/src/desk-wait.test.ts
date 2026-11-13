@@ -3,6 +3,7 @@ import { expect, test } from 'vite-plus/test';
 import sample from '../test/sample.json' with { type: 'json' };
 import { placementOf } from './board-view.ts';
 import { deskWait, questionWaitReason } from './desk-wait.ts';
+import { nextAction } from './item-next-action.ts';
 import type { Item, ItemThread } from './model.ts';
 
 const stopped: ItemThread = { id: 'build', title: 'Build', purpose: 'build', state: 'stopped', updated: '2026-11-13' };
@@ -28,6 +29,7 @@ test.each([
     });
 
     expect(deskWait(work)).toEqual({ label, action: { kind: 'thread', label: action, threadId: 'owner' } });
+    expect(nextAction(work)).toEqual({ kind: 'thread', label: action, threadId: 'owner' });
 });
 
 test.each([

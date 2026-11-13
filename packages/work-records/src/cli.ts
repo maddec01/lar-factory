@@ -20,6 +20,7 @@ import { exportMarkdown } from './export.ts';
 import { gateWorkIds } from './gate-batch.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { requireHumanAction } from './human-action.ts';
+import { releaseCommand } from './release-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
 import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
@@ -68,6 +69,16 @@ Confirmed scope, local only
                                     linked or concept with its reason. Missing fields refuse.
   brief-scope-check <work-id>       Compare those sections; report missing/extra claims, exit 1
                                     on mismatch or absent confirmation. Other prose needs Doubt.
+
+Parent release records, local only
+  release-plan <work-id>           Read ordered release steps and the Outcome check.
+  set-release-plan <work-id> --revision N --file F
+                                    Save {steps:[{id,who,what}],outcomeCheck:"observable check"}.
+                                    A changed plan needs fresh evidence; old versions remain.
+  complete-release-step <work-id> --revision N --step ID --identity person --evidence proof
+                                    Record done evidence after preceding steps are done.
+  record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof
+                                    Record the final observable check after release steps.
 
 Validation records, local only and requiring no revision
   run-check <work-id> --role R [--live] [--reason X] -- <command>
@@ -1096,6 +1107,9 @@ async function main(args: string[]): Promise<number> {
 
     if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
         return verificationCommand(args[0]!, args.slice(1));
+
+    if (['release-plan', 'set-release-plan', 'complete-release-step', 'record-outcome-check'].includes(args[0]!))
+        return releaseCommand(args[0]!, args.slice(1));
 
     if (['confirm-scope', 'confirmed-scope', 'brief-scope-check', 'choose-structure'].includes(args[0]!))
         return scopeCommand(args[0]!, args.slice(1));

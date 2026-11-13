@@ -4,6 +4,7 @@
 
 import {
     readTicketSpec,
+    releaseHolds,
     parseDecisionMethod,
     type Item,
     stripTrackerStructure,
@@ -39,6 +40,7 @@ import { gateRecords, type GateRecords } from './gate-records.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
+import { releaseRecords, storedRelease, type ReleaseRecords } from './release-records.ts';
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
@@ -375,6 +377,7 @@ export interface WorkRecords
     extends
         ScopeRecords,
         ConceptRunRecords,
+        ReleaseRecords,
         RetitleRecords,
         DecisionAnswers,
         MergeBuildRecords,
@@ -564,7 +567,7 @@ export interface WorkRecords
     /** Whether the work is complete, from local facts only. A build or other built record completes once its recorded PR
      * is observed merged, a slice once it is finished, a decision once its answer and domain drafts are recorded and its
      * concept's map was written after them, and a concept once its Fog is gone and every decision and build it owns,
-     * except set-aside ones, is complete. A build stays incomplete while an unmet Dependency holds it. A Status, a ticket
+     * except set-aside ones, is complete. Linked parents complete from their parts. Both parents also require their recorded release steps and Outcome check. A build stays incomplete while an unmet Dependency holds it. A Status, a ticket
      * closing or a thread ending never completes work. */
     completion(workId: string): Completion;
     refinement(workId: string): Completion;
@@ -1149,14 +1152,25 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 : [`Its concept ${row.parent_id}'s map isn't updated since its answer and domain drafts.`];
         }
 
-        if (row.kind === 'concept') {
-            const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
-            const children = childRows.all(row.work_id) as unknown as Row[];
+        const children = childRows.all(row.work_id) as unknown as Row[];
+        const parts = children.filter((child) => child.kind !== 'slice');
+
+        if (row.kind === 'concept' || parts.length) {
+            const reasons = row.kind !== 'concept' || row.fog_gone_at ? [] : ["Its Fog isn't gone."];
+
+            if (row.needs_you) reasons.push(`Needs you: ${row.needs_you}`);
+
+            reasons.push(...releaseHolds(storedRelease(database, row.work_id)));
+            reasons.push(
+                ...unmet(row.work_id).map(
+                    ({ dependencyId, owner }) => `Its Dependency ${dependencyId} on ${owner} isn't met.`,
+                ),
+            );
 
             if (!row.finished_at && !children.some((child) => child.kind === 'build' && !child.set_aside_at))
                 reasons.push('No delivery planned.');
 
-            for (const child of children) {
+            for (const child of parts) {
                 if (child.set_aside_at || !incomplete(child).length) continue;
 
                 reasons.push(
@@ -1258,6 +1272,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, gates);
 
     const records: WorkRecords = {
+        ...releaseRecords(database, (id) => fromRow(find(id))),
         ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
         ...conceptRunRecords(database, () => records),

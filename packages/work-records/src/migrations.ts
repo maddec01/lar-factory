@@ -555,4 +555,12 @@ export const MIGRATIONS: readonly Migration[] = [
           SELECT RAISE(ABORT, 'Verify results are immutable');
         END;
     `),
+    (db) =>
+        db.exec(`
+        CREATE TABLE release_plans(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL, content TEXT NOT NULL, PRIMARY KEY(work_id,revision)) STRICT;
+        CREATE TRIGGER journal_release_plan AFTER INSERT ON release_plans BEGIN
+          INSERT INTO write_dirty VALUES('work',NEW.work_id,'releasePlan') ON CONFLICT DO NOTHING;
+        END;
+    `),
 ];

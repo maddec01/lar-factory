@@ -222,3 +222,4 @@ export {
 } from './FactorySettingsLists';
 
 export { ConceptBuildRun } from './ConceptBuildRun';
+export { ReleaseProgress } from './ReleaseProgress';

@@ -41,6 +41,8 @@ time you record it, run `lar-work kind-disagreement <work ID>` and settle its
 
 When the read fails, tell the user the ticket went unchecked and continue.
 
+For linked work and concepts, record release or activation on the parent with `lar-work set-release-plan` and record its steps and Outcome check evidence through the release commands in `lar-work --help`; never create an activation task.
+
 Anything the user adds or corrects is another open question. Then:
 
 - **Bug**: first a **Diagnose subagent** with [diagnosing-bugs](diagnose-bug.md) returns the

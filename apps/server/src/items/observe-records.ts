@@ -301,12 +301,15 @@ export async function observeRecords(
 }
 
 /**
- * Finishes each active decision and concept of `repos` that lar-work completion says is complete, making it Done. A
+ * Finishes each active decision or group parent of `repos` whose local completion facts are complete. A
  * build finishes only when its PR is observed merged, so its completion alone changes nothing here.
  */
 export function finishCompleted(records: WorkRecords, repos: readonly string[]): void {
     for (const record of records.list({})) {
-        if (record.setAside || record.finishedAt || (record.kind !== 'decision' && record.kind !== 'concept')) continue;
+        const group =
+            record.kind === 'concept' || records.children(record.workId).some((child) => child.kind !== 'slice');
+
+        if (record.setAside || record.finishedAt || (record.kind !== 'decision' && !group)) continue;
 
         if (!repos.some((repo) => sameRepo(repo, record.repository)) || !records.completion(record.workId).complete)
             continue;

@@ -778,3 +778,51 @@ test('an agreement already kept writes nothing more', async () => {
     await observeRecords(records, [REPO], { ...reads, agreedKind: () => 'bug' });
     assert.deepEqual(records.read(workId).kindAnswer, answered.kindAnswer);
 });
+
+test('a linked parent finishes from its parts and release evidence without a parent PR', async () => {
+    const records = await open();
+    const parent = records.create({
+        title: 'Linked delivery',
+        repository: REPO,
+        kind: 'feature',
+        status: 'In progress',
+    });
+    const revision = () => records.read(parent.workId).revision;
+    let child = records.createPart({
+        parentId: parent.workId,
+        parentRevision: revision(),
+        repository: REPO,
+        kind: 'build',
+        title: 'One repository',
+        body: 'Approved scope.',
+        blockerIds: [],
+    });
+
+    child = records.setPullRequest(child.workId, child.revision, `${REPO}#44`);
+    records.setReleasePlan(parent.workId, revision(), {
+        steps: [{ id: 'activate', who: 'Pedro', what: 'activate the bundle' }],
+        outcomeCheck: 'Check the delivered outcome.',
+    });
+    records.observe(child.workId, child.revision, { of: 'pr', state: 'merged' });
+
+    const item = () => recordItems(records, [], [REPO]).find((candidate) => candidate.id === parent.workId)!;
+
+    finishCompleted(records, [REPO]);
+    assert.equal(item().status, 'In progress');
+    assert.ok(item().releasePlan);
+    assert.ok(item().completion?.reasons.some((reason) => reason.includes('activate')));
+    records.completeReleaseStep(parent.workId, revision(), 'activate', 'Pedro', 'Manifest receipt.');
+    records.recordOutcomeCheck(parent.workId, revision(), 'passed', 'Pedro', 'Actual post-activation checks passed.');
+    records.setNeedsYou(parent.workId, revision(), 'Review the delivery evidence.');
+    assert.equal(
+        item().status,
+        'In progress',
+        'an explicit human hold remains open after child and release completion',
+    );
+    records.clearNeedsYou(parent.workId, revision());
+    assert.equal(item().status, 'Done', 'the projection derives Done immediately');
+    finishCompleted(records, [REPO]);
+    assert.equal(records.read(parent.workId).status, 'Done');
+    assert.ok(records.read(parent.workId).finishedAt);
+    assert.equal(records.read(parent.workId).pullRequest, null);
+});

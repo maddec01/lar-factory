@@ -27,7 +27,14 @@ import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
 import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle, RowGlyph } from '@/ui/board';
+import {
+    ReleaseProgress,
+    DossierBody as Body,
+    DossierList,
+    DossierRow as Row,
+    DossierToggle,
+    RowGlyph,
+} from '@/ui/board';
 
 /** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
 const ABOVE_MAP = ['you'];
@@ -55,6 +62,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                 </Text>
             )}
             <StructureSync item={unsynced} />
+            <ReleaseProgress plan={parent.releasePlan} remaining={parent.completion?.reasons} />
             {view === 'map' ? (
                 <>
                     <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />

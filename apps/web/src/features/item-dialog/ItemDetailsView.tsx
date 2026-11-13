@@ -105,7 +105,7 @@ export function ItemMeta({
                     <ConceptState state={item.refinement} />
                 </Fact>
             )}
-            {item.kind === 'concept' && item.completion && (
+            {(item.kind === 'concept' || (item.flow === 'linked' && item.subIssues.total > 0)) && item.completion && (
                 <Fact label="Delivery">
                     <ConceptState state={item.completion} item={item} />
                 </Fact>

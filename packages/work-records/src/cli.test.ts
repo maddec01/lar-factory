@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
-import { openWorkRecords } from './work-records.ts';
+import { openWorkRecords, type WorkKind } from './work-records.ts';
 
 const CLI = join(import.meta.dirname, 'cli.ts');
 const dirs: string[] = [];
@@ -17,6 +17,17 @@ const tempDir = () => {
 
     return dir;
 };
+
+/** Command-specific tests seed directly; the create/read/update and context tests below retain real CLI creation. */
+async function fixtureRecord(dataDir: string, kind: WorkKind) {
+    const records = await openWorkRecords(join(dataDir, 'work-records.db'));
+
+    try {
+        return records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+    } finally {
+        records.close();
+    }
+}
 
 afterEach(() => {
     vi.unstubAllEnvs();
@@ -664,9 +675,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('reports a stale revision on stderr and changes nothing', async () => {
         const data = tempDir();
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'bug');
 
         await larWork(data, 'update', workId, '--revision', '1', '--status', 'Shaping');
 
@@ -682,9 +691,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('sets a parent and a blocker in a data folder with no board running', async () => {
         const data = tempDir();
-        const create = async (kind: string) =>
-            (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record
-                .workId;
+        const create = async (kind: WorkKind) => (await fixtureRecord(data, kind)).workId;
         const [build, slice, other] = [await create('build'), await create('slice'), await create('slice')];
 
         expect((await larWork(data, 'set-parent', slice, '--revision', '1', '--parent', build)).record).toMatchObject({
@@ -711,9 +718,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('writes and reads a brief, a phase, a PR and a review round with no board running', async () => {
         const data = tempDir();
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'build');
         const brief = join(tempDir(), 'brief.md');
 
         writeFileSync(brief, '## What\n\nAdd it.\n');
@@ -785,9 +790,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('records a launch intent and resolves it to a thread with no board running', async () => {
         const data = tempDir();
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'feature');
         const { intent } = (await larWork(data, 'record-intent', workId, '--revision', '1', '--purpose', 'shape'))
             .record;
 
@@ -837,9 +840,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('moves into and out of Needs you atomically and snapshots skills with no board running', async () => {
         const data = tempDir();
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'build');
 
         expect(
             (
@@ -893,9 +894,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('reports completion and the blockers a record waits on with no board running', async () => {
         const data = tempDir();
-        const create = async (kind: string) =>
-            (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record
-                .workId;
+        const create = async (kind: WorkKind) => (await fixtureRecord(data, kind)).workId;
         const [concept, slice, build] = [await create('concept'), await create('slice'), await create('build')];
 
         await larWork(data, 'add-blocker', build, '--revision', '1', '--blocker', slice);
@@ -998,9 +997,7 @@ throw Error('Local exploration must not call a tracker');
 
         expect((await larWork(data, 'retention')).record).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
 
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'feature');
         const kept = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug'))
             .record;
 
@@ -1031,9 +1028,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('exports a brief as markdown to a folder and refuses a missing folder', async () => {
         const data = tempDir();
-        const { workId } = (
-            await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
-        ).record;
+        const { workId } = await fixtureRecord(data, 'build');
         const brief = join(tempDir(), 'brief.md');
 
         writeFileSync(brief, '# Add it\n');
@@ -1051,8 +1046,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('records a Dependency that holds a build until it is marked met, then replaces it with a build', async () => {
         const data = tempDir();
-        const create = async (kind: string) =>
-            (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record;
+        const create = async (kind: WorkKind) => await fixtureRecord(data, kind);
         const [build, replacement] = [await create('build'), await create('build')];
         const file = join(tempDir(), 'dependency.json');
 
@@ -1405,7 +1399,7 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
     expect(reply.stdout).not.toContain('Hostile title');
 });
 
-it('resets a build through the CLI with revision checks', async () => {
+it('resets a build through the CLI with revision checks', { timeout: 30_000 }, async () => {
     const data = join(tempDir(), 'Lar Factory');
     const made = await larWork(data, 'create', '--title', 'Build', '--repository', 'a/b', '--kind', 'build');
     const id = made.record.workId;

@@ -328,6 +328,10 @@ it('requires a fresh decision when delivery or the approved brief changed', asyn
 
 it('keeps displayed approval through the Needs you round trip and unrelated observations', async () => {
     const { records, other, record, agent } = await fixture();
+    const input = records.doubtPackage(record.workId);
+
+    records.recordDoubt(record.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+
     const display = agent.displayGate(record.workId);
     const waiting = agent.waitForUser(record.workId, record.revision, 'Approve this exact brief');
     const observed = other.observe(record.workId, waiting.revision, { of: 'pr', state: 'open' });
@@ -351,4 +355,23 @@ it('rejects a displayed approval after a brief edit and restoration', async () =
     other.setBody(record.workId, changed.revision, 'brief', display.brief);
     expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/body.brief/);
     expect(records.gate(record.workId).evidence).toEqual([]);
+});
+
+it('refuses retried displayed approval after sibling contracts change until Doubt runs again', async () => {
+    const { records, other, record, agent } = await fixture();
+    const sibling = records.create({ title: 'Sibling', repository: record.repository, kind: 'build' });
+    const siblingBrief = records.setBody(sibling.workId, sibling.revision, 'brief', 'Files: `src/shared.ts`');
+    const work = records.setBody(record.workId, record.revision, 'brief', 'Files: `src/shared.ts`');
+    const input = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Compatible changes.', [
+        { otherWorkId: sibling.workId, reason: 'Independent changes within the file.' },
+    ]);
+
+    const display = agent.displayGate(work.workId);
+
+    other.observe(work.workId, work.revision, { of: 'pr', state: 'open' });
+    other.setBody(sibling.workId, siblingBrief.revision, 'brief', 'Files: `src/shared.ts`\nContracts: `new-contract`');
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/Doubt/);
+    expect(records.gate(work.workId).evidence).toEqual([]);
 });

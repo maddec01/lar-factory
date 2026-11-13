@@ -27,7 +27,9 @@ routine work.
 - <each assumption the user confirmed, and each decision with its gist>
 
 ## Notes for the builder
-<essential constraints or prototype evidence, only when needed>
+<essential constraints or prototype evidence>
+Files: `<repo-relative path>`, ... (or none)
+Contracts: `<shared contract name>`, ... (or none)
 
 ## Domain docs
 - Glossary: <each term to add or change, as a GLOSSARY-FORMAT.md entry>, or "none"

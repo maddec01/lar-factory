@@ -1,7 +1,7 @@
 import { applyAgentWrite } from './agent-apply.ts';
 import { agentConceptWrites } from './agent-concept-writes.ts';
 import { makeGateDisplay, verifyGateDisplay } from './gate-display.ts';
-import type { WorkRecords } from './work-records.ts';
+import { WorkRecordError, type WorkRecords } from './work-records.ts';
 
 const active = ['kind', 'setAsideAt', 'finishedAt'];
 const build = [...active, 'buildBranch'];
@@ -146,7 +146,16 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                     makeGateDisplay(display.workId, display.sourceRevision, current.brief),
                 );
 
+                const review = records.currentDoubt(display.workId);
+
+                if (!review)
+                    throw new WorkRecordError(
+                        'invalid',
+                        'Run Doubt on the current doubt-package and record-doubt before approval.',
+                    );
+
                 return records.recordGate(display.workId, r, {
+                    reviewDigest: review.packageDigest,
                     briefDigest: display.briefDigest,
                     approvalDigest: approved,
                     approvedBy: identity,

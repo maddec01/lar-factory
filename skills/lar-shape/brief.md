@@ -34,7 +34,9 @@ With it ON, use the entries and ADR drafts in the template below.
 - <each assumption the user confirmed, and each decision with its gist>
 
 ## Notes for the builder
-<essential constraints or a chosen prototype branch; omit when none>
+<essential constraints or a chosen prototype branch>
+Files: `<repo-relative path>`, ... (or none)
+Contracts: `<shared contract name>`, ... (or none)
 
 ## Domain docs
 - Glossary: <each term to add or change, as a GLOSSARY-FORMAT.md entry>, or "none"

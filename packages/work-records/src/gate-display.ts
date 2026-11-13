@@ -10,6 +10,7 @@ export interface GateDisplay {
     approvalDigest: string;
 }
 export interface GateApproval {
+    reviewDigest?: string;
     briefDigest: string;
     approvedBy: string;
     evidence: string;

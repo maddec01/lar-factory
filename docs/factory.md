@@ -307,10 +307,18 @@ the brief and revision. Read failure preserves the local copy with a warning.
 It runs `build-overlap`, checks shared contracts and records blockers for builds
 that change the same files or conflicting contracts. This check includes work
 outside the concept and standalone Ready tickets.
-Doubt gets the exact brief, repository evidence and an affected-work package:
+`doubt-package ID` supplies the exact brief and an affected-work package:
 destination, current decision answers, sibling and overlapping briefs, blockers,
 Dependencies and release constraints. It receives no shaping conversation. It
 challenges claims against code, acceptance criteria, contracts and ordering.
+`Files:` and `Contracts:` lines in briefs declare exact backticked names.
+`build-overlap ID` proposes edges for matching files in one repository or matching
+contracts across repositories. It recognizes existing transitive ordering and
+leaves semantic judgment to Doubt. The owner records blockers, or explains each
+unordered overlap with `record-doubt ID --digest H --identity I --evidence E
+[--file ordering.json]`. That command binds a clean review to the current package.
+Gating rechecks it atomically; sibling, answer, map, blocker or Dependency changes
+invalidate the review and affected gates. Execution Status changes do not.
 
 The owner fixes factual defects and records the result. Unresolved choices or
 findings go to Pedro through the question stage. Scope changes run group
@@ -338,8 +346,7 @@ Spec edits refresh the local copy without changing Status; unverified GitHub
 edits wait for Accept or Reject. A build keeps its starting snapshot if the
 tracker changes later.
 
-Today: Doubt receives one brief and one repository, with no affected-work
-package. Batch approval and recording are manual. The current ticket sync path
+Today: batch approval and recording are manual. The current ticket sync path
 mostly covers already active Specs, so edits to starting ticket text also need
 coverage before pick-up. Build-start Spec reads can replace locally reviewed
 text; the target requires a current gate for the exact snapshot launched.

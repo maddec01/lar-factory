@@ -16,6 +16,7 @@ import type {
 } from '@lar-factory/shared';
 import { createHash, randomUUID } from 'node:crypto';
 
+import type { BriefReviewRecords } from './brief-review.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval } from './gate-display.ts';
 import { queueTicketSpec } from './spec-records.ts';
@@ -185,6 +186,7 @@ export function publicationRecords(
     database: Database,
     readRecord: (workId: string) => WorkRecord,
     recordDependencyTicket: (dependencyId: string, ticket: string) => void,
+    reviews?: BriefReviewRecords,
 ): PublicationRecords {
     const { db } = database;
     const find = (workId: string) => readRecord(workId);
@@ -223,13 +225,19 @@ export function publicationRecords(
                 recordedAt: String(row.recorded_at),
                 source: row.source as GateEvidence['source'],
                 ...(row.approval_digest ? { approvalDigest: String(row.approval_digest) } : {}),
+                ...(row.review_digest
+                    ? { reviewDigest: String(row.review_digest), doubtReviewId: String(row.doubt_review_id) }
+                    : {}),
             }));
         const passed = db
             .prepare(
-                "SELECT gate_id FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1",
+                "SELECT gate_id, review_digest FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1",
             )
             .get(workId, briefDigest);
-        const passing = evidence.find((item) => item.gateId === passed?.gate_id) ?? null;
+        const passing =
+            passed?.review_digest && reviews?.currentDoubt(workId)?.packageDigest !== passed.review_digest
+                ? null
+                : (evidence.find((item) => item.gateId === passed?.gate_id) ?? null);
 
         return { briefDigest, current: passing !== null, passing, evidence };
     };
@@ -308,10 +316,11 @@ export function publicationRecords(
 
         return { eligible: !reasons.length, reasons };
     };
+    const reviewBound = `EXISTS(SELECT 1 FROM brief_gates g WHERE g.work_id = bodies.work_id AND g.review_digest IS NOT NULL AND g.invalidated = 0) AS review_bound`;
     const bodyReadiness = (row: Record<string, unknown>): BodyReadiness => ({
         written: Number(row.written),
         hasContent: Boolean(row.has_content),
-        hasPassingGate: Boolean(row.has_passing_gate),
+        hasPassingGate: Boolean(row.has_passing_gate) && (!row.review_bound || gate(String(row.work_id)).current),
     });
     const readiness = (workId: string): PublicationReadiness => {
         const root = find(workId);
@@ -320,7 +329,9 @@ export function publicationRecords(
         return {
             ...eligibility(root, records, (id, name) => {
                 const row = db
-                    .prepare('SELECT written, has_content, has_passing_gate FROM bodies WHERE work_id = ? AND body = ?')
+                    .prepare(
+                        `SELECT work_id, written, has_content, has_passing_gate, ${reviewBound} FROM bodies WHERE work_id = ? AND body = ?`,
+                    )
                     .get(id, name);
 
                 return row ? bodyReadiness(row) : undefined;
@@ -1033,7 +1044,7 @@ export function publicationRecords(
     const saveGate = (workId: string, revision: number, value: GateApproval): GateEvidence => {
         const record = expected(workId, revision);
 
-        keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest']);
+        keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest', 'reviewDigest']);
 
         if (['concept', 'decision', 'slice'].includes(record.kind))
             invalid('Only a publishable brief can pass a gate.');
@@ -1043,7 +1054,13 @@ export function publicationRecords(
         if (!current.briefDigest || current.briefDigest !== value.briefDigest)
             invalid('The brief changed or is missing; inspect it before recording its gate.');
 
+        const review = reviews?.currentDoubt(workId);
+
+        if (value.reviewDigest !== undefined && value.reviewDigest !== review?.packageDigest)
+            invalid('The affected-work package changed; rerun Doubt before approval.');
+
         const item: GateEvidence = {
+            ...(review ? { reviewDigest: review.packageDigest, doubtReviewId: review.reviewId } : {}),
             ...(value.approvalDigest ? { approvalDigest: value.approvalDigest } : {}),
             gateId: randomUUID(),
             workId,
@@ -1055,7 +1072,7 @@ export function publicationRecords(
         };
 
         db.prepare(
-            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest, review_digest, doubt_review_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         ).run(
             item.gateId,
             workId,
@@ -1065,6 +1082,8 @@ export function publicationRecords(
             item.evidence,
             item.recordedAt,
             item.approvalDigest ?? null,
+            item.reviewDigest ?? null,
+            item.doubtReviewId ?? null,
         );
         db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
 
@@ -1089,11 +1108,16 @@ export function publicationRecords(
             database.write(() => {
                 verifyGateDisplay(display, approvalDigest, displayGate(display.workId));
 
+                const review = reviews?.currentDoubt(display.workId);
+
+                if (!review) invalid('Run Doubt on the current doubt-package and record-doubt before approval.');
+
                 return saveGate(display.workId, display.sourceRevision, {
                     briefDigest: display.briefDigest,
                     approvedBy,
                     evidence,
                     approvalDigest,
+                    reviewDigest: review!.packageDigest,
                 });
             }),
         publicationReceipt: (workId) =>
@@ -1160,7 +1184,9 @@ export function publicationRecords(
                     .all();
                 const bodies = new Map(
                     db
-                        .prepare('SELECT work_id, body, written, has_content, has_passing_gate FROM bodies')
+                        .prepare(
+                            `SELECT work_id, body, written, has_content, has_passing_gate, ${reviewBound} FROM bodies`,
+                        )
                         .all()
                         .map((row) => [`${String(row.work_id)}:${String(row.body)}`, bodyReadiness(row)]),
                 );

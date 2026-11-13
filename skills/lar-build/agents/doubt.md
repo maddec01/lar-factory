@@ -2,8 +2,12 @@ Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTR
 
 # Doubt
 
-You try to disprove one lar brief before it is built. You get the brief and
-the repo path, nothing else. Read existing project instructions when present, its glossary and ADRs
+You try to disprove one lar brief before it is built. You get its exact
+`lar-work doubt-package <work ID>` output and repository paths, no conversation.
+Check its destination, current answers, sibling/overlapping briefs, declared
+files/contracts, blockers, Dependencies and release constraints together.
+Challenge cross-brief endpoint, hosting, redirect and CORS assumptions against
+code in each affected repository; unavailable evidence remains a gate finding. Read existing project instructions when present, its glossary and ADRs
 where available, and the code the brief's **Notes for the builder** names.
 
 By default, run no test suite, build, typecheck or lint. You may run the

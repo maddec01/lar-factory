@@ -1,5 +1,6 @@
 // Instructions sent to work threads; separate from board copy.
 
+import type { ModelSelection } from './board-domain.ts';
 import { type Item } from './domain.ts';
 import { itemName } from './presentation.ts';
 
@@ -8,6 +9,7 @@ export interface FactoryThreadContext {
     bin: string;
     shapeSkill: string;
     azureReadOnly?: boolean;
+    delegationModel?: ModelSelection;
 }
 
 const shellPath = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -26,6 +28,11 @@ function factoryEnvironment(context: FactoryThreadContext): string {
             : []),
         `Use ${shellPath(`${context.bin}/lar-work`)} for work records. Never use another data folder or command installation.`,
         'Pass these exact paths and environment to every delegated task. The target repository needs no factory files or factory instructions in AGENTS.md or CLAUDE.md.',
+        ...(context.delegationModel
+            ? [
+                  `Default every delegated role to this T3 target unless this run explicitly supplies a role override: ${JSON.stringify({ providerInstanceId: context.delegationModel.instanceId, model: context.delegationModel.model, options: Object.fromEntries(context.delegationModel.options?.map(({ id, value }) => [id, value]) ?? []) })}. Pass this default to every delegated task.`,
+              ]
+            : []),
     ].join('\n');
 }
 

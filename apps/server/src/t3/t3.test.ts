@@ -1,6 +1,6 @@
 import type { ModelSelection } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
-import { test } from 'vite-plus/test';
+import { test, vi } from 'vite-plus/test';
 
 import type { RunResult } from '../tools/run-tool.ts';
 import type { LaunchThread, LaunchWorkspace } from './launch-thread.ts';
@@ -209,6 +209,31 @@ function launches(selection: ModelSelection | null, runtimeMode = 'full-access')
 
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 const MEDIUM = [{ id: 'effort', value: 'medium' }];
+
+test('a development run freezes model and effort for default launches while allowing an explicit other model', async () => {
+    const { startThread } = await import('./t3.ts');
+    const model = { instanceId: 'codex', model: 'gpt-6-astra', options: [{ id: 'reasoningEffort', value: 'high' }] };
+    const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
+    const { run, calls } = t3With({});
+
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('BOARD_DEV_MODEL_SELECTION', JSON.stringify(model));
+
+    try {
+        await startThread('p', 'Shape', undefined, undefined, run, defaults, launch);
+        await startThread('p', 'Build', undefined, { base: 'main', branch: 'b' }, run, defaults, launch);
+        await startThread('p', 'Overlay', OPUS, undefined, run, defaults, launch);
+        assert.deepEqual(
+            sent.map((s) => s.selection),
+            [model, model, OPUS],
+        );
+        assert.deepEqual(calls, []);
+        vi.stubEnv('NODE_ENV', 'production');
+        await assert.rejects(startThread('p', 'Refuse', undefined, undefined, run, defaults, launch), /development/);
+    } finally {
+        vi.unstubAllEnvs();
+    }
+});
 
 test('a choice equal to the T3 Project default launches with its options, in each workspace', async () => {
     const { startThread } = await import('./t3.ts');

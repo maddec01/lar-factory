@@ -1,7 +1,7 @@
 // The frame of Lar Factory's item dialog: the summary under its title, the body's column with the main column and the
 // sidebar beside it, its notes, and the footer's groups of actions.
 
-import { Alert } from '@lar-works/design-system';
+import { Alert, Text } from '@lar-works/design-system';
 import { linkRecipe } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
@@ -246,5 +246,14 @@ export function DialogActions({
         >
             <ButtonDensityProvider density="md">{children}</ButtonDensityProvider>
         </span>
+    );
+}
+
+/** The group’s current delivery state under its title. */
+export function GroupStatus({ children }: { children: ReactNode }) {
+    return (
+        <Text variant="caption" tone="muted" data-group-status>
+            {children}
+        </Text>
     );
 }

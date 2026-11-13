@@ -138,7 +138,7 @@ export function ItemKind({
     ) : null;
 }
 
-export function StructureSync({ item }: { item: Item }) {
+export function StructureSync({ item, localNote = true }: { item: Item; localNote?: boolean }) {
     return (
         <>
             {item.specSync && (
@@ -146,7 +146,7 @@ export function StructureSync({ item }: { item: Item }) {
                     {item.specSync.warning ?? item.specSync.error ?? 'Spec waiting to save to tracker'}
                 </Text>
             )}
-            {item.sync && item.sync.state !== 'saved' && (
+            {localNote && item.sync && item.sync.state !== 'saved' && (
                 <Text
                     as="span"
                     variant="caption"

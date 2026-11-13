@@ -4,6 +4,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
 
+import { isGroupParent } from './group-parent';
 import { ItemChecksSection } from './ItemChecks';
 import { ItemRelations } from './ItemRelations';
 import { waitsOn } from './Relations';
@@ -43,7 +44,7 @@ export function ItemAside({
                 </DetailsSection>
             )}
             <ItemRelations item={item} read={read} refresh={refresh} />
-            {(item.linkedPrs.length > 0 || item.kind === 'build') && (
+            {(item.linkedPrs.length > 0 || (item.kind === 'build' && !isGroupParent(item, data.items))) && (
                 <DetailsSection heading="Pull requests">
                     {item.linkedPrs.length ? (
                         <PrList

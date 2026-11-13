@@ -6,6 +6,8 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { ButtonLink, Modal, Stack } from '@lar-works/design-system';
 
 import { ConceptParts } from './ConceptParts';
+import { isGroupParent } from './group-parent';
+import { GroupDetails } from './GroupDetails';
 import { ItemAside } from './ItemAside';
 import { ItemComments } from './ItemComments';
 import { ItemDescription } from './ItemDescription';
@@ -29,7 +31,7 @@ import {
     StartAfterError,
     StartMessage,
 } from '@/features/items';
-import { ItemAgents } from '@/features/line';
+import { ItemAgents, isDone, partsOf } from '@/features/line';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 import {
@@ -65,7 +67,10 @@ export function ItemDialogContent({
     toggleExpanded,
     openPart,
 }: ContentProps) {
-    const aside = hasRelations(item, read);
+    const group = isGroupParent(item, data.items);
+    const builds = group ? partsOf(item, data.items).filter((part) => part.kind === 'build') : [];
+    const buildsDone = builds.length > 0 && builds.every((part) => isDone(part.item));
+    const aside = hasRelations(item, read, group);
     const record = read.state === 'loaded' ? read.details.record : undefined;
     // Work with no ticket has no ticket text to show beside its record's.
     const ticket = !record || item.number > 0;
@@ -90,8 +95,11 @@ export function ItemDialogContent({
             headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
             headerDetails={
                 <>
+                    {group && <GroupDetails item={item} />}
                     <AgentWork item={item} label={item.kind === 'concept' ? 'Direct work' : undefined} />
-                    <AgentWorkNote item={item} />
+                    {(!group || item.usageState === 'loading' || item.usageState === 'failed') && (
+                        <AgentWorkNote item={item} />
+                    )}
                 </>
             }
         >
@@ -99,18 +107,18 @@ export function ItemDialogContent({
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
                 <ItemDialogBody fill={fill} data-item-body>
-                    <ItemProgress item={item} />
+                    {!group && <ItemProgress item={item} />}
                     {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                     {item.shapingCleanupProblem && (
                         <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
                     <NeedsYou item={item} data={data} />
                     <VerifyBuild item={item} />
-                    {item.kind === 'concept' && <ConceptBuild item={item} />}
+                    {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
+                    {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress plan={item.releasePlan} remaining={item.completion?.reasons} />
-                    {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
-                        {record && (
+                        {record && (!group || record.body?.trim() || record.answer?.trim()) && (
                             <RecordText
                                 item={item}
                                 record={record}

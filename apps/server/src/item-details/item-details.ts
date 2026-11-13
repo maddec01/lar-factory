@@ -85,6 +85,9 @@ export interface RecordsDeps {
     /** A repository's local setup and its type reads, for what a kind update would write; tests stand in for them. */
     setupOf?: (repo: string) => RepositorySetup | undefined;
     kindsOf?: (repo: string) => TicketKinds;
+    readDetails?: ReadItemDetails;
+    readComments?: ReadOlderComments;
+    saveTicketDescription?: SaveDescription;
 }
 
 /** Comments per older page; GitHub and Azure DevOps both answer 10. */
@@ -101,9 +104,6 @@ const NO_DETAILS: ItemDetails = {
     hasOlderComments: false,
     olderCursor: null,
 };
-
-/** The details file next to the board fixture: `sample.json` has `sample-details.json`. */
-export const detailsFileFor = (fixture: string): string => fixture.replace(/\.json$/, '-details.json');
 
 /**
  * Reads the details file, which maps an item's id to its details; an item it doesn't name has none. Its `$older` key
@@ -192,6 +192,9 @@ export function createItemDetails(
         labelsOf = trackerLabels,
         setupOf = (repo) => readRepositorySetups().find((setup) => sameRepo(setup.repo, repo)),
         kindsOf,
+        readDetails: readTicketDetails,
+        readComments,
+        saveTicketDescription,
     }: RecordsDeps = { records: null },
 ): ItemDetailsReader {
     if (sampleFile) return fromFile(sampleFile, sampleTimeShiftMs);
@@ -231,9 +234,11 @@ export function createItemDetails(
         const item = ticketOf(work);
         const read = !item
             ? NO_DETAILS
-            : azure(item)
-              ? await readAzureItemDetails(item)
-              : await readGithubItemDetails(item);
+            : readTicketDetails
+              ? await readTicketDetails(item)
+              : azure(item)
+                ? await readAzureItemDetails(item)
+                : await readGithubItemDetails(item);
         const state = record && records ? activeSpecState(records, work.id, specSync) : null;
 
         if (state) {
@@ -283,6 +288,8 @@ export function createItemDetails(
 
             if (!item) return NO_TICKET;
 
+            if (readComments) return readComments(item, before);
+
             return azure(item) ? readAzureOlderComments(item, before) : readGithubOlderComments(item, before);
         },
         async saveDescription(work, { body, bodyField, revision }) {
@@ -297,6 +304,8 @@ export function createItemDetails(
                     return { status: 409, error: (error as Error).message };
                 }
             }
+
+            if (saveTicketDescription) return saveTicketDescription(item, { body, bodyField, revision });
 
             if (!azure(item)) return saveGithubDescription(item, body);
 

@@ -94,14 +94,14 @@ test('it shows T3 as unavailable when T3 stops and reads again when T3 returns',
     assert.equal((await fetch(`${board.url}/api/onboarding/projects`)).status, 200);
 });
 
-test("every write gets sample mode's refusal", async (t) => {
+test("real operations retain sample mode's refusal", async (t) => {
     const board = await sampleT3(t, tempHome(t));
     const refusals: [string, object, string][] = [
         ['/api/onboarding/projects', { folder: '/tmp' }, 'Sample mode onboards no Project.'],
         ['/api/onboarding/setup', {}, 'Sample mode onboards no Project.'],
         ['/api/t3/reauthorize', {}, 'T3 reauthorization is unavailable here.'],
         ['/api/recheck', {}, 'Sample mode looks no tools up.'],
-        ['/api/items', { title: 'x' }, 'Adding items is disabled in sample mode.'],
+        ['/api/start', {}, 'Starting threads is disabled in sample mode.'],
     ];
 
     for (const [path, body, error] of refusals) {

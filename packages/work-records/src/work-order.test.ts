@@ -95,6 +95,10 @@ it('reports saved briefs, cross-repository blockers, decisions and every hold wi
         );
         expect(workOrderReport(rows)).toContain('Brief: saved; gate: not approved');
         expect(records.changes()).toBe(before);
+        records.update(build.workId, records.read(build.workId).revision, { status: 'Done' });
+        expect(workOrder(records, group.workId).find((entry) => entry.workId === build.workId)?.waits).toContain(
+            'It has no recorded PR.',
+        );
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

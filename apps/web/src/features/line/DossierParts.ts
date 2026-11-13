@@ -149,6 +149,17 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
     const parts = projectWorkMap(all, parent.id)
         .nodes.map(({ item }) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
         .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
+
+    if (parent.conceptBuild) {
+        const order = new Map(parent.conceptBuild.members.map((member, index) => [member.workId, index]));
+
+        return parts.sort(
+            (a, b) =>
+                (order.get(a.item.id) ?? Infinity) - (order.get(b.item.id) ?? Infinity) ||
+                a.item.id.localeCompare(b.item.id),
+        );
+    }
+
     const waves = partWaves(parts);
 
     return parts.sort((a, b) => waves.get(a.item.id)! - waves.get(b.item.id)!);

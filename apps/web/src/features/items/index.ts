@@ -46,3 +46,5 @@ export { useStatusActivity } from './useStatusActivity';
 export { workflowSteps } from './WorkflowSteps';
 
 export { ConceptBuild } from './ConceptBuild';
+
+export { conceptBuildWait } from './ConceptBuildProgress';

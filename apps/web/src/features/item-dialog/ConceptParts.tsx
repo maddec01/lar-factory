@@ -6,6 +6,7 @@ import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 
 import {
+    conceptBuildWait,
     AgentWork,
     hasFigures,
     ItemTitle,
@@ -118,7 +119,7 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
                     <ItemTitle item={item} />
                 </PartName>
             }
-            meta={complete ? 'Complete' : shown.word}
+            meta={complete ? 'Complete' : (conceptBuildWait(item, data) ?? shown.word)}
             usage={usage}
             action={hasThread && <OpenThread item={item} data={data} part />}
         />

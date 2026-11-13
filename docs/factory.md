@@ -521,10 +521,14 @@ retry when facts change. A refused start pauses that item until a successful
 manual start or a new gate. Uncertain launches retain their intent and capacity
 until recovery proves the outcome. Only one board owns automatic scheduling.
 
-Today: Auto-build is OFF by default and already orders eligible gates by age,
-shares the build limit, waits for concept refinement and recovers launch intents.
-There is no one-action concept run. Child Start build can currently proceed
-before parent refinement completes.
+Today: Auto-build is OFF by default. Start concept builds saves the run after
+one complete preflight; Pause and scope changes stop future starts. Manual
+Start, Start after, concept runs and Auto-build use the same transactional
+eligibility and capacity claim, with frozen approved input. The group uses the
+same deterministic build order as `lar-work work-order <group-id> [--json]`.
+Provider-confirmed PR merges unblock successors through the shared scheduler;
+closed tickets, thread completion and failed PR reads do not. Concept views
+show active builds, capacity waits, blocker waits and PR merge waits.
 
 ## Building stages
 

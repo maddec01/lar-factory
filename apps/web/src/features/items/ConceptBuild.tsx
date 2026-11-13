@@ -3,6 +3,7 @@ import type { Item } from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { useBuilds } from './BuildLimitText';
+import { conceptBuildProgress } from './ConceptBuildProgress';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction } from '@/services/board/board.service';
 import { ConceptBuildRun } from '@/ui/board';
@@ -17,6 +18,7 @@ export function ConceptBuild({
     showAction?: boolean;
 }) {
     const builds = useBuilds();
+    const data = useBoardStore((state) => state.data);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +49,7 @@ export function ConceptBuild({
             capacity={`${builds.occupancy}: ${builds.items.filter((build) => item.conceptBuild!.members.some((member) => member.workId === build.id)).length} from this concept`}
             showAction={showAction}
             startLabel={startActionChoice(item, 'build').label}
+            progress={conceptBuildProgress(item, data)}
             pending={pending}
             error={error}
             onChange={(state) => void change(state)}

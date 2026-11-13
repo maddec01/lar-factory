@@ -14,7 +14,9 @@ export function ConceptBuildRun({
     showAction = true,
     startLabel,
     capacity,
+    progress,
 }: {
+    progress?: { total: number; complete: number; building: number; waiting: number; names: string; outside: number };
     compact?: boolean;
     showAction?: boolean;
     startLabel: string;
@@ -25,6 +27,7 @@ export function ConceptBuildRun({
     onChange: (state: 'running' | 'paused') => void;
 }) {
     const running = plan.run?.state === 'running';
+    const finished = Boolean(progress?.total && progress.complete === progress.total);
 
     const action = (
         <Button
@@ -37,6 +40,8 @@ export function ConceptBuildRun({
             {running ? 'Pause concept builds' : startLabel}
         </Button>
     );
+
+    if (compact && finished) return null;
 
     if (compact)
         return (
@@ -54,15 +59,31 @@ export function ConceptBuildRun({
     return (
         <DetailsSection heading="Concept builds" data-concept-build-run>
             <Text variant="caption" tone="muted" role="status">
-                {running
-                    ? 'Running · starts unblocked builds as shared capacity becomes available.'
-                    : plan.run
-                      ? 'Paused · active builds continue.'
-                      : 'Not started · shares build capacity with Ready tickets.'}
+                {finished
+                    ? 'All planned builds are complete.'
+                    : running
+                      ? 'Running · starts unblocked builds as shared capacity becomes available.'
+                      : plan.run
+                        ? 'Paused · active builds continue.'
+                        : 'Not started · shares build capacity with Ready tickets.'}
             </Text>
             <Text variant="caption" tone="muted" data-shared-build-capacity>
                 {capacity}
             </Text>
+            {progress && progress.total > 0 && (
+                <Text variant="caption" tone="muted" data-concept-build-progress>
+                    {progress.complete === progress.total
+                        ? 'All planned builds are complete.'
+                        : `${progress.building} building · ${progress.waiting} waiting · ${progress.complete}/${progress.total} complete`}
+                </Text>
+            )}
+            {progress?.names && <Text variant="caption">Building: {progress.names}</Text>}
+            {Boolean(progress?.outside) && (
+                <Text variant="caption">
+                    {progress!.outside} {progress!.outside === 1 ? 'build is' : 'builds are'} outside the board. Add{' '}
+                    {progress!.outside === 1 ? 'its Project' : 'their Projects'} in Settings to let this work start.
+                </Text>
+            )}
             {plan.run?.reason && <Text variant="caption">{plan.run.reason}</Text>}
             {plan.holds.length > 0 && (
                 <ul className="m-0 grid gap-1 pl-4 text-sm" aria-label="Concept build holds">
@@ -71,7 +92,7 @@ export function ConceptBuildRun({
                     ))}
                 </ul>
             )}
-            {showAction && <div className="flex flex-wrap gap-2">{action}</div>}
+            {showAction && !finished && <div className="flex flex-wrap gap-2">{action}</div>}
             {error && <Text role="alert">{error}</Text>}
         </DetailsSection>
     );

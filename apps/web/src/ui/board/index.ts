@@ -240,3 +240,5 @@ export { BriefApprovalDetails } from './BriefApprovalDetails';
 
 export { OutcomeForm } from './OutcomeForm';
 export { BriefDependencyStatus } from './BriefDependencyStatus';
+
+export { DeskDependencyProof } from './DeskDependencyProof';

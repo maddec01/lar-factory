@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 
 import type { Migration } from './database.ts';
 import { migrateDecisionAnswers } from './decision-answer-migration.ts';
+import { parseBriefVerify } from './verify-requirement.ts';
 import { installWriteJournal } from './write-journal.ts';
 
 export const MIGRATIONS: readonly Migration[] = [
@@ -606,4 +607,30 @@ export const MIGRATIONS: readonly Migration[] = [
             'CREATE TABLE release_continuations(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
     (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_release_step TEXT'),
+    (db) => {
+        db.exec('ALTER TABLE verification ADD COLUMN required INTEGER NOT NULL DEFAULT 1 CHECK(required IN (0,1))');
+
+        // Existing recommendations cannot override a retained, approved Verify decision.
+        const save = db.prepare(
+            'INSERT INTO verification(work_id,required) VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET required=excluded.required',
+        );
+
+        for (const row of db
+            .prepare(
+                "SELECT b.work_id,b.markdown,g.brief_digest FROM bodies b JOIN brief_gates g ON b.work_id=g.work_id WHERE b.body='brief' AND g.invalidated=0 AND g.source IN ('gate','user')",
+            )
+            .all()) {
+            const brief = String(row.markdown);
+
+            if (createHash('sha256').update(JSON.stringify(brief)).digest('hex') !== row.brief_digest) continue;
+
+            try {
+                const required = parseBriefVerify(brief);
+
+                if (required !== null) save.run(String(row.work_id), Number(required));
+            } catch {
+                /* Preserve legacy, unstructured Verify text without inventing a decision. */
+            }
+        }
+    },
 ];

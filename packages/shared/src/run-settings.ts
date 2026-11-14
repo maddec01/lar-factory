@@ -72,7 +72,25 @@ export interface RoleRunFinish {
     failure?: string;
 }
 
+/** The role-launch request becomes this T3 task ID; never match another attempt by title. */
+export function roleTaskMatches(attempt: Pick<RoleRunInput, 'executionId' | 'taskId'>, reference: string): boolean {
+    if (attempt.taskId) return attempt.taskId === reference;
+
+    try {
+        return (
+            reference.startsWith('node:delegated-task:') &&
+            decodeURIComponent(reference).endsWith(`:delegate-task:${attempt.executionId}`)
+        );
+    } catch {
+        return false;
+    }
+}
+
 export interface RoleRun extends RoleRunInput {
+    /** Only reconciliation's inference may be replaced by the matching terminal T3 result. */
+    inferredAbandonment?: boolean;
+    /** An agent/system wait, never a product question for Pedro. */
+    reconciliationHold?: string;
     summary?: string;
     workId: string;
     requested: ExecutionSettings;

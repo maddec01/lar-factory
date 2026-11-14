@@ -17,6 +17,7 @@ import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval
 import { queueGateResume } from './gate-resume.ts';
 import { storedScope } from './scope-records.ts';
 import { queueTicketSpec } from './spec-records.ts';
+import { briefVerify } from './verify-requirement.ts';
 import type { WorkRecord } from './work-records.ts';
 
 export interface GateRecords {
@@ -180,6 +181,13 @@ export function gateRecords(
             item.batchDigest ?? null,
         );
         db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
+
+        const verify = briefVerify(database, workId);
+
+        if (verify)
+            db.prepare(
+                'INSERT INTO verification(work_id,required) VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET required=excluded.required',
+            ).run(workId, Number(verify.required));
 
         if (record.ticket) queueTicketSpec(database, workId, record.ticket, body(workId, 'brief')!);
 

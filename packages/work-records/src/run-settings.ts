@@ -1,4 +1,5 @@
 import { executionMismatch, executionSettingsOf } from '@lar-factory/shared/execution-target';
+import { roleTaskMatches } from '@lar-factory/shared/run-settings';
 import type {
     RoleRun,
     RoleRunFinish,
@@ -15,7 +16,10 @@ import { captureRunSettings, executionSettings, invalidRun, runObject, runText }
 import type { WorkRecord } from './work-records.ts';
 
 export interface RunSettingsRecords {
-    reconcileRoleRuns(workId: string, observation: { ownerEnded: boolean }): void;
+    reconcileRoleRuns(
+        workId: string,
+        observation: { ownerEnded: boolean; executionIds?: string[]; holds?: Record<string, string> },
+    ): void;
     snapshotRun(workId: string, revision: number, input: SnapshotRunInput): RunSettings;
     runSettings(workId: string, runId?: string): { workId: string; runs: RunSettings[]; roleRuns: RoleRun[] };
     startRoleRun(workId: string, revision: number, input: RoleRunInput): RoleRun;
@@ -64,9 +68,9 @@ export function runSettingsRecords(
     };
 
     return {
-        reconcileRoleRuns: (workId, { ownerEnded }) =>
+        reconcileRoleRuns: (workId, { ownerEnded, executionIds, holds }) =>
             database.write(() => {
-                if (!ownerEnded) return;
+                if (!ownerEnded && !holds) return;
 
                 read(workId);
                 for (const row of db.prepare('SELECT content FROM role_runs WHERE work_id=?').all(workId)) {
@@ -74,10 +78,28 @@ export function runSettingsRecords(
 
                     if (run.role === 'thread' || run.result !== 'running') continue;
 
+                    const hold = holds?.[run.executionId];
+
+                    if (hold) {
+                        if (run.reconciliationHold !== hold) {
+                            db.prepare('UPDATE role_runs SET content=? WHERE work_id=? AND execution_id=?').run(
+                                JSON.stringify({ ...run, reconciliationHold: hold }),
+                                workId,
+                                run.executionId,
+                            );
+                            bump(workId);
+                        }
+
+                        continue;
+                    }
+
+                    if (!ownerEnded || (executionIds && !executionIds.includes(run.executionId))) continue;
+
                     db.prepare('UPDATE role_runs SET content=? WHERE work_id=? AND execution_id=?').run(
                         JSON.stringify({
                             ...run,
                             result: 'failed',
+                            inferredAbandonment: true,
                             endedAt: new Date().toISOString(),
                             failure:
                                 'Abandoned execution: owner ended with no live child and never recorded a terminal T3 result.',
@@ -262,7 +284,15 @@ export function runSettingsRecords(
                 if (input.result === 'completed' && input.failure !== undefined)
                     invalidRun('A completed role cannot carry a failure.');
 
-                if (old.endedAt !== null) {
+                const inferred =
+                    old.inferredAbandonment === true ||
+                    (old.report === null &&
+                        old.actual === null &&
+                        old.failure ===
+                            'Abandoned execution: owner ended with no live child and never recorded a terminal T3 result.');
+                const recovery = inferred && report !== null && roleTaskMatches(old, report.reference);
+
+                if (old.endedAt !== null && !recovery) {
                     if (
                         JSON.stringify(old.report) !== JSON.stringify(report) ||
                         old.result !== input.result ||
@@ -276,6 +306,7 @@ export function runSettingsRecords(
 
                 const run: RoleRun = {
                     ...old,
+                    inferredAbandonment: false,
                     ...(summary && { summary }),
                     report,
                     actual: report?.actual ?? null,
@@ -284,6 +315,7 @@ export function runSettingsRecords(
                     endedAt: new Date().toISOString(),
                 };
 
+                delete run.reconciliationHold;
                 db.prepare('UPDATE role_runs SET content=? WHERE work_id=? AND execution_id=?').run(
                     JSON.stringify(run),
                     workId,
@@ -299,3 +331,5 @@ export function runSettingsRecords(
             }),
     };
 }
+
+export { roleFinish } from './role-evidence.ts';

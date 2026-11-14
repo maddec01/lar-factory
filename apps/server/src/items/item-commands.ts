@@ -206,6 +206,7 @@ export interface ItemCommandsDeps {
     checkoutOf?: (projectId: string) => Promise<string>;
     factoryContext?: FactoryThreadContext | null;
     runLaunchDeps?: RunLaunchDeps;
+    readRoleProjection?: (threadId: string) => Promise<unknown>;
     verifyRecoveredExecution?: typeof verifyRecoveredExecution;
     board: BoardState;
     /** The file that names the failed starts already cleared; none keeps them for this board run only. */
@@ -412,6 +413,7 @@ export function createItemCommands({
     retroDeps,
     outcomeDeps,
     releaseDeps,
+    readRoleProjection,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
@@ -1427,7 +1429,8 @@ export function createItemCommands({
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
-            if (records) for (const item of currentItems) reconcileOwnerActivity(records, item);
+            if (records)
+                for (const item of currentItems) await reconcileOwnerActivity(records, item, readRoleProjection);
 
             pushStarts();
             await gating.reconcileBriefApprovals();

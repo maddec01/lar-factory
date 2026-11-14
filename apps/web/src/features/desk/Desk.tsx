@@ -8,6 +8,7 @@
 
 import {
     deskItems,
+    dependencyProofs,
     pendingBriefBatch,
     openQuestionThread,
     questionOwnerParent,
@@ -44,6 +45,7 @@ import {
     boardStatusState,
     DeskCard as Card,
     DeskPrProgress,
+    DeskDependencyProof,
     DeskHint,
     DeskSection,
     noteBoardPlaces,
@@ -58,6 +60,9 @@ function NextStep({ item, waitLabel }: { item: Item; waitLabel: string }) {
     const group = groupState(item, data);
 
     const batch = pendingBriefBatch(item, data.items);
+    const proofs = dependencyProofs(item);
+
+    if (proofs.length) return null;
 
     if (batch.length) return null;
 
@@ -158,6 +163,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
                                 summary={approval.questionSummary}
                             />
                         )}
+                        <DeskDependencyProof proofs={dependencyProofs(item)} />
                         <AzureFields azure={item.azure} />
                         <Progress item={item} data={data} />
                     </>
@@ -166,7 +172,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             statusIcon={<ItemStatusGlyph item={item} />}
             status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
             statusState={
-                followups || batch.length || wait.label === 'Outcome check'
+                followups || batch.length || dependencyProofs(item).length || wait.label === 'Outcome check'
                     ? 'waiting'
                     : (shown.state ?? boardStatusState[shown.glyph])
             }

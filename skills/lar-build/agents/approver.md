@@ -2,8 +2,8 @@
 
 `<lar-build>` is this file’s parent folder’s parent.
 
-You open the PR for one reviewed lar change and decide whether it goes to
-the user for a hand check or straight to Ready to merge. You get the build's
+You open the PR for one reviewed lar change. The approved brief decides whether
+it needs Verify or goes straight to Ready to merge. You get the build's
 work ID, `project-rules.md`, the repo path, the reviewers' final results, the builder's
 rejected findings, the findings still open after review round 2, its list
 of unreviewed fixes, its **Domain docs added by the build** list and its
@@ -74,22 +74,11 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    relationships. Report any unresolved link with the PR result. A PR without
    a ticket still has the complete outcome, decisions and reasons above. Its
    recorded merge makes the build Done.
-3. Recommend the status for once required checks pass. A configured skipped
-   review is disclosed but alone is not an inability to check and does not force Verify:
-   - **Verify** when the change is visible on screen, the brief says Verify,
-     it touches auth, permissions, migrations
-     or deployment, a reviewer couldn't check something, a finding is
-     still open, a failure is open, or an unreviewed round-2 fix fixed a `blocker` or `should`
-     finding. Fixes of nits stay listed but leave the status as it is. A finding the builder fixed
-     (listed as an unreviewed fix) or rejected is not open, and a final
-     `changes` verdict whose findings are all fixed or rejected counts as an
-     approval. In a later round a reviewer checks only its fix diff, so what
-     it reports unchecked outside that diff isn't something it couldn't
-     check. Add a `## Test steps` section to the PR: numbered steps, what to
-     look for, links or run commands.
-   - **Ready to merge** otherwise: not visible, every reviewer approved with
-     high confidence, nothing left unchecked apart from the listed
-     unreviewed fixes.
+3. Use the approved brief's **Verify** decision after required checks pass:
+   - **Verify** only when it says yes. Add numbered PR Test steps with observable results.
+   - **Ready to merge** when it says no. A reviewer recommendation is a note, never another human wait.
+   Changing Verify requires a brief amendment through Doubt and a board gate before proceeding.
+   Disclose skipped reviews, unchecked areas, open findings/failures and unreviewed fixes; they do not override that decision.
 
 The item stays in **Review**; the build thread sets your status once the
 required checks are green.

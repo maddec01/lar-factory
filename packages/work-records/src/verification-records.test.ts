@@ -1,9 +1,11 @@
 import { verificationPassed } from '@lar-factory/shared';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -234,4 +236,102 @@ test('schema 38 preserves the pre-upgrade latest result in history', async () =>
 
     opened.push({ dir, records });
     expect(records.verification('legacy')).toMatchObject({ latest: result, history: [result] });
+});
+
+test.each([false, true])(
+    'S05 F3: approved Verify %s controls the saved wait; recommendations cannot change it',
+    async (required) => {
+        const s = await setup();
+        const work = s.records.create({ title: 'Consumer', repository: 'fake/b', kind: 'build', status: 'Review' });
+        const id = work.workId;
+        const rev = () => s.records.read(id).revision;
+        const brief = completeBrief(
+            `Consume numeric v1 greeting.\n\n## Verify\n${required ? 'yes: Inspect the greeting.' : 'no'}\n`,
+        );
+
+        s.records.setBody(id, rev(), 'brief', brief);
+
+        const approve = () => {
+            const input = s.records.doubtPackage(id);
+
+            s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.', []);
+
+            const display = s.records.displayGate(id);
+
+            s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
+        };
+
+        approve();
+
+        if (!required) {
+            expect(() => s.records.update(id, rev(), { status: 'Verify' })).toThrow(/approved brief/i);
+            expect(s.records.verification(id).required).toBe(false);
+            s.records.update(id, rev(), { status: 'Ready to merge' });
+        } else {
+            expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/Verify/);
+            s.records.update(id, rev(), { status: 'Verify' });
+            expect(s.records.verification(id).required).toBe(true);
+        }
+
+        s.records.setBody(
+            id,
+            rev(),
+            'brief',
+            brief.replace(
+                required ? 'yes: Inspect the greeting.' : 'no',
+                required ? 'no' : 'yes: Inspect the greeting.',
+            ),
+        );
+        expect(s.records.verification(id).required).toBe(required);
+        expect(() => s.records.update(id, rev(), { status: required ? 'Ready to merge' : 'Verify' })).toThrow(
+            /Doubt|gate|approved/i,
+        );
+        approve();
+
+        if (required) s.records.update(id, rev(), { status: 'Ready to merge' });
+        else s.records.update(id, rev(), { status: 'Verify' });
+
+        expect(s.records.verification(id).required).toBe(!required);
+    },
+);
+
+test('S05 F3: upgrade replaces legacy recommendation waits only from exact approved briefs, retaining evidence', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'verify-decision-upgrade-'));
+    const path = join(dir, 'work.db');
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+    const cases = [
+        ['no', 'no', true, false],
+        ['yes', 'yes: Inspect the greeting.', true, true],
+        ['amended', 'no', false, true],
+        ['legacy', '', true, true],
+    ] as const;
+
+    for (const [id, decision, approved] of cases) {
+        old.db
+            .prepare(
+                "INSERT INTO work_records(work_id,repository,kind,status,revision,created_at,updated_at,title) VALUES(?,'fake/b','build','Verify',1,'before','before',?)",
+            )
+            .run(id, id);
+
+        const brief = decision ? `## Verify\n${decision}\n` : 'Legacy brief';
+
+        old.db.prepare("INSERT INTO bodies(work_id,body,markdown) VALUES(?,'brief',?)").run(id, brief);
+
+        const digest = createHash('sha256')
+            .update(JSON.stringify(approved ? brief : 'previous brief'))
+            .digest('hex');
+
+        old.db
+            .prepare(
+                "INSERT INTO brief_gates(gate_id,work_id,source_revision,brief_digest,approved_by,evidence,recorded_at) VALUES(?,?,1,?,'Pedro','Approved','before')",
+            )
+            .run(id, id, digest);
+        old.db.prepare('UPDATE verification SET head=? WHERE work_id=?').run(head, id);
+    }
+    old.close();
+
+    const records = await openWorkRecords(path);
+
+    opened.push({ dir, records });
+    for (const [id, , , required] of cases) expect(records.verification(id)).toMatchObject({ required, head });
 });

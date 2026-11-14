@@ -467,9 +467,9 @@ it('finishes from a file and preserves T3 evidence', async () => {
     writeFileSync(file, JSON.stringify({ structuredContent: reported() }));
     expect((await f.finish(clientRequestId, '', ['--file', file])).status).toBe(0);
 
-    // Contradictory later evidence cannot rewrite a completed report, but must still hold the work.
+    // Contradictory evidence is an agent hold and cannot overwrite a completed report.
     expect((await f.finish(clientRequestId, reported({ executedModel: 'other' }))).status).toBe(1);
-    expect(f.records.read(f.workId).needsYou).toContain('mismatch');
+    expect(f.records.read(f.workId).needsYou).toBeNull();
     expect(f.records.runSettings(f.workId).roleRuns.at(-1)!.actual!.model!.model).toBe('configured');
 });
 
@@ -511,7 +511,7 @@ for (const [name, input] of [
         expect(result.stdout).toBe('');
         expect(attempt.result).toBe('failed');
         expect(attempt.failure).toBeTruthy();
-        expect(f.records.read(f.workId).needsYou).toBe(attempt.failure);
+        expect(f.records.read(f.workId).needsYou).toBeNull();
         expect(result.stderr).toContain(attempt.failure!);
     });
 }

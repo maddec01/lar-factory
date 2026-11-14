@@ -110,7 +110,7 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
     /** Disarms the part, then runs its start and keeps the error a failed one gives. */
     async function startNow(item: Item, { model }: ArmedStart): Promise<void> {
         const { body } = await (item.status === 'Ready'
-            ? commands.startBuild(item.id, model, undefined, true)
+            ? commands.startBuild(item.id, model, undefined, true, { automatic: true })
             : commands.start(item.id, model, true));
         const { error, hold } = body as { error?: string | null; hold?: boolean };
 

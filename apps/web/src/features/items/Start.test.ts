@@ -309,3 +309,22 @@ for (const state of ['done', 'stopped'] as const)
         expect(start()?.textContent).toContain('Resume shaping');
         expect(card().querySelector('[data-start-result]')).toBeNull();
     });
+
+test('Ready offers manual Start build at capacity and warns that it will go over the limit', async () => {
+    const data = {
+        ...withChoices,
+        buildLimit: { limit: 1, automatic: 1 },
+        items: withChoices.items.map((item) =>
+            item.id === 'I_sample13'
+                ? { ...item, status: 'Ready' as const, passingBrief: true, parentId: null, blockers: [], threads: [] }
+                : item,
+        ),
+    };
+
+    await mountItem(data, 'I_sample13');
+    expect(start('I_sample13').disabled).toBe(false);
+    expect(text(card())).toContain('Starting now will go over the limit.');
+    await open('I_sample13');
+    await press(entries()[0]!);
+    expect(posted()[0]?.[0]).toBe('/api/start-build');
+});

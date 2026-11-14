@@ -1,4 +1,4 @@
-import type { GateEvidence } from '@lar-factory/shared';
+import { reservesBuildSlot, type GateEvidence } from '@lar-factory/shared';
 
 import { groupMembers } from './blocker-declarations.ts';
 import { blockerPath, groupContractReferences } from './contract-references.ts';
@@ -11,6 +11,8 @@ export interface BuildPreparation {
     expectedGateId?: string;
     conceptId?: string;
     automatic?: boolean;
+    /** Set only by Pedro's item-level board action; never by a scheduler. */
+    manual?: boolean;
     recovery?: boolean;
 }
 export interface BuildInput {
@@ -20,6 +22,8 @@ export interface BuildInput {
     gate: GateEvidence;
     revision: number;
     blockers: Record<string, number>;
+    /** Claim-time evidence, retained with the launch. Absent on older inputs. */
+    capacity?: { source: 'manual' | 'automatic'; limit: number; occupied: number; manualOverride: boolean };
 }
 
 /** Called inside the intent's write transaction: eligibility, frozen input and capacity claim commit together. */
@@ -98,20 +102,23 @@ export function prepareBuildClaim(
     const counted = new Set(
         records
             .list({})
-            .filter(
-                (row) =>
-                    !row.setAside &&
-                    row.kind !== 'concept' &&
-                    row.kind !== 'decision' &&
-                    row.kind !== 'slice' &&
-                    ['In progress', 'Review'].includes(row.status) &&
-                    !(
-                        records.children(row.workId).some((child) => child.kind !== 'slice') &&
-                        !row.buildBranch &&
-                        !row.pullRequest &&
-                        !records.threads(row.workId).some((thread) => thread.purpose === 'build')
-                    ),
-            )
+            .filter((row) => {
+                const deliveryStarted =
+                    !!row.buildBranch ||
+                    !!row.buildPhase ||
+                    !!row.pullRequest ||
+                    records.threads(row.workId).some((thread) => thread.purpose === 'build');
+
+                return reservesBuildSlot({
+                    kind: row.kind,
+                    status: row.status,
+                    complete: records.completion(row.workId).complete,
+                    retired: row.setAside,
+                    coordinating:
+                        records.children(row.workId).some((child) => child.kind !== 'slice') && !deliveryStarted,
+                    deliveryStarted,
+                });
+            })
             .map((row) => row.workId),
     );
 
@@ -120,9 +127,22 @@ export function prepareBuildClaim(
         if (intent.purpose === 'build') counted.add(intent.workId);
     counted.delete(workId);
 
-    if (counted.size >= input.limit) refuse('The shared build capacity is full. Wait for a build to hand back.');
+    const ownsSlot =
+        records.threads(workId).some((thread) => thread.purpose === 'build') ||
+        records.launchIntents({ workId }).some((intent) => intent.purpose === 'build' && intent.outcome !== 'failed');
+    const full = !ownsSlot && counted.size >= input.limit;
+
+    const manual = input.manual === true;
+
+    if (full && !manual) refuse('Waiting for a build slot. The shared build capacity is full.');
 
     return {
+        capacity: {
+            source: manual ? 'manual' : 'automatic',
+            limit: input.limit,
+            occupied: counted.size,
+            manualOverride: full && manual,
+        },
         context: records.initialContext(workId),
         brief: records.body(workId, 'brief')!,
         gate: gate!,

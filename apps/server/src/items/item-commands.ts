@@ -90,6 +90,7 @@ import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
 import { createOutcomeCheck } from './outcome-check.ts';
+import { reconcileOwnerActivity } from './owner-reconciliation.ts';
 import { createPrMerge } from './pr-merge.ts';
 import { createReleaseStep } from './release-step.ts';
 import { createRetro } from './retro.ts';
@@ -1422,6 +1423,8 @@ export function createItemCommands({
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
+            if (records) for (const item of currentItems) reconcileOwnerActivity(records, item);
+
             pushStarts();
             await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
@@ -2082,7 +2085,7 @@ export function createItemCommands({
             }
         },
 
-        startBuild: (itemId, model, drift, quiet = false, source) =>
+        startBuild: (itemId, model, drift, quiet = false, source = { manual: true }) =>
             press('startedBuilds', itemId, quiet, () =>
                 startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
                     if (records) {

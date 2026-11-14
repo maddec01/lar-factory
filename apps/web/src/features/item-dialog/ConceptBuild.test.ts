@@ -59,7 +59,7 @@ test.each(['running', 'paused'] as const)(
     },
 );
 
-test('a ready concept has one start per surface and its footer never starts an ordinary build', async () => {
+test('a ready concept has one group start per surface and its parts retain manual Start build', async () => {
     const concept = sample.items.find((item) => item.kind === 'concept')!;
     const build = sample.items.find((item) => item.kind !== 'concept')!;
     const plan: ConceptBuildPlan = {
@@ -106,7 +106,7 @@ test('a ready concept has one start per surface and its footer never starts an o
 
     await settle(() => row.querySelector<HTMLButtonElement>('[data-dossier-open]')!.click());
     expect([...row.querySelectorAll('button')].filter((b) => text(b) === 'Start concept builds')).toHaveLength(1);
-    expect([...row.querySelectorAll('button')].some((b) => text(b) === 'Start build')).toBe(false);
+    expect([...row.querySelectorAll('button')].some((b) => text(b) === 'Start build')).toBe(true);
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
 

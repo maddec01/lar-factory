@@ -41,7 +41,7 @@ export interface Pipeline {
 }
 
 /** GitHub's merge state status, in four: CLEAN, HAS_HOOKS and UNSTABLE can merge; UNKNOWN is checking; DIRTY is conflicts; the rest blocked. */
-export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts';
+export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts' | 'behind';
 
 export interface CheckProgress {
     state: 'current' | 'stale' | 'unavailable';
@@ -327,7 +327,10 @@ export interface Item {
     briefChangesRequested?: true;
     staleGateDetail?: string;
     staleGate?: 'brief' | 'sources' | 'approval';
+    /** The current brief package lacks Doubt; only live thread evidence may say reviewing. */
     briefReviewing?: true;
+    /** Durable delivery evidence, including a branch awaiting owner recovery. */
+    buildStarted?: true;
     briefApproval?: { reason: string; digest?: string };
     publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & {
         recoverable?: boolean;

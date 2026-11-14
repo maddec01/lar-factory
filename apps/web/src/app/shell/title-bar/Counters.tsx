@@ -128,7 +128,7 @@ export function Counters() {
                 foot={
                     reading
                         ? undefined
-                        : 'Concept builds, manual starts, Start after and Auto-build share this limit. At capacity, manual starts are refused; scheduled starts wait for a slot.'
+                        : 'All builds count toward this limit. At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.'
                 }
             >
                 {listOf(building, 'Nothing building right now.')}

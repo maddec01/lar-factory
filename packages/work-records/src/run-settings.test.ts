@@ -373,3 +373,31 @@ it('migrates legacy records without inventing snapshots or changing history; SQL
         database.close();
     }
 });
+
+it('S08 F06: reconciliation terminates an unbound launch after its owner ends, preserving unknown actuals', async () => {
+    const { records, workId, revision } = await fixture();
+
+    records.snapshotRun(workId, revision(), input('shaping', 'shaping'));
+    records.addThread(workId, revision(), 'owner', 'shape');
+    records.startRoleRun(workId, revision(), { runId: 'shaping', executionId: 'orphan', role: 'explore' });
+    records.startRoleRun(workId, revision(), { runId: 'shaping', executionId: 'later', role: 'explore' });
+    records.finishRoleRun(workId, revision(), { executionId: 'later', result: 'completed', report: null });
+    records.reconcileRoleRuns(workId, { ownerEnded: false });
+    expect(records.runSettings(workId).roleRuns[0]!.result).toBe('running');
+    records.reconcileRoleRuns(workId, { ownerEnded: true });
+
+    const orphan = records.runSettings(workId).roleRuns[0]!;
+
+    expect(orphan).toMatchObject({
+        result: 'failed',
+        actual: null,
+        report: null,
+        failure: expect.stringMatching(/abandoned|owner ended/i),
+    });
+    expect(orphan.endedAt).not.toBeNull();
+
+    const before = revision();
+
+    records.reconcileRoleRuns(workId, { ownerEnded: true });
+    expect(revision()).toBe(before);
+});

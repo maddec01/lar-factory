@@ -69,3 +69,10 @@ test.each([
 
     expect(evidence.blockers.length).toBeGreaterThan(0);
 });
+
+test('S08 F05: behind-main readiness names the required branch update', async () => {
+    const evidence = await githubMerge(fake({ pullRequest: { ...pr, mergeStateStatus: 'BEHIND' } })).read('o/r', 8);
+
+    expect(evidence.blockers.join(' ')).toMatch(/behind main.*rebase|behind main.*update/i);
+    expect(evidence.pr.mergeState).toBe('behind');
+});

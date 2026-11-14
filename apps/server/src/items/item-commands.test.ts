@@ -3063,8 +3063,8 @@ test('two boards share one atomic capacity claim, and independent same-repositor
         for (const { board } of [first, second]) board.update({ buildLimit: { limit, automatic: limit } });
 
         const results = await Promise.all([
-            first.commands.startBuild(a, undefined),
-            second.commands.startBuild(b, undefined),
+            first.commands.startBuild(a, undefined, undefined, true, { automatic: true }),
+            second.commands.startBuild(b, undefined, undefined, true, { automatic: true }),
         ]);
 
         assert.equal(results.filter((result) => result.status === 200).length, limit);
@@ -3214,3 +3214,21 @@ for (const kind of ['concept', 'feature'] as const) {
         assert.ok(records.read(id).finishedAt);
     });
 }
+
+test('Pedro manual Start build can exceed capacity and records the override on the actual launch', async () => {
+    const records = await openRecords();
+    const ids = ['Manual A', 'Manual B'].map(
+        (title) => records.create({ title, repository: WEB, kind: 'build', status: 'Ready' }).workId,
+    );
+
+    for (const id of ids) approveBuild(records, id);
+
+    const { commands, board } = commandsOn([], undefined, records);
+
+    board.update({ buildLimit: { limit: 1, automatic: 1 } });
+    for (const id of ids) assert.equal((await commands.startBuild(id, undefined)).status, 200);
+    assert.deepEqual(
+        ids.map((id) => records.launchIntents({ workId: id })[0]?.buildInput?.capacity?.manualOverride),
+        [false, true],
+    );
+});

@@ -176,6 +176,13 @@ desk cards, unless Pedro must act. A quiet thread gets an honest notice; five
 minutes without a new action and with no tool running does not prove failure.
 Unavailable activity remains unknown.
 
+The exact observed T3 request is saved durably. Once it resolves and the same
+owner resumes, its matching desk notice clears even if scope writes landed first;
+newer notices, independent pending requests, board approvals and provider causes
+remain. Another item's gate or merge is an agent wait: record its blocker with
+`add-blocker`/`sync-blockers`, never Needs you. The notice commands reject those
+ordering waits.
+
 Actions say Start shaping, Start decision or Start build. Start after names the
 prerequisite and the action it will start. Labels name the current stage, such as
 Waiting for brief approval, Implementing, Code review or Waiting for required
@@ -183,8 +190,11 @@ checks. A build waiting for Pedro retains the progress stage from its build stat
 progress never becomes tracker labels, tags, comments or Azure State.
 
 A changed brief offers approval only after Doubt has a result for its current
-package and displayed digest. Until then the item says Doubt reviewing without
-a human approval action or desk wait. Board approval of an active amended build
+package and displayed digest. While a Doubt child execution actually runs, the item says Doubt reviewing.
+Otherwise it says "Brief changed; Doubt hasn't run", without a human approval
+action or desk wait. Reconcile reports that missing current-package review as a
+process gap. Every amendment ends through Gate, including its Doubt execution;
+ending the shaping turn after saving text does not complete that process. Board approval of an active amended build
 queues a durable notification for its build owner, regardless of newer shaping
 threads; restart retries reuse the same message identity. The retained tracker
 Spec is labelled Out-of-date Spec whenever its approved gate is no longer current,
@@ -690,18 +700,31 @@ automatic waits remain, the group shows them. A required human action also
 appears on the desk. The concept finishes after delivery and Outcome check.
 
 Concept builds stay in their group; standalone Ready work stays in Ready to
-build. Both draw from the existing machine build limit through one scheduler.
-The limit reflects the machine's hardware capacity. Each build runs in its own
-worktree, so a repository is never reserved. Blockers prevent conflicting work
-and can cross the concept boundary. Unblocked builds can run together in the
-same or different repositories up to the shared limit. A parked branch must
+build. Automatic starts draw from the existing machine build limit through one
+scheduler. The limit reflects the machine's hardware capacity for automatic
+starts. Each build runs in its own worktree, so a repository is never reserved. Blockers prevent conflicting work
+and can cross the concept boundary. Unblocked automatic builds can run together
+in the same or different repositories up to the shared limit. A parked branch must
 rebase and pass the same eligibility and capacity checks before resuming.
 
-The shared build limit counts starting or uncertain launches, In progress,
-Review and builds at work again after handback, as today. PRs merely waiting
-on Pedro release active capacity; their dependents still wait for merge. Starts
-from the desk, group, standalone section, Start after and Auto-build all obey
-the same capacity and eligibility checks. When capacity is short, choose among
+The shared build limit counts starting or uncertain launches and every started
+build. A started build retains its capacity reservation through every Pedro wait
+(question, tool approval, amended-brief approval, Verify and merge), and through
+handoff, recovery and continuation. It releases only on merge/completion or
+set-aside. Answering in T3 therefore resumes an already reserved build; no new
+build may take its place during the wait. This keeps automatic starts within
+the hardware bound when T3 answers resume work. The board counts reservations
+in its build limit. A candidate without a slot says "Waiting for a build slot" and automatic scheduling retries on each
+refresh in the same deterministic order. Auto-build, the concept run scheduler,
+merge-starts-next and Start after use strict capacity claims. Pedro's item-level **Start build** uses a free slot when available
+and otherwise starts anyway; its frozen launch input records a manual override,
+the limit and occupied count at the atomic claim. Every eligibility, gate, blocker
+and Access check still applies. That build retains its slot through waits too, so
+automatic starts wait until the count is below the limit. The board says
+`N building · limit M · K over the limit` and Ready rows keep Start build available
+with the note "Starting now will go over the limit." Clicking **Start concept builds**
+only authorizes its run: the run's starts remain automatic and wait at capacity.
+When capacity is short, choose among
 all eligible standalone work and running concepts' builds by oldest passing
 gate, then work ID. Each start claims capacity atomically. Blocked candidates
 do not hold up eligible work, including in the same repository.
@@ -742,8 +765,9 @@ settings and report only after their work and descendants are complete.
 Pedro's Start build, Start after when its prerequisites complete, a running
 concept or Auto-build requests the same start command. It refreshes the ticket
 Spec, reads the current gate and blockers, checks T3 Project availability,
-Settings, Access and capacity, and calls `prepare-build`. A changed digest
-returns to gate. Held edits wait for Accept or Reject. Read failure uses the
+Settings and Access, and calls `prepare-build` with its start source. Automatic
+requests use strict capacity; Pedro's item action records a manual override
+when full. A changed digest returns to gate. Held edits wait for Accept or Reject. Read failure uses the
 last gated local copy with a warning.
 
 The board fetches the resolved default branch from origin. Fetch failure or a
@@ -898,6 +922,10 @@ sets Needs you and stops the watch. The desk names the job or conflict and offer
 the next action. Pedro can request a rerun, another fix or a stop. A response
 resumes Review and the check watch. The stage ends at green required checks and
 Verify/Ready to merge, or an explicit Needs you hold.
+
+A behind-main merge hold names the needed
+rebase/update and directs Pedro to the existing Open PR action, followed by
+Refresh readiness.
 
 ### Verify, merge and handback
 
@@ -1071,6 +1099,10 @@ Each round reports differences, context sizes and package-test/CI times against
 #805's baseline. Remove or cheapen a test only when another check still protects
 its behavior. Rounds continue until Pedro says to stop; a successful scenario
 does not authorize ending the effort.
+
+When a current owner and its entire family have ended, restart
+reconciliation fails unfinished role launch records with an abandonment reason;
+unknown actual settings remain null.
 
 ## Sources and current limits
 

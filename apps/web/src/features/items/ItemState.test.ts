@@ -130,7 +130,7 @@ test('an amended brief awaiting current Doubt says Doubt reviewing in Build', ()
         buildPhase: 'implement',
     });
 
-    expect(stateOf(subject)).toMatchObject({ word: 'Doubt reviewing', progressStage: 'Build' });
+    expect(stateOf(subject)).toMatchObject({ word: "Brief changed; Doubt hasn't run", progressStage: 'Build' });
 });
 
 test.each([
@@ -151,4 +151,25 @@ test.each([
     });
 
     expect(stateOf(subject).progressStage).toBe(progressStage);
+});
+
+test('S08 F01: a gated candidate names its capacity wait without a desk action', () => {
+    const subject = item('I_sample13', {
+        status: 'Ready',
+        passingBrief: true,
+        blockers: [],
+        needsYou: undefined,
+        linkedPrs: [],
+        threads: [],
+        buildPhase: undefined,
+    });
+
+    expect(
+        itemState(subject, { unavailable: false, starting: false, lost: false, line: undefined, capacityFull: true })
+            .word,
+    ).toBe('Waiting for a build slot');
+    expect(
+        itemState(subject, { unavailable: false, starting: false, lost: false, line: undefined, capacityFull: false })
+            .word,
+    ).toBe('Ready');
 });

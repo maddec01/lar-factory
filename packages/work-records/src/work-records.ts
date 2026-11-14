@@ -49,6 +49,7 @@ import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { outcomeRecords } from './outcome-records.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { assertProductContent, productContent } from './product-content.ts';
+import { requireProductQuestion } from './product-question.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
 import { expectRevision } from './record-revision.ts';
@@ -67,6 +68,7 @@ import { specRecords, type SpecRecords } from './spec-records.ts';
 import { testRuntimeRecords, type TestRuntimeRecords } from './test-runtime-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
+import { userWaitRecords, type UserWaitRecords } from './user-wait.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
 import { verificationRecords, type VerificationRecords } from './verification-records.ts';
 
@@ -403,6 +405,7 @@ export interface WorkRecords
         SetAsideRecords,
         VerificationRecords,
         RunSettingsRecords,
+        UserWaitRecords,
         ValidationRecords,
         TrackerCache,
         PublicationRecords,
@@ -1315,6 +1318,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, gates);
 
     const records: WorkRecords = {
+        ...userWaitRecords(database, () => records),
         ...partBatchRecords(database, () => records, dataDir),
         ...reviewSelectionRecords(database, () => records),
         ...gateResumeRecords(database),
@@ -1678,12 +1682,16 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         setNeedsYou: (workId, revision, reason) => {
             const why = checkFilled(reason, 'Needs you reason');
 
+            requireProductQuestion(records, workId, why);
+
             return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
         },
         clearNeedsYou: (workId, revision) =>
             change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
         waitForUser: (workId, revision, reason) => {
             const why = checkFilled(reason, 'Needs you reason');
+
+            requireProductQuestion(records, workId, why);
 
             return change(workId, revision, (row) =>
                 row.needs_you === why && row.status === 'Needs you'

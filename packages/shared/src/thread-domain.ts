@@ -1,6 +1,7 @@
 // Project settings and onboarding contracts.
 
 import { type BoardData, type ModelSelection } from './board-domain.ts';
+import { reservesBuildSlot } from './build-capacity.ts';
 import { type Item } from './item-domain.ts';
 import type { RoleRunFinish } from './run-settings.ts';
 import type { ThreadActivity } from './thread-activity.ts';
@@ -64,6 +65,8 @@ export interface ItemThread {
     /** A running, waiting or queued descendant still belongs to this thread's work. */
     hasLiveChildren?: true;
     currentRunning?: true;
+    /** A current descendant execution titled by role-launch, not merely a missing review result. */
+    doubtRunning?: true;
     /** T3 has queued this thread's next turn. Its state stays `done`. */
     queued?: true;
     /** T3 archived this thread. T3 opens New thread for an archived thread's link, so the board never links it. */
@@ -222,28 +225,28 @@ export function workingAgain(item: Item, unavailable = false): boolean {
 
 /**
  * The builds that count against the build limit, in every repository: a build whose start is in flight or may have
- * started, one In progress or Review, and one at Verify or Ready to merge at work again. A concept never counts.
+ * started, one In progress or Review, and every started delivery through Pedro waits until completion or set-aside.
+ * A concept never counts.
  */
-export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, unavailable = false): Item[] {
+export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, _unavailable = false): Item[] {
     return data.items.filter((item) => {
-        if (item.kind === 'concept') return false;
-
         const start = startProgressOf(data, item.id, 'build');
+        const hasOwner = Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build');
+        const deliveryStarted = !!item.buildStarted || !!item.buildPhase || !!item.linkedPrs?.length || hasOwner;
         const parentOnly =
             item.flow === 'linked' &&
             (item.subIssues?.total > 0 || data.items.some((part) => part.parentId === item.id)) &&
-            !item.linkedPrs?.length &&
-            !(Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build'));
+            !deliveryStarted;
+        const pending = start?.phase === 'starting' || start?.phase === 'may-have-started';
 
-        if (parentOnly && start?.phase !== 'starting' && start?.phase !== 'may-have-started') return false;
-
-        return (
-            start?.phase === 'starting' ||
-            start?.phase === 'may-have-started' ||
-            item.status === 'In progress' ||
-            item.status === 'Review' ||
-            workingAgain(item, unavailable)
-        );
+        return reservesBuildSlot({
+            kind: item.kind,
+            status: item.status,
+            complete: item.completion?.complete ?? item.status === 'Done',
+            retired: !!item.setAside || !!item.archived,
+            coordinating: parentOnly && !pending,
+            deliveryStarted: deliveryStarted || pending,
+        });
     });
 }
 

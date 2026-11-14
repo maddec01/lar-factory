@@ -275,7 +275,7 @@ test("GitHub's merge state statuses map to can merge, checking, conflicts and bl
         UNKNOWN: 'checking',
         DIRTY: 'conflicts',
         BLOCKED: 'blocked',
-        BEHIND: 'blocked',
+        BEHIND: 'behind',
         DRAFT: 'blocked',
     });
     assert.equal(normalizeMergeState(undefined), 'checking', 'a status not read is still being checked');

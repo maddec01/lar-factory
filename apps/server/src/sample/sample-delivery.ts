@@ -5,8 +5,56 @@ import type { WorkRecords } from '@lar-factory/work-records';
 export function sampleDelivery(records: WorkRecords) {
     const threads = new Map<string, ItemThread[]>();
     let groupId: string | undefined;
+    let manualId: string | undefined;
 
     return {
+        manualOverride(repository: string, capacity: { limit: number; atWorkIds: string[] }) {
+            if (!repository.startsWith('lar-factory-sample/')) throw Error('Only fake sample work is supported.');
+
+            if (manualId) return manualId;
+
+            let work = records.create({
+                repository,
+                title: 'Sample manual build over the limit',
+                kind: 'build',
+                status: 'Ready',
+            });
+
+            work = records.setBody(
+                work.workId,
+                work.revision,
+                'brief',
+                '## Approved brief\nDeliver an independent fake greeting helper.',
+            );
+            records.recordGate(work.workId, work.revision, {
+                briefDigest: records.gate(work.workId).briefDigest!,
+                approvedBy: 'Sample Pedro',
+                evidence: 'Fake board approval.',
+            });
+
+            const { intent } = records.prepareBuild(work.workId, records.read(work.workId).revision, {
+                ...capacity,
+                manual: true,
+            });
+
+            records.resolveLaunchIntent(work.workId, records.read(work.workId).revision, intent.intentId, {
+                threadId: 'sample-manual-build',
+            });
+            records.setBuildPhase(work.workId, records.read(work.workId).revision, 'implement');
+            manualId = work.workId;
+            threads.set(manualId, [
+                {
+                    id: 'sample-manual-build',
+                    title: 'Sample manual override',
+                    purpose: 'build',
+                    state: 'running',
+                    currentRunning: true,
+                    updated: new Date().toISOString(),
+                },
+            ]);
+
+            return manualId;
+        },
         project(item: Item): Item {
             const owned = threads.get(item.id);
 

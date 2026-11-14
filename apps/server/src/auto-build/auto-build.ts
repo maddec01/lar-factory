@@ -198,7 +198,7 @@ export function createAutoBuild({
 
         for (const item of data.items) if (item.status === 'Ready' && startPending(item)) counted.add(item.id);
 
-        return counted.size;
+        return counted;
     };
 
     /**
@@ -276,7 +276,8 @@ export function createAutoBuild({
         endPauses();
 
         const { builds, waitsForRefinement } = eligible();
-        let room = Math.max(0, limit() - atWork());
+        const reserved = atWork();
+        let room = Math.max(0, limit() - reserved.size);
         /** The builds still eligible: a start, a pause or a change since the scan drops a build. */
         let waiting = builds.length;
         const shown = (held?: string | null) => ({
@@ -289,7 +290,7 @@ export function createAutoBuild({
 
         const scheduled = builds.filter((item) => on || conceptOf(item)?.explicit);
 
-        if (!scheduled.length || !room) return show(shown());
+        if (!scheduled.length || (!room && !scheduled.some((item) => reserved.has(item.id)))) return show(shown());
 
         const holds = hold() ?? ((await owns()) ? null : ANOTHER_BOARD);
 
@@ -298,7 +299,7 @@ export function createAutoBuild({
         let buildHold: string | null = null;
 
         for (const item of scheduled) {
-            if (!room) break;
+            if (!room && !reserved.has(item.id)) continue;
 
             const retry = held.get(item.id);
 
@@ -342,7 +343,10 @@ export function createAutoBuild({
             waiting--;
 
             // A start T3 may have made keeps its place, and the existing recovery settles it.
-            if (!error || uncertain) room--;
+            if ((!error || uncertain) && !reserved.has(item.id)) {
+                room--;
+                reserved.add(item.id);
+            }
 
             if (!error) log(`Auto-build started ${ref(item)}`);
             else if (!uncertain) {

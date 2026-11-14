@@ -231,3 +231,22 @@ it('keeps the pending user question without exposing the runtime request payload
     });
     expect(JSON.stringify(lookup(['question']))).not.toContain('private command');
 });
+
+it('S08 F03: a finished owner advertises Doubt only while its named child execution runs', () => {
+    const owner = { id: 'shape-owner', title: 'Shaping ST', status: 'completed', updatedAt: '2026-11-14T00:00:00Z' };
+    const child = {
+        id: 'doubt-child',
+        title: 'Doubt · ST',
+        lineage: { parentThreadId: 'shape-owner', rootThreadId: 'shape-owner' },
+        status: 'running',
+        updatedAt: owner.updatedAt,
+    };
+
+    expect(executionItemThreads([owner, child])(['shape-owner'])?.[0]?.doubtRunning).toBe(true);
+    expect(
+        executionItemThreads([owner, { ...child, status: 'completed' }])(['shape-owner'])?.[0]?.doubtRunning,
+    ).toBeUndefined();
+    expect(
+        executionItemThreads([owner, { ...child, title: 'Explore · ST' }])(['shape-owner'])?.[0]?.doubtRunning,
+    ).toBeUndefined();
+});

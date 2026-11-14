@@ -15,8 +15,8 @@ and board-recorded approval, or a Needs you wait.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
    gets that exact package, repository paths, resolved domain-doc setting/paths,
    [Doubt](doubt.md) and the orchestration guide's **Wait for delegated work**, no conversation.
-   Fix findings within the approved destination; ask for new scope, decisions
-   or changes to active builds. Rerun Doubt after brief or affected-work edits.
+   Fix findings within the destination; ask for scope changes. Every amendment
+   ends here: rerun Doubt after edits before ending the turn.
    Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>" [--file <ordering reasons.json>]`.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
 4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`

@@ -1,8 +1,8 @@
 // The work record's own text in the item dialog, ahead of any ticket's: a concept's map, a decision's text or any other
 // record's brief, with its build phase, review rounds and the initial context it began with, folded. Export markdown
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
-
 import {
+    buildActivity,
     buildPhaseLabel,
     conceptMapProse,
     parseDecisionMethod,
@@ -101,8 +101,9 @@ export function RecordText({
               )
               .map((part) => part.id)
         : [];
-    const reviewing =
-        item.briefReviewing || pendingBriefs.some((id) => items.find((part) => part.id === id)?.briefReviewing);
+    const reviewing = item.briefReviewing
+        ? item
+        : items.find((part) => pendingBriefs.includes(part.id) && part.briefReviewing);
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
         record.bodyKind === 'map'
@@ -127,7 +128,7 @@ export function RecordText({
                 <BriefChangeHistory itemId={item.id} requests={record.briefChangeRequests} refresh={refresh} />
             )}
             <ExportedLine exported={exported} />
-            {reviewing && <Text role="status">Doubt reviewing</Text>}
+            {reviewing && <Text role="status">{buildActivity(reviewing).label}</Text>}
             {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}

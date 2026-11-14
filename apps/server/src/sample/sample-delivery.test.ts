@@ -38,6 +38,16 @@ test('fake delivery exercises stale approval, grouped Auto-build and current bui
         const building = board.snapshot().items.find((item) => item.parentId === parent.id && item.buildPhase)!;
 
         expect(itemActivityThread(building)?.purpose).toBe('build');
+
+        const overridden = await sample.sampleControl({ action: 'delivery', change: 'manual-override' });
+
+        expect(overridden.status).toBe(200);
+        expect(buildsAtWork(board.snapshot())).toHaveLength(5);
+        expect(limitNumber(board.snapshot().buildLimit!)).toBe(4);
+
+        const manual = board.find((overridden.body as { manualWorkId: string }).manualWorkId)!;
+
+        expect(manual.buildStarted).toBe(true);
     } finally {
         sample.close();
         vi.unstubAllEnvs();

@@ -70,7 +70,9 @@ export function ItemDialogContent({
     openPart,
 }: ContentProps) {
     const group = isGroupParent(item, data.items);
-    const builds = group ? partsOf(item, data.items).filter((part) => part.kind === 'build') : [];
+    const builds = group
+        ? partsOf(item, data.items).filter((part) => part.kind === 'build' && !part.item.setAside)
+        : [];
     const buildsDone = builds.length > 0 && builds.every((part) => isDone(part.item));
     const aside = hasRelations(item, read, group);
     const record = read.state === 'loaded' ? read.details.record : undefined;
@@ -81,7 +83,7 @@ export function ItemDialogContent({
         azureReadOnly: setup?.azureReadOnly,
         recheckAction: true,
     });
-    const editable = accessProblem === null;
+    const editable = !item.setAside && accessProblem === null;
     // The open editor in an expanded dialog takes the height the rest leaves.
     const fill = expanded && edit.editing;
     const moves = useMovesItem(item, data);
@@ -109,14 +111,18 @@ export function ItemDialogContent({
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
                 <ItemDialogBody fill={fill} data-item-body>
-                    {!group && <ItemProgress item={item} />}
+                    {!group && !item.setAside && <ItemProgress item={item} />}
                     {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                     {item.shapingCleanupProblem && (
                         <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
-                    <NeedsYou item={item} data={data} />
-                    <VerifyBuild item={item} />
-                    <RetroFollowups item={item} />
+                    {!item.setAside && (
+                        <>
+                            <NeedsYou item={item} data={data} />
+                            <VerifyBuild item={item} />
+                            <RetroFollowups item={item} />
+                        </>
+                    )}
                     {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
                     {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress
@@ -124,7 +130,7 @@ export function ItemDialogContent({
                         remaining={item.completion?.reasons}
                         name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
                     />
-                    <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />
+                    {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (!group || record.body?.trim() || record.answer?.trim()) && (
                             <RecordText

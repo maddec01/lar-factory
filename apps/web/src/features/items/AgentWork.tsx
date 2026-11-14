@@ -1,11 +1,12 @@
 import type { Item, ItemStats } from '@lar-factory/shared';
 // An item's agent work: its usage figures as one muted line, or the line that says why there are none.
-import { duration, formatTokens, formatUsd } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, shapingOwner } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
 
 import { useItemState } from './ItemState';
 import { hasFigures, usageUnreadable } from './UsageFigures';
 import { useLastKnown } from './useLastKnown';
+import { useBoardStore } from '@/services/board/board.hooks';
 
 /** Why a total isn't the whole sum. */
 export const INCOMPLETE_TOTAL = 'Some agent usage is not available yet.';
@@ -71,6 +72,11 @@ export function AgentWork({
 
 /** The header’s muted work state when there are no figures, including loading and unreadable usage. */
 export function AgentWorkNote({ item }: { item: Item }) {
+    const owner = shapingOwner(
+        item,
+        useBoardStore((state) => state.data.items),
+    );
+
     if (item.conceptBuild?.run)
         return (
             <Text variant="caption" tone="muted" data-agent-work-note>
@@ -99,7 +105,9 @@ export function AgentWorkNote({ item }: { item: Item }) {
                 ? 'Fixing failed Verify'
                 : item.kind === 'concept'
                   ? 'No direct agent work yet'
-                  : 'No agent work yet';
+                  : owner
+                    ? `Shaped in ${owner.kind} thread`
+                    : 'No agent work yet';
 
     return (
         <Text variant="caption" tone="muted" data-agent-work-note>

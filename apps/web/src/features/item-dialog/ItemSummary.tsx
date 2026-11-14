@@ -3,7 +3,7 @@
 // kind as its row names it when the dialog's Kind control doesn't, and attaching or creating its ticket. The meta area
 // says when it was updated.
 
-import { blockedText, staleGateReason, itemName, openBlockers } from '@lar-factory/shared';
+import { blockedText, staleGateReason, itemName, openBlockers, retiredPartLabel } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
@@ -29,9 +29,12 @@ export function ItemSummary({ item }: { item: Item }) {
                 <>
                     <SourceIcon item={item} />
                     <RepoCell item={item} />
-                    <ItemStatusGlyph item={item} /> <SummaryStatus title={shown.recorded}>{shown.word}</SummaryStatus>
-                    {item.staleGate && <SummaryBlocked>{staleGateReason(item)}</SummaryBlocked>}
-                    {openBlockers(item).length > 0 && !shown.blocked && (
+                    <ItemStatusGlyph item={item} />{' '}
+                    <SummaryStatus title={item.setAside ? `Last status: ${shown.recorded}` : shown.recorded}>
+                        {retiredPartLabel(item) ?? shown.word}
+                    </SummaryStatus>
+                    {!item.setAside && item.staleGate && <SummaryBlocked>{staleGateReason(item)}</SummaryBlocked>}
+                    {!item.setAside && openBlockers(item).length > 0 && !shown.blocked && (
                         <SummaryBlocked>{blockedText(item)}</SummaryBlocked>
                     )}
                 </>
@@ -56,6 +59,7 @@ export function ItemSummary({ item }: { item: Item }) {
                 </>
             }
             actions={
+                !item.setAside &&
                 item.status !== 'Done' && (
                     <>
                         <AttachTicket item={item} />

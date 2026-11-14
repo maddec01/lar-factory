@@ -9,6 +9,7 @@ import {
     ownerThreads,
     openQuestionThread,
     questionOwnerParent,
+    shapingOwner,
     threadLink,
 } from '@lar-factory/shared';
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
@@ -38,7 +39,10 @@ function latestThread(
             : undefined;
     const requestOwner =
         threadId && item.threads?.find((thread) => !thread.observedAt && thread.pendingRequest?.threadId === threadId);
-    const latest = own ?? requestOwner ?? inherited;
+    const shaping = shapingOwner(item, data.items);
+    const shapingThread = shaping && ownerThread(shaping);
+    const latest =
+        own ?? requestOwner ?? inherited ?? (!threadId || shapingThread?.id === threadId ? shapingThread : undefined);
 
     if (!latest) return { reason: 'No T3 thread has worked on this yet' };
 

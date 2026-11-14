@@ -298,6 +298,13 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
+    /** Stable creation facts for group display order, independent of Queue and approval renewal. */
+    createdAt?: string;
+    partOrder?: number;
+    /** Retired children stay inspectable within their group, outside the active board and scheduler. */
+    retiredParts?: Item[];
+    setAside?: boolean;
+    supersededBy?: IssueRef & { workId: string };
     releasePlan?: import('./release-plan.ts').ReleasePlan | null;
     retro?: import('./retro.ts').Retro | null;
     reconciliation?: import('./group-reconciliation.ts').ReconcileReport;

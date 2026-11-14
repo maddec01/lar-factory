@@ -229,7 +229,7 @@ export function createItemDetails(
     const readDetails: ReadItemDetails = async (work) => {
         let record = records ? recordDetails(records, work.id) : undefined;
 
-        if (record && records) {
+        if (record && records && !work.setAside) {
             await refreshSpecs(records, { ...specSync, workId: work.id });
             record = recordDetails(records, work.id);
         }

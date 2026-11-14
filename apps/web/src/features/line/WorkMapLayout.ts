@@ -44,6 +44,7 @@ interface Edge {
     label?: string;
     names?: string;
     kind?: 'blocker' | 'dependency';
+    complete?: boolean;
 }
 
 /** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
@@ -98,11 +99,23 @@ function edgesOf(parts: Part[], check: boolean): Edge[] {
 
     return [...edges.values()].map(({ from, to, via, kind }) => {
         const names = [...via].map((p) => itemName(p.item)).join(', ');
+        const retired = [...via].some((part) => part.item.setAside);
 
-        if (from === HISTORY) return { from, to, kind, label: plural(via.size, 'completed prerequisite'), names };
+        if (from === HISTORY) {
+            const complete = !retired;
+
+            return {
+                from,
+                to,
+                kind,
+                complete,
+                label: plural(via.size, complete ? 'completed prerequisite' : 'past prerequisite'),
+                names,
+            };
+        }
 
         return to === HISTORY
-            ? { from, to, kind, label: `before ${plural(via.size, 'completed part')}`, names }
+            ? { from, to, kind, label: `before ${plural(via.size, retired ? 'past part' : 'completed part')}`, names }
             : { from, to, kind };
     });
 }
@@ -142,8 +155,7 @@ export function layout(parts: Part[], data: BoardData, width: number, check: boo
 
     lanes.forEach((lane) => {
         const here = current.filter((p) => laneOf(p) === lane);
-        const inCol = (c: number) =>
-            here.filter((p) => depth.get(keyOf(p))! + offset === c).sort((a, b) => urgency(a) - urgency(b));
+        const inCol = (c: number) => here.filter((p) => depth.get(keyOf(p))! + offset === c);
         const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
 
         for (let c = 0; c < cols; c++) {
@@ -225,10 +237,15 @@ export function edgeLine(m: ReturnType<typeof layout>, from: Placed | undefined,
 
 /** How the group sums itself up: its settled decisions and finished builds, each left out at zero. */
 export const historyText = (parts: Part[]) => {
-    const decisions = parts.filter((p) => DECISION_KINDS.includes(p.kind)).length;
-    const builds = parts.length - decisions;
+    const retired = parts.filter((p) => p.item.setAside).length;
+    const decisions = parts.filter((p) => !p.item.setAside && DECISION_KINDS.includes(p.kind)).length;
+    const builds = parts.length - decisions - retired;
 
-    return [decisions && plural(decisions, 'settled decision'), builds && plural(builds, 'finished build')]
+    return [
+        decisions && plural(decisions, 'settled decision'),
+        builds && plural(builds, 'finished build'),
+        retired && plural(retired, 'retired part'),
+    ]
         .filter(Boolean)
         .join(' · ');
 };

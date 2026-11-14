@@ -169,13 +169,13 @@ test('while a Queue start launches, the item counts in shaping as its row moves 
     expect(popup()!.querySelector('[data-item="I_sample05"]')).not.toBeNull();
 });
 
-test('shipped lists this week’s done items, newest first', async () => {
+test('shipped lists this week’s delivered builds, newest first', async () => {
     await mountPage();
 
     const pop = await openCounter('shipped');
 
-    expect(head(pop)).toBe('Shipped4Last 7 days');
-    expect(rows().map((r) => r.split(' ')[0])).toEqual(['#5', '#40', '#203', '#181']);
+    expect(head(pop)).toBe('Shipped3Last 7 days');
+    expect(rows().map((r) => r.split(' ')[0])).toEqual(['#5', '#40', '#181']);
 });
 
 test('spend lists every priced item, highest cost first, with its cost', async () => {
@@ -202,7 +202,7 @@ test('while the first read could add items, a count with none is a dash, one wit
     const data = structuredClone(completeSample);
 
     await mountPage({ ...data, items: data.items.filter((i) => i.status === 'Done'), firstRead });
-    expect(counters().slice(0, 4).map(value)).toEqual(['–', '–', '–', '4']);
+    expect(counters().slice(0, 4).map(value)).toEqual(['–', '–', '–', '3']);
     for (const label of ['need you', 'shaping', 'building'] as const) {
         expect(nameOf(counter(label))).toBe(`${label}: Still loading projects`);
 

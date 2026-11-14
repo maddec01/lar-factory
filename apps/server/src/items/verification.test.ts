@@ -177,3 +177,24 @@ test('a CLI-recorded failure is delivered by the board reconciliation after rest
     await s.commands.reconcileVerificationFixes();
     expect(s.send).toHaveBeenCalledOnce();
 });
+
+test('concurrent head inspection identifies a pending read for automatic UI retry', async () => {
+    const s = await setup();
+    let finish!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+        finish = resolve;
+    });
+
+    s.read.mockImplementationOnce(async () => {
+        await waiting;
+
+        return { pr: { ...s.pr }, methods: ['squash'] as const, blockers: [] };
+    });
+
+    const first = s.commands.inspectVerification(s.item.id);
+
+    expect((await s.commands.inspectVerification(s.item.id)).body).toMatchObject({ verificationPending: true });
+    finish();
+    expect((await first).status).toBe(200);
+    expect((await s.commands.inspectVerification(s.item.id)).status).toBe(200);
+});

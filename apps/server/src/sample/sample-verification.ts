@@ -8,6 +8,8 @@ import type { createVerification } from '../items/verification.ts';
 export function sampleVerification(records: WorkRecords, tickets: () => Item[], refresh: () => void) {
     const prs = new Map<string, LinkedPr>();
     const messages: unknown[] = [];
+    let headRead: Promise<void> | undefined;
+    let releaseHeadRead: (() => void) | undefined;
     const provider: MergeProvider = {
         async read(repo, number) {
             if (!repo.startsWith('lar-factory-sample/')) throw new Error('Only fake sample PRs are supported.');
@@ -15,6 +17,8 @@ export function sampleVerification(records: WorkRecords, tickets: () => Item[], 
             const pr = prs.get(`${repo}#${number}`);
 
             if (!pr) throw new Error('No fake Verify fixture was selected.');
+
+            await headRead;
 
             return { pr: structuredClone(pr), methods: ['squash'], blockers: [] };
         },
@@ -71,6 +75,20 @@ export function sampleVerification(records: WorkRecords, tickets: () => Item[], 
             } else {
                 if (!record) throw new Error('Seed the fake Verify fixture first.');
 
+                if (input.change === 'hold-head' || input.change === 'release-head') {
+                    if (input.change === 'hold-head' && !headRead)
+                        headRead = new Promise<void>((resolve) => {
+                            releaseHeadRead = resolve;
+                        });
+                    else if (input.change === 'release-head') {
+                        releaseHeadRead?.();
+                        headRead = undefined;
+                        releaseHeadRead = undefined;
+                    }
+
+                    return { workId: record.workId, messages };
+                }
+
                 if (input.change === 'head') {
                     if (typeof input.head !== 'string' || !/^[a-f0-9]{40}$/.test(input.head))
                         throw new Error('Use a full fake SHA.');
@@ -78,7 +96,7 @@ export function sampleVerification(records: WorkRecords, tickets: () => Item[], 
                     prs.get(record.pullRequest!)!.sourceRevision = input.head;
                 } else if (input.change === 'ready')
                     record = records.update(record.workId, record.revision, { status: 'Verify' });
-                else throw new Error('Choose seed, head or ready.');
+                else throw new Error('Choose seed, head, ready, hold-head or release-head.');
             }
 
             records.observeVerificationHead(

@@ -130,7 +130,7 @@ export function createVerification({
             throw new Error(`Verify failure saved. ${answer.reason} Retry sending the fix to this build.`);
     };
     const run = async (id: string, action: () => Promise<object>): Promise<Reply> => {
-        if (pending.has(id)) return reply(409, { error: 'A Verify action is pending.' });
+        if (pending.has(id)) return reply(409, { error: 'A Verify action is pending.', verificationPending: true });
 
         pending.add(id);
 

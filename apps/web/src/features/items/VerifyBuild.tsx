@@ -30,17 +30,29 @@ export function VerifyBuild({ item }: { item: Item }) {
         if (!awaiting) return;
 
         const controller = new AbortController();
+        let retry: ReturnType<typeof setTimeout> | undefined;
 
-        void postAction<{ verification: Context }>('/api/inspect-verification', { itemId: item.id }).then((result) => {
+        void postAction<{ verification: Context; verificationPending: boolean }>('/api/inspect-verification', {
+            itemId: item.id,
+        }).then((result) => {
             if (controller.signal.aborted) return;
 
             receive(result);
+
+            if (result.verificationPending || result.error === 'A Verify action is pending.') {
+                setError(null);
+                retry = setTimeout(() => setAttempt((value) => value + 1), 500);
+
+                return;
+            }
+
             setInspected({ request, context: result.verification });
             setError(result.error);
         });
 
         return () => {
             controller.abort();
+            clearTimeout(retry);
         };
     }, [item.id, awaiting, request]);
 

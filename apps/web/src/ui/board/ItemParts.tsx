@@ -64,7 +64,7 @@ export function TitleLink({
 
 const identities = {
     row: 'flex min-w-0 items-center gap-1',
-    map: 'inline-flex min-w-0 items-center gap-1.5',
+    map: 'inline-flex min-w-0 max-w-full items-center gap-1.5',
     wrap: 'inline-flex min-w-0 items-center gap-2',
 } as const;
 
@@ -94,7 +94,7 @@ export function RepoIdentity({
             className={identities[presentation]}
         >
             {icon}
-            <span className={presentation !== 'row' ? 'min-w-0 wrap-anywhere' : 'truncate'}>{name}</span>
+            <span className={presentation === 'wrap' ? 'min-w-0 wrap-anywhere' : 'min-w-0 truncate'}>{name}</span>
         </span>
     );
 }

@@ -1,5 +1,5 @@
 import type { Item } from './item-domain.ts';
-import { openQuestionThread, type ItemThread } from './thread-domain.ts';
+import { openQuestionThread, ownerThread, type ItemThread } from './thread-domain.ts';
 
 /** The next action names the pending request and opens its exact owner, including a child thread. */
 export function questionThreadAction(thread: ItemThread | undefined) {
@@ -66,4 +66,26 @@ export function delegatedBriefApproval(owner: Item, all: readonly Item[]): Item 
             summary.includes(candidate.briefApproval.digest) &&
             (candidate.parentId === owner.id || (!!owner.parentId && candidate.parentId === owner.parentId)),
     );
+}
+
+/** Navigation to the nearest shaping owner, including a finished decision or concept. It confers no activity or usage. */
+export function shapingOwner(item: Item, all: readonly Item[]): Item | undefined {
+    if (item.threads === 'unavailable' || item.threads?.length) return undefined;
+
+    const seen = new Set([item.id]);
+    let parentId = item.parentId;
+
+    while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+
+        const parent = all.find((candidate) => candidate.id === parentId);
+
+        if (!parent) return undefined;
+
+        if (['concept', 'decision'].includes(parent.kind) && ownerThread(parent)) return parent;
+
+        parentId = parent.parentId;
+    }
+
+    return undefined;
 }

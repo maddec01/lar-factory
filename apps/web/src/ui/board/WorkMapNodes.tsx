@@ -2,8 +2,10 @@ import type { WorkMapPrerequisite } from '@lar-factory/shared';
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-/** Room for the action header, two title lines, status and slices; the graph uses the same height for its edges. */
-export const MAP_NODE_HEIGHT = 152;
+import { MapStartAction } from './StartAfterButton';
+
+/** Room for a wrapping action header, a project line, two title lines, status and slices; edges share this height. */
+export const MAP_NODE_HEIGHT = 184;
 
 const NODE_ATTENTION = {
     default: 'border-line',
@@ -28,6 +30,7 @@ export function MapPartNode({
     onOpen,
     source,
     head,
+    repository,
     action,
     name,
     glyph,
@@ -56,6 +59,8 @@ export function MapPartNode({
     source: ReactNode;
     /** The card's head line, such as its repository. */
     head: ReactNode;
+    /** A project name on its own bounded line, outside the action row. */
+    repository?: ReactNode;
     /** What it asks next. */
     action?: ReactNode;
     /** The part's name. */
@@ -86,16 +91,21 @@ export function MapPartNode({
             />
             {source}
             <span
-                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 items-center gap-1.5 pr-5 text-xs"
+                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 pr-5 text-xs"
                 data-map-head
             >
                 {head}
                 {action && (
-                    <span className="pointer-events-auto ml-auto flex min-w-0 flex-1 justify-end [&_button]:max-w-full">
-                        {action}
+                    <span className="pointer-events-auto ml-auto flex max-w-full min-w-0 justify-end">
+                        <MapStartAction>{action}</MapStartAction>
                     </span>
                 )}
             </span>
+            {repository && (
+                <span className="text-fg-muted pointer-events-none relative min-w-0 shrink-0 truncate text-xs">
+                    {repository}
+                </span>
+            )}
             <span className="pointer-events-none relative line-clamp-2 shrink-0 text-sm leading-5 font-medium wrap-anywhere">
                 {name}
             </span>
@@ -105,7 +115,10 @@ export function MapPartNode({
                     {facts}
                 </span>
             </span>
-            <span className="text-fg-muted pointer-events-none relative shrink-0 text-xs" data-map-record-state>
+            <span
+                className="text-fg-muted pointer-events-none relative min-w-0 shrink-0 truncate text-xs"
+                data-map-record-state
+            >
                 {recordState}
             </span>
             {slices && <span className="pointer-events-none relative shrink-0">{slices}</span>}

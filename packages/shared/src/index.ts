@@ -53,3 +53,7 @@ export * from './brief-gate.ts';
 export * from './group-state.ts';
 
 export * from './group-capacity.ts';
+
+export * from './part-order.ts';
+export * from './retired-part.ts';
+export { shapingOwner } from './question-thread.ts';

@@ -1020,7 +1020,10 @@ export function createBoardServer({
 
         if (!itemId) return json(res, 400, { error: 'Name the item whose details to read.' });
 
-        const item = board.snapshot().items.find((i) => i.id === itemId);
+        const items = board.snapshot().items;
+        const item =
+            items.find((i) => i.id === itemId) ??
+            items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId);
 
         if (!item) return json(res, 404, { error: 'That item is not on the board.' });
 

@@ -119,9 +119,10 @@ export function WorkMap({
                                     d,
                                     kind: e.kind,
                                     done:
-                                        e.from === HISTORY ||
-                                        (!!a?.part && isDone(a.part.item)) ||
-                                        a?.prerequisite?.blocker.state === 'closed',
+                                        e.from === HISTORY
+                                            ? e.complete !== false
+                                            : (!!a?.part && isDone(a.part.item)) ||
+                                              a?.prerequisite?.blocker.state === 'closed',
                                     lit,
                                     dim: !!hover && !lit,
                                 },

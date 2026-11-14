@@ -44,7 +44,7 @@ export function ItemKindControl({ item, fallback }: { item: Item; fallback: Reac
 
     const { start } = useKindChangeStore.getState();
 
-    if (!kindCanChange(item.kind)) return fallback;
+    if (item.setAside || !kindCanChange(item.kind)) return fallback;
 
     return (
         <span data-kind-control>

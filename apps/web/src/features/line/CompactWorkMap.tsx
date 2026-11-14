@@ -1,3 +1,4 @@
+import { comparePartOrder } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 
 import { DECISION_KINDS } from './DossierParts';
@@ -21,7 +22,13 @@ export function CompactWorkMap({
     home: string;
 }) {
     const cardWidth = Math.max(0, width - 24);
-    const ordered = [...map.placed].sort((a, b) => a.col - b.col || a.y - b.y);
+    const ordered = [...map.placed].sort(
+        (a, b) =>
+            a.col - b.col ||
+            (a.part && b.part && (a.part.item.createdAt || b.part.item.createdAt)
+                ? comparePartOrder(a.part.item, b.part.item)
+                : a.y - b.y),
+    );
     const title = (key: string) => {
         const node = map.placed.find((node) => node.key === key);
 

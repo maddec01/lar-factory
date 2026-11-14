@@ -226,3 +226,30 @@ it.each([false, true])(
         expect(mergePr).not.toHaveBeenCalled();
     },
 );
+
+it('reads a retired group part without putting it back on the active board', async () => {
+    const retired = { id: 'retired', title: 'b04', setAside: true };
+    const board = createBoardState({
+        repos: [],
+        items: [{ id: 'group', retiredParts: [retired] }],
+    } as unknown as BoardData);
+    const details = vi.fn(async () => ({ body: 'Preserved historical brief', bodyFormat: 'markdown' }));
+    const { server } = createBoardServer({
+        board,
+        page: { template: '<html></html>', assets: new Map() },
+        ready: () => undefined,
+        itemDetails: { details },
+    } as unknown as HttpDeps);
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    close = () => new Promise((resolve) => server.close(resolve));
+
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const response = await fetch(`${origin}/api/item-details?itemId=retired`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ details: { body: 'Preserved historical brief' } });
+    expect(details).toHaveBeenCalledWith(retired);
+    expect(board.find('retired')).toBeUndefined();
+    expect((await fetch(`${origin}/api/item-details?itemId=unknown`)).status).toBe(404);
+});

@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { validateBlockers } from './blocker-graph.ts';
 import type { Database } from './database.ts';
 import { WorkRecordError } from './database.ts';
+import { assertProductContent } from './product-content.ts';
 import { validateTrackerSnapshot } from './tracker-snapshot.ts';
 
 type Row = Record<string, string | number | null>;
@@ -471,6 +472,8 @@ export function trackerCache(database: Database): TrackerCache {
                         node.map !== undefined &&
                         !db.prepare("SELECT 1 FROM bodies WHERE work_id = ? AND body='map'").get(id)
                     ) {
+                        assertProductContent(node.map);
+
                         const written = Number(
                             db.prepare('SELECT coalesce(max(written), 0)+1 AS n FROM bodies').get()?.n,
                         );

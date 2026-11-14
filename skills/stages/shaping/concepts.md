@@ -17,7 +17,7 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 - <shaping result needed to explain a part or relationship> (<decision title>)
 
 ## Fog
-- <what we don't know yet, and can't phrase as a question yet>
+- [decision: ID] <remaining question and its live owner/route>
 
 ## Out of scope
 - <what this won't do>
@@ -45,7 +45,7 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
 2. Create the currently known decisions with one `create-parts` batch per
    [Structure](shared/issue-tracker/structure.md), including the current map.
    Each decision body starts `Method: grill`, `prototype`, `research` or `task`,
-   then its question. Name its repository; leave unphrased questions in Fog.
+   then its question. Name its repository; route remaining Fog per Reconcile group.
 3. Start each research decision now, in the background, with the
    [research](research-question.md) step.
 4. Keep the concept in Shaping while decisions are open. Each grill,

@@ -121,3 +121,18 @@ test('stopped builds wait while their slots remain occupied', () => {
     ];
     expect(groupState(parent, data)?.word).toBe('1 build running · 2 waiting');
 });
+
+test('a shaping-only concept never presents its future Outcome check as the current hold', () => {
+    const { parent, data } = group();
+
+    data.items = [parent];
+    parent.subIssues = { total: 0, completed: 0 };
+    parent.refinement = { complete: true, reasons: [] };
+    parent.releasePlan = {
+        steps: [],
+        outcomeCheck: { what: 'Inspect after release', result: 'pending', evidence: null },
+    };
+    expect(groupState(parent, data)?.word).toBe('Refined · no delivery planned');
+    parent.refinement = { complete: false, reasons: ["Its Fog isn't gone."] };
+    expect(groupState(parent, data)?.word).toBe('Shaping');
+});

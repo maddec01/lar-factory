@@ -53,7 +53,8 @@ test('a growing concept folds every gate and status hold behind its compact summ
     const run = group().querySelector('[data-concept-build-run]')!;
     const disclosure = run.querySelector('details')!;
 
-    expect(text(disclosure.querySelector('summary'))).toContain('Waiting on 20 gates');
+    expect(text(disclosure.querySelector('summary'))).toBe('Build hold details');
+    expect(text(group()).match(/Waiting on 20 gates/g)).toHaveLength(1);
     expect(disclosure.open).toBe(false);
     await press(disclosure.querySelector('summary'));
     expect(disclosure.open).toBe(true);

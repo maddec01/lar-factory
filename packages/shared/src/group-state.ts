@@ -83,6 +83,7 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
         return null;
 
     const progress = groupBuildProgress(parent, data, unavailable);
+    const delivery = progress.total > 0 && progress.complete === progress.total;
     const parts = data.items.filter((item) => item.parentId === parent.id);
     const pending = parts.filter((item) => !complete(item));
     const waiting = humanWait(parent, unavailable, data.items);
@@ -100,9 +101,9 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
             : (buildWord ??
               (waiting && waiting.label !== 'Release step'
                   ? waiting.label
-                  : !pending.length && parent.releasePlan?.steps.some((step) => !step.done)
+                  : delivery && !pending.length && parent.releasePlan?.steps.some((step) => !step.done)
                     ? 'Waiting on release step'
-                    : !pending.length && releaseHolds(parent.releasePlan).length
+                    : delivery && !pending.length && releaseHolds(parent.releasePlan).length
                       ? parent.releasePlan?.outcomeCheck.result === 'failed'
                           ? 'Outcome check failed'
                           : 'Waiting on Outcome check'
@@ -114,7 +115,9 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
                             ? 'Some parts are outside the board'
                             : progress.total
                               ? 'Waiting on delivery'
-                              : parent.status));
+                              : parent.refinement?.complete
+                                ? 'Refined · no delivery planned'
+                                : parent.status));
 
     return { word, running, progress };
 }

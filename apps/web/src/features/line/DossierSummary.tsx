@@ -1,7 +1,16 @@
 // A dossier's reading for its line: its parts done and counted, its chips, what's next and its threads.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { humanWait, itemName, needsAnswer, plural, repoKey, repoName, workingAgain } from '@lar-factory/shared';
+import {
+    humanWait,
+    itemFog,
+    itemName,
+    needsAnswer,
+    plural,
+    repoKey,
+    repoName,
+    workingAgain,
+} from '@lar-factory/shared';
 import { Ban, CircleHelp, MessagesSquare } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -28,6 +37,7 @@ export interface Moving {
     ready: Part[];
     active: Part[];
     fog: string[];
+    unroutedFog: string[];
 }
 
 export function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
@@ -55,7 +65,12 @@ export function moving(parent: Item, parts: Part[], unavailable: boolean): Movin
                 !needsAnswer(p.item) &&
                 (['Shaping', 'In progress', 'Review'].includes(p.item.status) || workingAgain(p.item, unavailable)),
         ),
-        fog: parent.map?.fog ?? [],
+        fog: itemFog(parent, all, unavailable)
+            .filter((f) => f.routed)
+            .map((f) => f.question),
+        unroutedFog: itemFog(parent, all, unavailable)
+            .filter((f) => !f.routed)
+            .map((f) => f.question),
     };
 }
 
@@ -149,6 +164,7 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         ...(parent.refinement?.complete ? [{ words: 'Refined', tone: 'success' as const, refined: true }] : []),
         ...(noDelivery(parent) ? [{ words: 'no delivery planned', tone: 'neutral' as const }] : []),
         ...count(m.fog.length, m.fog.length === 1 ? 'open question' : 'open questions', 'neutral', <CircleHelp />),
+        ...count(m.unroutedFog.length, 'Fog to reconcile', 'warning', <CircleHelp />),
     ];
 }
 

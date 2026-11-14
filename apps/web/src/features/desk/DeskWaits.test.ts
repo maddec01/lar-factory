@@ -279,3 +279,16 @@ test('tool approval names the delegated owner and request, then leaves the desk 
     expect($('.desk-card')).toBeNull();
     expect($('[data-stage="shaping"] [data-item="I_sample12"]')).not.toBeNull();
 });
+
+test('a concept question has one wait label on its desk card', async () => {
+    await mountPage(
+        board({
+            kind: 'concept',
+            status: 'Shaping',
+            subIssues: { total: 0, completed: 0 },
+            releasePlan: { steps: [], outcomeCheck: { what: 'After release', result: 'pending', evidence: null } },
+            threads: [{ ...thread, pendingRequest: { id: 'q', threadId: 'waiting', kind: 'question' } }],
+        }),
+    );
+    expect(text(card()).match(/Question/g)).toHaveLength(1);
+});

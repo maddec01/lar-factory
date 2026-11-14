@@ -2,6 +2,7 @@ import { readTicketSpec } from '@lar-factory/shared';
 import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
 
 import { blockerDeclarations, missingBlockerDeclarations } from './blocker-declarations.ts';
+import { fogChecks } from './fog-checks.ts';
 import { projectionChecks } from './group-projections.ts';
 import type { WorkRecord, WorkRecords } from './work-records.ts';
 
@@ -48,7 +49,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
         add('blocker', `declared-blockers:${groupId}`, groupId, (error as Error).message, []);
     }
 
-    items.push(...projectionChecks(records, groupId));
+    items.push(...projectionChecks(records, groupId), ...fogChecks(records, groupId));
     for (const request of records.partTicketRequests(groupId))
         if (!request.ticket)
             add(

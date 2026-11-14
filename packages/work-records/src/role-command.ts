@@ -34,6 +34,8 @@ function preamble(snapshot: RunSettings, role: string, dataDir: string): string 
     accessSync(cli);
 
     return [
+        '<!-- factory-runtime:start -->',
+        'Runtime instructions only: carry in thread handoffs, never in product records; execution choices belong in run-settings.',
         `Factory role ${role}; work ID ${snapshot.workId}; run ID ${snapshot.runId}.`,
         `Read ${snapshot.kind === 'build' ? build : shape} first; resolve relative files there. Never discover skills independently or read global skills first. Hold if a supplied path is unavailable.`,
         `Factory skill entries: ${JSON.stringify({ 'lar-shape': shape, 'lar-build': build })}`,
@@ -58,6 +60,7 @@ function preamble(snapshot: RunSettings, role: string, dataDir: string): string 
         ...snapshot.reviewers
             .filter((reviewer) => role === `reviewer:${reviewer.id}`)
             .map((reviewer) => reviewer.instructions.text),
+        '<!-- factory-runtime:end -->',
     ].join('\n');
 }
 

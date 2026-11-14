@@ -1,7 +1,7 @@
 // What keeps a dossier's work moving, as the labelled rows its Attention lists.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { humanWait, itemName, needsAnswer, ref } from '@lar-factory/shared';
+import { humanWait, itemFog, itemName, needsAnswer, ref } from '@lar-factory/shared';
 
 import { PartLink, Refs } from './DossierEntries';
 import type { FindRef } from './DossierHelpers';
@@ -180,14 +180,14 @@ export function useAttentionRows(
         },
         {
             key: 'fog',
-            label: 'Open questions',
+            label: 'Fog routes',
             tone: 'fog' as const,
-            entries: (parent.map?.fog ?? []).map((q) => (
+            entries: itemFog(parent, data.items, unavailable).map((fog) => (
                 <Entry
-                    key={q}
+                    key={fog.text}
                     main={
                         <AttentionMark mark="fog">
-                            <Refs text={q} find={find} />
+                            <Refs text={fog.routed ? fog.question : `Fog to reconcile: ${fog.question}`} find={find} />
                         </AttentionMark>
                     }
                 />

@@ -280,9 +280,9 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
         '2 decisions',
         'Refined',
         'no delivery planned',
-        '2 open questions',
+        '2 Fog to reconcile',
     ]);
-    expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 open questions');
+    expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 Fog to reconcile');
 
     const title = next().querySelector('[title]')!;
 
@@ -294,9 +294,9 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
     expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
     await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
     expect(chips(), 'Refined over fog').toEqual(['Refined']);
-    expect(words()).toContain('Refined · no delivery planned · 1 open question');
+    expect(words()).toContain('Refined · no delivery planned · 1 Fog to reconcile');
     await receive(calm({ refinement: undefined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(chips(), 'fog with nothing above it').toEqual(['1 open question']);
+    expect(chips(), 'fog with nothing above it').toEqual(['1 Fog to reconcile']);
     expect(more(), 'nothing more to count').toBeNull();
     await receive(calm({ refinement: undefined }));
     expect(header().querySelector('[data-chips]'), 'no chips, no room').toBeNull();
@@ -976,4 +976,21 @@ test('a group names its out-of-date checklist and ships-with release steps in ma
     expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(members[0]!.title);
     expect(text(dossier().querySelector('[data-reconciliation]'))).not.toContain('rerun Doubt');
     expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Pedro');
+});
+
+test('unrouted Fog is reported for reconciliation instead of counted as an open question', async () => {
+    await mountPage(
+        calm({
+            map: {
+                destination: 'UTC display',
+                decisions: [],
+                fog: ['Fixture files and presentation remain unspecified.'],
+            },
+        }),
+    );
+    expect(header().getAttribute('title')).not.toContain('open question');
+    expect(header().getAttribute('title')).toContain('1 Fog to reconcile');
+    await press(opener());
+    expect(text(body())).toContain('Fog to reconcile');
+    expect(text(body())).toContain('Fixture files and presentation remain unspecified.');
 });

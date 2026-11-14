@@ -80,6 +80,12 @@ owner still checks semantic agreement. A map write settles incorporated decision
 immediately. Editing a delivery draft moves it to Shaping until its new gate;
 it cannot be silently requeued after an approved draft changes.
 
+Records hold product content. Launch/handoff environment and frozen model/role
+contracts stay in thread prompts and run-settings records. All body writes,
+including part creation and projection refresh, reject copied runtime blocks
+before changing content, history or digests. Ordinary product discussion of
+settings is allowed.
+
 The same command layer serves the board and skills. It owns transitions,
 completion, capacity reservations, graph validation, ordering and reviewer selection.
 `record-stage` validates the transition and derives Status and the Needs you
@@ -429,6 +435,17 @@ It reports what changed. A new product choice, conflict with Pedro's decision
 or expansion of scope still goes to questions. The same authority and question
 rules apply to changes affecting active builds.
 
+Before a concept owner ends a shaping turn, it removes resolved Fog and settles
+factory details such as fixture files and presentation itself. Each remaining
+Fog bullet has a live route: `[decision: ID]` names an unfinished decision,
+`[factory: ID]` names a task decision actively in Shaping, or `[question: ID]`
+names this group or a direct part with a pending question and saved Needs you
+visible on Your desk. Pedro answers in T3. Queued factory work uses a decision
+route. A map write with Fog clears the gone flag; `set-fog --fog gone`
+refuses a map that still contains Fog. Missing, retired or completed owners and cleared questions are mechanical
+`reconcile` holds; they cannot be acknowledged away. The board counts only live
+routes as open questions and calls unrouted leftovers Fog to reconcile.
+
 For a new part, use `lar-work create-part --parent ID --revision N --title X
 --repository R --kind build|decision --file F [--blocked-by ID]...`, where N is
 the parent's last-read revision. It creates the decision or build in its explicit
@@ -548,7 +565,9 @@ A blocker means merged work, not released software. `set-release-plan ID
 an `outcomeCheck` describing the final observable check. These records belong
 to a linked-work or concept parent. `complete-release-step` records the named
 step's done evidence and identity after preceding steps are done.
-`record-outcome-check` records passed or failed with evidence after all steps.
+`record-outcome-check` records passed or failed with evidence after all steps and release.
+A future Outcome criterion never holds refinement. The board shows planned
+checks separately and reaches release/Outcome waits only after delivery builds complete.
 A changed plan needs fresh evidence; previous versions remain in the database.
 Parent completion reads its parts, explicit human holds, unmet Dependencies, release steps and Outcome
 check. It does not require a parent PR. A concept also needs its Fog gone.

@@ -11,8 +11,10 @@ export function ConceptBuild({
     item,
     compact = false,
     showAction = true,
+    holdsSummarized = false,
 }: {
     item: Item;
+    holdsSummarized?: boolean;
     compact?: boolean;
     showAction?: boolean;
 }) {
@@ -51,6 +53,7 @@ export function ConceptBuild({
     return (
         <ConceptBuildRun
             plan={item.conceptBuild}
+            holdsSummarized={holdsSummarized}
             compact={compact}
             capacity={groupCapacityWait(item, data)}
             showAction={showAction && (running || addsWork)}

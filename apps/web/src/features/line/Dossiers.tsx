@@ -51,7 +51,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
 
     return (
         <Body>
-            {parent.conceptBuild && <ConceptBuild item={parent} showAction={false} />}
+            {parent.conceptBuild && <ConceptBuild item={parent} showAction={false} holdsSummarized />}
             {noDelivery(parent) && (
                 <Text variant="caption" tone="muted" data-no-delivery>
                     {NO_DELIVERY}

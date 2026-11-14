@@ -1,7 +1,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, detailsRead, detailsReply, fetchMock, fresh, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const parent = sample.items.find((item) => item.kind === 'concept')!;
 const base = sample.items.find((item) => item.kind !== 'concept')!;
@@ -52,7 +52,7 @@ function group(kind: 'feature' | 'concept', done: boolean): BoardData {
     return { ...sample, items: [root, ...parts] };
 }
 
-async function show(data: BoardData) {
+async function show(data: BoardData, body = '') {
     fetchMock.mockImplementation(async (url: string) => {
         const id = detailsRead(url);
 
@@ -60,7 +60,7 @@ async function show(data: BoardData) {
 
         const reply = await detailsReply(id).json();
 
-        reply.details.record = { bodyKind: 'brief', body: '', context: '', buildPhase: null, reviewRounds: [] };
+        reply.details.record = { bodyKind: 'brief', body, context: '', buildPhase: null, reviewRounds: [] };
         reply.details.subTickets = [];
 
         return new Response(JSON.stringify(reply));
@@ -148,4 +148,69 @@ test('the header counts running builds and then waits for Outcome after release'
         }),
     );
     expect(text($('[data-group-status]'))).toBe('Waiting on Outcome check');
+});
+
+test('a large group keeps part holds folded and batch review before delivery details', async () => {
+    const data = group('concept', false);
+    const root: Item = { ...data.items[0]!, status: 'Shaping' };
+    const parts = Array.from({ length: 20 }, (_, index): Item => ({
+        ...data.items[1]!,
+        id: `waiting-${index}`,
+        title: `Greeting fixture ${index + 1}`,
+        status: 'Needs you',
+        state: 'open',
+        passingBrief: false,
+        completion: { complete: false, reasons: [] },
+        needsYou: {
+            reason: `Review fixture ${index + 1}: ${'The complete current contract needs approval. '.repeat(8)}`,
+            offers: [],
+            causes: [],
+            ticketOpen: true,
+        },
+    }));
+
+    root.conceptBuild = {
+        run: null,
+        members: parts.map((part) => ({
+            workId: part.id,
+            title: part.title,
+            repository: part.repo!,
+            kind: 'build',
+            status: part.status,
+            complete: false,
+            waits: [part.needsYou!.reason],
+        })),
+        holds: parts.map((part) => ({
+            workId: part.id,
+            reason: `${part.title}: the current brief needs an approved gate. ${part.needsYou!.reason}`,
+        })),
+    };
+    await show(fresh({ ...data, items: [root, ...parts] }), 'Review the complete group batch.');
+
+    const dialog = $('[data-item-dialog]')!;
+    const section = dialog.querySelector('[data-concept-parts]')!;
+    const disclosure = section.querySelector('details')!;
+    const review = dialog.querySelector('[data-record]')!;
+
+    expect(disclosure, 'per-part holds have a counted disclosure').not.toBeNull();
+    expect(text(disclosure.querySelector('summary'))).toBe('20 parts and their holds');
+    expect(disclosure.open).toBe(false);
+    expect(disclosure.querySelectorAll('[data-row-open]')).toHaveLength(20);
+
+    const holds = dialog.querySelector<HTMLDetailsElement>('[data-concept-build-run] details')!;
+
+    expect(holds.open).toBe(false);
+    expect(text(holds.querySelector('summary'))).toBe('Waiting on 20 gates');
+    expect(text(holds)).toContain(parts[0]!.needsYou!.reason.trim());
+    expect(review.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(review.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+        review.compareDocumentPosition(dialog.querySelector('[data-release-progress]')!) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect([...review.querySelectorAll('button')].some((button) => text(button) === 'Approve briefs')).toBe(true);
+    await settle(() => disclosure.querySelector('summary')!.click());
+    expect(disclosure.open).toBe(true);
+    await settle(() => disclosure.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
+    expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });

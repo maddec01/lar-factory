@@ -246,6 +246,13 @@ test.each(['approve', 'request changes'])(
         ]);
         expect(buttons().find((button) => text(button) === 'Request changes')).toBeDefined();
 
+        const approve = buttons().find((button) => text(button) === 'Approve displayed brief')!;
+        const briefs = [...dialog.querySelectorAll('details')].find(
+            (node) => text(node.querySelector('summary')) === 'Brief to approve',
+        )!;
+
+        expect(approve.compareDocumentPosition(briefs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
         const details = [...dialog.querySelectorAll('details')].find(
             (node) => text(node.querySelector('summary')) === 'Approval details',
         )!;
@@ -275,6 +282,8 @@ test.each(['approve', 'request changes'])(
             );
 
             const input = dialog.querySelector('input')!;
+
+            expect(input.compareDocumentPosition(briefs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
             await settle(() => {
                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(

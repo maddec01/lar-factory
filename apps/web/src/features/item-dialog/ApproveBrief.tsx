@@ -77,19 +77,6 @@ export function ApproveBrief({
     return (
         <Stack space="tight">
             {error && <Alert tone="danger">{error}</Alert>}
-            {approval && (
-                <>
-                    <Disclosure label="Brief to approve" presentation="section" defaultOpen>
-                        {approval.briefs.map((brief) => (
-                            <Stack key={brief.workId} space="tight">
-                                <Text>{brief.title}</Text>
-                                <RichText text={brief.brief} format="markdown" />
-                            </Stack>
-                        ))}
-                    </Disclosure>
-                    <BriefApprovalDetails briefs={approval.briefs} digest={approval.digest} />
-                </>
-            )}
             <Inline wrap>
                 <Button {...buttonKind('main')} disabled={pending} onClick={() => void act()}>
                     {approval
@@ -106,6 +93,19 @@ export function ApproveBrief({
             </Inline>
             {approval && requesting && (
                 <BriefChanges note={note} onNote={setNote} pending={pending} onSubmit={() => void requestChanges()} />
+            )}
+            {approval && (
+                <>
+                    <Disclosure label="Brief to approve" presentation="section" defaultOpen>
+                        {approval.briefs.map((brief) => (
+                            <Stack key={brief.workId} space="tight">
+                                <Text>{brief.title}</Text>
+                                <RichText text={brief.brief} format="markdown" />
+                            </Stack>
+                        ))}
+                    </Disclosure>
+                    <BriefApprovalDetails briefs={approval.briefs} digest={approval.digest} />
+                </>
             )}
         </Stack>
     );

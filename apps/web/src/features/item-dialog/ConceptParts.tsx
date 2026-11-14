@@ -4,6 +4,7 @@
 
 import { UNREADABLE, itemTotal, plural, retiredPartLabel, shapingOwner } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { Disclosure } from '@lar-works/design-system';
 
 import {
     conceptBuildWait,
@@ -170,11 +171,15 @@ export function ConceptParts({
                     <ConceptReasons state={item.completion} />
                 </DetailFact>
             )}
-            <PartsList>
-                {parts.map((part) => (
-                    <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
-                ))}
-            </PartsList>
+            {parts.length > 0 && (
+                <Disclosure label={`${plural(parts.length, 'part')} and their holds`} presentation="section">
+                    <PartsList>
+                        {parts.map((part) => (
+                            <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
+                        ))}
+                    </PartsList>
+                </Disclosure>
+            )}
         </MainSection>
     );
 }

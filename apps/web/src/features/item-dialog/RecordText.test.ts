@@ -43,9 +43,7 @@ test.each(['map', 'brief'] as const)(
     },
 );
 
-// Enable after the coordinator releases/adopts design-system 0.7.4 (lar-web multi-word placeholder fix).
-// oxlint-disable-next-line vitest/no-disabled-tests -- Published 0.7.3 still strips multi-word placeholders.
-test.skip('the decision Outcome preserves a spaced placeholder beside code and a link', async () => {
+test('the decision Outcome preserves a spaced placeholder beside code and a link', async () => {
     const item = { ...sample.items.find((work) => work.id === 'I_sample13')!, kind: 'decision' as const, threads: [] };
     const board = fresh({ ...sample, items: [item] });
 

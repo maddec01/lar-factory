@@ -331,6 +331,8 @@ export interface Item {
     briefReviewing?: true;
     /** Durable delivery evidence, including a branch awaiting owner recovery. */
     buildStarted?: true;
+    /** Authoritative local reservation, shared with the atomic build claim; absent on provider-only items. */
+    buildReserved?: boolean;
     briefApproval?: { reason: string; digest?: string };
     publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & {
         recoverable?: boolean;

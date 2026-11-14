@@ -1,0 +1,32 @@
+## What
+Expose the greeting helper through a Node CLI.
+
+## Done when
+### Behaviour
+- Add node cli.js [name] using greet(value).
+- Print one greeting followed by one newline.
+- With no name, use friend.
+- Preserve the existing API.
+### Tests
+
+
+## Scope
+### Files
+- cli.js
+### Size
+
+### Excluded
+- Other flags or features.
+
+## Verify
+no
+
+## Confirmed
+Pedro confirmed the stated outcome and constraints. There are no open product decisions.
+
+## Notes for the builder
+Contracts: `greet(value)`, `parseName(value)`.
+
+## Domain docs
+none
+

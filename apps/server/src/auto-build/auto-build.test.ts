@@ -121,7 +121,10 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
 
                 const answer = s.answers.get(itemId) ?? OK;
 
-                if (answer === OK) records.update(itemId, at(records, itemId), { status: 'In progress' });
+                if (answer === OK) {
+                    records.addThread(itemId, at(records, itemId), `build-${itemId}`, 'build');
+                    records.update(itemId, at(records, itemId), { status: 'In progress' });
+                }
 
                 // A start T3 may have made leaves its launch intent unresolved.
                 if ((answer.body as { uncertain?: boolean }).uncertain)
@@ -543,6 +546,11 @@ test('running concepts and automatic standalone builds compete by gate age for o
     await s.pass();
     assert.deepEqual(s.started, [standalone, a]);
     s.records.update(standalone, at(s.records, standalone), { status: 'Ready to merge' });
+    s.reread();
+    await s.pass();
+    assert.deepEqual(s.started, [standalone, a], 'merge waits retain their reservation');
+    s.records.setPullRequest(standalone, at(s.records, standalone), `${REPO}#100`);
+    s.records.observe(standalone, at(s.records, standalone), { of: 'pr', state: 'merged' });
     s.reread();
     await s.pass();
     assert.deepEqual(s.started, [standalone, a, b]);

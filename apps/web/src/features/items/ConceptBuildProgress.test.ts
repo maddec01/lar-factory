@@ -9,6 +9,7 @@ const build = (id: string, status: Item['status'] = 'Ready') =>
         title: id,
         kind: 'build',
         status,
+        buildReserved: status === 'In progress',
         parentId: 'group',
         passingBrief: true,
         blockers: [],

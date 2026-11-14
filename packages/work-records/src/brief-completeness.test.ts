@@ -1,8 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vite-plus/test';
 
+import { requireCompleteBrief } from './brief-completeness.ts';
 import { openWorkRecords } from './work-records.ts';
 
 const feature =
@@ -102,4 +103,51 @@ test('every linked batch member is checked again while unrelated sibling progres
         records.close();
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+for (const kind of ['feature', 'improvement', 'build', 'issue']) {
+    test(`${kind} accepts S01's amended brief and explains the first brief's missing tests`, () => {
+        const amended = readFileSync(new URL('../test/briefs/s01-amended.txt', import.meta.url), 'utf8');
+        const first = readFileSync(new URL('../test/briefs/s01-first.txt', import.meta.url), 'utf8');
+
+        expect(() => requireCompleteBrief(kind, amended)).not.toThrow();
+        expect(() => requireCompleteBrief(kind, first)).toThrow(
+            'named tests (Tests or Done when: name a test file plus its case, or a test case with an assertion; e.g. test/cli.test.js: omitted name prints Hello, friend!)',
+        );
+    });
+}
+
+test.each([
+    '### Tests\n- test/name.test.js: preserves one-character names.',
+    '### Tests\ntest/name.test.js: preserves one-character names.',
+    '### Tests\n- In test/name.test.js, verify one-character names survive trimming.',
+    '- test/name.test.js: preserves one-character names.',
+    '- `test/name.test.js`: preserves one-character names.',
+    '- assertions.js: preserves one-character names.',
+    '### Acceptance criteria\n- test/name.test.js: preserves one-character names.',
+])('accepts named tests in natural brief forms: %s', (tests) => {
+    const brief = feature.replace(/### Tests\n[^#]*/, `${tests}\n`);
+
+    expect(() => requireCompleteBrief('build', brief)).not.toThrow();
+});
+
+test.each([
+    'Run tests and keep them green.',
+    '- `name.js`',
+    '- test/name.test.js',
+    '- TODO',
+    '```markdown\n- test/name.test.js: preserves one-character names.\n```',
+])('generic prose, filenames alone and fenced examples do not name a test case: %s', (tests) => {
+    const brief = feature.replace(/### Tests\n[^#]*/, `### Tests\n${tests}\n`);
+
+    expect(() => requireCompleteBrief('build', brief)).toThrow('named tests');
+});
+
+test('Bug accepts an unquoted regression test file and case and explains missing format', () => {
+    const unquoted = diagnosis.replaceAll('`', '');
+
+    expect(() => requireCompleteBrief('bug', feature + unquoted)).not.toThrow();
+    expect(() => requireCompleteBrief('bug', feature + unquoted.replace(/## Regression test\n[^#]*/, ''))).toThrow(
+        'named regression test (Regression test: name a test file plus its case',
+    );
 });

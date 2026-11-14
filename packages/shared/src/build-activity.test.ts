@@ -199,8 +199,8 @@ it('counts builds against the build limit while they start, build or work again,
         item('starting', {}),
         item('may', {}),
         item('failed', {}),
-        item('progress', { status: 'In progress' }),
-        item('review', { status: 'Review' }),
+        item('progress', { status: 'In progress', buildStarted: true }),
+        item('review', { status: 'Review', buildStarted: true }),
         item('verify', { status: 'Verify' }),
         item('again', { status: 'Ready to merge', ...again }),
         item('concept', { kind: 'concept', status: 'In progress' }),
@@ -245,6 +245,7 @@ it('excludes a coordinating linked parent while counting real child builds and e
         ...parent,
         id: 'child',
         kind: 'build',
+        buildStarted: true,
         parentId: parent.id,
         subIssues: { total: 0, completed: 0 },
     } as Item;
@@ -289,4 +290,26 @@ it('S08 F03: only a live Doubt child makes the review label claim running', () =
         label: "Brief changed; Doubt hasn't run",
         running: false,
     });
+});
+
+it('PR links and status labels cannot create factory reservations, and terminal PRs release legacy builds', () => {
+    const base = { kind: 'build', threads: [], slices: [], linkedPrs: [] } as unknown as Item;
+    const items = [
+        { ...base, id: 'status-only', status: 'In progress' },
+        ...(['open', 'closed', 'merged'] as const).map((state) => ({
+            ...base,
+            id: state,
+            status: 'List',
+            linkedPrs: [{ state }],
+        })),
+        ...(['closed', 'merged'] as const).map((state) => ({
+            ...base,
+            id: `factory-${state}`,
+            status: 'Review',
+            buildStarted: true,
+            linkedPrs: [{ state }],
+        })),
+    ] as Item[];
+
+    expect(buildsAtWork({ items })).toEqual([]);
 });

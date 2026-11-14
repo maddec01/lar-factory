@@ -8,7 +8,7 @@ export function sampleDelivery(records: WorkRecords) {
     let manualId: string | undefined;
 
     return {
-        manualOverride(repository: string, capacity: { limit: number; atWorkIds: string[] }) {
+        manualOverride(repository: string, capacity: { limit: number }) {
             if (!repository.startsWith('lar-factory-sample/')) throw Error('Only fake sample work is supported.');
 
             if (manualId) return manualId;

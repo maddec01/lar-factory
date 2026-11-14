@@ -10,7 +10,7 @@ import type { ItemState } from './ItemState';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 export const BUILD_LIMIT_NOTE =
-    'The limit counts pending starts and reserves a slot for every started build, including questions, approval waits, Verify and Merge. A slot releases on completion or set-aside. The limit holds automatic starts; Pedro can override it with Start build on an item.';
+    'The limit counts pending starts and reserves a slot for every started build, including questions, approval waits, Verify and Merge. A slot releases when its PR closes or merges, on completion or set-aside. The limit holds automatic starts; Pedro can override it with Start build on an item.';
 
 /** A state's word inside a sentence: "working", "stopped", "PR merged", "in review", "starting". */
 const inSentence = ({ word, stage, execution }: ItemState): string =>

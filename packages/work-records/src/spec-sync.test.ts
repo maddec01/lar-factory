@@ -563,7 +563,7 @@ test('trusted queued ticket edits refresh starting context without approving a b
     });
     r = f.records.update(contextId, r.revision, { status: 'Ready' });
 
-    const frozen = f.records.prepareBuild(contextId, r.revision, { limit: 2, atWorkIds: [] }).intent.buildInput!;
+    const frozen = f.records.prepareBuild(contextId, r.revision, { limit: 2 }).intent.buildInput!;
 
     f.edit({ body: 'Changed while build runs.', version: '3' });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: contextId });

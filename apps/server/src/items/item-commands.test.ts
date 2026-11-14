@@ -1,4 +1,4 @@
-import { effectiveVocabulary } from '@lar-factory/shared';
+import { buildsAtWork, effectiveVocabulary } from '@lar-factory/shared';
 import type {
     BoardData,
     Item,
@@ -3230,5 +3230,43 @@ test('Pedro manual Start build can exceed capacity and records the override on t
     assert.deepEqual(
         ids.map((id) => records.launchIntents({ workId: id })[0]?.buildInput?.capacity?.manualOverride),
         [false, true],
+    );
+});
+
+test('an unrecorded List issue with an open PR consumes no board slot or manual claim', async () => {
+    const records = await openRecords();
+    const build = records.create({ title: 'S01 build', repository: WEB, kind: 'build', status: 'Ready' });
+
+    approveBuild(records, build.workId);
+
+    const external = queued(3, {
+        status: 'List',
+        statuses: [],
+        recorded: false,
+        linkedPrs: [
+            {
+                number: 4,
+                url: 'https://example.test/pr/4',
+                state: 'open',
+                isDraft: false,
+                checks: null,
+                mergeState: 'can merge',
+            },
+        ],
+    });
+    const { commands, board } = commandsOn([], undefined, records, [external]);
+
+    board.update({ buildLimit: { limit: 1, automatic: 1 } });
+    assert.equal(buildsAtWork(board.snapshot()).length, 0);
+    assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+    assert.deepEqual(records.launchIntents({ workId: build.workId })[0]?.buildInput?.capacity, {
+        source: 'manual',
+        limit: 1,
+        occupied: 0,
+        manualOverride: false,
+    });
+    assert.deepEqual(
+        buildsAtWork(board.snapshot()).map((item) => item.id),
+        [build.workId],
     );
 });

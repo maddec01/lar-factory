@@ -1,13 +1,12 @@
-import { reservesBuildSlot, type GateEvidence } from '@lar-factory/shared';
+import type { GateEvidence } from '@lar-factory/shared';
 
 import { groupMembers } from './blocker-declarations.ts';
 import { blockerPath, groupContractReferences } from './contract-references.ts';
-import { WorkRecordError, type Database } from './database.ts';
+import { WorkRecordError } from './database.ts';
 import type { WorkRecords } from './work-records.ts';
 
 export interface BuildPreparation {
     limit: number;
-    atWorkIds: string[];
     expectedGateId?: string;
     conceptId?: string;
     automatic?: boolean;
@@ -27,12 +26,7 @@ export interface BuildInput {
 }
 
 /** Called inside the intent's write transaction: eligibility, frozen input and capacity claim commit together. */
-export function prepareBuildClaim(
-    database: Database,
-    records: WorkRecords,
-    workId: string,
-    input: BuildPreparation,
-): BuildInput {
+export function prepareBuildClaim(records: WorkRecords, workId: string, input: BuildPreparation): BuildInput {
     const work = records.read(workId);
     const gate = records.gate(workId).passing;
     const refuse = (reason: string): never => {
@@ -99,37 +93,12 @@ export function prepareBuildClaim(
             refuse('The concept build run is paused.');
     } else if (input.conceptId) refuse('This build no longer belongs to the running concept.');
 
-    const counted = new Set(
-        records
-            .list({})
-            .filter((row) => {
-                const deliveryStarted =
-                    !!row.buildBranch ||
-                    !!row.buildPhase ||
-                    !!row.pullRequest ||
-                    records.threads(row.workId).some((thread) => thread.purpose === 'build');
+    const counted = new Set(records.buildReservations());
 
-                return reservesBuildSlot({
-                    kind: row.kind,
-                    status: row.status,
-                    complete: records.completion(row.workId).complete,
-                    retired: row.setAside,
-                    coordinating:
-                        records.children(row.workId).some((child) => child.kind !== 'slice') && !deliveryStarted,
-                    deliveryStarted,
-                });
-            })
-            .map((row) => row.workId),
-    );
+    const ownsSlot = counted.has(workId);
 
-    for (const id of input.atWorkIds) counted.add(id);
-    for (const intent of records.launchIntents({ unresolved: true }))
-        if (intent.purpose === 'build') counted.add(intent.workId);
     counted.delete(workId);
 
-    const ownsSlot =
-        records.threads(workId).some((thread) => thread.purpose === 'build') ||
-        records.launchIntents({ workId }).some((intent) => intent.purpose === 'build' && intent.outcome !== 'failed');
     const full = !ownsSlot && counted.size >= input.limit;
 
     const manual = input.manual === true;

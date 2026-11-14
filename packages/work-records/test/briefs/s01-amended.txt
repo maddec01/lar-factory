@@ -1,0 +1,36 @@
+## What
+Expose the greeting helper through a Node CLI.
+
+## Done when
+### Behaviour
+- Run node cli.js [name] on Node 24.
+- Import greet from ./greeting.js and print greet(process.argv[2]) exactly once followed by one newline.
+- An omitted name defaults to friend; ignore extra arguments.
+- Preserve the greet and parseName exports and their behavior.
+### Tests
+- Shell-free subprocess test for Ada asserts status 0, empty stderr, and stdout exactly "Hello, Ada!\n".
+- Shell-free subprocess test for an omitted name asserts status 0, empty stderr, and stdout exactly "Hello, friend!\n".
+- Shell-free subprocess test for padded Ada, "  Ada  ", asserts status 0, empty stderr, and stdout exactly "Hello, Ada!\n".
+- Existing tests remain green on Node 24.
+
+## Scope
+### Files
+- cli.js
+- test/cli.test.js
+### Size
+Small
+### Excluded
+- Dependencies, package scripts, docs, flags, extra features, follow-ups or routine manual Verify.
+
+## Verify
+no
+
+## Confirmed
+Pedro explicitly amended the scope to these criteria. There are no open product decisions.
+
+## Notes for the builder
+Contracts: `greet(value)`, `parseName(value)`.
+
+## Domain docs
+none
+

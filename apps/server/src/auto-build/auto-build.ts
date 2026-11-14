@@ -191,15 +191,8 @@ export function createAutoBuild({
         return { builds: builds.map(({ item }) => item), waitsForRefinement };
     }
 
-    /** The builds at work, with the Ready ones whose start the board holds, so an unsettled start keeps its place. */
-    const atWork = () => {
-        const data = board.snapshot();
-        const counted = new Set(buildsAtWork(data).map((item) => item.id));
-
-        for (const item of data.items) if (item.status === 'Ready' && startPending(item)) counted.add(item.id);
-
-        return counted;
-    };
+    /** The same durable reservation projection shown by the board and checked by each atomic claim. */
+    const atWork = () => new Set(buildsAtWork(board.snapshot()).map((item) => item.id));
 
     /**
      * Ends the pauses whose build left Ready, as a person's Start build moves it, or whose brief passed a new gate since.
@@ -333,6 +326,13 @@ export function createAutoBuild({
             });
             const { error, uncertain, hold: passes } = body as Partial<StartResult>;
 
+            // The command projects its claim or release before returning, including uncertain starts.
+            const occupied = atWork();
+
+            reserved.clear();
+            for (const id of occupied) reserved.add(id);
+            room = Math.max(0, limit() - reserved.size);
+
             if (passes && error) {
                 log(`Auto-build held ${ref(item)}: ${error}`);
                 held.set(item.id, { error, retryAt: now() + HOLD_RETRY_MS });
@@ -341,12 +341,6 @@ export function createAutoBuild({
             }
 
             waiting--;
-
-            // A start T3 may have made keeps its place, and the existing recovery settles it.
-            if ((!error || uncertain) && !reserved.has(item.id)) {
-                room--;
-                reserved.add(item.id);
-            }
 
             if (!error) log(`Auto-build started ${ref(item)}`);
             else if (!uncertain) {

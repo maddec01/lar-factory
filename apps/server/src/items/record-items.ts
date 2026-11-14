@@ -158,6 +158,7 @@ export function agreedKind(
 function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly RecordSetup[] = []) {
     const byTicket = ticketsByReference(tickets);
     const trackerState = records.trackerStates();
+    const reservations = new Set(records.buildReservations());
     const byReference = new Map(
         records.list({}).flatMap((record) => (record.ticket ? [[record.ticket.toLowerCase(), record] as const] : [])),
     );
@@ -336,6 +337,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }),
             recorded: true,
             buildPhase: record.buildPhase,
+            buildReserved: reservations.has(record.workId),
             ...(activeBuild && { buildStarted: true as const }),
             verification: records.verification(record.workId),
             retro: records.retro(record.workId),

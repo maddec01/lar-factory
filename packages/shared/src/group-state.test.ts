@@ -27,7 +27,10 @@ function group(kind: Item['kind'] = 'concept') {
         flow: 'linked',
         status,
         linkedPrs: [],
-        threads: [],
+        threads:
+            status === 'Ready'
+                ? []
+                : [{ id: `owner-${index}`, title: 'Build', purpose: 'build', state: 'running', updated: 'now' }],
         completion: { complete: false, reasons: [] },
     })) as Item[];
 
@@ -41,6 +44,9 @@ test.each(['concept', 'feature'] as const)(
 
         expect(groupState(parent, data)).toMatchObject({ word: '2 builds running · 1 waiting', running: true });
         data.items[1]!.status = 'Ready to merge';
+        data.items[1]!.threads = [
+            { id: 'merge-owner', title: 'Build', purpose: 'build', state: 'done', updated: 'now' },
+        ];
         expect(groupState(parent, data)?.word).toBe('1 build running · 2 waiting');
         data.startProgress = { 'build-0': { build: { phase: 'may-have-started', message: 'Checking T3' } } };
         expect(groupState(parent, data)?.word).toBe('2 builds running · 1 waiting');

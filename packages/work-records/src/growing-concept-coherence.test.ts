@@ -189,7 +189,7 @@ test('S06: new file and contract overlaps hold ordering without invalidating x a
     const b09 = part('b09 fixture', 'Files: `fixtures/greeting.json`\nContracts: `format-1`\nBlocked by: none');
 
     expect(records.gate(x.workId).current).toBe(true);
-    expect(() => records.buildReadiness(x.workId, { limit: 2, atWorkIds: [] })).toThrow(/overlap.*blocker/i);
+    expect(() => records.buildReadiness(x.workId, { limit: 2 })).toThrow(/overlap.*blocker/i);
     expect(records.reconcile(g.workId).items).toContainEqual(
         expect.objectContaining({ kind: 'overlap', requiresFix: true }),
     );

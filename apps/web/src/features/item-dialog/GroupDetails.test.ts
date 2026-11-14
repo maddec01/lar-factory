@@ -118,6 +118,7 @@ test('the header counts running builds and then waits for Outcome after release'
             : {
                   ...item,
                   status: 'In progress',
+                  buildReserved: true,
                   state: 'open',
                   completion: { complete: false, reasons: [] },
                   threads: [

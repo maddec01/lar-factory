@@ -184,6 +184,7 @@ test.each(['running', 'paused'] as const)(
                         id: member.workId,
                         kind: 'build' as const,
                         status: member.status as 'Ready' | 'In progress' | 'Review',
+                        buildReserved: member.status !== 'Ready',
                         parentId: ['outside', 'standalone'].includes(member.workId) ? null : concept.id,
                         parent: null,
                         threads: [],
@@ -211,6 +212,7 @@ test('the concept shows active builds, total progress and an explicit capacity w
         {
             ...part,
             id: 'running',
+            buildReserved: true,
             title: 'Build running',
             kind: 'build',
             status: 'In progress',
@@ -275,6 +277,7 @@ test.each([
         parentId: parent.id,
         parent: null,
         status: ready ? 'Ready' : 'In progress',
+        buildReserved: !ready,
         threads: [],
         blockers: [],
     }));

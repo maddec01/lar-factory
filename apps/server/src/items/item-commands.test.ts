@@ -2892,6 +2892,11 @@ for (const kind of ['issue', 'concept', 'decision', 'build'] as const)
 
         const { runs, roleRuns } = records.runSettings(record.workId);
 
+        const message = start.mock.calls[0]![1];
+
+        assert.equal(message.split('\n')[0], `${kind === 'build' ? 'Build' : 'Shaping'} #5 Configured`);
+        assert.equal(message.match(/<!-- factory-runtime:start -->/g)?.length, 2);
+        assert.equal(message.match(/<!-- factory-runtime:end -->/g)?.length, 2);
         assert.match(start.mock.calls[0]![1], new RegExp(runs[0]!.runId));
         assert.ok(
             start.mock.calls[0]![1].includes(JSON.stringify(runs[0]!.roles)),

@@ -164,7 +164,7 @@ describe('thread launch', () => {
         let exit: unknown = { _tag: 'Interrupted' };
         const result = await launchThread(
             'project',
-            'Build it\nIssue',
+            'Build #5 Configured\n<!-- factory-runtime:start -->\nRuntime contract\n<!-- factory-runtime:end -->',
             selection,
             { type: 'worktree', baseRef: 'main', branch: 'build/x' },
             'full-access',
@@ -174,7 +174,7 @@ describe('thread launch', () => {
         expect(result).toMatchObject({ thread: null, uncertain: true });
         expect(vi.mocked(subscribeProjects).mock.calls[0]![4]!.payload).toMatchObject({
             projectId: 'project',
-            title: 'Build it',
+            title: 'Build #5 Configured',
             modelSelection: selection,
             runtimeMode: 'full-access',
             interactionMode: 'default',

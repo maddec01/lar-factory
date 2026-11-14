@@ -237,7 +237,10 @@ test('a linked parent notice is the same human wait on the desk and in its group
     expect(text(group)).not.toContain('Nothing holds this up');
 });
 
-test('tool approval names the delegated owner and request, then leaves the desk when resolved', async () => {
+test.each([
+    ['Explore', 'tool-approval', 'Approval in T3'],
+    ['Doubt', 'tool-approval', 'Approval in T3'],
+] as const)('%s %s names the role and work, then leaves the desk when resolved', async (role, kind, label) => {
     const data = board({
         status: 'Shaping',
         threads: [
@@ -248,8 +251,8 @@ test('tool approval names the delegated owner and request, then leaves the desk 
                 pendingRequest: {
                     id: 'approval',
                     threadId: 'child',
-                    kind: 'tool-approval',
-                    ownerTitle: 'Explore sandbox',
+                    kind,
+                    ownerTitle: `${role} · Diagnostic date option`,
                 },
                 questionSummary: 'Allow reading the sandbox folder?',
             },
@@ -257,8 +260,10 @@ test('tool approval names the delegated owner and request, then leaves the desk 
     });
 
     await mountPage(data);
-    expect(text(card())).toContain('Approval in T3');
-    expect(text(card())).toContain('Explore sandbox');
+    expect(text(card())).toContain(label);
+    expect(text(card())).toContain(`${role} · Diagnostic date option`);
+    expect(text(card())).toContain(base.title);
+    expect(text(card())).not.toContain('factory-runtime');
     expect(text(card())).toContain('Allow reading the sandbox folder?');
     expect(card().querySelector<HTMLAnchorElement>('[data-open-thread]')!.href).toBe(
         't3code://threads/sample-environment/child',

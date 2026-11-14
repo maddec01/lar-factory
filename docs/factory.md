@@ -140,8 +140,10 @@ Verify, Merge PR, Choose follow-ups, Recheck access or Start again. Answer opens
 question. Merge uses the same guarded merge action as item details.
 
 Questions and tool approvals are answered in T3, through the exact owner thread
-linked from the desk. Tool approvals have their own Approval in T3 wait, naming
-the owner and T3's display prompt when available; resolving the request clears
+linked from the desk. Role threads are titled `Role · Work title` (including
+Explore and Doubt); owner titles keep `Shaping #N …` or `Build #N …`. Tool
+approvals have their own Approval in T3 wait, naming the owner and T3's display
+prompt when available; resolving the request clears
 that wait. The board never approves tools. Chat alone does not establish a wait.
 When question tools are unavailable, the explicit saved question and Needs you
 notice keep it actionable. Agent work, ordinary blockers, a full

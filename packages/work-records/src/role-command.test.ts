@@ -1,4 +1,4 @@
-import { FACTORY_ROLES, defaultFactorySettings } from '@lar-factory/shared/factory-settings';
+import { defaultFactorySettings } from '@lar-factory/shared/factory-settings';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -167,16 +167,29 @@ for (const provider of ['claude', 'codex']) {
         const changed = readFactorySettings(f.dir).settings;
 
         changed.threadKinds.build = { model: { instanceId: 'later', model: 'later' }, effort: 'low' };
+        changed.reviewers.find((reviewer) => reviewer.id === 'custom')!.name = 'Later name';
         writeFactorySettings(changed, f.dir);
 
-        for (const role of [
-            ...FACTORY_ROLES,
-            'reviewer:code',
-            'reviewer:security',
-            'reviewer:ui',
-            'reviewer:performance',
-            'reviewer:custom',
-        ]) {
+        for (const [role, label] of Object.entries({
+            thread: 'Build',
+            explore: 'Explore',
+            diagnose: 'Diagnose',
+            research: 'Research',
+            prototype: 'Prototype',
+            planner: 'Planner',
+            implementer: 'Implementer',
+            checks: 'Checks',
+            'domain-docs': 'Domain docs',
+            fixer: 'Fixer',
+            approver: 'Approver',
+            'ci-fixer': 'Ci fixer',
+            doubt: 'Doubt',
+            'reviewer:code': 'Code review',
+            'reviewer:security': 'Security review',
+            'reviewer:ui': 'UI review',
+            'reviewer:performance': 'Performance review',
+            'reviewer:custom': 'Custom review',
+        })) {
             const result = await f.launch(role);
 
             expect(result.stderr).toBe('');
@@ -190,6 +203,13 @@ for (const provider of ['claude', 'codex']) {
                 model: 'configured',
                 options: { [provider === 'claude' ? 'effort' : 'reasoningEffort']: 'high' },
             });
+
+            const title = `${label} · Role command fixture`;
+
+            expect(args.title).toBe(title);
+            expect(args.task.split('\n')[0]).toBe(title);
+            expect(args.task).toContain('\n\n<!-- factory-runtime:start -->\n');
+            expect(args.task).toContain('<!-- factory-runtime:end -->');
             expect(args.runtimeMode).toBe('inherit');
             expect(args.clientRequestId).toBe(attempt.executionId);
             expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
@@ -522,3 +542,31 @@ it('routes the executable commands and reads a terminal T3 result from stdin', a
     expect(finish.status).toBe(0);
     expect(JSON.parse(finish.stdout).result).toBe('completed');
 }, 30_000);
+
+it('keeps role runtime prompts out of product records after the title line', async () => {
+    const f = await fixture();
+    const result = await f.launch('explore');
+    const args = JSON.parse(result.stdout);
+    const before = f.records.read(f.workId);
+
+    expect(result.status).toBe(0);
+    expect(args.title).toBe('Explore · Role command fixture');
+    expect(() => f.records.setBody(f.workId, before.revision, 'brief', args.task)).toThrow(/product content/i);
+    expect(f.records.read(f.workId)).toEqual(before);
+});
+
+it('fits T3 titles to 512 characters without splitting Unicode or exposing runtime text', async () => {
+    const f = await fixture();
+    const record = f.records.read(f.workId);
+
+    f.records.retitle(f.workId, record.revision, 'a'.repeat(500) + '🧭'.repeat(20));
+
+    const result = await f.launch('explore');
+    const args = JSON.parse(result.stdout);
+
+    expect(result.status).toBe(0);
+    expect(args.title).toBe('Explore · ' + 'a'.repeat(500) + '…');
+    expect(args.title.length).toBeLessThanOrEqual(512);
+    expect(args.task.split('\n')[0]).toBe(args.title);
+    expect(args.task).toContain('<!-- factory-runtime:start -->');
+});

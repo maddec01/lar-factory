@@ -39,7 +39,7 @@ async function fixture() {
     return { records, other, path, rev, ready };
 }
 
-const capacity = { limit: 1, atWorkIds: [] };
+const capacity = { limit: 1 };
 
 it('claims once across connections, counts an uncertain intent after reopen, and releases a definite failure', async () => {
     const { records, other, path, rev, ready } = await fixture();
@@ -69,12 +69,12 @@ it('permits independent worktrees in one repository and across repositories up t
     const { records, other, rev, ready } = await fixture();
     const ids = [ready('A1'), ready('A2'), ready('B1', 'example/b')];
 
-    for (const id of ids) other.prepareBuild(id, rev(id), { limit: 3, atWorkIds: [] });
+    for (const id of ids) other.prepareBuild(id, rev(id), { limit: 3 });
     expect(records.launchIntents({ unresolved: true })).toHaveLength(3);
 
     const extra = ready('C1', 'example/c');
 
-    expect(() => records.prepareBuild(extra, rev(extra), { limit: 3, atWorkIds: [] })).toThrow('capacity');
+    expect(() => records.prepareBuild(extra, rev(extra), { limit: 3 })).toThrow('capacity');
 });
 
 it('holds missing/stale gates, unmet blockers and a concept with an open pre-task without claiming', async () => {
@@ -140,8 +140,8 @@ it('a PR waiting for Pedro retains capacity alongside unresolved launches', asyn
     expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
     records.update(a, rev(a), { status: 'Ready to merge' });
     expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
-    records.prepareBuild(b, rev(b), { limit: 2, atWorkIds: [] });
-    expect(() => records.prepareBuild(c, rev(c), { limit: 2, atWorkIds: [a] })).toThrow('capacity');
+    records.prepareBuild(b, rev(b), { limit: 2 });
+    expect(() => records.prepareBuild(c, rev(c), { limit: 2 })).toThrow('capacity');
     expect(records.launchIntents({ workId: a })[0]?.buildInput?.brief).toBe('Exact A');
 });
 
@@ -288,4 +288,74 @@ it('Pedro manual starts record free claims and overrides; automatic claims wait 
         manualOverride: false,
         occupied: 0,
     });
+});
+
+it.each(['open', 'closed', 'merged'] as const)(
+    'a recorded List PR (%s) without a factory start never consumes a claim',
+    async (state) => {
+        const { records, rev, ready } = await fixture();
+        const old = records.create({
+            title: 'Old tracker work',
+            repository: 'example/a',
+            kind: 'build',
+            status: 'List',
+        }).workId;
+
+        records.setPullRequest(old, rev(old), 'example/a#4');
+        records.observe(old, rev(old), { of: 'pr', state });
+
+        const id = ready('Fresh');
+
+        expect(records.prepareBuild(id, rev(id), { ...capacity, manual: true }).intent.buildInput?.capacity).toEqual({
+            source: 'manual',
+            limit: 1,
+            occupied: 0,
+            manualOverride: false,
+        });
+    },
+);
+
+it.each(['closed', 'merged'] as const)(
+    'a terminal factory PR (%s) releases its slot even before status reconciliation',
+    async (state) => {
+        const { records, rev, ready } = await fixture();
+        const old = ready('Old factory build');
+        const intent = records.prepareBuild(old, rev(old), capacity).intent;
+
+        records.resolveLaunchIntent(old, rev(old), intent.intentId, { threadId: 'old-builder' });
+        records.setPullRequest(old, rev(old), 'example/a#4');
+        records.observe(old, rev(old), { of: 'pr', state });
+
+        const id = ready('Fresh');
+
+        expect(records.prepareBuild(id, rev(id), capacity).intent.buildInput?.capacity?.occupied).toBe(0);
+    },
+);
+
+it('a failed launch releases its slot even after the system Plan was saved', async () => {
+    const { records, rev, ready } = await fixture();
+    const failed = ready('Failed start');
+    const intent = records.prepareBuild(failed, rev(failed), capacity).intent;
+
+    records.setBuildPhase(failed, rev(failed), 'plan');
+    records.resolveLaunchIntent(failed, rev(failed), intent.intentId, { failure: 'Confirmed no thread was created' });
+
+    const next = ready('Next');
+
+    expect(records.prepareBuild(next, rev(next), capacity).intent.buildInput?.capacity?.occupied).toBe(0);
+});
+
+it('a released owner cannot bypass capacity when restarting a closed PR build', async () => {
+    const { records, rev, ready } = await fixture();
+    const old = ready('Old owner');
+    const intent = records.prepareBuild(old, rev(old), capacity).intent;
+
+    records.resolveLaunchIntent(old, rev(old), intent.intentId, { threadId: 'old-owner' });
+    records.setPullRequest(old, rev(old), 'example/a#4');
+    records.observe(old, rev(old), { of: 'pr', state: 'closed' });
+
+    const next = ready('Next');
+
+    records.prepareBuild(next, rev(next), capacity);
+    expect(() => records.buildReadiness(old, { ...capacity, recovery: true })).toThrow('capacity');
 });

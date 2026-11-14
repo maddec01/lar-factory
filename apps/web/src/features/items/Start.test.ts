@@ -317,7 +317,9 @@ test('Ready offers manual Start build at capacity and warns that it will go over
         items: withChoices.items.map((item) =>
             item.id === 'I_sample13'
                 ? { ...item, status: 'Ready' as const, passingBrief: true, parentId: null, blockers: [], threads: [] }
-                : item,
+                : item.id === 'I_sample14'
+                  ? { ...item, buildReserved: true }
+                  : item,
         ),
     };
 
@@ -327,4 +329,45 @@ test('Ready offers manual Start build at capacity and warns that it will go over
     await open('I_sample13');
     await press(entries()[0]!);
     expect(posted()[0]?.[0]).toBe('/api/start-build');
+});
+
+test('an unrecorded List PR leaves the build count at zero and the Ready row without a capacity warning', async () => {
+    const ready = {
+        ...withChoices.items.find((item) => item.id === 'I_sample13')!,
+        status: 'Ready' as const,
+        passingBrief: true,
+        parentId: null,
+        blockers: [],
+        threads: [],
+        buildStarted: undefined,
+        buildPhase: undefined,
+        linkedPrs: [],
+    };
+    const external = {
+        ...ready,
+        id: 'external',
+        status: 'List' as const,
+        statuses: [],
+        recorded: false,
+        linkedPrs: [
+            {
+                number: 4,
+                url: 'https://example.test/pr/4',
+                state: 'open' as const,
+                isDraft: false,
+                checks: null,
+                mergeState: 'can merge' as const,
+            },
+        ],
+    };
+
+    await mountItem({ ...withChoices, buildLimit: { limit: 1, automatic: 1 }, items: [ready, external] }, ready.id);
+
+    const building = $$('[data-slot="toolbar-counter"]').find((node) => text(node).startsWith('building:'))!;
+
+    expect(text(building)).toContain('0');
+    expect(text(document.body)).toContain('0 building · limit 1');
+    expect(text(card())).not.toContain('Starting now will go over the limit.');
+    expect(text(document.body)).not.toContain('Waiting for a build slot');
+    expect(start(ready.id).disabled).toBe(false);
 });

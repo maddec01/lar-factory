@@ -400,6 +400,7 @@ Bug briefs name cause, evidence, affected files, a named regression test and
 red-before-green; Feature and Improvement briefs name acceptance, affected files
 or areas and named tests. Empty/placeholding sections fail with the missing
 section names. Generic Build/Issue delivery briefs use the same acceptance, affected files and named-tests checks. Linked parents have no delivery gate.
+Named tests may be bullets under Tests or Done when (including Behaviour/Acceptance criteria), or `file: case` lines, with optional Markdown backticks. Name the test file plus its case, or a specific test case and assertion (for example, “Shell-free subprocess test for Ada asserts stdout exactly Hello, Ada!”). A filename alone or “tests pass” is insufficient. Refusals name the expected section and format with an example.
 Doubt judges the substance after this mechanical check.
 
 The displayed approval offers Request changes for one brief or the whole batch.
@@ -710,10 +711,10 @@ rebase and pass the same eligibility and capacity checks before resuming.
 The shared build limit counts starting or uncertain launches and every started
 build. A started build retains its capacity reservation through every Pedro wait
 (question, tool approval, amended-brief approval, Verify and merge), and through
-handoff, recovery and continuation. It releases only on merge/completion or
+handoff, recovery and continuation. It releases when its delivery PR closes or merges, on completion or
 set-aside. Answering in T3 therefore resumes an already reserved build; no new
 build may take its place during the wait. This keeps automatic starts within
-the hardware bound when T3 answers resume work. The board counts reservations
+the hardware bound when T3 answers resume work. The board, Ready notes and every manual or automatic claim use the same durable factory reservation set. A linked PR or Status alone is not a factory start: List, Queued and unrecorded tracker items never reserve slots. A recorded delivery PR observed closed or merged releases its slot, even before Status catches up. Completed and set-aside builds also release; a Done label alone cannot conceal an unfinished build. The board counts these reservations
 in its build limit. A candidate without a slot says "Waiting for a build slot" and automatic scheduling retries on each
 refresh in the same deterministic order. Auto-build, the concept run scheduler,
 merge-starts-next and Start after use strict capacity claims. Pedro's item-level **Start build** uses a free slot when available

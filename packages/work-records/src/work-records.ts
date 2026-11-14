@@ -26,6 +26,7 @@ import { blockerDeclarationRecords } from './blocker-declarations.ts';
 import { validateBlockers } from './blocker-graph.ts';
 import { briefChangeRecords, type BriefChangeRecords } from './brief-changes.ts';
 import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
+import { buildReservations } from './build-reservations.ts';
 import { chooseStructure } from './choose-structure.ts';
 import { conceptRunRecords, type ConceptRunRecords } from './concept-build.ts';
 import { partCreator, type NewPart } from './create-part.ts';
@@ -609,6 +610,8 @@ export interface WorkRecords
      * except set-aside ones, is complete. Linked parents complete from their parts. Both parents also require their recorded release steps and Outcome check. A build stays incomplete while an unmet Dependency holds it. A Status, a ticket
      * closing or a thread ending never completes work. */
     completion(workId: string): Completion;
+    /** Factory-started builds still holding a shared capacity reservation. */
+    buildReservations(): string[];
     refinement(workId: string): Completion;
     /** Its blockers that aren't complete yet, then the unmet Dependencies holding it, each with the reasons; the work can
      * start once this is empty. */
@@ -2288,7 +2291,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 return byWork;
             }),
-        buildReadiness: (workId, input) => database.read(() => prepareBuildClaim(database, records, workId, input)),
+        buildReservations: () => database.read(() => buildReservations(records)),
+        buildReadiness: (workId, input) => database.read(() => prepareBuildClaim(records, workId, input)),
         prepareBuild: (workId, revision, input, recovery, cleanup) =>
             records.recordLaunchIntent(workId, revision, 'build', recovery, cleanup, input),
         recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup, preparation) => {
@@ -2328,7 +2332,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         `A ${checked} launch already owns this item. Resolve its existing intent before starting another thread.`,
                     );
 
-                const buildInput = preparation ? prepareBuildClaim(database, records, workId, preparation) : undefined;
+                const buildInput = preparation ? prepareBuildClaim(records, workId, preparation) : undefined;
 
                 insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
 

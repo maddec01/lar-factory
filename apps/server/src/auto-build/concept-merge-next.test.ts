@@ -1,4 +1,4 @@
-import type { BoardData, ModelGroup } from '@lar-factory/shared';
+import { buildsAtWork, type BoardData, type Item, type ModelGroup } from '@lar-factory/shared';
 import { openWorkRecords, type PullRequestState } from '@lar-factory/work-records';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,7 +64,8 @@ async function fixture(autoOn = false, limit = 1) {
         buildLimit: { limit, automatic: 1 },
         t3Availability: { availability: 'available' },
     } as unknown as BoardData);
-    const reread = () => board.update({ items: recordItems(records, [], repos) });
+    const tickets: Item[] = [];
+    const reread = () => board.update({ items: recordItems(records, tickets, repos) });
 
     reread();
 
@@ -151,6 +152,7 @@ async function fixture(autoOn = false, limit = 1) {
 
     return {
         records,
+        tickets,
         rev,
         group,
         a,
@@ -296,4 +298,67 @@ test('manual override holds its slot; an authorized concept and merge-starts-nex
         source: 'automatic',
         manualOverride: false,
     });
+});
+
+test.each([false, true])('three old List PRs cannot block one concept Start (Auto-build %s)', async (autoOn) => {
+    const s = await fixture(autoOn, 2);
+    const old = [1, 2, 3].map((number) => {
+        const id = s.records.create({
+            title: `Old run ${number}`,
+            repository: repos[2]!,
+            kind: 'build',
+            status: 'List',
+        }).workId;
+
+        s.records.setPullRequest(id, s.rev(id), `${repos[2]}#${number}`);
+        s.records.observe(id, s.rev(id), { of: 'pr', state: 'closed' });
+
+        return id;
+    });
+
+    s.reread();
+
+    // Also reproduce tracker-only List entries: no local record or factory owner.
+    const external = old.map((id, index) => ({
+        ...s.board.snapshot().items.find((item) => item.id === id)!,
+        id: `external-${index}`,
+        number: 100 + index,
+        buildReserved: undefined,
+        recorded: false,
+    }));
+
+    s.tickets.push(...external);
+    s.reread();
+    expect(buildsAtWork(s.board.snapshot())).toEqual([]);
+    expect(s.start().status).toBe(200);
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+    expect([s.a, s.b].map((id) => s.records.launchIntents({ workId: id })[0]?.buildInput?.capacity)).toEqual([
+        { source: 'automatic', limit: 2, occupied: 0, manualOverride: false },
+        { source: 'automatic', limit: 2, occupied: 1, manualOverride: false },
+    ]);
+    expect(buildsAtWork(s.board.snapshot()).map((item) => item.id)).toEqual([s.a, s.b]);
+    await s.scheduler.pass();
+    expect(s.launches).toHaveLength(2);
+    expect(s.board.snapshot().items.filter((item) => item.recorded === false)).toHaveLength(3);
+});
+
+test('released Ready builds with stale start labels do not block concept scheduling', async () => {
+    const s = await fixture(false, 2);
+    const old = s.records.create({
+        title: 'Released old run',
+        repository: repos[2]!,
+        kind: 'build',
+        status: 'Ready',
+    }).workId;
+
+    s.records.addThread(old, s.rev(old), 'old-owner', 'build');
+    s.records.setPullRequest(old, s.rev(old), `${repos[2]}#90`);
+    s.records.observe(old, s.rev(old), { of: 'pr', state: 'closed' });
+    s.reread();
+    s.board.update({ startedBuilds: { [old]: { threadId: 'old-owner', title: 'Old build' } } });
+    expect(buildsAtWork(s.board.snapshot())).toEqual([]);
+    expect(s.start().status).toBe(200);
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
 });

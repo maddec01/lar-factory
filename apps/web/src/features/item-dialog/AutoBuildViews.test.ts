@@ -26,6 +26,7 @@ const build = (index: number, status: Item['status']): Item => ({
     parentId: group.id,
     parent: null,
     status,
+    buildReserved: status !== 'Ready',
     linkedPrs: [],
     buildPhase: null,
     completion: { complete: false, reasons: [] },

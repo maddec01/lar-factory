@@ -1,6 +1,5 @@
 import {
     sampleActivityFrom,
-    buildsAtWork,
     sameLabel,
     type LabelChange,
     SETTLED_FIRST_READ,
@@ -276,16 +275,15 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             if (input.action === 'delivery') {
                 const workId = delivery.seed(repos()[0]!.repo);
 
-                // Two existing sample builds plus the delivery fixture's two builds share four slots.
-                board.update({ buildLimit: { limit: 4, automatic: 2 } });
+                // Only the delivery fixture's two recorded factory builds reserve these slots.
+                board.update({ buildLimit: { limit: 2, automatic: 2 } });
 
                 reread();
 
                 const manualWorkId =
                     input.change === 'manual-override'
                         ? delivery.manualOverride(repos()[0]!.repo, {
-                              limit: 4,
-                              atWorkIds: buildsAtWork(board.snapshot()).map((item) => item.id),
+                              limit: 2,
                           })
                         : undefined;
 

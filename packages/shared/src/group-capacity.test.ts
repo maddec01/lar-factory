@@ -12,6 +12,7 @@ function fixture() {
         id: `part-${index}`,
         kind: 'build',
         status,
+        buildReserved: status !== 'Ready',
         parentId: 'group',
         threads: [],
         blockers: [],

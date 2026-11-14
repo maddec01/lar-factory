@@ -1,6 +1,6 @@
 /** A concept run keeps its authorization when Auto-build is switched off. */
 export interface ConceptBuildRun {
-    state: 'running' | 'paused';
+    state: 'running' | 'paused' | 'completed';
     startedAt: string;
     pausedAt?: string;
     reason?: string;

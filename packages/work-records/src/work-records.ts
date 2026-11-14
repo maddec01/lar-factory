@@ -45,6 +45,7 @@ import { gateRecords, type GateRecords } from './gate-records.ts';
 import { gateResumeRecords } from './gate-resume.ts';
 import { groupProjectionRecords, saveProjection } from './group-projections.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
+import { outcomeRecords } from './outcome-records.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { assertProductContent } from './product-content.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -431,6 +432,9 @@ export interface WorkRecords
     saveReviewerSelection: ReturnType<typeof reviewSelectionRecords>['saveReviewerSelection'];
     reviewerSelection: ReturnType<typeof reviewSelectionRecords>['reviewerSelection'];
     recordSelectedReviewRound: ReturnType<typeof reviewSelectionRecords>['recordSelectedReviewRound'];
+    outcomeCheck: ReturnType<typeof outcomeRecords>['outcomeCheck'];
+    prepareOutcomeCheck: ReturnType<typeof outcomeRecords>['prepareOutcomeCheck'];
+    outcomeCheckDelivered: ReturnType<typeof outcomeRecords>['outcomeCheckDelivered'];
     pendingGateResumes: ReturnType<typeof gateResumeRecords>['pendingGateResumes'];
     gateResumeResult: ReturnType<typeof gateResumeRecords>['gateResumeResult'];
     createParts: ReturnType<typeof partBatchRecords>['createParts'];
@@ -1312,6 +1316,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...partBatchRecords(database, () => records, dataDir),
         ...reviewSelectionRecords(database, () => records),
         ...gateResumeRecords(database),
+        ...outcomeRecords(database, () => records),
         ...blockerDeclarationRecords(database, () => records),
         ...groupProjectionRecords(database, () => records),
         chooseStructure: (id) =>
@@ -1331,7 +1336,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 return choice;
             }),
-        ...releaseRecords(database, (id) => fromRow(find(id))),
+        ...releaseRecords(
+            database,
+            (id) => fromRow(find(id)),
+            (id, digest) => outcomeRecords(database, () => records).validateOutcomeInput(id, digest),
+        ),
         ...releaseStepRecords(() => records),
         ...reconciliationRecords(database, () => records),
         ...scopeRecords(database, (id) => fromRow(find(id))),

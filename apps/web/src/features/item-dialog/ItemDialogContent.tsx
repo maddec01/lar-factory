@@ -17,6 +17,7 @@ import { ItemMeta } from './ItemDetailsView';
 import { MoveActions, StatusActions } from './ItemDialogActions';
 import { ItemProgress } from './ItemProgress';
 import { ItemSummary } from './ItemSummary';
+import { RecordOutcome } from './RecordOutcome';
 import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
 import { RetroFollowups } from './RetroFollowups';
@@ -133,6 +134,9 @@ export function ItemDialogContent({
                         name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
                     />
                     {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
+                    {!item.setAside && (
+                        <RecordOutcome key={`outcome-${item.id}-${item.revision}`} item={item} items={data.items} />
+                    )}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (!group || record.body?.trim() || record.answer?.trim()) && (
                             <RecordText

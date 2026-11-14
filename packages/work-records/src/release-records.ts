@@ -13,6 +13,7 @@ export interface ReleaseRecords {
         result: 'passed' | 'failed',
         by: string,
         evidence: string,
+        inputDigest?: string,
     ): ReleasePlan;
 }
 
@@ -59,7 +60,11 @@ export function releaseMemberHolds(database: Database, id: string): string[] {
         )
         .map((step) => `Release step ${step.id}: reconcile removed or set-aside ships-with members.`);
 }
-export function releaseRecords(database: Database, read: (id: string) => WorkRecord): ReleaseRecords {
+export function releaseRecords(
+    database: Database,
+    read: (id: string) => WorkRecord,
+    validateOutcome: (id: string, digest?: string) => void,
+): ReleaseRecords {
     const { db } = database;
     const save = (id: string, revision: number, change: (current: ReleasePlan | null) => ReleasePlan) =>
         database.write(() => {
@@ -195,7 +200,7 @@ export function releaseRecords(database: Database, read: (id: string) => WorkRec
 
                 return plan;
             }),
-        recordOutcomeCheck: (id, revision, result, by, proof) =>
+        recordOutcomeCheck: (id, revision, result, by, proof, inputDigest) =>
             save(id, revision, (current) => {
                 const plan = required(current);
 
@@ -207,6 +212,7 @@ export function releaseRecords(database: Database, read: (id: string) => WorkRec
                 if (plan.steps.some((step) => !step.done))
                     invalid('Complete every release step before checking the Outcome.');
 
+                validateOutcome(id, inputDigest);
                 plan.outcomeCheck.result = result;
                 plan.outcomeCheck.evidence = evidence(by, proof);
 

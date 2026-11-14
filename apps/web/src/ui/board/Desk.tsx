@@ -95,6 +95,8 @@ interface DeskCardProps {
     name: string;
     /** The concept or linked parent this work belongs to, supplied by the desk projection. */
     parentName?: string;
+    /** The exact member names covered by one group approval. */
+    members?: string[];
     /** More about the item under its title, such as a work item's fields. */
     details?: ReactNode;
     /** The status's glyph, only where there is no `statusState` (whose light is drawn instead). */
@@ -127,6 +129,7 @@ export function DeskCard({
     title,
     name,
     parentName,
+    members,
     details,
     statusIcon,
     status,
@@ -178,6 +181,7 @@ export function DeskCard({
             actions={<span className="desk-actions contents">{actions}</span>}
         >
             {parentName && <p className="text-fg-muted text-xs">Part of {parentName}</p>}
+            {!!members?.length && <p className="text-fg-muted text-xs wrap-anywhere">Briefs: {members.join(' · ')}</p>}
             {details}
         </CardBase>
     );

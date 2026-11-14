@@ -8,6 +8,7 @@
 
 import {
     deskItems,
+    pendingBriefBatch,
     openQuestionThread,
     questionOwnerParent,
     groupState,
@@ -55,6 +56,10 @@ import {
 function NextStep({ item, waitLabel }: { item: Item; waitLabel: string }) {
     const data = useBoardStore((state) => state.data);
     const group = groupState(item, data);
+
+    const batch = pendingBriefBatch(item, data.items);
+
+    if (batch.length) return null;
 
     if (group) return group.word === waitLabel ? null : <DeskHint>{group.word}</DeskHint>;
 
@@ -123,6 +128,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
     const wait = deskWait(item, useActivityUnavailable(), data.items);
     const followups = retroWaits(item.retro);
+    const batch = pendingBriefBatch(item, data.items);
     const requestOwner = openQuestionThread(item) ?? openQuestionThread(questionOwnerParent(item, data.items) ?? item);
     const approval = requestOwner?.pendingRequest?.kind === 'tool-approval' ? requestOwner : undefined;
     const picked = useItemDialogStore((state) => state.itemId === item.id);
@@ -138,6 +144,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             title={<ItemTitle item={item} />}
             name={itemName(item)}
             parentName={deskParentName(item, data.items)}
+            members={batch.map((part) => part.title)}
             details={
                 !followups && (
                     <>
@@ -158,7 +165,11 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             }
             statusIcon={<ItemStatusGlyph item={item} />}
             status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
-            statusState={followups ? 'waiting' : (shown.state ?? boardStatusState[shown.glyph])}
+            statusState={
+                followups || batch.length || wait.label === 'Outcome check'
+                    ? 'waiting'
+                    : (shown.state ?? boardStatusState[shown.glyph])
+            }
             next={<NextStep item={item} waitLabel={wait.label} />}
             actions={<HumanWaitAction item={item} data={data} />}
         />

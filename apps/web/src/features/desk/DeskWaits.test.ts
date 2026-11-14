@@ -292,3 +292,45 @@ test('a concept question has one wait label on its desk card', async () => {
     );
     expect(text(card()).match(/Question/g)).toHaveLength(1);
 });
+
+test.each(['concept', 'linked'])('%s batch has one Approve card naming parent and members', async (kind) => {
+    const parent = {
+        ...base,
+        id: 'batch-parent',
+        title: 'Greeting delivery',
+        parentId: null,
+        parent: null,
+        kind: kind === 'concept' ? ('concept' as const) : ('feature' as const),
+        flow: 'linked' as const,
+        status: 'Shaping' as const,
+        linkedPrs: [],
+        threads: [],
+        needsYou: { reason: 'Approve the build briefs', offers: [], causes: [], ticketOpen: true },
+    };
+    const parts = ['Lowercase', 'Trim', 'Length'].map((title) => ({
+        ...base,
+        id: title,
+        title,
+        kind: 'build' as const,
+        flow: 'linked' as const,
+        status: 'Queued' as const,
+        parentId: parent.id,
+        linkedPrs: [],
+        threads: [],
+        passingBrief: false,
+        briefApproval: { reason: 'Approve brief', digest: title },
+    }));
+
+    await mountPage(fresh({ ...sample, items: [parent, ...parts] }));
+    expect(document.querySelectorAll('.desk-card')).toHaveLength(1);
+    for (const label of ['Greeting delivery', 'Lowercase', 'Trim', 'Length', 'Approve briefs'])
+        expect(text(card())).toContain(label);
+
+    const action = [...card().querySelectorAll('button')].find((button) => text(button) === 'Approve briefs')!;
+
+    await settle(() => action.click());
+
+    const { useItemDialogStore } = await import('@/features/item-dialog');
+
+    expect(useItemDialogStore.getState().itemId).toBe(parent.id);
+});

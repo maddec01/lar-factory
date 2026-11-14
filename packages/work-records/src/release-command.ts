@@ -21,6 +21,7 @@ export async function releaseCommand(command: string, args: string[]): Promise<n
                 identity: { type: 'string' },
                 evidence: { type: 'string' },
                 result: { type: 'string' },
+                'input-digest': { type: 'string' },
             },
         });
 
@@ -56,7 +57,14 @@ export async function releaseCommand(command: string, args: string[]): Promise<n
                 if (values.result !== 'passed' && values.result !== 'failed')
                     throw Error('Use --result passed|failed.');
 
-                records.recordOutcomeCheck(id, revision, values.result, values.identity, values.evidence);
+                records.recordOutcomeCheck(
+                    id,
+                    revision,
+                    values.result,
+                    values.identity,
+                    values.evidence,
+                    values['input-digest'],
+                );
             }
         }
 

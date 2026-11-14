@@ -63,6 +63,23 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+it.each(['feature', 'concept'] as const)('reports a stranded %s Outcome as a mechanical hold', async (kind) => {
+    const f = await fixture(kind);
+
+    f.records.setReleasePlan(f.id, f.revision(), { steps: [], outcomeCheck: 'Check exact merged composition.' });
+
+    if (kind === 'concept') f.records.setFogGone(f.id, f.revision(), true);
+
+    f.merge();
+    expect(f.records.reconcile(f.id).items).toContainEqual(
+        expect.objectContaining({
+            key: `outcome:${f.id}`,
+            requiresFix: true,
+            summary: expect.stringContaining('Outcome'),
+        }),
+    );
+});
+
 it('completes repeat 4 parent from three observed merges, ordered release receipts and passing Outcome without its own PR', async () => {
     const f = await fixture();
 

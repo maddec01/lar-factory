@@ -82,3 +82,29 @@ export function shapingOwner(item: Item, all: readonly Item[]): Item | undefined
 
     return undefined;
 }
+
+/** One group approval action owns every displayed member; unfinished Doubt remains an agent wait. */
+export function pendingBriefBatch(parent: Item, all: readonly Item[]): Item[] {
+    if (
+        parent.setAside ||
+        parent.status === 'Done' ||
+        parent.parentId ||
+        (parent.kind !== 'concept' && parent.flow !== 'linked')
+    )
+        return [];
+
+    const parts = all.filter(
+        (part) =>
+            part.parentId === parent.id &&
+            !part.setAside &&
+            part.status !== 'Done' &&
+            !['concept', 'decision', 'slice'].includes(part.kind) &&
+            part.passingBrief === false &&
+            !part.briefChangesRequested,
+    );
+    const requested =
+        /approve.*brief|brief.*approval/i.test(parent.needsYou?.reason ?? '') ||
+        parts.some((part) => part.briefApproval);
+
+    return requested && parts.length && !parts.some((part) => part.briefReviewing) ? parts : [];
+}

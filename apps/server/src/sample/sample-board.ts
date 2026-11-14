@@ -142,6 +142,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             identity: () => 'Sample Pedro',
             send: verification.dependencies.send,
         },
+        outcomeDeps: { send: verification.dependencies.send },
         retroDeps: {
             send: verification.dependencies.send,
             identity: verification.dependencies.identity,

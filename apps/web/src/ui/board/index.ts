@@ -237,3 +237,5 @@ export { StartAfterButton } from './StartAfterButton';
 export { ApprovalWait } from './ApprovalWait';
 export { BriefChanges } from './BriefChanges';
 export { BriefApprovalDetails } from './BriefApprovalDetails';
+
+export { OutcomeForm } from './OutcomeForm';

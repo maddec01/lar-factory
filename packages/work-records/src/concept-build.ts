@@ -1,7 +1,8 @@
-import type { ConceptBuildPlan, ConceptBuildRun } from '@lar-factory/shared';
+import { parseConceptMap, type ConceptBuildPlan, type ConceptBuildRun } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { contractText } from './review-dependencies.ts';
 import { workOrder } from './work-order.ts';
 import type { WorkRecords } from './work-records.ts';
 
@@ -33,7 +34,7 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
 
         if (group.needsYou) holds.push({ workId, reason: group.needsYou });
 
-        if (!rows.some((row) => row.kind === 'build' && !row.complete))
+        if (!rows.some((row) => row.kind === 'build'))
             holds.push({ workId, reason: 'No remaining builds are planned.' });
 
         for (const row of rows) {
@@ -76,10 +77,12 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
         const signature = createHash('sha256')
             .update(
                 JSON.stringify({
-                    map: work.body(workId, 'map'),
+                    map: /^##\s/m.test(work.body(workId, 'map') ?? '')
+                        ? parseConceptMap(work.body(workId, 'map')!)
+                        : work.body(workId, 'map')?.trim(),
+                    scope: work.confirmedScope(workId)?.scope,
                     fog: group.fogGone,
                     setAside: group.setAside,
-                    refinement: work.refinement(workId),
                     dependencies: [workId, ...rows.map((row) => row.workId)].flatMap((id) =>
                         work
                             .dependencies(id)
@@ -98,13 +101,14 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                         .map((row) => ({
                             id: row.workId,
                             kind: row.kind,
-                            brief: row.brief,
+                            brief: contractText(row.brief),
+                            scope: work.confirmedScope(row.workId)?.scope,
                             ...(row.kind === 'decision' && {
-                                decision: work.body(row.workId, 'decision'),
-                                answer: work.body(row.workId, 'answer'),
-                                drafts: work.body(row.workId, 'domain-drafts'),
+                                decision: work.body(row.workId, 'decision')?.trim(),
+                                answer: work.body(row.workId, 'answer')?.trim(),
+                                drafts: work.body(row.workId, 'domain-drafts')?.trim(),
                             }),
-                            gate: row.gate.passing?.gateId,
+                            gate: row.gate.passing?.briefDigest,
                             blockers: row.blockers.map((blocker) => blocker.workId).sort(),
                         }))
                         .sort((a, b) => a.id.localeCompare(b.id)),
@@ -126,7 +130,9 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
             ...(saved.reason && { reason: saved.reason }),
         };
 
-        if (run?.state === 'running' && saved!.signature !== signature) {
+        if (run?.state === 'running' && rows.some((row) => row.kind === 'build') && rows.every((row) => row.complete)) {
+            run.state = 'completed';
+        } else if (run?.state === 'running' && saved!.signature !== signature) {
             run.state = 'paused';
             run.reason = 'Concept scope, gates or blockers changed. Check the holds and start concept builds again.';
         }
@@ -155,7 +161,7 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                     )
                     .all()
                     .map((row) => String(row.work_id))
-                    .filter((id) => plan(id).run?.state === 'paused'),
+                    .filter((id) => plan(id).run?.state !== 'running'),
             );
 
             if (!changed.length) return;
@@ -164,13 +170,17 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                 for (const id of changed) {
                     const current = plan(id).run;
 
-                    if (current?.state !== 'paused') continue;
+                    if (!current || current.state === 'running') continue;
 
                     const row = db.prepare('SELECT content FROM concept_build_runs WHERE work_id=?').get(id)!;
                     const saved = JSON.parse(String(row.content)) as SavedRun;
 
                     db.prepare('UPDATE concept_build_runs SET content=? WHERE work_id=?').run(
-                        JSON.stringify({ ...saved, ...current, pausedAt: new Date().toISOString() }),
+                        JSON.stringify({
+                            ...saved,
+                            ...current,
+                            ...(current.state === 'paused' && { pausedAt: new Date().toISOString() }),
+                        }),
                         id,
                     );
                 }

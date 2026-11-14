@@ -80,7 +80,7 @@ Parent release records, local only
                                     A changed plan needs fresh evidence; old versions remain.
   complete-release-step <work-id> --revision N --step ID --identity person --evidence proof
                                     Record done evidence after preceding steps are done.
-  record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof
+  record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof [--input-digest digest]
                                     Record the final observable check after release steps.
 
 Post-merge retro

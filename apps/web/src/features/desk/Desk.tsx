@@ -52,11 +52,11 @@ import {
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
  * leave out a zero count other than passed.
  */
-function NextStep({ item }: { item: Item }) {
+function NextStep({ item, waitLabel }: { item: Item; waitLabel: string }) {
     const data = useBoardStore((state) => state.data);
     const group = groupState(item, data);
 
-    if (group) return <DeskHint>{group.word}</DeskHint>;
+    if (group) return group.word === waitLabel ? null : <DeskHint>{group.word}</DeskHint>;
 
     if (retroWaits(item.retro)) return null;
 
@@ -159,7 +159,7 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             statusIcon={<ItemStatusGlyph item={item} />}
             status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
             statusState={followups ? 'waiting' : (shown.state ?? boardStatusState[shown.glyph])}
-            next={<NextStep item={item} />}
+            next={<NextStep item={item} waitLabel={wait.label} />}
             actions={<HumanWaitAction item={item} data={data} />}
         />
     );

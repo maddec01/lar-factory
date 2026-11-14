@@ -16,8 +16,10 @@ export function ConceptBuildRun({
     startLabel,
     capacity,
     progress,
+    holdsSummarized = false,
 }: {
     progress?: { total: number; complete: number; building: number; waiting: number; names: string; outside: number };
+    holdsSummarized?: boolean;
     compact?: boolean;
     showAction?: boolean;
     startLabel: string;
@@ -88,7 +90,10 @@ export function ConceptBuildRun({
             )}
             {plan.run?.reason && <Text variant="caption">{plan.run.reason}</Text>}
             {plan.holds.length > 0 && (
-                <Disclosure label={conceptBuildHoldSummary(plan)} presentation="section">
+                <Disclosure
+                    label={holdsSummarized ? 'Build hold details' : conceptBuildHoldSummary(plan)}
+                    presentation="section"
+                >
                     <ul
                         className="m-0 grid list-disc gap-1 pl-4 text-left text-sm wrap-anywhere"
                         aria-label="Concept build holds"

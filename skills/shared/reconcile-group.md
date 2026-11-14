@@ -27,9 +27,18 @@ Use `sync-blockers` for declarations. For stale current-answer/map sources, use
 with all group revisions and reviewed current prose. Refresh affected answers and
 map together; historical answers remain. Commands hold stale projections until refreshed.
 
+Before ending a shaping turn, settle factory details (fixtures, files,
+presentation) yourself. Remove resolved Fog; record `set-fog --fog gone` when
+empty. Every remaining bullet starts `[decision: ID]` for an open decision,
+`[factory: ID]` for a task decision actively in Shaping, or `[question: ID]`
+for Pedro's actually pending question with saved Needs you (visible on Your
+desk; answer in T3). IDs name this group or its direct parts. Queued factory
+work uses a decision route. Finished, retired, missing or unrouted Fog is a
+mechanical hold; repair it, never leave an ownerless wait.
+
 Save release order with `set-release-plan`: `shipsWith` names delivery work IDs;
 `who` is `Pedro` for human steps, `Agent` for automated ones. Record release
-evidence with `complete-release-step`, then the Outcome check; merges alone
+evidence with `complete-release-step`, then the post-release Outcome check (never a refinement hold); merges alone
 prove neither. Save the map after current answers and domain drafts.
 
 Resolve reviewed source changes with `lar-work resolve-reconcile GROUP_ID --item

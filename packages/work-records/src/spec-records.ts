@@ -3,6 +3,7 @@ import type { GateEvidence } from '@lar-factory/shared';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { assertProductContent } from './product-content.ts';
 import type { WorkRecord } from './work-records.ts';
 
 export interface SpecRemote {
@@ -123,6 +124,8 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
 
                 if (change && !change.contextOnly && ['concept', 'decision', 'slice'].includes(record.kind))
                     throw new WorkRecordError('invalid', 'This record cannot hold a ticket Spec.');
+
+                if (change && !change.contextOnly) assertProductContent(change.text);
 
                 save(database, workId, state.error?.startsWith('Title: ') ? { ...state, error: before.error } : state);
 

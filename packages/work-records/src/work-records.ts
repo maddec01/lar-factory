@@ -11,6 +11,7 @@ import {
     STATUSES,
     type NeedsYouCause,
     type ShapingThreadCleanup,
+    parseConceptMap,
     type Status,
     type ThreadLaunchRequest,
 } from '@lar-factory/shared';
@@ -44,6 +45,7 @@ import { gateResumeRecords } from './gate-resume.ts';
 import { groupProjectionRecords, saveProjection } from './group-projections.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
+import { assertProductContent } from './product-content.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
 import { releaseRecords, releaseMemberHolds, storedRelease, type ReleaseRecords } from './release-records.ts';
@@ -892,6 +894,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user') AND invalidated = 0))
     ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`);
     const writeBody = (workId: string, body: Body, markdown: string) => {
+        assertProductContent(markdown);
+
         const digest =
             body === 'brief' && markdown.trim()
                 ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex')
@@ -1785,7 +1789,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                     if (name === 'answer') recordDecisionAnswer(db, workId, row.revision + 1, text);
 
-                    if (name === 'map') touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
+                    if (name === 'map') {
+                        touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
+
+                        if (parseConceptMap(text).fog.length) return { fog_gone_at: null };
+                    }
 
                     if (row.kind === 'decision' && changed && ['answer', 'domain-drafts'].includes(name))
                         return { status: 'Shaping', finished_at: null };
@@ -2639,6 +2647,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             return change(workId, revision, (row) => {
                 if (row.kind !== 'concept') throw invalid(`Only a concept has Fog; this record is a ${row.kind}.`);
+
+                if (gone && parseConceptMap(records.body(workId, 'map') ?? '').fog.length)
+                    throw invalid('Remove resolved Fog from the map before recording it gone.');
 
                 if ((row.fog_gone_at !== null) === gone) return null;
 

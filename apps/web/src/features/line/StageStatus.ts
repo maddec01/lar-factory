@@ -3,7 +3,7 @@
 import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
 import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
-export const STAGES: { name: string; statuses: Status[] }[] = [
+const STAGES: { name: string; statuses: Status[] }[] = [
     { name: 'Refining', statuses: ['Shaping', 'Needs you'] },
     { name: 'Ready', statuses: ['Ready'] },
     { name: 'Building', statuses: ['In progress'] },

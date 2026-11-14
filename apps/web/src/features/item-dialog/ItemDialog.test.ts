@@ -192,7 +192,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     holdPosts(readyBuild);
     await mountPage(readyBuild);
     await openItem('I_sample13');
-    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start build']);
+    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Build']);
     await pressMenu(button('start', 'I_sample13'));
     await settle(() => vi.advanceTimersByTime(20));
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
@@ -656,7 +656,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
     );
-    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start build after Dependency on server team']);
+    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start after Dependency on server team']);
     expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe(
         'Pick a model to start it once you mark the Dependency on server team met',
     );
@@ -996,14 +996,17 @@ test.each(['task', 'research', 'prototype', 'grill', null] as const)(
 
         await mountPage({ ...sample, items: [decision] });
         await openItem(decision.id);
-        expect(text(inDialog('[data-step-names]'))).toBe('QueueWorkingOutcome');
-        expect(text(inDialog('[data-steps]'))).toContain('Stage 1 of 3');
-        expect(text(button('start', decision.id))).toContain('Start decision');
+        // The dialog names the current step in words, so the decision's own steps show one at a time.
+        expect(text(inDialog('[data-step-names]'))).toBe('Queue');
+        expect(inDialog('[data-steps]')?.getAttribute('title')).toBe('Stage 1 of 3');
+        expect(text(button('start', decision.id))).toBe('Decide');
         await push(moved(decision.id, 'Shaping', { ...sample, items: [decision] }));
-        expect(text(inDialog('[data-steps]'))).toContain('Stage 2 of 3');
+        expect(inDialog('[data-steps]')?.getAttribute('title')).toBe('Stage 2 of 3');
+        expect(text(inDialog('[data-step-names]'))).toBe('Working');
         expect(text(inDialog('[data-item-summary]'))).toContain('Working');
         await push(moved(decision.id, 'Done', { ...sample, items: [decision] }));
-        expect(text(inDialog('[data-steps]'))).toContain('Stage 3 of 3');
+        expect(inDialog('[data-steps]')?.getAttribute('title')).toBe('Stage 3 of 3');
+        expect(text(inDialog('[data-step-names]'))).toBe('Outcome');
         expect(text(inDialog('[data-item-summary]'))).toContain('Complete');
     },
 );

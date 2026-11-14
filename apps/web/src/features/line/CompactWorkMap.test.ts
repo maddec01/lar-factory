@@ -1,8 +1,11 @@
-import { expect, test, vi } from 'vite-plus/test';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
 import { $, mountPage, sample, settle, text } from '@/test/PageTest';
 
 vi.mock('./useWidth', () => ({ useWidth: () => ({ ref: () => {}, width: 318 }) }));
+
+// A dossier opens on its parts list; these tests read #200's Work map.
+beforeEach(() => localStorage.setItem('lar-board:dossier-view:I_sample09', 'map'));
 
 test('phone map puts every current card in view and names its prerequisites', async () => {
     await mountPage({

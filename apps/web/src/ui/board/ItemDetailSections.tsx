@@ -1,5 +1,8 @@
+import { Button } from '@lar-works/design-system';
+import { Pencil } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
+import { buttonKind } from './ButtonKinds';
 import type { DataAttributes } from './DataAttributes';
 
 const headings = {
@@ -106,6 +109,17 @@ export function MainSection({
             {header}
             {children}
         </Tag>
+    );
+}
+
+/** An empty description's one quiet control, where the section would otherwise be a heading over nothing. */
+export function AddDescription({ onAdd }: { onAdd: () => void }) {
+    return (
+        <div data-description>
+            <Button {...buttonKind('control')} leftIcon={<Pencil />} onClick={onAdd}>
+                Add description
+            </Button>
+        </div>
     );
 }
 

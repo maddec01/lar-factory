@@ -1,11 +1,9 @@
 // Ticket description, Spec sync notice and description editor.
 
-import type { ItemDetails, TextFormat } from '@lar-factory/shared';
+import type { TextFormat } from '@lar-factory/shared';
 import {
     Button,
     Disclosure,
-    Heading,
-    Inline,
     MarkdownEditor,
     PageError,
     RichText,
@@ -15,11 +13,12 @@ import {
 import { CircleAlert, Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
-import type { DescriptionEdit } from './useDescriptionEdit';
-import { postAction } from '@/services/board/board.service';
-import { forgetItemDetails, type ItemDetailsRead } from '@/services/items/items.hooks';
+import { SpecNotice } from './SpecNotice';
+import { proseOf, type DescriptionEdit } from './useDescriptionEdit';
+import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import {
+    AddDescription,
     buttonKind,
     EditActions,
     EditorSlot,
@@ -27,7 +26,6 @@ import {
     MainColumnSlot,
     MainSection,
     SectionHeader,
-    SpecSync,
     TextSection,
 } from '@/ui/board';
 
@@ -88,72 +86,6 @@ function EditDescription({
                 </Button>
             </EditActions>
         </>
-    );
-}
-
-function SpecNotice({
-    itemId,
-    spec,
-    refresh,
-}: {
-    itemId: string;
-    spec: NonNullable<ItemDetails['spec']>;
-    refresh: () => Promise<boolean>;
-}) {
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const act = async (action: 'retry' | 'accept' | 'reject') => {
-        setBusy(true);
-        setError(null);
-
-        const result = await postAction('/api/item-spec', { itemId, generation: spec.generation, action });
-
-        if (result.error) setError(result.error);
-        else {
-            forgetItemDetails(itemId);
-
-            if (!(await refresh())) setError('Couldn’t reload the Spec. Reopen the item to read it.');
-        }
-
-        setBusy(false);
-    };
-
-    return (
-        <SpecSync
-            status={
-                spec.outdated || spec.error || spec.warning || spec.pending
-                    ? spec.outdated
-                        ? 'The brief changed. The ticket keeps the last approved Spec until you approve the new brief.'
-                        : (spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.')
-                    : undefined
-            }
-            error={error}
-        >
-            {spec.held ? (
-                <>
-                    <Disclosure label="Review held GitHub edit" presentation="section">
-                        <Heading as="h3" variant="title">
-                            {spec.held.title}
-                        </Heading>
-                        <RichText text={spec.held.body} format="markdown" />
-                    </Disclosure>
-                    <Inline as="span">
-                        <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('accept')}>
-                            Accept edit
-                        </Button>
-                        <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('reject')}>
-                            Reject edit
-                        </Button>
-                    </Inline>
-                </>
-            ) : (
-                (spec.pending || spec.error) && (
-                    <Button {...buttonKind('other')} loading={busy} onClick={() => void act('retry')}>
-                        Retry Spec sync
-                    </Button>
-                )
-            )}
-        </SpecSync>
     );
 }
 
@@ -218,6 +150,10 @@ export function ItemDescription({
     const [body, format]: [string, TextFormat] =
         edit.saved === null ? [read.details.body, read.details.format] : [edit.saved, 'markdown'];
 
+    // An empty description that can be written is one quiet button, with no heading over nothing.
+    if (!edit.editing && editable && !proseOf(body) && !read.details.spec && !sections?.length)
+        return <AddDescription onAdd={edit.start} />;
+
     return (
         <MainSection
             fill={fill}
@@ -232,7 +168,7 @@ export function ItemDescription({
                                 ? 'Ticket description'
                                 : 'Description'
                     }
-                    empty={!edit.editing && !body && 'No description.'}
+                    empty={!edit.editing && !proseOf(body) && !editable && 'No description.'}
                 >
                     {!edit.editing && (
                         <>
@@ -251,13 +187,13 @@ export function ItemDescription({
             {read.details.spec && <SpecNotice itemId={itemId} spec={read.details.spec} refresh={refresh} />}
             {edit.editing ? (
                 <EditDescription
-                    body={edit.draft ?? body}
+                    body={edit.draft ?? proseOf(body)}
                     format={edit.draft === null ? format : 'markdown'}
                     edit={edit}
                     fill={fill}
                 />
             ) : (
-                body &&
+                proseOf(body) &&
                 (format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />)
             )}
             {read.details.spec?.original && (

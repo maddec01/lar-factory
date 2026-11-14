@@ -13,7 +13,7 @@ import type { Chip, Moving } from './DossierSummary';
 import { chipsOf, moving, nextOf, otherRepos, rowTooltip } from './DossierSummary';
 import { PartStart } from './PartStart';
 import { figuresOf } from './RowDetails';
-import { RowKind, RowSource } from './RowIdentity';
+import { RowKindMark, RowSource } from './RowIdentity';
 import { stageOf } from './StageStatus';
 import {
     ConceptBuild,
@@ -42,7 +42,6 @@ import {
     RowCells,
     RowCount,
     RowFirst,
-    RowKindCell,
     RowSide,
     RowStateCell,
 } from '@/ui/board';
@@ -128,15 +127,19 @@ export function DossierLine({
         : undefined;
 
     return (
-        <Line item={parent.id} picked={isPicked} title={rowTooltip(chips, threads)} onClick={onClick}>
+        <Line
+            item={parent.id}
+            picked={isPicked}
+            attention={m.needsYou.length > 0}
+            title={rowTooltip(chips, threads)}
+            onClick={onClick}
+        >
             <RowFirst>
                 <RowCells>
                     {lead}
                     <RowSource item={parent} />
-                    <RowKindCell>
-                        <RowKind item={parent} />
-                    </RowKindCell>
                     <DossierTitleCell>
+                        <RowKindMark item={parent} />
                         <DossierTitle name={parent.title} onOpen={() => open(parent)}>
                             <ItemTitle item={parent} />
                         </DossierTitle>
@@ -151,6 +154,8 @@ export function DossierLine({
                         <DossierStates>
                             <DossierState item={parent} />
                             <Chips chips={chips} />
+                            {/* Its cost reads on the first line, where a lane row's does. */}
+                            <Figures s={figuresOf(parent, data, true)} item={parent} total />
                         </DossierStates>
                     </RowStateCell>
                 </RowCells>
@@ -166,11 +171,10 @@ export function DossierLine({
             </RowFirst>
             <RowSecondLine
                 bar={m.count > 0 && <PartsBar m={m} />}
-                figures={<Figures s={figuresOf(parent, data, true)} item={parent} total />}
                 count={
                     (m.count > 0 || !hasParent || parent.kind === 'concept') && (
                         <RowCount title={m.count ? `${m.done}/${m.count} parts done` : undefined}>
-                            {m.count ? `${m.done}/${m.count} parts` : 'No parts yet'}
+                            {m.count ? `${m.done}/${m.count} parts done` : 'No parts yet'}
                         </RowCount>
                     )
                 }

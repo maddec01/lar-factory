@@ -91,10 +91,9 @@ test('changes packaged reviewer mode, duplicates it and only edits the copy', as
     expect(text($('[aria-label="Security reviewer"]')!)).toContain('Default security');
     expect($('textarea')).toBeNull();
     expect($('[aria-label="Trigger"]')).toBeNull();
+    // Duplicate is an icon button, named for its reviewer.
     await settle(() =>
-        $$<HTMLButtonElement>('[aria-label="Security reviewer"] button')
-            .find((entry) => text(entry) === 'Duplicate')!
-            .click(),
+        $<HTMLButtonElement>('[aria-label="Security reviewer"] button[aria-label="Duplicate Security"]')!.click(),
     );
     expect(input('Reviewer name').value).toBe('Security (copy)');
     expect(document.activeElement).toBe(input('Reviewer name'));

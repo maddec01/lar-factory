@@ -15,12 +15,12 @@
 }
 
 .factory-reviewer-row {
-    padding: --spacing(4);
-    border-bottom: 1px solid var(--color-line);
+    padding: --spacing(3) --spacing(4);
+    border-radius: var(--radius-lg);
 }
 
-.factory-reviewer-row:last-child {
-    border-bottom: 0;
+.factory-reviewer-row:hover {
+    background: var(--color-fill-hover);
 }
 
 .factory-reviewer-summary {
@@ -28,7 +28,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: --spacing(3);
-    margin-bottom: --spacing(2);
+    margin-bottom: --spacing(1);
 }
 
 .factory-reviewer-name {
@@ -62,7 +62,6 @@
 .factory-model-table th,
 .factory-model-table td {
     padding: --spacing(3);
-    border-bottom: 1px solid var(--color-line);
     font-weight: normal;
 }
 

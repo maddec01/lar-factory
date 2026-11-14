@@ -9,6 +9,7 @@ import { Alert, Button, ConfirmDialog, RadioGroup, RadioGroupItem, Stack, Text }
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
+import { ICON } from './ButtonIcons';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { useBoardStore } from '@/services/board/board.hooks';
 import type { ActionResult } from '@/services/board/board.service';
@@ -112,8 +113,10 @@ export function MergePr({
 
     return (
         <>
+            {/* Off the dialog's footer it reads as the other pull request actions: an outline with the PR icon. */}
             <Button
-                {...kindOf(primary ? 'main' : next ? 'next' : 'other')}
+                {...kindOf(primary ? 'main' : next ? 'next' : 'open')}
+                leftIcon={primary ? undefined : ICON.pr}
                 disabled={pending}
                 onClick={() => {
                     setAttempt((n) => n + 1);

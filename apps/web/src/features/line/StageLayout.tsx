@@ -2,9 +2,11 @@
 // bottom, then the dock of concepts and linked work, in one page scroll. Rows move between sections as board pushes
 // change their placement, sliding in and flashing as they land (BoardLife). A dossier expands in place, under its row.
 
+import { deskItems } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
+import { BoardIdle } from './BoardIdle';
 import { Dossiers } from './Dossiers';
 import { Queue } from './Queue';
 import { Build, ReadyToBuild, Shaping } from './StagePanes';
@@ -33,7 +35,19 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
     const { queue, shaping, ready, build, dock } = stageRows(items, data, unavailable);
 
     // The board's life follows every item, whatever the scope and filters show.
-    noteBoardPlaces('lane', lanes(stageRows(data.items, data, unavailable)), data.firstRead.settled);
+    const all = stageRows(data.items, data, unavailable);
+
+    noteBoardPlaces('lane', lanes(all), data.firstRead.settled);
+
+    // A factory with no work at any stage says so once, rather than as empty lanes with their controls; a scope or
+    // filter that hides every row keeps the lanes, which say what they hide.
+    const idle =
+        data.firstRead.settled &&
+        ![...all.queue, ...all.shaping, ...all.ready, ...all.build].length &&
+        !all.dock.length &&
+        !deskItems(data, unavailable).length;
+
+    if (idle) return <BoardIdle />;
 
     return (
         <>

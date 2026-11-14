@@ -10,5 +10,9 @@ export function DossierParentContext({ children }: { children: ReactNode }) {
 }
 
 export function DossierStates({ children }: { children: ReactNode }) {
-    return <span className="grid min-w-0 gap-1 [&_[data-state]]:whitespace-normal">{children}</span>;
+    return (
+        <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 [&_[data-state]]:whitespace-normal">
+            {children}
+        </span>
+    );
 }

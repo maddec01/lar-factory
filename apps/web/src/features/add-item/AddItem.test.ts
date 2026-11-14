@@ -102,9 +102,10 @@ test('a draft without a kind isn’t sent and says why', async () => {
     await enter(field('item-title'), 'Playback stalls');
     await settle(() => submit().click());
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(result().textContent).toBe('Choose bug, feature or improvement.');
-    await enter(field('item-title'), 'Playback stalls on seek');
-    expect(result().textContent, 'editing clears the message').toBe('');
+    expect(text($('#item-kind-error')), 'said under the Kind field').toBe('Choose bug, feature or improvement.');
+    expect(field('item-kind').getAttribute('aria-describedby')).toBe('item-kind-error');
+    await chooseOption(field('item-kind'), 'Bug');
+    expect($('#item-kind-error'), 'choosing a kind clears the message').toBeNull();
 });
 
 test('submitting posts the draft, shows it sending, then closes and announces the recorded work, which has no ticket number', async () => {
@@ -173,15 +174,12 @@ test('a lost response offers a retry', async () => {
     expect(submit().textContent).toBe('Retry this submission');
 });
 
-test('with no repository onboarded, adding is disabled and says where to add one, but not before the first read, beside a read error or a repository left off the board', async () => {
+test('with no repository onboarded the title bar offers no Add item, but it stays beside a read error, before the first read or with a repository left off the board, where adding is disabled without the onboarding hint', async () => {
     const empty = { ...withFactory, repos: [], repositoryConfigProblems: [], error: null };
     const hint = () => $('#item-repo-hint');
 
-    await open(empty);
-    expect(submit().disabled).toBe(true);
-    expect(dialog()!.textContent).toContain('Record work and add it to List.');
-    expect(hint()!.textContent).toBe('No Project is onboarded. Read how to add a project.');
-    expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
+    await mountPage(empty);
+    expect($('.add-item'), 'there is nowhere to add to yet').toBeNull();
     for (const data of [
         { ...empty, error: 'gh: HTTP 502' },
         { ...empty, fetchedAt: null },
@@ -193,9 +191,14 @@ test('with no repository onboarded, adding is disabled and says where to add one
         },
     ]) {
         await push(data);
+        await settle(() => addButton().click());
+        await settle(() => vi.advanceTimersByTime(50));
+        expect(dialog()!.textContent).toContain('Record work and add it to List.');
         expect(hint()).toBeNull();
         expect(field('item-repo').hasAttribute('aria-describedby')).toBe(false);
         expect(submit().disabled).toBe(true);
+        await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+        await settle(() => vi.advanceTimersByTime(50));
     }
 });
 
@@ -247,7 +250,7 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
     await settle(() => $<HTMLButtonElement>('[data-pane="pick"]')!.click());
     expect($('[data-pane="pick"]')!.getAttribute('aria-pressed')).toBe('true');
     expect(dialog()!.style.height, 'both panes keep the same dialog height').toBe(newWorkHeight);
-    expect([...dialog()!.classList], 'the ticket pane does not opt into content height').not.toContain('sm:h-auto');
+    expect([...dialog()!.classList], 'until expanded, both panes are content-sized').toContain('sm:h-auto');
     expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(
         expect.arrayContaining(['min-h-0', 'overflow-y-auto']),
     );

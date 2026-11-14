@@ -37,7 +37,7 @@ test.each(['unavailable', 'stale'] as const)('withdraws readiness for %s check e
         prReadiness(
             item({ checkProgress: { state }, checks: { passed: 3, failed: 0, running: 0, total: 3, since: null } }),
         ),
-    ).toMatchObject({ word: 'Review PR', action: 'Review PR', state: 'off' });
+    ).toMatchObject({ word: 'Review PR', action: 'Review PR', state: 'waiting' });
 });
 test('unknown native check states cannot claim passing checks', () => {
     expect(prReadiness(item({ checks: { passed: 1, failed: 0, running: 0, total: 2, since: null } }))).toMatchObject({

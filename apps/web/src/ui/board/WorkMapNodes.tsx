@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { MapStartAction } from './StartAfterButton';
 
 /** Room for a wrapping action header, a project line, two title lines, status and slices; edges share this height. */
-export const MAP_NODE_HEIGHT = 184;
+export const MAP_NODE_HEIGHT = 156;
 
 const NODE_ATTENTION = {
     default: 'border-line',
@@ -91,7 +91,7 @@ export function MapPartNode({
             />
             {source}
             <span
-                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 pr-5 text-xs"
+                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 pr-7 text-xs"
                 data-map-head
             >
                 {head}

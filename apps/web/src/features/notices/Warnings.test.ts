@@ -104,7 +104,8 @@ test.each(['empty', 'T3 Code missing'])(
         expect(warningText(entry!)[1]).toContain('HTTP 503');
         await settle(() => entry!.querySelector<HTMLElement>('.dismiss')!.focus());
         await closeWarning('client-error');
-        expect(document.activeElement).toBe($(screen === 'empty' ? '.add-item' : '.open-settings'));
+        // Neither screen has Add item in the title bar, so focus falls back to Settings.
+        expect(document.activeElement).toBe($('.open-settings'));
         fetchMock.mockImplementation(async () => new Response('', { status: 504 }));
         await settle(() => vi.advanceTimersByTime(15_000));
         expect(warning('client-error')).toBeNull();
@@ -208,7 +209,7 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
     const freshness = () => $('.refreshed')!;
     const refreshed = () => $('.refreshed')!.textContent;
 
-    expect(freshness().dataset.health).toBe('live');
+    expect($('.refreshed'), 'a live board shows no Refreshed light').toBeNull();
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
     await settle(() => vi.advanceTimersByTime(15_000));
 
@@ -217,9 +218,8 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
     expect(warningText(notice)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
     expect(notice.closest('ul')!.hasAttribute('data-folded'), 'not folded under the header').toBe(false);
     expect(freshness().dataset.health).toBe('disconnected');
-    expect($('.refreshed [data-ping]')).toBeNull();
     expect(refreshed()).toContain('Disconnected');
-    expect($$('.desk-card')).toHaveLength(0);
+    expect($$('.desk-row')).toHaveLength(0);
     expect($('section.desk')!.textContent).toBe('Your desk0Nothing waited on you at the last read.');
     fetchMock.mockImplementation(
         async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })),
@@ -227,8 +227,7 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
     await settle(() => vi.advanceTimersByTime(15_000));
     expect(warning('client-error')).toBeNull();
     expect($('[data-board-notices]')).toBeNull();
-    expect(freshness().dataset.health).toBe('live');
-    expect(refreshed()).not.toContain('Disconnected');
+    expect($('.refreshed'), 'live again, the light goes').toBeNull();
     expect($('section.desk')!.textContent).toBe('Your desk0Nothing waits on you.');
 });
 
@@ -251,6 +250,5 @@ test('closing the disconnected notice leaves the title bar saying Disconnected u
         async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })),
     );
     await settle(() => vi.advanceTimersByTime(15_000));
-    expect(refreshed()).not.toContain('Disconnected');
-    expect($('.refreshed')!.dataset.health).toBe('live');
+    expect($('.refreshed'), 'live again, the light goes').toBeNull();
 });

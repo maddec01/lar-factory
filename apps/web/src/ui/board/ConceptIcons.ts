@@ -1,9 +1,11 @@
 // The board's icon glossary: the design system's shared concepts plus the board's own, one icon each. Feature code
 // draws a concept's icon from here, never by its lucide name.
 import {
+    BotIcon,
     CircleStopIcon,
     conceptIcons as sharedConceptIcons,
     FolderGit2Icon,
+    ListTreeIcon,
     type LucideIcon,
     PlugIcon,
     SparklesIcon,
@@ -13,6 +15,8 @@ import {
 /** Each concept's one icon. */
 export const conceptIcons = {
     ...sharedConceptIcons,
+    /** The agents that review and build, and the models they run on: Reviewers and models. A bot. */
+    agents: BotIcon,
     /** Code projects (repositories). Folder with a branch. */
     projects: FolderGit2Icon,
     /** Connected services, such as issue trackers. Plug. */
@@ -25,4 +29,6 @@ export const conceptIcons = {
     /** An item with no kind (no type label): the No kind filter and choice. Dashed square; the dashed circle is
      *  Shaping's status glyph. */
     noKind: SquareDashedIcon,
+    /** Work with parts: a concept and its briefs, an issue and its sub-issues (Concepts and linked work). A list tree. */
+    linkedWork: ListTreeIcon,
 } as const satisfies Record<string, LucideIcon>;

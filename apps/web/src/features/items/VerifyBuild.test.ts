@@ -32,7 +32,7 @@ const context = {
     revision: 5,
     by: 'Pedro',
 };
-const card = () => $('.desk-card')!;
+const card = () => $('.desk-row')!;
 const dialog = () => $('[data-item-dialog]')!;
 const button = (label: string) => [...dialog().querySelectorAll('button')].find((node) => text(node) === label)!;
 

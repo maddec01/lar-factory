@@ -127,10 +127,10 @@ test('a grouped child reaches the desk with parent context when Projects shows i
 
     await mountOpen(data);
     expect(step('I_sample13')).not.toBeNull();
-    expect(text($('.desk-card[data-item="I_sample13"]'))).toContain(
-        'Part of #200 lar cloud: sign-in and direct connections',
-    );
-    expect(text(step('I_sample13'))).toContain('Open item details');
+    expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('in #200 lar cloud: sign-in and direct connections');
+    // A part that waits on you offers its thread, as the desk's row does; its row opens its details.
+    expect(step('I_sample13').querySelector('[data-part-action] [data-open-thread]')).not.toBeNull();
+    expect(step('I_sample13').querySelector('[data-row-open]')).not.toBeNull();
 });
 
 test('live status changes keep linked work in its group with details, thread and PR links', async () => {
@@ -150,12 +150,13 @@ test('live status changes keep linked work in its group with details, thread and
         await receive(withItem('I_sample13', { status }, data));
         expect(step('I_sample13')).not.toBeNull();
         expect($(`[data-stage]:not([data-stage="dock"]) [data-item="I_sample13"]`)).toBeNull();
-        expect(!!$('.desk-card[data-item="I_sample13"]')).toBe(
+        expect(!!$('.desk-row[data-item="I_sample13"]')).toBe(
             ['Needs you', 'Verify', 'Ready to merge'].includes(status),
         );
         expect($('[data-stage="shaping"] [data-item="I_sample09"]')).toBeNull();
     }
-    await press(button(step('I_sample13'), 'Open item details'));
+    // The part's row opens its details; its action opens its thread, as the desk's row does.
+    await press(step('I_sample13').querySelector('[data-row-open]')!);
     expect(dialogTitle()).toContain('Owner accounts');
     expect($('[data-item-dialog] [data-open-thread]')).not.toBeNull();
     expect($('[data-item-dialog] a[href="https://github.com/maddec01/lar-server/pull/150"]')).not.toBeNull();
@@ -276,13 +277,12 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
     await mountPage(withItem(C200, refined));
     expect(chips(), 'a part in Needs you over open decisions and Refined').toEqual(['1 needs you']);
     expect(header().querySelector('[data-refined]')).toBeNull();
-    expect([...header().querySelectorAll('[data-chips-more]')].map(text)).toEqual([
-        '2 decisions',
-        'Refined',
-        'no delivery planned',
-        '2 Fog to reconcile',
+    // The rest are counted on the row and named on hover, so the row keeps to one summary.
+    expect([text(more()), more()!.getAttribute('title')]).toEqual([
+        '+4 more',
+        '2 decisions · Refined · no delivery planned · 2 questions to route',
     ]);
-    expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 Fog to reconcile');
+    expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 questions to route');
 
     const title = next().querySelector('[title]')!;
 
@@ -294,9 +294,9 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
     expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
     await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
     expect(chips(), 'Refined over fog').toEqual(['Refined']);
-    expect(words()).toContain('Refined · no delivery planned · 1 Fog to reconcile');
+    expect(words()).toContain('Refined · no delivery planned · 1 question to route');
     await receive(calm({ refinement: undefined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(chips(), 'fog with nothing above it').toEqual(['1 Fog to reconcile']);
+    expect(chips(), 'fog with nothing above it').toEqual(['1 question to route']);
     expect(more(), 'nothing more to count').toBeNull();
     await receive(calm({ refinement: undefined }));
     expect(header().querySelector('[data-chips]'), 'no chips, no room').toBeNull();
@@ -318,7 +318,7 @@ test('a settled decision counts as done in its part bar, whatever its Status say
     ];
 
     await mountPage({ ...sample, items: [{ ...c200, subIssues: { total: 2, completed: 0 } }, ...parts] });
-    expect(text(col('count'))).toBe('1/2 parts');
+    expect(text(col('count'))).toBe('1/2 parts done');
 
     const bar = [...col('bar').querySelectorAll<HTMLElement>('[data-part-bar] li')];
 
@@ -429,12 +429,11 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
     holdPosts(unblocked());
     await mountOpen(unblocked());
 
-    const ready = dossier().querySelector('[data-attention-row="ready"]')!;
+    // Each part shows once, in the list with its own Start; nothing repeats it above the list.
+    const ready = step('I_sample13');
 
-    expect([text(ready.firstElementChild), text(ready.querySelector('dd > div > span'))]).toEqual([
-        'Ready to start 1',
-        '#140 Owner accounts',
-    ]);
+    expect(text(ready.querySelector('[data-row-open]'))).toContain('#140 Owner accounts');
+    expect(dossier().querySelector('[data-attention-row="ready"]'), 'no Ready to start row repeats it').toBeNull();
     expect(dossier().querySelector('[data-attention-row="waiting"]'), 'nothing waits').toBeNull();
     await pressMenu(startIn(ready)!);
     expect(dialogTitle(), 'Start opens its menu, not the dialog').toBe('');
@@ -447,22 +446,19 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
     ]);
 });
 
-test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread can’t', async () => {
+test('a part’s row and the header agree on what can start: a Queued decision can, a part with a live thread can’t', async () => {
     const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
 
     await mountOpen(data);
 
-    const ready = () => dossier().querySelector('[data-attention-row="ready"]');
+    const ready = () => startIn(step('I_d204'));
 
-    expect([text(ready()!.firstElementChild), text(startIn(col('side')))]).toEqual([
-        'Ready to start 1',
-        'Start decision',
-    ]);
+    expect([text(ready()), text(startIn(col('side')))]).toEqual(['Decide', 'Decide']);
     await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
     expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
 });
 
-test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
+test('a dossier opens on its parts list, and the browser remembers a switch to the Work map for that dossier alone', async () => {
     vi.stubGlobal(
         'ResizeObserver',
         class {
@@ -473,22 +469,22 @@ test('a dossier opens on its Work map, and the browser remembers a switch to the
     for (const id of [C200, C180]) localStorage.removeItem(VIEW_KEY + id);
     await mountOpen();
     expect([
-        button(dossier(), 'Work map').getAttribute('aria-pressed'),
-        dossier().querySelector('[data-work-map]') !== null,
-    ]).toEqual(['true', true]);
-    await press(button(dossier(), 'Parts list'));
-    expect([
-        dossier().querySelector('[data-work-map]'),
+        button(dossier(), 'Parts list').getAttribute('aria-pressed'),
         dossier().querySelector('[data-parts-list]') !== null,
+    ]).toEqual(['true', true]);
+    await press(button(dossier(), 'Work map'));
+    expect([
+        dossier().querySelector('[data-parts-list]'),
+        dossier().querySelector('[data-work-map]') !== null,
         localStorage.getItem(VIEW_KEY + C200),
-    ]).toEqual([null, true, 'list']);
+    ]).toEqual([null, true, 'map']);
     vi.resetModules();
     await mountOpen();
-    expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
+    expect(button(dossier(), 'Work map').getAttribute('aria-pressed'), 'it stays on the Work map').toBe('true');
     await openInstead(C180);
     expect(
-        button(dossier(C180), 'Work map').getAttribute('aria-pressed'),
-        'the other dossier stays on its Work map',
+        button(dossier(C180), 'Parts list').getAttribute('aria-pressed'),
+        'the other dossier stays on its parts list',
     ).toBe('true');
 });
 
@@ -497,7 +493,7 @@ test('once its blockers complete, Start build sends the build, and the header of
     await mountOpen(
         withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()),
     );
-    expect(text(startIn(col('side')))).toBe('Start build');
+    expect(text(startIn(col('side')))).toBe('Build');
     expect(
         next().querySelector('.sr-only')?.textContent,
         'Next reads to a screen reader and leaves its room to the title',
@@ -523,13 +519,17 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
     ]);
 
     holdPosts(data);
-    await mountOpen(data);
-    expect(startIn(step('I_d204'))).toBeNull();
 
-    const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
+    // The parts list says what a held part waits on; its Work map card offers Start after.
+    const map = await mapOpen(data);
+    const card = () => map.querySelector('[data-map-part="I_d204"]')!;
+
+    expect(startIn(card())).toBeNull();
+
+    const after = card().querySelector<HTMLButtonElement>('[data-start-after]')!;
 
     expect([text(after), after.title]).toEqual([
-        'Start decision after #140',
+        'Start after #140',
         'Pick a model to start it once #201, #140 complete',
     ]);
     await pressMenu(after);
@@ -538,7 +538,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
         ['/api/arm', { session: 's1', itemId: 'I_d204' }],
     ]);
     await answer({ error: null, board: { ...data, armed: { I_d204: {} } } });
-    expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts decision after #140 ✓');
+    expect(text(card().querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
 });
 
 test('the parts list keeps cross-repository dependency order even when builds return to a repository', async () => {
@@ -797,7 +797,9 @@ test('a finished part with work still running stays with current work', async ()
     expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Complete · Working');
 });
 
-const dossierTotal = () => dossier().querySelector<HTMLElement>('[data-col="figures"] [title]')!;
+/** The dossier's total, which reads on its first line beside its state. */
+const dossierTotal = () =>
+    header().querySelector('[data-col="state"] [data-partial]')!.closest<HTMLElement>('[title]')!;
 
 test('a Dossier total marks a sum with a failed part partial with a + after its cost, and says why', async () => {
     const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
@@ -809,7 +811,8 @@ test('a Dossier total marks a sum with a failed part partial with a + after its 
             withItem('I_sample12', { stats: usage, usageState: 'current' }),
         ),
     );
-    expect(text(dossierTotal())).toBe('45m · 2.59M · $7.90+ partial');
+    // The first line keeps to its cost; time and tokens are in its tooltip.
+    expect(text(dossierTotal())).toBe('$7.90+ partial');
     expect(
         [
             text(dossierTotal().querySelector('[data-partial]')),
@@ -843,11 +846,14 @@ test('decision map and attention actions use answer wording only for a current q
     expect(action().getAttribute('aria-label')).toBe('Open thread');
     await press(button(dossier(), 'Parts list'));
 
-    const attentionAction = () => dossier().querySelector('[data-attention-row="you"] [data-open-thread]')!;
+    // In the parts list, the part's own action opens its thread; nothing repeats it above the list.
+    const attentionAction = () =>
+        dossier().querySelector('[data-part="W_question"] [data-part-action] [data-open-thread]')!;
 
     expect(attentionAction().getAttribute('aria-label')).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
-    expect(text(attentionAction())).toBe('Answer in T3');
+    // The list's part opens the thread that asks, as an icon; the Work map card above says Answer in T3.
+    expect(attentionAction().getAttribute('href')).toBe('t3code://threads/sample-environment/question-thread');
 });
 
 test('queued empty concepts and parts with off-board parents stay in the dock and keep their desk waits', async () => {
@@ -873,10 +879,10 @@ test('a working off-board part keeps its stage, newest action and progress in th
     const part = fresh().items.find((item) => item.number === 22)!;
 
     await mountPage({ ...fresh(), items: [part] });
-    expect(text(header(part.id))).toContain('Shaping · Working');
+    expect(text(header(part.id))).toContain('Working');
     expect(text(header(part.id))).toContain('Edit ContinueWatchingRow.swift');
     expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
-    expect(header(part.id).querySelector('[data-activity-track="running"]')).not.toBeNull();
+    expect(header(part.id).querySelector('[data-activity="working"]')).not.toBeNull();
     expect(text(header(part.id))).not.toContain('0/0 parts');
     expect(text(header(part.id))).not.toContain('Nothing waits on you');
     expect($('[data-stage="shaping"] [data-item]')).toBeNull();
@@ -887,11 +893,11 @@ test('an explicitly linked empty parent keeps its own activity and says No parts
     const parent = { ...part, parent: null, parentId: null, flow: 'linked' as const };
 
     await mountPage({ ...fresh(), items: [parent] });
-    expect(text(header(parent.id))).toContain('Linked work');
+    expect(header(parent.id).querySelector('[data-kind-mark]')?.getAttribute('aria-label')).toBe('Linked work');
     expect(text(header(parent.id))).toContain('No parts yet');
-    expect(text(header(parent.id))).toContain('Shaping · Working');
+    expect(text(header(parent.id))).toContain('Working');
     expect(text(header(parent.id))).toContain('Edit ContinueWatchingRow.swift');
-    expect(header(parent.id).querySelector('[data-activity-track="running"]')).not.toBeNull();
+    expect(header(parent.id).querySelector('[data-activity="working"]')).not.toBeNull();
     await receive({ ...fresh(), items: [{ ...parent, flow: 'single' }] });
     expect(dossier(parent.id)).toBeNull();
     expect($(`[data-stage="shaping"] [data-item="${parent.id}"]`)).not.toBeNull();
@@ -989,9 +995,9 @@ test('unrouted Fog is reported for reconciliation instead of counted as an open 
         }),
     );
     expect(header().getAttribute('title')).not.toContain('open question');
-    expect(header().getAttribute('title')).toContain('1 Fog to reconcile');
+    expect(header().getAttribute('title')).toContain('1 question to route');
     await press(opener());
-    expect(text(body())).toContain('Fog to reconcile');
+    expect(text(body())).toContain('no part answers this yet');
     expect(text(body())).toContain('Fixture files and presentation remain unspecified.');
 });
 

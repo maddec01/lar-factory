@@ -2,7 +2,7 @@ import type { ButtonProps } from '@lar-works/design-system';
 
 /**
  * Footer rule: the stage's next action is the single Main button at the right. Starts in a dialog use Main;
- * compact starts on board rows use Start. GitHub and Open thread stay Open unless they perform the next action
+ * compact starts on board rows use Open, outlined with the play icon, so a board's only colour at rest is amber. GitHub and Open thread stay Open unless they perform the next action
  * (Answer in T3, Verify build or Merge PR). Completed work has no next action and needs no Main button.
  * Lar Factory's five kinds of button. A Main action, at most one per area, is filled; a Start is tinted, with the play
  * icon: it launches agent work (Shape, Start build, Start after), and its split half chooses the model/options; a desk

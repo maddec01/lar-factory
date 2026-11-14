@@ -13,8 +13,8 @@ interface Stored<T> {
 }
 
 export const OPEN: Stored<boolean> = { name: 'open', read: (s) => s === '1', write: (on) => (on ? '1' : '0') };
-/** Work map or parts list; a dossier starts on its Work map. */
-export const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'list' ? 'list' : 'map'), write: (v) => v };
+/** Parts list or Work map; a dossier starts on its compact parts list, its Work map one switch away. */
+export const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'map' ? 'map' : 'list'), write: (v) => v };
 
 export function useStored<T>({ name, read, write }: Stored<T>, parent: Item): [T, (v: T) => void] {
     const key = `lar-board:dossier-${name}:${parent.id}`;

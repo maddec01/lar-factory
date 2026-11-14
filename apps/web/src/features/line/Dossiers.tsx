@@ -28,6 +28,7 @@ import { WorkMap } from './WorkMap';
 import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
+    conceptIcons,
     ReleaseProgress,
     GroupUpkeep,
     DossierBody as Body,
@@ -37,7 +38,7 @@ import {
     RowGlyph,
 } from '@/ui/board';
 
-/** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
+/** What neither the Work map nor the parts list draws: the concept's own question over them, what it depends on and doesn't know yet under them. */
 const ABOVE_MAP = ['you'];
 const BELOW_MAP = ['dependencies', 'fog'];
 
@@ -72,18 +73,15 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                 remaining={parent.completion?.reasons}
                 name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
             />
+            {/* Each part shows once, on the map or in the list, with its holds; around it only the concept's own question,
+                what it depends on and what it doesn't know yet. */}
+            <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
             {view === 'map' ? (
-                <>
-                    <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
-                    <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
-                    <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
-                </>
+                <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
             ) : (
-                <>
-                    <Attention parent={parent} parts={parts} data={data} find={find} />
-                    <PartsList parts={parts} data={data} home={repoKey(parent)} />
-                </>
+                <PartsList parts={parts} data={data} home={repoKey(parent)} />
             )}
+            <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
         </Body>
     );
 }
@@ -147,7 +145,12 @@ export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
     if (!dossiers.length) return null;
 
     return (
-        <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>
+        <Pane
+            id="dock"
+            title="Concepts and linked work"
+            glyph={<conceptIcons.linkedWork aria-hidden="true" />}
+            count={dossiers.length}
+        >
             <DossierList>
                 {dossiers.map(({ parent, parts }) => (
                     <DossierRow key={parent.id} parent={parent} parts={parts} data={data} />

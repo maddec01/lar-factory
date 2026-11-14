@@ -1,8 +1,6 @@
-// Your desk: the items awaiting your action, including shaping and concept questions, as small cards in one row that
-// scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
-// same four rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
-// row's order; the title; the status and next step; and the card's action in the right corner, with Open thread as an
-// icon beside it. Scope, Kind and Labels narrow the cards. An empty desk is one small line, which while the board is
+// Your desk: the items awaiting your action, including shaping and concept questions, as a list of rows on the stage
+// rows' columns: status light, kind and title, project, then what it waits for and its age, and its action at the end,
+// with Open thread as an icon beside it. A row opens the item dialog. Scope, Kind and Labels narrow the rows. An empty desk is one small line, which while the board is
 // disconnected only speaks for the last read, during a first read that may still add items is the loader, and says so
 // when Scope, Kind and Labels hide every card.
 
@@ -23,6 +21,7 @@ import {
     itemName,
     readingScope,
     prReadiness,
+    placementOf,
 } from '@lar-factory/shared';
 import type { BoardData, Item, Checks } from '@lar-factory/shared';
 import { Loading } from '@lar-works/design-system';
@@ -31,14 +30,13 @@ import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     HumanWaitAction,
-    Age,
     AzureFields,
     ItemTitle,
     useActivityUnavailable,
     ItemStatusGlyph,
     useShownStatus,
 } from '@/features/items';
-import { RowKind, RowSource } from '@/features/line';
+import { RowKindMark, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     ApprovalWait,
@@ -74,7 +72,11 @@ function NextStep({ item, waitLabel }: { item: Item; waitLabel: string }) {
 
     if (needsAnswer(item)) return null;
 
-    if (prReadiness(item)) return <DeskHint>{prReadiness(item)?.word}</DeskHint>;
+    const readiness = prReadiness(item);
+
+    // A hint that only repeats the card's status or its button, such as Verify build or Review PR, says nothing more.
+    if (readiness)
+        return [waitLabel, readiness.action].includes(readiness.word) ? null : <DeskHint>{readiness.word}</DeskHint>;
 
     const pipeline = itemPr(item)?.pipeline;
 
@@ -129,9 +131,24 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
     );
 }
 
+/** Each lane's name, as its header says it, for a desk row to say which stage its item is at. */
+const LANES: Record<string, string> = {
+    queue: 'Queue',
+    shaping: 'Shaping',
+    ready: 'Ready to build',
+    build: 'Build',
+    dock: 'Concepts',
+};
+
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
-    const wait = deskWait(item, useActivityUnavailable(), data.items);
+    const unavailable = useActivityUnavailable();
+    const wait = deskWait(item, unavailable, data.items);
+    const lane = placementOf(item, {
+        starts: data.startProgress?.[item.id],
+        unavailable,
+        all: data.items,
+    }).sections.find((section) => section !== 'desk');
     const followups = retroWaits(item.retro);
     const batch = pendingBriefBatch(item, data.items);
     const requestOwner = openQuestionThread(item) ?? openQuestionThread(questionOwnerParent(item, data.items) ?? item);
@@ -144,8 +161,8 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             picked={picked}
             onOpen={() => useItemDialogStore.getState().open(item.id)}
             source={<RowSource item={item} />}
-            kind={<RowKind item={item} />}
-            age={<Age at={item.updatedAt} />}
+            kind={<RowKindMark item={item} />}
+            stage={lane && LANES[lane]}
             title={<ItemTitle item={item} />}
             name={itemName(item)}
             parentName={deskParentName(item, data.items)}
@@ -170,14 +187,21 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
                 )
             }
             statusIcon={<ItemStatusGlyph item={item} />}
-            status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
+            // A wait its button already names says nothing more, so the row keeps to its lane.
+            status={
+                followups
+                    ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}`
+                    : wait.action?.label === wait.label
+                      ? ''
+                      : wait.label
+            }
             statusState={
                 followups || batch.length || dependencyProofs(item).length || wait.label === 'Outcome check'
                     ? 'waiting'
                     : (shown.state ?? boardStatusState[shown.glyph])
             }
             next={<NextStep item={item} waitLabel={wait.label} />}
-            actions={<HumanWaitAction item={item} data={data} />}
+            actions={<HumanWaitAction item={item} data={data} quiet />}
         />
     );
 }

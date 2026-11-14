@@ -1,7 +1,7 @@
 // The frame of Lar Factory's item dialog: the summary under its title, the body's column with the main column and the
 // sidebar beside it, its notes, and the footer's groups of actions.
 
-import { Alert, Text } from '@lar-works/design-system';
+import { Alert } from '@lar-works/design-system';
 import { linkRecipe } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
@@ -159,7 +159,7 @@ export function ItemDialogColumns({
 
     return (
         <div
-            className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@split:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}
+            className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@split:grid-cols-[minmax(0,1fr)_20rem]' : ''} ${rows}`}
         >
             {children}
         </div>
@@ -174,7 +174,10 @@ export function ItemDialogAside({
     children: ReactNode;
 }) {
     return (
-        <aside className="@split:border-line @split:col-start-2 @split:row-span-2 @split:row-start-1 @split:border-l @split:pl-6 grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+        <aside
+            className="@split:border-line @split:col-start-2 @split:row-span-2 @split:row-start-1 @split:border-l @split:pl-6 grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4"
+            data-item-aside
+        >
             {children}
         </aside>
     );
@@ -246,14 +249,5 @@ export function DialogActions({
         >
             <ButtonDensityProvider density="md">{children}</ButtonDensityProvider>
         </span>
-    );
-}
-
-/** The group’s current delivery state under its title. */
-export function GroupStatus({ children }: { children: ReactNode }) {
-    return (
-        <Text variant="caption" tone="muted" data-group-status>
-            {children}
-        </Text>
     );
 }

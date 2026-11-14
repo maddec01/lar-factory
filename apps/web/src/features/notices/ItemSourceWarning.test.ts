@@ -53,5 +53,5 @@ test('failed sources mark retained data stale and expose diagnostics until recov
     expect(document.querySelector('[data-board-notices]')?.textContent).toContain('Diagnostics');
     await push({ ...fresh(), itemSourceProblems: [] });
     expect(document.querySelector('[data-board-notices]')).toBeNull();
-    expect(document.querySelector<HTMLElement>('.refreshed [data-status-dot]')?.dataset.statusDot).toBe('success');
+    expect(document.querySelector('.refreshed'), 'a live board shows no Refreshed light').toBeNull();
 });

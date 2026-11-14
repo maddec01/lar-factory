@@ -13,7 +13,7 @@ const thread: ItemThread = {
 };
 const board = (patch: Partial<Item>): BoardData =>
     fresh({ ...sample, items: [{ ...base, parentId: null, flow: 'single', linkedPrs: [], ...patch }] });
-const card = () => $('.desk-card')!;
+const card = () => $('.desk-row')!;
 
 test.each([
     ['question', 'Question', 'Answer in T3'],
@@ -104,7 +104,7 @@ test('a stopped build reaches the desk, keeps its Build row and offers the retry
             })),
         }),
     );
-    expect($('.desk-card')).toBeNull();
+    expect($('.desk-row')).toBeNull();
 });
 
 test.each([
@@ -122,7 +122,7 @@ test.each([
     });
     await mountPage(data);
 
-    const link = $('.desk-card[data-item="I_sample12"] [data-open-thread]') as HTMLAnchorElement;
+    const link = $('.desk-row[data-item="I_sample12"] [data-open-thread]') as HTMLAnchorElement;
 
     expect([text(link), link.href]).toEqual([label, 't3code://threads/sample-environment/waiting']);
 });
@@ -186,7 +186,7 @@ test('linked parent gate ownership and a later notice agree across desk, group a
 
     await mountPage(fresh({ ...sample, items: [parent, child] }));
 
-    const cards = [...document.querySelectorAll('.desk-card')];
+    const cards = [...document.querySelectorAll('.desk-row')];
 
     expect(cards).toHaveLength(2);
     for (const entry of cards)
@@ -281,7 +281,7 @@ test.each([
             })),
         }),
     );
-    expect($('.desk-card')).toBeNull();
+    expect($('.desk-row')).toBeNull();
     expect($('[data-stage="shaping"] [data-item="I_sample12"]')).not.toBeNull();
 });
 
@@ -327,7 +327,7 @@ test.each(['concept', 'linked'])('%s batch has one Approve card naming parent an
     }));
 
     await mountPage(fresh({ ...sample, items: [parent, ...parts] }));
-    expect(document.querySelectorAll('.desk-card')).toHaveLength(1);
+    expect(document.querySelectorAll('.desk-row')).toHaveLength(1);
     for (const label of ['Greeting delivery', 'Lowercase', 'Trim', 'Length', 'Approve briefs'])
         expect(text(card())).toContain(label);
 
@@ -392,6 +392,6 @@ test('S05 F3: Accept dependency proof names the dependency and waiting build, op
                 })),
             }),
         );
-        expect($('.desk-card')).toBeNull();
+        expect($('.desk-row')).toBeNull();
     }
 });

@@ -129,7 +129,7 @@ interface ListItemRowProps {
     repoIcon?: ReactNode;
     /** The item's facts on one line. */
     meta: string;
-    /** After the meta line: the item's kind, labels and sync state. */
+    /** The item's kind, labels and sync state: at the row's end from `sm` up, after the meta line on a phone. */
     chips?: ReactNode;
     /** More under the meta line, such as a work item's fields. */
     details?: ReactNode;
@@ -154,23 +154,23 @@ export function ListItemRow({
             onClick={onOpen}
             data-item={item}
             title={name}
-            className="hover:bg-fill-hover focus-ring-inset flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left"
+            className="hover:bg-fill-hover focus-ring-inset grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 rounded-md px-2 py-2 text-left sm:grid-cols-[auto_minmax(0,1fr)_auto]"
         >
-            {source}
-            <span className="min-w-0 flex-1">
-                <span className="text-fg block truncate text-sm font-medium">
-                    {reference ? <span className="text-fg-muted font-normal">{reference} </span> : null}
-                    {title}
-                </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-                    <span className="text-fg-muted me-1 flex min-w-0 items-center gap-1 text-xs">
-                        {repoIcon}
-                        <span className="min-w-0 truncate tabular-nums">{meta}</span>
-                    </span>
+            <span className="row-span-2">{source}</span>
+            <span className="text-fg block truncate text-sm font-medium">
+                {reference ? <span className="text-fg-muted font-normal">{reference} </span> : null}
+                {title}
+            </span>
+            <span className="text-fg-muted col-start-2 flex min-w-0 items-center gap-1 text-xs">
+                {repoIcon}
+                <span className="min-w-0 truncate tabular-nums">{meta}</span>
+            </span>
+            {chips && (
+                <span className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 self-center sm:col-start-3 sm:row-span-2 sm:row-start-1 sm:justify-end">
                     {chips}
                 </span>
-                {details}
-            </span>
+            )}
+            {details && <span className="col-span-full col-start-2 min-w-0">{details}</span>}
         </button>
     );
 }

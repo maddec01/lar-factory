@@ -31,7 +31,7 @@ export function AddItemButton({
     title: string;
     /** The shortcut, for `aria-keyshortcuts`. */
     keyShortcuts?: string;
-    /** No project is added yet, so adding an item can't come first. */
+    /** An outline, not the fill: the title bar's Add item, which a page's own next step (an empty board's) outranks. */
     waits?: boolean;
     /** Called as the reader opens the add-item dialog. */
     onOpen: () => void;
@@ -51,6 +51,25 @@ export function AddItemButton({
             </TooltipTrigger>
             <TooltipPopup side="bottom">{title}</TooltipPopup>
         </Tooltip>
+    );
+}
+
+/** The top of Add item's body: the switch between its panes, then what the shown pane does, muted, on one line, so the
+ *  dialog's header keeps to its title and window controls. */
+export function AddItemModes({
+    description,
+    children,
+}: {
+    /** What the shown pane does, such as "Record work in lar-server and add it to List." */
+    description: ReactNode;
+    /** The panes' switch. */
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 sm:px-6" data-add-item-modes>
+            {children}
+            <span className="text-fg-muted min-w-0 text-sm">{description}</span>
+        </div>
     );
 }
 

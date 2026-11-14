@@ -180,14 +180,17 @@ export function useAttentionRows(
         },
         {
             key: 'fog',
-            label: 'Fog routes',
+            label: 'Open questions',
             tone: 'fog' as const,
             entries: itemFog(parent, data.items, unavailable).map((fog) => (
                 <Entry
                     key={fog.text}
                     main={
                         <AttentionMark mark="fog">
-                            <Refs text={fog.routed ? fog.question : `Fog to reconcile: ${fog.question}`} find={find} />
+                            <Refs
+                                text={fog.routed ? fog.question : `${fog.question} · no part answers this yet`}
+                                find={find}
+                            />
                         </AttentionMark>
                     }
                 />

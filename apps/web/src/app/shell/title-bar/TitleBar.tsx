@@ -3,14 +3,15 @@
 // Refreshed time and the counters, one status group that folds into a "Board status" popover on a narrow bar), what
 // you can do (List, Add item, Update while there's an update) and Settings. Every control is the bar's 28px one with a
 // glass tooltip. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the lockup
-// and Settings.
+// and Settings; before the first project it holds the lockup, the Refreshed light, Update and Settings.
 
-import { clock, failedCheck, isStale, shortAgo } from '@lar-factory/shared';
+import { clock, failedCheck, isStale, noneOnboarded, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { ToolbarStatusGroup } from '@lar-works/design-system';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Counters } from './Counters';
+import { useWideBar } from './useWideBar';
 import { AddItem } from '@/features/add-item';
 import { BoardSearch } from '@/features/board-search';
 import { useScopeStore } from '@/features/filters';
@@ -19,22 +20,6 @@ import { SettingsButton } from '@/features/settings';
 import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { BoardTitleBar, type RefreshHealth, RefreshIndicator, scrollBoardToTop } from '@/ui/board';
-
-/** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
-function useLandedReads(fetchedAt: string | null) {
-    const [landed, setLanded] = useState(0);
-    const shown = useRef(fetchedAt);
-
-    useEffect(() => {
-        const before = shown.current;
-
-        shown.current = fetchedAt;
-
-        if (fetchedAt && (!before || Date.parse(fetchedAt) > Date.parse(before))) setLanded((count) => count + 1);
-    }, [fetchedAt]);
-
-    return landed;
-}
 
 /** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. Only the dot
  *  changes colour (amber when stale, red while the page has lost the board server) and only the dot pings. */
@@ -63,7 +48,6 @@ function Refreshed({ data }: { data: BoardData }) {
         };
     }, [fetchedAt]);
 
-    const landed = useLandedReads(fetchedAt);
     // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
     const reading = data.firstRead.waiting ?? [];
     const health: RefreshHealth = clientError
@@ -80,7 +64,6 @@ function Refreshed({ data }: { data: BoardData }) {
     return (
         <RefreshIndicator
             health={health}
-            landed={landed}
             label={
                 health === 'disconnected' ? (
                     fetchedAt ? (
@@ -111,6 +94,9 @@ function Refreshed({ data }: { data: BoardData }) {
 export function TitleBar() {
     const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
     const data = useBoardStore((state) => state.data);
+    // Before the first project there is nothing to count, search, list or add to.
+    const work = board && !noneOnboarded(data);
+    const wide = useWideBar();
 
     return (
         <BoardTitleBar
@@ -122,20 +108,26 @@ export function TitleBar() {
                     scrollBoardToTop();
                 },
             }}
-            search={board && <BoardSearch />}
+            search={work && <BoardSearch />}
             status={
-                board && (
-                    <ToolbarStatusGroup role="group" aria-label="Board status">
-                        <Refreshed data={data} />
-                        <Counters />
-                    </ToolbarStatusGroup>
+                board &&
+                wide && (
+                    <>
+                        {/* Need you leads; on a narrow bar, which keeps to it, it stands among the actions. */}
+                        {work && <Counters part="need you" />}
+                        <ToolbarStatusGroup role="group" aria-label="Board status">
+                            <Refreshed data={data} />
+                            {work && <Counters part="routine" />}
+                        </ToolbarStatusGroup>
+                    </>
                 )
             }
             actions={
                 board && (
                     <>
-                        <ListButton />
-                        <AddItem />
+                        {work && !wide && <Counters part="need you" narrow />}
+                        {work && <ListButton />}
+                        {work && <AddItem />}
                         <UpdateButton />
                     </>
                 )

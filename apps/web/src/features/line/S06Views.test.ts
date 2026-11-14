@@ -23,6 +23,8 @@ const press = (element: Element | null) => settle(() => (element as HTMLElement)
 const group = () => $(`[data-dossier="${parent.id}"]`)!;
 const mount = async (parts: Item[], extra: Partial<Item> = {}) => {
     localStorage.clear();
+    // A dossier opens on its parts list; these tests start on its Work map.
+    localStorage.setItem(`lar-board:dossier-view:${parent.id}`, 'map');
     await mountPage({ ...sample, items: [{ ...parent, ...extra }, ...parts] });
     await press(group().querySelector('[data-dossier-open]'));
 };
@@ -121,7 +123,7 @@ test('retired parts appear in map history, Show done and details with their surv
     expect(text(group().querySelector('[data-part="b6"]'))).toContain('Set aside');
 });
 
-test('a decision card gives its long project name its own bounded line beside a reachable Start decision', async () => {
+test('a decision card gives its long project name its own bounded line beside a reachable Decide', async () => {
     const decision = part(4, {
         kind: 'decision',
         decisionMethod: 'grill',
@@ -136,10 +138,10 @@ test('a decision card gives its long project name its own bounded line beside a 
     const repo = card.querySelector('[data-part-repo]')!;
 
     expect(card.querySelector('[data-map-head]')!.contains(repo)).toBe(false);
-    expect(text(card.querySelector('[data-start]'))).toBe('Start decision');
+    expect(text(card.querySelector('[data-start]'))).toBe('Decide');
 });
 
-test('linked-part Start after controls wrap a ticketless prerequisite without losing its full name', async () => {
+test('a linked part held by a ticketless prerequisite names it in full: Start after on its map card, its wait in the list', async () => {
     const title = 'Produce the compatible greeting contract and accepted immutable manifest';
     const build = part(2, {
         status: 'Ready',
@@ -147,14 +149,15 @@ test('linked-part Start after controls wrap a ticketless prerequisite without lo
     });
 
     await mount([build], { kind: 'feature' });
-    await press([...group().querySelectorAll('button')].find((el) => el.getAttribute('aria-label') === 'Parts list')!);
 
-    const action = group().querySelector('[data-part-action]')!;
-    const control = action.querySelector('[data-start-after]')!;
+    const control = group().querySelector('[data-map-part="b2"] [data-start-after]')!;
 
     expect(text(control)).toContain(title);
-    expect(control.classList.contains('whitespace-normal')).toBe(true);
-    expect(action.classList.contains('max-w-full')).toBe(true);
+
+    // The parts list offers no start for a part other work holds; its row says what it waits on.
+    await press([...group().querySelectorAll('button')].find((el) => el.getAttribute('aria-label') === 'Parts list')!);
+    expect(group().querySelector('[data-part-action] [data-start-after]')).toBeNull();
+    expect(text(group().querySelector('[data-part="b2"]'))).toContain(`Blocked · starts after ${title}`);
 });
 
 test('a retired prerequisite in history stays unresolved on the map', async () => {

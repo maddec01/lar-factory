@@ -16,7 +16,7 @@ const reader = { ...sample, firstRead: reading };
 const scopeLabel = () => $('[data-search-field]')!.getAttribute('aria-description');
 const scoped = (name: string) => `filtered by ${name}`;
 const ALL = null;
-const deskCards = () => $$('.desk-card').length;
+const deskCards = () => $$('.desk-row').length;
 const receive = async (data: BoardData) => {
     const { useBoardStore } = await import('@/services/board/board.hooks');
 

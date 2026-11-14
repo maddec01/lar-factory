@@ -37,9 +37,11 @@ export function SliceBar({
             <SegmentedProgress
                 label={`Slices, ${done} of ${slices.length} done`}
                 size={size}
+                // Done slices read as the track's past, so the active slice's accent and a blocked one's amber stand out.
                 segments={slices.map((s, i) => ({
                     label: named[i]!,
                     state: sliceProgressState[s.progress],
+                    ...(s.progress === 'done' && { color: 'var(--color-fg-muted)' }),
                     pulse: s.progress === 'active' && !still,
                 }))}
             />
@@ -48,8 +50,8 @@ export function SliceBar({
 }
 
 /** A slice's state as a ring: ticked when done, a question mark when unknown, a dot pulsing unless `still` while
- *  active. */
-export function SliceMark({
+ *  active, dashed while held by another slice, so blocked never reads as queued. */
+function SliceMark({
     progress,
     still = false,
 }: {
@@ -60,7 +62,7 @@ export function SliceMark({
 }) {
     return (
         <span
-            className="grid size-4 shrink-0 place-items-center rounded-full border-[1.5px]"
+            className={`grid size-4 shrink-0 place-items-center rounded-full border-[1.5px] ${progress === 'blocked' ? 'border-dashed' : ''}`}
             style={{
                 borderColor: SLICE_COLOR[progress],
                 background: progress === 'done' ? SLICE_COLOR.done : 'transparent',

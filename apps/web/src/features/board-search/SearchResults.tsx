@@ -4,6 +4,8 @@
 
 import {
     byFlowOrder,
+    deskItems,
+    deskWait,
     inRepo,
     isRecentlyDone,
     readingScope,
@@ -13,6 +15,7 @@ import {
     shownRepo,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { StatusIndicator } from '@lar-works/design-system';
 import { Archive, Inbox, ListX, Search, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
 import type { LucideIcon } from '@lar-works/design-system/icons';
 
@@ -166,13 +169,15 @@ export function settingsOptions(
 
 const ticketValue = (item: Item) => `ticket:${item.id}`;
 
-function ticketOption(item: Item, data: BoardData, leave: SearchHandlers['leave']): SearchOption {
+/** `yours`: the item is on Your desk, so it leads with the waiting light rather than its kind. */
+function ticketOption(item: Item, data: BoardData, leave: SearchHandlers['leave'], yours: boolean): SearchOption {
     return {
         value: ticketValue(item),
         name: item.title,
         ...(item.number ? { hint: ref(item) } : {}),
-        meta: `${repoName(repoKey(item), data.repos)} · ${item.status}`,
-        icon: <KindIcon choice={kindFilterOf(item)} />,
+        // An item on Your desk says what it waits for, in the desk's words; any other its status.
+        meta: `${repoName(repoKey(item), data.repos)} · ${yours ? deskWait(item, false, data.items).label : item.status}`,
+        icon: yours ? <StatusIndicator state="waiting" /> : <KindIcon choice={kindFilterOf(item)} />,
         select: () => leave(() => useItemDialogStore.getState().open(item.id)),
     };
 }
@@ -193,7 +198,8 @@ function ticketOptions(
         .sort(byFlowOrder);
     const shown = hits.filter(kept);
     const hidden = hits.filter((item) => !kept(item));
-    const option = (item: Item) => ticketOption(item, data, leave);
+    const desk = new Set(deskItems(data, false).map((item) => item.id));
+    const option = (item: Item) => ticketOption(item, data, leave, desk.has(item.id));
 
     if (widened) return [...shown, ...hidden].map(option);
 

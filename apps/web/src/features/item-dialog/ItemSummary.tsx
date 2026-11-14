@@ -27,7 +27,7 @@ export function ItemSummary({ item }: { item: Item }) {
             data-item-summary
             line={
                 <>
-                    <SourceIcon item={item} />
+                    <SourceIcon item={item} bare always />
                     <RepoCell item={item} />
                     <ItemStatusGlyph item={item} />{' '}
                     <SummaryStatus title={item.setAside ? `Last status: ${shown.recorded}` : shown.recorded}>

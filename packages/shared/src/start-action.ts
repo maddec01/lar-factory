@@ -7,6 +7,9 @@ export const isDecisionWork = (item: Item): boolean =>
     item.kind === 'decision' ||
     (item.recorded !== true && ['grill', 'prototype', 'research', 'task'].includes(decisionType(item) ?? ''));
 
+/** Each start's verb: Shape, Build, Build all for a concept's builds, Decide for a decision. */
+const SHORT = { shaping: 'Shape', build: 'Build', 'concept builds': 'Build all', decision: 'Decide' } as const;
+
 /** One action name for every item, part, map node and dialog that starts work. */
 export function startActionChoice(
     item: Item,
@@ -21,10 +24,11 @@ export function startActionChoice(
             : isDecisionWork(item)
               ? 'decision'
               : 'shaping';
-    const verb = kind === 'refine' && canResumeShaping(item) ? 'Resume' : 'Start';
+    // One short verb names the start, as the lane already says what kind of work it is.
+    const verb = kind === 'refine' && canResumeShaping(item) ? 'Resume' : SHORT[work as keyof typeof SHORT];
 
     return {
         kind,
-        label: after ? `${after.armed ? 'Starts' : 'Start'} ${work} after ${after.prerequisite}` : `${verb} ${work}`,
+        label: after ? `${after.armed ? 'Starts' : 'Start'} after ${after.prerequisite}` : verb,
     };
 }

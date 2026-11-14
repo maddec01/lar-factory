@@ -72,8 +72,8 @@ test('re-gating stays in Build, retains the approved Spec, and requires a second
         return new Response(JSON.stringify(reply));
     });
     await mountPage(board);
-    expect(text($('.desk-card'))).toContain('Approve brief');
-    expect(text($('.desk-card'))).toContain('The brief changed during Build.');
+    expect(text($('.desk-row'))).toContain('Approve brief');
+    expect(text($('.desk-row'))).toContain('The brief changed during Build.');
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
 
@@ -389,6 +389,6 @@ test('details show Doubt reviewing without an approval button for an amended bri
             /Approve brief|Display brief/.test(text(button)),
         ),
     ).toBe(false);
-    expect($('.desk-card')).toBeNull();
+    expect($('.desk-row')).toBeNull();
     expect(text($('[data-item-dialog]'))).not.toContain('Needs you:');
 });

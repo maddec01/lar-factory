@@ -10,20 +10,24 @@ import { useArrival } from './BoardLife';
 import { pickedRow, ROW_ACTION, ROW_OPENS } from './RowStyles';
 import { StateWord } from './StateWord';
 
-/** A stage row, a tile on its section's card: `item` names it as `data-item`, and `picked` marks the item the dialog
- *  shows. A row a read just moved here from another lane slides in from that side and flashes the navy wash
+/** A stage row, a line on its section's card: `item` names it as `data-item`, `picked` marks the item the dialog
+ *  shows, and `attention` marks one that waits on you: its state reads in the warning colour, as Your desk above carries
+ *  the loud recipe. A row a read just moved here from another lane slides in from that side and flashes the navy wash
  *  (BoardLife). A row is 42px with one line and 62 with two: its hairline edge, 6px above its 28px first line and 6
  *  below. Its hover and the picked wash sit over the tile's fill, as light mode's hover is the same wash as that fill;
  *  the hover eases in as a card's does. */
 export function StageRowItem({
     item,
     picked,
+    attention = false,
     children,
 }: {
     /** The item, named as `data-item`. */
     item: string;
     /** The item the dialog shows now. */
     picked: boolean;
+    /** The item waits on you: it is on Your desk. */
+    attention?: boolean;
     /** The row's lines. */
     children: ReactNode;
 }) {
@@ -33,9 +37,10 @@ export function StageRowItem({
         <li
             data-item={item}
             data-arrived={arrival?.from}
-            className="border-line bg-surface-sunken @container overflow-hidden rounded-lg border"
+            data-attention={attention || undefined}
+            className="@container"
         >
-            <div className={`hover:bg-fill-hover rounded-[inherit] py-1.5 transition-colors ${pickedRow(picked)}`}>
+            <div className={`hover:bg-fill-hover rounded-lg py-1.5 transition-colors ${pickedRow(picked)}`}>
                 {children}
             </div>
         </li>
@@ -151,20 +156,6 @@ export function RowIdentity({
     );
 }
 
-/** The kind cell. */
-export function RowKindCell({
-    children,
-}: {
-    /** The kind's badge. */
-    children: ReactNode;
-}) {
-    return (
-        <span className="flex min-w-0 items-center" data-kind>
-            {children}
-        </span>
-    );
-}
-
 /** The title cell: the RowTitle and what it is part of. */
 export function RowTitleCell({
     children,
@@ -190,7 +181,7 @@ export function RowTitle({
     children: ReactNode;
 }) {
     return (
-        <span className="text-fg min-w-0 truncate text-sm leading-7 font-medium" title={name} data-title>
+        <span className="text-fg min-w-0 truncate text-sm leading-7" title={name} data-title>
             {children}
         </span>
     );
@@ -305,12 +296,14 @@ export function RowSecondLine({
 }) {
     return (
         <div data-progress onClick={onClick} className={`row-second ${onClick ? 'cursor-pointer' : ''}`}>
-            <span data-col="bar" className="min-w-0">
-                {bar}
-            </span>
-            {count || <span data-col="count" />}
             <span data-col="next" className="flex min-w-0 flex-wrap items-center gap-3">
                 {children}
+            </span>
+            <span data-col="progress" className="flex min-w-0 items-center gap-2">
+                <span data-col="bar" className="min-w-0 flex-1">
+                    {bar}
+                </span>
+                {count || <span data-col="count" />}
             </span>
             <span data-col="pr" className="flex min-w-0 gap-2 overflow-hidden tabular-nums">
                 {prs}

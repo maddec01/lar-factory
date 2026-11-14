@@ -5,7 +5,6 @@
 // second track of its own for the slices. A chip for each slice follows, so what the bar shows is also readable; each opens its ticket, so the sidebar doesn't list them again. A
 // concept has no step of its own to show: it shows its parts done, and why the count holds parts its list doesn't.
 
-import { itemName } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { statusStateColors } from '@lar-works/design-system';
 
@@ -14,10 +13,9 @@ import {
     useActivityFeedback,
     useShownStatus,
     SliceBar,
-    shownSliceProgress,
-    SourceIcon,
     STATUS_COLOR,
     workflowSteps,
+    SliceList,
 } from '@/features/items';
 import { partsOf, unreadParts, unreadPartsText } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -26,9 +24,7 @@ import {
     PartsProgress,
     ProgressActivity,
     ProgressCount,
-    SliceChip,
     SliceChips,
-    sliceProgressLabel,
     WorkflowSteps,
 } from '@/ui/board';
 
@@ -99,17 +95,8 @@ export function ItemProgress({ item }: { item: Item }) {
                     }
                     bar={at < 0 || concept ? <SliceBar item={item} thick /> : undefined}
                 >
-                    {item.slices.map((s) => (
-                        <SliceChip
-                            key={s.workId ?? s.number}
-                            title={`${itemName(s)} (${sliceProgressLabel[shownSliceProgress(item, s.progress)]})`}
-                            source={<SourceIcon item={s} />}
-                            progress={shownSliceProgress(item, s.progress)}
-                            number={s.number}
-                            name={s.title}
-                            href={s.url || undefined}
-                        />
-                    ))}
+                    {/* The slices as the board's own slice list, a row each, not chips. */}
+                    <SliceList item={item} />
                 </SliceChips>
             )}
         </ItemProgressPanel>

@@ -172,7 +172,7 @@ test('a failed Start shows in the dialog, keeps Move to List and the last choice
     close.focus();
     await settle(() => close.click());
     expect(card().querySelector('.start')).toBeNull();
-    expect(text(start())).toBe('Start shaping');
+    expect(text(start())).toBe('Shape');
     expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
 
@@ -234,7 +234,7 @@ test('a failed start from the server offers Retry start, and closing it clears i
     expect(posted()).toEqual([['/api/dismiss-start-error', { session: 's1', itemId: 'I_sample05', purpose: 'shape' }]]);
     await answer({ error: null, board: withChoices });
     expect(card().querySelector('.start')).toBeNull();
-    expect(text(start())).toBe('Start shaping');
+    expect(text(start())).toBe('Shape');
 });
 
 test('a refusal the board holds no state for, as from a restarted server, keeps its error here', async () => {
@@ -306,7 +306,7 @@ for (const state of ['done', 'stopped'] as const)
         };
 
         await mountItem(data);
-        expect(start()?.textContent).toContain('Resume shaping');
+        expect(start()?.textContent).toBe('Resume');
         expect(card().querySelector('[data-start-result]')).toBeNull();
     });
 
@@ -363,9 +363,8 @@ test('an unrecorded List PR leaves the build count at zero and the Ready row wit
 
     await mountItem({ ...withChoices, buildLimit: { limit: 1, automatic: 1 }, items: [ready, external] }, ready.id);
 
-    const building = $$('[data-slot="toolbar-counter"]').find((node) => text(node).startsWith('building:'))!;
-
-    expect(text(building)).toContain('0');
+    // A quiet board leaves the building count out of the title bar rather than counting zero.
+    expect($$('[data-slot="toolbar-counter"]').some((node) => text(node).startsWith('building:'))).toBe(false);
     expect(text(document.body)).toContain('0 building · limit 1');
     expect(text(card())).not.toContain('Starting now will go over the limit.');
     expect(text(document.body)).not.toContain('Waiting for a build slot');

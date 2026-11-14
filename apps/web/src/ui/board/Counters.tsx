@@ -127,7 +127,7 @@ interface CounterItemProps {
     leading: ReactNode;
     /** The item's title. */
     title: ReactNode;
-    /** At the right: CounterAge, or a figure such as its spend. */
+    /** Under the title: CounterAge, or a figure such as its spend. */
     trailing: ReactNode;
     /** Called as the reader picks the item, closing the panel. */
     onOpen: () => void;
@@ -142,12 +142,12 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen }: C
                     type="button"
                     onClick={onOpen}
                     data-item={item}
-                    className="text-fg hover:bg-fill-hover focus-visible:bg-fill-hover flex min-h-7 w-full cursor-default items-center gap-2 rounded-sm px-2 py-1 text-left text-sm outline-none max-lg:min-h-11 pointer-coarse:min-h-11"
+                    className="text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-7 w-full cursor-default grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none max-lg:min-h-11 pointer-coarse:min-h-11"
                 >
-                    {leading}
-                    {/* Up to two lines, so a title is read, not cut after a few words. */}
-                    <span className="line-clamp-2 min-w-0 flex-1">{title}</span>
-                    <span className="text-fg-muted flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
+                    <span className="row-span-2 flex items-center gap-2 self-start pt-0.5">{leading}</span>
+                    {/* The title takes the row's width, its project and age quiet on a line under it. */}
+                    <span className="min-w-0 truncate">{title}</span>
+                    <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
                         {trailing}
                     </span>
                 </button>
@@ -156,20 +156,28 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen }: C
     );
 }
 
-/** A row's repository icon and age. */
+/** A row's repository, its icon and name, then its age. */
 export function CounterAge({
     icon,
+    name,
     age,
 }: {
     /** The repository's icon. */
     icon: ReactNode;
-    /** The item's age, such as "3h". */
-    age: string;
+    /** The repository's name, giving way first, in full on hover. */
+    name?: string | undefined;
+    /** The item's age, such as "3h"; none where the list's heading already says what matters. */
+    age?: string | undefined;
 }) {
     return (
         <>
             {icon}
-            <span className="min-w-7 text-right whitespace-nowrap">{age}</span>
+            {name && (
+                <span className="min-w-0 truncate" title={name}>
+                    {name}
+                </span>
+            )}
+            {age && <span className="whitespace-nowrap">{name ? `· ${age}` : age}</span>}
         </>
     );
 }
@@ -182,6 +190,35 @@ export function CounterFigure({
     children: ReactNode;
 }) {
     return <span className="text-fg font-medium">{children}</span>;
+}
+
+/** A routine counter's glyph without its colour, so the title bar's one colour is need you's amber. */
+export function QuietGlyph({ children }: { children: ReactNode }) {
+    return <span className="text-fg-muted inline-flex grayscale">{children}</span>;
+}
+
+/** What a counter's figure counts, in words after it on a wide bar, such as "need you"; its label already says it to
+ *  assistive technology. */
+export function CounterWords({
+    quiet = false,
+    always = false,
+    children,
+}: {
+    /** Muted, for a routine count beside the one that asks for you. */
+    quiet?: boolean;
+    /** Shown at every width, as need you's on a phone's bar. */
+    always?: boolean;
+    /** The words, such as "need you". */
+    children: string;
+}) {
+    return (
+        <span
+            aria-hidden="true"
+            className={`whitespace-nowrap ${always ? '' : 'max-lg:hidden'} ${quiet ? 'text-fg-muted font-normal' : 'text-fg'}`}
+        >
+            {children}
+        </span>
+    );
 }
 
 /** A value not known yet, as nothing has been read. */

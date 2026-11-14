@@ -34,7 +34,7 @@ const item = {
     revision: 7,
 };
 const board = fresh({ ...sample, items: [item] });
-const card = () => $('.desk-card')!;
+const card = () => $('.desk-row')!;
 const details = () => $('[data-item-dialog]')!;
 const button = (label: string) => [...details().querySelectorAll('button')].find((node) => text(node) === label)!;
 const openChoice = () =>
@@ -43,12 +43,12 @@ const openChoice = () =>
 test('a compact Done card opens the full choice in details and creates only checked follow-ups', async () => {
     fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: null })));
     await mountPage(board);
-    expect(document.querySelectorAll('.desk-card')).toHaveLength(1);
+    expect(document.querySelectorAll('.desk-row')).toHaveLength(1);
     expect(text(card())).toContain('Choose follow-ups · 6');
     expect(text(card())).toContain(item.title);
     expect(card().querySelector('input[type=checkbox]')).toBeNull();
     expect(text(card())).not.toContain('Full description');
-    expect(card().querySelectorAll('.desk-actions button')).toHaveLength(1);
+    expect(card().querySelectorAll('.row-side button')).toHaveLength(1);
     await openChoice();
     expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
     for (let i = 1; i <= 6; i++) expect(text(details())).toContain(`Full description ${i}.`);
@@ -94,5 +94,5 @@ test('a grouped build keeps its parent context on the retro card', async () => {
     const parent = { ...item, id: 'parent', title: 'Media library', kind: 'concept' as const, retro: null };
 
     await mountPage(fresh({ ...sample, items: [parent, { ...item, parentId: parent.id, flow: 'linked' }] }));
-    expect(text(card())).toContain(`Part of #${parent.number} Media library`);
+    expect(text(card())).toContain(`in #${parent.number} Media library`);
 });

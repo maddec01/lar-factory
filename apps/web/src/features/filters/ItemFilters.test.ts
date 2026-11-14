@@ -183,7 +183,8 @@ test('removing a chip or clearing moves focus to the Kind menu, which always sta
     const kindMenu = () => bar().querySelector<HTMLElement>('[data-filter="kind"]');
 
     seed(LIST_KEY, ['bug'], ['gone']);
-    await mountPage(withItems([]));
+    // The filters show once List holds something to filter.
+    await mountPage(withItems([item('L1', { status: 'List', kind: 'feature' })]));
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
     await removeChip('gone');
     expect(document.activeElement).toBe(kindMenu());

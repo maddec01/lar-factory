@@ -32,10 +32,11 @@ function AgentList({ agents, details = false }: { agents: ThreadAgent[]; details
             {agents.map(({ title, model, action, actionAt }, index) => (
                 <AgentRow
                     key={index}
-                    title={title}
+                    // One agent leads with what it does: its thread's name says nothing a reader needs.
+                    title={agents.length === 1 && action ? action : title}
                     model={details && model ? modelDisplayName(groups, model) : undefined}
                     age={details && actionAt ? <LiveAge at={actionAt} /> : undefined}
-                    action={action}
+                    action={agents.length === 1 ? undefined : action}
                     state={action === 'Waiting for your answer' ? 'waiting' : 'working'}
                 />
             ))}
@@ -57,7 +58,7 @@ export function ItemAgents({ item }: { item: Item }) {
     if (!agents) return null;
 
     return (
-        <WorkingAgents heading={shown.execution === 'working' ? 'Working agents' : 'Last activity'}>
+        <WorkingAgents heading={shown.execution === 'working' ? 'Working now' : 'Last activity'}>
             {agents === 'unavailable' ? (
                 <Alert
                     size="sm"

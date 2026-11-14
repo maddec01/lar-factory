@@ -5,7 +5,7 @@ import { groupState, type Item } from '@lar-factory/shared';
 import { ActivityLine } from './ActivityLine';
 import { RowSecondLine } from './Columns';
 import { useActivityState, useActivityStill } from './useActivityState';
-import { ActivityFeedback, SliceBar, useActivityFeedback, useShownStatus } from '@/features/items';
+import { useActivityFeedback, useShownStatus } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { RowState } from '@/ui/board';
 
@@ -14,7 +14,12 @@ export function DossierState({ item }: { item: Item }) {
 
     const data = useBoardStore((state) => state.data);
     const stage = item.status === 'Ready' ? 'Ready to build' : item.status;
-    const text = groupState(item, data) || shown.word === stage ? shown.word : `${stage} · ${shown.word}`;
+    // One word for the parent's state: its activity's when it works, else its stage's.
+    const text =
+        groupState(item, data) || shown.word === stage || shown.running ? shown.word : `${stage} · ${shown.word}`;
+
+    // The second line's count says how many parts are done, so the state would say it twice.
+    if (text.endsWith(' parts done')) return null;
 
     return <RowState title={text}>{text}</RowState>;
 }
@@ -30,16 +35,9 @@ export function DossierActivity({ item }: { item: Item }) {
 
     if ((!activity || activity === 'unavailable') && !working && !item.slices.length) return null;
 
+    // The row's parts track is its one bar: the parent's own work reads as its sentence alone.
     return (
-        <RowSecondLine
-            bar={
-                item.slices.length ? (
-                    <SliceBar item={item} still={still} />
-                ) : (
-                    working && <ActivityFeedback feedback={{ ...feedback, running: true }} />
-                )
-            }
-        >
+        <RowSecondLine>
             <ActivityLine item={item} />
         </RowSecondLine>
     );

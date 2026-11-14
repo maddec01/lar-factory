@@ -42,7 +42,7 @@ export function RowSecondLine({
     );
 }
 
-/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label, which keeps naming the usage read while it loads. Usage T3 couldn't read, with no figures known, says it's unavailable rather than nothing. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
+/** The agent figures, from the same fields AgentCell reads: the cost on the row, with time · tokens · cost in its tooltip; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label, which keeps naming the usage read while it loads. Usage T3 couldn't read, with no figures known, says it's unavailable rather than nothing. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
 export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; total?: boolean }) {
     const lastKnown = useLastKnown(item);
     const data = useBoardStore((state) => state.data);
@@ -60,11 +60,12 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
 
     const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;
     const all = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), cost].filter(Boolean).join(' · ') : null;
-    const text = all && loading ? [duration(s.agentMs), cost].filter(Boolean).join(' · ') : all;
+    // The row says the cost, the figure that matters at a glance; time and tokens are in its tooltip. With no cost, time.
+    const text = all && (cost ?? duration(s.agentMs));
     const title = s.frozen
-        ? 'Agent time · tokens · cost, as it stood at merge'
+        ? `Agent time · tokens · cost, as it stood at merge: ${all}`
         : [
-              all && `Agent time · tokens · cost${loading ? `: ${all}` : ''}`,
+              all && `Agent time · tokens · cost: ${all}`,
               all && lastKnown,
               s.incomplete && INCOMPLETE_TOTAL,
               loading && UPDATING,

@@ -325,6 +325,7 @@ export interface Item {
     /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
     passingBrief?: boolean;
     briefChangesRequested?: true;
+    staleGateDetail?: string;
     staleGate?: 'brief' | 'sources' | 'approval';
     briefReviewing?: true;
     briefApproval?: { reason: string; digest?: string };

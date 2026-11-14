@@ -48,9 +48,10 @@ import { projectMapParts } from './map-parts.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { outcomeRecords } from './outcome-records.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
-import { assertProductContent } from './product-content.ts';
+import { assertProductContent, productContent } from './product-content.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
+import { expectRevision } from './record-revision.ts';
 import { releaseRecords, releaseMemberHolds, storedRelease, type ReleaseRecords } from './release-records.ts';
 import { releaseStepRecords, type ReleaseStepRecords } from './release-steps.ts';
 import type { Retention } from './retention.ts';
@@ -1802,6 +1803,19 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const text = checkText(markdown, name);
 
             return database.write(() => {
+                if (
+                    name === 'answer' &&
+                    bodyText.get(workId, name) &&
+                    records.decisionAnswer(workId).current &&
+                    productContent(String(bodyText.get(workId, name)!.markdown)) === productContent(text)
+                ) {
+                    expectRevision(fromRow(find(workId)), revision);
+                    assertProductContent(text);
+                    saveProjection(database, records, workId, name);
+
+                    return fromRow(find(workId));
+                }
+
                 const result = change(workId, revision, (row, touched) => {
                     checkHolds(row.kind, name, !row.parent_id && childRows.all(workId).some((r) => r.kind !== 'slice'));
 

@@ -2,6 +2,7 @@ import { parseConceptMap, type ConceptBuildPlan, type ConceptBuildRun } from '@l
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { productContent } from './product-content.ts';
 import { contractText } from './review-dependencies.ts';
 import { workOrder } from './work-order.ts';
 import type { WorkRecords } from './work-records.ts';
@@ -14,11 +15,12 @@ export interface ConceptRunRecords {
 
 interface SavedRun extends ConceptBuildRun {
     signature: string;
+    signatureVersion?: 2;
 }
 
 export function conceptRunRecords(database: Database, records: () => WorkRecords): ConceptRunRecords {
     const { db } = database;
-    const inspect = (workId: string) => {
+    const inspect = (workId: string, legacy = false) => {
         const work = records();
         const group = work.read(workId);
 
@@ -78,8 +80,12 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
             .update(
                 JSON.stringify({
                     map: /^##\s/m.test(work.body(workId, 'map') ?? '')
-                        ? parseConceptMap(work.body(workId, 'map')!)
-                        : work.body(workId, 'map')?.trim(),
+                        ? parseConceptMap(
+                              legacy ? work.body(workId, 'map')! : productContent(work.body(workId, 'map')!),
+                          )
+                        : legacy
+                          ? work.body(workId, 'map')?.trim()
+                          : productContent(work.body(workId, 'map') ?? ''),
                     scope: work.confirmedScope(workId)?.scope,
                     fog: group.fogGone,
                     setAside: group.setAside,
@@ -91,9 +97,9 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                                 need,
                                 owner,
                                 contract,
-                                evidence,
+                                ...(legacy && { evidence }),
                                 blocks: [...blocks].sort(),
-                                met: Boolean(met),
+                                ...(legacy && { met: Boolean(met) }),
                                 replacedBy,
                             })),
                     ),
@@ -101,11 +107,17 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                         .map((row) => ({
                             id: row.workId,
                             kind: row.kind,
-                            brief: contractText(row.brief),
+                            brief: legacy ? contractText(row.brief) : productContent(contractText(row.brief)),
                             scope: work.confirmedScope(row.workId)?.scope,
                             ...(row.kind === 'decision' && {
                                 decision: work.body(row.workId, 'decision')?.trim(),
-                                answer: work.body(row.workId, 'answer')?.trim(),
+                                answer: legacy
+                                    ? work.body(row.workId, 'answer')?.trim()
+                                    : productContent(
+                                          work.decisionAnswer(row.workId).current?.text ??
+                                              work.decisionAnswer(row.workId).replacement?.text ??
+                                              '',
+                                      ),
                                 drafts: work.body(row.workId, 'domain-drafts')?.trim(),
                             }),
                             gate: row.gate.passing?.briefDigest,
@@ -132,7 +144,11 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
 
         if (run?.state === 'running' && rows.some((row) => row.kind === 'build') && rows.every((row) => row.complete)) {
             run.state = 'completed';
-        } else if (run?.state === 'running' && saved!.signature !== signature) {
+        } else if (
+            run?.state === 'running' &&
+            saved!.signature !== signature &&
+            (saved!.signatureVersion === 2 || saved!.signature !== inspect(workId, true).signature)
+        ) {
             run.state = 'paused';
             run.reason = 'Concept scope, gates or blockers changed. Check the holds and start concept builds again.';
         }
@@ -154,6 +170,36 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
 
     return {
         reconcileConceptBuildRuns() {
+            const upgrades = database.read(() =>
+                db
+                    .prepare('SELECT work_id,content FROM concept_build_runs')
+                    .all()
+                    .filter((row) => {
+                        const saved = JSON.parse(String(row.content)) as SavedRun;
+
+                        return (
+                            saved.signatureVersion !== 2 &&
+                            saved.signature === inspect(String(row.work_id), true).signature
+                        );
+                    }),
+            );
+
+            if (upgrades.length)
+                database.write(() => {
+                    for (const row of upgrades) {
+                        const id = String(row.work_id);
+                        const latest = db.prepare('SELECT content FROM concept_build_runs WHERE work_id=?').get(id)!;
+                        const saved = JSON.parse(String(latest.content)) as SavedRun;
+
+                        if (saved.signatureVersion === 2 || saved.signature !== inspect(id, true).signature) continue;
+
+                        db.prepare('UPDATE concept_build_runs SET content=? WHERE work_id=?').run(
+                            JSON.stringify({ ...saved, signature: inspect(id).signature, signatureVersion: 2 }),
+                            id,
+                        );
+                    }
+                });
+
             const changed = database.read(() =>
                 db
                     .prepare(
@@ -207,6 +253,7 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                     startedAt: previous?.startedAt ?? now,
                     ...(state === 'paused' && { pausedAt: now }),
                     signature,
+                    signatureVersion: 2,
                     prepared:
                         state === 'paused' && previous
                             ? previous.prepared

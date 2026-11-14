@@ -8,6 +8,7 @@ export interface GateDisplay {
     brief: string;
     briefDigest: string;
     approvalDigest: string;
+    reviewDigest?: string;
 }
 export interface GateApproval {
     batchDigest?: string;
@@ -18,12 +19,17 @@ export interface GateApproval {
     approvalDigest?: string;
 }
 
-export function makeGateDisplay(workId: string, sourceRevision: number, brief: string): GateDisplay {
+export function makeGateDisplay(
+    workId: string,
+    sourceRevision: number,
+    brief: string,
+    reviewDigest?: string,
+): GateDisplay {
     const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
     const briefDigest = hash(brief);
-    const content = { workId, sourceRevision, brief, briefDigest };
+    const content = { workId, brief, briefDigest, ...(reviewDigest && { reviewDigest }) };
 
-    return { ...content, approvalDigest: hash(content) };
+    return { ...content, sourceRevision, approvalDigest: hash(content) };
 }
 
 /** Both the displayed copy and current source must match the digest the user approved. */
@@ -34,6 +40,7 @@ export function verifyGateDisplay(display: GateDisplay, approved: string, curren
         display.sourceRevision !== current.sourceRevision ||
         display.brief !== current.brief ||
         display.briefDigest !== current.briefDigest ||
+        display.reviewDigest !== current.reviewDigest ||
         display.approvalDigest !== current.approvalDigest ||
         approved !== current.approvalDigest
     )

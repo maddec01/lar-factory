@@ -61,7 +61,7 @@ const now = () => new Date().toISOString();
 export function gateRecords(
     database: Database,
     readRecord: (workId: string) => WorkRecord,
-    reviews: Pick<BriefReviewRecords, 'currentDoubt'>,
+    reviews: Pick<BriefReviewRecords, 'currentDoubt' | 'doubtPackage'>,
 ): GateRecords {
     const { db } = database;
     const find = (workId: string) => readRecord(workId);
@@ -200,7 +200,7 @@ export function gateRecords(
 
         requireCompleteBrief(record.kind, brief!);
 
-        return makeGateDisplay(workId, record.revision, brief!);
+        return makeGateDisplay(workId, record.revision, brief!, reviews.doubtPackage(workId).packageDigest);
     };
 
     const gateBatch = (workIds: string[]): GateManifest =>
@@ -259,6 +259,7 @@ export function gateRecords(
                             member.display.workId,
                             displayed.members[index]!.display.sourceRevision,
                             member.display.brief,
+                            member.display.reviewDigest,
                         ),
                     })),
                 );

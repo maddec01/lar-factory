@@ -185,3 +185,28 @@ it('ignores generated map status prose while preserving destination and decision
     );
     expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
 });
+
+it('keeps running through Dependency delivery evidence while still binding its contract', async () => {
+    const { records, group, change, prepare } = await fixture();
+
+    prepare();
+
+    const dependency = records.addDependency(group, {
+        need: 'Label service',
+        owner: 'Hosting',
+        contract: 'Return labels.',
+        evidence: 'Accepted.',
+    });
+
+    records.markDependencyMet(dependency.dependencyId, dependency.revision, 'Pedro');
+    records.setConceptBuildRun(group, change(group), 'running');
+    records.updateDependency(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, {
+        evidence: 'A1 merged; rollout progressing.',
+    });
+    records.reconcileConceptBuildRuns();
+    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
+    records.updateDependency(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, {
+        contract: 'Return numbers instead.',
+    });
+    expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
+});

@@ -27,6 +27,7 @@ it('binds the displayed text and source revision to durable approval evidence', 
         expect(() => approve(display, display.briefDigest)).toThrow(/approval digest/);
         expect(records.gate(work.workId).evidence).toEqual([]);
         records.update(work.workId, work.revision, { status: 'Shaping' });
+        expect(records.displayGate(work.workId).approvalDigest).toBe(display.approvalDigest);
         expect(() => approve()).toThrow(/revision/);
 
         const fresh = records.displayGate(work.workId);

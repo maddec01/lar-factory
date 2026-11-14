@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { staleAnswerQuotes } from './answer-quotes.ts';
 import { groupMembers } from './blocker-declarations.ts';
 import { WorkRecordError, type Database } from './database.ts';
+import { productContent } from './product-content.ts';
 import { expectRevision } from './record-revision.ts';
 import type { WorkRecords } from './work-records.ts';
 
@@ -27,9 +28,11 @@ function sources(records: WorkRecords, groupId: string, ownerId: string): Source
                     .sort(),
                 answer:
                     r.kind === 'decision' && r.workId !== ownerId
-                        ? (records.decisionAnswer(r.workId).current?.text ??
-                          records.decisionAnswer(r.workId).replacement?.text ??
-                          null)
+                        ? productContent(
+                              records.decisionAnswer(r.workId).current?.text ??
+                                  records.decisionAnswer(r.workId).replacement?.text ??
+                                  '',
+                          )
                         : undefined,
             }),
         ]),

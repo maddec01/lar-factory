@@ -5,8 +5,10 @@ import { contractReferences } from './contract-references.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { DecisionAnswers } from './decision-answers.ts';
 import type { DependencyRecords } from './dependencies.ts';
+import { productContent } from './product-content.ts';
 import { storedRelease } from './release-records.ts';
 import { cites, contractText } from './review-dependencies.ts';
+import { reviewChanges, type ProductInputs } from './review-inputs.ts';
 import { storedScope } from './scope-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
@@ -47,7 +49,8 @@ export interface OrderingReason {
 }
 export interface DoubtReview {
     reviewId: string;
-    dependencyVersion?: 1 | 2;
+    dependencyVersion?: 1 | 2 | 3;
+    productInputs?: ProductInputs;
     packageDigest: string;
     identity: string;
     evidence: string;
@@ -95,6 +98,7 @@ export interface BriefReviewRecords {
         ordering: OrderingReason[],
     ): DoubtReview;
     currentDoubt(workId: string): DoubtReview | null;
+    doubtChanges(workId: string, reviewId?: string): string[];
 }
 
 export function briefReviewRecords(
@@ -153,7 +157,12 @@ export function briefReviewRecords(
 
         return false;
     };
-    const buildPackage = (workId: string, legacy = false, overlapDependencies = false): DoubtPackage => {
+    const buildPackage = (
+        workId: string,
+        legacy = false,
+        overlapDependencies = false,
+        raw = false,
+    ): DoubtPackage & { productInputs: ProductInputs } => {
         const sources = new Map<string, ReviewSource>();
         const sourceOf = (record: WorkRecord): ReviewSource => {
             const prior = sources.get(record.workId);
@@ -257,12 +266,13 @@ export function briefReviewRecords(
             items.map(({ dependencyId, need, owner, contract }) => ({ dependencyId, need, owner, contract }));
         const releaseSpec = (plan: import('@lar-factory/shared').ReleasePlan | null) =>
             plan && { steps: plan.steps.map(({ done: _, ...step }) => step), outcomeCheck: plan.outcomeCheck.what };
+        const contract = (text: string) => (raw ? contractText(text) : productContent(contractText(text)));
         const sourceSpec = (item: ReviewSource, own = false) => ({
             workId: item.workId,
             repository: item.repository,
             kind: item.kind,
             request: own ? item.request : undefined,
-            brief: own ? brief : contractText(item.bodies.find((b) => b.body === 'brief')?.markdown ?? ''),
+            brief: own ? brief : contract(item.bodies.find((b) => b.body === 'brief')?.markdown ?? ''),
             confirmedScope: own ? item.confirmedScope : undefined,
             dependencies: own ? dependencySpecs(item.dependencies.filter((d) => d.blocks.includes(workId))) : undefined,
         });
@@ -296,7 +306,9 @@ export function briefReviewRecords(
             source: sourceSpec(own, true),
             decisions: content.decisions.filter(referenced).map((item) => ({
                 workId: item.workId,
-                answer: item.answer?.current?.text ?? item.answer?.replacement?.text ?? null,
+                answer: raw
+                    ? (item.answer?.current?.text ?? item.answer?.replacement?.text ?? null)
+                    : productContent(item.answer?.current?.text ?? item.answer?.replacement?.text ?? ''),
             })),
             contracts: contracts.map((item) => sourceSpec(item)),
             blockers: overlapDependencies ? own.blockers : undefined,
@@ -336,7 +348,28 @@ export function briefReviewRecords(
               }
             : null;
 
-        return { ...content, packageDigest: digest(legacy ? old : reviewed) };
+        return {
+            ...content,
+            packageDigest: digest(legacy ? old : reviewed),
+            productInputs: {
+                brief: brief!,
+                decisions: reviewed.decisions.map((item) => ({
+                    ...item,
+                    answer: item.answer ?? '',
+                    title: read(item.workId).title,
+                })),
+                contracts: reviewed.contracts.map((item) => ({
+                    workId: item.workId,
+                    title: read(item.workId).title,
+                    text: item.brief ?? '',
+                })),
+                other: digest({
+                    scope: own.confirmedScope,
+                    dependencies: reviewed.dependencies,
+                    releaseContracts: reviewed.releaseContracts,
+                }),
+            },
+        };
     };
     const current = (workId: string): DoubtReview | null => {
         const row = db
@@ -354,7 +387,7 @@ export function briefReviewRecords(
     const oldReviews = db
         .prepare('SELECT review_id,work_id,content FROM doubt_reviews')
         .all()
-        .filter((row) => JSON.parse(String(row.content)).dependencyVersion !== 2);
+        .filter((row) => JSON.parse(String(row.content)).dependencyVersion !== 3);
 
     if (oldReviews.length)
         database.write(() => {
@@ -369,12 +402,18 @@ export function briefReviewRecords(
                 if (
                     review.packageDigest !== current.packageDigest &&
                     review.packageDigest !== buildPackage(id, true).packageDigest &&
-                    review.packageDigest !== buildPackage(id, false, true).packageDigest
+                    review.packageDigest !== buildPackage(id, false, true, true).packageDigest &&
+                    review.packageDigest !== buildPackage(id, false, false, true).packageDigest
                 )
                     continue;
 
                 db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
-                    JSON.stringify({ ...review, dependencyVersion: 2, packageDigest: current.packageDigest }),
+                    JSON.stringify({
+                        ...review,
+                        dependencyVersion: 3,
+                        packageDigest: current.packageDigest,
+                        productInputs: current.productInputs,
+                    }),
                     String(row.review_id),
                 );
                 db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=? AND review_digest=?').run(
@@ -386,8 +425,28 @@ export function briefReviewRecords(
         });
 
     return {
-        doubtPackage: (id) => database.read(() => buildPackage(id)),
+        doubtPackage: (id) =>
+            database.read(() => {
+                const { productInputs: _, ...input } = buildPackage(id);
+
+                return input;
+            }),
         currentDoubt: (id) => database.read(() => current(id)),
+        doubtChanges: (id, reviewId) =>
+            database.read(() => {
+                const row = reviewId
+                    ? db.prepare('SELECT content FROM doubt_reviews WHERE work_id=? AND review_id=?').get(id, reviewId)
+                    : db
+                          .prepare('SELECT content FROM doubt_reviews WHERE work_id=? ORDER BY rowid DESC LIMIT 1')
+                          .get(id);
+
+                return row
+                    ? reviewChanges(
+                          (JSON.parse(String(row.content)) as DoubtReview).productInputs,
+                          buildPackage(id).productInputs,
+                      )
+                    : [];
+            }),
         recordDoubt: (id, packageDigest, identity, evidence, ordering) =>
             database.write(() => {
                 const input = buildPackage(id);
@@ -418,7 +477,8 @@ export function briefReviewRecords(
 
                 const review = {
                     reviewId: randomUUID(),
-                    dependencyVersion: 2 as const,
+                    dependencyVersion: 3 as const,
+                    productInputs: input.productInputs,
                     packageDigest,
                     identity: text(identity),
                     evidence: text(evidence),

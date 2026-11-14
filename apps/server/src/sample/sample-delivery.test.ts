@@ -33,7 +33,7 @@ test('fake delivery exercises stale approval, grouped Auto-build and current bui
         const stale = board.snapshot().items.find((item) => item.staleGate)!;
 
         expect(deskItems(board.snapshot(), false)).toContain(stale);
-        expect(stale.briefApproval?.reason).toBe('Gate out of date: brief changed since approval');
+        expect(stale.briefApproval?.reason).toBe('Brief changed. Review and approve the current product content.');
 
         const building = board.snapshot().items.find((item) => item.parentId === parent.id && item.buildPhase)!;
 

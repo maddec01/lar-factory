@@ -1083,7 +1083,7 @@ test('a changed approved brief during Build carries a brief approval reason inst
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
     assert.equal(item.passingBrief, false);
-    assert.equal(item.briefApproval!.reason, 'Gate out of date: brief changed since approval');
+    assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
     assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
 });
 
@@ -1150,7 +1150,7 @@ for (const status of ['Ready', 'Queued'] as const) {
         assert.equal(item.status, 'Shaping');
         assert.equal(item.passingBrief, false);
         assert.equal(item.staleGate, 'brief');
-        assert.equal(item.briefApproval!.reason, 'Gate out of date: brief changed since approval');
+        assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
         assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
     });
 }
@@ -1448,4 +1448,54 @@ test('S06: an unknown-provenance ticket edit stays on Your desk until board acce
         deskItems({ items }, false).some((i) => i.id === x.workId),
         false,
     );
+});
+
+test('stale approval names the changed cited answer, contract or brief', async () => {
+    const records = await open();
+    const group = records.create({ title: 'G', repository: REPO, kind: 'concept' }).workId;
+    const revision = (id: string) => records.read(id).revision;
+    const part = (title: string, kind: 'build' | 'decision', body: string) =>
+        records.createPart({
+            parentId: group,
+            parentRevision: revision(group),
+            title,
+            repository: REPO,
+            kind,
+            body,
+            blockerIds: [],
+        }).workId;
+    const decision = part('DEC', 'decision', 'Method: grill\nChoose label.');
+    const contract = part('X', 'build', '## What\nExport formatLabel.');
+    const build = part(
+        'A2',
+        'build',
+        `${completeBrief('Trim labels.')}\nConsumes: \`${contract}\`\nChosen answer: ${decision}`,
+    );
+    const write = (id: string, body: 'brief' | 'answer', text: string) => records.setBody(id, revision(id), body, text);
+    const approve = () => {
+        records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Checked.', []);
+        records.recordGate(build, revision(build), {
+            briefDigest: records.gate(build).briefDigest!,
+            approvedBy: 'Pedro',
+            evidence: 'Yes.',
+        });
+    };
+    const shown = () => recordItems(records, [], [REPO]).find((item) => item.id === build)!;
+
+    write(decision, 'answer', '## Product\nUse AMBER.');
+    records.setBuildBranch(build, revision(build), 'fix/labels');
+    approve();
+    write(decision, 'answer', '## Product\nUse BLUE.');
+    assert.equal(shown().staleGateDetail, 'Cited answer DEC changed.');
+    records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Rechecked.', []);
+    assert.equal(
+        shown().briefApproval?.reason,
+        'Cited answer DEC changed. Review and approve the current product content.',
+    );
+    approve();
+    write(contract, 'brief', '## What\nExport a renamed helper.');
+    assert.equal(shown().staleGateDetail, 'Contract X changed.');
+    approve();
+    write(build, 'brief', `${records.body(build, 'brief')}\nA new acceptance criterion.`);
+    assert.equal(shown().staleGateDetail, 'Brief changed.');
 });

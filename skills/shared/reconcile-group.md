@@ -1,7 +1,6 @@
 # Reconcile affected work
 
-Input: group change or overlapping work. Output: coherent briefs, blockers,
-Dependencies, tickets, map, current answers and release order; parts must agree.
+Input: changed/overlapping work. Output: coherent product contracts and records.
 
 After every group change (answers, scope/contracts, set-aside, merge-build,
 single/batch board gates, observed PR merges), run `lar-work reconcile GROUP_ID`
@@ -24,11 +23,11 @@ board approval, then resume reconciliation.
 
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use
 `refresh-projections GROUP_ID --file F`: `{revisions:{ID:N},answers:{ID:text},map?}`
-with all group revisions. Refresh answers and narrative together; commands reject
-stale exact brief quotes and generate map part state. History remains.
+with all group revisions. Answers use `## Product` for choices; `## History` is excluded from approvals.
+Status comes from records/commands, never answers/map. Commands generate state
+and reject stale brief quotes.
 
-Before ending a shaping turn, settle factory details (fixtures, files,
-presentation) yourself. Remove resolved Fog; record `set-fog --fog gone` when
+Before ending shaping, settle factory details yourself. Remove resolved Fog; record `set-fog --fog gone` when
 empty. Every remaining bullet starts `[decision: ID]` for an open decision,
 `[factory: ID]` for a task decision actively in Shaping, or `[question: ID]`
 for Pedro's actually pending question with saved Needs you (visible on Your

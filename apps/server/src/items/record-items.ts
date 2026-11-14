@@ -257,6 +257,13 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                       ? ('sources' as const)
                       : ('approval' as const)
                 : undefined;
+        const staleGateDetail =
+            staleGate === 'brief'
+                ? 'Brief changed.'
+                : staleGate === 'sources'
+                  ? records.doubtChanges(record.workId, gate.evidence.at(-1)?.doubtReviewId).join(' ') ||
+                    'Approval sources changed.'
+                  : undefined;
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const matchesScope = !records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok;
         let briefApproval =
@@ -352,6 +359,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             passingBrief: gate.current,
             ...(briefReviewing && { briefReviewing: true as const }),
             ...(staleGate && { staleGate }),
+            ...(staleGateDetail && { staleGateDetail }),
             ...(changesRequested && { briefChangesRequested: true as const }),
             ...(briefApproval && {
                 briefApproval: {
@@ -359,9 +367,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                     reason:
                         (!matchesScope
                             ? 'The current brief differs from confirmed scope. Its owner must update it before approval.'
-                            : staleGateReason({ staleGate })) ??
+                            : staleGateDetail
+                              ? `${staleGateDetail} Review and approve the current product content.`
+                              : staleGateReason({ staleGate })) ??
                         (activeBuild
-                            ? 'The brief changed during Build. Review and approve the new brief.'
+                            ? 'Review and approve the current product content before Build continues.'
                             : 'Review the complete brief before it becomes Ready.'),
                 },
             }),

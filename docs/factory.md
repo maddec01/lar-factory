@@ -94,6 +94,13 @@ legacy Parts prose with record-derived status, gate, Spec state and phase; agent
 write narrative and destination only. Map history retains original prose. Work-order
 labels absorbed builds Merged into the survivor and distinguishes ordinary Set aside.
 
+Decision answers put chosen product content under `## Product`; `## History`
+retains context outside approval and scheduling digests. Legacy answers remain
+readable with workflow-status sentences excluded. Delivery progress is generated
+from records, never written into answers or map narrative. Status-only answer
+refreshes leave the product version unchanged. Doubt retains named product inputs
+so stale gates identify a changed cited answer, contract or brief honestly.
+
 Records hold product content. Launch/handoff environment and frozen model/role
 contracts stay in thread prompts and run-settings records. All body writes,
 including part creation and projection refresh, reject copied runtime blocks
@@ -431,8 +438,9 @@ contracts across repositories. It recognizes existing transitive ordering and
 leaves semantic judgment to Doubt. The owner records blockers, or explains each
 unordered overlap with `record-doubt ID --digest H --identity I --evidence E
 [--file ordering.json]`. That command binds a clean review to the current package.
-Gating rechecks it atomically; sibling, answer, map, blocker or Dependency changes
-invalidate the review and affected gates. Execution Status changes do not.
+Gating rechecks it atomically. Only the brief, cited product answers, consumed
+contracts, confirmed scope and named Dependency/release contracts invalidate its
+review and approval. Delivery progress and unrelated projections do not.
 
 The owner fixes factual defects and records the result. Unresolved choices or
 findings go to Pedro through the question stage. Scope changes run group
@@ -668,7 +676,9 @@ The action saves `buildRun: running` with the prepared record
 revisions. Pause concept builds stops future starts and preserves active work.
 A new scope change pauses the run until affected gates pass again. The run compares
 scheduling contracts (parts, scope, gate digests and blockers); projection whitespace
-and Notes do not change its authorization. Once all parts are complete the build
+and Notes do not change its authorization. Status/history prose and answer
+revision citations do not enter the signature; chosen answers and product
+contracts do. Once all parts are complete the build
 run is completed, while release and Outcome may still wait.
 
 The scheduler never builds an ungated Queued record. A running concept starts

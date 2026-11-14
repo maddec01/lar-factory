@@ -3,17 +3,17 @@
 Input: integrated branch and passing validation record. Output: `review-rounds`,
 fixed/rejected/open findings, unreviewed fixes and UI process ownership.
 
-At most two rounds.
+At most two rounds per cycle; Verify rejection starts a fresh cycle.
 
 Round 1: in the build checkout, pin `head=$(git rev-parse HEAD)` and
 `base=$(git merge-base origin/$base_branch "$head")`, then run
 `lar-work select-reviewers <work ID> --base "$base" --head "$head"`.
-With a supplied run ID, add `--run-id RUN_ID`. Use returned decisions/reasons,
-including uncertain matches; report skips in chat. In parallel, start each
+Add `--run-id RUN_ID` when supplied. After Verify rejection, select again;
+use the returned base/head delta and reasons, then always run Approve.
+Use returned decisions, including uncertainty; report skips. In parallel, start each
 selected reviewer with its returned instruction path (under installed lar-build)
 or frozen text, work ID, repo path, `<lar-build>/project-rules.md`, saved domain-doc
-setting/paths and `<lar-build>/shared/orchestration.md`, including its report and
-**Wait for delegated work** rules. Supply `git diff <base SHA> <head SHA>`.
+setting/paths and `<lar-build>/shared/orchestration.md`, and its **Wait for delegated work** rules. Supply `git diff <base SHA> <head SHA>`.
 UI returns screenshot paths and an app report: commit, access instructions and
 each started process with recheckable ownership evidence such as its port.
 
@@ -22,15 +22,14 @@ Give Code the selection. For its `escalations`, repeat the pinned selection with
 diff before fixing. `never` wins. Preserve each returned `escalation` (requester
 and reason) in that reviewer's round-1 record.
 
-Each returns verdict (`approve` or `changes`), findings and not-checked evidence.
+Each returns verdict (`approve`/`changes`), findings and unchecked evidence.
 Explain rejected findings. Before assigning accepted findings to the
 [Fixer](../agents/fixer.md), save HEAD as the round base and call
 `lar-work record-review-round <work ID> --revision N --file <json>` with base,
 runId when supplied, reviewer verdicts, findings and optional `notChecked` text.
 The command fills each reviewer's selection/escalation and skip reason from the
 saved `select-reviewers` result; omit unchecked notes when none (`""` is accepted).
-Example: `{"base":"<saved HEAD>","reviewers":[{"axis":"code","verdict":"approve","findings":[]}]}`.
-Record every reviewer that ran; configured skips are filled automatically. Findings are `open`,
+Record every reviewer run; skips are filled. Findings are `open`,
 or `rejected` with reason. Mark fixes with `lar-work set-disposition ... --disposition fixed`.
 
 Round 2: rerun only reviewers with fixed findings, in parallel, with the same

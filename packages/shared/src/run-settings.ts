@@ -79,7 +79,7 @@ export interface RoleRun extends RoleRunInput {
 
 /** Versioned trigger evidence kept with a review, including skips and uncertain matches. */
 export interface ReviewSelectionEvidence {
-    triggerVersion: 1;
+    triggerVersion: 1 | 2;
     outcome: 'matched' | 'unmatched' | 'uncertain';
     rule: string;
     evidence: string;

@@ -11,10 +11,11 @@ interface Selection {
     runId?: string;
     base: string;
     head: string;
+    verifyReturn?: { rejectedHead: string };
     reviewers: {
         id: string;
         name?: string;
-        triggerVersion: 1;
+        triggerVersion: 1 | 2;
         outcome: 'matched' | 'unmatched' | 'uncertain';
         rule: string;
         evidence: string;
@@ -106,13 +107,17 @@ export function reviewSelectionRecords(database: Database, get: () => WorkRecord
                     .prepare('SELECT content FROM reviewer_selections WHERE work_id=? ORDER BY rowid DESC')
                     .all(id)
                     .map((row) => JSON.parse(String(row.content)) as Selection);
-                const selected = selections.find(
-                    (s) =>
-                        (!input?.runId || s.runId === input.runId) &&
-                        (s.base === input?.base ||
-                            s.head === input?.base ||
-                            records.reviewRounds(id).some((round) => round.runId === s.runId)),
-                );
+                const latest = selections.find((s) => !input?.runId || s.runId === input.runId);
+                const selected = latest?.verifyReturn
+                    ? latest
+                    : selections.find(
+                          (s) =>
+                              (!input?.runId || s.runId === input.runId) &&
+                              (s.head === input?.base ||
+                                  s.base === input?.base ||
+                                  (!s.verifyReturn &&
+                                      records.reviewRounds(id).some((round) => round.runId === s.runId))),
+                      );
 
                 if (
                     !input ||
@@ -127,7 +132,15 @@ export function reviewSelectionRecords(database: Database, get: () => WorkRecord
                     invalid('Supply reviewer results with optional text notes.');
 
                 const reviewers = [...input.reviewers];
-                const initial = selected && !records.reviewRounds(id).some((round) => round.runId === selected.runId);
+
+                const initial =
+                    selected &&
+                    !records
+                        .reviewRounds(id)
+                        .some((round) => round.base === selected.head && round.runId === selected.runId);
+
+                if (selected?.verifyReturn && initial && input.base !== selected.head)
+                    invalid('Verify reassessment must record the selected new head.');
 
                 if (initial)
                     for (const reviewer of selected.reviewers) {

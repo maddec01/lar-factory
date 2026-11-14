@@ -8,6 +8,11 @@ import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-dom
 
 /** The same human wait determines desk placement and group attention. */
 export function humanWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    const question = openQuestionThread(item);
+
+    if (item.briefReviewing && !item.needsYou && (!question || question.pendingRequest?.kind === 'brief-approval'))
+        return null;
+
     if (
         !item.briefApproval &&
         !retroWaits(item.retro) &&

@@ -153,6 +153,14 @@ Waiting for brief approval, Implementing, Code review or Waiting for required
 checks. Tracker Labels and Kind are separate from workflow Status. Factory
 progress never becomes tracker labels, tags, comments or Azure State.
 
+A changed brief offers approval only after Doubt has a result for its current
+package and displayed digest. Until then the item says Doubt reviewing without
+a human approval action or desk wait. Board approval of an active amended build
+queues a durable notification for its build owner, regardless of newer shaping
+threads; restart retries reuse the same message identity. The retained tracker
+Spec is labelled Out-of-date Spec whenever its approved gate is no longer current,
+including while an already-open dialog receives another amendment.
+
 Every view must show the same record revision and wait reasons, readable text
 and reachable actions in light and dark appearance and small and large windows.
 Loading, empty, error and unknown states must not claim readiness or completion.
@@ -850,8 +858,22 @@ Verify/Ready to merge, or an explicit Needs you hold.
 Verify puts the PR and Test steps on the desk and keeps the item in Build or its
 group. `verification` stores the tested head, result, local operator identity, time and
 PR Test steps. Pass and Fail Verify are available on the desk and in item details; a failure requires a short note. A failed Verify returns to this build, preserving its PR; fix, checks
-and reassessment follow the same rules. A pass permits Ready to merge. A later
-head change invalidates that verification. An already merged build is never
+and focused checks follow. Every new head after a Verify rejection runs
+`select-reviewers` before reassessment. Selection version 2 compares the last
+recorded reviewed head (`review-rounds`' latest `base`, within the frozen run)
+to the new head, overriding a supplied whole-branch base. Saved `always` modes
+run (Code defaults to always); conditional reviewers run only when their versioned
+triggers match that delta or its impact is uncertain; `never` still wins. The
+existing version-1 path/text predicates stay unchanged. Each result records the
+Verify rejection, exact delta, trigger version and run/skip reason. The round
+records the selected new head and all selection evidence, including skipped
+reviewers. This is a Verify reassessment, independent of whether an earlier
+reviewer finding was fixed; the two-round finding-fix rule applies within each
+review cycle. The approver always reassesses the final tree after those reviews,
+even when every configured reviewer is skipped. A pass permits Ready to merge. A later
+head change invalidates that verification. History labels every older-head result
+as superseded by the current head. Transient pending reads and build-activity
+guards retry automatically, keeping results disabled until inspection succeeds. An already merged build is never
 reopened; new work gets a new record.
 
 Ready to merge offers Merge PR on the desk. Pedro chooses the provider's merge

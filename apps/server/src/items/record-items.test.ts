@@ -1074,6 +1074,10 @@ test('a changed approved brief during Build carries a brief approval reason inst
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
     records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
 
+    const reviewed = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
+
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
     assert.equal(item.passingBrief, false);
@@ -1135,6 +1139,10 @@ for (const status of ['Ready', 'Queued'] as const) {
         });
         work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Changed brief.'));
 
+        const reviewed = records.doubtPackage(work.workId);
+
+        records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
+
         const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
         assert.equal(item.status, 'Shaping');
@@ -1190,6 +1198,10 @@ test('withdrawn approval asks for a new gate without claiming the brief or sourc
     });
     records.invalidateGate(work.workId, work.revision);
 
+    const reviewed = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
+
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
     assert.equal(item.staleGate, 'approval');
@@ -1213,6 +1225,10 @@ test('a confirmed scope amendment refreshes while the previous brief awaits repl
     records.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
     records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(scope.files)));
     records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.');
+
+    const review = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, review.packageDigest, 'Doubt', 'Clean.', []);
     assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval);
 
     const amended = { ...scope, files: ['cli.js', 'test/cli.test.js'] };
@@ -1225,7 +1241,14 @@ test('a confirmed scope amendment refreshes while the previous brief awaits repl
     assert.equal(waiting.briefApproval, undefined, 'the old brief cannot offer approval');
     assert.equal(waiting.passingBrief, false);
     records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(amended.files)));
-    assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval, 'a matching replacement offers approval again');
+
+    const replacement = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, replacement.packageDigest, 'Doubt', 'Rechecked.', []);
+    assert.ok(
+        recordItems(records, [], [REPO])[0]!.briefApproval,
+        'a reviewed matching replacement offers approval again',
+    );
 });
 
 test('a refused record read identifies the work and reason without losing its error code', async () => {
@@ -1301,4 +1324,33 @@ test('an incomplete draft stays readable without offering approval or breaking t
     assert.equal(shown.title, 'Incomplete bug');
     assert.equal(shown.briefApproval, undefined);
     assert.equal(shown.passingBrief, false);
+});
+
+test('S03 amended gate waits for Doubt on its current digest before advertising approval', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'In progress' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved D1.'));
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+    work = records.setBuildBranch(work.workId, work.revision, 'build/same');
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
+    records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
+
+    const shown = () => recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+    assert.equal(shown().briefApproval, undefined);
+    assert.equal(shown().briefReviewing, true);
+
+    const review = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, review.packageDigest, 'Doubt', 'Clean.', []);
+    assert.equal(shown().briefReviewing, undefined);
+    assert.equal(shown().briefApproval!.digest, records.displayGate(work.workId).approvalDigest);
+    work = records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief('Proposed D3.'));
+    assert.equal(shown().briefApproval, undefined);
+    assert.equal(shown().briefReviewing, true);
 });

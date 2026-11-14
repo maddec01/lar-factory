@@ -104,3 +104,30 @@ test('the fake Verify head can wait and resume without inventing missing Test st
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('fake amended-brief controls keep Doubt pending off the desk until its result arrives', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'brief-review-sample-test-'));
+
+    vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
+
+    const board = createBoardState(structuredClone(fixture) as unknown as BoardData);
+    const sample = await createSampleBoard(board, fixture as unknown as BoardData);
+
+    try {
+        const pending = await sample.sampleControl({ action: 'brief-approval', change: 'doubt-pending' });
+        const id = (pending.body as { workId: string }).workId;
+        const reviewing = board.find(id)!;
+
+        expect(reviewing.briefReviewing).toBe(true);
+        expect(reviewing.briefApproval).toBeUndefined();
+        expect(reviewing.needsYou).toBeUndefined();
+        expect(deskItems(board.snapshot(), false)).not.toContain(reviewing);
+        expect(await sample.itemDetails.details(reviewing)).toMatchObject({ spec: { outdated: true } });
+        await sample.sampleControl({ action: 'brief-approval', change: 'doubt-ready' });
+        expect(board.find(id)?.briefApproval?.digest).toBeTruthy();
+    } finally {
+        sample.close();
+        vi.unstubAllEnvs();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

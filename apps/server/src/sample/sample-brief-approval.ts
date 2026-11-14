@@ -2,7 +2,12 @@ import type { WorkRecords } from '@lar-factory/work-records';
 import { syncSpecs } from '@lar-factory/work-records/spec-sync';
 
 /** A changed-brief fixture uses the disposable sample's own provider and data folder. */
-export async function sampleBriefApproval(records: WorkRecords, id: string, specSync: Parameters<typeof syncSpecs>[1]) {
+export async function sampleBriefApproval(
+    records: WorkRecords,
+    id: string,
+    specSync: Parameters<typeof syncSpecs>[1],
+    reviewed = true,
+) {
     let work = records.read(id);
 
     if (!work.repository.startsWith('lar-factory-sample/')) throw new Error('Only fake sample work is supported.');
@@ -30,6 +35,7 @@ export async function sampleBriefApproval(records: WorkRecords, id: string, spec
 
     const input = records.doubtPackage(id);
 
-    records.recordDoubt(id, input.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.', []);
+    if (reviewed) records.recordDoubt(id, input.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.', []);
+
     records.waitForUser(id, work.revision, 'Approve revised brief after failed Verify.');
 }

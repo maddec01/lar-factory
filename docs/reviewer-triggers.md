@@ -1,8 +1,18 @@
-# Reviewer triggers, version 1
+# Reviewer triggers and selection versions
 
 Run `lar-work select-reviewers ID --base SHA --head SHA` in the build checkout.
 
-Both arguments must be full commit SHAs. For whole-branch review, pass the
+Both arguments must be full commit SHAs. Whole-branch selection uses version 1.
+After a Verify rejection, selection version 2 uses the latest recorded reviewed
+head in the same run as its base, regardless of the supplied whole-branch base.
+Repeating selection for the same new head reuses that exact delta. Every reason
+names the rejection and delta and requires approver reassessment. `record-review-round`
+requires results for every selected reviewer and fills all skips for that head.
+The saved round base is the selected new head. Version-1 trigger predicates and
+frozen settings are preserved; version 2 changes only the selection input range.
+Legacy version-1 evidence remains readable.
+
+For whole-branch review, pass the
 merge base with the target branch as base and the pinned HEAD as head. This
 compares those two trees directly; it does not include uncommitted files or
 compute a different merge base. `--data-dir D` selects local saved settings and
@@ -13,16 +23,15 @@ When Code identifies a missed reviewer, repeat the same command with
 Only skipped reviewers gain `escalation` metadata and become selected; `never` wins,
 and already selected reviewers or repeated requests add no run. Start each newly
 escalated reviewer once, then copy its `escalation` into its `record-review-round`
-entry with the result. The command remains read-only; the round stores the provenance.
+entry with the result. Selection saves its provenance and starts Review; the round copies that evidence.
 
 The result identifies the work ID, checkout, commits and trigger version, and
 contains every reviewer, sorted by stable ID. Each has `run`, `reason`, `mode`,
 `outcome`, `rule`, `evidence` and its selected instructions. `never` wins even
 when the diff is uncertain. `always` needs no match. Code defaults to always;
 Security, UI and Performance default to their named version-1 policies.
-Doubt and approver are separate stages and are unaffected. Selection prints a
-result; it does not launch reviewers, persist a run snapshot or change review
-history. The builder records skipped reasons through its existing round flow.
+Doubt and approver are separate stages and are unaffected. Selection saves and prints its result and starts Review; it does not launch
+reviewers or persist a run snapshot or review round. The builder records skipped reasons through its existing round flow.
 
 Named policies match case-insensitive path and code signals (UI text signals
 are case-sensitive). Security covers input, auth, sessions, permissions,

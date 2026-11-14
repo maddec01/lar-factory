@@ -10,6 +10,7 @@ import {
     sample,
     settle,
     text,
+    stream,
     detailsRead,
     detailsReply,
 } from '@/test/PageTest';
@@ -127,6 +128,18 @@ test('passing needs no note and shows recorded evidence only in details', async 
     expect(dialog().querySelector('[data-verification]')).toBeNull();
     expect(text(dialog())).toContain('Passed by Pedro at');
     expect(text(dialog())).toContain('Tested head aaaaaaa');
+
+    const advanced = fresh({
+        ...after,
+        items: after.items.map((work) => ({
+            ...work,
+            status: 'In progress' as const,
+            linkedPrs: [{ ...work.linkedPrs[0]!, sourceRevision: 'b'.repeat(40) }],
+        })),
+    });
+
+    await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(advanced) })));
+    expect(text(dialog())).toContain('Tested head aaaaaaa · superseded by bbbbbbb');
 });
 test('stale-head refusal keeps the failure draft and offers an explicit PR head reread', async () => {
     api(undefined, 'The PR head changed. Re-read PR head.');
@@ -186,7 +199,7 @@ test('details keeps earlier exact-head results readable while the next head awai
     expect(text(dialog())).toContain('Failed by Pedro at');
     expect(text(dialog())).toContain('Passed by Pedro at');
     expect(text(dialog())).toContain('Tested head aaaaaaa');
-    expect(text(dialog())).toContain('Tested head bbbbbbb');
+    expect(text(dialog())).toContain('Tested head bbbbbbb · superseded by aaaaaaa');
     expect(text(dialog())).toContain('Clipped greeting.');
     expect(dialog().querySelector('[data-verification]')).not.toBeNull();
 });

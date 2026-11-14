@@ -10,7 +10,7 @@ const approvalWait = (reason: string | null) => /approve.*brief|brief.*approval/
 export function gateOwner(
     database: Database,
     record: WorkRecord,
-    purpose?: 'shape',
+    purpose?: 'shape' | 'build',
 ): { workId: string; threadId: string } | null {
     const { db } = database;
     let owner = db
@@ -45,7 +45,7 @@ export function queueGateResume(database: Database, record: WorkRecord, value: G
         ).run(active ? 'In progress' : 'Ready', new Date().toISOString(), record.workId);
     }
 
-    const owner = gateOwner(database, record);
+    const owner = active ? gateOwner(database, record, 'build') : gateOwner(database, record);
 
     if (!owner) return;
 

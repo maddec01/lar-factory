@@ -352,3 +352,103 @@ it('selects from the named run after Settings edits, returning frozen instructio
         reread.close();
     }
 }, 30_000);
+
+it('S03 Verify return selects on the delta since the last reviewed head and records that scope', async () => {
+    const { cwd, commit } = repository();
+    const data = directory();
+    const records = await openWorkRecords(workRecordsPath(data));
+    let work = records.create({
+        title: 'Verify return',
+        repository: 'example/repo',
+        kind: 'feature',
+        status: 'Verify',
+    });
+    const base = commit();
+
+    writeFileSync(join(cwd, 'index.html'), '<button>Run greeting</button>\n');
+
+    const reviewed = commit();
+
+    records.recordReviewRound(work.workId, work.revision, {
+        base: reviewed,
+        reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }],
+    });
+    work = records.setPullRequest(work.workId, records.read(work.workId).revision, 'example/repo#8');
+    work = records.addThread(work.workId, work.revision, 'build-owner', 'build');
+    records.observeVerificationHead(work.workId, work.pullRequest!, reviewed);
+    records.recordVerification(work.workId, records.read(work.workId).revision, {
+        pr: work.pullRequest!,
+        head: reviewed,
+        result: 'fail',
+        note: 'Clarify documentation.',
+        testSteps: 'Press greeting.',
+        by: 'Pedro',
+    });
+    writeFileSync(join(cwd, 'README.md'), 'Greeting instructions.\n');
+
+    const head = commit();
+
+    records.close();
+
+    const run = (...args: string[]) =>
+        JSON.parse(
+            execFileSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args, '--data-dir', data], {
+                cwd,
+                encoding: 'utf8',
+            }),
+        );
+    const selection = run('select-reviewers', work.workId, '--base', base, '--head', head);
+
+    expect(selection).toMatchObject({ base: reviewed, head, triggerVersion: 2 });
+    expect(run('select-reviewers', work.workId, '--base', base, '--head', head)).toEqual(selection);
+    expect(selection.reviewers.filter((r: { run: boolean }) => r.run).map((r: { id: string }) => r.id)).toEqual([
+        'code',
+    ]);
+    expect(
+        selection.reviewers.every((r: { reason: string }) =>
+            r.reason.includes(`Verify rejection; delta ${reviewed}..${head}`),
+        ),
+    ).toBe(true);
+
+    const round = join(data, 'return.json');
+
+    writeFileSync(
+        round,
+        JSON.stringify({ base: head, reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }] }),
+    );
+    run('record-review-round', work.workId, '--revision', String(run('read', work.workId).revision), '--file', round);
+
+    const saved = run('review-rounds', work.workId)[1];
+
+    writeFileSync(join(cwd, 'index.html'), '<button>Check greeting</button>\n');
+
+    const visible = commit();
+    const next = run('select-reviewers', work.workId, '--base', base, '--head', visible);
+
+    expect(next.base).toBe(head);
+    expect(next.reviewers.filter((r: { run: boolean }) => r.run).map((r: { id: string }) => r.id)).toEqual([
+        'code',
+        'performance',
+        'ui',
+    ]);
+    writeFileSync(
+        round,
+        JSON.stringify({ base: visible, reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }] }),
+    );
+    expect(() =>
+        run(
+            'record-review-round',
+            work.workId,
+            '--revision',
+            String(run('read', work.workId).revision),
+            '--file',
+            round,
+        ),
+    ).toThrow(/Missing results/);
+
+    expect(saved.reviewers).toHaveLength(4);
+    expect(saved.reviewers.find((r: { axis: string }) => r.axis === 'ui')).toMatchObject({
+        verdict: 'skipped',
+        selection: { triggerVersion: 2, reason: expect.stringContaining('Verify rejection; delta') },
+    });
+}, 30_000);

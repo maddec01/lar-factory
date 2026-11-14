@@ -37,7 +37,8 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
     let records: WorkRecords | undefined;
 
     try {
-        const { base, head } = parsed.values;
+        const { head } = parsed.values;
+        let base = parsed.values.base!;
         const workId = parsed.positionals[0]!;
 
         records = await openWorkRecords(workRecordsPath(parsed.values['data-dir']));
@@ -55,14 +56,37 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
         const { settings, problem } = snapshot
             ? { settings: snapshot.settings, problem: null }
             : readFactorySettings(parsed.values['data-dir']);
-        const { root, diff } = readReviewerDiff(base!, head!);
+        const verification = records.verification(workId);
+        const rounds = records.reviewRounds(workId).filter((round) => !runId || round.runId === runId);
+        const previous = records.reviewerSelection(workId);
+        const reviewed = rounds.at(-1)?.base;
+        const verifyReturn =
+            verification.latest?.result === 'fail' && reviewed && head !== verification.latest.head
+                ? { rejectedHead: verification.latest.head }
+                : undefined;
+
+        if (verifyReturn)
+            base =
+                previous?.verifyReturn && previous.head === head && previous.runId === runId
+                    ? previous.base
+                    : reviewed!;
+
+        const { root, diff } = readReviewerDiff(base, head!);
         const requests = parsed.values.escalations ? JSON.parse(readFileSync(parsed.values.escalations, 'utf8')) : [];
         const reviewers = selectReviewers(settings, diff, requests).map((reviewer) => {
             const frozen = snapshot?.reviewers.find((entry) => entry.id === reviewer.id);
 
-            return frozen
-                ? { ...reviewer, instructions: frozen.instructions, target: snapshot!.roles[`reviewer:${reviewer.id}`] }
+            const scoped = verifyReturn
+                ? {
+                      ...reviewer,
+                      triggerVersion: 2 as const,
+                      reason: `Verify rejection; delta ${base}..${head}; approver required. ${reviewer.reason}`,
+                  }
                 : reviewer;
+
+            return frozen
+                ? { ...scoped, instructions: frozen.instructions, target: snapshot!.roles[`reviewer:${reviewer.id}`] }
+                : scoped;
         });
 
         const selection = {
@@ -71,7 +95,8 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
             base: base!,
             head: head!,
             root,
-            triggerVersion: 1,
+            triggerVersion: verifyReturn ? 2 : 1,
+            ...(verifyReturn && { verifyReturn }),
             complete: diff.complete,
             reviewers,
         };
@@ -82,9 +107,7 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
 
         if (problem) process.stderr.write(`lar-work: ${problem}\n`);
 
-        process.stdout.write(
-            `${JSON.stringify({ workId, ...(runId && { runId }), base, head, root, triggerVersion: 1, complete: diff.complete, reviewers }, null, 2)}\n`,
-        );
+        process.stdout.write(`${JSON.stringify(selection, null, 2)}\n`);
 
         return 0;
     } catch (error) {

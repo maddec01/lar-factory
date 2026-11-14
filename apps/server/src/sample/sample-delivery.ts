@@ -114,6 +114,10 @@ export function sampleDelivery(records: WorkRecords) {
                 '## Done when\nWrap the greeting on narrow screens.\n### Tests\n`test/greeting.test.js`: wraps on narrow screens.\n## Scope\n### Files\n`src/greeting.js`',
             );
 
+            const review = records.doubtPackage(stale.workId);
+
+            records.recordDoubt(stale.workId, review.packageDigest, 'Sample Doubt', 'Revised brief reviewed.', []);
+
             return groupId;
         },
     };

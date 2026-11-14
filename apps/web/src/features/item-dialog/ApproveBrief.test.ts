@@ -11,6 +11,7 @@ import {
     sample,
     settle,
     text,
+    stream,
 } from '@/test/PageTest';
 
 const item = {
@@ -299,3 +300,86 @@ test.each(['approve', 'request changes'])(
         }
     },
 );
+
+test('an open dialog refreshes the last approved Spec label on each build amendment', async () => {
+    let amended = false;
+
+    fetchMock.mockImplementation(async (url: string) => {
+        const id = detailsRead(url);
+
+        if (!id) return new Response(JSON.stringify(board));
+
+        const reply = await detailsReply(id).json();
+
+        reply.details.body = 'Approved D2 Spec.';
+        reply.details.spec = {
+            outdated: amended,
+            generation: 2,
+            pending: false,
+            error: null,
+            warning: null,
+            original: 'Original.',
+            originalFormat: 'markdown',
+            held: null,
+        };
+
+        return new Response(JSON.stringify(reply));
+    });
+
+    const initial = fresh({
+        ...board,
+        items: [{ ...item, revision: 10, staleGate: undefined, passingBrief: true, briefApproval: undefined }],
+    });
+
+    await mountPage(initial);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
+    expect(text($('[data-description]'))).not.toContain('Out-of-date Spec');
+    amended = true;
+    await settle(() =>
+        stream().onmessage!(
+            new MessageEvent('message', {
+                data: JSON.stringify(fresh({ ...board, items: [{ ...item, revision: 11, staleGate: 'brief' }] })),
+            }),
+        ),
+    );
+    expect(text($('[data-description]'))).toContain('Out-of-date Spec');
+    expect(text($('[data-description]'))).toContain('Approved D2 Spec.');
+});
+
+test('details show Doubt reviewing without an approval button for an amended brief', async () => {
+    const waiting = fresh({ ...board, items: [{ ...item, briefApproval: undefined, briefReviewing: true as const }] });
+
+    fetchMock.mockImplementation(async (url: string) => {
+        const id = detailsRead(url);
+
+        if (!id) return new Response(JSON.stringify(waiting));
+
+        const reply = await detailsReply(id).json();
+
+        reply.details.record = {
+            bodyKind: 'brief',
+            body: 'Proposed D3.',
+            context: '',
+            buildPhase: 'implement',
+            reviewRounds: [],
+        };
+
+        return new Response(JSON.stringify(reply));
+    });
+    await mountPage(waiting);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
+    expect(text($('[data-record]'))).toContain('Doubt reviewing');
+    expect(
+        [...$('[data-item-dialog]')!.querySelectorAll('button')].some((button) =>
+            /Approve brief|Display brief/.test(text(button)),
+        ),
+    ).toBe(false);
+    expect($('.desk-card')).toBeNull();
+    expect(text($('[data-item-dialog]'))).not.toContain('Needs you:');
+});

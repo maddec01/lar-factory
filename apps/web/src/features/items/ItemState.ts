@@ -204,6 +204,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         inputs.unavailable,
     );
     const word =
+        (item.briefReviewing && !wait ? 'Doubt reviewing' : undefined) ??
         group?.word ??
         wait ??
         (blockers.length
@@ -234,7 +235,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                       ? 'List'
                       : 'Queue'
                   : 'Working'
-            : item.briefApproval &&
+            : (item.briefApproval || item.briefReviewing) &&
                 (item.buildPhase ||
                     item.linkedPrs.length ||
                     (Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build')))

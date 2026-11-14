@@ -145,8 +145,9 @@ work revision and bumps it once. Read the work record for the next revision.
 
 `record-review-round` accepts `runId`. For a record with snapshots, it must name
 an existing build run belonging to that work record. Each reviewer also supplies
-`selection: {triggerVersion: 1, outcome, rule, evidence, reason, run}` from the
-version-1 matcher. `run` must agree with the verdict; `outcome` is `matched`,
+`selection: {triggerVersion: 1 | 2, outcome, rule, evidence, reason, run}` from the
+versioned matcher (version 2 scopes Verify returns to the last reviewed head;
+the frozen version-1 predicates stay unchanged). `run` must agree with the verdict; `outcome` is `matched`,
 `unmatched` or `uncertain`. Skips keep their reason and trigger evidence.
 Escalation provenance remains separate, preserving the original trigger result.
 

@@ -67,6 +67,10 @@ export function noneOnboarded(data: BoardData): boolean {
 
 /** Whether this item's own question or status asks for an answer. */
 export function needsAnswer(item: Item): boolean {
+    const question = openQuestionThread(item);
+
+    if (item.briefReviewing && (!question || question.pendingRequest?.kind === 'brief-approval')) return false;
+
     return (
         !!item.briefApproval || item.status === 'Needs you' || (item.status !== 'Done' && !!openQuestionThread(item))
     );
@@ -114,7 +118,11 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
 
     if (item.status === 'Done' || grouped(item)) return null;
 
-    if (building || (item.briefApproval && (item.buildPhase || item.linkedPrs.length || hasBuildThread(item))))
+    if (
+        building ||
+        ((item.briefApproval || item.briefReviewing) &&
+            (item.buildPhase || item.linkedPrs.length || hasBuildThread(item)))
+    )
         return 'build';
 
     if (shaping) return 'shaping';

@@ -274,6 +274,8 @@ export function buildAccessProblem(
 }
 
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
+    if (item.briefReviewing) return { label: 'Doubt reviewing', running: true };
+
     if (start?.phase === 'starting') return { label: 'Starting', running: false };
 
     if (start?.phase === 'may-have-started') return { label: 'May have started', running: false };

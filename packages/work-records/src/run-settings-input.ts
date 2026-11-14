@@ -148,15 +148,15 @@ export function reviewSelection(value: unknown, verdict: string): ReviewSelectio
     const input = runObject(value, ['triggerVersion', 'outcome', 'rule', 'evidence', 'reason', 'run']);
 
     if (
-        input.triggerVersion !== 1 ||
+        (input.triggerVersion !== 1 && input.triggerVersion !== 2) ||
         !['matched', 'unmatched', 'uncertain'].includes(String(input.outcome)) ||
         typeof input.run !== 'boolean' ||
         input.run !== (verdict !== 'skipped')
     )
-        invalidRun('Review selection must use version 1 and agree with the recorded verdict.');
+        invalidRun('Review selection must use version 1 or 2 and agree with the recorded verdict.');
 
     return {
-        triggerVersion: 1,
+        triggerVersion: input.triggerVersion as 1 | 2,
         outcome: input.outcome as ReviewSelectionEvidence['outcome'],
         run: input.run as boolean,
         rule: runText(input.rule),

@@ -56,6 +56,7 @@ export function KindNotice({
     const held = read.state === 'loaded' ? read.details.kindPlan : undefined;
     const plan = held?.itemKind === item.kind && held.ticketKind === disagreement?.ticketKind ? held : undefined;
     const planStale =
+        !item.setAside &&
         disagreement?.changed === 'item' &&
         (!disagreement.kept || reopened) &&
         read.state === 'loaded' &&
@@ -77,7 +78,7 @@ export function KindNotice({
         };
     }, [planStale, kinds, item.id, refresh]);
 
-    if (!disagreement) return null;
+    if (!disagreement || item.setAside) return null;
 
     const { ticketKind, changed, kept } = disagreement;
     const { swap, note } = plan ?? { swap: disagreement.swap, note: '' };

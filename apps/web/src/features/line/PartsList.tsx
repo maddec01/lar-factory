@@ -1,7 +1,15 @@
 // An expanded dossier's parts list: each part with what it asks next, its stage track, figures, thread and slices.
 
 import type { BoardData } from '@lar-factory/shared';
-import { UNREADABLE, blockerGroups, canRetryBuild, currentBuildThread, itemName, repoKey } from '@lar-factory/shared';
+import {
+    UNREADABLE,
+    retiredPartLabel,
+    blockerGroups,
+    canRetryBuild,
+    currentBuildThread,
+    itemName,
+    repoKey,
+} from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { ActivityLine } from './ActivityLine';
@@ -135,15 +143,19 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
                 <>
                     <PartKindLabel kind={part.kind} />
                     {repoKey(item) !== home && <RepoCell item={item} />}
-                    <PartTrack>
-                        <Track
-                            status={isDone(item) ? 'Done' : item.status}
-                            running={running(item)}
-                            label={word}
-                            waiting={waits.length > 0}
-                        />
-                    </PartTrack>
-                    <span>{isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word)}</span>
+                    {!item.setAside && (
+                        <PartTrack>
+                            <Track
+                                status={isDone(item) ? 'Done' : item.status}
+                                running={running(item)}
+                                label={word}
+                                waiting={waits.length > 0}
+                            />
+                        </PartTrack>
+                    )}
+                    <span>
+                        {retiredPartLabel(item) ?? (isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word))}
+                    </span>
                     <AzureFields azure={item.azure} />
                 </>
             }
@@ -196,13 +208,14 @@ export function PartsList({ parts, data, home }: { parts: Part[]; data: BoardDat
     const [showDone, setShowDone] = useState(false);
     const shown = parts.filter((p) => showDone || !isDone(p.item));
     const done = parts.filter((p) => isDone(p.item)).length;
+    const historyName = parts.some((part) => part.item.setAside) ? 'past parts' : 'done';
 
     return (
         <DesignPartsList
             showDone={
                 done > 0 && (
                     <ShowDoneToggle open={showDone} onToggle={() => setShowDone(!showDone)}>
-                        {showDone ? `Hide ${done} done` : `Show ${done} done`}
+                        {showDone ? `Hide ${done} ${historyName}` : `Show ${done} ${historyName}`}
                     </ShowDoneToggle>
                 )
             }

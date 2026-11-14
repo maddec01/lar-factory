@@ -1017,3 +1017,29 @@ test('acceptance evidence retains full unbroken paths and hashes alongside the c
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toContain('once the change is delivered');
     expect(dependencyRow().querySelector('button')).not.toBeNull();
 });
+
+test.each(['concept', 'decision'] as const)(
+    'reviewed children open the finished %s owner without inheriting usage',
+    async (kind) => {
+        const owner = {
+            ...sample.items.find((i) => i.id === 'I_sample09')!,
+            kind,
+            threads: [thread('review-owner', 'done')],
+        };
+        const child = {
+            ...sample.items.find((i) => i.id === 'I_sample13')!,
+            parentId: owner.id,
+            threads: [],
+            stats: undefined,
+            status: 'Ready' as const,
+        };
+
+        await mountPage({ ...sample, items: [owner, child] });
+        await openItem(child.id);
+        expect(inDialog('[data-open-thread]')?.getAttribute('href')).toBe(
+            't3code://threads/sample-environment/review-owner',
+        );
+        expect(text(inDialog('[data-agent-work-note]'))).toContain(`Shaped in ${kind} thread`);
+        expect(inDialog('[data-agent-work]')).toBeNull();
+    },
+);

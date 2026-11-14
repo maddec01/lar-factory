@@ -12,6 +12,7 @@ import {
     ref,
     repoKey,
     repoName,
+    retiredPartLabel,
 } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
@@ -28,6 +29,7 @@ import {
     ItemStatusGlyph,
     ItemTitle,
     OpenThread,
+    RowActions,
     SliceBar,
     SourceIcon,
     StatusGlyph,
@@ -92,6 +94,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const { item } = part;
     const record = projectWorkMap([item]).nodes[0]!;
     const recordState = [
+        item.partOrder ? `Part ${item.partOrder}` : null,
         record.queued ? (item.status === 'Queued' ? 'Queued' : null) : 'Not queued',
         record.gate === 'not applicable' ? null : `Gate ${record.gate}`,
     ]
@@ -159,14 +162,18 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             head={
                 <>
                     <PartKindLabel kind={part.kind} />
-                    {/* A build's lane already names its repository; the Decisions lane doesn't. */}
-                    {DECISION_KINDS.includes(part.kind) && repoKey(item) !== home && (
-                        <RepoIdentity repo={repoKey(item)} data={data} />
-                    )}
                     <AzureFields azure={item.azure} />
                 </>
             }
-            action={action ?? (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} />)}
+            repository={
+                DECISION_KINDS.includes(part.kind) &&
+                repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />
+            }
+            action={
+                <RowActions>
+                    {action ?? (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} />)}
+                </RowActions>
+            }
             name={<ItemTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
@@ -193,6 +200,7 @@ export function HistoryRow({ part, after, data, home }: { part: Part; after: Par
             afterTitle={`after ${after.map((u) => itemName(u.item)).join(', ')}`}
             side={
                 <>
+                    {retiredPartLabel(item)}
                     {repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
                     {item.linkedPrs.map((pr) => (
                         <PullRequestRef key={pr.number} label={prLabel(pr)} />

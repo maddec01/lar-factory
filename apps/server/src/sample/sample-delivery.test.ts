@@ -20,7 +20,7 @@ test('fake delivery exercises stale approval, grouped Auto-build and current bui
 
     vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
 
-    const board = createBoardState(fixture as unknown as BoardData);
+    const board = createBoardState(structuredClone(fixture) as unknown as BoardData);
     const sample = await createSampleBoard(board, fixture as unknown as BoardData);
 
     try {
@@ -38,6 +38,66 @@ test('fake delivery exercises stale approval, grouped Auto-build and current bui
         const building = board.snapshot().items.find((item) => item.parentId === parent.id && item.buildPhase)!;
 
         expect(itemActivityThread(building)?.purpose).toBe('build');
+    } finally {
+        sample.close();
+        vi.unstubAllEnvs();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('growing-concept sample exposes twenty active builds, retired history, long decision and owner navigation', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'growing-sample-test-'));
+
+    vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
+
+    const board = createBoardState(structuredClone(fixture) as unknown as BoardData);
+    const sample = await createSampleBoard(board, fixture as unknown as BoardData);
+
+    try {
+        const { body } = await sample.sampleControl({ action: 'growing-concept' });
+        const parent = board.find((body as { workId: string }).workId)!;
+
+        expect(parent.conceptBuild?.members.filter((member) => member.kind === 'build')).toHaveLength(20);
+        expect(parent.retiredParts?.map((item) => item.title.slice(0, 3))).toEqual(['b04', 'b06']);
+        expect(parent.retiredParts?.[0]?.supersededBy?.title).toContain('b05');
+        expect(parent.threads).toMatchObject([{ id: 'sample-concept-owner' }]);
+
+        const first = board.snapshot().items.find((item) => item.parentId === parent.id)!;
+
+        expect(await sample.itemDetails.details(first)).toMatchObject({
+            record: { body: expect.stringContaining('<fragment>') },
+        });
+        expect((await sample.sampleControl({ action: 'growing-concept' })).body).toEqual(body);
+    } finally {
+        sample.close();
+        vi.unstubAllEnvs();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('the fake Verify head can wait and resume without inventing missing Test steps or delivery evidence', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pending-head-sample-test-'));
+
+    vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
+
+    const board = createBoardState(structuredClone(fixture) as unknown as BoardData);
+    const sample = await createSampleBoard(board, fixture as unknown as BoardData);
+
+    try {
+        const reply = await sample.sampleControl({ action: 'verification', change: 'seed' });
+        const id = (reply.body as { workId: string }).workId;
+
+        await sample.sampleControl({ action: 'verification', change: 'hold-head' });
+
+        const pending = sample.commands.inspectVerification(id);
+
+        expect((await sample.commands.inspectVerification(id)).body).toMatchObject({ verificationPending: true });
+        expect(board.find(id)?.verification?.latest).toBeNull();
+        await sample.sampleControl({ action: 'verification', change: 'release-head' });
+        expect((await pending).body).toMatchObject({
+            verification: { testSteps: expect.stringContaining('Press Say hello') },
+        });
+        expect(board.find(id)?.verification?.latest).toBeNull();
     } finally {
         sample.close();
         vi.unstubAllEnvs();

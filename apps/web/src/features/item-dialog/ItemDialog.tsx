@@ -74,7 +74,9 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
 export function ItemDialog() {
     const { data, now } = useBoardStore();
     const { itemId, session, close } = useItemDialogStore();
-    const item = data.items.find((i) => i.id === itemId);
+    const item =
+        data.items.find((i) => i.id === itemId) ??
+        data.items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId);
 
     // An item that left the board closes the dialog for good, so a later read that brings it back doesn't reopen it.
     useEffect(() => {

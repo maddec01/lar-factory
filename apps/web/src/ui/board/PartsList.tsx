@@ -165,7 +165,7 @@ export function PartRow({
                 </button>
                 <span
                     data-part-action
-                    className="text-fg-muted ml-auto flex min-h-7 shrink-0 items-center justify-end gap-2 text-xs"
+                    className="text-fg-muted ml-auto flex min-h-7 max-w-full min-w-0 flex-wrap items-center justify-end gap-2 text-xs"
                 >
                     {action}
                 </span>

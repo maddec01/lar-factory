@@ -27,6 +27,7 @@ import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-a
 import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
 import { sampleDelivery } from './sample-delivery.ts';
+import { sampleGrowingConcept } from './sample-growing-concept.ts';
 import { sampleRetro } from './sample-retro.ts';
 import { sampleVerification } from './sample-verification.ts';
 
@@ -37,6 +38,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const repos = sampleRepositories(tracker, dir);
     const records = await openWorkRecords(join(dir, 'work-records.db'));
     const delivery = sampleDelivery(records);
+    const growingConcept = sampleGrowingConcept(records);
     const sources = new Map(repos().map(({ repo }) => [repo, fakeItemSource(tracker, repo)]));
     const items = mergeSources(sources, new Map([...sources.values()].map((source) => [source, 'issues' as const])));
     const vocabulary = sampleVocabulary(tracker);
@@ -72,7 +74,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             items: projected.map((item) => {
                 const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
-                if (!ticket) return delivery.project(item);
+                if (!ticket) return growingConcept.project(delivery.project(item));
 
                 return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
@@ -227,6 +229,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             );
         },
         sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action === 'growing-concept') {
+                const workId = growingConcept.seed(repos().map((repo) => repo.repo));
+
+                reread();
+
+                return { status: 200, body: { workId, error: null } };
+            }
+
             if (input.action === 'delivery') {
                 const workId = delivery.seed(repos()[0]!.repo);
 

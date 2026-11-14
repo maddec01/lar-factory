@@ -161,6 +161,17 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const byReference = new Map(
         records.list({}).flatMap((record) => (record.ticket ? [[record.ticket.toLowerCase(), record] as const] : [])),
     );
+    const children = new Map<string, WorkRecord[]>();
+    const childrenOf = (id: string) => {
+        let rows = children.get(id);
+
+        if (!rows) {
+            rows = records.children(id);
+            children.set(id, rows);
+        }
+
+        return rows;
+    };
     const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
     const completionOf = (record: WorkRecord) => {
         let completion = completions.get(record.workId);
@@ -188,7 +199,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             : ticket?.parent
               ? byReference.get(refKey(ticket.parent.repo, ticket.parent.number).toLowerCase())
               : undefined;
-        const children = records.children(record.workId).filter((c) => !c.setAside);
+        const children = childrenOf(record.workId).filter((c) => !c.setAside);
         // A blocker holds the work until its local facts complete it; its Status, its ticket closing and its thread ending never do.
         const blockers = records
             .blockers(record.workId)
@@ -262,6 +273,19 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             ...(ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }),
             ...(ticket?.currentSprint && { currentSprint: ticket.currentSprint }),
             id: record.workId,
+            createdAt: record.createdAt,
+            ...(parent && {
+                partOrder: childrenOf(parent.workId).findIndex((child) => child.workId === record.workId) + 1,
+            }),
+            ...(record.setAside && { setAside: true }),
+            ...(record.supersededBy && {
+                supersededBy: { ...ref(records.read(record.supersededBy)), workId: record.supersededBy },
+            }),
+            ...(group && {
+                retiredParts: childrenOf(record.workId)
+                    .filter((child) => child.setAside && child.kind !== 'slice')
+                    .map(toItem),
+            }),
             recorded: true,
             buildPhase: record.buildPhase,
             verification: records.verification(record.workId),

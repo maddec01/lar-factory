@@ -197,7 +197,7 @@ test.each([
     ['a parent cycle', { parentId: 'I_sample12' }, {}],
     ['an unrelated repository thread', { parentId: null }, {}],
 ] satisfies [string, Partial<Item>, Partial<Item>][])(
-    'a decision doesn’t borrow an unrelated question for %s',
+    'a decision keeps navigation without borrowing an unrelated question for %s',
     async (_name, child, concept) => {
         await mountPage(questionBoard(child, concept));
 
@@ -206,9 +206,17 @@ test.each([
         const action = answerAction() as HTMLButtonElement;
 
         expect(text(action)).toBe('Open thread');
-        expect(action.tagName).toBe('BUTTON');
-        expect(action.disabled).toBe(true);
-        expect(action.getAttribute('href')).toBeNull();
+
+        if (_name === 'retained concept observations' || _name === 'a finished concept thread') {
+            expect(action.tagName).toBe('A');
+            expect(action.getAttribute('href')).toContain(
+                _name === 'retained concept observations' ? 'stale-concept' : 'done-concept',
+            );
+        } else {
+            expect(action.tagName).toBe('BUTTON');
+            expect(action.disabled).toBe(true);
+            expect(action.getAttribute('href')).toBeNull();
+        }
     },
 );
 

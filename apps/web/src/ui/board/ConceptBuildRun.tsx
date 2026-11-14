@@ -88,11 +88,16 @@ export function ConceptBuildRun({
             )}
             {plan.run?.reason && <Text variant="caption">{plan.run.reason}</Text>}
             {plan.holds.length > 0 && (
-                <ul className="m-0 grid list-disc gap-1 pl-4 text-left text-sm" aria-label="Concept build holds">
-                    {plan.holds.map((hold, index) => (
-                        <li key={`${hold.workId}-${index}`}>{workHoldReason(hold.reason)}</li>
-                    ))}
-                </ul>
+                <Disclosure label={conceptBuildHoldSummary(plan)} presentation="section">
+                    <ul
+                        className="m-0 grid list-disc gap-1 pl-4 text-left text-sm wrap-anywhere"
+                        aria-label="Concept build holds"
+                    >
+                        {plan.holds.map((hold, index) => (
+                            <li key={`${hold.workId}-${index}`}>{workHoldReason(hold.reason)}</li>
+                        ))}
+                    </ul>
+                </Disclosure>
             )}
             {showAction && !finished && <div className="flex flex-wrap gap-2">{action}</div>}
             {error && <Text role="alert">{error}</Text>}

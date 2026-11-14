@@ -8,6 +8,7 @@ import {
     itemActivityThread,
     needsAnswer,
     nextAction,
+    shapingOwner,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
@@ -35,6 +36,8 @@ const latestThread = (item: Item) => (Array.isArray(item.threads) ? item.threads
 
 /** The one thing the item's status asks of you. A Start leaves the latest thread to the Open thread beside it. */
 function statusAction(item: Item, data: BoardData, { working, resume }: ItemState): StatusAction {
+    if (item.setAside) return LATEST_THREAD;
+
     const linkedBeside = latestThread(item);
 
     if (item.conceptBuild && ['Ready', 'In progress', 'Review'].includes(item.status)) return { control: null };
@@ -94,11 +97,13 @@ export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
 
     const action = statusAction(item, data, shown);
     const latest = latestThread(item);
+    const inherited = shapingOwner(item, data.items);
     const opensThread = 'opens' in action;
     const beside =
         item.threads === 'unavailable'
             ? !opensThread
-            : latest !== undefined && !(opensThread && (action.opens ?? latest) === latest);
+            : (latest !== undefined || inherited !== undefined) &&
+              !(opensThread && (action.opens ?? latest) === latest);
 
     return (
         <>

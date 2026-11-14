@@ -2,7 +2,7 @@
 // each with its status, usage under it and Open thread beside it, and what its refinement and delivery still need, in
 // words. Parts off the board aren't listed; the count above says how many and why.
 
-import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
+import { UNREADABLE, itemTotal, plural, retiredPartLabel, shapingOwner } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 
 import {
@@ -57,7 +57,7 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
 /** A concept's Refinement or Delivery: Complete, or what it still needs, naming unfinished parts in its tooltip. */
 export function ConceptState({ state, item }: { state: { complete: boolean; reasons: string[] }; item?: Item }) {
     const items = useBoardStore((board) => board.data.items);
-    const builds = item && partsOf(item, items).filter((part) => part.kind === 'build');
+    const builds = item && partsOf(item, items).filter((part) => part.kind === 'build' && !part.item.setAside);
     const otherReasons = state.reasons.filter((reason) => !reason.startsWith('Its build '));
 
     if (builds?.length)
@@ -104,7 +104,7 @@ export function ConceptWork({ item }: { item: Item }) {
 function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData; openPart: (itemId: string) => void }) {
     const shown = useShownStatus(item);
     const complete = isDone(item);
-    const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length);
+    const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length || shapingOwner(item, data.items));
     const usage = usageUnreadable(item) ? UNREADABLE : <AgentWork item={item} inline />;
 
     return (
@@ -124,7 +124,7 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
             meta={
                 <>
                     <RepoCell item={item} />
-                    {complete ? 'Done' : (conceptBuildWait(item, data) ?? shown.word)}
+                    {retiredPartLabel(item) ?? (complete ? 'Done' : (conceptBuildWait(item, data) ?? shown.word))}
                 </>
             }
             usage={usage}

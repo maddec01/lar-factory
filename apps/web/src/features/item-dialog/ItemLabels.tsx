@@ -68,42 +68,44 @@ export function ItemLabels({ item }: { item: Item }) {
                         )}
                     </ChipGroup>
                 )}
-                <Popover open={open} onOpenChange={openChange}>
-                    <Popover.Trigger asChild>
-                        <IconButton
-                            variant="inline"
-                            data-edit-labels
-                            title={problem ?? undefined}
-                            aria-label={`Edit ${heading.toLowerCase()}`}
-                            icon={<Pencil />}
-                        />
-                    </Popover.Trigger>
-                    <Popover.Content side="bottom" align="start">
-                        <LabelEditorPanel>
-                            {edit.choices ? (
-                                <LabelPicker
-                                    heading={heading}
-                                    choices={edit.choices}
-                                    picked={item.labels}
-                                    locked={kindLabels(item.kind, setup?.vocabulary)}
-                                    busy={edit.saving}
-                                    onToggle={(name) => void edit.toggle(name)}
-                                />
-                            ) : (
-                                !edit.error && (
-                                    <Text variant="caption" tone="muted" role="status">
-                                        Reading {noun}s…
-                                    </Text>
-                                )
-                            )}
-                            {edit.error && (
-                                <Alert size="sm" tone="danger">
-                                    {edit.error}
-                                </Alert>
-                            )}
-                        </LabelEditorPanel>
-                    </Popover.Content>
-                </Popover>
+                {!item.setAside && (
+                    <Popover open={open} onOpenChange={openChange}>
+                        <Popover.Trigger asChild>
+                            <IconButton
+                                variant="inline"
+                                data-edit-labels
+                                title={problem ?? undefined}
+                                aria-label={`Edit ${heading.toLowerCase()}`}
+                                icon={<Pencil />}
+                            />
+                        </Popover.Trigger>
+                        <Popover.Content side="bottom" align="start">
+                            <LabelEditorPanel>
+                                {edit.choices ? (
+                                    <LabelPicker
+                                        heading={heading}
+                                        choices={edit.choices}
+                                        picked={item.labels}
+                                        locked={kindLabels(item.kind, setup?.vocabulary)}
+                                        busy={edit.saving}
+                                        onToggle={(name) => void edit.toggle(name)}
+                                    />
+                                ) : (
+                                    !edit.error && (
+                                        <Text variant="caption" tone="muted" role="status">
+                                            Reading {noun}s…
+                                        </Text>
+                                    )
+                                )}
+                                {edit.error && (
+                                    <Alert size="sm" tone="danger">
+                                        {edit.error}
+                                    </Alert>
+                                )}
+                            </LabelEditorPanel>
+                        </Popover.Content>
+                    </Popover>
+                )}
                 {edit.error && !open && (
                     <Alert size="sm" tone="danger">
                         {edit.error}

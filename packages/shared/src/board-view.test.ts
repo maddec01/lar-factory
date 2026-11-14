@@ -597,3 +597,33 @@ test('shaping follows the placement rule: a pending start joins it, and a part s
 
     assert.deepEqual(ids(boardSections(boardWith(part, { items: [parent, part] }), AT)), []);
 });
+
+test('shipped counts delivered builds, leaving decisions, groups and undelivered Done records out', () => {
+    const now = Date.parse('2026-11-14T12:00:00Z');
+    const base = {
+        ...ticketed('owner/repo'),
+        status: 'Done',
+        closedAt: '2026-11-14T10:00:00Z',
+        updatedAt: '2026-11-14T10:00:00Z',
+        closedAs: 'done',
+    } as Item;
+    const items = [
+        { ...base, id: 'decision', kind: 'decision' as const },
+        { ...base, id: 'concept', kind: 'concept' as const },
+        {
+            ...base,
+            id: 'linked-parent',
+            kind: 'feature' as const,
+            subIssues: { total: 3, completed: 3 },
+            completion: { complete: true, reasons: [] },
+        },
+        { ...base, id: 'unfinished', kind: 'build' as const, completion: { complete: false, reasons: ['No PR'] } },
+        { ...base, id: 'delivered', kind: 'build' as const, completion: { complete: true, reasons: [] } },
+    ];
+    const data = { items, repos: [], fetchedAt: base.updatedAt, firstRead: { settled: true } } as unknown as BoardData;
+
+    assert.deepEqual(
+        boardSections(data, now).done.map((item) => item.id),
+        ['delivered'],
+    );
+});

@@ -31,6 +31,8 @@ export interface Moving {
 }
 
 export function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
+    parts = parts.filter((part) => !part.item.setAside);
+
     const ahead = parts.filter((p) => !isDone(p.item));
     const all = [parent, ...parts.map((part) => part.item)];
 

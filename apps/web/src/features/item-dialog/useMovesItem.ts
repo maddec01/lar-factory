@@ -7,5 +7,7 @@ import { hasLiveThread, useStartHolds } from '@/features/items';
 export function useMovesItem(item: Item, data: BoardData): boolean {
     const startHolds = useStartHolds(item, data);
 
-    return item.status === 'List' || (item.status === 'Queued' && !startHolds && !hasLiveThread(item));
+    return (
+        !item.setAside && (item.status === 'List' || (item.status === 'Queued' && !startHolds && !hasLiveThread(item)))
+    );
 }

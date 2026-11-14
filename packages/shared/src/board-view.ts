@@ -210,7 +210,14 @@ export function boardSections(data: BoardData, now: number, clientError?: string
         list,
         listGroups,
         done: items
-            .filter((i) => isRecentlyDone(i, now))
+            .filter(
+                (i) =>
+                    !['concept', 'decision'].includes(i.kind) &&
+                    !i.setAside &&
+                    (!i.subIssues?.total || i.linkedPrs.some((pr) => pr.state === 'merged')) &&
+                    i.completion?.complete !== false &&
+                    isRecentlyDone(i, now),
+            )
             .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt)),
     };
 }

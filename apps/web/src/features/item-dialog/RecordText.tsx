@@ -119,12 +119,14 @@ export function RecordText({
             data-record
         >
             <ExportedLine exported={exported} />
-            {pendingBriefs.length > 0 && (
+            {!item.setAside && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
-            {record.bodyKind === 'brief' && record.body && item.passingBrief === false && item.status !== 'Done' && (
-                <ApproveBrief itemId={item.id} onApproved={refresh} />
-            )}
+            {!item.setAside &&
+                record.bodyKind === 'brief' &&
+                record.body &&
+                item.passingBrief === false &&
+                item.status !== 'Done' && <ApproveBrief itemId={item.id} onApproved={refresh} />}
             {!spec && (
                 <div data-record-body>
                     {answer ? (

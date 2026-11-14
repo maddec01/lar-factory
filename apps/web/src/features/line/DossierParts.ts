@@ -4,6 +4,7 @@
 
 import {
     blockerRef,
+    comparePartOrder,
     ownerThreads,
     currentBuildThread,
     decisionType,
@@ -86,7 +87,7 @@ export function partActivity(part: Part, working = false, unavailable = false): 
 
 /** Finished and quiet: complete, with nothing of it still at work or waiting on the user. */
 export const isHistory = (part: Part): boolean =>
-    isDone(part.item) && ['stopped', 'finished', 'none'].includes(partActivity(part).kind);
+    !!part.item.setAside || (isDone(part.item) && ['stopped', 'finished', 'none'].includes(partActivity(part).kind));
 
 /** Past waiting: a thread has taken it on, whatever it waited for. */
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
@@ -94,7 +95,7 @@ const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 
 const started = (item: Item) => STARTED.includes(item.status);
 
 export const isDone = (item: Item): boolean =>
-    item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
+    !!item.setAside || (item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed'));
 
 export const threadsOf = (item: Item): ItemThread[] => ownerThreads(item);
 
@@ -145,11 +146,18 @@ export function partWaves(parts: Part[]): Map<string, number> {
     return depth;
 }
 
-/** The parent's sub-issues by dependency wave, then kind, in board order for ties. */
+/** Recorded group parts keep creation order; older provider-only groups retain their dependency-wave order. */
 export function partsOf(parent: Item, all: readonly Item[]): Part[] {
-    const parts = projectWorkMap(all, parent.id)
-        .nodes.map(({ item }) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
-        .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
+    const items = new Map([...all, ...(parent.retiredParts ?? [])].map((item) => [item.id, item]));
+    const parts = projectWorkMap([...items.values()], parent.id).nodes.map(({ item }) => ({
+        item,
+        kind: partKind(item),
+        waitsOn: item.blockers,
+        thread: threadsOf(item)[0],
+    }));
+
+    if (parts.some((part) => part.item.createdAt || part.item.partOrder))
+        return parts.sort((a, b) => comparePartOrder(a.item, b.item));
 
     if (parent.conceptBuild) {
         const order = new Map(parent.conceptBuild.members.map((member, index) => [member.workId, index]));
@@ -163,7 +171,10 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
 
     const waves = partWaves(parts);
 
-    return parts.sort((a, b) => waves.get(a.item.id)! - waves.get(b.item.id)!);
+    return parts.sort(
+        (a, b) =>
+            waves.get(a.item.id)! - waves.get(b.item.id)! || PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind),
+    );
 }
 
 /** What still holds a part back: the issues it's blocked by that are open, while no thread has taken it on. */

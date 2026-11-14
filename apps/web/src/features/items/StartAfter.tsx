@@ -28,7 +28,7 @@ import type { StartKind } from './StartStore';
 import { closeKeepingFocus, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ActionError, StartLine, StartHold, useButtonKind } from '@/ui/board';
+import { ActionError, StartAfterButton, StartLine, StartHold, useButtonKind } from '@/ui/board';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
@@ -84,10 +84,9 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
 
     if (armed) {
         return (
-            <Button
+            <StartAfterButton
                 {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
-                shrinks
                 mark="✓"
                 data-start-after={item.id}
                 aria-pressed
@@ -97,7 +96,7 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
                 onClick={() => !held && void run(null)}
             >
                 {label}
-            </Button>
+            </StartAfterButton>
         );
     }
 
@@ -110,10 +109,9 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
     return (
         <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
             <DropdownMenu.Trigger asChild>
-                <Button
+                <StartAfterButton
                     {...kindOf(onRow ? 'start' : 'main')}
                     leftIcon={ICON.play}
-                    shrinks
                     rightIcon={<ChevronDownIcon />}
                     data-start-after={item.id}
                     aria-label={`${label} for ${itemName(item)}`}
@@ -121,7 +119,7 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
                     {...(data.capture?.enabled === false ? {} : writes)}
                 >
                     {label}
-                </Button>
+                </StartAfterButton>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content
                 width="md"

@@ -36,6 +36,8 @@ export function VerifyResult({ head, testSteps, loading, pending, error, note, o
             <Disclosure label="Test steps" presentation="section" defaultOpen>
                 {loading ? (
                     <Loading presentation="inline" label="Reading PR Test steps…" />
+                ) : error && !head ? (
+                    <Text tone="muted">Test steps could not be read. Re-read PR head to try again.</Text>
                 ) : testSteps ? (
                     <RichText text={testSteps} format="markdown" />
                 ) : (

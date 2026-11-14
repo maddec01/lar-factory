@@ -8,6 +8,7 @@ import { openWorkRecords } from './work-records.ts';
 
 const row = (workId: string, at?: string, blockers: string[] = []): OrderedWork => ({
     workId,
+    createdAt: at ?? '\uffff',
     title: workId,
     repository: 'example/repo',
     kind: 'build',
@@ -36,7 +37,7 @@ const row = (workId: string, at?: string, blockers: string[] = []): OrderedWork 
     setAside: false,
 });
 
-it('orders the available graph by gate age then ID, independently of queue or input order', () => {
+it('orders the available graph by creation then ID, independently of queue or input order', () => {
     const rows = [
         row('dependent', '2000', ['a']),
         row('z', '2001'),
@@ -103,4 +104,15 @@ it('reports saved briefs, cross-repository blockers, decisions and every hold wi
         records.close();
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+it('keeps creation order when an earlier part is gated again, with prerequisites still first', () => {
+    const first = { ...row('b01', '2026-11-14'), createdAt: '2026-11-10', number: 1 };
+    const second = { ...row('b02', '2026-11-11'), createdAt: '2026-11-11', number: 2 };
+    const tenth = { ...row('b10', '2026-11-11', ['b02']), createdAt: '2026-11-12', number: 10 };
+
+    expect(orderWork([tenth, second, first]).map((entry) => entry.workId)).toEqual(['b01', 'b02', 'b10']);
+    expect(orderWork([first, second, tenth].map((entry) => ({ ...entry, status: 'Shaping' })))).toEqual(
+        [first, second, tenth].map((entry) => ({ ...entry, status: 'Shaping' })),
+    );
 });

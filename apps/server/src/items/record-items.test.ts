@@ -1242,3 +1242,48 @@ test('a refused record read identifies the work and reason without losing its er
             error.message === `Work record ${work.workId} (Broken work): Invalid saved gate data.`,
     );
 });
+
+test('keeps retired concept parts in history with creation order and survivor, never as active board items', async () => {
+    const records = await open();
+    const group = records.create({ title: 'Growing concept', repository: REPO, kind: 'concept' });
+    const part = (title: string) =>
+        records.createPart({
+            parentId: group.workId,
+            parentRevision: records.read(group.workId).revision,
+            title,
+            kind: 'build',
+            repository: REPO,
+            body: 'Build it',
+            blockerIds: [],
+        });
+    const retired = part('b04');
+    const survivor = part('b05');
+    const aside = part('b06');
+
+    records.setAside(aside.workId, records.read(aside.workId).revision);
+    records.mergeBuild(retired.workId, records.read(retired.workId).revision, {
+        into: survivor.workId,
+        revisions: {
+            [survivor.workId]: records.read(survivor.workId).revision,
+            [group.workId]: records.read(group.workId).revision,
+        },
+    });
+
+    const items = recordItems(records, [], [REPO]);
+
+    assert.deepEqual(items.map((item) => item.id).sort(), [group.workId, survivor.workId].sort());
+
+    const history = items.find((item) => item.id === group.workId)?.retiredParts;
+
+    assert.deepEqual(
+        history?.map((item) => item.title),
+        ['b04', 'b06'],
+    );
+    assert.equal(history?.[0]?.supersededBy?.workId, survivor.workId);
+    assert.equal(history?.[1]?.setAside, true);
+    assert.equal(items.find((item) => item.id === survivor.workId)?.createdAt, survivor.createdAt);
+    assert.equal(
+        archivedItems(records, [], [REPO], new Set()).find((item) => item.id === retired.workId)?.supersededBy?.title,
+        'b05',
+    );
+});

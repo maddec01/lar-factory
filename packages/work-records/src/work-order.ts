@@ -1,3 +1,4 @@
+import { comparePartOrder } from '@lar-factory/shared';
 import type { GateResult } from '@lar-factory/shared';
 
 import { WorkRecordError } from './database.ts';
@@ -5,6 +6,9 @@ import type { WorkRecord, WorkRecords } from './work-records.ts';
 
 export interface OrderedWork {
     workId: string;
+    createdAt: string;
+    partOrder?: number;
+    number?: number;
     title: string;
     repository: string;
     kind: WorkRecord['kind'];
@@ -18,13 +22,12 @@ export interface OrderedWork {
     setAside: boolean;
 }
 
-/** Stable Kahn order: dependencies first, then oldest current gate and work ID among available vertices. */
+/** Stable display order: prerequisites first, then creation order; approval renewal never moves a part. */
 export function orderWork(rows: readonly OrderedWork[]): OrderedWork[] {
     const pending = new Map(rows.map((row) => [row.workId, row]));
     const result: OrderedWork[] = [];
     const compare = (a: OrderedWork, b: OrderedWork) =>
-        (a.gate.passing?.recordedAt ?? '\uffff').localeCompare(b.gate.passing?.recordedAt ?? '\uffff') ||
-        a.workId.localeCompare(b.workId);
+        comparePartOrder({ ...a, id: a.workId }, { ...b, id: b.workId });
 
     while (pending.size) {
         const next = [...pending.values()]
@@ -51,7 +54,7 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
             .flatMap((child) => (deliveryGroup && child.kind === 'slice' ? [] : [child, ...descendants(child.workId)]));
 
     return orderWork(
-        descendants(groupId).map((record) => {
+        descendants(groupId).map((record, index) => {
             const id = record.workId;
             const complete = records.completion(id).complete;
             const gate = records.gate(id);
@@ -81,6 +84,9 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
 
             return {
                 workId: id,
+                createdAt: record.createdAt,
+                partOrder: index + 1,
+                number: record.ticket ? Number(record.ticket.split('#').at(-1)) : 0,
                 title: record.title,
                 repository: record.repository,
                 kind: record.kind,

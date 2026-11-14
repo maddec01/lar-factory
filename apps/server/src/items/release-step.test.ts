@@ -44,8 +44,10 @@ test('board records Pedro evidence and clears the parent hold; refuses stale, em
         expect((await submit({ by: 'Agent' })).status).toBe(200);
         expect(records.releasePlan(id)?.steps[1]?.done).toMatchObject({
             by: 'Pedro',
+            at: expect.any(String),
             evidence: 'Activated manifest 123.',
         });
+        expect(Number.isFinite(Date.parse(records.releasePlan(id)!.steps[1]!.done!.at))).toBe(true);
         expect(records.completion(id).reasons.join(' ')).not.toContain('Release step activate');
         expect((await submit({})).status).toBe(409);
         expect(reread).toHaveBeenCalledTimes(1);

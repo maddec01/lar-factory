@@ -1,11 +1,14 @@
 // The Shaping, Ready to build and Build sections. Ready to build's header holds the Auto-build switch, and Build's counts the
-// factory's builds at work against the build limit.
+// factory's builds at work against the build limit. An item on Your desk stays in its lane too, quiet there and after
+// the lane's own work, so each lane shows everything at its stage and leads with what is moving.
+
+import { deskItems } from '@lar-factory/shared';
 
 import { AutoBuildSwitch } from './AutoBuildSwitch';
 import { Pane, PaneEmpty } from './Pane';
 import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
-import { useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
+import { useActivityUnavailable, useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { BuildLimit as DesignBuildLimit, ReadyBuildControls, StageList } from '@/ui/board';
 
@@ -13,10 +16,13 @@ type Shows = (row: Row) => boolean;
 
 function Rows({ rows }: { rows: Row[] }) {
     const data = useBoardStore((state) => state.data);
+    const desk = new Set(deskItems(data, useActivityUnavailable()).map((item) => item.id));
+    // The lane's own work first, in its order, then what waits on Your desk, in its order.
+    const ordered = [...rows.filter((row) => !desk.has(row.item.id)), ...rows.filter((row) => desk.has(row.item.id))];
 
     return (
         <StageList>
-            {rows.map((row) => (
+            {ordered.map((row) => (
                 <StageRow key={row.item.id} row={row} data={data} />
             ))}
         </StageList>
@@ -55,8 +61,8 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
             status="Ready"
             count={rows.length}
             right={
+                // Build's header carries the shared occupancy; Ready keeps only what starts builds.
                 <ReadyBuildControls>
-                    <BuildLimit />
                     <AutoBuildSwitch />
                 </ReadyBuildControls>
             }

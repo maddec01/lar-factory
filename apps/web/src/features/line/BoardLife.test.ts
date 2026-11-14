@@ -29,5 +29,5 @@ test('a read that puts an item on Your desk marks its card', async () => {
     const { useBoardStore } = await import('@/services/board/board.hooks');
 
     await settle(() => useBoardStore.getState().receive(withStatus(sample, 'I_sample07', 'Needs you')));
-    expect($('[data-slot="card"][data-item="I_sample07"]')?.hasAttribute('data-arrived')).toBe(true);
+    expect($('.desk-row[data-item="I_sample07"]')?.hasAttribute('data-arrived')).toBe(true);
 });

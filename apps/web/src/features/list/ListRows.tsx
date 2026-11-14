@@ -26,7 +26,7 @@ export function ItemRow({
             item={item.id}
             name={item.title}
             onOpen={onOpen}
-            source={<SourceIcon item={item} />}
+            source={<SourceIcon item={item} bare always />}
             {...(item.number ? { reference: ref(item) } : {})}
             title={item.title}
             repoIcon={showRepo && <ProjectIcon repo={repoKey(item)} size="sm" />}

@@ -61,6 +61,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
     const shows = rowFilter(filters, data.repos);
     // In boardSections' order, which counts items before the search so the rows stay put while typing.
     const held = boardSections(data, now).listGroups;
+    const listed = held.some((group) => group.items.length > 0);
     const groups = held.map((group): ListGroup => ({
         ...group,
         items: group.items.filter((i) => matchesSearch(i, q) && shows(i)),
@@ -149,15 +150,18 @@ function ListModal({ onClose }: { onClose: () => void }) {
                                 </Button>
                             )
                         }
-                        sort={<SortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
+                        // Sorting and filters wait until there is something to sort or filter.
+                        sort={listed && <SortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
                         filters={
-                            <ItemFilterBar
-                                filters={filters}
-                                onChange={setFilters}
-                                rows={held
-                                    .filter((group) => !picked || group.repo === picked.repo)
-                                    .flatMap((group) => group.items)}
-                            />
+                            listed && (
+                                <ItemFilterBar
+                                    filters={filters}
+                                    onChange={setFilters}
+                                    rows={held
+                                        .filter((group) => !picked || group.repo === picked.repo)
+                                        .flatMap((group) => group.items)}
+                                />
+                            )
                         }
                     />
                     {items.map((item) => (
@@ -188,10 +192,16 @@ function ListModal({ onClose }: { onClose: () => void }) {
                                     </Button>
                                 }
                             />
-                        ) : (
+                        ) : reading ? (
                             <ListNote>
-                                {reading ? <Loading presentation="inline" label="Loading projects…" /> : 'No items yet'}
+                                <Loading presentation="inline" label="Loading projects…" />
                             </ListNote>
+                        ) : (
+                            <EmptyState
+                                size="compact"
+                                title="Nothing in List yet"
+                                description="Work you add or tickets you find wait here until you queue them."
+                            />
                         ))}
                     {items.length > 0 && reading && (
                         <ListNote reading>

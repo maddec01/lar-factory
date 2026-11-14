@@ -4,13 +4,15 @@ import { AzureDevOpsIcon, GitHubIcon, LaptopIcon } from '@lar-works/design-syste
 export type ItemSource = 'github' | 'azure' | 'local';
 
 /**
- * Where an item's ticket is saved, as a small muted mark named by `label`: a bordered square in rows and details, or
- * with `corner` a tab in a card's top right corner, which lets clicks through to the card.
+ * Where an item's ticket is saved, as a small muted mark named by `label`: a bordered square in details, with `corner`
+ * a tab in a card's top right corner, which lets clicks through to the card, or with `bare` the icon alone, as a row's
+ * quiet mark beside its project.
  */
 export function SourceIcon({
     source,
     label,
     corner = false,
+    bare = false,
 }: {
     /** Where the ticket is saved: `github`, `azure` or `local`. */
     source: ItemSource;
@@ -18,18 +20,17 @@ export function SourceIcon({
     label: string;
     /** Drawn as a tab in a card's top right corner. */
     corner?: boolean;
+    /** Drawn as the icon alone, with no square around it. */
+    bare?: boolean;
 }) {
-    const shape = corner
-        ? 'absolute right-2 top-2 z-10 size-5 rounded-md border pointer-events-none'
-        : 'size-5 shrink-0 rounded-md border';
+    const shape = bare
+        ? 'size-3.5 shrink-0'
+        : corner
+          ? 'absolute right-2 top-2 z-10 size-5 rounded-md border pointer-events-none border-line bg-fill-hover'
+          : 'size-5 shrink-0 rounded-md border border-line bg-fill-hover';
 
     return (
-        <span
-            role="img"
-            aria-label={label}
-            title={label}
-            className={`border-line bg-fill-hover text-fg-muted grid place-items-center ${shape}`}
-        >
+        <span role="img" aria-label={label} title={label} className={`text-fg-muted grid place-items-center ${shape}`}>
             {source === 'local' ? (
                 <LaptopIcon className="size-3" strokeWidth={1.75} aria-hidden="true" />
             ) : source === 'github' ? (

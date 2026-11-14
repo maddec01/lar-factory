@@ -2,7 +2,7 @@ import type { AzureWorkItem, Item, Kind } from '@lar-factory/shared';
 // The bits every view draws for an item: its numbered title, title link, repository, kind badge and label chips. Slices,
 // pull requests, agent work and activity have files of their own.
 import { decisionMethodName, itemRepoNames, ref, repoKey, shortAgo } from '@lar-factory/shared';
-import { Badge, Inline, LabelChip, Text } from '@lar-works/design-system';
+import { Inline, LabelChip, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { KIND_BADGES } from './KindBadges';
@@ -121,7 +121,8 @@ export function ItemKind({
     // The summary's "Part of" link names the parent already.
     if (!(inSummary && item.parent)) {
         if (parentIsConcept) words.push('Part of a concept');
-        else if (item.parent) words.push('Part of another issue');
+        else if (item.parent)
+            words.push(item.parent.number ? `Part of #${item.parent.number}` : 'Part of another issue');
     }
 
     if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Across Projects');
@@ -131,9 +132,12 @@ export function ItemKind({
     return kind || words.length ? (
         <Inline as="span" inline wrap space="tight" data-item-kind>
             {kind}
-            {words.map((word) => (
-                <Badge key={word}>{word}</Badge>
-            ))}
+            {/* Relationships read as quiet words beside the kind's badge, so the badge stays the one coloured mark. */}
+            {words.length > 0 && (
+                <Text as="span" variant="caption" tone="muted">
+                    {words.join(' · ')}
+                </Text>
+            )}
         </Inline>
     ) : null;
 }

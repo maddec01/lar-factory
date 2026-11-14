@@ -10,8 +10,9 @@ import { useActivityUnavailable } from './useActivityFeedback';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { buttonKind } from '@/ui/board';
 
-/** The card's action, and Open thread as a square icon in the right corner unless it is the action. */
-export function HumanWaitAction({ item, data }: { item: Item; data: BoardData }) {
+/** The card's action, and Open thread as a square icon in the right corner unless it is the action. `quiet` draws a
+ *  next step outlined, as on Your desk, where its rows' amber bar already says it waits on you. */
+export function HumanWaitAction({ item, data, quiet = false }: { item: Item; data: BoardData; quiet?: boolean }) {
     const action = deskWait(item, useActivityUnavailable(), data.items).action;
 
     if (action?.kind === 'start-again') return <StartAgain item={item} data={data} />;
@@ -22,16 +23,19 @@ export function HumanWaitAction({ item, data }: { item: Item; data: BoardData })
 
     if ((item.status === 'Verify' && item.verification?.required) || action?.kind === 'details')
         return (
-            <Button {...buttonKind('next')} onClick={() => useItemDialogStore.getState().open(item.id)}>
+            <Button
+                {...buttonKind(quiet ? 'open' : 'next')}
+                onClick={() => useItemDialogStore.getState().open(item.id)}
+            >
                 {item.status === 'Verify' ? 'Verify build' : action?.label}
             </Button>
         );
 
     return action?.kind === 'thread' ? (
-        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next />
+        <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next={!quiet} />
     ) : (
         <>
-            <PrAction item={item} label={action?.label ?? 'Open PR'} next />
+            <PrAction item={item} label={action?.label ?? 'Open PR'} next={!quiet} />
             <OpenThread item={item} data={data} iconOnly />
         </>
     );

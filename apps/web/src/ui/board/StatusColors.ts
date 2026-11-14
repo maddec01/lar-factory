@@ -17,14 +17,15 @@ export type BoardStatus =
     | 'Ready to merge'
     | 'Done';
 
-/** What each status means, which fixes its colour: not started is off (grey), work being shaped, built or reviewed is
- *  active (blue), your turn is waiting (amber), built and mergeable or done is ready (green). */
+/** What each status means, which fixes its colour: not started, or ready and waiting for a build slot, is off (grey);
+ *  work being shaped, built or reviewed is active (blue); your turn is waiting (amber); built and mergeable or done is
+ *  ready (green). */
 export const boardStatusState = {
     List: 'off',
     Queued: 'off',
     Shaping: 'active',
     'Needs you': 'waiting',
-    Ready: 'active',
+    Ready: 'off',
     'In progress': 'active',
     Review: 'active',
     Verify: 'waiting',
@@ -56,11 +57,12 @@ export const boardColor = {
 /** Where a slice stands. `waiting` is a slice not started yet (word it "Queued"); `blocked` one held up by another. */
 export type SliceProgress = 'done' | 'active' | 'blocked' | 'unknown' | 'waiting';
 
-/** What each slice progress means, which fixes its colour: blocked is waiting (amber), not started is off (grey). */
+/** What each slice progress means, which fixes its colour: blocked by other work and not started are off (grey), as
+ *  amber is kept for what waits on you. */
 export const sliceProgressState = {
     done: 'ready',
     active: 'active',
-    blocked: 'waiting',
+    blocked: 'off',
     unknown: 'off',
     waiting: 'off',
 } as const satisfies Record<SliceProgress, StatusState>;
@@ -74,13 +76,13 @@ export const sliceProgressLabel: Record<SliceProgress, string> = {
     waiting: 'Queued',
 };
 
-/** What each tone means, which fixes its light (the one state map): your turn and a blocked part are waiting (amber), a
- *  decision being made and ready work active (blue), work not started and open questions off (grey). The label itself
- *  is text, in a text token. */
+/** What each tone means, which fixes its light (the one state map): your turn is waiting (amber), a decision being
+ *  made and ready work active (blue), a part blocked by other work, work not started and open questions off (grey).
+ *  The label itself is text, in a text token. */
 export const attentionToneState = {
     yours: 'waiting',
     decision: 'active',
-    blocked: 'waiting',
+    blocked: 'off',
     waiting: 'off',
     ready: 'active',
     fog: 'off',

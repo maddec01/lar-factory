@@ -6,12 +6,12 @@ import { describe, expect, test } from 'vite-plus/test';
 
 import { $, $$, mountPage, sample, settle, text } from '@/test/PageTest';
 
-const cards = () => $$('.desk-card');
-const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
-/** Opens a card as a click anywhere on it does: on its open button, stretched over the whole card. */
-const open = (id: string) => card(id).querySelector<HTMLButtonElement>('[data-slot="action-overlay"]')!.click();
-/** The card's next-step line. */
-const nextLine = (id: string) => text(card(id).querySelector('.desk-next'));
+const cards = () => $$('.desk-row');
+const card = (id: string) => $(`.desk-row[data-item="${id}"]`)!;
+/** Opens a card as a click anywhere on it does: on its row's open button. */
+const open = (id: string) => card(id).querySelector<HTMLButtonElement>('[data-row-open]')!.click();
+/** The card's next-step line, under its title. */
+const nextLine = (id: string) => text(card(id).querySelector('[data-desk-more] > :first-child'));
 const dialog = () => $('[data-item-dialog]');
 const withItem = (id: string, change: Partial<Item>): BoardData => ({
     ...sample,
@@ -71,7 +71,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
         expect(text($('#desk-h')!.parentElement)).toBe('Your desk1');
-        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 7');
+        expect(text($('[data-slot=toolbar-counter]')), 'need you counts the whole factory').toBe('need you: 7need you');
     });
 
     test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {
@@ -151,7 +151,7 @@ test('a decision with no thread answers in its concept thread without inheriting
     expect(card('I_sample09')).not.toBeNull();
     expect(card('I_sample12')).not.toBeNull();
     expect(card('I_sample12').querySelector('[data-open-thread]')?.getAttribute('href')).toBe(action.href);
-    expect(text(card('I_sample12'))).toContain('Part of #200 lar cloud: sign-in and direct connections');
+    expect(text(card('I_sample12'))).toContain('in #200 lar cloud: sign-in and direct connections');
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
 
@@ -222,7 +222,7 @@ test.each([
 
 test('a Ready part stays in its dossier without a desk card or Ready to build row', async () => {
     await mountPage();
-    expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+    expect($('.desk-row[data-item="I_sample13"]')).toBeNull();
     expect($('[data-stage="ready"] [data-item="I_sample13"]')).toBeNull();
     await settle(() => $<HTMLButtonElement>('[data-dossier="I_sample09"] [data-dossier-open]')!.click());
     expect(
@@ -285,7 +285,7 @@ test('a child opens a running concept thread and answers only a later question i
     ]);
     expect(card('I_sample12')).not.toBeNull();
     expect(card('I_sample12').querySelector('[data-open-thread]')?.getAttribute('href')).toBe(action().href);
-    expect(text(card('I_sample12'))).toContain('Part of #200 lar cloud: sign-in and direct connections');
+    expect(text(card('I_sample12'))).toContain('in #200 lar cloud: sign-in and direct connections');
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Open thread');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');

@@ -40,7 +40,7 @@ export function StartBuild({
     if (problem)
         return (
             <Button
-                {...kindOf(onRow ? 'start' : 'main')}
+                {...kindOf(onRow ? 'open' : 'main')}
                 leftIcon={ICON.play}
                 disabled
                 title={problem}

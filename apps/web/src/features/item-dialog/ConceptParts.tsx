@@ -172,7 +172,12 @@ export function ConceptParts({
                 </DetailFact>
             )}
             {parts.length > 0 && (
-                <Disclosure label={`${plural(parts.length, 'part')} and their holds`} presentation="section">
+                // Open while a part waits on you, so the work the notice names is in reach.
+                <Disclosure
+                    label={`${plural(parts.length, 'part')} and their holds`}
+                    presentation="section"
+                    defaultOpen={parts.some((part) => part.item.needsYou || part.item.status === 'Needs you')}
+                >
                     <PartsList>
                         {parts.map((part) => (
                             <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />

@@ -45,12 +45,14 @@ function Comments({
     const older = useOlderComments(itemId, entry);
     const comments = [...entry.details.comments, ...older.comments];
 
+    // A ticket with no comments shows no Comments section: the dialog keeps to what there is.
+    if (!comments.length && !older.hasMore) return null;
+
     return (
         <MainSection
             header={
                 <SectionHeader
                     heading={`${ticketContext ? 'Ticket comments' : 'Comments'}${comments.length > 0 ? ` · ${comments.length}` : ''}`}
-                    empty={!comments.length && !older.hasMore && 'No comments.'}
                 />
             }
             data-comments

@@ -1,4 +1,4 @@
-import { itemRepoNames } from '@lar-factory/shared';
+import { itemRepoNames, placementOf } from '@lar-factory/shared';
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
@@ -11,13 +11,12 @@ import { ActivityLine } from './ActivityLine';
 import { AutoBuildNote } from './AutoBuildNote';
 import { Figures, RowSecondLine } from './Columns';
 import { figuresOf, opensItem } from './RowDetails';
-import { RowKind, RowSource } from './RowIdentity';
+import { RowKindMark, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
 import { YOURS, threadText } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
-    ActivityFeedback,
     Age,
     AzureFields,
     ItemStatusGlyph,
@@ -34,6 +33,7 @@ import {
     usageLoading,
     usageUnreadable,
     useActivityFeedback,
+    useActivityUnavailable,
     useShownStatus,
 } from '@/features/items';
 import {
@@ -43,7 +43,6 @@ import {
     RowFirst,
     RowFoot,
     RowGlyph,
-    RowKindCell,
     RowOpen,
     RowSide,
     RowSliceNote,
@@ -111,6 +110,13 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const activity = useActivityState(item);
     const [slices, setSlices] = useState(false);
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
+    const unavailable = useActivityUnavailable();
+    // A row whose item is on Your desk waits on you, wherever it sits on the board.
+    const yours = placementOf(item, {
+        starts: data.startProgress?.[item.id],
+        unavailable,
+        all: data.items,
+    }).sections.includes('desk');
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const implemented = item.slices.length > 0 && done === item.slices.length;
     const note = sliceNote(item);
@@ -140,7 +146,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
         shown.light;
 
     return (
-        <StageRowItem item={item.id} picked={isPicked}>
+        <StageRowItem item={item.id} picked={isPicked} attention={yours}>
             <RowFirst>
                 <RowOpen
                     repository={itemRepoNames(item, data.repos)}
@@ -154,10 +160,8 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         <QueuePlace>{n + 1}</QueuePlace>
                     )}
                     <RowSource item={item} />
-                    <RowKindCell>
-                        <RowKind item={item} />
-                    </RowKindCell>
                     <RowTitleCell>
+                        <RowKindMark item={item} />
                         <RowTitle name={itemName(item)}>
                             <ItemTitle item={item} />
                         </RowTitle>
@@ -173,7 +177,9 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                                     .filter(Boolean)
                                     .join(' · ')}
                             >
-                                {state}
+                                {/* A running thread's sentence under the title says what it does, so its state's place holds
+                                    its cost, on the line with the rest of the row's facts. */}
+                                {showsActivity ? <Figures s={figures} item={item} /> : state}
                             </RowState>
                         ) : (
                             <QueueAge>
@@ -191,14 +197,9 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                 <RowSecondLine
                     onClick={opensItem(item)}
                     prs={prs}
-                    figures={<Figures s={figures} item={item} />}
-                    bar={
-                        item.slices.length > 0 ? (
-                            <SliceBar item={item} still={still} />
-                        ) : (
-                            working && <ActivityFeedback feedback={{ ...feedback, running: true }} />
-                        )
-                    }
+                    figures={!showsActivity && <Figures s={figures} item={item} />}
+                    // Only slices measure progress; a running thread's sentence says it works, with no sweeping bar.
+                    bar={item.slices.length > 0 && <SliceBar item={item} still={still} />}
                     count={
                         item.slices.length > 0 && (
                             <RowSliceToggle

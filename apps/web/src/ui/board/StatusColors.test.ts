@@ -20,9 +20,9 @@ it('every board status is drawn in its state colour', () => {
 it('slices and attention lights map through a state', () => {
     for (const state of [...Object.values(sliceProgressState), ...Object.values(attentionToneState)])
         expect(Object.keys(statusStateColors)).toContain(state);
-    expect(sliceProgressState.blocked).toBe('waiting');
+    expect(sliceProgressState.blocked).toBe('off');
     expect(sliceProgressState.waiting).toBe('off');
-    expect(attentionToneState.blocked).toBe('waiting');
+    expect(attentionToneState.blocked).toBe('off');
 });
 
 it('the stage bar differs from the status only in the Review stage', () => {

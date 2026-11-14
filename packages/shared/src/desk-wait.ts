@@ -1,5 +1,6 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
+import { prReadiness } from './model.ts';
 import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
 import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
@@ -100,7 +101,9 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
     if (item.status === 'Verify') return { label: 'Verify build', action: nextAction(item) };
 
-    if (item.status === 'Ready to merge') return { label: 'Merge PR', action: nextAction(item) };
+    // Until its PR can merge, the wait is the review its button opens, in the row's words.
+    if (item.status === 'Ready to merge')
+        return { label: prReadiness(item)?.word ?? 'Merge PR', action: nextAction(item) };
 
     if (item.needsYou)
         return { label: 'Decision needed', action: { kind: 'details' as const, label: 'Review notice' } };

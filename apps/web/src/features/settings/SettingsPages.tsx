@@ -56,7 +56,7 @@ export function pages(input: PagesInput): Page[] {
             label: 'Reviewers and models',
             keywords:
                 'instructions trigger effort planner implementer approver CI fixer Doubt shaping concept decision build',
-            icon: <conceptIcons.settings />,
+            icon: <conceptIcons.agents />,
             description:
                 'Reviewers, models and effort for future runs on this Mac. Save changes to apply your choices.',
             groups: [
@@ -144,14 +144,15 @@ export function pages(input: PagesInput): Page[] {
             icon: <Sparkles />,
             description: input.app
                 ? 'Choose the folders where Lar Factory installs and maintains its skills: copies, or links in a Claude home.'
-                : 'Use the Lar Factory app to install and maintain skill folders for your agents.',
+                : 'The skills Lar Factory gives your agents. The Mac app chooses where they install.',
             groups: [...(input.app ? [targetGroup(input)] : []), bundledGroup(input)],
         },
         {
             id: 'updates',
             label: 'Updates',
             icon: <conceptIcons.updates />,
-            description: 'Choose your release channel and check for app updates.',
+            // In a browser the page's one empty state says where updates are, so no intro repeats it.
+            description: input.app ? 'Choose your release channel and check for app updates.' : '',
             // In a browser there is nothing to set here: the inline empty state says where updates are, rather than a
             // lone sentence in an empty pane.
             groups: input.app
@@ -183,8 +184,7 @@ export function pages(input: PagesInput): Page[] {
             id: 'archive',
             label: 'Archive',
             icon: <Archive />,
-            description:
-                'Work off the board: set aside, or finished and hidden. This Mac keeps it unless you delete it or turn on automatic deletion in Archive.',
+            description: 'Work off the board: set aside, or finished and hidden, kept on this Mac until you delete it.',
             groups: archiveGroups(data, input.archive),
         },
         {

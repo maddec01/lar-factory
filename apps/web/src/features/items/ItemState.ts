@@ -227,8 +227,9 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                 ? EXECUTION_WORD[said]
                 : (readiness?.word ??
                   (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : statusWord)));
+    // Blocked by other work is not your turn: it reads off (grey), as amber is kept for what waits on you.
     const state: StatusState | undefined = blockers.length
-        ? 'waiting'
+        ? 'off'
         : said === 'waiting'
           ? 'waiting'
           : said === 'stopped'
@@ -291,11 +292,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                 ? 'In progress'
                 : item.status,
         glyphState:
-            said === 'stopped'
-                ? 'off'
-                : blockers.length || (!atWork && openBlockers(item).length)
-                  ? 'waiting'
-                  : undefined,
+            said === 'stopped' ? 'off' : blockers.length || (!atWork && openBlockers(item).length) ? 'off' : undefined,
         light: Boolean(readiness || merged),
         // A read the board can't trust stills the motion, while a thread's own fresh line still names what it does.
         running: group ? group.running && !inputs.unavailable : atWork && !inputs.unavailable && !blockers.length,

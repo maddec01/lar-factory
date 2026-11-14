@@ -34,21 +34,9 @@
     position: relative;
 }
 
-/* Keep the status readable when a desk card's PR actions need a second line. */
-.desk-card [data-slot='card-footer'] {
-    flex-wrap: wrap;
-}
-.desk-card [data-slot='card-footer'] > :first-child {
-    flex: 1 0 8rem;
-    max-width: 100%;
-}
-.desk-card [data-slot='status-indicator'] {
-    flex-shrink: 0;
-}
-.desk-card [data-slot='card-footer'] > :last-child {
-    flex-wrap: wrap;
-    max-width: 100%;
-    margin-left: auto;
+/* A desk row's next step and details sit under its title, on the title's edge. */
+.desk-more {
+    padding: --spacing(1) --spacing(3) 0 calc(--spacing(3) + 1.5rem + --spacing(3));
 }
 
 /* The confirmation includes the full provider URL and source revision. */
@@ -108,4 +96,60 @@ li[data-arrived]:not([data-slot='card']) {
 }
 body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) [data-arrived] {
     animation-play-state: paused;
+}
+
+/* A desk row's actions can be a next step, a second destination and Open thread, on one line: the next step pins to the
+   row's end, where every row's does, and the others sit before it. */
+.desk-row .row-side {
+    flex-direction: row-reverse;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+/* On a narrower row a desk row's title keeps the line; what it belongs to shows in its dialog. */
+@container (width < 64rem) {
+    .desk-row [data-title-cell] > [data-part-of] {
+        display: none;
+    }
+}
+
+/* A desk row offers its one next step; its other destinations (Open PR, Open thread) are in its dialog, so the action
+   column never grows over the row's state. */
+.desk-row .row-side > :not(:first-child) {
+    display: none;
+}
+
+/* On a phone a desk row's actions start at the title's edge, as a lane row's do. */
+@container (width < 41.25rem) {
+    .desk-row .row-side {
+        flex-direction: row;
+    }
+}
+
+/* A desk of more than five shows its first five and Show all, so the board under it stays in reach. */
+.desk ol[data-collapsed] > li:nth-child(n + 6) {
+    display: none;
+}
+
+/* An item dialog's side with nothing to show takes no column and draws no rule. */
+aside[data-item-aside]:empty {
+    display: none;
+}
+:has(> aside[data-item-aside]:empty) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* On a phone a row's start sits on the title's edge, as its other actions do. */
+@container (width < 41.25rem) {
+    .row-side .start-group {
+        margin-left: 0;
+    }
+}
+
+/* What waits on you, as Your desk's panel and the dialog's notice draw it: the attention recipe's bar down its leading
+   edge over an even tint of the same tone, the same in both schemes, rather than the recipe's fading wash, which bands
+   on a wide light panel. */
+.attention-flat {
+    background: color-mix(in srgb, var(--color-warning) 7%, transparent);
+    box-shadow: inset 3px 0 0 0 var(--color-warning);
 }

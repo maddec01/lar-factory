@@ -7,7 +7,7 @@ import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, 
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
     await mountPage(fresh());
-    expect($$('.desk-card')).toHaveLength(7);
+    expect($$('.desk-row')).toHaveLength(7);
     expect(text($('.list-button')), 'the list counts its 4 items').toBe('List4');
     expect(fetchMock).not.toHaveBeenCalled();
     expect($('#board-data')).not.toBeNull();
@@ -41,7 +41,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
     await settle(() => stream().onopen!());
     await settle(() => vi.advanceTimersByTime(60_000));
     expect(fetchMock).not.toHaveBeenCalled();
-    expect($('.refreshed')!.textContent).toBe('1m ago');
+    expect($('.refreshed'), 'a live board shows no Refreshed light').toBeNull();
 
     await settle(() =>
         stream().onmessage!(
@@ -49,7 +49,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
         ),
     );
     expect(text($('.list-button'))).toBe('List1');
-    expect($$('.desk-card')).toHaveLength(0);
+    expect($$('.desk-row')).toHaveLength(0);
 });
 
 test('while the stream is down the page fetches /api/board every 15 s', async () => {
@@ -75,7 +75,7 @@ test('a failed fetch says the server can’t be reached and keeps the last data'
         'Board disconnected — showing last received data',
         'HTTP 502',
     ]);
-    expect($$('.desk-card')).toHaveLength(6);
+    expect($$('.desk-row')).toHaveLength(6);
 
     fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh())));
     await settle(() => vi.advanceTimersByTime(15_000));

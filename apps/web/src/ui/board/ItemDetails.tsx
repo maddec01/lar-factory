@@ -1,5 +1,6 @@
 // Item detail compositions. Public imports remain stable; implementations live in focused modules.
 export {
+    AddDescription,
     DetailsSection,
     TextSection,
     MainSection,

@@ -1,15 +1,14 @@
-// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): a
-// card on the page, with the card's fill, edge and shadow, its header on a sunken band, then its rows as tiles apart by
-// gaps. It forks the design system's Panel (PanelBase) without its hairlines, so it follows Panel's header and heading
-// when those change. A lane with no rows collapses to its header band, which says why it's empty, so the page scrolls
-// past it in one line.
+// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): its
+// header line, then its rows as one list of rounded rows, straight on the page with no card around them, so the board
+// reads as one calm surface. It follows the design system's Panel header and heading. A lane with no rows collapses to
+// its header line, which says why it's empty, so the page scrolls past it in one line.
 
 import { SectionTitle } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { LimitBars } from './Counters';
 
-/** Ready keeps the shared occupancy beside its scheduling controls at every width. */
+/** Ready keeps its scheduling controls together at the header's end at every width. */
 export function ReadyBuildControls({ children }: { children: ReactNode }) {
     return (
         <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1" data-ready-build-controls>
@@ -48,13 +47,8 @@ export function StagePane({
     const headingId = `${id}-h`;
 
     return (
-        <section
-            data-stage={id}
-            data-empty={collapsed || undefined}
-            aria-labelledby={headingId}
-            className="surface-card min-w-0 overflow-hidden rounded-xl border"
-        >
-            <header className="bg-surface-sunken flex min-h-10 items-center px-3 py-1">
+        <section data-stage={id} data-empty={collapsed || undefined} aria-labelledby={headingId} className="min-w-0">
+            <header className="flex min-h-9 items-center px-3 py-1">
                 <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <SectionTitle id={headingId} level="h3" title={title} icon={glyph} count={count} />
                     {(right || collapsed) && (
@@ -65,31 +59,38 @@ export function StagePane({
                     )}
                 </div>
             </header>
-            {!collapsed && children && <div className="@container min-w-0 p-1.5">{children}</div>}
+            {!collapsed && children && <div className="@container min-w-0">{children}</div>}
         </section>
     );
 }
 
-/** The rows of a stage's section, each a tile, apart by gaps. */
+/** The rows of a stage's section, rounded rows a hair apart under its header, as the design system's lists. */
 export function StageList({
     children,
 }: {
     /** The rows. */
     children: ReactNode;
 }) {
-    return <ol className="m-0 grid list-none gap-1.5 p-0">{children}</ol>;
+    return <ol className="m-0 grid list-none gap-0.5 p-0">{children}</ol>;
 }
 
 /** What a collapsed lane's header line says: that it's loading, that nothing is in it, or that the filters hide every
- *  row, muted at its end. On a phone the line keeps the room for the lane's name and says it to screen readers only. */
+ *  row, muted at its end. A `quiet` one (nothing in it, which its count of 0 already says) and, on a phone, every one
+ *  says it to screen readers only, so the line keeps the room for the lane's name. */
 export function StagePaneEmpty({
+    quiet = false,
     children,
 }: {
+    /** Says it to screen readers only. */
+    quiet?: boolean;
     /** What the lane says, such as "Nothing here". */
     children: ReactNode;
 }) {
     return (
-        <p data-pane-empty className="text-fg-muted m-0 min-w-0 truncate text-xs max-sm:sr-only">
+        <p
+            data-pane-empty
+            className={`text-fg-muted m-0 min-w-0 truncate text-xs ${quiet ? 'sr-only' : 'max-sm:sr-only'}`}
+        >
             {children}
         </p>
     );

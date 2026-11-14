@@ -4,7 +4,9 @@
 
 /* Board action hierarchy (ButtonKinds.ts): solid primary is the area's one next/submit action. A tinted Start
    launches agent work (Shape, Start build, Start after), including a split button's model/options half; it never
-   means selected, running, or merely opens a thread. Neutral outlines open destinations or offer other actions.
+   means selected, running, or merely opens a thread. On board rows and Your desk, starts and next steps are neutral
+   outlines with their icon, so the board's only colour at rest is amber. Neutral outlines open destinations or offer
+   other actions.
    Quiet icon controls open tools or a thread within a concept parts list. Disabled actions retain their kind. */
 @import './base.css';
 @import './refreshed.css';

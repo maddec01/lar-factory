@@ -994,3 +994,34 @@ test('unrouted Fog is reported for reconciliation instead of counted as an open 
     expect(text(body())).toContain('Fog to reconcile');
     expect(text(body())).toContain('Fixture files and presentation remain unspecified.');
 });
+
+test('a Ready linked parent whose Kind is build shows its running parts in the group heading', async () => {
+    const data = structuredClone(sample);
+    const parent = data.items.find((item) => item.id === C200)!;
+
+    Object.assign(parent, {
+        kind: 'build',
+        flow: 'linked',
+        status: 'Ready',
+        linkedPrs: [],
+        buildPhase: null,
+        threads: [],
+        conceptBuild: undefined,
+    });
+
+    const parts = data.items.filter((item) => item.parentId === parent.id && item.kind !== 'decision');
+
+    for (const part of parts)
+        Object.assign(part, {
+            kind: 'build',
+            status: 'In progress',
+            linkedPrs: [],
+            threads: [{ ...thread(`owner-${part.id}`, 'running'), purpose: 'build' }],
+            completion: { complete: false, reasons: [] },
+        });
+    await mountPage(data);
+    expect(parts.length).toBeGreaterThan(0);
+    expect(text(header())).toContain('build');
+    expect(text(header())).toContain('running');
+    expect(text(header())).not.toContain('Ready to build');
+});

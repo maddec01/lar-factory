@@ -77,7 +77,6 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
         !group ||
         ownsBuild ||
         parent.kind === 'decision' ||
-        parent.kind === 'build' ||
         (!parent.conceptBuild && !parent.releasePlan && !data.items.some((item) => item.parentId === parent.id))
     )
         return null;

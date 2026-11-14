@@ -24,8 +24,8 @@ then resume reconciliation.
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use
 `refresh-projections GROUP_ID --file F`: `{revisions:{ID:N},answers:{ID:text},map?}`
 with all group revisions. Answers use `## Product` for choices; `## History` is excluded from approvals.
-Status comes from records/commands, never answers/map. Commands generate state
-and reject stale brief quotes.
+Status comes from records, never answers/map. Group delivery comes from parts;
+never set a group parent Ready. Commands reject stale brief quotes.
 
 Before ending shaping, settle factory details yourself. Remove resolved Fog; record `set-fog --fog gone` when
 empty. Every remaining bullet starts `[decision: ID]` for an open decision,
@@ -37,7 +37,8 @@ mechanical hold; repair it, never leave an ownerless wait.
 
 Save release order with `set-release-plan`: `shipsWith` names delivery work IDs;
 `who` is `Pedro` for human steps, `Agent` for automated ones. Record Agent evidence
-with `complete-release-step`, then post-release Outcome (never a refinement hold); merges prove neither.
+with `complete-release-step`, then end the turn. The board dispatches Outcome
+after release settles; measure once in that turn with its `--input-digest`.
 For Pedro's approval, save the step/wait and end the turn; never open a T3 question.
 Save the map after current answers and domain drafts.
 

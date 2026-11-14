@@ -145,7 +145,9 @@ including while queued, shaping, building, waiting and finishing. A proposed
 `flow` field distinguishes `single` from `linked` for non-concept parents;
 private slices do not make a build a linked-work parent. Concept Kind implies
 grouped work. Each group shows its current stage, refinement and delivery
-separately, a generated Work map, buildable order and all wait reasons. Each part
+separately, a generated Work map, buildable order and all wait reasons. A group parent
+derives its displayed delivery state from its parts, including when its Kind is Build.
+Running parts show running builds; a parent cannot be set Ready. Each part
 shows whether it is queued. A completed part stays available in its group's
 history.
 
@@ -160,7 +162,12 @@ Approval waits derive from current Doubt and gate records, never notice wording.
 The item also stays in its group or ordinary stage section. A card names the item,
 its Project and its concept or parent when present. It says what is needed and
 offers an action that works from the desk: Answer in T3, Approve brief,
-Verify, Merge PR, Accept dependency proof, Choose follow-ups, Recheck access or Start again. Dependency acceptance names the waiting build, owner and need, and opens its existing Mark met control. It clears when met or the pending proof is withdrawn/rejected; closure alone is not acceptance. Answer opens the exact unresolved
+Verify, Merge PR, Accept dependency proof, Choose follow-ups, Recheck access or Start again. Dependency acceptance names the waiting build, owner and need, and opens its existing Mark met control. It appears only for nonempty evidence explicitly marked `proofState: submitted`,
+with a closed/merged delivery observation or ticketless handover. `pending`
+(the default, including legacy records) and `insufficient` remain Dependency holds.
+Evidence notes alone never establish submission; editing evidence resets it to
+pending unless explicitly resubmitted. It clears when met or the pending proof is
+withdrawn/rejected; closure alone is not acceptance. Answer opens the exact unresolved
 question. Merge uses the same guarded merge action as item details.
 
 Questions and tool approvals are answered in T3, through the exact owner thread
@@ -668,7 +675,10 @@ answers through T3's supported `runtime-request.respond` command; its ID is stab
 per continuation/request. It sends no tool-approval decision. Mixed requests,
 different manifests and ordinary product questions remain Answer in T3.
 The owner continues ordered Agent steps using actual release evidence; the final
-receipt unlocks the existing durable Outcome dispatch below. Changed inputs or
+receipt unlocks the existing durable Outcome dispatch below. The release owner
+ends that turn after the last receipt, without measuring Outcome. The separate
+Outcome dispatch captures its input after every delivery and release receipt is
+recorded and supplies the required digest before measurement. Changed inputs or
 independent human holds stop the continuation. An idle owner retains Resume
 release even with a generic notice; dispatch still respects independent holds.
 After delivery, a parent offers

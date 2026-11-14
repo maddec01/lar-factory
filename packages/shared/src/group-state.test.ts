@@ -37,11 +37,12 @@ function group(kind: Item['kind'] = 'concept') {
     return { parent, data: { items: [parent, ...children] } as BoardData };
 }
 
-test.each(['concept', 'feature'] as const)(
+test.each(['concept', 'feature', 'build'] as const)(
     '%s delivery derives from parts even without an explicit concept run',
     (kind) => {
         const { parent, data } = group(kind);
 
+        parent.status = 'Ready';
         expect(groupState(parent, data)).toMatchObject({ word: '2 builds running · 1 waiting', running: true });
         data.items[1]!.status = 'Ready to merge';
         data.items[1]!.threads = [
@@ -141,4 +142,11 @@ test('a shaping-only concept never presents its future Outcome check as the curr
     expect(groupState(parent, data)?.word).toBe('Refined · no delivery planned');
     parent.refinement = { complete: false, reasons: ["Its Fog isn't gone."] };
     expect(groupState(parent, data)?.word).toBe('Shaping');
+});
+
+test('a delivery build with its own build run never inherits a group status', () => {
+    const { parent, data } = group('build');
+
+    parent.buildPhase = 'implementing';
+    expect(groupState(parent, data)).toBeNull();
 });

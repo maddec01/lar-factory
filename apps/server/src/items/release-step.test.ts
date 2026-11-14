@@ -106,6 +106,9 @@ test('board approval settles only the duplicate T3 question and durably resumes 
             threadId: 'owner',
             text: expect.stringContaining('activate'),
         });
+        expect(send.mock.calls[2]![0].text).toContain(
+            'End the turn after the last release receipt; do not measure or record Outcome',
+        );
         expect(deskWait(board.find(id)!, false, board.snapshot().items).action?.label).not.toBe('Answer in T3');
         expect(records.releasePlan(id)?.steps[1]?.done).toBeNull();
 
@@ -129,6 +132,13 @@ test('board approval settles only the duplicate T3 question and durably resumes 
         await restarted.reconcileReleaseContinuations();
         expect(send).toHaveBeenCalledTimes(4);
 
+        const beforeActivation = records.outcomeCheck(id).digest;
+
+        await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
+        expect(records.outcomeCheck(id).run).toBeNull();
+
+        const dispatches = send.mock.calls.length;
+
         // Only measured activation evidence unlocks Outcome; the board approval alone never completes delivery.
         records.completeReleaseStep(id, at(), 'activate', 'Release owner', 'Activated exact approved manifest abc.');
         reread();
@@ -136,6 +146,14 @@ test('board approval settles only the duplicate T3 question and durably resumes 
         await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
 
         const outcome = records.outcomeCheck(id).run!;
+
+        expect(outcome.digest).not.toBe(beforeActivation);
+        expect(send.mock.calls).toHaveLength(dispatches + 1);
+        expect(send.mock.calls.at(-1)![0].text).toContain(`--input-digest ${outcome.digest}`);
+        expect(() => records.recordOutcomeCheck(id, at(), 'passed', 'Owner', 'Missing digest')).toThrow(/input-digest/);
+        expect(() => records.recordOutcomeCheck(id, at(), 'passed', 'Owner', 'Stale input', beforeActivation)).toThrow(
+            /composition changed/,
+        );
 
         expect(send.mock.calls.at(-1)![0]).toMatchObject({
             type: 'message.dispatch',
@@ -303,6 +321,14 @@ test('S05-F2-001: saved release notice resolves on board receipt through activat
         });
         await create().reconcileReleaseContinuations();
         expect(send).toHaveBeenCalledTimes(1);
+
+        const beforeActivation = records.outcomeCheck(id).digest;
+
+        await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
+        expect(records.outcomeCheck(id).run).toBeNull();
+
+        const dispatches = send.mock.calls.length;
+
         // Only measured activation evidence unlocks Outcome; the board approval alone never completes delivery.
         records.completeReleaseStep(id, at(), 'activate', 'Release owner', 'Activated exact approved manifest abc.');
         reread();
@@ -310,6 +336,14 @@ test('S05-F2-001: saved release notice resolves on board receipt through activat
         await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
 
         const outcome = records.outcomeCheck(id).run!;
+
+        expect(outcome.digest).not.toBe(beforeActivation);
+        expect(send.mock.calls).toHaveLength(dispatches + 1);
+        expect(send.mock.calls.at(-1)![0].text).toContain(`--input-digest ${outcome.digest}`);
+        expect(() => records.recordOutcomeCheck(id, at(), 'passed', 'Owner', 'Missing digest')).toThrow(/input-digest/);
+        expect(() => records.recordOutcomeCheck(id, at(), 'passed', 'Owner', 'Stale input', beforeActivation)).toThrow(
+            /composition changed/,
+        );
 
         expect(send.mock.calls.at(-1)![0]).toMatchObject({
             type: 'message.dispatch',

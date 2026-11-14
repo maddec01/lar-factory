@@ -229,6 +229,7 @@ test('S05 dependency acceptance waits require proof and delivery, and vanish whe
         ticket: 'fake/c#18',
         named: [],
         evidence: 'Inspected exact fixture and predicate.',
+        proofState: 'submitted' as const,
         met: null,
         needsReview: false,
         observation: {
@@ -252,6 +253,9 @@ test('S05 dependency acceptance waits require proof and delivery, and vanish whe
     });
     for (const change of [
         { evidence: '' },
+        { proofState: 'pending' as const },
+        { proofState: 'insufficient' as const },
+        { proofState: undefined },
         { met: { by: 'Pedro', at: 'now' } },
         { observation: { ...dependency.observation, kind: 'reopened' as const } },
     ]) {

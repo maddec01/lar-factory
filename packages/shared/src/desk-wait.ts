@@ -15,6 +15,7 @@ export const dependencyProofs = (item: Item) =>
 
               return d &&
                   !d.met &&
+                  d.proofState === 'submitted' &&
                   d.evidence.trim() &&
                   ((!d.ticket && !d.named.length) || ['closed', 'merged'].includes(d.observation?.kind ?? ''))
                   ? [d]

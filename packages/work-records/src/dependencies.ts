@@ -3,7 +3,7 @@
 // reads of its ticket and PRs are kept beside it; a read never sets or clears the mark, and never deletes the
 // Dependency or its handover.
 
-import { DEPENDENCY_OBSERVATION_KINDS, type DependencyObservationKind } from '@lar-factory/shared';
+import { DEPENDENCY_OBSERVATION_KINDS, type DependencyHold, type DependencyObservationKind } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
 
 import { validateBlockers } from './blocker-graph.ts';
@@ -37,6 +37,8 @@ export interface Dependency {
     contract: string;
     /** What will establish that the change was delivered; empty until agreed. */
     evidence: string;
+    /** Submitted proof awaits Pedro; notes and insufficient evidence never create a desk action. */
+    proofState: NonNullable<DependencyHold['proofState']>;
     ticket: string | null;
     pullRequests: string[];
     /** Markdown for the owning team. */
@@ -62,6 +64,7 @@ export interface NewDependency {
     owner: string;
     contract?: string;
     evidence?: string;
+    proofState?: Dependency['proofState'];
     ticket?: string;
     pullRequests?: readonly string[];
     handover?: string;
@@ -109,6 +112,7 @@ interface Row {
     owner: string;
     contract: string;
     evidence: string;
+    proof_state: Dependency['proofState'];
     ticket: string | null;
     pull_requests: string;
     handover: string;
@@ -128,6 +132,14 @@ interface RecordRow {
 }
 
 const invalid = (message: string) => new WorkRecordError('invalid', message);
+const checkProofState = (value: unknown, evidence: string): Dependency['proofState'] => {
+    if (value !== 'pending' && value !== 'submitted' && value !== 'insufficient')
+        throw invalid('Proof state must be pending, submitted or insufficient.');
+
+    if (value === 'submitted' && !evidence.trim()) throw invalid('Submitted proof needs evidence.');
+
+    return value;
+};
 
 function checkFilled(text: unknown, what: string): string {
     if (typeof text !== 'string' || !text.trim()) throw invalid(`The Dependency's ${what} is empty or isn't text.`);
@@ -233,9 +245,9 @@ export function dependencyRecords(
     const deleteObservation = db.prepare('DELETE FROM dependency_observations WHERE dependency_id = ? AND subject = ?');
     const insertRow =
         db.prepare(`INSERT INTO dependencies (dependency_id, work_id, need, owner, contract, evidence, ticket, pull_requests, handover,
-    revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
+    proof_state, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
     const updateRow =
-        db.prepare(`UPDATE dependencies SET need = ?, owner = ?, contract = ?, evidence = ?, ticket = ?, pull_requests = ?, handover = ?,
+        db.prepare(`UPDATE dependencies SET need = ?, owner = ?, contract = ?, evidence = ?, proof_state = ?, ticket = ?, pull_requests = ?, handover = ?,
     met_by = ?, met_at = ?, needs_review_at = ?, replaced_by = ?, revision = ?, updated_at = ? WHERE dependency_id = ? AND revision = ?`);
     const selectRecord = db.prepare('SELECT work_id, kind, parent_id FROM work_records WHERE work_id = ?');
     const hasBlocker = db.prepare('SELECT 1 FROM blockers WHERE work_id = ? AND blocker_id = ?');
@@ -275,6 +287,7 @@ export function dependencyRecords(
         owner: row.owner,
         contract: row.contract,
         evidence: row.evidence,
+        proofState: row.proof_state,
         ticket: row.ticket,
         pullRequests: JSON.parse(row.pull_requests) as string[],
         handover: row.handover,
@@ -310,6 +323,7 @@ export function dependencyRecords(
             next.owner,
             next.contract,
             next.evidence,
+            next.proof_state,
             next.ticket,
             next.pull_requests,
             next.handover,
@@ -368,6 +382,10 @@ export function dependencyRecords(
             const owner = checkFilled(dependency.owner, 'owner');
             const contract = checkText(dependency.contract ?? '', 'contract');
             const evidence = checkText(dependency.evidence ?? '', 'evidence');
+            const proofState = checkProofState(
+                dependency.proofState === undefined ? 'pending' : dependency.proofState,
+                evidence,
+            );
             const ticket = dependency.ticket === undefined ? null : checkReference(dependency.ticket, 'ticket');
             const pullRequests = checkPullRequests(dependency.pullRequests ?? []);
             const handover = checkText(dependency.handover ?? '', 'handover');
@@ -388,6 +406,7 @@ export function dependencyRecords(
                     ticket,
                     JSON.stringify(pullRequests),
                     handover,
+                    proofState,
                     now,
                     now,
                 );
@@ -434,7 +453,18 @@ export function dependencyRecords(
             if (update.pullRequests !== undefined)
                 patch.pull_requests = JSON.stringify(checkPullRequests(update.pullRequests));
 
-            return change(dependencyId, revision, (row) => keepNamed(row, patch));
+            return change(dependencyId, revision, (row) => {
+                const state =
+                    update.proofState !== undefined
+                        ? update.proofState
+                        : patch.evidence !== undefined && patch.evidence !== row.evidence
+                          ? 'pending'
+                          : row.proof_state;
+
+                patch.proof_state = checkProofState(state, patch.evidence ?? row.evidence);
+
+                return keepNamed(row, patch);
+            });
         },
         addDependencyBlock: (dependencyId, revision, buildId) =>
             change(dependencyId, revision, (row) => {

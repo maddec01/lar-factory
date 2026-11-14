@@ -40,5 +40,8 @@ build is the user's choice and needs their approval of the plan. Once they
 approve, make the build as above and run
 `lar-work replace-dependency <Dependency ID> --revision N --build <work ID>`.
 
-Keep proof/status in Dependency records, never brief prose.
+Keep proof/status in Dependency records, never briefs. `update-dependency --file F`
+saves `evidence` and `proofState`: `pending`, `insufficient`, or `submitted` only
+for actual proof awaiting Pedro. Closure notes are not proof; evidence edits reset
+submission unless explicitly resubmitted.
 After changes, [Reconcile group](../reconcile-group.md).

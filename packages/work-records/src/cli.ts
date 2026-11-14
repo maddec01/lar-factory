@@ -433,7 +433,7 @@ Dependencies
   Dependency or one blocks it. Dependency commands take a Dependency ID.
   add-dependency <work-id> --file F Add a Dependency from the JSON in F: {"need",
                                     "owner", "contract"?, "evidence"?, "ticket"?,
-                                    "pullRequests"?: [...], "handover"?}. need says
+                                    "pullRequests"?: [...], "handover"?, "proofState"?}. need says
                                     what is needed and why; owner names the owning
                                     repository or team. Prints its Dependency ID.
   dependencies <work-id>            Print the Dependencies the record holds.
@@ -441,7 +441,10 @@ Dependencies
   update-dependency <dependency-id> --revision N --file F
                                     Change the fields in the JSON in F; a null
                                     ticket removes it. Observations of a ticket or
-                                    PR it no longer names are dropped.
+                                    PR it no longer names are dropped. proofState is
+                                    pending (default), submitted (evidence awaiting
+                                    Pedro) or insufficient. Editing evidence resets
+                                    it to pending unless explicitly submitted.
   add-dependency-block <dependency-id> --revision N --build B
                                     Record that the Dependency holds the build B.
   remove-dependency-block <dependency-id> --revision N --build B

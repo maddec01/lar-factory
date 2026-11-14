@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
 import { completeBrief } from '../../test/complete-brief.ts';
+import { legacyApprovalNotice } from '../../test/legacy-notice.ts';
 import { createBoardState } from '../board/board-state.ts';
 import type { sendThreadCommand } from '../t3/thread-commands.ts';
 import { createBriefApproval } from './brief-approval.ts';
@@ -81,9 +82,7 @@ test('board approval requires a displayed one-use request and supplies its own o
 
     expect(preview.briefs[0]?.brief).toBe(completeBrief('Complete brief 0.'));
 
-    const waiting = s.records.read(id);
-
-    s.records.waitForUser(id, waiting.revision, 'Approve this brief');
+    legacyApprovalNotice(s.records, id, 'Approve this brief');
     expect((await s.commands.approveBrief(id, { ...preview, by: 'Agent', evidence: 'Verify failed' })).status).toBe(
         200,
     );
@@ -125,7 +124,7 @@ test('a changed build resumes Build after board approval and never requeues a se
 
     const preview = await s.inspect();
 
-    s.records.waitForUser(id, s.records.read(id).revision, 'Approve revised brief');
+    legacyApprovalNotice(s.records, id, 'Approve revised brief');
     expect((await s.commands.approveBrief(id, preview)).status).toBe(200);
     expect(s.records.read(id)).toMatchObject({ status: 'In progress', buildBranch: 'build/same', needsYou: null });
 });
@@ -149,7 +148,7 @@ test('S06 batch approval readies Queued children and automatically notifies thei
     });
 
     parent = s.records.addThread(parent.workId, parent.revision, 'owner-thread', 'shape');
-    s.records.waitForUser(parent.workId, parent.revision, 'Approve briefs in the board');
+    legacyApprovalNotice(s.records, parent.workId, 'Approve briefs in the board');
     for (const id of s.ids) {
         s.records.setParent(id, s.records.read(id).revision, parent.workId);
         s.records.update(id, s.records.read(id).revision, { status: 'Queued' });
@@ -385,7 +384,7 @@ test.each(['accepted', 'unconfirmed'] as const)(
 
         parent = s.records.addThread(parent.workId, parent.revision, 'linked-owner', 'shape');
         parent = s.records.addThread(parent.workId, parent.revision, 'linked-builder', 'build');
-        s.records.waitForUser(parent.workId, parent.revision, 'Approve briefs in the board');
+        legacyApprovalNotice(s.records, parent.workId, 'Approve briefs in the board');
 
         const ids = s.ids.map(
             (_, index) =>
@@ -479,7 +478,7 @@ test('S03 single amended build approval durably resumes its build owner even wit
     s.records.setBuildBranch(id, s.records.read(id).revision, 'build/same');
     s.records.addThread(id, s.records.read(id).revision, 'build-owner', 'build');
     s.records.addThread(id, s.records.read(id).revision, 'newer-shaping', 'shape');
-    s.records.waitForUser(id, s.records.read(id).revision, 'Approve amended brief');
+    legacyApprovalNotice(s.records, id, 'Approve amended brief');
 
     const board = createBoardState({ items: [{ id }], repos: [] } as never);
     const send = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'unconfirmed', reason: 'Connection lost' }));

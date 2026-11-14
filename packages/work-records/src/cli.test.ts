@@ -69,14 +69,22 @@ describe('lar-work', { timeout: 30_000 }, () => {
         try {
             const results = await Promise.all([
                 larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'checks'),
-                larWork(data, 'set-needs-you', build.workId, '--revision', '1', '--reason', 'Verify this head'),
+                larWork(
+                    data,
+                    'set-needs-you',
+                    build.workId,
+                    '--revision',
+                    '1',
+                    '--reason',
+                    'Should search match whole words?',
+                ),
             ]);
 
             expect(results.map((result) => result.code)).toEqual([0, 0]);
             expect(records.read(build.workId)).toMatchObject({
                 revision: 3,
                 buildPhase: 'checks',
-                needsYou: 'Verify this head',
+                needsYou: 'Should search match whole words?',
             });
 
             const refused = await larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'review');
@@ -1179,30 +1187,17 @@ it('keeps the brief gate local and refuses removed refinement publication comman
 
     writeFileSync(displayFile, JSON.stringify(gate.record.display));
 
-    const waiting = await larWork(
-        data,
-        'set-needs-you',
-        work.workId,
-        '--revision',
-        String(work.revision),
-        '--reason',
-        'Approve this brief',
-    );
-
-    expect(waiting.code).toBe(0);
     expect(
-        (
-            await larWork(
-                data,
-                'clear-needs-you',
-                work.workId,
-                '--revision',
-                String(waiting.record.revision),
-                '--status',
-                'Shaping',
-            )
-        ).code,
-    ).toBe(0);
+        await larWork(
+            data,
+            'set-needs-you',
+            work.workId,
+            '--revision',
+            String(work.revision),
+            '--reason',
+            'Approve this brief in the board.',
+        ),
+    ).toMatchObject({ code: 1, stderr: expect.stringContaining('board action') });
     expect(
         await larWork(
             data,
@@ -1217,7 +1212,7 @@ it('keeps the brief gate local and refuses removed refinement publication comman
             '--evidence',
             'Passed.',
         ),
-    ).toMatchObject({ code: 1, stderr: expect.stringContaining('set-needs-you') });
+    ).toMatchObject({ code: 1, stderr: expect.stringContaining('recorded board control') });
     expect((await larWork(data, 'gate', work.workId)).record.current).toBe(false);
     expect(await larWork(data, 'execute-publication', work.workId)).toMatchObject({
         code: 2,
@@ -1564,7 +1559,7 @@ it(
                 '--revision',
                 String(records.read(ids[0]!).revision),
                 '--reason',
-                'Approve this batch',
+                'Should search match whole words?',
             );
 
             expect(waiting.code).toBe(0);
@@ -1584,7 +1579,7 @@ it(
 
             const result = await approve(renewed.record.digest);
 
-            expect(result).toMatchObject({ code: 1, stderr: expect.stringContaining('set-needs-you') });
+            expect(result).toMatchObject({ code: 1, stderr: expect.stringContaining('recorded board control') });
             expect(ids.every((id) => records.gate(id).evidence.length === 0)).toBe(true);
         } finally {
             records.close();

@@ -8,8 +8,8 @@ prototype picks, grilling, gate findings and build holds. Discover deferred
 question tools when needed. If unavailable, save the numbered question and
 Needs you notice, and ask in chat: title, body, recommended answer, separated
 from other questions by a horizontal rule. Word recommendations so "yes"
-accepts them. Gate, Verify, release-step and Outcome approvals are board-only:
-save the wait/step and end the turn, never open a T3 question for them. Brief approval uses [Gate](../gate.md).
+accepts them. Gates, Verify, release steps, Outcome and merges use board controls.
+End the turn; never duplicate them with Needs you or a T3 question. Brief approval uses [Gate](../gate.md).
 
 Reuse prior answers and authorization. Continue routine routes and implementation
 choices. Ask only for missing decisions, real conflicts or expanded scope,

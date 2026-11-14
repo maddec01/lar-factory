@@ -1,10 +1,14 @@
+import { withoutDependencyStatus } from './dependency-status.ts';
 import { trackerMarkdownHtml } from './tracker-markdown.ts';
 
 /** Visible on both trackers, outside the retained approved Spec. */
 export const OUT_OF_DATE_SPEC =
     '<p><strong>Out-of-date Spec</strong>: changes await brief approval on the board.</p>\n';
-export const withoutSpecFreshness = (body: string): string =>
-    body.startsWith(OUT_OF_DATE_SPEC) ? body.slice(OUT_OF_DATE_SPEC.length) : body;
+export const withoutSpecFreshness = (body: string): string => {
+    const clean = withoutDependencyStatus(body);
+
+    return withoutDependencyStatus(clean.startsWith(OUT_OF_DATE_SPEC) ? clean.slice(OUT_OF_DATE_SPEC.length) : clean);
+};
 export const markSpecFreshness = (body: string, stale: boolean): string =>
     (stale ? OUT_OF_DATE_SPEC : '') + withoutSpecFreshness(body);
 

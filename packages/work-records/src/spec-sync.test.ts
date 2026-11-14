@@ -1,7 +1,8 @@
 import { formatTicketSpec, readTicketSpec, type RepositorySetup } from '@lar-factory/shared';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
 import { refreshSpecs, resolveSpecEdit, editSpec, syncSpecs } from './spec-sync.ts';
@@ -631,4 +632,81 @@ test('a changed brief marks the retained approved ticket Spec out of date, then 
     await syncSpecs(f.records, { provider: f.provider, setups: [setup], workId: id });
     expect(f.remote().body).not.toContain('Out-of-date Spec');
     expect(readTicketSpec(f.remote().body)).toEqual({ ...old, spec: 'New unapproved reconnect scope.' });
+});
+
+test('S05-F2-002: generated dependency status supersedes legacy prose without changing brief or approval', async () => {
+    const f = await fixture();
+    const id = f.record.workId;
+    const { brief, briefDigest } = JSON.parse(
+        readFileSync(new URL('../../shared/test/s05-consumer-brief.json', import.meta.url), 'utf8'),
+    ) as { brief: string; briefDigest: string };
+    const db = new DatabaseSync(f.path);
+
+    db.prepare("UPDATE bodies SET markdown=? WHERE work_id=? AND body='brief'").run(brief, id);
+    db.close();
+    f.records.update(id, f.records.read(id).revision, { kind: 'build' });
+
+    const dependency = f.records.addDependency(id, {
+        owner: 'Sandbox external team',
+        need: 'v1 contract proof',
+        contract: 'numeric version 1',
+        evidence: 'Inspect exact proof',
+    });
+
+    f.records.addDependencyBlock(dependency.dependencyId, dependency.revision, id);
+    f.records.recordGate(id, f.records.read(id).revision, {
+        briefDigest: f.records.gate(id).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Approved contract',
+    });
+
+    const before = f.records.gate(id);
+
+    expect(before.briefDigest).toBe(briefDigest);
+
+    const approval = f.records.displayGate(id).approvalDigest;
+
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.remote().body).toContain('Current dependency status');
+    expect(f.remote().body).toContain('Unmet');
+
+    const d = f.records.dependency(dependency.dependencyId);
+
+    f.records.updateDependency(d.dependencyId, d.revision, {
+        evidence: 'Corrected proof verified: SHA256 exact-v1',
+        handover: 'Inspected corrected proof and attached handover',
+    });
+    f.records.markDependencyMet(d.dependencyId, f.records.dependency(d.dependencyId).revision, 'Pedro');
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.remote().body).toContain('Met by Pedro');
+    expect(f.remote().body).toContain('Corrected proof verified');
+    expect(f.remote().body).toContain('superseded');
+    expect(readTicketSpec(f.remote().body).spec).toBe(brief);
+    expect(f.records.body(id, 'brief')).toBe(brief);
+    expect(f.records.displayGate(id).approvalDigest).toBe(approval);
+    expect(f.records.gate(id)).toMatchObject({ current: true, briefDigest: before.briefDigest });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.records.body(id, 'brief')).toBe(brief);
+    f.records.clearDependencyMet(d.dependencyId, f.records.dependency(d.dependencyId).revision);
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.remote().body).toContain('Unmet');
+});
+
+test('brief writes reject dependency proof status but allow requirements and fenced product examples', async () => {
+    const f = await fixture();
+    const id = f.record.workId;
+    const before = f.records.body(id, 'brief');
+
+    expect(() =>
+        f.records.setBody(id, f.records.read(id).revision, 'brief', '## Notes\nNo proof has been supplied.'),
+    ).toThrow(/Dependency records/);
+    expect(f.records.body(id, 'brief')).toBe(before);
+    expect(() =>
+        f.records.setBody(
+            id,
+            f.records.read(id).revision,
+            'brief',
+            'Require inspected proof before acceptance.\n```text\nNo proof has been supplied.\n```',
+        ),
+    ).not.toThrow();
 });

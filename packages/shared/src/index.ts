@@ -62,3 +62,6 @@ export { pendingBriefBatch, shapingOwner } from './question-thread.ts';
 export { conceptFog, itemFog } from './concept-fog.ts';
 
 export { reservesBuildSlot } from './build-capacity.ts';
+
+export * from './release-notice.ts';
+export * from './dependency-status.ts';

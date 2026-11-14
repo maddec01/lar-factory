@@ -9,7 +9,7 @@ import {
     needsAnswer,
     nextAction,
     shapingOwner,
-    releaseContinuationReady,
+    releaseRecoveryAvailable,
     openQuestionThread,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
@@ -43,7 +43,7 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
 
     const linkedBeside = latestThread(item);
 
-    if (releaseContinuationReady(item, data.items) && !openQuestionThread(item))
+    if (releaseRecoveryAvailable(item, data.items) && !working && !openQuestionThread(item))
         return { control: <ResumeRelease item={item} data={data} /> };
 
     if (item.conceptBuild && ['Ready', 'In progress', 'Review'].includes(item.status)) return { control: null };

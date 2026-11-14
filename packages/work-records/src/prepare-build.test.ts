@@ -359,3 +359,54 @@ it('a released owner cannot bypass capacity when restarting a closed PR build', 
     records.prepareBuild(next, rev(next), capacity);
     expect(() => records.buildReadiness(old, { ...capacity, recovery: true })).toThrow('capacity');
 });
+
+it('S05-F2-001: board actions cannot create independent owner notices', async () => {
+    const { records } = await fixture();
+    const id = records.create({ title: 'Release', repository: 'fake/app', kind: 'concept' }).workId;
+    const at = () => records.read(id).revision;
+
+    records.setReleasePlan(id, at(), {
+        steps: [{ id: 'approve-joint-activation', who: 'Pedro', what: 'Approve activation' }],
+        outcomeCheck: 'Composition',
+    });
+    for (const reason of [
+        'Release step approve-joint-activation awaits Pedro in the board.',
+        'Please approve the brief gate in the board.',
+        'Approve revised brief after failed Verify in the board.',
+        'Waiting for release approval in the board.',
+        'No Pedro activation receipt is recorded.',
+        'Waiting for Verify on the board.',
+        'Please merge the PR through the board.',
+        'Waiting for Outcome approval in the board.',
+    ]) {
+        expect(() => records.setNeedsYou(id, at(), reason)).toThrow(/board|release step/i);
+        expect(() => records.waitForUser(id, at(), reason)).toThrow(/board|release step/i);
+        expect(records.read(id).needsYou).toBeNull();
+    }
+    records.setNeedsYou(id, at(), 'Which region should Release step approve-joint-activation use?');
+    records.waitForUser(id, at(), 'Which activation region should we use?');
+    expect(records.read(id).needsYou).toContain('Which activation region');
+    records.resumeFromUser(id, at(), 'Shaping');
+    records.completeReleaseStep(id, at(), 'approve-joint-activation', 'Pedro', 'Exact manifest approved.');
+    expect(() => records.waitForUser(id, at(), 'No Pedro activation receipt is recorded.')).toThrow(
+        /release step approve-joint-activation/,
+    );
+});
+
+it('CI #983: generic Needs you reasons stay writable without an explicit board action', async () => {
+    const { records } = await fixture();
+    const work = records.create({ title: 'Review wording', repository: 'fake/app', kind: 'build' });
+    const at = () => records.read(work.workId).revision;
+
+    for (const reason of [
+        'Approve the brief.',
+        'Revised brief needs approval',
+        'Verify this head',
+        'Waiting for missing credentials.',
+        'Which board button should we use?',
+    ]) {
+        expect(records.setNeedsYou(work.workId, at(), reason).needsYou).toBe(reason);
+        expect(records.waitForUser(work.workId, at(), reason)).toMatchObject({ status: 'Needs you', needsYou: reason });
+        records.resumeFromUser(work.workId, at(), 'Shaping');
+    }
+});

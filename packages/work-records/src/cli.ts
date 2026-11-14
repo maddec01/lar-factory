@@ -388,7 +388,7 @@ Brief gate
                                     Refused for agents: ask Pedro to Approve briefs in the board.
   record-gate <work-id> --file display.json --digest H --identity I --evidence E
                                     Refused for agents: ask Pedro to Approve brief in the board.
-                                    Set Needs you with the one wait command, then stop.
+                                    Use its board wait; never save a generic Needs you duplicate.
   Spec writes preserve prior text as Original. A digest on GitHub or revision on
   Azure identifies tracker edits; an unchanged ticket keeps an unsent brief.
   Concurrent tracker text wins, with the unsent text retained in gate history.

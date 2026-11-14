@@ -22,6 +22,13 @@ test.each(['concept', 'build'] as const)(
                     status: 'Shaping',
                     linkedPrs: [],
                     revision: 12,
+                    needsYou: {
+                        reason: 'A generic saved owner notice',
+                        offers: ['mark-handled', 'set-aside'],
+                        causes: [],
+                        ticketOpen: false,
+                    },
+                    releaseContinuation: { ready: false, digest: 'blocked', run: null },
                     threads: [
                         {
                             id: 'release-owner',

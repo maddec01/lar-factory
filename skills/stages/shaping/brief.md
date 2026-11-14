@@ -16,9 +16,9 @@ text kept as Original. From then on, trusted tracker edits update the record's
 copy. Follow [Ticket Specs](shared/issue-tracker/ticket-specs.md).
 
 Write for the team reading that ticket: lead with the result and observable
-acceptance criteria. Keep each fact once. Confirmed holds product decisions,
-not approval records. Keep delegation, gate evidence, factory work IDs and
-workflow mechanics in local records. Notes for the builder holds only constraints
+acceptance criteria. Keep facts once. Confirmed holds product decisions. Dependency/proof status
+belongs only in Dependency records, generated beside the brief/Spec. Keep
+approvals, delegation, factory IDs and workflow mechanics in records. Notes for the builder holds only constraints
 or references that cannot be rediscovered from the code, such as a chosen
 prototype branch; name affected files and shared contracts for overlap checks; omit line numbers
 and step-by-step implementation recipes. Omit empty optional sections. A routine brief should fit on one screen;

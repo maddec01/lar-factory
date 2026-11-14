@@ -22,6 +22,7 @@ import { afterEach, test, vi } from 'vite-plus/test';
 
 import { completeBrief } from '../../test/complete-brief.ts';
 import shapingHold from '../../test/fixtures/s07-shaping-hold.json' with { type: 'json' };
+import { legacyApprovalNotice } from '../../test/legacy-notice.ts';
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
@@ -1150,7 +1151,7 @@ test('a changed approved brief during Build carries a brief approval reason inst
     });
     work = records.setBuildBranch(work.workId, work.revision, 'build/same');
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
-    records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
+    legacyApprovalNotice(records, work.workId, 'Revised brief needs approval');
 
     const reviewed = records.doubtPackage(work.workId);
 
@@ -1302,7 +1303,10 @@ test('a confirmed scope amendment refreshes while the previous brief awaits repl
 
     records.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
     records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(scope.files)));
-    records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.');
+    assert.throws(
+        () => records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.'),
+        /board action/,
+    );
 
     const review = records.doubtPackage(work.workId);
 
@@ -1395,7 +1399,7 @@ test('an incomplete draft stays readable without offering approval or breaking t
     let work = records.create({ title: 'Incomplete bug', repository: REPO, kind: 'bug', status: 'Shaping' });
 
     work = records.setBody(work.workId, work.revision, 'brief', '## What\nFix the name bug.');
-    records.setNeedsYou(work.workId, work.revision, 'Approve brief in the board.');
+    assert.throws(() => records.setNeedsYou(work.workId, work.revision, 'Approve brief in the board.'), /board action/);
 
     const shown = recordItems(records, [], [REPO])[0]!;
 
@@ -1416,7 +1420,7 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
     });
     work = records.setBuildBranch(work.workId, work.revision, 'build/same');
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
-    records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
+    legacyApprovalNotice(records, work.workId, 'Revised brief needs approval');
 
     const shown = () => recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
@@ -1451,7 +1455,7 @@ for (const kind of ['concept', 'feature'] as const)
             );
             const ids = asked === 'parent' ? [parent.workId] : asked === 'members' ? parts.map((p) => p.workId) : [];
 
-            for (const id of ids) records.waitForUser(id, records.read(id).revision, 'Approve briefs in the board');
+            for (const id of ids) legacyApprovalNotice(records, id, 'Approve briefs in the board');
 
             const project = () => recordItems(records, [], [REPO]);
 

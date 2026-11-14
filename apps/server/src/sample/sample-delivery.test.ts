@@ -131,7 +131,7 @@ test('fake amended-brief controls preserve a saved notice while approval waits f
 
         expect(reviewing.briefReviewing).toBe(true);
         expect(reviewing.briefApproval).toBeUndefined();
-        expect(reviewing.needsYou?.reason).toBe('Approve revised brief after failed Verify.');
+        expect(reviewing.needsYou?.reason).toBe('Should narrow layouts wrap the greeting or preserve one line?');
         expect(deskItems(board.snapshot(), false)).toContain(reviewing);
         expect(await sample.itemDetails.details(reviewing)).toMatchObject({ spec: { outdated: true } });
         await sample.sampleControl({ action: 'brief-approval', change: 'doubt-ready' });

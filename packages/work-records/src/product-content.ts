@@ -1,3 +1,5 @@
+import { hasDependencyStatusProse } from '@lar-factory/shared';
+
 import { WorkRecordError } from './database.ts';
 
 /** Reject copied launch contracts before any body/history/digest changes, including legacy unmarked prompts. */
@@ -78,4 +80,13 @@ export function productContent(markdown: string): string {
     }
 
     return product.join('\n').trim();
+}
+
+/** Dependency delivery facts are generated alongside the byte-bound approved brief. */
+export function assertBriefContent(markdown: string): void {
+    if (hasDependencyStatusProse(markdown))
+        throw new WorkRecordError(
+            'invalid',
+            'Keep dependency and proof status in Dependency records; briefs contain product requirements and stable contract references.',
+        );
 }

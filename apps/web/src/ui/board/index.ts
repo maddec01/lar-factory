@@ -239,3 +239,4 @@ export { BriefChanges } from './BriefChanges';
 export { BriefApprovalDetails } from './BriefApprovalDetails';
 
 export { OutcomeForm } from './OutcomeForm';
+export { BriefDependencyStatus } from './BriefDependencyStatus';

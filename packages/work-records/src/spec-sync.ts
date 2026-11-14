@@ -1,5 +1,8 @@
 import {
     formatTicketSpec,
+    markDependencyStatus,
+    withoutDependencyStatus,
+    OUT_OF_DATE_SPEC,
     markSpecFreshness,
     withoutSpecFreshness,
     readTicketSpec,
@@ -402,13 +405,16 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
 
             let state = records.specState(workId);
 
+            const dependencies = records.blockingDependencies(workId);
+            const dependencyChanged =
+                state.active && state.base && markDependencyStatus(state.base.body, dependencies) !== state.base.body;
             const freshnessChanged =
                 state.active &&
                 state.base &&
-                (state.base.body !== withoutSpecFreshness(state.base.body)) !== !records.gate(workId).current;
+                withoutDependencyStatus(state.base.body).startsWith(OUT_OF_DATE_SPEC) !== !records.gate(workId).current;
 
             if (
-                (state.pending === null && !freshnessChanged) ||
+                (state.pending === null && !freshnessChanged && !dependencyChanged) ||
                 state.held ||
                 (!options.workId && (state.retryAfter ?? 0) > Date.now())
             )
@@ -451,9 +457,12 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                 if (!provider.replaceSpec) throw Error('The provider cannot write ticket Specs.');
 
                 const publishedSpec = state.pending ?? content(ticket).spec;
-                const body = markSpecFreshness(
-                    state.pending === null ? ticket.body : outgoing(ticket, state.pending, state.original),
-                    !records.gate(workId).current,
+                const body = markDependencyStatus(
+                    markSpecFreshness(
+                        state.pending === null ? ticket.body : outgoing(ticket, state.pending, state.original),
+                        !records.gate(workId).current,
+                    ),
+                    records.blockingDependencies(workId),
                 );
 
                 if (body === ticket.body) continue;

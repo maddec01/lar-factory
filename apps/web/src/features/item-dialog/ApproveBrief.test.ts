@@ -89,13 +89,21 @@ test('re-gating stays in Build, retains the approved Spec, and requires a second
 
     await settle(() => button('Approve brief').click());
     expect(text(dialog)).toContain('Complete proposed D2 brief.');
-    expect(text(dialog)).toContain('exact-approval-digest');
+
+    const details = [...dialog.querySelectorAll('details')].find(
+        (node) => text(node.querySelector('summary')) === 'Approval details',
+    )!;
+
+    expect(details).toBeDefined();
+    expect(details.open).toBe(false);
+    expect(text(details)).toContain(`Approval digest: ${approval.briefs[0]!.approvalDigest}`);
+    expect(text(details)).toContain(`Batch digest: ${approval.digest}`);
     expect(button('Request changes')).toBeDefined();
     expect(posted().some(([url]) => url === '/api/approve-brief')).toBe(false);
     await settle(() => button('Approve displayed brief').click());
     expect(posted()).toContainEqual([
         '/api/approve-brief',
-        { itemId: item.id, requestId: approval.requestId, digest: approval.digest },
+        { itemId: item.id, requestId: approval.requestId, digest: text(details).split('Batch digest: ')[1] },
     ]);
     expect(text(dialog)).toContain('Display it again.');
     expect(button('Approve brief')).toBeDefined();
@@ -160,77 +168,134 @@ test('successful approval reloads the open dialog so the new Spec replaces the o
     expect(text($('[data-description]'))).not.toContain('Approved D1');
 });
 
-test('a linked parent displays only its child batch gate and offers Request changes for that batch', async () => {
-    const parent = {
-        ...item,
-        id: 'linked-parent',
-        kind: 'build' as const,
-        flow: 'linked' as const,
-        status: 'Shaping' as const,
-        briefApproval: undefined,
-        buildPhase: null,
-    };
-    const children = [0, 1].map((index) => ({
-        ...item,
-        id: `linked-child-${index}`,
-        kind: 'build' as const,
-        parentId: parent.id,
-        status: 'Queued' as const,
-        buildPhase: null,
-        briefApproval: undefined,
-    }));
-    const linked = fresh({ ...sample, items: [parent, ...children] });
+test.each(['approve', 'request changes'])(
+    'a linked parent keeps batch digests folded and binds %s to the displayed batch',
+    async (action) => {
+        const parent = {
+            ...item,
+            id: 'linked-parent',
+            kind: 'build' as const,
+            flow: 'linked' as const,
+            status: 'Shaping' as const,
+            briefApproval: undefined,
+            buildPhase: null,
+        };
+        const children = [0, 1].map((index) => ({
+            ...item,
+            id: `linked-child-${index}`,
+            kind: 'build' as const,
+            parentId: parent.id,
+            status: 'Queued' as const,
+            buildPhase: null,
+            briefApproval: undefined,
+        }));
+        const linked = fresh({ ...sample, items: [parent, ...children] });
 
-    fetchMock.mockImplementation(async (url: string) => {
-        if (url === '/api/inspect-brief')
-            return new Response(
-                JSON.stringify({
-                    approval: {
-                        ...approval,
-                        briefs: children.map((child) => ({
-                            ...approval.briefs[0]!,
-                            workId: child.id,
-                            title: child.title,
-                        })),
-                    },
-                    error: null,
-                }),
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url === '/api/inspect-brief')
+                return new Response(
+                    JSON.stringify({
+                        approval: {
+                            ...approval,
+                            briefs: children.map((child) => ({
+                                ...approval.briefs[0]!,
+                                workId: child.id,
+                                title: child.title,
+                                approvalDigest: `approval-digest-${child.id}`,
+                            })),
+                        },
+                        error: null,
+                    }),
+                );
+
+            const id = detailsRead(url);
+
+            if (!id) return new Response(JSON.stringify(linked));
+
+            const reply = await detailsReply(item.id).json();
+
+            reply.details.record = {
+                bodyKind: 'brief',
+                body: 'Linked delivery context; the parent is not a delivery gate.',
+                context: '',
+                buildPhase: null,
+                reviewRounds: [],
+            };
+
+            return new Response(JSON.stringify(reply));
+        });
+        await mountPage(linked);
+
+        const { useItemDialogStore } = await import('./ItemDialogStore');
+
+        await settle(() => useItemDialogStore.getState().open(parent.id));
+
+        const dialog = $('[data-item-dialog]')!;
+        const buttons = () => [...dialog.querySelectorAll('button')];
+
+        expect(buttons().filter((button) => text(button) === 'Approve brief')).toHaveLength(0);
+        await settle(() =>
+            buttons()
+                .find((button) => text(button) === 'Approve briefs')!
+                .click(),
+        );
+        expect(posted()).toContainEqual([
+            '/api/inspect-brief',
+            { itemId: children[0]!.id, workIds: children.map((child) => child.id) },
+        ]);
+        expect(buttons().find((button) => text(button) === 'Request changes')).toBeDefined();
+
+        const details = [...dialog.querySelectorAll('details')].find(
+            (node) => text(node.querySelector('summary')) === 'Approval details',
+        )!;
+
+        expect(details).toBeDefined();
+        expect(details.open).toBe(false);
+        for (const child of children) expect(text(details)).toContain(`Approval digest: approval-digest-${child.id}`);
+        expect(text(details)).toContain(`Batch digest: ${approval.digest}`);
+
+        const displayedDigest = text(details).split('Batch digest: ')[1];
+
+        if (action === 'approve') {
+            await settle(() =>
+                buttons()
+                    .find((button) => text(button) === 'Approve displayed brief')!
+                    .click(),
+            );
+            expect(posted()).toContainEqual([
+                '/api/approve-brief',
+                { itemId: children[0]!.id, requestId: approval.requestId, digest: displayedDigest },
+            ]);
+        } else {
+            await settle(() =>
+                buttons()
+                    .find((button) => text(button) === 'Request changes')!
+                    .click(),
             );
 
-        const id = detailsRead(url);
+            const input = dialog.querySelector('input')!;
 
-        if (!id) return new Response(JSON.stringify(linked));
-
-        const reply = await detailsReply(item.id).json();
-
-        reply.details.record = {
-            bodyKind: 'brief',
-            body: 'Linked delivery context; the parent is not a delivery gate.',
-            context: '',
-            buildPhase: null,
-            reviewRounds: [],
-        };
-
-        return new Response(JSON.stringify(reply));
-    });
-    await mountPage(linked);
-
-    const { useItemDialogStore } = await import('./ItemDialogStore');
-
-    await settle(() => useItemDialogStore.getState().open(parent.id));
-
-    const dialog = $('[data-item-dialog]')!;
-    const buttons = () => [...dialog.querySelectorAll('button')];
-
-    expect(buttons().filter((button) => text(button) === 'Approve brief')).toHaveLength(0);
-    await settle(() =>
-        buttons()
-            .find((button) => text(button) === 'Approve briefs')!
-            .click(),
-    );
-    expect(posted()).toContainEqual([
-        '/api/inspect-brief',
-        { itemId: children[0]!.id, workIds: children.map((child) => child.id) },
-    ]);
-    expect(buttons().find((button) => text(button) === 'Request changes')).toBeDefined();
-});
+            await settle(() => {
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+                    input,
+                    'Keep the greeting readable.',
+                );
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            await settle(() =>
+                buttons()
+                    .find((button) => text(button) === 'Send change request')!
+                    .click(),
+            );
+            expect(posted()).toContainEqual([
+                '/api/request-brief-changes',
+                {
+                    itemId: children[0]!.id,
+                    requestId: approval.requestId,
+                    digest: displayedDigest,
+                    note: 'Keep the greeting readable.',
+                },
+            ]);
+        }
+    },
+);

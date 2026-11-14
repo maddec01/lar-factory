@@ -1,18 +1,16 @@
-import { Alert, Button, Field, Inline, Input, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, Field, Inline, Input, Stack } from '@lar-works/design-system';
 import { useId } from 'react';
 
 import { buttonKind } from './ButtonKinds';
 
 /** A parent delivery receipt, with the same evidence-entry pattern as release steps. */
 export function OutcomeForm({
-    what,
     evidence,
     onEvidence,
     onResult,
     pending,
     error,
 }: {
-    what: string;
     evidence: string;
     onEvidence: (value: string) => void;
     onResult: (result: 'passed' | 'failed') => void;
@@ -23,7 +21,6 @@ export function OutcomeForm({
 
     return (
         <Stack space="tight" data-outcome-form>
-            <Text>{what}</Text>
             <Field label="Outcome evidence" id={id}>
                 <Input
                     id={id}

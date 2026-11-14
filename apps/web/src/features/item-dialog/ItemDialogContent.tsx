@@ -129,14 +129,20 @@ export function ItemDialogContent({
                     {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
                     {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress
+                        outcomeControls={
+                            !item.setAside && (
+                                <RecordOutcome
+                                    key={`outcome-${item.id}-${item.revision}`}
+                                    item={item}
+                                    items={data.items}
+                                />
+                            )
+                        }
                         plan={item.releasePlan}
                         remaining={item.completion?.reasons}
                         name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
                     />
                     {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
-                    {!item.setAside && (
-                        <RecordOutcome key={`outcome-${item.id}-${item.revision}`} item={item} items={data.items} />
-                    )}
                     <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (!group || record.body?.trim() || record.answer?.trim()) && (
                             <RecordText

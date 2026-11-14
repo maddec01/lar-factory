@@ -93,7 +93,7 @@
 }
 
 /* Under 880px of row the title would drop below a readable width: source and kind move under it, and it takes their
-   columns. With no PR, the second line's text takes the PR's cell too. */
+   columns. The second line gives its activity text a full line below the track, count, PR and figures. */
 @container (width < 55rem) {
     .row-first,
     .row-second,
@@ -126,18 +126,21 @@
         grid-column: 5;
         grid-row: 1;
     }
-    .row-second > [data-col='next']:has(+ [data-col='pr']:empty) {
-        grid-column: 3 / 5;
+    /* Activity gets its own line instead of a shrinking column between the track and PR. */
+    .row-second > [data-col='next'] {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+    .row-second > [data-col='pr'] {
+        grid-column: 4;
+        grid-row: 1;
     }
     .row-second > [data-col='pr']:empty {
         display: none;
     }
     .row-second > [data-col='figures'] {
         grid-column: 5;
-    }
-    /* Without a bar or count the action begins under the title, where the narrow first line begins too. */
-    .row-second:has(> [data-col='bar']:empty):has(> [data-col='count']:empty) > [data-col='next'] {
-        grid-column: 1 / 4;
+        grid-row: 1;
     }
 }
 

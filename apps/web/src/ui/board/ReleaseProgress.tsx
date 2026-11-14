@@ -1,6 +1,7 @@
 import { plural, releaseHolds, type ReleaseEvidence, type ReleasePlan } from '@lar-factory/shared';
 import { CopyButton, Disclosure, Text, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { CheckIcon, CircleIcon } from '@lar-works/design-system/icons';
+import type { ReactNode } from 'react';
 
 import { DetailFact, MainSection, SectionHeader } from './ItemDetails';
 import { workHoldReason } from './work-hold-reason';
@@ -42,10 +43,12 @@ function Evidence({ evidence }: { evidence: ReleaseEvidence }) {
 export function ReleaseProgress({
     plan,
     remaining,
+    outcomeControls,
     name = (id) => id,
 }: {
     plan: ReleasePlan | null | undefined;
     remaining?: string[];
+    outcomeControls?: ReactNode;
     name?: (id: string) => string;
 }) {
     if (!plan) return null;
@@ -120,6 +123,7 @@ export function ReleaseProgress({
                         <Evidence evidence={outcome.evidence} />
                     </>
                 )}
+                {outcomeControls}
             </div>
             <DetailFact label="What's left">
                 {left.length || partNames.length ? (

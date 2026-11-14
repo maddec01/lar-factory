@@ -117,14 +117,22 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
 /** Statuses whose work may be under way, so a stopped thread or a T3 that can't be read matters to the row. */
 const UNDER_WAY: readonly Item['status'][] = ['Shaping', 'In progress', 'Review'];
 
-/** The thread a row follows: the newest at work, else the newest if it stopped work still under way. Threads come newest first. */
+/** The thread a row follows: the newest at work, or an unfinished build's idle owner, else the newest stopped owner. Threads come newest first. */
 export function itemActivityThread(item: Item): ItemThread | undefined {
     if (item.paused || item.archived || !Array.isArray(item.threads)) return undefined;
 
     const threads = ownerThreads(item).filter((thread) => !thread.archived);
     const atWork = threads.find((thread) => isLiveThread(thread) || thread.hasRunningChildren);
 
-    return atWork ?? (threads[0]?.state === 'stopped' && UNDER_WAY.includes(item.status) ? threads[0] : undefined);
+    const owner = threads.find((thread) => thread.purpose === 'build' && !thread.observedAt);
+    // Ending a turn does not finish the recorded build. Keep its last activity while that stage remains open.
+    const unfinished = ['In progress', 'Review'].includes(item.status) && item.buildPhase && owner?.state === 'done';
+
+    return (
+        atWork ??
+        (unfinished ? owner : undefined) ??
+        (threads[0]?.state === 'stopped' && UNDER_WAY.includes(item.status) ? threads[0] : undefined)
+    );
 }
 
 /** What `item`'s row shows at `now`; undefined when it shows no line. `unreadable` is a page that lost the server, whose threads may be out of date. */
@@ -137,7 +145,15 @@ export function itemActivityLine(item: Item, now: number, unreadable = false): T
 
     if (!thread) return undefined;
 
-    return unreadable ? UNAVAILABLE : threadActivityLine(thread, now);
+    if (unreadable) return UNAVAILABLE;
+
+    if (thread.state === 'done' && !isLiveThread(thread) && !thread.hasRunningChildren) {
+        const line = threadActivityLine({ ...thread, state: 'running' }, now);
+
+        return line?.state === 'quiet' || line?.state === 'unavailable' ? line : undefined;
+    }
+
+    return threadActivityLine(thread, now);
 }
 
 /** Who `item`'s thread has at work: its own action first, as the lead thread, then its agents. Undefined with nothing to list, and 'unavailable' when the line says so, so no old action reads as current. */

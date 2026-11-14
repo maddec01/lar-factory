@@ -145,6 +145,13 @@ test('an Outcome without an agent owner reaches the desk and records evidence th
 
     expect(form).not.toBeNull();
 
+    const dialog = document.querySelector('[data-item-dialog]')!;
+    const criterion = item.releasePlan.outcomeCheck.what;
+
+    expect(text(dialog).split(criterion)).toHaveLength(2);
+    expect(form.closest('[data-outcome-check]')).not.toBeNull();
+    expect(text(dialog.querySelector('[aria-label="What\'s left"]'))).toBe('Outcome check pending');
+
     const input = form.querySelector('input')!;
 
     await settle(() => {

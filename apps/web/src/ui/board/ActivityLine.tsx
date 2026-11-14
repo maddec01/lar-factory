@@ -80,8 +80,9 @@ export function ActivityLine({
     const shown = (
         <span
             data-activity={state}
+            title={[typeof action === 'string' && action, age, agents].filter(Boolean).join(' · ')}
             tabIndex={agentList ? 0 : undefined}
-            className="focus-ring flex min-w-0 items-center gap-1.5 rounded-xs"
+            className="focus-ring flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-xs"
         >
             <span data-mark className={`inline-block size-2 shrink-0 ${MARK[state]}`} />
             <Words state={state}>{action}</Words>

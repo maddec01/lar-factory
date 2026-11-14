@@ -119,5 +119,6 @@ test('ten unfinished builds fold into one summary beside the questions, release 
     expect(root.querySelectorAll('details li')).toHaveLength(10);
     expect(root.querySelectorAll('ul[aria-label="What\'s left"] > li')).toHaveLength(4);
     expect(root.textContent).toContain('Ship together · Pedro');
-    expect(root.textContent).toContain('Outcome check pending: Links open');
+    expect(root.textContent).toContain('Outcome check pending');
+    expect(root.textContent!.split('Links open')).toHaveLength(2);
 });

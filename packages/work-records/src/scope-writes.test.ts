@@ -105,7 +105,7 @@ it.each(['title', 'confirmedScope', 'gate'] as const)(
         if (field === 'title') other.retitle(work.workId, start.revision, 'Different understanding');
         else if (field === 'confirmedScope') other.confirmScope(work.workId, start.revision, scope, 'Pedro', 'Yes.');
         else {
-            const waiting = other.setNeedsYou(work.workId, start.revision, 'Approve this brief.');
+            const waiting = other.setNeedsYou(work.workId, start.revision, 'Should search match whole words?');
 
             other.recordGate(work.workId, waiting.revision, {
                 briefDigest: other.gate(work.workId).briefDigest!,

@@ -37,7 +37,7 @@ export function supersededReleaseQuestion(item: Item, thread: ItemThread | undef
 }
 
 /** Delivery parents continue their existing owner even when their stored status still says Shaping. */
-export function releaseContinuationReady(item: Item, all: readonly Item[]): boolean {
+export function releaseRecoveryAvailable(item: Item, all: readonly Item[]): boolean {
     const parts = all.filter((part) => part.parentId === item.id && !part.setAside);
 
     return (
@@ -45,12 +45,16 @@ export function releaseContinuationReady(item: Item, all: readonly Item[]): bool
         item.status !== 'Done' &&
         !!item.releasePlan &&
         (item.kind === 'concept' || item.flow === 'linked') &&
-        (item.releaseContinuation?.ready ??
+        (item.releaseContinuation?.ready === true ||
             (parts.some((part) => part.kind === 'build') &&
                 parts.every((part) => part.status === 'Done' || part.completion?.complete))) &&
-        !pendingPedroReleaseStep(item.releasePlan) &&
         (item.releasePlan.steps.some((step) => !step.done) || item.releasePlan.outcomeCheck.result !== 'passed')
     );
+}
+
+/** Automatic continuation still waits for any board-only Pedro step. */
+export function releaseContinuationReady(item: Item, all: readonly Item[]): boolean {
+    return releaseRecoveryAvailable(item, all) && !pendingPedroReleaseStep(item.releasePlan);
 }
 
 /** Failed delivery or an owner ending without its next receipt needs a board retry. */

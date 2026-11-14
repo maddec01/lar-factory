@@ -49,7 +49,7 @@ import { projectMapParts } from './map-parts.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { outcomeRecords } from './outcome-records.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
-import { assertProductContent, productContent } from './product-content.ts';
+import { assertProductContent, assertBriefContent, productContent } from './product-content.ts';
 import { requireProductQuestion } from './product-question.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
@@ -333,6 +333,7 @@ export interface WorkRecord {
     fogGone: boolean;
     /** Why it waits on the user in free text, such as a merge conflict; null when it doesn't. Its Status stays as it was. */
     needsYou: string | null;
+    needsYouReleaseStep?: string | null;
     /** The changes the board saw that make it wait on the user, such as a closed unmerged PR. Its Status stays as it was. */
     needsYouCauses: NeedsYouCause[];
     /** The project skills selected when its build started, or null before it starts. Later selections never change it. */
@@ -654,6 +655,7 @@ interface Row {
     answer_state: string | null;
     fog_gone_at: string | null;
     needs_you: string | null;
+    needs_you_release_step: string | null;
     needs_you_causes: string | null;
     skills: string | null;
     finished_at: string | null;
@@ -682,6 +684,7 @@ const fromRow = (row: Row): WorkRecord => ({
     decisionAnswer: row.answer_state ? (JSON.parse(row.answer_state) as DecisionAnswerState) : null,
     fogGone: row.fog_gone_at !== null,
     needsYou: row.needs_you,
+    needsYouReleaseStep: row.needs_you_release_step,
     needsYouCauses: row.needs_you_causes === null ? [] : (JSON.parse(row.needs_you_causes) as NeedsYouCause[]),
     skills: row.skills === null ? null : (JSON.parse(row.skills) as string[]),
     finishedAt: row.finished_at,
@@ -917,6 +920,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`);
     const writeBody = (workId: string, body: Body, markdown: string) => {
         assertProductContent(markdown);
+
+        if (body === 'brief' && records.body(workId, body) !== markdown) assertBriefContent(markdown);
 
         const digest =
             body === 'brief' && markdown.trim()
@@ -1694,10 +1699,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             requireProductQuestion(records, workId, why);
 
-            return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
+            return change(workId, revision, (row) =>
+                row.needs_you === why ? null : { needs_you: why, needs_you_release_step: null },
+            );
         },
         clearNeedsYou: (workId, revision) =>
-            change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
+            change(workId, revision, (row) =>
+                row.needs_you === null ? null : { needs_you: null, needs_you_release_step: null },
+            ),
         waitForUser: (workId, revision, reason) => {
             const why = checkFilled(reason, 'Needs you reason');
 
@@ -1706,7 +1715,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             return change(workId, revision, (row) =>
                 row.needs_you === why && row.status === 'Needs you'
                     ? null
-                    : { needs_you: why, status: 'Needs you', queue_order: null },
+                    : { needs_you: why, needs_you_release_step: null, status: 'Needs you', queue_order: null },
             );
         },
         resumeFromUser: (workId, revision, status) => {
@@ -1720,6 +1729,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     ? null
                     : {
                           needs_you: null,
+                          needs_you_release_step: null,
                           status: moved,
                           queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),
                       },
@@ -1736,7 +1746,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     ? null
                     : {
                           needs_you_causes: saved,
-                          ...(clearReason && { needs_you: null }),
+                          ...(clearReason && { needs_you: null, needs_you_release_step: null }),
                           ...(moved &&
                               moved !== row.status && {
                                   status: moved,

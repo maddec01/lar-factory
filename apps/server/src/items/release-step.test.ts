@@ -1,15 +1,20 @@
 import type { Item } from '@lar-factory/shared';
 import { deskWait, questionWaitReason } from '@lar-factory/shared';
 import { openWorkRecords } from '@lar-factory/work-records';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { expect, test, vi } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
 import { createOutcomeCheck } from './outcome-check.ts';
 import { recordItems } from './record-items.ts';
 import { createReleaseStep } from './release-step.ts';
+
+const fixture = JSON.parse(
+    readFileSync(new URL('../../../../packages/shared/test/s05-release-notice.json', import.meta.url), 'utf8'),
+);
 
 test('board approval settles only the duplicate T3 question and durably resumes activation once', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'release-owner-'));
@@ -197,6 +202,131 @@ test('board records Pedro evidence and clears the parent hold; refuses stale, em
         expect(records.completion(id).reasons.join(' ')).not.toContain('Release step activate');
         expect((await submit({})).status).toBe(409);
         expect(reread).toHaveBeenCalledTimes(1);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('S05-F2-001: saved release notice resolves on board receipt through activation, Outcome and Done', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'release-owner-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    try {
+        const id = records.create({ title: 'Greeting', repository: 'fake/app', kind: 'concept' }).workId;
+        const at = () => records.read(id).revision;
+
+        records.setFogGone(id, at(), true);
+
+        records.addThread(id, at(), 'owner', 'shape');
+
+        for (const [repository, number] of [
+            ['fake/a', 16],
+            ['fake/b', 11],
+            ['fake/c', 16],
+        ] as const) {
+            const part = records.createPart({
+                parentId: id,
+                parentRevision: at(),
+                title: `Deliver ${repository}`,
+                repository,
+                kind: 'build',
+                body: 'Deliver numeric v1 contract.',
+                blockerIds: [],
+            });
+
+            records.setPullRequest(part.workId, part.revision, `${repository}#${number}`);
+            records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
+        }
+        records.setReleasePlan(id, at(), {
+            steps: [
+                { id: 'stage-merged-manifest', who: 'Agent', what: 'Stage merged artifacts' },
+                { id: 'approve-joint-activation', who: 'Pedro', what: 'Approve activation of exact manifest' },
+                { id: 'activate', who: 'Agent', what: 'Activate approved manifest' },
+            ],
+            outcomeCheck: 'Actual composition',
+        });
+
+        records.completeReleaseStep(id, at(), 'stage-merged-manifest', 'Agent', 'Actual staged manifest.');
+
+        // Already-saved owner notice from the live run, written before the new notice guard.
+        const db = new DatabaseSync(join(dir, 'work.db'));
+
+        db.prepare("UPDATE work_records SET needs_you=?, status='Needs you' WHERE work_id=?").run(
+            fixture.savedNotice,
+            id,
+        );
+        db.close();
+
+        const owner = {
+            id: 'owner',
+            title: 'Release',
+            state: 'done' as const,
+            updated: '2026-11-14T12:00:00Z',
+            purpose: 'shape',
+        };
+        const items = () =>
+            recordItems(records, [], ['fake/app', 'fake/a', 'fake/b', 'fake/c']).map((item) =>
+                item.id === id ? { ...item, threads: [owner] } : item,
+            );
+        const board = createBoardState({ items: items(), repos: [{ repo: 'fake/app' }] } as never);
+        const reread = () => board.update({ items: items() });
+        const send = vi.fn().mockResolvedValue({ outcome: 'accepted', sequence: 1 });
+        const readProjection = vi.fn().mockResolvedValue({
+            thread: { id: 'owner' },
+            runtimeRequests: [],
+            turnItems: [],
+            runs: [{ status: 'completed' }],
+        });
+        const create = () => createReleaseStep({ board, records, reread, send, readProjection });
+        const before = board.find(id)!;
+
+        expect(deskWait(before, false, board.snapshot().items).action?.label).toBe('Mark release step done');
+        expect(
+            (
+                await create().completeReleaseStep(id, {
+                    revision: at(),
+                    stepId: 'approve-joint-activation',
+                    evidence: fixture.recordedApproval.evidence,
+                })
+            ).status,
+        ).toBe(200);
+        expect(send).toHaveBeenCalledTimes(1);
+
+        expect(records.read(id).needsYou).toBeNull();
+        expect(records.read(id).needsYouReleaseStep).toBeNull();
+        expect(records.releaseContinuation(id)).toMatchObject({ ready: true, run: { sent: true } });
+        expect(send.mock.calls[0]![0]).toMatchObject({
+            type: 'message.dispatch',
+            threadId: 'owner',
+            text: expect.stringContaining('activate'),
+        });
+        await create().reconcileReleaseContinuations();
+        expect(send).toHaveBeenCalledTimes(1);
+        // Only measured activation evidence unlocks Outcome; the board approval alone never completes delivery.
+        records.completeReleaseStep(id, at(), 'activate', 'Release owner', 'Activated exact approved manifest abc.');
+        reread();
+        expect(records.prepareOutcomeCheck(id).ready).toBe(true);
+        await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
+
+        const outcome = records.outcomeCheck(id).run!;
+
+        expect(send.mock.calls.at(-1)![0]).toMatchObject({
+            type: 'message.dispatch',
+            threadId: 'owner',
+            text: expect.stringContaining('final Outcome check'),
+        });
+        expect(records.completion(id).complete).toBe(false);
+        records.recordOutcomeCheck(
+            id,
+            at(),
+            'passed',
+            'Release owner',
+            'Exact merged SHA composition and legacy checks passed.',
+            outcome.digest,
+        );
+        await createOutcomeCheck({ board, records, reread, send }).reconcileOutcomeChecks();
+        expect(records.read(id).status).toBe('Done');
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

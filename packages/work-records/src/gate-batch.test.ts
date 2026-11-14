@@ -205,7 +205,7 @@ it('preserves one approved manifest through all members waiting, resuming and re
     const manifest = records.gateBatch(ids);
 
     for (const id of ids) {
-        const waiting = records.waitForUser(id, records.read(id).revision, 'Approve this batch');
+        const waiting = records.waitForUser(id, records.read(id).revision, 'Should search match whole words?');
         const observed = records.observe(id, waiting.revision, { of: 'ticket', state: 'open' });
 
         records.resumeFromUser(id, observed.revision, 'Shaping');

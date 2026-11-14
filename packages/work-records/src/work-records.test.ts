@@ -985,26 +985,29 @@ describe('work-record facts the board sets', () => {
 
         first.setNeedsYouCauses(build.workId, 1, [{ type: 'pr-closed' }]);
         expect(() => first.waitForUser(build.workId, 2, ' ')).toThrow(/reason/);
-        expect(() => first.waitForUser(build.workId, 1, 'Approve the brief.')).toThrow(/revision/i);
+        expect(() => first.waitForUser(build.workId, 1, 'Should search match whole words?')).toThrow(/revision/i);
         expect(first.read(build.workId)).toMatchObject({ status: 'Queued', needsYou: null, revision: 2 });
-        expect(first.waitForUser(build.workId, 2, 'Approve the brief.')).toMatchObject({
+        expect(first.waitForUser(build.workId, 2, 'Should search match whole words?')).toMatchObject({
             status: 'Needs you',
-            needsYou: 'Approve the brief.',
+            needsYou: 'Should search match whole words?',
             queueOrder: null,
             revision: 3,
         });
-        expect(first.waitForUser(build.workId, 3, 'Approve the brief.').revision).toBe(3);
+        expect(first.waitForUser(build.workId, 3, 'Should search match whole words?').revision).toBe(3);
         first.close();
 
         const reopened = await open(path);
 
-        expect(reopened.read(build.workId)).toMatchObject({ status: 'Needs you', needsYou: 'Approve the brief.' });
+        expect(reopened.read(build.workId)).toMatchObject({
+            status: 'Needs you',
+            needsYou: 'Should search match whole words?',
+        });
         for (const status of ['Needs you', 'Done', 'Nowhere'])
             expect(() => reopened.resumeFromUser(build.workId, 3, status as never)).toThrow(/Status/);
         expect(() => reopened.resumeFromUser(build.workId, 2, 'Shaping')).toThrow(/revision/i);
         expect(reopened.read(build.workId)).toMatchObject({
             status: 'Needs you',
-            needsYou: 'Approve the brief.',
+            needsYou: 'Should search match whole words?',
             revision: 3,
         });
         expect(reopened.resumeFromUser(build.workId, 3, 'Queued')).toMatchObject({
@@ -1015,7 +1018,7 @@ describe('work-record facts the board sets', () => {
             revision: 4,
         });
         expect(reopened.resumeFromUser(build.workId, 4, 'Queued').revision).toBe(4);
-        expect(reopened.waitForUser(build.workId, 4, 'Approve the brief.').revision).toBe(5);
+        expect(reopened.waitForUser(build.workId, 4, 'Should search match whole words?').revision).toBe(5);
         expect(reopened.resumeFromUser(build.workId, 5, 'Review')).toMatchObject({
             status: 'Review',
             needsYou: null,

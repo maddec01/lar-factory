@@ -14,6 +14,7 @@ import { useState } from 'react';
 
 import { ApproveBrief } from './ApproveBrief';
 import { BriefChangeHistory } from './BriefChangeHistory';
+import { DependencyStatus } from './DependencyStatus';
 import { isGroupParent } from './group-parent';
 import { SavedRunSettings } from './SavedRunSettings';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -128,6 +129,7 @@ export function RecordText({
                 <BriefChangeHistory itemId={item.id} requests={record.briefChangeRequests} refresh={refresh} />
             )}
             <ExportedLine exported={exported} />
+            {record.bodyKind === 'brief' && <DependencyStatus item={item} />}
             {reviewing && <Text role="status">{buildActivity(reviewing).label}</Text>}
             {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />

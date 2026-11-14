@@ -1,7 +1,7 @@
 # 4. Gate
 
 Input: saved brief, confirmed scope and affected work. Output: current Doubt
-and board-recorded approval, or a Needs you wait.
+and board approval, or its generated board wait.
 
 1. Run `lar-work gate <work ID>`. Resolve held edits in `specSync`; report read
    failures and warnings. Review its refreshed `display.brief` against code.
@@ -21,16 +21,16 @@ and board-recorded approval, or a Needs you wait.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
 4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
-   verbatim; ask Pedro to use Approve brief in the board. Wait in Needs you
-   using the single wait command in Questions. Feedback
+   verbatim; ask Pedro to use Approve brief in the board, then stop.
+   The gate generates its wait; never save a Needs you duplicate. Feedback
    returns to Shaping and Doubt. Reshape always requires renewed approval. Keep approval in gate evidence, never Confirmed.
    For grouped work, inspect `lar-work gate-batch --file ids.json`: complete briefs,
    source revisions, approval/batch digests and current immutable Doubt results.
    Only Pedro's **Approve brief** action in the board records approval. For a group,
    **Approve briefs** holds only parts needing approval and approves that batch atomically; any
    stale text, revision or Doubt result rejects the whole batch. Agent
-   `record-gate` and `record-gate-batch` calls refuse: use the one Needs you wait
-   command in Questions, ask Pedro to approve in the board, and stop. A Verify note,
+   `record-gate` and `record-gate-batch` calls refuse: ask Pedro to approve
+   in the board, then stop. A Verify note,
    an approver name or agent-written response reference never grants approval.
    If this gate supersedes an answer, run `lar-work supersede-answer` per
    [Completion](shared/issue-tracker/completion.md), reconcile

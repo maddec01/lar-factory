@@ -605,4 +605,5 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'CREATE TABLE release_continuations(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
+    (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_release_step TEXT'),
 ];

@@ -610,6 +610,11 @@ and `add-dependency-block` record it. Only Pedro's `mark-met` releases it;
 observed ticket closure or PR merge does not. `replace-dependency` can replace
 the hold with an onboarded build atomically.
 
+Dependency and proof status is generated beside briefs and published Specs from
+Dependency records. It supersedes legacy status prose without changing approved
+brief bytes or digests. Brief writes reject the bounded legacy status sentences;
+product requirements and fenced examples remain valid.
+
 Today: `create-part` and `slice.sh` create complete Queued delivery parts in any
 named repository. Ordinary `create` still defaults to List; private slices keep
 their existing behavior. There is no supported group amendment, merge/retitle
@@ -642,9 +647,12 @@ A blocker means merged work, not released software. `set-release-plan ID
 an `outcomeCheck` describing the final observable check. These records belong
 to a linked-work or concept parent. `complete-release-step` records the named
 step's done evidence and identity after preceding steps are done.
-Pedro's release steps, gates, Verify results and Outcome approvals use board
-buttons. Owners save the step or wait and end the turn; they never open a T3
-question for the same approval. A duplicate release question is shown as
+Pedro's release steps, gates, Verify results, Outcome approvals and merges use
+board controls. Owners save the step and end the turn; they never duplicate its
+wait with a generic Needs you notice or T3 question. Notice commands refuse such
+duplicates and point to the represented release step. A receipt resolves only
+its linked notice, with exact manifest/SHA pins; the observed legacy S05 wording
+is linked narrowly. Independent questions and tool approvals remain human holds. A duplicate release question is shown as
 superseded by the board step, including after its receipt is recorded.
 
 Completing a release step atomically saves its continuation intent when the next
@@ -659,7 +667,9 @@ per continuation/request. It sends no tool-approval decision. Mixed requests,
 different manifests and ordinary product questions remain Answer in T3.
 The owner continues ordered Agent steps using actual release evidence; the final
 receipt unlocks the existing durable Outcome dispatch below. Changed inputs or
-independent human holds stop the continuation. After delivery, a parent offers
+independent human holds stop the continuation. An idle owner retains Resume
+release even with a generic notice; dispatch still respects independent holds.
+After delivery, a parent offers
 Resume release for this same owner instead of launching another shaping thread.
 Explicit retries check current T3 activity and consume the parent revision;
 uncertain sends retain their IDs, accepted sends are not automatically repeated.

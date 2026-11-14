@@ -81,7 +81,7 @@ export function createReleaseStep({
                     creationSource: 'web',
                     attachments: [],
                     dispatchMode: { type: 'queue_after_active' },
-                    text: `Continue release of group ${item.id} in this same owner. Read lar-work release-plan ${item.id}, children and completion. The board's recorded Pedro receipts are authoritative: ${JSON.stringify(plan.steps.filter((step) => step.done?.by === 'Pedro'))}. Next recorded step: ${JSON.stringify(plan.steps.find((step) => !step.done) ?? null)}. Run only unfinished Agent steps, in order, against the exact approved manifest/digests/merged SHAs; record actual evidence with complete-release-step. Re-read before each step. Never repeat a completed operation or expand the approval. When a Pedro step is next, leave it on the board and end the turn; never ask its approval in a T3 question. After every release receipt the board requests the final Outcome check. Merges alone prove neither activation nor Outcome.`,
+                    text: `Continue release of group ${item.id} in this same owner. Read lar-work release-plan ${item.id}, children and completion. The board's recorded Pedro receipts are authoritative: ${JSON.stringify(plan.steps.filter((step) => step.done?.by === 'Pedro'))}. Next recorded step: ${JSON.stringify(plan.steps.find((step) => !step.done) ?? null)}. Run only unfinished Agent steps, in order, against the exact approved manifest/digests/merged SHAs; record actual evidence with complete-release-step. Re-read before each step. Never repeat a completed operation or expand the approval. When a Pedro step is next, leave it on the board and end the turn; never duplicate it with a generic Needs you notice or a T3 question. After every release receipt the board requests the final Outcome check. Merges alone prove neither activation nor Outcome.`,
                 });
 
                 records.releaseContinuationDelivered(
@@ -120,8 +120,19 @@ export function createReleaseStep({
 
                 const continuation = records.prepareReleaseContinuation(id);
 
-                if (!continuation.ready)
-                    throw new Error('Complete the delivery parts and any pending board step first.');
+                if (!continuation.ready) {
+                    const step = pendingPedroReleaseStep(records.releasePlan(id));
+
+                    throw new Error(
+                        step
+                            ? `Complete release step ${step.id} with Mark release step done first.`
+                            : records.read(id).needsYou
+                              ? 'Resolve the Needs you notice before resuming release.'
+                              : 'Complete the delivery parts and any pending board step first.',
+                    );
+                }
+
+                const retryRevision = records.read(id).revision;
 
                 if (continuation.run?.sent || continuation.run?.rejected) {
                     const projection = await readProjection(continuation.run.threadId);
@@ -136,7 +147,7 @@ export function createReleaseStep({
                     )
                         throw new Error('The release owner is already working.');
 
-                    records.retryReleaseContinuation(id, record.revision);
+                    records.retryReleaseContinuation(id, retryRevision);
                 }
 
                 await reconcileReleaseContinuations();

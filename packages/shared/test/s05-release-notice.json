@@ -1,0 +1,8 @@
+{
+    "savedNotice": "Release step approve-joint-activation awaits Pedro in the board. Inspect the staged manifest /tmp/s05/staged/manifest-2387e9fe3065db37fd3886f6cc067886ba60b10b8d7cdbd01282a7e480b218bf.json, SHA256 2387e9fe3065db37fd3886f6cc067886ba60b10b8d7cdbd01282a7e480b218bf, and approve only these exact three repository/PR/merged-SHA artifacts together. stage-merged-manifest has its actual Agent receipt; do not repeat staging. No Pedro activation receipt is recorded. After board approval, resume In progress in this same owner for activate-local-artifacts against this manifest, then actual composition/version-rejection/legacy Outcome. Activation and Outcome are still pending.",
+    "recordedApproval": {
+        "by": "Pedro",
+        "evidence": "Pedro approves only joint local sandbox activation of manifest /tmp/s05/staged/manifest-2387e9fe3065db37fd3886f6cc067886ba60b10b8d7cdbd01282a7e480b218bf.json; SHA256 2387e9fe3065db37fd3886f6cc067886ba60b10b8d7cdbd01282a7e480b218bf; 11153 bytes. Exact merged artifacts: A PR16 5a34fe853afc5c84d37ac0ef907c41ec5d4ab813; B PR11 bd1bcb964819fb96129c8778a9e840077d13a591; C PR16 1bf354b5c187ffb0256a9e42169a28751e7fead0. Independent audit verified all28 Git blobs/file hashes, all21 unchanged seed files, PR-head/merge-tree equality and current brief gates. This approves these exact three artifacts together only. No production deployment or extra scope. Actual activation and Outcome are still required; this is not an Outcome pass.",
+        "at": "2026-11-14T10:34:30.565Z"
+    }
+}

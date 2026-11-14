@@ -40,4 +40,5 @@ build is the user's choice and needs their approval of the plan. Once they
 approve, make the build as above and run
 `lar-work replace-dependency <Dependency ID> --revision N --build <work ID>`.
 
-After group Dependency changes, follow [Reconcile group](../reconcile-group.md).
+Keep proof/status in Dependency records, never brief prose.
+After changes, [Reconcile group](../reconcile-group.md).

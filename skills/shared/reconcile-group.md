@@ -18,8 +18,8 @@ Spec stays visibly out of date until re-gated.
 
 Use `build-overlap` and `doubt-package`; record ordering or Doubt's current reason
 for each overlap. After source edits, rerun Doubt and [Gate](../gate.md) for
-affected briefs needing approval. Stop in Needs you through Questions for Pedro's
-board approval, then resume reconciliation.
+affected briefs needing approval. Stop for Pedro's board approval, without a generic Needs you duplicate;
+then resume reconciliation.
 
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use
 `refresh-projections GROUP_ID --file F`: `{revisions:{ID:N},answers:{ID:text},map?}`

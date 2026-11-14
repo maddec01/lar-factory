@@ -72,3 +72,20 @@ test('scope questions and tool approvals about releases remain in T3', () => {
     thread.pendingRequest!.kind = 'tool-approval';
     expect(deskWait(item).label).toBe('Approval in T3');
 });
+
+test.each([false, true])(
+    'idle release recovery stays available with a generic notice, approval done=%s',
+    async (done) => {
+        const { releaseRecoveryAvailable } = await import('./release-continuation.ts');
+        const item = {
+            ...parent(done),
+            threads: [],
+            releaseContinuation: { ready: false, digest: 'hold', run: null },
+            needsYou: { reason: 'Independent scope question', offers: [], causes: [], ticketOpen: false },
+        };
+        const parts = [{ id: 'part', kind: 'build', parentId: item.id, status: 'Done' } as Item];
+
+        expect(releaseRecoveryAvailable(item, parts)).toBe(true);
+        expect(deskWait(item, false, parts).action?.label).toBe(done ? 'Resume release' : 'Mark release step done');
+    },
+);

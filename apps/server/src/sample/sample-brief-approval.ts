@@ -37,5 +37,6 @@ export async function sampleBriefApproval(
 
     if (reviewed) records.recordDoubt(id, input.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.', []);
 
-    records.waitForUser(id, work.revision, 'Approve revised brief after failed Verify.');
+    // An independent scope question can coexist with the generated gate wait.
+    records.waitForUser(id, work.revision, 'Should narrow layouts wrap the greeting or preserve one line?');
 }

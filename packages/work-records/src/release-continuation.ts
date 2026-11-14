@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Database } from './database.ts';
 import { WorkRecordError } from './database.ts';
 import { gateOwner } from './gate-resume.ts';
+import { resolveReleaseNotice } from './release-notice.ts';
 import type { WorkRecords } from './work-records.ts';
 
 /** Same durable dispatch contract as Outcome: one pair of T3 IDs per release input. */
@@ -71,6 +72,8 @@ export function releaseContinuationRecords(database: Database, get: () => WorkRe
         releaseContinuation: (id: string) => database.read(() => inspect(id)),
         prepareReleaseContinuation: (id: string) =>
             database.write(() => {
+                resolveReleaseNotice(database, get().read(id));
+
                 const current = inspect(id);
 
                 if (!current.ready || current.run) return current;

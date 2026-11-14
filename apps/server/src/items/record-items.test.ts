@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../../test/complete-brief.ts';
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
@@ -700,7 +701,7 @@ test('concept counts completed decision facts while its Status remains Shaping, 
 
     let ready = records.create({ repository: REPO, kind: 'build', title: 'Ready work', status: 'Ready' });
 
-    ready = records.setBody(ready.workId, ready.revision, 'brief', 'A private passing brief.');
+    ready = records.setBody(ready.workId, ready.revision, 'brief', completeBrief('A private passing brief.'));
     records.recordGate(ready.workId, ready.revision, {
         briefDigest: records.gate(ready.workId).briefDigest!,
         approvedBy: 'reviewer',
@@ -1063,14 +1064,14 @@ test('a changed approved brief during Build carries a brief approval reason inst
     const records = await open();
     let work = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'In progress' });
 
-    work = records.setBody(work.workId, work.revision, 'brief', 'Approved D1.');
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved D1.'));
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
         approvedBy: 'Pedro',
         evidence: 'Board approval.',
     });
     work = records.setBuildBranch(work.workId, work.revision, 'build/same');
-    work = records.setBody(work.workId, work.revision, 'brief', 'Proposed D2.');
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
     records.waitForUser(work.workId, work.revision, 'Revised brief needs approval');
 
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
@@ -1090,7 +1091,7 @@ test('a group projects the live reconciliation count and record-backed ships-wit
             parentId: group.workId,
             parentRevision: records.read(group.workId).revision,
             kind: 'build',
-            body: 'Reconnect safely.',
+            body: completeBrief('Reconnect safely.'),
             blockerIds: [],
         }),
     );
@@ -1126,13 +1127,13 @@ for (const status of ['Ready', 'Queued'] as const) {
         const records = await open();
         let work = records.create({ title: 'Held', repository: REPO, kind: 'build', status });
 
-        work = records.setBody(work.workId, work.revision, 'brief', 'Approved brief.');
+        work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved brief.'));
         records.recordGate(work.workId, work.revision, {
             briefDigest: records.gate(work.workId).briefDigest!,
             approvedBy: 'Pedro',
             evidence: 'Board approval.',
         });
-        work = records.setBody(work.workId, work.revision, 'brief', 'Changed brief.');
+        work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Changed brief.'));
 
         const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
@@ -1148,7 +1149,7 @@ test('an unrelated concept map edit preserves a reviewed gate', async () => {
     const records = await open();
     let work = records.create({ title: 'Source hold', repository: REPO, kind: 'build', status: 'Ready' });
 
-    work = records.setBody(work.workId, work.revision, 'brief', 'Keep the agreed contract.');
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Keep the agreed contract.'));
 
     let parent = records.create({ title: 'Source concept', repository: REPO, kind: 'concept' });
 
@@ -1181,7 +1182,7 @@ test('withdrawn approval asks for a new gate without claiming the brief or sourc
     const records = await open();
     let work = records.create({ title: 'Approval withdrawn', repository: REPO, kind: 'build', status: 'Ready' });
 
-    work = records.setBody(work.workId, work.revision, 'brief', 'Unchanged brief.');
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Unchanged brief.'));
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
         approvedBy: 'Pedro',
@@ -1200,17 +1201,17 @@ test('a confirmed scope amendment refreshes while the previous brief awaits repl
     const work = records.create({ title: 'CLI greeting', repository: REPO, kind: 'feature' });
     const scope = {
         files: ['cli.js'],
-        tests: [],
+        tests: ['`test/cli.test.js`: prints the greeting.'],
         behaviour: ['Print the greeting.'],
         excluded: [],
         size: 'Small' as const,
         verify: { required: false, visibleUi: null },
     };
     const brief = (files: string[]) =>
-        `## Done when\n### Behaviour\n- Print the greeting.\n\n## Scope\n### Files\n${files.map((file) => `- ${file}`).join('\n')}\n### Size\nSmall\n\n## Verify\nno\n`;
+        `## Done when\n### Behaviour\n- Print the greeting.\n### Tests\n- \`test/cli.test.js\`: prints the greeting.\n\n## Scope\n### Files\n${files.map((file) => `- ${file}`).join('\n')}\n### Size\nSmall\n\n## Verify\nno\n`;
 
     records.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
-    records.setBody(work.workId, records.read(work.workId).revision, 'brief', brief(scope.files));
+    records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(scope.files)));
     records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.');
     assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval);
 
@@ -1223,7 +1224,7 @@ test('a confirmed scope amendment refreshes while the previous brief awaits repl
     assert.equal(waiting.title, 'CLI greeting');
     assert.equal(waiting.briefApproval, undefined, 'the old brief cannot offer approval');
     assert.equal(waiting.passingBrief, false);
-    records.setBody(work.workId, records.read(work.workId).revision, 'brief', brief(amended.files));
+    records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(amended.files)));
     assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval, 'a matching replacement offers approval again');
 });
 
@@ -1253,7 +1254,7 @@ test('keeps retired concept parts in history with creation order and survivor, n
             title,
             kind: 'build',
             repository: REPO,
-            body: 'Build it',
+            body: completeBrief('Build it'),
             blockerIds: [],
         });
     const retired = part('b04');
@@ -1286,4 +1287,18 @@ test('keeps retired concept parts in history with creation order and survivor, n
         archivedItems(records, [], [REPO], new Set()).find((item) => item.id === retired.workId)?.supersededBy?.title,
         'b05',
     );
+});
+
+test('an incomplete draft stays readable without offering approval or breaking the board', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Incomplete bug', repository: REPO, kind: 'bug', status: 'Shaping' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', '## What\nFix the name bug.');
+    records.setNeedsYou(work.workId, work.revision, 'Approve brief in the board.');
+
+    const shown = recordItems(records, [], [REPO])[0]!;
+
+    assert.equal(shown.title, 'Incomplete bug');
+    assert.equal(shown.briefApproval, undefined);
+    assert.equal(shown.passingBrief, false);
 });

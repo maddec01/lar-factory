@@ -13,6 +13,8 @@ import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-work
 import { useState } from 'react';
 
 import { ApproveBrief } from './ApproveBrief';
+import { BriefChangeHistory } from './BriefChangeHistory';
+import { isGroupParent } from './group-parent';
 import { SavedRunSettings } from './SavedRunSettings';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction } from '@/services/board/board.service';
@@ -86,18 +88,19 @@ export function RecordText({
 }) {
     const [exported, setExported] = useState<Exported>({ state: 'idle' });
     const items = useBoardStore((state) => state.data.items);
-    const pendingBriefs =
-        record.bodyKind === 'map'
-            ? items
-                  .filter(
-                      (part) =>
-                          part.parentId === item.id &&
-                          part.passingBrief === false &&
-                          !['concept', 'decision', 'slice'].includes(part.kind) &&
-                          part.status !== 'Done',
-                  )
-                  .map((part) => part.id)
-            : [];
+    const group = isGroupParent(item, items);
+    const pendingBriefs = group
+        ? items
+              .filter(
+                  (part) =>
+                      part.parentId === item.id &&
+                      part.passingBrief === false &&
+                      !part.briefChangesRequested &&
+                      !['concept', 'decision', 'slice'].includes(part.kind) &&
+                      part.status !== 'Done',
+              )
+              .map((part) => part.id)
+        : [];
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
         record.bodyKind === 'map'
@@ -118,13 +121,18 @@ export function RecordText({
             }
             data-record
         >
+            {record.briefChangeRequests && (
+                <BriefChangeHistory itemId={item.id} requests={record.briefChangeRequests} refresh={refresh} />
+            )}
             <ExportedLine exported={exported} />
             {!item.setAside && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
-            {!item.setAside &&
+            {!group &&
+                !item.setAside &&
                 record.bodyKind === 'brief' &&
                 record.body &&
+                !item.briefChangesRequested &&
                 item.passingBrief === false &&
                 item.status !== 'Done' && <ApproveBrief itemId={item.id} onApproved={refresh} />}
             {!spec && (
@@ -142,6 +150,20 @@ export function RecordText({
                 <Disclosure label="Original question" presentation="section">
                     <MarkdownDiagrams text={body} />
                 </Disclosure>
+            )}
+            {record.reviewers && (
+                <FactList data-selected-reviewers>
+                    {record.reviewers.map((reviewer) => (
+                        <DetailFact
+                            key={reviewer.id}
+                            label={`${reviewer.name} · ${reviewer.status}`}
+                            presentation="record"
+                        >
+                            <Text>{reviewer.reason}</Text>
+                            {reviewer.result && <Text>{reviewer.result}</Text>}
+                        </DetailFact>
+                    ))}
+                </FactList>
             )}
             {record.runSettings && <SavedRunSettings runs={record.runSettings} />}
             {buildPhase && (

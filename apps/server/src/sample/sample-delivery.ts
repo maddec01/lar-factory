@@ -100,7 +100,7 @@ export function sampleDelivery(records: WorkRecords) {
                 stale.workId,
                 stale.revision,
                 'brief',
-                '## Approved brief\nKeep the greeting on one line.',
+                '## Done when\nKeep the greeting on one line.\n### Tests\n`test/greeting.test.js`: preserves the greeting.\n## Scope\n### Files\n`src/greeting.js`',
             );
             records.recordGate(stale.workId, stale.revision, {
                 briefDigest: records.gate(stale.workId).briefDigest!,
@@ -111,7 +111,7 @@ export function sampleDelivery(records: WorkRecords) {
                 stale.workId,
                 stale.revision,
                 'brief',
-                '## Changed brief\nWrap the greeting on narrow screens.',
+                '## Done when\nWrap the greeting on narrow screens.\n### Tests\n`test/greeting.test.js`: wraps on narrow screens.\n## Scope\n### Files\n`src/greeting.js`',
             );
 
             return groupId;

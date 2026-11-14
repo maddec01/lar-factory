@@ -205,7 +205,7 @@ it('selects through the CLI with saved modes and custom rules, atomically starti
     expect(reopened.read(record.workId)).toMatchObject({
         status: 'Review',
         buildPhase: 'review',
-        revision: before.revision + 1,
+        revision: before.revision + 2,
     });
     expect(reopened.reviewRounds(record.workId)).toEqual([]);
     reopened.close();
@@ -257,7 +257,7 @@ it('accepts Code requests through the CLI and saves their provenance with the re
 
     expect(reviewers.filter((entry) => entry.escalation).map((entry) => entry.id)).toEqual(['security']);
     expect(reviewers.filter((entry) => entry.run).map((entry) => entry.id)).toEqual(['code', 'security']);
-    expect(run('read', record.workId).revision).toBe(2);
+    expect(run('read', record.workId).revision).toBe(3);
 
     const roundFile = join(data, 'round.json');
 
@@ -274,7 +274,7 @@ it('accepts Code requests through the CLI and saves their provenance with the re
             })),
         }),
     );
-    expect(run('record-review-round', record.workId, '--revision', '2', '--file', roundFile).revision).toBe(3);
+    expect(run('record-review-round', record.workId, '--revision', '3', '--file', roundFile).revision).toBe(4);
     expect(
         run('review-rounds', record.workId)[0].reviewers.find((entry: { axis: string }) => entry.axis === 'security'),
     ).toMatchObject({ verdict: 'approve', escalation });
@@ -346,7 +346,7 @@ it('selects from the named run after Settings edits, returning frozen instructio
         expect(reread.read(record.workId)).toMatchObject({
             status: 'Review',
             buildPhase: 'review',
-            revision: before.revision + 1,
+            revision: before.revision + 2,
         });
     } finally {
         reread.close();

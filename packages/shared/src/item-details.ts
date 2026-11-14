@@ -31,6 +31,23 @@ export interface ItemComment {
     format: TextFormat;
 }
 
+export interface BriefChangeRequest {
+    requestId: string;
+    note: string;
+    by: string;
+    at: string;
+    briefDigest: string;
+    delivery: {
+        ownerWorkId?: string;
+        workIds?: string[];
+        threadId: string;
+        commandId: string;
+        messageId: string;
+        sent: boolean;
+        error: string | null;
+    };
+}
+
 /** A review round as the item dialog shows it: each reviewer's verdict and how many of its findings are still open. */
 export interface RecordReviewRound {
     round: number;
@@ -63,6 +80,8 @@ export interface RecordDetails {
     /** The build's review rounds, oldest first. */
     reviewRounds: RecordReviewRound[];
     runSettings?: SavedRunChoices[];
+    briefChangeRequests?: BriefChangeRequest[];
+    reviewers?: { id: string; name: string; reason: string; status: string; result?: string }[];
 }
 
 export interface ItemDetails {

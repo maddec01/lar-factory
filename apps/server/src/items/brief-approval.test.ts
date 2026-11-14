@@ -5,9 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../../test/complete-brief.ts';
 import { createBoardState } from '../board/board-state.ts';
 import type { sendThreadCommand } from '../t3/thread-commands.ts';
 import { createBriefApproval } from './brief-approval.ts';
+import { recordItems } from './record-items.ts';
 
 const opened: { dir: string; records: WorkRecords }[] = [];
 
@@ -32,7 +34,7 @@ async function setup() {
             status: 'Shaping',
         });
 
-        work = records.setBody(work.workId, work.revision, 'brief', `Complete brief ${index}.`);
+        work = records.setBody(work.workId, work.revision, 'brief', completeBrief(`Complete brief ${index}.`));
 
         const input = records.doubtPackage(work.workId);
 
@@ -77,7 +79,7 @@ test('board approval requires a displayed one-use request and supplies its own o
 
     const preview = await s.inspect();
 
-    expect(preview.briefs[0]?.brief).toBe('Complete brief 0.');
+    expect(preview.briefs[0]?.brief).toBe(completeBrief('Complete brief 0.'));
 
     const waiting = s.records.read(id);
 
@@ -99,7 +101,7 @@ test('board batch approval is atomic and a stale brief refuses every member', as
     const preview = await s.inspect(s.ids);
     const last = s.records.read(s.ids[1]!);
 
-    s.records.setBody(last.workId, last.revision, 'brief', 'Changed after display.');
+    s.records.setBody(last.workId, last.revision, 'brief', completeBrief('Changed after display.'));
     expect((await s.commands.approveBrief(s.ids[0]!, preview)).status).toBe(409);
     expect(s.ids.map((id) => s.records.gate(id).evidence)).toEqual([[], []]);
 
@@ -179,6 +181,11 @@ test('S06 batch approval readies Queued children and automatically notifies thei
     expect((await commands.approveBrief(s.ids[0]!, approval)).status).toBe(200);
     expect(s.ids.map((id) => s.records.read(id).status)).toEqual(['Ready', 'Ready']);
     expect(s.records.read(parent.workId)).toMatchObject({ status: 'Shaping', needsYou: null });
+    expect(
+        (await commands.requestBriefChanges(s.ids[0]!, { ...approval, note: 'Do not send this after approval.' }))
+            .status,
+    ).toBe(409);
+    for (const id of s.ids) expect(s.records.briefChangeRequests(id)).toEqual([]);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]?.[0]).toMatchObject({
         threadId: 'owner-thread',
@@ -238,3 +245,229 @@ test('a recorded approval retries its same owner notification after an unconfirm
     expect(records.pendingGateResumes()).toEqual([]);
     expect(records.gate(id).evidence).toHaveLength(1);
 });
+
+test('Request changes saves Pedro’s note for every displayed member, keeps gates and resumes the shaping owners', async () => {
+    const s = await setup();
+    const send = vi.fn<typeof import('../t3/thread-commands.ts').sendThreadCommand>(async () => ({
+        outcome: 'accepted' as const,
+        sequence: 1,
+    }));
+    const board = createBoardState({
+        items: s.ids.map((id) => ({ id }) as Item),
+        repos: [],
+        firstRead: { settled: true },
+    } as never);
+
+    for (const id of s.ids) {
+        const work = s.records.read(id);
+
+        s.records.addThread(id, work.revision, `shape-${id}`, 'shape');
+    }
+
+    const commands = createBriefApproval({
+        board,
+        records: s.records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        identity: () => 'Pedro',
+        send,
+    });
+    const displayed = await commands.inspectBrief(s.ids[0]!, { workIds: s.ids });
+    const approval = (displayed.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect(
+        (await commands.requestBriefChanges(s.ids[0]!, { ...approval, note: 'Name the failing test.', by: 'spoof' }))
+            .status,
+    ).toBe(200);
+    for (const id of s.ids) {
+        expect(s.records.read(id).status).toBe('Shaping');
+        expect(recordItems(s.records, [], ['fake/app']).find((item) => item.id === id)).toMatchObject({
+            status: 'Shaping',
+            briefChangesRequested: true,
+        });
+        expect(recordItems(s.records, [], ['fake/app']).find((item) => item.id === id)?.briefApproval).toBeUndefined();
+        expect(s.records.briefChangeRequests(id)[0]).toMatchObject({
+            by: 'Pedro',
+            note: 'Name the failing test.',
+            delivery: { sent: true },
+        });
+    }
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+        type: 'message.dispatch',
+        text: expect.stringContaining('Name the failing test.'),
+    });
+    expect((await commands.approveBrief(s.ids[0]!, approval)).status).toBe(409);
+});
+
+test('a failed change-request delivery keeps approval history and retries the same message after reopening records', async () => {
+    const s = await setup();
+    const id = s.ids[0]!;
+
+    s.records.addThread(id, s.records.read(id).revision, 'shaping-owner', 'shape');
+
+    const send = vi
+        .fn<typeof import('../t3/thread-commands.ts').sendThreadCommand>()
+        .mockResolvedValueOnce({ outcome: 'accepted', sequence: 1 })
+        .mockResolvedValueOnce({ outcome: 'unconfirmed', reason: 'Connection lost' })
+        .mockResolvedValue({ outcome: 'accepted', sequence: 1 });
+    const board = createBoardState({ items: [{ id }], repos: [] } as never);
+    const dependencies = {
+        board,
+        records: s.records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        identity: () => 'Pedro',
+        send,
+    };
+    const commands = createBriefApproval(dependencies);
+    const shown = await commands.inspectBrief(id, {});
+    const approval = (shown.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect((await commands.approveBrief(id, approval)).status).toBe(200);
+
+    const prior = s.records.gate(id);
+    const next = await commands.inspectBrief(id, {});
+    const display = (next.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect(
+        (await commands.requestBriefChanges(id, { ...display, note: 'Add the missing boundary assertion.' })).status,
+    ).toBe(200);
+    expect(s.records.gate(id)).toEqual(prior);
+    expect(s.records.briefChangeRequests(id)[0]).toMatchObject({
+        by: 'Pedro',
+        at: expect.stringMatching(/^\d{4}-/),
+        delivery: { sent: false, error: 'Connection lost' },
+    });
+
+    // A fresh board command instance has no in-memory inspection receipt, but can resume durable delivery.
+    const reopened = createBriefApproval(dependencies);
+
+    expect((await reopened.retryBriefChanges(id)).status).toBe(200);
+    expect(send.mock.calls[2]?.[0]).toEqual(send.mock.calls[1]?.[0]);
+    expect(s.records.briefChangeRequests(id)[0]?.delivery.sent).toBe(true);
+    expect(s.records.read(id).status).toBe('Shaping');
+    expect(recordItems(s.records, [], ['fake/app']).find((item) => item.id === id)).toMatchObject({
+        status: 'Shaping',
+        briefChangesRequested: true,
+    });
+    expect(recordItems(s.records, [], ['fake/app']).find((item) => item.id === id)?.briefApproval).toBeUndefined();
+});
+
+test('a stale batch change request or empty note writes no member', async () => {
+    const s = await setup();
+    const preview = await s.inspect(s.ids);
+    const id = s.ids[0]!;
+    const before = s.ids.map((member) => s.records.read(member));
+
+    expect((await s.commands.requestBriefChanges(id, { ...preview, note: ' ' })).status).toBe(409);
+    expect(s.ids.map((member) => s.records.read(member))).toEqual(before);
+
+    const last = s.records.read(s.ids[1]!);
+
+    s.records.setBody(last.workId, last.revision, 'brief', completeBrief('Changed before request.'));
+    expect((await s.commands.requestBriefChanges(id, { ...preview, note: 'Rework this.' })).status).toBe(409);
+    for (const member of s.ids) expect(s.records.briefChangeRequests(member)).toEqual([]);
+});
+
+test.each(['accepted', 'unconfirmed'] as const)(
+    'Request changes on a linked batch sends one owner note without an approval notification (%s)',
+    async (outcome) => {
+        const s = await setup();
+        let parent = s.records.create({
+            title: 'Linked work',
+            repository: 'fake/app',
+            kind: 'build',
+            status: 'Shaping',
+        });
+
+        parent = s.records.addThread(parent.workId, parent.revision, 'linked-owner', 'shape');
+        parent = s.records.addThread(parent.workId, parent.revision, 'linked-builder', 'build');
+        s.records.waitForUser(parent.workId, parent.revision, 'Approve briefs in the board');
+
+        const ids = s.ids.map(
+            (_, index) =>
+                s.records.createPart({
+                    parentId: parent.workId,
+                    parentRevision: s.records.read(parent.workId).revision,
+                    title: `Linked part ${index}`,
+                    repository: 'fake/app',
+                    kind: 'build',
+                    body: completeBrief(`Complete linked brief ${index}.`),
+                    blockerIds: [],
+                }).workId,
+        );
+
+        s.ids.splice(0, s.ids.length, ...ids);
+        for (const id of s.ids) {
+            const input = s.records.doubtPackage(id);
+
+            s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Linked batch reviewed.', []);
+        }
+        expect(() => s.records.displayGate(parent.workId)).toThrow('linked parent has no delivery gate');
+
+        const board = createBoardState({
+            items: [...s.ids, parent.workId].map((id) => ({ id }) as Item),
+            repos: [],
+        } as never);
+        const send = vi
+            .fn<typeof sendThreadCommand>()
+            .mockResolvedValueOnce(
+                outcome === 'accepted'
+                    ? { outcome: 'accepted', sequence: 1 }
+                    : { outcome: 'unconfirmed', reason: 'Connection lost' },
+            )
+            .mockResolvedValue({ outcome: 'accepted', sequence: 1 });
+        const commands = createBriefApproval({
+            board,
+            records: s.records,
+            reread: vi.fn(),
+            refresh: s.refresh,
+            sync: s.sync,
+            send,
+            identity: () => 'Pedro',
+        });
+        const displayed = await commands.inspectBrief(s.ids[0]!, { workIds: s.ids });
+        const approval = (displayed.body as { approval: { requestId: string; digest: string } }).approval;
+
+        expect(
+            (await commands.requestBriefChanges(s.ids[0]!, { ...approval, note: 'Name the boundary tests.' })).status,
+        ).toBe(200);
+        await commands.reconcileBriefApprovals();
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(send.mock.calls[0]?.[0]).toMatchObject({
+            threadId: 'linked-owner',
+            text: expect.stringContaining('Name the boundary tests.'),
+        });
+        expect(send.mock.calls[0]?.[0]).toMatchObject({ text: expect.stringContaining(s.ids[0]!) });
+        expect(send.mock.calls[0]?.[0]).toMatchObject({ text: expect.stringContaining(s.ids[1]!) });
+        expect(s.records.pendingGateResumes()).toEqual([]);
+
+        if (outcome === 'unconfirmed') {
+            for (const id of s.ids) expect(s.records.briefChangeRequests(id)[0]?.delivery.sent).toBe(false);
+
+            const restarted = createBriefApproval({
+                board,
+                records: s.records,
+                reread: vi.fn(),
+                refresh: s.refresh,
+                sync: s.sync,
+                send,
+            });
+
+            expect((await restarted.retryBriefChanges(s.ids[1]!)).status).toBe(200);
+            expect(send.mock.calls[1]?.[0]).toEqual(send.mock.calls[0]?.[0]);
+        }
+
+        for (const id of s.ids) {
+            expect(s.records.gate(id).evidence).toEqual([]);
+            expect(s.records.briefChangeRequests(id)[0]?.delivery.sent).toBe(true);
+            expect(s.records.read(id).status).toBe('Shaping');
+        }
+        expect(s.records.read(parent.workId)).toMatchObject({ status: 'Shaping', needsYou: null });
+        expect((await commands.approveBrief(s.ids[0]!, approval)).status).toBe(409);
+        expect(send).toHaveBeenCalledTimes(outcome === 'accepted' ? 1 : 2);
+    },
+);

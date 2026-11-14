@@ -57,6 +57,7 @@ export interface RoleRunInput {
 }
 
 export interface RoleRunFinish {
+    summary?: string;
     executionId: string;
     /** Only values reported by T3. No report stays null, even on a failed launch. */
     report: { source: 't3'; reference: string; actual: ExecutionSettings } | null;
@@ -65,6 +66,7 @@ export interface RoleRunFinish {
 }
 
 export interface RoleRun extends RoleRunInput {
+    summary?: string;
     workId: string;
     requested: ExecutionSettings;
     actual: ExecutionSettings | null;

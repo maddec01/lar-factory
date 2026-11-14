@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { openWorkRecords } from './work-records.ts';
 
 it('binds the displayed text and source revision to durable approval evidence', async () => {
@@ -12,7 +13,7 @@ it('binds the displayed text and source revision to durable approval evidence', 
     try {
         let work = records.create({ title: 'Search', repository: 'fake/app', kind: 'build' });
 
-        work = records.setBody(work.workId, work.revision, 'brief', 'Find saved searches.');
+        work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Find saved searches.'));
 
         const input = records.doubtPackage(work.workId);
 
@@ -34,7 +35,7 @@ it('binds the displayed text and source revision to durable approval evidence', 
         expect(evidence).toMatchObject({ sourceRevision: fresh.sourceRevision, approvalDigest: fresh.approvalDigest });
         expect(records.gate(work.workId).passing).toMatchObject(evidence);
         work = records.read(work.workId);
-        records.setBody(work.workId, work.revision, 'brief', 'Find shared searches.');
+        records.setBody(work.workId, work.revision, 'brief', completeBrief('Find shared searches.'));
         expect(records.gate(work.workId).current).toBe(false);
         expect(() => approve(fresh, fresh.approvalDigest)).toThrow(/displayed brief/);
     } finally {

@@ -5,6 +5,7 @@ import { itemName, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/sh
 import type { BoardData, Item } from '@lar-factory/shared';
 import { ButtonLink, Modal, Stack } from '@lar-works/design-system';
 
+import { canStopShaping } from './can-stop-shaping';
 import { CompleteReleaseStep } from './CompleteReleaseStep';
 import { ConceptParts } from './ConceptParts';
 import { isGroupParent } from './group-parent';
@@ -19,6 +20,7 @@ import { ItemSummary } from './ItemSummary';
 import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
 import { RetroFollowups } from './RetroFollowups';
+import { StopShaping } from './StopShaping';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import { useMovesItem } from './useMovesItem';
 import {
@@ -173,8 +175,9 @@ export function ItemDialogContent({
             </Modal.Body>
             <Modal.Footer
                 leading={
-                    moves && (
+                    (moves || canStopShaping(item)) && (
                         <DialogActions presentation="leading">
+                            <StopShaping item={item} />
                             <MoveActions item={item} data={data} />
                         </DialogActions>
                     )

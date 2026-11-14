@@ -585,4 +585,12 @@ export const MIGRATIONS: readonly Migration[] = [
         CREATE TABLE part_ticket_requests(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, request_id TEXT NOT NULL UNIQUE) STRICT;
         CREATE TABLE group_projections(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, body TEXT NOT NULL, sources TEXT NOT NULL, PRIMARY KEY(work_id,body)) STRICT;
     `),
+    (db) =>
+        db.exec(
+            `CREATE TABLE brief_change_requests(request_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;`,
+        ),
+    (db) =>
+        db.exec(
+            'CREATE TABLE test_runtimes(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
+        ),
 ];

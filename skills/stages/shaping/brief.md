@@ -8,6 +8,7 @@ Write the brief to a file, then save it in the record with
 user's original text stays in the record's initial context.
 Use `lar-work confirmed-scope <work ID> --markdown` for Done when, Scope and Verify below; keep scope claims there. Run `lar-work brief-scope-check <work ID>` after saving and fix every missing/extra claim before Gate.
 
+`lar-work gate` checks required sections by Kind and names omissions; fix them before Doubt.
 The brief is the builder's handover. Editing it invalidates prior gate evidence.
 Run [Gate](gate.md) on the final text before marking it Ready. With Spec writing
 ON, the whole passing brief becomes the ticket's main description with its prior

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { scopeMarkdown, type BriefScope } from './brief-scope.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
@@ -27,7 +28,7 @@ async function fixture() {
     const part = (title: string, body: string, kind: 'build' | 'decision' = 'build') =>
         records.createPart({
             title,
-            body,
+            body: completeBrief(body),
             kind,
             repository: 'fake/a',
             parentId: g.workId,
@@ -83,7 +84,7 @@ test('S06: adding D1 and editing another build Notes preserve b01 approval and n
         last.workId,
         records.read(last.workId).revision,
         'brief',
-        `${records.body(last.workId, 'brief')}\n## Notes\nUse the sandbox fixture only.`,
+        completeBrief(`${records.body(last.workId, 'brief')}\n## Notes\nUse the sandbox fixture only.`),
     );
     expect([b01, ...builds.slice(0, -1)].every((b) => records.gate(b.workId).current)).toBe(true);
     expect(records.gate(last.workId).current).toBe(false);
@@ -109,7 +110,7 @@ test('S06: only cited answers and named sibling contracts invalidate approval', 
         b.workId,
         records.read(b.workId).revision,
         'brief',
-        records.body(b.workId, 'brief')!.replace('Use sample.', 'Use sandbox.'),
+        completeBrief(records.body(b.workId, 'brief')!.replace('Use sample.', 'Use sandbox.')),
     );
     expect(records.gate(consumer.workId).current).toBe(true);
     records.setBody(d.workId, records.read(d.workId).revision, 'answer', 'Use a query.');
@@ -119,7 +120,7 @@ test('S06: only cited answers and named sibling contracts invalidate approval', 
         b.workId,
         records.read(b.workId).revision,
         'brief',
-        'Contracts: `greeting-v1`\n## Done when\nProduce v2.',
+        completeBrief('Contracts: `greeting-v1`\n## Done when\nProduce v2.'),
     );
     expect(records.gate(consumer.workId).current).toBe(false);
 });
@@ -154,7 +155,7 @@ test('S06: fourteen-part growth commits records, ticket requests, graph and map 
         title: `Proof ${n}`,
         repository: 'fake/a',
         kind: 'build' as const,
-        body: `Proof ${n}.`,
+        body: completeBrief(`Proof ${n}.`),
         blockerIds: n ? [`$b${n + 8}`] : [],
         ticketRequestId: randomUUID(),
     }));
@@ -213,7 +214,7 @@ test('S06: incorporation settles decisions immediately; changed approved draft r
 
     approve(b.workId);
     records.update(b.workId, records.read(b.workId).revision, { status: 'Ready' });
-    records.setBody(b.workId, records.read(b.workId).revision, 'brief', 'Direct equivalence proof.');
+    records.setBody(b.workId, records.read(b.workId).revision, 'brief', completeBrief('Direct equivalence proof.'));
     expect(records.read(b.workId).status).toBe('Shaping');
     expect(() => records.update(b.workId, records.read(b.workId).revision, { status: 'Queued' })).toThrow(
         /Shaping|gate/,
@@ -235,7 +236,7 @@ test('S06: structure classifies standalone implementation as Build', async () =>
     };
 
     records.confirmScope(x.workId, x.revision, scope, 'Pedro', 'Yes.');
-    records.setBody(x.workId, records.read(x.workId).revision, 'brief', scopeMarkdown(scope));
+    records.setBody(x.workId, records.read(x.workId).revision, 'brief', completeBrief(scopeMarkdown(scope)));
     records.chooseStructure(x.workId);
     expect(records.read(x.workId).kind).toBe('build');
 });
@@ -310,7 +311,9 @@ test('S06: D1 seven declared blockers replace its six erroneous stored edges in 
             build.workId,
             records.read(build.workId).revision,
             'brief',
-            `Build ${n}.\nBlocked by: ${declared[Number(n)]!.length ? declared[Number(n)]!.map((b) => `\`${builds[b]!.workId}\``).join(', ') : 'none'}`,
+            completeBrief(
+                `Build ${n}.\nBlocked by: ${declared[Number(n)]!.length ? declared[Number(n)]!.map((b) => `\`${builds[b]!.workId}\``).join(', ') : 'none'}`,
+            ),
         );
 
     const revisions = () => Object.fromEntries(records.list({}).map((r) => [r.workId, r.revision]));
@@ -340,7 +343,7 @@ test('S06: linked growth also saves all parts and its map without reclassifying 
                 title: 'Producer',
                 repository: 'fake/a',
                 kind: 'build',
-                body: 'Produce v1.',
+                body: completeBrief('Produce v1.'),
                 blockerIds: [],
             },
             {
@@ -348,7 +351,7 @@ test('S06: linked growth also saves all parts and its map without reclassifying 
                 title: 'View',
                 repository: 'fake/c',
                 kind: 'build',
-                body: 'Show v1.',
+                body: completeBrief('Show v1.'),
                 blockerIds: ['$producer'],
             },
         ],
@@ -389,7 +392,7 @@ test('S06: upgrading a still-current legacy review preserves its approval throug
         title: 'D1',
         repository: 'fake/a',
         kind: 'decision',
-        body: 'Method: grill\nExchange?',
+        body: completeBrief('Method: grill\nExchange?'),
         parentId: g.workId,
         parentRevision: upgraded.read(g.workId).revision,
         blockerIds: [],

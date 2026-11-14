@@ -23,6 +23,7 @@ import type { StatementSync } from 'node:sqlite';
 import { agentRevision } from './agent-revision.ts';
 import { blockerDeclarationRecords } from './blocker-declarations.ts';
 import { validateBlockers } from './blocker-graph.ts';
+import { briefChangeRecords, type BriefChangeRecords } from './brief-changes.ts';
 import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
 import { chooseStructure } from './choose-structure.ts';
 import { conceptRunRecords, type ConceptRunRecords } from './concept-build.ts';
@@ -58,6 +59,7 @@ import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-set
 import { scopeRecords, type ScopeRecords } from './scope-records.ts';
 import { setAsideRecords, type SetAsideRecords } from './set-aside.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
+import { testRuntimeRecords, type TestRuntimeRecords } from './test-runtime-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
@@ -401,6 +403,8 @@ export interface WorkRecords
         PublicationRecords,
         GateRecords,
         BriefReviewRecords,
+        BriefChangeRecords,
+        TestRuntimeRecords,
         DependencyRecords,
         SpecRecords {
     captureSubmission(requestId: string): CaptureSubmission | null;
@@ -423,6 +427,7 @@ export interface WorkRecords
     create(record: NewWorkRecord): WorkRecord;
     /** Atomically creates a Queued delivery part in its named repository. */
     saveReviewerSelection: ReturnType<typeof reviewSelectionRecords>['saveReviewerSelection'];
+    reviewerSelection: ReturnType<typeof reviewSelectionRecords>['reviewerSelection'];
     recordSelectedReviewRound: ReturnType<typeof reviewSelectionRecords>['recordSelectedReviewRound'];
     pendingGateResumes: ReturnType<typeof gateResumeRecords>['pendingGateResumes'];
     gateResumeResult: ReturnType<typeof gateResumeRecords>['gateResumeResult'];
@@ -1344,6 +1349,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publications,
         ...gates,
+        ...testRuntimeRecords(database, (id) => fromRow(find(id))),
+        ...briefChangeRecords(
+            database,
+            (id) => fromRow(find(id)),
+            (id) => gates.displayGate(id),
+        ),
         ...reviews,
         ...dependencyChanges,
         captureSubmission: (requestId) =>

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
 import { forgetItemDetails } from '@/services/items/items.hooks';
-import { BriefChanges, buttonKind } from '@/ui/board';
+import { BriefApprovalDetails, BriefChanges, buttonKind } from '@/ui/board';
 
 interface Approval {
     requestId: string;
@@ -78,20 +78,17 @@ export function ApproveBrief({
         <Stack space="tight">
             {error && <Alert tone="danger">{error}</Alert>}
             {approval && (
-                <Disclosure label="Brief to approve" presentation="section" defaultOpen>
-                    {approval.briefs.map((brief) => (
-                        <Stack key={brief.workId} space="tight">
-                            <Text>{brief.title}</Text>
-                            <RichText text={brief.brief} format="markdown" />
-                            <Text variant="caption" breaks>
-                                Approval digest: {brief.approvalDigest}
-                            </Text>
-                        </Stack>
-                    ))}
-                    <Text variant="caption" breaks>
-                        Batch digest: {approval.digest}
-                    </Text>
-                </Disclosure>
+                <>
+                    <Disclosure label="Brief to approve" presentation="section" defaultOpen>
+                        {approval.briefs.map((brief) => (
+                            <Stack key={brief.workId} space="tight">
+                                <Text>{brief.title}</Text>
+                                <RichText text={brief.brief} format="markdown" />
+                            </Stack>
+                        ))}
+                    </Disclosure>
+                    <BriefApprovalDetails briefs={approval.briefs} digest={approval.digest} />
+                </>
             )}
             <Inline wrap>
                 <Button {...buttonKind('main')} disabled={pending} onClick={() => void act()}>

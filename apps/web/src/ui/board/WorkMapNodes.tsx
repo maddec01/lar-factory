@@ -180,7 +180,11 @@ export function MapPrerequisiteNode({ prerequisite, width }: { prerequisite: Wor
         kind === 'dependency'
             ? blocker.dependency?.met
                 ? 'Accepted as met'
-                : 'Waiting for acceptance as met'
+                : blocker.dependency?.proofState === 'submitted'
+                  ? 'Waiting for acceptance as met'
+                  : blocker.dependency?.proofState === 'insufficient'
+                    ? 'Proof insufficient · waiting'
+                    : 'Waiting for proof'
             : blocker.state === 'closed'
               ? 'Complete'
               : 'Waiting for completion';

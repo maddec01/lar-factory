@@ -349,6 +349,7 @@ test('S05 F3: Accept dependency proof names the dependency and waiting build, op
         ticket: 'fake/c#18',
         named: [],
         evidence: 'Inspected v1 artifact; numeric version and two-field schema passed.',
+        proofState: 'submitted' as const,
         met: null,
         needsReview: false,
         observation: {
@@ -376,7 +377,12 @@ test('S05 F3: Accept dependency proof names the dependency and waiting build, op
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
 
-    for (const change of [{ met: { by: 'Pedro', at: '2026-11-14T12:26:41.137Z' } }, { evidence: '' }]) {
+    for (const change of [
+        { met: { by: 'Pedro', at: '2026-11-14T12:26:41.137Z' } },
+        { evidence: '' },
+        { proofState: 'insufficient' as const },
+        { proofState: 'pending' as const },
+    ]) {
         await settle(() =>
             useBoardStore.getState().receive({
                 ...data,

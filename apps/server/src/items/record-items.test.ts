@@ -471,6 +471,7 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
                     { reference: 'maddec01/lar-server#41', url: 'https://github.com/maddec01/lar-server/pull/41' },
                 ],
                 evidence: 'It answers in staging',
+                proofState: 'pending',
                 met: null,
                 needsReview: false,
                 observation: {

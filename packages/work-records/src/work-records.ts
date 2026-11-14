@@ -1612,6 +1612,18 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 }
 
                 if (
+                    nextStatus === 'Ready' &&
+                    ((nextKind ?? row.kind) === 'concept' ||
+                        (!row.parent_id &&
+                            childRows.all(workId).some((part) => part.kind !== 'slice') &&
+                            !row.pull_request &&
+                            !row.build_phase))
+                )
+                    throw invalid(
+                        'A group derives delivery readiness from its parts; do not set the group parent Ready.',
+                    );
+
+                if (
                     nextStatus === 'Queued' &&
                     row.status === 'Shaping' &&
                     db.prepare("SELECT 1 FROM brief_gates WHERE work_id=? AND source IN ('gate','user')").get(workId) &&

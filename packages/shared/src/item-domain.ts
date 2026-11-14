@@ -126,6 +126,8 @@ export interface DependencyHold {
     named: { reference: string; url: string }[];
     /** What will establish that the change was delivered; empty until agreed. */
     evidence: string;
+    /** Missing on legacy data means pending; only submitted proof awaits acceptance. */
+    proofState?: 'pending' | 'submitted' | 'insufficient';
     met: { by: string; at: string } | null;
     /** Whether an observation changed after it was marked met. */
     needsReview: boolean;

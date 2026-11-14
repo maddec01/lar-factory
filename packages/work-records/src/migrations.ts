@@ -634,4 +634,8 @@ export const MIGRATIONS: readonly Migration[] = [
         }
     },
     (db) => db.exec('ALTER TABLE review_axes ADD COLUMN consumption TEXT'),
+    (db) =>
+        db.exec(
+            "ALTER TABLE dependencies ADD COLUMN proof_state TEXT NOT NULL DEFAULT 'pending' CHECK(proof_state IN ('pending','submitted','insufficient'))",
+        ),
 ];

@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
+import { openDatabase } from './database.ts';
+import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkKind, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
@@ -403,5 +405,50 @@ describe('Dependencies', () => {
         });
         expect(records.dependency(id)).toMatchObject({ blocks: [build.workId], revision: 5 });
         expect(at(records, concept.workId)).toBe(before + 1);
+    });
+});
+
+it('separates proof submission from closure notes, preserves it on reopen and resets edited evidence', async () => {
+    const { records, dependency } = await blockedBuild();
+    const id = dependency.dependencyId;
+    const edit = (patch: object) => records.updateDependency(id, records.dependency(id).revision, patch);
+
+    expect(records.dependency(id)).toMatchObject({ proofState: 'pending' });
+    edit({ evidence: 'Ticket closed with no proof attached.' });
+    expect(records.dependency(id)).toMatchObject({ proofState: 'pending' });
+    edit({ proofState: 'insufficient' });
+    expect(records.dependency(id)).toMatchObject({ proofState: 'insufficient' });
+    for (const proofState of ['accepted', '', null, 1]) expect(() => edit({ proofState })).toThrow(/proof state/i);
+    expect(() => edit({ evidence: '', proofState: 'submitted' })).toThrow(/evidence/i);
+    expect(records.dependency(id)).toMatchObject({ proofState: 'insufficient' });
+    edit({ evidence: 'Immutable fixture and assertions checked.', proofState: 'submitted' });
+    expect(records.dependency(id)).toMatchObject({ proofState: 'submitted', met: null });
+    edit({ handover: 'Owner unchanged.' });
+    expect(records.dependency(id).proofState).toBe('submitted');
+
+    const reopened = await open(join(dirs.at(-1)!, 'work-records.db'));
+
+    expect(reopened.dependency(id).proofState).toBe('submitted');
+    edit({ evidence: 'Proof withdrawn.' });
+    expect(records.dependency(id).proofState).toBe('pending');
+});
+
+it('upgrades legacy closure evidence to pending without inventing a submitted proof', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+
+    old.db.exec(`INSERT INTO work_records(work_id,title,repository,kind,status,revision,created_at,updated_at)
+        VALUES ('g','Group','fake/a','concept','Shaping',1,'now','now');
+        INSERT INTO dependencies(dependency_id,work_id,need,owner,contract,evidence,ticket,pull_requests,handover,revision,created_at,updated_at)
+        VALUES ('d','g','Proof','External','','Closed with no proof attached.','fake/c#25','[]','',4,'now','now')`);
+    old.close();
+
+    const records = await open(path);
+
+    expect(records.dependency('d')).toMatchObject({
+        evidence: 'Closed with no proof attached.',
+        proofState: 'pending',
+        met: null,
+        revision: 4,
     });
 });

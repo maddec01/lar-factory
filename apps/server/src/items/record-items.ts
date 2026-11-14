@@ -73,6 +73,7 @@ function dependencyBlocker(d: Dependency): Blocker {
         ticket: d.ticket,
         named,
         evidence: d.evidence,
+        proofState: d.proofState,
         met: d.met,
         needsReview: d.needsReview,
         observation,

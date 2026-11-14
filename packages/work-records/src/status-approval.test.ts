@@ -217,3 +217,27 @@ it('upgrades a still-current v2 cited-answer approval without reviving a stale p
     opened.push({ records: reopened, dir: join(path, '..') });
     expect(reopened.gate(build).current).toBe(false);
 });
+
+it.each(['concept', 'build'] as const)('group parent %s cannot be set Ready like a delivery build', async (kind) => {
+    const { records, group, revision } = await fixture();
+    const parent =
+        kind === 'concept'
+            ? group
+            : records.create({ title: 'Linked parent', repository: 'fake/a', kind, status: 'Shaping' }).workId;
+
+    if (kind === 'build')
+        records.createPart({
+            parentId: parent,
+            parentRevision: revision(parent),
+            title: 'Child',
+            repository: 'fake/a',
+            kind: 'build',
+            body: 'Child',
+            blockerIds: [],
+        });
+
+    const before = records.read(parent);
+
+    expect(() => records.update(parent, before.revision, { status: 'Ready' })).toThrow(/group.*parts/i);
+    expect(records.read(parent)).toEqual(before);
+});

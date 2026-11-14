@@ -29,6 +29,7 @@ import { WorkRecordError, type Dependency, type WorkRecord, type WorkRecords } f
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
+import { briefDoubtHold } from './brief-doubt-hold.ts';
 import { needsYouNotice } from './needs-you-causes.ts';
 
 type RecordSetup = {
@@ -224,20 +225,13 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                   ? (ticket?.map ?? parseConceptMap(''))
                   : ticket?.map;
         const group = record.kind === 'concept' || work.length > 0;
-        const parentApprovalWait =
-            group &&
-            record.status === 'Needs you' &&
-            record.needsYouCauses.length === 0 &&
-            /approve.*brief|brief.*approval/i.test(record.needsYou ?? '');
-        const derivedStatus = parentApprovalWait
-            ? 'Shaping'
-            : group
-              ? completionOf(record).complete
-                  ? 'Done'
-                  : record.status === 'Done'
-                    ? 'In progress'
-                    : record.status
-              : record.status;
+        const derivedStatus = group
+            ? completionOf(record).complete
+                ? 'Done'
+                : record.status === 'Done'
+                  ? 'In progress'
+                  : record.status
+            : record.status;
         const done = derivedStatus === 'Done' || (isDone(record) && !group);
         const sync = trackerState(record.workId);
         const savedSpec = records.specState(record.workId);
@@ -273,9 +267,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
-            (!!staleGate ||
-                (!!parent && !!records.currentDoubt(record.workId)) ||
-                /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
+            (!!staleGate || !!records.currentDoubt(record.workId)) &&
             (!!staleGate || matchesScope);
         let approvalDisplay: ReturnType<WorkRecords['displayGate']> | undefined;
 
@@ -304,6 +296,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
 
         if (briefReviewing) briefApproval = false;
 
+        const doubtHold = briefReviewing ? briefDoubtHold(records, record) : undefined;
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -362,6 +355,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             revision: record.revision,
             passingBrief: gate.current,
             ...(briefReviewing && { briefReviewing: true as const }),
+            ...(doubtHold && { briefDoubtHold: doubtHold }),
             ...(staleGate && { staleGate }),
             ...(staleGateDetail && { staleGateDetail }),
             ...(changesRequested && { briefChangesRequested: true as const }),
@@ -411,12 +405,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             records.launchIntents({ workId: record.workId }),
         );
 
-        if (
-            needsYou &&
-            !parentApprovalWait &&
-            !(briefReviewing && /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''))
-        )
-            item.needsYou = needsYou;
+        if (needsYou) item.needsYou = needsYou;
 
         if (item.briefApproval && !item.needsYou)
             item.needsYou = {

@@ -21,6 +21,23 @@ const work = (change: Partial<Item> = {}): Item => ({
 const question = { id: 'question', state: 'needs you' } as ItemThread;
 const notice = { reason: 'Approve the brief', offers: [], causes: [], ticketOpen: true };
 
+test('batch eligibility preserves an independent saved notice even when its wording mentions brief approval', () => {
+    const parent = work({ id: 'parent', kind: 'concept' });
+    const part = work({
+        id: 'part',
+        parentId: parent.id,
+        passingBrief: false,
+        briefApproval: { digest: 'current', reason: 'Review current brief' },
+        needsYou: { ...notice, reason: 'Repair seed evidence before brief approval.' },
+    });
+    const all = [parent, part];
+
+    expect(deskItems({ items: all }, false)).toEqual(all);
+    expect(deskWait(part, false, all).label).toBe('Decision needed');
+    part.needsYou = { ...notice, reason: part.briefApproval!.reason };
+    expect(deskItems({ items: all }, false)).toEqual([parent]);
+});
+
 test.each(['concept', 'linked'])('%s batch approval appears once on the parent desk card', (kind) => {
     const parent = work({
         id: 'parent',

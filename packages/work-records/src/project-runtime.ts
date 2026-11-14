@@ -25,7 +25,7 @@ export function resolveTestRuntime(dir: string, repository: string): TestRuntime
                   }),
               );
     } catch (error) {
-        throw new Error(`Build held: board test runtime unavailable: ${(error as Error).message}`);
+        throw new Error(`Run held: board test runtime unavailable: ${(error as Error).message}`);
     }
 
     if (
@@ -35,7 +35,7 @@ export function resolveTestRuntime(dir: string, repository: string): TestRuntime
         typeof runtime.version !== 'string' ||
         !/^v\d+\.\d+\.\d+$/.test(runtime.version)
     )
-        throw new Error('Invalid saved project runtime; build held before launch.');
+        throw new Error('Invalid saved project runtime; run held before launch.');
 
     return { node: runtime.node, version: runtime.version };
 }

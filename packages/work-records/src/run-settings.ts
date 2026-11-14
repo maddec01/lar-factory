@@ -112,7 +112,7 @@ export function runSettingsRecords(
 
                 const snapshot = captureRunSettings(workId, input, settings);
 
-                if (snapshot.kind === 'build') snapshot.testRuntime = resolveTestRuntime(dir, read(workId).repository);
+                snapshot.testRuntime = resolveTestRuntime(dir, read(workId).repository);
 
                 db.prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)').run(
                     workId,

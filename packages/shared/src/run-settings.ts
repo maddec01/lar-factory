@@ -42,7 +42,7 @@ export interface RunSettings {
     kind: ThreadKind;
     capturedAt: string;
     settingsDigest: string;
-    /** Resolved by the board at build start; every role and slice uses this value. */
+    /** Resolved at run creation for every kind; roles and slices use this value. Absent on legacy runs. */
     testRuntime?: TestRuntime;
     triggerVersion: 1;
     /** Preserve all policies, including never, without consulting later Settings. */

@@ -17,25 +17,25 @@ function runtimeEnv(runtime: Runtime | undefined): NodeJS.ProcessEnv {
         !isAbsolute(runtime.node) ||
         !/^v\d+\.\d+\.\d+$/.test(runtime.version)
     )
-        throw new Error('Build held: no valid frozen test runtime.');
+        throw new Error('Run held: no valid frozen test runtime.');
 
     const actual = execFileSync(runtime.node, ['--version'], { encoding: 'utf8', timeout: 10000 }).trim();
 
     if (actual !== runtime.version)
         throw new Error(
-            `Build held: frozen test runtime mismatch: expected ${runtime.version}, found ${actual}. Tests were not executed.`,
+            `Run held: frozen test runtime mismatch: expected ${runtime.version}, found ${actual}. Tests were not executed.`,
         );
 
     const env = { ...process.env, PATH: `${dirname(runtime.node)}${delimiter}${process.env.PATH ?? ''}` };
     const resolved = execFileSync('node', ['-p', 'process.execPath'], { env, encoding: 'utf8', timeout: 10000 }).trim();
 
     if (realpathSync(resolved) !== realpathSync(runtime.node))
-        throw new Error('Build held: frozen runtime must provide node in its own bin directory.');
+        throw new Error('Run held: frozen runtime must provide node in its own bin directory.');
 
     return env;
 }
 
-/** The same checked local runtime wraps focused tests and recorded suites, for every build role. */
+/** The same checked local runtime wraps focused tests and recorded suites, for every role. */
 export async function testRuntimeCommand(args: string[]): Promise<number> {
     try {
         const separator = args.indexOf('--');
@@ -101,7 +101,7 @@ export async function testRuntimeCommand(args: string[]): Promise<number> {
             termination.dispose();
         }
     } catch (error) {
-        process.stderr.write(`lar-work: build held: test runtime: ${(error as Error).message}\n`);
+        process.stderr.write(`lar-work: run held: test runtime: ${(error as Error).message}\n`);
 
         return 1;
     }

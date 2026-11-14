@@ -116,7 +116,7 @@ test('the fake Verify head can wait and resume without inventing missing Test st
     }
 });
 
-test('fake amended-brief controls keep Doubt pending off the desk until its result arrives', async () => {
+test('fake amended-brief controls preserve a saved notice while approval waits for Doubt', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'brief-review-sample-test-'));
 
     vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
@@ -131,8 +131,8 @@ test('fake amended-brief controls keep Doubt pending off the desk until its resu
 
         expect(reviewing.briefReviewing).toBe(true);
         expect(reviewing.briefApproval).toBeUndefined();
-        expect(reviewing.needsYou).toBeUndefined();
-        expect(deskItems(board.snapshot(), false)).not.toContain(reviewing);
+        expect(reviewing.needsYou?.reason).toBe('Approve revised brief after failed Verify.');
+        expect(deskItems(board.snapshot(), false)).toContain(reviewing);
         expect(await sample.itemDetails.details(reviewing)).toMatchObject({ spec: { outdated: true } });
         await sample.sampleControl({ action: 'brief-approval', change: 'doubt-ready' });
         expect(board.find(id)?.briefApproval?.digest).toBeTruthy();

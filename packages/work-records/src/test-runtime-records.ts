@@ -8,7 +8,7 @@ export interface TestRuntimeRecords {
     testRuntime(id: string, runId?: string): TestRuntime;
 }
 
-/** Slices and roles read the owning build's frozen run, never current project settings. */
+/** Every role reads its owning run; slices inherit their build. Never consult mutable settings here. */
 export function testRuntimeRecords(database: Database, read: (id: string) => WorkRecord): TestRuntimeRecords {
     return {
         testRuntime: (id, runId) =>
@@ -19,13 +19,19 @@ export function testRuntimeRecords(database: Database, read: (id: string) => Wor
 
                 const row = database.db
                     .prepare(
-                        "SELECT content FROM run_settings WHERE work_id=? AND json_extract(content,'$.kind')='build' AND (? IS NULL OR run_id=?) ORDER BY rowid DESC LIMIT 1",
+                        'SELECT content FROM run_settings WHERE work_id=? AND (? IS NULL OR run_id=?) ORDER BY rowid DESC LIMIT 1',
                     )
                     .get(work.workId, runId ?? null, runId ?? null);
-                const runtime = row && (JSON.parse(String(row.content)) as RunSettings).testRuntime;
+                const run = row && (JSON.parse(String(row.content)) as RunSettings);
+                const runtime = run?.testRuntime;
 
                 if (!runtime)
-                    throw new WorkRecordError('invalid', 'Build held: no frozen test runtime in its run settings.');
+                    throw new WorkRecordError(
+                        'invalid',
+                        run
+                            ? `Run ${run.runId} (${run.kind}) held: legacy run settings have no frozen test runtime. Tests were not executed.`
+                            : `Run held: no saved run settings${runId ? ` for ${runId}` : ''}. Tests were not executed.`,
+                    );
 
                 return runtime;
             }),

@@ -22,7 +22,7 @@
     },
     "dependencies": {
         "@lar-factory/shared": "workspace:*",
-        "@lar-works/design-system": "^0.7.2",
+        "@lar-works/design-system": "^0.7.3",
         "mermaid": "^12.2.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",

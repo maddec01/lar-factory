@@ -2,7 +2,6 @@
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { deskParentName, itemActivityStill, itemName } from '@lar-factory/shared';
-import { Badge } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Figures, RowSecondLine } from './Columns';
@@ -135,11 +134,7 @@ export function DossierLine({
                     {lead}
                     <RowSource item={parent} />
                     <RowKindCell>
-                        {parent.kind === 'concept' || hasParent ? (
-                            <RowKind item={parent} />
-                        ) : (
-                            <Badge tone="neutral">Linked work</Badge>
-                        )}
+                        <RowKind item={parent} />
                     </RowKindCell>
                     <DossierTitleCell>
                         <DossierTitle name={parent.title} onOpen={() => open(parent)}>

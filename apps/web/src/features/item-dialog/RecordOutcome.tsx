@@ -31,7 +31,6 @@ export function RecordOutcome({ item, items }: { item: Item; items: Item[] }) {
 
     return (
         <OutcomeForm
-            what={item.releasePlan!.outcomeCheck.what}
             evidence={evidence}
             onEvidence={setEvidence}
             pending={pending}

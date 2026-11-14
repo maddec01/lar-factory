@@ -307,3 +307,20 @@ test('returning to shaping transfers activity away from the earlier build', () =
 
     expect(itemActivityThread(work)?.id).toBe('shape');
 });
+
+test('an ended owner turn is quiet only while its recorded build remains unfinished and its activity read is current', () => {
+    const owner = thread({
+        purpose: 'build',
+        state: 'done',
+        activity: activity({ action: 'Read a.ts', actionAt: ago(12) }),
+    });
+    const work = item([owner], { status: 'In progress', buildPhase: 'implement' });
+
+    expect(itemActivityLine(work, NOW)).toMatchObject({ state: 'quiet', action: 'No action for 12m' });
+    expect(itemActivityLine(work, NOW + ACTIVITY_STALE_MS + 1)?.state).toBe('unavailable');
+    expect(itemActivityLine({ ...work, paused: 'Later' }, NOW)).toBeUndefined();
+    expect(itemActivityLine({ ...work, status: 'Verify' }, NOW)).toBeUndefined();
+    expect(itemActivityLine({ ...work, status: 'Done' }, NOW)).toBeUndefined();
+    expect(itemActivityLine({ ...work, buildPhase: null }, NOW)).toBeUndefined();
+    expect(itemActivityLine({ ...work, threads: [{ ...owner, archived: true }] }, NOW)).toBeUndefined();
+});

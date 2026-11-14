@@ -11,8 +11,11 @@ import { PartKindLabel } from './WorkMapParts';
 import { KIND_BADGES, KindBadge, RepoCell, SourceIcon } from '@/features/items';
 import { RowIdentity } from '@/ui/board';
 
-/** A row's kind: its badge, a decision's method or Build, with or without a ticket; a ticket with no recognised kind has none. */
+/** A row's kind: Linked work for a group parent, otherwise its kind badge, decision method or Build; no recognised kind has none. */
 export const RowKind = memo(function RowKind({ item }: { item: Item }) {
+    if (item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
+        return <Badge tone="neutral">Linked work</Badge>;
+
     if (KIND_BADGES[item.kind]) return <KindBadge kind={item.kind} />;
 
     return item.kind === 'decision' || item.kind === 'build' || isBuild(item) ? (

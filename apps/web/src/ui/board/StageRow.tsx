@@ -309,7 +309,7 @@ export function RowSecondLine({
                 {bar}
             </span>
             {count || <span data-col="count" />}
-            <span data-col="next" className="flex min-w-0 items-center gap-3">
+            <span data-col="next" className="flex min-w-0 flex-wrap items-center gap-3">
                 {children}
             </span>
             <span data-col="pr" className="flex min-w-0 gap-2 overflow-hidden tabular-nums">

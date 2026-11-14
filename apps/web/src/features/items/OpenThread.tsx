@@ -58,7 +58,12 @@ function latestThread(
             requestOwner ? threadId! : question ? (latest.pendingRequest?.threadId ?? latest.id) : latest.id,
         ),
         question,
-        inheritedLabel: inherited && question ? (owner?.kind === 'concept' ? 'concept' : 'parent') : null,
+        inheritedLabel:
+            inherited && question && latest.pendingRequest?.kind !== 'tool-approval'
+                ? owner?.kind === 'concept'
+                    ? 'concept'
+                    : 'parent'
+                : null,
     };
 }
 
@@ -96,7 +101,7 @@ export function OpenThread({
     const actionLabel =
         question && thread.inheritedLabel && ['Answer in T3', 'Open thread'].includes(label)
             ? `Answer in ${thread.inheritedLabel} thread`
-            : ['Answer in T3', 'Approve brief', 'Resolve approval'].includes(label) && !question
+            : ['Answer in T3', 'Approve brief'].includes(label) && !question
               ? 'Open thread'
               : label;
     const onRow = useOnRow();

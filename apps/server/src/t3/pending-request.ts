@@ -13,7 +13,10 @@ export function pendingRequest(
 
     const items = Array.isArray(projection?.turnItems) ? projection.turnItems : [];
     const input = items.find(
-        (item) => isRecord(item) && item.requestId === request.id && item.type === 'user_input_request',
+        (item) =>
+            isRecord(item) &&
+            item.requestId === request.id &&
+            ['user_input_request', 'approval_request'].includes(String(item.type)),
     );
     const questions = isRecord(input) && Array.isArray(input.questions) ? input.questions.filter(isRecord) : [];
     // Factory questions name the checkpoint in their title, before the colon. Do not classify from chat or a brief's contents.
@@ -24,20 +27,26 @@ export function pendingRequest(
             `${typeof question.header === 'string' ? question.header : ''} ${title}`,
         );
     });
-    const summary = questions
-        .flatMap((question) => (typeof question.question === 'string' ? [question.question] : []))
-        .join(' ');
+    const approval =
+        (isRecord(input) && input.type === 'approval_request') ||
+        ['command', 'file-read', 'file-change', 'mcp-elicitation', 'permission', 'auth_refresh'].includes(
+            String(request.kind),
+        );
+    const summary =
+        approval && isRecord(input)
+            ? [input.prompt, input.reason]
+                  .filter((value): value is string => typeof value === 'string' && !!value.trim())
+                  .map((value) => value.trim())
+                  .join(' ')
+            : questions
+                  .flatMap((question) => (typeof question.question === 'string' ? [question.question] : []))
+                  .join(' ');
 
     return {
         id: request.id,
         threadId: shell.id,
-        kind: gate
-            ? 'brief-approval'
-            : ['command', 'file-read', 'file-change', 'mcp-elicitation', 'permission', 'auth_refresh'].includes(
-                    String(request.kind),
-                )
-              ? 'tool-approval'
-              : 'question',
+        kind: approval ? 'tool-approval' : gate ? 'brief-approval' : 'question',
+        ...(typeof shell.title === 'string' && shell.title.trim() ? { ownerTitle: shell.title } : {}),
         ...(summary ? { summary } : {}),
     };
 }

@@ -93,3 +93,48 @@ test.each(['Approve revised brief', 'Approve current brief', 'Approve final brie
         ).toBe('brief-approval');
     },
 );
+
+test('the exact pending approval exposes only its display prompt and reason and names its child owner', () => {
+    const approval = { ...shell, title: 'Explore sandbox', pendingRuntimeRequest: { id: 'approval', kind: 'command' } };
+    const projection = {
+        turnItems: [
+            { type: 'approval_request', requestId: 'old', prompt: 'Stale request' },
+            {
+                type: 'approval_request',
+                requestId: 'approval',
+                prompt: 'Read sandbox folder?',
+                reason: 'Inspect its fixture.',
+                command: 'private command',
+                arguments: { token: 'private' },
+            },
+        ],
+    };
+    const request = pendingRequest(approval, projection)!;
+
+    expect(request).toEqual({
+        id: 'approval',
+        threadId: 'owner',
+        kind: 'tool-approval',
+        ownerTitle: 'Explore sandbox',
+        summary: 'Read sandbox folder? Inspect its fixture.',
+    });
+
+    const roots = [{ id: 'root', title: 'Shape sandbox', status: 'running', updatedAt: shell.updatedAt }];
+    const waiting = executionItemThreads(
+        [...roots, { ...approval, lineage: { parentThreadId: 'root' } }],
+        new Map([['owner', request]]),
+    )(['root'])![0]!;
+
+    expect(waiting).toMatchObject({
+        childNeedsYou: true,
+        pendingRequest: { ownerTitle: 'Explore sandbox', threadId: 'owner', kind: 'tool-approval' },
+        questionSummary: request.summary,
+    });
+    expect(JSON.stringify(waiting)).not.toContain('private');
+    expect(pendingRequest({ ...approval, pendingRuntimeRequest: null }, projection)).toBeUndefined();
+
+    const resolved = executionItemThreads(roots, new Map([['owner', request]]))(['root'])![0]!;
+
+    expect(resolved.pendingRequest).toBeUndefined();
+    expect(resolved.childNeedsYou).toBeUndefined();
+});

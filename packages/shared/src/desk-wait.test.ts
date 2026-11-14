@@ -21,7 +21,7 @@ const item = (patch: Partial<Item> = {}): Item => ({
 
 test.each([
     ['question', 'Question', 'Answer in T3'],
-    ['tool-approval', 'Tool approval', 'Resolve approval'],
+    ['tool-approval', 'Approval in T3', 'Answer in T3'],
     ['brief-approval', 'Approve brief', 'Approve brief'],
 ] as const)('%s names its wait and exact request owner', (kind, label, action) => {
     const work = item({
@@ -89,7 +89,7 @@ test('unavailable activity cannot put a stopped run on the desk', () => {
 
 test.each([
     ['brief-approval', 'Approve brief'],
-    ['tool-approval', 'Resolve approval'],
+    ['tool-approval', 'Answer in T3'],
     ['question', 'Answer in T3'],
 ] as const)('an unstarted concept part resolves its inherited %s', (kind, label) => {
     const parent = item({

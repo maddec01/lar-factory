@@ -234,3 +234,4 @@ export { MapStack, MapStackItem } from './CompactWorkMap';
 export { workHoldReason } from './work-hold-reason';
 
 export { StartAfterButton } from './StartAfterButton';
+export { ApprovalWait } from './ApprovalWait';

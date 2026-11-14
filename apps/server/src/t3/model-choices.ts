@@ -86,7 +86,7 @@ export interface ProjectDefaults {
     runtimeMode: string;
 }
 
-/** T3's DEFAULT_RUNTIME_MODE, for settings that don't name one. */
+/** T3's own fallback, not a factory policy: providerPolicy.ts at 7ae21bf1; see docs/t3-access.md. */
 const DEFAULT_RUNTIME_MODE = 'full-access';
 
 /** The project's defaults from T3's `settings`. `projectRow` reads the database's selection, which T3 ignores once settings are folded. */

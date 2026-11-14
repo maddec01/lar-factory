@@ -190,6 +190,7 @@ for (const provider of ['claude', 'codex']) {
                 model: 'configured',
                 options: { [provider === 'claude' ? 'effort' : 'reasoningEffort']: 'high' },
             });
+            expect(args.runtimeMode).toBe('inherit');
             expect(args.clientRequestId).toBe(attempt.executionId);
             expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
             expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);

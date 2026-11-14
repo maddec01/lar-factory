@@ -354,25 +354,28 @@ test('another model launches with no options, even on the same provider instance
     );
 });
 
-test('new launches keep the project runtime mode the CLI gives; the existing worktree keeps approval-required', async () => {
-    const { startThread } = await import('./t3.ts');
-    const { sent, launch, defaults } = launches(null, 'auto-accept-edits');
+test.each(['approval-required', 'auto-accept-edits', 'auto', 'full-access'])(
+    'new and resumed launches follow T3 project runtime %s',
+    async (mode) => {
+        const { startThread } = await import('./t3.ts');
+        const { sent, launch, defaults } = launches(null, mode);
 
-    await startThread('p', 'T\nm', OPUS, { base: 'main', branch: 'build' }, t3With({}).run, defaults, launch);
-    await startThread(
-        'p',
-        'T\nm',
-        OPUS,
-        { type: 'existing_worktree', worktreePath: '/w', branch: 'build' },
-        t3With({}).run,
-        defaults,
-        launch,
-    );
-    assert.deepEqual(
-        sent.map((s) => s.runtimeMode),
-        ['auto-accept-edits', 'approval-required'],
-    );
-});
+        await startThread('p', 'T\nm', OPUS, { base: 'main', branch: 'build' }, t3With({}).run, defaults, launch);
+        await startThread(
+            'p',
+            'T\nm',
+            OPUS,
+            { type: 'existing_worktree', worktreePath: '/w', branch: 'build' },
+            t3With({}).run,
+            defaults,
+            launch,
+        );
+        assert.deepEqual(
+            sent.map((s) => s.runtimeMode),
+            [mode, mode],
+        );
+    },
+);
 
 test('T3 Project default sends no model through the CLI, and an existing worktree refuses it', async () => {
     const { startThread } = await import('./t3.ts');

@@ -92,7 +92,7 @@ test('failed PR checks share Verify while a merged PR advances to Merge', () => 
 
 test.each([
     ['question', 'Question'],
-    ['tool-approval', 'Tool approval'],
+    ['tool-approval', 'Approval in T3'],
     ['brief-approval', 'Approve brief'],
 ] as const)('rows name the same %s wait as the desk', (kind, label) => {
     const subject = item('I_sample14', {

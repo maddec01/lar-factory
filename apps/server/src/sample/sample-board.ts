@@ -24,6 +24,7 @@ import { recordItems } from '../items/record-items.ts';
 import { fakeItemSource } from './fake-item-source.ts';
 import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
+import { sampleApproval } from './sample-approval.ts';
 import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
 import { sampleDelivery } from './sample-delivery.ts';
@@ -39,6 +40,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const records = await openWorkRecords(join(dir, 'work-records.db'));
     const delivery = sampleDelivery(records);
     const growingConcept = sampleGrowingConcept(records);
+    const approval = sampleApproval(records);
     const sources = new Map(repos().map(({ repo }) => [repo, fakeItemSource(tracker, repo)]));
     const items = mergeSources(sources, new Map([...sources.values()].map((source) => [source, 'issues' as const])));
     const vocabulary = sampleVocabulary(tracker);
@@ -74,7 +76,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             items: projected.map((item) => {
                 const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
-                if (!ticket) return growingConcept.project(delivery.project(item));
+                if (!ticket) return approval.project(growingConcept.project(delivery.project(item)));
 
                 return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
@@ -255,6 +257,18 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 await refresh();
 
                 return { status: 200, body: { workId, error: null } };
+            }
+
+            if (input.action === 'tool-approval') {
+                try {
+                    const workId = approval.control(repos()[0]!.repo, input.change);
+
+                    reread();
+
+                    return { status: 200, body: { workId, error: null } };
+                } catch (error) {
+                    return { status: 400, body: { error: (error as Error).message } };
+                }
             }
 
             if (input.action === 'retro') return sampleRetro(records, repos, reread, input);

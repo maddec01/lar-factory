@@ -126,13 +126,16 @@ Your desk lists everything waiting on Pedro, of any Kind and at any stage.
 This includes concepts, linked-work parents, decisions, builds and slice questions.
 The item also stays in its group or ordinary stage section. A card names the item,
 its Project and its concept or parent when present. It says what is needed and
-offers an action that works from the desk: Answer, Approve brief, Resolve approval,
+offers an action that works from the desk: Answer in T3, Approve brief,
 Verify, Merge PR, Choose follow-ups, Recheck access or Start again. Answer opens the exact unresolved
 question. Merge uses the same guarded merge action as item details.
 
-A question or tool approval is an Open question held by T3. Chat alone does not
-establish one. When question tools are unavailable, the explicit saved question
-and Needs you notice keep it actionable. Agent work, ordinary blockers, a full
+Questions and tool approvals are answered in T3, through the exact owner thread
+linked from the desk. Tool approvals have their own Approval in T3 wait, naming
+the owner and T3's display prompt when available; resolving the request clears
+that wait. The board never approves tools. Chat alone does not establish a wait.
+When question tools are unavailable, the explicit saved question and Needs you
+notice keep it actionable. Agent work, ordinary blockers, a full
 build limit, CI in progress and an unmet prerequisite create wait reasons, not
 desk cards, unless Pedro must act. A quiet thread gets an honest notice; five
 minutes without a new action and with no tool running does not prove failure.
@@ -160,6 +163,13 @@ Threads pass the snapshot to every delegated role and snapshot-linked review.
 `role-launch` constructs and records each delegate request from that snapshot;
 `role-finish` compares T3's reported execution and holds mismatches with Needs you.
 The skill supplies the role's brief and passes the command's launch JSON unchanged.
+
+Access follows T3 Code's own project or thread setting. The factory never
+chooses an access policy or offers an access-mode control in Settings. New
+owners use T3's project default; child roles inherit their parent's access,
+without escalation. See [T3 access API behavior](t3-access.md) for the required
+launch adapter and source references. Brief and batch gates, Verify, release
+steps and merges remain board-only.
 
 Settings has machine-wide defaults for reviewers, models and effort. It offers
 model and effort per thread kind: shaping, concept, decision and

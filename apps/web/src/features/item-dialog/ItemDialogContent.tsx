@@ -126,6 +126,14 @@ export function ItemDialogContent({
                             <RetroFollowups item={item} />
                         </>
                     )}
+                    {group && record && (record.body?.trim() || record.answer?.trim()) && (
+                        <RecordText
+                            item={item}
+                            record={record}
+                            refresh={refresh}
+                            spec={read.state === 'loaded' && Boolean(read.details.spec)}
+                        />
+                    )}
                     {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
                     {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                     <ReleaseProgress
@@ -144,7 +152,7 @@ export function ItemDialogContent({
                     />
                     {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
                     <ItemDialogColumns aside={aside} fill={fill}>
-                        {record && (!group || record.body?.trim() || record.answer?.trim()) && (
+                        {record && !group && (
                             <RecordText
                                 item={item}
                                 record={record}

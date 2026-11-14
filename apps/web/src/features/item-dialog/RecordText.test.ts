@@ -42,3 +42,38 @@ test.each(['map', 'brief'] as const)(
         expect(body?.querySelector('fragment, placeholder')).toBeNull();
     },
 );
+
+// Enable after the coordinator releases/adopts design-system 0.7.4 (lar-web multi-word placeholder fix).
+// oxlint-disable-next-line vitest/no-disabled-tests -- Published 0.7.3 still strips multi-word placeholders.
+test.skip('the decision Outcome preserves a spaced placeholder beside code and a link', async () => {
+    const item = { ...sample.items.find((work) => work.id === 'I_sample13')!, kind: 'decision' as const, threads: [] };
+    const board = fresh({ ...sample, items: [item] });
+
+    fetchMock.mockImplementation(async (url: string) => {
+        if (detailsRead(url) !== item.id) return new Response(JSON.stringify(board));
+
+        const reply = await detailsReply(item.id).json();
+
+        reply.details.record = {
+            bodyKind: 'decision',
+            body: 'Method: grill\nChoose the greeting format.',
+            answer: 'Accept only #greeting=<percent-encoded JSON>, decode once. Use `<percent-encoded JSON>` and [the contract](https://example.com).',
+            context: '',
+            buildPhase: null,
+            reviewRounds: [],
+        };
+
+        return new Response(JSON.stringify(reply));
+    });
+    await mountPage(board);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
+
+    const body = $('[data-item-dialog] [data-record-body]')!;
+
+    expect(text(body)).toContain('Accept only #greeting=<percent-encoded JSON>, decode once.');
+    expect(text(body.querySelector('code'))).toBe('<percent-encoded JSON>');
+    expect(body.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+});

@@ -148,7 +148,16 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
             if (!request) throw new Error(`Unknown run role: ${role}.`);
 
             const selection = executionTarget(request, roleCapabilities(json(values.capabilities!)));
-            const task = `${preamble(snapshot, role, dirname(databasePath))}\n\n${readFileSync(values.task!, 'utf8')}`;
+            const reviewer = snapshot.reviewers.find((reviewer) => role === `reviewer:${reviewer.id}`);
+            const name = role === 'thread' ? snapshot.kind : role;
+            const label = reviewer
+                ? `${reviewer.name} review`
+                : name[0]!.toUpperCase() + name.slice(1).replaceAll('-', ' ');
+            const fullTitle = `${label} · ${records.read(workId).title}`.replace(/\s+/g, ' ').trim();
+            // T3's explicit delegate title is limited to 512 UTF-16 code units.
+            const title =
+                fullTitle.length > 512 ? `${fullTitle.slice(0, 511).replace(/[\uD800-\uDBFF]$/u, '')}…` : fullTitle;
+            const task = `${title}\n\n${preamble(snapshot, role, dirname(databasePath))}\n\n${readFileSync(values.task!, 'utf8')}`;
 
             attempt = records.startRoleRun(workId, revision(), { ...identity, launchOptions: selection.options });
 
@@ -159,6 +168,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
                 `${JSON.stringify(
                     {
                         clientRequestId: attempt.executionId,
+                        title,
                         runtimeMode: 'inherit',
                         target: {
                             providerInstanceId: selection.instanceId,

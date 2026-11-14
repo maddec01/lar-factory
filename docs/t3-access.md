@@ -34,6 +34,23 @@ Verified against pingdotgg/t3code commit
   Owners launched through T3 tools omit runtime overrides and follow T3's
   tool-specific inheritance rules.
 
+## Thread titles
+
+Both `orchestration.launchThread` (`OrchestrationV2ThreadLaunchInput`) and
+[`delegate_task`](https://github.com/pingdotgg/t3code/blob/7ae21bf164065506d27fb60bf8c1e5e1eac0af1a/packages/contracts/src/orchestratorMcp.ts#L169)
+(`OrchestratorMcpDelegateTaskInput`) accept an explicit `title`.
+The board adapter supplies the first message line as that title. Owner prompts
+keep `Shaping #N …` and `Build #N …` before the environment and run-settings
+blocks; the CLI fallback also titles from that first line. Retro continues the
+existing build thread.
+
+`lar-work role-launch` supplies `Role · Work title` explicitly and as its first
+prompt line, including Explore, Doubt, reviewers and delegated owners. Reviewer
+names come from the frozen run settings. Titles fit T3's 512-character limit
+without splitting a Unicode surrogate pair. The marked runtime block follows the
+title, so first-line title fallbacks stay useful without weakening the
+record-write guard. Desk tool approvals display the exact owner's title.
+
 ## Display contract
 
 `apps/server/src/t3/pending-request.ts` uses the shell's exact unresolved request

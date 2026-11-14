@@ -308,3 +308,70 @@ test('a batch suppresses member approvals while preserving an unrelated member t
     expect(deskWait(parent, false, all).label).toBe('Approve briefs');
     expect(deskWait(part, false, all).label).toBe('Approval in T3');
 });
+
+test('S05-F4-001 failed Outcome has one criterion-named fix card, never a replacement receipt', () => {
+    const parent = work({
+        id: 'failed-group',
+        kind: 'concept',
+        status: 'In progress',
+        outcomeCheck: { ready: true, digest: 'failed', run: null },
+        releasePlan: {
+            steps: [],
+            outcomeCheck: {
+                what: 'A factory → B consumer → C display composition',
+                result: 'failed',
+                evidence: {
+                    by: 'Outcome owner',
+                    at: '2026-11-14T15:02:18Z',
+                    evidence: 'C only exports displayGreeting(element); no accepted-text argument.',
+                },
+            },
+        },
+    });
+
+    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
+    expect(deskWait(parent, false, [parent])).toEqual({
+        label: 'Outcome failed: A factory → B consumer → C display composition',
+        action: { kind: 'details', label: 'Propose fix part' },
+    });
+});
+
+test('a requested Outcome fix waits on its owner, then offers its exact thread if that owner stops', () => {
+    const parent = work({
+        id: 'repair-group',
+        kind: 'concept',
+        status: 'In progress',
+        outcomeCheck: {
+            ready: true,
+            digest: 'failed',
+            run: {
+                digest: 'failed',
+                ownerWorkId: 'repair-group',
+                threadId: 'repair-owner',
+                commandId: 'outcome',
+                messageId: 'outcome-message',
+                requestedAt: '2026-11-14T15:00:00Z',
+                sent: true,
+                error: null,
+                fixProposal: {
+                    commandId: 'fix',
+                    messageId: 'fix-message',
+                    threadId: 'repair-owner',
+                    requestedAt: '2026-11-14T15:05:00Z',
+                    sent: true,
+                    error: null,
+                },
+            },
+        },
+        releasePlan: { steps: [], outcomeCheck: { what: 'B→C composition', result: 'failed', evidence: null } },
+        threads: [{ id: 'repair-owner', state: 'running', updated: '2026-11-14T15:06:00Z' } as ItemThread],
+    });
+
+    expect(deskItems({ items: [parent] }, false)).toEqual([]);
+    parent.threads = [{ id: 'repair-owner', state: 'done', updated: '2026-11-14T15:06:00Z' } as ItemThread];
+    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
+    expect(deskWait(parent, false, [parent])).toEqual({
+        label: 'Outcome failed: B→C composition',
+        action: { kind: 'thread', threadId: 'repair-owner', label: 'Resume fix proposal in T3' },
+    });
+});

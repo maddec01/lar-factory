@@ -95,6 +95,9 @@ export async function captureWork(
     const body = `${draft.description}\n\n<!-- lar-factory:create {"identity":"${input.requestId}"} -->`;
     let createdTicket = submission.createdTicket ?? undefined;
     const finishSpec = async (workId: string) => {
+        if (createdTicket && !readTicketSpec(draft.description).marked)
+            rememberCreatedSpec(records, workId, createdTicket);
+
         if (target && readTicketSpec(draft.description).marked) {
             if (!records.specState(workId).active) {
                 // A lost create response has no provider checkpoint. Compare against the exact authorized submission instead.

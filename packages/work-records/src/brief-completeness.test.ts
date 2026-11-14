@@ -151,3 +151,97 @@ test('Bug accepts an unquoted regression test file and case and explains missing
         'named regression test (Regression test: name a test file plus its case',
     );
 });
+
+test('S05-F4-001 refuses C’s constant-only acceptance at single and batch gates', async () => {
+    const brief = readFileSync(new URL('../test/briefs/s05-final4-c.txt', import.meta.url), 'utf8');
+    const source = 'Consume the v1 greeting envelope in B · S05 round 2 final repeat 4';
+    const declaration =
+        '\nConsumption test: ' +
+        JSON.stringify({
+            source,
+            test: 'test/sim-891/view.test.mjs: renders supplied accepted text',
+            output: 'B returns a string; golden fixture Hello, Pedro!',
+            input: 'displayGreeting(element, acceptedText)',
+        }) +
+        '\n';
+
+    expect(() => requireCompleteBrief('build', brief)).toThrow('Consumption test:');
+    expect(() => requireCompleteBrief('build', brief + declaration)).not.toThrow();
+    for (const field of ['source', 'test', 'output', 'input']) {
+        const row = JSON.parse(declaration.slice(declaration.indexOf('{')));
+
+        row[field] = 'TODO';
+        expect(() => requireCompleteBrief('build', brief + '\nConsumption test: ' + JSON.stringify(row))).toThrow(
+            'Consumption test:',
+        );
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'consumption-gate-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    try {
+        let work = records.create({ title: 'C view', repository: 'fake/c', kind: 'build' });
+
+        work = records.setBody(work.workId, work.revision, 'brief', brief);
+        expect(() => records.displayGate(work.workId)).toThrow('Consumption test:');
+        expect(() => records.gateBatch([work.workId])).toThrow('Consumption test:');
+        expect(records.gate(work.workId).evidence).toEqual([]);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('consumption Code checklist refuses a constant-only approval and survives reopen', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'consumption-review-'));
+    const file = join(dir, 'work.db');
+    const records = await openWorkRecords(file);
+    const source = 'B accepted text';
+    const contract = {
+        source,
+        test: 'test/view.test.mjs: feeds accepted text to renderer',
+        output: 'B string output',
+        input: 'displayGreeting(element, message)',
+    };
+
+    try {
+        let work = records.create({ title: 'C', repository: 'fake/c', kind: 'build' });
+
+        work = records.setBody(
+            work.workId,
+            work.revision,
+            'brief',
+            feature + '\nConsumes: `B accepted text`\nConsumption test: ' + JSON.stringify(contract),
+        );
+
+        const round = { base: 'abc1234', reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }] } as const;
+
+        expect(() => records.recordReviewRound(work.workId, work.revision, round)).toThrow('consumption:');
+        expect(records.reviewRounds(work.workId)).toEqual([]);
+
+        const consumption = [
+            {
+                source,
+                input: contract.input,
+                test: contract.test,
+                evidence: 'view.mjs:3 takes the supplied string; test/view.test.mjs:8 passes two B-shaped values.',
+            },
+        ];
+
+        records.recordReviewRound(work.workId, work.revision, {
+            ...round,
+            reviewers: [{ ...round.reviewers[0], consumption }],
+        });
+
+        const reopened = await openWorkRecords(file);
+
+        try {
+            expect(reopened.reviewRounds(work.workId)[0]!.reviewers[0]!.consumption).toEqual(consumption);
+        } finally {
+            reopened.close();
+        }
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

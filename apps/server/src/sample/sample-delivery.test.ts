@@ -142,3 +142,33 @@ test('fake amended-brief controls preserve a saved notice while approval waits f
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('failed Outcome sample offers a writable fix proposal without contacting T3', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'outcome-sample-test-'));
+
+    vi.stubEnv('LAR_FACTORY_DATA_DIR', dir);
+
+    const board = createBoardState(structuredClone(fixture) as unknown as BoardData);
+    const sample = await createSampleBoard(board, fixture as unknown as BoardData);
+
+    try {
+        const reply = await sample.sampleControl({ action: 'failed-outcome' });
+        const parent = board.find((reply.body as { workId: string }).workId)!;
+
+        expect(parent.releasePlan?.outcomeCheck.result).toBe('failed');
+        expect(deskItems(board.snapshot(), false).filter((item) => item.id === parent.id)).toHaveLength(1);
+
+        const result = await sample.commands.proposeOutcomeFix(parent.id, {
+            revision: parent.revision,
+            inputDigest: parent.outcomeCheck!.digest,
+        });
+
+        expect(result.status).toBe(200);
+        expect(board.find(parent.id)?.outcomeCheck?.run?.fixProposal?.sent).toBe(true);
+        expect(board.find(parent.id)?.releasePlan?.outcomeCheck.result).toBe('failed');
+    } finally {
+        sample.close();
+        vi.unstubAllEnvs();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

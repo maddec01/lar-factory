@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Database } from './database.ts';
 import { WorkRecordError } from './database.ts';
 import { gateOwner } from './gate-resume.ts';
+import { expectRevision } from './record-revision.ts';
 import { contractText } from './review-dependencies.ts';
 import type { WorkRecords } from './work-records.ts';
 
@@ -87,6 +88,89 @@ export function outcomeRecords(database: Database, get: () => WorkRecords) {
                 save(id, run);
 
                 return { ...current, run };
+            }),
+        prepareOutcomeFix: (id: string, revision: number, digest: string) =>
+            database.write(() => {
+                const records = get();
+
+                expectRevision(records.read(id), revision);
+
+                const current = inspect(id);
+
+                if (
+                    !current.ready ||
+                    current.digest !== digest ||
+                    records.releasePlan(id)?.outcomeCheck.result !== 'failed'
+                )
+                    throw new WorkRecordError(
+                        'invalid',
+                        'Read the current failed Outcome before proposing a fix part.',
+                    );
+
+                let run = current.run;
+
+                if (!run) {
+                    const owner =
+                        gateOwner(database, records.read(id)) ??
+                        records
+                            .children(id)
+                            .filter((p) => p.kind === 'decision' && !p.setAside)
+                            .map((p) => gateOwner(database, p))
+                            .find(Boolean);
+
+                    if (!owner)
+                        throw new WorkRecordError(
+                            'invalid',
+                            'This group needs a shaping owner before it can propose a fix part.',
+                        );
+
+                    run = {
+                        digest,
+                        ownerWorkId: owner.workId,
+                        threadId: owner.threadId,
+                        commandId: randomUUID(),
+                        messageId: randomUUID(),
+                        requestedAt: new Date().toISOString(),
+                        sent: true,
+                        error: null,
+                    };
+                }
+
+                if (run.fixProposal) return run.fixProposal;
+
+                const fixProposal: NonNullable<OutcomeCheckRun['fixProposal']> = {
+                    requestedAt: new Date().toISOString(),
+                    commandId: randomUUID(),
+                    messageId: randomUUID(),
+                    threadId: run.threadId,
+                    sent: false,
+                    error: null,
+                };
+
+                save(id, { ...run, fixProposal });
+
+                return fixProposal;
+            }),
+        outcomeFixDelivered: (
+            id: string,
+            commandId: string,
+            result: 'accepted' | 'unconfirmed' | 'rejected',
+            error?: string,
+        ) =>
+            database.write(() => {
+                const { run } = inspect(id);
+
+                if (!run?.fixProposal || run.fixProposal.commandId !== commandId) return;
+
+                save(id, {
+                    ...run,
+                    fixProposal: {
+                        ...run.fixProposal,
+                        sent: result === 'accepted',
+                        rejected: result === 'rejected',
+                        error: result === 'accepted' ? null : (error ?? 'Fix proposal dispatch is unconfirmed.'),
+                    },
+                });
             }),
         outcomeCheckDelivered: (
             id: string,

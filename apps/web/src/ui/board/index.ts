@@ -238,7 +238,7 @@ export { ApprovalWait } from './ApprovalWait';
 export { BriefChanges } from './BriefChanges';
 export { BriefApprovalDetails } from './BriefApprovalDetails';
 
-export { OutcomeForm } from './OutcomeForm';
+export { OutcomeForm, OutcomeFix } from './OutcomeForm';
 export { BriefDependencyStatus } from './BriefDependencyStatus';
 
 export { DeskDependencyProof } from './DeskDependencyProof';

@@ -47,6 +47,15 @@ export interface OutcomeCheckRun {
     sent: boolean;
     error: string | null;
     rejected?: boolean;
+    fixProposal?: {
+        requestedAt: string;
+        commandId: string;
+        messageId: string;
+        threadId: string;
+        sent: boolean;
+        error: string | null;
+        rejected?: boolean;
+    };
 }
 
 /** A missing owner, failed check, failed dispatch or owner that ended without evidence returns to Pedro. */
@@ -55,7 +64,12 @@ export function outcomeNeedsPedro(item: Item, all: readonly Item[] = []): boolea
 
     const run = item.outcomeCheck.run;
 
-    if (!run || run.error || item.releasePlan?.outcomeCheck.result === 'failed') return true;
+    const failed = item.releasePlan?.outcomeCheck.result === 'failed';
+    const fix = run?.fixProposal;
+
+    if (failed && (!fix?.sent || fix.error)) return true;
+
+    if (!run || (!failed && run.error)) return true;
 
     const owner = all.find((candidate) => candidate.id === run.ownerWorkId);
     const thread = Array.isArray(owner?.threads)
@@ -71,6 +85,6 @@ export function outcomeNeedsPedro(item: Item, all: readonly Item[] = []): boolea
         !thread.observedAt &&
         ['done', 'stopped'].includes(thread.state ?? '') &&
         !!thread.updated &&
-        Date.parse(thread.updated) >= Date.parse(run.requestedAt)
+        Date.parse(thread.updated) >= Date.parse(failed && fix ? fix.requestedAt : run.requestedAt)
     );
 }

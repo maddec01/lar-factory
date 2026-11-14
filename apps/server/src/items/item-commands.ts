@@ -107,6 +107,7 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    proposeOutcomeFix(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     recordOutcomeCheck(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     completeReleaseStep(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     resumeRelease(itemId: string, input: Record<string, unknown>): Promise<Reply>;
@@ -1421,6 +1422,7 @@ export function createItemCommands({
     return {
         ...gating,
         recordOutcomeCheck: outcomes.recordOutcomeCheck,
+        proposeOutcomeFix: outcomes.proposeOutcomeFix,
         ...createShapingControl({ board, records, reread, ...shapingControlDeps }),
         ...releases,
         ...verifying,

@@ -314,6 +314,11 @@ export function createBoardServer({
             what: 'the exact brief for approval',
             run: forItem('Name the brief to display.', (id, input) => commands.inspectBrief(id, input)),
         },
+        '/api/propose-outcome-fix': {
+            sampleWrite: 'fake',
+            what: 'a fix part proposal for the failed Outcome',
+            run: forItem('Name the failed Outcome.', (id, input) => commands.proposeOutcomeFix(id, input)),
+        },
         '/api/record-outcome-check': {
             sampleWrite: 'fake',
             what: 'the Outcome check',

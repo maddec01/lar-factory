@@ -29,6 +29,7 @@ import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
 import { buildReservations } from './build-reservations.ts';
 import { chooseStructure } from './choose-structure.ts';
 import { conceptRunRecords, type ConceptRunRecords } from './concept-build.ts';
+import { consumptionReview, type ConsumptionReview } from './consumption-tests.ts';
 import { partCreator, type NewPart } from './create-part.ts';
 import { partBatchRecords } from './create-parts.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
@@ -169,6 +170,7 @@ export interface ReviewFinding {
 }
 
 export interface AxisReview {
+    consumption?: ConsumptionReview[];
     selection?: ReviewSelectionEvidence;
     axis: ReviewAxis;
     escalation?: ReviewEscalation;
@@ -193,6 +195,7 @@ export interface NewReviewRound {
     runId?: string;
     base: string;
     reviewers: readonly {
+        consumption?: ConsumptionReview[];
         selection?: ReviewSelectionEvidence;
         axis: ReviewAxis;
         escalation?: ReviewEscalation;
@@ -446,6 +449,8 @@ export interface WorkRecords
     retryReleaseContinuation: ReturnType<typeof releaseContinuationRecords>['retryReleaseContinuation'];
     prepareReleaseContinuation: ReturnType<typeof releaseContinuationRecords>['prepareReleaseContinuation'];
     releaseContinuationDelivered: ReturnType<typeof releaseContinuationRecords>['releaseContinuationDelivered'];
+    prepareOutcomeFix: ReturnType<typeof outcomeRecords>['prepareOutcomeFix'];
+    outcomeFixDelivered: ReturnType<typeof outcomeRecords>['outcomeFixDelivered'];
     prepareOutcomeCheck: ReturnType<typeof outcomeRecords>['prepareOutcomeCheck'];
     outcomeCheckDelivered: ReturnType<typeof outcomeRecords>['outcomeCheckDelivered'];
     pendingGateResumes: ReturnType<typeof gateResumeRecords>['pendingGateResumes'];
@@ -905,7 +910,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         'INSERT INTO review_rounds (work_id, round, base, recorded_at, run_id) VALUES (?, ?, ?, ?, ?)',
     );
     const insertAxis = db.prepare(
-        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked, escalation, selection) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO review_axes (work_id, round, axis, verdict, not_checked, escalation, selection, consumption) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
     const insertFinding = db.prepare(
         'INSERT INTO review_findings (work_id, round, axis, finding, severity, summary, disposition, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -2135,6 +2140,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     )
                         throw invalid(`The ${axis} reviewer is set to never in this run.`);
 
+                    const consumption = consumptionReview(
+                        records.body(workId, 'brief') ?? '',
+                        reviewer.consumption,
+                        axis === 'code' && verdict === 'approve',
+                    );
+
                     insertAxis.run(
                         workId,
                         number,
@@ -2143,6 +2154,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         notChecked,
                         escalation && JSON.stringify(escalation),
                         selection && JSON.stringify(selection),
+                        consumption ? JSON.stringify(consumption) : null,
                     );
                     reviewer.findings.forEach((finding, index) => {
                         const severity = checkOneOf(FINDING_SEVERITIES, finding?.severity, 'severity');
@@ -2181,6 +2193,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     recordedAt: String(round.recorded_at),
                     reviewers: axisRows.all(workId, Number(round.round)).map((axis): AxisReview => ({
                         axis: axis.axis as ReviewAxis,
+                        ...(axis.consumption
+                            ? { consumption: JSON.parse(String(axis.consumption)) as ConsumptionReview[] }
+                            : {}),
                         ...(axis.selection
                             ? { selection: JSON.parse(String(axis.selection)) as ReviewSelectionEvidence }
                             : {}),

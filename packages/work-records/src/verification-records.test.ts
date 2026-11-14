@@ -298,7 +298,7 @@ test.each([false, true])(
 test('S05 F3: upgrade replaces legacy recommendation waits only from exact approved briefs, retaining evidence', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-decision-upgrade-'));
     const path = join(dir, 'work.db');
-    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 51) });
     const cases = [
         ['no', 'no', true, false],
         ['yes', 'yes: Inspect the greeting.', true, true],

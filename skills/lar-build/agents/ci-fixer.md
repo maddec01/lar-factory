@@ -53,3 +53,6 @@ check: <failing job name>
 run: <run link>
 summary: <one or two lines on the cause and what you changed>
 ```
+
+For every body update, run `lar-work pr-body --file <draft> --to <body-file>`
+and publish that generated file; preserve its canonical Test steps section.

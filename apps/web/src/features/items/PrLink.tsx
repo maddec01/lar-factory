@@ -67,7 +67,7 @@ export function PrAction({
     primary?: boolean;
     next?: boolean;
 }) {
-    if (mergeStageProblem(item))
+    if (item.linkedPrs[0]?.mergeState === 'behind' || mergeStageProblem(item))
         return <PrLink item={item} label={label === 'Merge PR' ? 'Open PR' : label} primary={primary} next={next} />;
 
     const openPr = <PrLink item={item} label="Open PR" />;

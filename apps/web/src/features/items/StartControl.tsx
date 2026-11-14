@@ -5,6 +5,8 @@ import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 // Once a thread starts or may have started, a tag takes Start's place.
 import {
     startActionChoice,
+    buildsAtWork,
+    limitNumber,
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
@@ -137,6 +139,11 @@ export function StartControl({
     }
 
     const retry = kind === 'build' && canRetryBuild(item);
+    const exceedsLimit =
+        kind === 'build' &&
+        data.buildLimit &&
+        !buildsAtWork({ items: [item] }).length &&
+        buildsAtWork(data).length >= limitNumber(data.buildLimit);
     const verb = pending ? 'Starting…' : error || retry ? 'Retry start' : stopped && !resume ? 'Start again' : label;
     // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
     const state =
@@ -185,6 +192,7 @@ export function StartControl({
                     <StartEntries item={item} data={data} onPick={pick} />
                 </DropdownMenu.Content>
             </DropdownMenu>
+            {exceedsLimit && !pending && <StartNote>Starting now will go over the limit.</StartNote>}
         </StartGroup>
     );
 }

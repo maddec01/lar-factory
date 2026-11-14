@@ -41,7 +41,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
                     `Consumer cites ${records.read(producer).title}'s output without a blocker; run sync-blockers or record No ordering needed with a reason.`,
                     [producer],
                 );
-    for (const quote of staleAnswerQuotes(records, groupId))
+    for (const quote of members.length ? staleAnswerQuotes(records, groupId) : [])
         add(
             'map',
             `answer-quote:${quote.workId}:${quote.partId}`,
@@ -80,7 +80,9 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
         add('blocker', `declared-blockers:${groupId}`, groupId, (error as Error).message, []);
     }
 
-    items.push(...projectionChecks(records, groupId), ...fogChecks(records, groupId));
+    if (members.length || records.read(groupId).kind === 'concept')
+        items.push(...projectionChecks(records, groupId), ...fogChecks(records, groupId));
+
     for (const request of records.partTicketRequests(groupId))
         if (!request.ticket)
             add(
@@ -116,7 +118,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
         const id = r.workId;
         const gate = records.gate(id);
 
-        if (id !== groupId && !['concept', 'decision', 'slice'].includes(r.kind)) {
+        if ((id !== groupId || members.length === 0) && !['concept', 'decision', 'slice'].includes(r.kind)) {
             const brief = records.body(id, 'brief');
             const review = brief?.trim() ? records.currentDoubt(id) : null;
 
@@ -129,7 +131,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
                         'brief',
                         `doubt:${id}`,
                         id,
-                        `${r.title}: review current answers, sibling endpoints/fields and removed contracts in Doubt; repair the brief and rerun the review.`,
+                        `${r.title}: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.`,
                         [input.packageDigest],
                     );
 

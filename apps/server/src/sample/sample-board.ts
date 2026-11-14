@@ -1,5 +1,6 @@
 import {
     sampleActivityFrom,
+    buildsAtWork,
     sameLabel,
     type LabelChange,
     SETTLED_FIRST_READ,
@@ -280,7 +281,17 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
 
                 reread();
 
-                return { status: 200, body: { workId, error: null } };
+                const manualWorkId =
+                    input.change === 'manual-override'
+                        ? delivery.manualOverride(repos()[0]!.repo, {
+                              limit: 4,
+                              atWorkIds: buildsAtWork(board.snapshot()).map((item) => item.id),
+                          })
+                        : undefined;
+
+                if (manualWorkId) reread();
+
+                return { status: 200, body: { workId, ...(manualWorkId && { manualWorkId }), error: null } };
             }
 
             if (input.action === 'brief-approval') {

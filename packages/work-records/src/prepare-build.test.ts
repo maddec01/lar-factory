@@ -129,7 +129,7 @@ it('rejects a Pause that races preparation, and permanently records scope-change
     expect(records.launchIntents({})).toEqual([]);
 });
 
-it('a PR waiting for review releases active capacity, while working again and unresolved launches still count', async () => {
+it('a PR waiting for Pedro retains capacity alongside unresolved launches', async () => {
     const { records, rev, ready } = await fixture();
     const a = ready('A');
     const b = ready('B');
@@ -139,7 +139,8 @@ it('a PR waiting for review releases active capacity, while working again and un
     records.resolveLaunchIntent(a, rev(a), intent.intentId, { threadId: 'build-a' });
     expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
     records.update(a, rev(a), { status: 'Ready to merge' });
-    records.prepareBuild(b, rev(b), capacity);
+    expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
+    records.prepareBuild(b, rev(b), { limit: 2, atWorkIds: [] });
     expect(() => records.prepareBuild(c, rev(c), { limit: 2, atWorkIds: [a] })).toThrow('capacity');
     expect(records.launchIntents({ workId: a })[0]?.buildInput?.brief).toBe('Exact A');
 });
@@ -184,4 +185,107 @@ it('a linked parent without its own build does not consume a shared capacity slo
     const other = ready('Other');
 
     expect(() => records.prepareBuild(other, rev(other), capacity)).toThrow(/capacity/);
+});
+
+it('S08 F01: Pedro waits retain the original slot across answers, amendments, handoff and reopen', async () => {
+    const { records, other, rev, ready } = await fixture();
+    const a = ready('SA');
+    const b = ready('S08 R02 GB — greeting build');
+    const intent = records.prepareBuild(a, rev(a), capacity).intent;
+
+    records.resolveLaunchIntent(a, rev(a), intent.intentId, { threadId: 'sa-owner' });
+    for (const status of ['Needs you', 'Shaping', 'Verify'] as const) {
+        records.update(a, rev(a), { status });
+        expect(() => other.prepareBuild(b, rev(b), capacity)).toThrow(/capacity/);
+        expect(() => other.buildReadiness(b, { ...capacity, recovery: true })).toThrow(/capacity/);
+    }
+    records.resumeFromUser(a, rev(a), 'In progress');
+    expect(() => other.prepareBuild(b, rev(b), capacity)).toThrow(/capacity/);
+    records.update(a, rev(a), { status: 'Done' });
+    expect(() => other.prepareBuild(b, rev(b), capacity)).toThrow(/capacity/);
+    records.setAside(a, rev(a));
+    expect(other.prepareBuild(b, rev(b), capacity).intent.workId).toBe(b);
+});
+
+it('S08 F04: a notice cannot turn another work item gate or merge into a Pedro question', async () => {
+    const { records, rev, ready } = await fixture();
+    const a = ready('Decision owner');
+    const b = ready('S08 R02 GB — greeting build');
+
+    for (const reason of [`Waiting for GB's gate`, `Waiting for ${b} to merge`, 'Blocked until GB is Ready']) {
+        expect(() => records.waitForUser(a, rev(a), reason)).toThrow(/blocker/i);
+        expect(() => records.setNeedsYou(a, rev(a), reason)).toThrow(/blocker/i);
+    }
+    records.waitForUser(a, rev(a), 'Should the product use gold or amber?');
+    expect(records.read(a).needsYou).toContain('gold');
+});
+
+it('S08 F03: standalone reconcile reports an amended brief missing current Doubt', async () => {
+    const { records, rev, ready } = await fixture();
+    const id = ready('ST');
+
+    records.setBody(id, rev(id), 'brief', 'Amended to gold');
+    expect(records.reconcile(id).items).toContainEqual(
+        expect.objectContaining({
+            key: `doubt:${id}`,
+            requiresFix: true,
+            summary: expect.stringContaining("Doubt hasn't run"),
+        }),
+    );
+
+    const input = records.doubtPackage(id);
+
+    records.recordDoubt(id, input.packageDigest, 'Doubt', 'Gold checked.', []);
+    expect(records.reconcile(id).items.some((item) => item.key === `doubt:${id}`)).toBe(false);
+});
+
+it('S08 F04: exact T3 wait observation survives a new connection and later scope writes', async () => {
+    const { records, other, rev, ready } = await fixture();
+    const id = ready('SA scope');
+
+    records.waitForUser(id, rev(id), 'Gold or amber?');
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'scope-q', running: false });
+    records.setBody(id, rev(id), 'brief', 'Gold scope saved after the exact T3 answer');
+    other.reconcileUserWait(id, { threadId: 'owner', running: true });
+    expect(records.read(id)).toMatchObject({ needsYou: null, status: 'Shaping' });
+    records.waitForUser(id, rev(id), 'New question still needs an answer');
+    other.reconcileUserWait(id, { threadId: 'owner', running: true });
+    expect(records.read(id).needsYou).toBe('New question still needs an answer');
+});
+
+it('Pedro manual starts record free claims and overrides; automatic claims wait until below the limit', async () => {
+    const { records, other, rev, ready } = await fixture();
+    const a = ready('Manual first');
+    const b = ready('Manual override');
+    const c = ready('Automatic next');
+    const first = records.prepareBuild(a, rev(a), { ...capacity, manual: true }).intent;
+
+    expect(first.buildInput?.capacity).toMatchObject({
+        source: 'manual',
+        occupied: 0,
+        limit: 1,
+        manualOverride: false,
+    });
+    records.resolveLaunchIntent(a, rev(a), first.intentId, { threadId: 'manual-a' });
+
+    const override = other.prepareBuild(b, rev(b), { ...capacity, manual: true }).intent;
+
+    expect(override.buildInput?.capacity).toMatchObject({
+        source: 'manual',
+        occupied: 1,
+        limit: 1,
+        manualOverride: true,
+    });
+    records.resolveLaunchIntent(b, rev(b), override.intentId, { threadId: 'manual-b' });
+    expect(records.launchIntents({ workId: b })[0]!.buildInput?.capacity?.manualOverride).toBe(true);
+    expect(() => other.prepareBuild(c, rev(c), { ...capacity, automatic: true })).toThrow(/capacity/);
+    expect(other.buildReadiness(a, { ...capacity, recovery: true }).capacity?.manualOverride).toBe(false);
+    records.setAside(b, rev(b));
+    expect(() => other.prepareBuild(c, rev(c), { ...capacity, automatic: true })).toThrow(/capacity/);
+    records.setAside(a, rev(a));
+    expect(other.prepareBuild(c, rev(c), { ...capacity, automatic: true }).intent.buildInput?.capacity).toMatchObject({
+        source: 'automatic',
+        manualOverride: false,
+        occupied: 0,
+    });
 });

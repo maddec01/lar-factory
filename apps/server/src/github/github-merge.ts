@@ -104,9 +104,11 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
 
             if (pr.mergeStateStatus !== 'CLEAN')
                 blockers.push(
-                    pr.mergeStateStatus === 'DIRTY'
-                        ? 'Resolve conflicts before merging.'
-                        : 'GitHub readiness is blocked or unknown. Check reviews, checks and policies.',
+                    pr.mergeStateStatus === 'BEHIND'
+                        ? `The branch is behind ${pr.baseRefName}. Rebase or update it using Open PR, then refresh readiness.`
+                        : pr.mergeStateStatus === 'DIRTY'
+                          ? 'Resolve conflicts before merging.'
+                          : 'GitHub readiness is blocked or unknown. Check reviews, checks and policies.',
                 );
 
             if (pr.statusCheckRollup && pr.statusCheckRollup.state !== 'SUCCESS')
@@ -174,7 +176,9 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
                         ? 'can merge'
                         : pr.mergeStateStatus === 'DIRTY'
                           ? 'conflicts'
-                          : 'blocked',
+                          : pr.mergeStateStatus === 'BEHIND'
+                            ? 'behind'
+                            : 'blocked',
             };
 
             return { pr: linked, methods, blockers };

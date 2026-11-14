@@ -42,8 +42,8 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
         const records = get(),
             group = records.read(id);
 
-        if (group.parentId || (group.kind !== 'concept' && !records.children(id).some((p) => p.kind !== 'slice')))
-            throw new WorkRecordError('invalid', 'Reconcile the owning concept or linked-work parent.');
+        if (group.parentId || group.kind === 'slice')
+            throw new WorkRecordError('invalid', 'Reconcile the owning group or standalone work.');
 
         const snapshot: Snapshot = {};
         const visit = (workId: string) => {

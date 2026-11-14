@@ -52,9 +52,11 @@ export function mergePrProblems(pr: LinkedPr): string[] {
 
     if (pr.mergeState !== 'can merge')
         problems.push(
-            pr.mergeState === 'conflicts'
-                ? 'Resolve conflicts before merging.'
-                : 'Provider readiness is blocked or unknown. Check reviews and policies.',
+            pr.mergeState === 'behind'
+                ? 'The branch is behind main. Rebase or update it using Open PR, then refresh readiness.'
+                : pr.mergeState === 'conflicts'
+                  ? 'Resolve conflicts before merging.'
+                  : 'Provider readiness is blocked or unknown. Check reviews and policies.',
         );
 
     if (pr.pipelineUnread || (pr.checkProgress && pr.checkProgress.state !== 'current'))

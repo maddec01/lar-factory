@@ -210,6 +210,11 @@ test('Auto-build starts the oldest passing gate first, up to the build limit, an
     records.update(c, at(records, c), { status: 'Done' });
     s.reread();
     await s.pass();
+    assert.deepEqual(s.started, [c, a], 'Status Done alone releases no reservation');
+    records.setPullRequest(c, at(records, c), `${REPO}#99`);
+    records.observe(c, at(records, c), { of: 'pr', state: 'merged' });
+    s.reread();
+    await s.pass();
     assert.deepEqual(s.started, [c, a, b]);
 });
 

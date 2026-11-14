@@ -1,4 +1,5 @@
 import {
+    buildActivity,
     effectiveVocabulary,
     deskItems,
     deskWait,
@@ -1498,4 +1499,16 @@ test('stale approval names the changed cited answer, contract or brief', async (
     approve();
     write(build, 'brief', `${records.body(build, 'brief')}\nA new acceptance criterion.`);
     assert.equal(shown().staleGateDetail, 'Brief changed.');
+});
+
+test('S08 F03: an idle amended brief reports a process gap instead of a running Doubt', async () => {
+    const records = await open();
+    const work = records.create({ title: 'ST', repository: REPO, kind: 'build', status: 'Shaping' });
+
+    records.setBody(work.workId, work.revision, 'brief', completeBrief('Gold amendment.'));
+
+    const shown = recordItems(records, [], [REPO])[0]!;
+
+    assert.deepEqual(buildActivity(shown), { label: "Brief changed; Doubt hasn't run", running: false });
+    assert.equal(shown.briefApproval, undefined);
 });

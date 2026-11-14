@@ -189,6 +189,8 @@ export function prReadiness(
 
     if (pr.checks?.failed) return { word: 'Checks failed', action: 'Review failed checks', state: 'failed' };
 
+    if (pr.mergeState === 'behind') return { word: 'Behind main · needs rebase', state: 'waiting', action: 'Open PR' };
+
     if (pr.state !== 'open' || pr.isDraft || pr.mergeState === 'blocked' || pr.mergeState === 'conflicts')
         return {
             word: pr.mergeState === 'conflicts' ? 'Resolve conflicts' : 'Review PR',
@@ -274,7 +276,14 @@ export function buildAccessProblem(
 }
 
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
-    if (item.briefReviewing) return { label: 'Doubt reviewing', running: true };
+    if (item.briefReviewing) {
+        const running =
+            !stale &&
+            Array.isArray(item.threads) &&
+            item.threads.some((thread) => !thread.observedAt && thread.doubtRunning);
+
+        return { label: running ? 'Doubt reviewing' : "Brief changed; Doubt hasn't run", running };
+    }
 
     if (start?.phase === 'starting') return { label: 'Starting', running: false };
 

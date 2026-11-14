@@ -17,7 +17,7 @@ const choices: ModelGroup[] = [
 ];
 
 /** Only the provider and T3 transports are fake; starts, claims, observation and scheduling use their production modules. */
-async function fixture(autoOn = false) {
+async function fixture(autoOn = false, limit = 1) {
     vi.useFakeTimers({ toFake: ['Date'] });
 
     const dir = mkdtempSync(join(tmpdir(), 'concept-merge-'));
@@ -61,7 +61,7 @@ async function fixture(autoOn = false) {
         items: [],
         repos: [],
         modelChoices: choices,
-        buildLimit: { limit: 1, automatic: 1 },
+        buildLimit: { limit, automatic: 1 },
         t3Availability: { availability: 'available' },
     } as unknown as BoardData);
     const reread = () => board.update({ items: recordItems(records, [], repos) });
@@ -101,7 +101,7 @@ async function fixture(autoOn = false) {
         records,
         commands,
         setting: () => setting,
-        limit: () => 1,
+        limit: () => limit,
         offerModelChoices: () => choices,
         dir,
     });
@@ -179,8 +179,7 @@ test('one Start makes parallel-capable progress at capacity one; only a provider
 
     const aPr = await s.handBack(s.a, 1);
 
-    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
-    await s.handBack(s.b, 2);
+    expect(s.launches.map((row) => row.id)).toEqual([s.a]);
     expect(s.records.read(s.next).status).toBe('Ready');
     s.records.attachTicket(s.a, s.rev(s.a), 'example/a#91');
     s.records.observe(s.a, s.rev(s.a), { of: 'ticket', state: 'closed' });
@@ -197,6 +196,13 @@ test('one Start makes parallel-capable progress at capacity one; only a provider
     s.states.set(aPr, 'merged');
     await s.poll();
     expect(s.records.read(s.a).finishedAt).toBeTruthy();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+
+    const bPr = await s.handBack(s.b, 2);
+
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+    s.states.set(bPr, 'merged');
+    await s.poll();
     expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
     expect(s.launches[2]?.base).toMatchObject({ base: 'base-with-merged-helper' });
     await s.poll();
@@ -217,21 +223,77 @@ test.each(['pause', 'auto-off'] as const)(
 
         const aPr = await s.handBack(s.a, 1);
 
-        await s.handBack(s.b, 2);
-
         if (mode === 'pause') s.commands.setConceptBuildRun(s.group, s.rev(s.group), 'paused');
 
         s.states.set(aPr, 'merged');
         await s.poll();
 
         if (mode === 'pause') {
-            expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+            expect(s.launches.map((row) => row.id)).toEqual([s.a]);
             expect(s.start().status).toBe(200);
             await s.scheduler.pass();
         }
 
+        expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+
+        const bPr = await s.handBack(s.b, 2);
+
+        s.states.set(bPr, 'merged');
+        await s.poll();
         expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
         expect(s.records.read(s.standalone).status).toBe('Ready');
         expect(s.records.launchIntents({ workId: s.next })).toHaveLength(1);
     },
 );
+
+test('S08 F01: T3 question answers cannot let Auto-build overrun the shared two-slot capacity', async () => {
+    const s = await fixture(true, 2);
+
+    expect(s.start().status).toBe(200);
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+    s.records.waitForUser(s.b, s.rev(s.b), 'Use gold or amber?');
+    s.reread();
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+    s.records.resumeFromUser(s.b, s.rev(s.b), 'In progress');
+    s.reread();
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+
+    const aPr = await s.handBack(s.a, 1);
+
+    s.states.set(aPr, 'merged');
+    await s.poll();
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
+});
+
+test('manual override holds its slot; an authorized concept and merge-starts-next wait until below the automatic limit', async () => {
+    const s = await fixture(false, 1);
+
+    expect((await s.commands.startBuild(s.standalone, undefined)).status).toBe(200);
+    expect(s.start().status).toBe(200);
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.standalone]);
+    expect(s.records.conceptBuildPlan(s.group).run?.state).toBe('running');
+    expect((await s.commands.startBuild(s.a, undefined)).status).toBe(200);
+    expect(s.records.launchIntents({ workId: s.a })[0]!.buildInput?.capacity?.manualOverride).toBe(true);
+    await s.scheduler.pass();
+    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a]);
+
+    const aPr = await s.handBack(s.a, 1);
+
+    s.states.set(aPr, 'merged');
+    await s.poll();
+    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a]);
+
+    const standalonePr = await s.handBack(s.standalone, 2);
+
+    s.states.set(standalonePr, 'merged');
+    await s.poll();
+    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a, s.b]);
+    expect(s.records.launchIntents({ workId: s.b })[0]!.buildInput?.capacity).toMatchObject({
+        source: 'automatic',
+        manualOverride: false,
+    });
+});

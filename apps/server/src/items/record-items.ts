@@ -306,7 +306,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
-            ...(!record.parentId && (record.kind === 'concept' || work.length > 0)
+            ...(!record.parentId && (record.kind === 'concept' || work.length > 0 || briefReviewing)
                 ? {
                       reconciliation: records.reconciliation(record.workId),
                   }
@@ -336,6 +336,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }),
             recorded: true,
             buildPhase: record.buildPhase,
+            ...(activeBuild && { buildStarted: true as const }),
             verification: records.verification(record.workId),
             retro: records.retro(record.workId),
             completion: completionOf(record),

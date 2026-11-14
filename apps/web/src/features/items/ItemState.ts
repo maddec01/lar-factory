@@ -5,6 +5,8 @@
 
 import {
     isDecisionWork,
+    buildsAtWork,
+    limitNumber,
     groupState,
     deskWait,
     needsAnswer,
@@ -95,6 +97,7 @@ export interface ItemStateInputs {
     starting: boolean;
     all?: readonly Item[];
     starts?: BoardData['startProgress'];
+    capacityFull?: boolean;
 }
 
 /** Whether T3's own run state says the item's work runs, when its activity can't say: a shaping thread, a build thread or
@@ -203,8 +206,17 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         { items: [...(inputs.all ?? [])], startProgress: inputs.starts },
         inputs.unavailable,
     );
+    const slotWait =
+        item.status === 'Ready' &&
+        item.passingBrief &&
+        !item.needsYou &&
+        !blockers.length &&
+        !inputs.starting &&
+        !buildsAtWork({ items: [item] }).length &&
+        inputs.capacityFull;
     const word =
-        (item.briefReviewing && !wait ? 'Doubt reviewing' : undefined) ??
+        (slotWait ? 'Waiting for a build slot' : undefined) ??
+        (item.briefReviewing && !wait ? buildActivity(item, stale).label : undefined) ??
         group?.word ??
         wait ??
         (blockers.length
@@ -322,6 +334,9 @@ function useStarting(): (item: Item) => boolean {
         starts[item.id]?.phase === 'pending' || builds[item.id]?.phase === 'pending' || reported.includes(item.id);
 }
 
+const capacityFull = ({ data }: { data: BoardData }) =>
+    !!data.buildLimit && buildsAtWork(data).length >= limitNumber(data.buildLimit);
+
 export const useBoardUnavailable = () => useBoardStore(boardUnavailable);
 
 /** The presenter for many items at once, such as a counter's or a heading's: read at the time it is called. */
@@ -331,6 +346,7 @@ export function useItemStates(): (item: Item) => ItemState {
     const starting = useStarting();
     const all = useBoardStore((state) => state.data.items);
     const starts = useBoardStore((state) => state.data.startProgress);
+    const full = useBoardStore(capacityFull);
 
     return (item) => {
         const now = Date.now();
@@ -339,6 +355,7 @@ export function useItemStates(): (item: Item) => ItemState {
             unavailable,
             all,
             starts,
+            capacityFull: full,
             line: itemActivityLine(item, now, disconnected)?.state,
             lost: activityLost(itemActivityThread(item)?.activity, now),
             starting: starting(item),
@@ -353,11 +370,12 @@ export function useItemState(item: Item): ItemState {
     const starting = useStarting()(item);
     const all = useBoardStore((state) => state.data.items);
     const starts = useBoardStore((state) => state.data.startProgress);
+    const full = useBoardStore(capacityFull);
     const line = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
     const lost = useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
 
     return useMemo(
-        () => itemState(item, { unavailable, line, lost, starting, all, starts }),
-        [item, unavailable, line, lost, starting, all, starts],
+        () => itemState(item, { unavailable, line, lost, starting, all, starts, capacityFull: full }),
+        [item, unavailable, line, lost, starting, all, starts, full],
     );
 }

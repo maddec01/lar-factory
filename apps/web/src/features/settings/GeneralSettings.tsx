@@ -89,7 +89,7 @@ export const generalGroups = (data: SettingsData): Group[] => [
                 id: 'build-limit',
                 title: 'Shared build limit',
                 description: 'Limit builds running together across all concepts and standalone tickets.',
-                help: `${BUILD_LIMIT_NOTE} Concept builds, manual starts, Start after and Auto-build share this limit. At capacity, manual starts are refused; scheduled starts wait for a slot. Automatic uses the parallel tests and builds limit.`,
+                help: `${BUILD_LIMIT_NOTE} Start concept builds authorizes automatic starts within this limit. Automatic uses the parallel tests and builds limit.`,
                 control: custom(() => (
                     <LimitSetting
                         name="build-limit"

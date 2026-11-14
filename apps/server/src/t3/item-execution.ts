@@ -103,6 +103,7 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
     const liveChildren = new Set<string>();
     const runningChildren = new Set<string>();
     const needsYouChildren = new Set<string>();
+    const doubtRunning = new Set<string>();
 
     for (const shell of working) {
         const id = shell.id as string;
@@ -122,6 +123,9 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
             if (live) liveChildren.add(ancestor);
 
             if (background || running) runningChildren.add(ancestor);
+
+            if (running && typeof shell.title === 'string' && shell.title.startsWith('Doubt · '))
+                doubtRunning.add(ancestor);
 
             if (shell.pendingRuntimeRequest) needsYouChildren.add(ancestor);
         }
@@ -175,6 +179,7 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
             updated: shell.updatedAt as string,
             ...(runningChildren.has(id) ? { hasRunningChildren: true } : {}),
             ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}),
+            ...(doubtRunning.has(id) ? { doubtRunning: true } : {}),
             ...(needsYouChildren.has(id) ? { childNeedsYou: true } : {}),
         };
 

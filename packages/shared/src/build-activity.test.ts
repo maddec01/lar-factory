@@ -222,8 +222,8 @@ it('counts builds against the build limit while they start, build or work again,
     ]);
     expect(
         buildsAtWork({ items, startProgress }, true).map((i) => i.id),
-        'unknown activity drops a build working again',
-    ).toEqual(['starting', 'may', 'progress', 'review']);
+        'unknown activity retains a started build reservation',
+    ).toEqual(['starting', 'may', 'progress', 'review', 'again']);
 });
 
 it('a limit allows its number, or what Automatic gives', () => {
@@ -257,4 +257,36 @@ it('excludes a coordinating linked parent while counting real child builds and e
     expect(
         counted({ threads: [{ id: 'build', purpose: 'build', state: 'running', updated: 'now', title: 'Build' }] }),
     ).toEqual(['parent', 'child']);
+});
+
+it('S08 F01: every started build retains its slot throughout Pedro waits and handoffs', () => {
+    const items = ['Needs you', 'Shaping', 'Verify', 'Ready to merge'].map(
+        (status, i) =>
+            ({
+                id: `${i}`,
+                kind: 'build',
+                status,
+                buildPhase: 'implement',
+                threads: [],
+                linkedPrs: [],
+                slices: [],
+            }) as unknown as Item,
+    );
+
+    expect(buildsAtWork({ items })).toEqual(items);
+    expect(buildsAtWork({ items: items.map((item) => ({ ...item, setAside: true })) })).toEqual([]);
+});
+
+it('S08 F03: only a live Doubt child makes the review label claim running', () => {
+    const item = {
+        briefReviewing: true,
+        threads: [{ purpose: 'shape', state: 'done', doubtRunning: true }],
+    } as unknown as Item;
+
+    expect(buildActivity(item)).toEqual({ label: 'Doubt reviewing', running: true });
+    expect(buildActivity(item, true)).toEqual({ label: "Brief changed; Doubt hasn't run", running: false });
+    expect(buildActivity({ ...item, threads: [] })).toEqual({
+        label: "Brief changed; Doubt hasn't run",
+        running: false,
+    });
 });

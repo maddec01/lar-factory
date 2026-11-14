@@ -15,6 +15,7 @@ import { captureRunSettings, executionSettings, invalidRun, runObject, runText }
 import type { WorkRecord } from './work-records.ts';
 
 export interface RunSettingsRecords {
+    reconcileRoleRuns(workId: string, observation: { ownerEnded: boolean }): void;
     snapshotRun(workId: string, revision: number, input: SnapshotRunInput): RunSettings;
     runSettings(workId: string, runId?: string): { workId: string; runs: RunSettings[]; roleRuns: RoleRun[] };
     startRoleRun(workId: string, revision: number, input: RoleRunInput): RoleRun;
@@ -63,6 +64,30 @@ export function runSettingsRecords(
     };
 
     return {
+        reconcileRoleRuns: (workId, { ownerEnded }) =>
+            database.write(() => {
+                if (!ownerEnded) return;
+
+                read(workId);
+                for (const row of db.prepare('SELECT content FROM role_runs WHERE work_id=?').all(workId)) {
+                    const run = JSON.parse(String(row.content)) as RoleRun;
+
+                    if (run.role === 'thread' || run.result !== 'running') continue;
+
+                    db.prepare('UPDATE role_runs SET content=? WHERE work_id=? AND execution_id=?').run(
+                        JSON.stringify({
+                            ...run,
+                            result: 'failed',
+                            endedAt: new Date().toISOString(),
+                            failure:
+                                'Abandoned execution: owner ended with no live child and never recorded a terminal T3 result.',
+                        }),
+                        workId,
+                        run.executionId,
+                    );
+                    bump(workId);
+                }
+            }),
         snapshotRun: (workId, revision, input) =>
             database.write(() => {
                 expected(workId, revision);

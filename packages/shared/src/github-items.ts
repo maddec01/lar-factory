@@ -174,7 +174,7 @@ const MERGE_STATES: Record<string, MergeState> = {
     UNKNOWN: 'checking',
     DIRTY: 'conflicts',
     BLOCKED: 'blocked',
-    BEHIND: 'blocked',
+    BEHIND: 'behind',
     DRAFT: 'blocked',
 };
 

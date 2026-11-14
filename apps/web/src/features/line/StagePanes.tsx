@@ -82,7 +82,7 @@ function BuildLimit() {
         <DesignBuildLimit
             building={builds.items.length}
             limit={builds.limit}
-            title={`${builds.text}. ${BUILD_LIMIT_NOTE} Concept builds, manual starts, Start after and Auto-build share this limit. At capacity, manual starts are refused; scheduled starts wait for a slot.`}
+            title={`${builds.text}. ${BUILD_LIMIT_NOTE} All builds count toward this limit. At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.`}
         >
             {builds.occupancy}
         </DesignBuildLimit>

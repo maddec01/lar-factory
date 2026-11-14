@@ -126,3 +126,20 @@ test('pending confirmation disables merge actions on the desk and in the item di
     await answer({ error: null, merged: true });
     expect(posted().filter(([url]) => url === '/api/merge-pr')).toHaveLength(1);
 });
+
+test('S08 F05: behind-main work offers the provider PR update link instead of merge', async () => {
+    const board = data();
+
+    await mountPage({
+        ...board,
+        items: board.items.map((item) =>
+            item.id === 'I_sample16'
+                ? { ...item, linkedPrs: item.linkedPrs.map((pr) => ({ ...pr, mergeState: 'behind' as const })) }
+                : item,
+        ),
+    });
+    expect($('a[data-pr-link="I_sample16"]')?.getAttribute('href')).toBe(confirmation.url);
+    expect($('a[data-pr-link="I_sample16"]')?.textContent).toBe('Open PR');
+    expect(document.body.textContent).toContain('Behind main');
+    expect($('#merge-pr-dialog')).toBeNull();
+});

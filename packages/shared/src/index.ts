@@ -59,3 +59,5 @@ export * from './retired-part.ts';
 export { pendingBriefBatch, shapingOwner } from './question-thread.ts';
 
 export { conceptFog, itemFog } from './concept-fog.ts';
+
+export { reservesBuildSlot } from './build-capacity.ts';

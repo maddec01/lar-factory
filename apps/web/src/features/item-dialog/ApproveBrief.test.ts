@@ -383,7 +383,7 @@ test('details show Doubt reviewing without an approval button for an amended bri
     const { useItemDialogStore } = await import('./ItemDialogStore');
 
     await settle(() => useItemDialogStore.getState().open(item.id));
-    expect(text($('[data-record]'))).toContain('Doubt reviewing');
+    expect(text($('[data-record]'))).toContain("Brief changed; Doubt hasn't run");
     expect(
         [...$('[data-item-dialog]')!.querySelectorAll('button')].some((button) =>
             /Approve brief|Display brief/.test(text(button)),

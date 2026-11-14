@@ -23,7 +23,13 @@ const labelOf = (b: Element) => /^[^:]*:/.exec(text(b))?.[0] ?? '';
 /** What a screen reader says for a counter: its label, then what its number means: "building: 4 builds open: 2 working, 1 waiting to close, 1 run stopped". */
 const nameOf = (b: Element) => `${labelOf(b)} ${b.getAttribute('aria-description')}`;
 /** The number a counter shows. */
-const value = (b: Element) => text(b).slice(labelOf(b).length).trim();
+const value = (b: Element) => {
+    const copy = b.cloneNode(true) as Element;
+
+    copy.querySelectorAll('[aria-hidden]').forEach((element) => element.remove());
+
+    return text(copy).slice(labelOf(b).length).trim();
+};
 const counter = (label: string) => counters().find((b) => labelOf(b) === `${label}:`)!;
 /** The open counter's popover: its header, its list (`data-counter-list`) and its footer. */
 const popup = () => $('[data-counter-list]')?.closest<HTMLElement>('[data-state="open"]') ?? null;
@@ -112,20 +118,20 @@ test('a build counts while its start is in flight or in Review, and the count sh
     };
 
     await mountPage(moved('I_sample14', 'Review', started));
-    expect(value(counter('building'))).toBe('5');
+    expect(value(counter('building'))).toBe('10');
     expect(nameOf(counter('building'))).toBe(
-        'building: 5 builds open · shared limit 1: 2 working, 1 starting, 1 waiting to close, 1 run stopped',
+        'building: 10 builds open · shared limit 1: 2 working, 2 checks failed, 1 starting, 1 waiting to close, 1 run stopped, 1 verify build, 1 checks running, 1 resolve conflicts',
     );
 });
 
 test('a concept in progress is no build at work', async () => {
     await mountPage(moved('I_sample09', 'In progress', limited));
-    expect(value(counter('building'))).toBe('4');
+    expect(value(counter('building'))).toBe('9');
 
     const pop = await openCounter('building');
 
     expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');
-    expect(head(pop)).toBe('Building4Shared limit 2');
+    expect(head(pop)).toBe('Building9Shared limit 2');
 });
 
 test('an item waiting on you during shaping counts in both need you and shaping', async () => {

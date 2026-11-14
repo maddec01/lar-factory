@@ -249,7 +249,13 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                             List: 'List',
                             Queued: 'Queue',
                             Shaping: 'Shaping',
-                            'Needs you': 'Shaping',
+                            'Needs you': ['review', 'approve', 'checks', 'retro'].includes(item.buildPhase ?? '')
+                                ? 'Review'
+                                : item.buildPhase ||
+                                    (Array.isArray(item.threads) &&
+                                        item.threads.some((thread) => thread.purpose === 'build'))
+                                  ? 'Build'
+                                  : 'Shaping',
                             Ready: 'Ready to build',
                             'In progress': 'Build',
                             Review: 'Review',

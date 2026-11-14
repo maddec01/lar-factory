@@ -9,6 +9,7 @@ import type {
 
 import { WorkRecordError, type Database } from './database.ts';
 import { readFactorySettings } from './factory-settings.ts';
+import { resolveTestRuntime } from './project-runtime.ts';
 import { recordRolePhase } from './role-phases.ts';
 import { captureRunSettings, executionSettings, invalidRun, runObject, runText } from './run-settings-input.ts';
 import type { WorkRecord } from './work-records.ts';
@@ -85,6 +86,8 @@ export function runSettingsRecords(
                 if (problem) invalidRun(problem);
 
                 const snapshot = captureRunSettings(workId, input, settings);
+
+                if (snapshot.kind === 'build') snapshot.testRuntime = resolveTestRuntime(dir, read(workId).repository);
 
                 db.prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)').run(
                     workId,

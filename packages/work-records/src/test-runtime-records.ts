@@ -1,41 +1,33 @@
+import type { RunSettings, TestRuntime } from '@lar-factory/shared/run-settings';
+
 import type { Database } from './database.ts';
 import { WorkRecordError } from './database.ts';
 import type { WorkRecord } from './work-records.ts';
 
-export interface TestRuntime {
-    node: string;
-    version: string;
-}
 export interface TestRuntimeRecords {
-    requireTestRuntime(id: string, runtime: TestRuntime): void;
+    testRuntime(id: string, runId?: string): TestRuntime;
 }
 
-/** A build and its slices share the first validated runtime; changing settings cannot mix test environments. */
+/** Slices and roles read the owning build's frozen run, never current project settings. */
 export function testRuntimeRecords(database: Database, read: (id: string) => WorkRecord): TestRuntimeRecords {
-    const { db } = database;
-
     return {
-        requireTestRuntime: (id, runtime) =>
-            database.write(() => {
+        testRuntime: (id, runId) =>
+            database.read(() => {
                 let work = read(id);
 
                 while (work.kind === 'slice' && work.parentId) work = read(work.parentId);
 
-                const old = db.prepare('SELECT content FROM test_runtimes WHERE work_id=?').get(work.workId);
+                const row = database.db
+                    .prepare(
+                        "SELECT content FROM run_settings WHERE work_id=? AND json_extract(content,'$.kind')='build' AND (? IS NULL OR run_id=?) ORDER BY rowid DESC LIMIT 1",
+                    )
+                    .get(work.workId, runId ?? null, runId ?? null);
+                const runtime = row && (JSON.parse(String(row.content)) as RunSettings).testRuntime;
 
-                if (old) {
-                    const pinned = JSON.parse(String(old.content)) as TestRuntime;
+                if (!runtime)
+                    throw new WorkRecordError('invalid', 'Build held: no frozen test runtime in its run settings.');
 
-                    if (pinned.node !== runtime.node || pinned.version !== runtime.version)
-                        throw new WorkRecordError(
-                            'invalid',
-                            `This build already uses ${pinned.node} ${pinned.version}. Restore that project test runtime before running more tests.`,
-                        );
-                } else
-                    db.prepare('INSERT INTO test_runtimes(work_id,content) VALUES(?,?)').run(
-                        work.workId,
-                        JSON.stringify(runtime),
-                    );
+                return runtime;
             }),
     };
 }

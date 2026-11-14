@@ -130,7 +130,9 @@ history.
 
 Your desk lists everything waiting on Pedro, of any Kind and at any stage.
 A pending group brief batch has one Approve briefs card naming the parent and its
-members, rather than separate member approval cards. It opens the existing exact
+members, rather than separate member approval cards. Current Doubt and missing or
+invalid gates determine that batch, whether the approval notice is on the parent
+or its members. It opens the existing exact
 batch display and board approval buttons; unfinished Doubt remains an agent wait.
 This includes concepts, linked-work parents, decisions, builds and slice questions.
 The item also stays in its group or ordinary stage section. A card names the item,
@@ -155,7 +157,7 @@ Unavailable activity remains unknown.
 Actions say Start shaping, Start decision or Start build. Start after names the
 prerequisite and the action it will start. Labels name the current stage, such as
 Waiting for brief approval, Implementing, Code review or Waiting for required
-checks. Tracker Labels and Kind are separate from workflow Status. Factory
+checks. A build waiting for Pedro retains the progress stage from its build state. Tracker Labels and Kind are separate from workflow Status. Factory
 progress never becomes tracker labels, tags, comments or Azure State.
 
 A changed brief offers approval only after Doubt has a result for its current
@@ -176,16 +178,17 @@ Your desk definition excludes grouped work; it must change with that behavior.
 
 ## Settings and roles
 
-For Node projects, `lar-work test-runtime REPOSITORY --node /absolute/bin/node
---version vX.Y.Z` saves an explicit test runtime in local app data's
-`project-runtimes.json`. No repository guidance/config file is detected or read
-for runtime selection. Builder, slices, checks and approver run every test with
-`lar-work run-test ID --role ROLE [--record] -- COMMAND`. Focused red/green and
-recorded suites receive the same validated executable directory on PATH. A build
-and its slices pin the first validated runtime; a later configuration change
-refuses further tests until that runtime is restored. Missing
-or changed runtimes stop the test before execution and require the owner to wait
-in Needs you. Non-test checks retain `run-check`.
+At build start the system resolves a Node test runtime once: the project's saved
+`project-runtimes.json` entry in local app data, otherwise the board environment's
+Node executable and version used by checks. It freezes that value in run settings
+alongside model and effort. Builder, implementer, slices, checks, CI fixer and
+approver run every test with `lar-work run-test ID --role ROLE [--record] -- COMMAND`.
+The owning run ID travels in `LAR_FACTORY_RUN_ID` (or `--run-id`), including after
+handoff; focused red/green and recorded suites use its frozen executable directory
+on PATH. Later Project setting changes affect only new runs. Agents never register,
+ask about or change runtimes. Missing or mismatched frozen runtimes hold execution
+with a reason before tests run, without asking Pedro. No repository files are
+inspected for runtime selection. Non-test checks retain `run-check`.
 
 Reviewer selection is saved before launching reviews. Item details show every
 selected/skipped reviewer, its selection reason, live execution status and

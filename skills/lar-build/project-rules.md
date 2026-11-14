@@ -19,11 +19,10 @@ when checking those drafts.
 ## Checks
 
 Run every Node test through `lar-work run-test ID --role ROLE -- COMMAND`;
-for broad tests add `--record` (and any live/reason flags). It checks the
-Project runtime saved by `lar-work test-runtime REPOSITORY --node /absolute/bin/node
---version vX.Y.Z` in local app data. If missing or unavailable, stop in Needs you;
-never substitute shell Node. Use this for red/green, slices, fixes, checks and
-approver runs. Non-test checks use `run-check` below.
+for broad tests add `--record` (and any live/reason flags). The system freezes
+its runtime at build start for every role and slice. A mismatch holds tests with
+a reason; never register, change or ask about runtimes. Non-test checks use
+`run-check` below.
 During edits, run focused tests, plus typecheck/lint when they take seconds.
 The full-check stage runs applicable whole suites once, limited to what the diff
 can reach, satisfying per-change suite rules. Required project checks and hooks

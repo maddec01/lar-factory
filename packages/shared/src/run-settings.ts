@@ -1,6 +1,11 @@
 import type { ModelChoice, ModelSelection, ModelSelectionOption } from './board-domain.ts';
 import type { BuiltinReviewer, FactoryRole, FactorySettings, ReviewerMode, ThreadKind } from './factory-settings.ts';
 
+export interface TestRuntime {
+    node: string;
+    version: string;
+}
+
 /** Null means the provider default was unresolved, never that the requested value was confirmed. */
 export interface ExecutionSettings {
     model: ModelChoice | null;
@@ -37,6 +42,8 @@ export interface RunSettings {
     kind: ThreadKind;
     capturedAt: string;
     settingsDigest: string;
+    /** Resolved by the board at build start; every role and slice uses this value. */
+    testRuntime?: TestRuntime;
     triggerVersion: 1;
     /** Preserve all policies, including never, without consulting later Settings. */
     settings: FactorySettings;

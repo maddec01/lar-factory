@@ -132,3 +132,23 @@ test('an amended brief awaiting current Doubt says Doubt reviewing in Build', ()
 
     expect(stateOf(subject)).toMatchObject({ word: 'Doubt reviewing', progressStage: 'Build' });
 });
+
+test.each([
+    ['implement', 'Build'],
+    ['checks', 'Review'],
+    ['review', 'Review'],
+])('a build waiting for Pedro retains progress for phase %s', (buildPhase, progressStage) => {
+    const subject = item('I_sample14', {
+        status: 'Needs you',
+        buildPhase: buildPhase as Item['buildPhase'],
+        linkedPrs: [],
+        needsYou: {
+            reason: 'Answer the product question. Resume In progress.',
+            causes: [],
+            offers: [],
+            ticketOpen: true,
+        },
+    });
+
+    expect(stateOf(subject).progressStage).toBe(progressStage);
+});

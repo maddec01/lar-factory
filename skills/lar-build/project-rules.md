@@ -20,7 +20,7 @@ when checking those drafts.
 
 Run every Node test through `lar-work run-test ID --role ROLE -- COMMAND`;
 for broad tests add `--record` (and any live/reason flags). The system freezes
-its runtime at build start for every role and slice. A mismatch holds tests with
+its runtime at run start for every role and slice. A mismatch holds tests with
 a reason; never register, change or ask about runtimes. Non-test checks use
 `run-check` below.
 During edits, run focused tests, plus typecheck/lint when they take seconds.

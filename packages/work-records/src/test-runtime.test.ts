@@ -2,9 +2,103 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { expect, test } from 'vite-plus/test';
 
 import { openWorkRecords } from './work-records.ts';
+
+for (const kind of ['shaping', 'concept', 'decision'] as const)
+    test(`${kind} preparation and every role use their own frozen runtime`, async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'shaping-runtime-'));
+        const records = await openWorkRecords(join(dir, 'work-records.db'));
+
+        try {
+            const work = records.create({ title: 'Preparation', repository: 'fake/app', kind: 'feature' });
+            const snapshot = (runId: string) =>
+                records.snapshotRun(work.workId, records.read(work.workId).revision, {
+                    runId,
+                    kind,
+                    skills: [],
+                    packaged: {
+                        version: 'test',
+                        reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+                    },
+                });
+            const frozen = snapshot('preparation');
+
+            writeFileSync(
+                join(dir, 'project-runtimes.json'),
+                JSON.stringify({
+                    'fake/app': { node: process.execPath, version: 'v0.0.0' },
+                }),
+            );
+            snapshot('later');
+            expect(snapshot('preparation')).toEqual(frozen);
+            expect(frozen.testRuntime).toEqual({ node: process.execPath, version: process.version });
+            for (const role of ['thread', ...Object.keys(frozen.roles)]) {
+                const result = spawnSync(
+                    process.execPath,
+                    [
+                        join(import.meta.dirname, 'cli.ts'),
+                        'run-test',
+                        work.workId,
+                        '--role',
+                        role,
+                        ...(role === 'checks' ? ['--record'] : []),
+                        '--',
+                        'node',
+                        '-p',
+                        'process.version',
+                    ],
+                    {
+                        encoding: 'utf8',
+                        cwd: dir,
+                        env: { ...process.env, LAR_FACTORY_DATA_DIR: dir, LAR_FACTORY_RUN_ID: 'preparation' },
+                    },
+                );
+
+                if (role === 'checks') expect(result.stderr).toContain('lar-work: check');
+                else expect(result.stderr).toBe('');
+
+                expect(result.status).toBe(0);
+                expect(result.stdout).toBe(`${process.version}\n`);
+            }
+
+            // Emulate a persisted pre-runtime snapshot; it must not borrow 'later' or mutable project settings.
+            const legacy = new DatabaseSync(join(dir, 'work-records.db'));
+
+            legacy
+                .prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)')
+                .run(work.workId, 'legacy', JSON.stringify({ ...frozen, runId: 'legacy', testRuntime: undefined }));
+            legacy.close();
+
+            const held = spawnSync(
+                process.execPath,
+                [
+                    join(import.meta.dirname, 'cli.ts'),
+                    'run-test',
+                    work.workId,
+                    '--run-id',
+                    'legacy',
+                    '--role',
+                    'explore',
+                    '--',
+                    'node',
+                    '-e',
+                    'console.log("MUST NOT RUN")',
+                ],
+                { encoding: 'utf8', env: { ...process.env, LAR_FACTORY_DATA_DIR: dir } },
+            );
+
+            expect(held.status).toBe(1);
+            expect(held.stdout).not.toContain('MUST NOT RUN');
+            expect(held.stderr).toContain(`Run legacy (${kind}) held: legacy run settings have no frozen test runtime`);
+            expect(held.stderr).not.toMatch(/register|repair|Needs you/);
+        } finally {
+            records.close();
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 30000);
 
 test('all build roles and slices use the runtime frozen at run start despite shell and later project changes', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'test-runtime-'));

@@ -282,7 +282,14 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
             Array.isArray(item.threads) &&
             item.threads.some((thread) => !thread.observedAt && thread.doubtRunning);
 
-        return { label: running ? 'Doubt reviewing' : "Brief changed; Doubt hasn't run", running };
+        return {
+            label: running
+                ? 'Doubt reviewing'
+                : item.briefDoubtHold
+                  ? `Doubt held: ${item.briefDoubtHold}`
+                  : "Brief changed; Doubt hasn't run",
+            running,
+        };
     }
 
     if (start?.phase === 'starting') return { label: 'Starting', running: false };

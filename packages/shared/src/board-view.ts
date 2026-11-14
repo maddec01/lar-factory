@@ -69,7 +69,8 @@ export function noneOnboarded(data: BoardData): boolean {
 export function needsAnswer(item: Item): boolean {
     const question = openQuestionThread(item);
 
-    if (item.briefReviewing && (!question || question.pendingRequest?.kind === 'brief-approval')) return false;
+    if (item.briefReviewing && !item.needsYou && (!question || question.pendingRequest?.kind === 'brief-approval'))
+        return false;
 
     return (
         !!item.briefApproval || item.status === 'Needs you' || (item.status !== 'Done' && !!openQuestionThread(item))

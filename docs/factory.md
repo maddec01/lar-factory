@@ -156,7 +156,7 @@ members, rather than separate member approval cards. Current Doubt and missing o
 invalid gates determine that batch, whether the approval notice is on the parent
 or its members. It opens the existing exact
 batch display and board approval buttons; unfinished Doubt remains an agent wait.
-This includes concepts, linked-work parents, decisions, builds and slice questions.
+Approval waits derive from current Doubt and gate records, never notice wording. A saved Needs you notice stays on the desk unless a structured wait already represents the same action. This includes concepts, linked-work parents, decisions, builds and slice questions.
 The item also stays in its group or ordinary stage section. A card names the item,
 its Project and its concept or parent when present. It says what is needed and
 offers an action that works from the desk: Answer in T3, Approve brief,
@@ -191,8 +191,8 @@ progress never becomes tracker labels, tags, comments or Azure State.
 
 A changed brief offers approval only after Doubt has a result for its current
 package and displayed digest. While a Doubt child execution actually runs, the item says Doubt reviewing.
-Otherwise it says "Brief changed; Doubt hasn't run", without a human approval
-action or desk wait. Reconcile reports that missing current-package review as a
+A completed Doubt execution naming the exact current package plus a saved hold says "Doubt held: <reason>". Otherwise it says "Brief changed; Doubt hasn't run", without a human approval
+action. An independent saved Needs you notice stays on the desk. Reconcile reports that missing current-package review as a
 process gap. Every amendment ends through Gate, including its Doubt execution;
 ending the shaping turn after saving text does not complete that process. Board approval of an active amended build
 queues a durable notification for its build owner, regardless of newer shaping
@@ -210,16 +210,15 @@ Your desk definition excludes grouped work; it must change with that behavior.
 
 ## Settings and roles
 
-At build start the system resolves a Node test runtime once: the project's saved
+At every run creation (shaping, concept, decision and build), the system resolves a Node test runtime once: the project's saved
 `project-runtimes.json` entry in local app data, otherwise the board environment's
 Node executable and version used by checks. It freezes that value in run settings
-alongside model and effort. Builder, implementer, slices, checks, CI fixer and
-approver run every test with `lar-work run-test ID --role ROLE [--record] -- COMMAND`.
+alongside model and effort. Every owner, delegated role and slice runs tests with `lar-work run-test ID --role ROLE [--record] -- COMMAND`.
 The owning run ID travels in `LAR_FACTORY_RUN_ID` (or `--run-id`), including after
 handoff; focused red/green and recorded suites use its frozen executable directory
 on PATH. Later Project setting changes affect only new runs. Agents never register,
 ask about or change runtimes. Missing or mismatched frozen runtimes hold execution
-with a reason before tests run, without asking Pedro. No repository files are
+with a reason before tests run, without asking Pedro. A legacy snapshot without a runtime holds with its run ID and reason; it never borrows a newer run or current settings. No repository files are
 inspected for runtime selection. Non-test checks retain `run-check`.
 
 Reviewer selection is saved before launching reviews. Item details show every

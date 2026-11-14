@@ -21,10 +21,85 @@ import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 
 import { completeBrief } from '../../test/complete-brief.ts';
+import shapingHold from '../../test/fixtures/s07-shaping-hold.json' with { type: 'json' };
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
+
+test('S07 repeat 6 preserves all saved runtime notices and identifies the completed held Doubt packages', async () => {
+    const records = await open();
+    const parent = records.create({ title: 'G', repository: REPO, kind: 'concept' });
+    const parts = ['A1', 'A2', 'B1'].map((title) =>
+        records.createPart({
+            parentId: parent.workId,
+            parentRevision: records.read(parent.workId).revision,
+            title,
+            repository: REPO,
+            kind: 'build',
+            body: completeBrief(title),
+            blockerIds: [],
+        }),
+    );
+    let decision = records.create({ title: 'DEC', repository: REPO, kind: 'decision' });
+
+    decision = records.setParent(decision.workId, decision.revision, parent.workId);
+    records.snapshotRun(decision.workId, decision.revision, {
+        runId: 'decision',
+        kind: 'decision',
+        skills: [],
+        packaged: {
+            version: 'test',
+            reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+        },
+    });
+
+    let partIndex = 0;
+    const summary = shapingHold.doubt.summary.replaceAll(
+        /packageDigest `([a-f0-9]+)`/g,
+        () => `packageDigest \`${records.doubtPackage(parts[partIndex++]!.workId).packageDigest}\``,
+    );
+    const builds = records.children(parent.workId).filter((r) => r.kind === 'build');
+
+    records.startRoleRun(decision.workId, records.read(decision.workId).revision, {
+        runId: 'decision',
+        executionId: 'doubt',
+        role: 'doubt',
+    });
+    records.finishRoleRun(decision.workId, records.read(decision.workId).revision, {
+        executionId: 'doubt',
+        result: 'completed',
+        report: null,
+        summary,
+    });
+    for (const r of [parent, ...builds])
+        records.waitForUser(r.workId, records.read(r.workId).revision, shapingHold.notice);
+
+    const items = recordItems(records, [], [REPO]);
+
+    assert.deepEqual(
+        deskItems({ items }, false)
+            .map((i) => i.title)
+            .sort(),
+        ['A1', 'A2', 'B1', 'G'],
+    );
+    for (const item of items.filter((i) => i.kind !== 'decision')) {
+        assert.equal(item.needsYou?.reason, shapingHold.notice);
+        assert.equal(item.briefApproval, undefined);
+        assert.equal(deskWait(item, false, items).label, 'Decision needed');
+
+        if (item.kind === 'build') assert.equal(buildActivity(item).label, `Doubt held: ${shapingHold.notice}`);
+    }
+
+    const changed = builds[0]!;
+
+    records.setBody(changed.workId, records.read(changed.workId).revision, 'brief', completeBrief('Changed package'));
+
+    const stale = recordItems(records, [], [REPO]).find((i) => i.id === changed.workId)!;
+
+    assert.equal(buildActivity(stale).label, "Brief changed; Doubt hasn't run");
+    assert.equal(stale.needsYou?.reason, shapingHold.notice);
+});
 
 afterEach(() => {
     for (const { records, dir } of opened.splice(0)) {
@@ -1359,7 +1434,7 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
 });
 
 for (const kind of ['concept', 'feature'] as const)
-    for (const asked of ['parent', 'members'] as const)
+    for (const asked of ['parent', 'members', 'none'] as const)
         test(`${kind} batch desk projection comes from current Doubt and gates when ${asked} asked`, async () => {
             const records = await open();
             const parent = records.create({ title: 'Group', repository: REPO, kind });
@@ -1374,15 +1449,17 @@ for (const kind of ['concept', 'feature'] as const)
                     blockerIds: [],
                 }),
             );
-            const ids = asked === 'parent' ? [parent.workId] : parts.map((p) => p.workId);
+            const ids = asked === 'parent' ? [parent.workId] : asked === 'members' ? parts.map((p) => p.workId) : [];
 
             for (const id of ids) records.waitForUser(id, records.read(id).revision, 'Approve briefs in the board');
 
             const project = () => recordItems(records, [], [REPO]);
 
             assert.deepEqual(
-                deskItems({ items: project() }, false).map((i) => i.id),
-                [],
+                deskItems({ items: project() }, false)
+                    .map((i) => i.id)
+                    .sort(),
+                [...ids].sort(),
             );
             for (const part of parts) {
                 const input = records.doubtPackage(part.workId);
@@ -1393,11 +1470,15 @@ for (const kind of ['concept', 'feature'] as const)
             const items = project();
             const desk = deskItems({ items }, false);
 
-            assert.deepEqual(
-                desk.map((i) => i.id),
-                [parent.workId],
+            assert.deepEqual(desk.map((i) => i.id).sort(), [...new Set([parent.workId, ...ids])].sort());
+            assert.equal(
+                deskWait(
+                    items.find((i) => i.id === parent.workId)!,
+                    false,
+                    items,
+                ).label,
+                'Approve briefs',
             );
-            assert.equal(deskWait(desk[0]!, false, items).label, 'Approve briefs');
             records.setBody(
                 parts[0]!.workId,
                 records.read(parts[0]!.workId).revision,

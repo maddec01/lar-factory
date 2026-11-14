@@ -328,8 +328,10 @@ export interface Item {
     briefChangesRequested?: true;
     staleGateDetail?: string;
     staleGate?: 'brief' | 'sources' | 'approval';
-    /** The current brief package lacks Doubt; only live thread evidence may say reviewing. */
+    /** The current brief package lacks clean Doubt; only live thread evidence may say reviewing. */
     briefReviewing?: true;
+    /** A completed Doubt execution names this exact package, with a saved unresolved hold. */
+    briefDoubtHold?: string;
     /** Durable delivery evidence, including a branch awaiting owner recovery. */
     buildStarted?: true;
     /** Authoritative local reservation, shared with the atomic build claim; absent on provider-only items. */

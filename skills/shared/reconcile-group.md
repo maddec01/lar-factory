@@ -36,9 +36,10 @@ work uses a decision route. Finished, retired, missing or unrouted Fog is a
 mechanical hold; repair it, never leave an ownerless wait.
 
 Save release order with `set-release-plan`: `shipsWith` names delivery work IDs;
-`who` is `Pedro` for human steps, `Agent` for automated ones. Record release
-evidence with `complete-release-step`, then the post-release Outcome check (never a refinement hold); merges alone
-prove neither. Save the map after current answers and domain drafts.
+`who` is `Pedro` for human steps, `Agent` for automated ones. Record Agent evidence
+with `complete-release-step`, then post-release Outcome (never a refinement hold); merges prove neither.
+For Pedro's approval, save the step/wait and end the turn; never open a T3 question.
+Save the map after current answers and domain drafts.
 
 Resolve reviewed source changes with `lar-work resolve-reconcile GROUP_ID --item
 KEY --digest H --evidence "what was checked/fixed"`. Repair mechanical holds;

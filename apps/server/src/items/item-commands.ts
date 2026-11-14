@@ -109,6 +109,7 @@ export interface Reply {
 export interface ItemCommands {
     recordOutcomeCheck(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     completeReleaseStep(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    resumeRelease(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     stopShaping(itemId: string): Promise<Reply>;
     inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     requestBriefChanges(itemId: string, input: Record<string, unknown>): Promise<Reply>;
@@ -238,6 +239,7 @@ export interface ItemCommandsDeps {
     startThread?: typeof startThread;
     resumeLaunch?: typeof resumeLaunch;
     outcomeDeps?: Pick<Parameters<typeof createOutcomeCheck>[0], 'send'>;
+    releaseDeps?: Pick<Parameters<typeof createReleaseStep>[0], 'send' | 'readProjection'>;
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
@@ -409,12 +411,14 @@ export function createItemCommands({
     shapingControlDeps,
     retroDeps,
     outcomeDeps,
+    releaseDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
     const gating = createBriefApproval({ board, records, reread, ...briefApprovalDeps });
     const outcomes = createOutcomeCheck({ board, records, reread, ...outcomeDeps });
+    const releases = createReleaseStep({ board, records, reread, ...releaseDeps });
     const retros = createRetro({ board, records, reread, ...retroDeps });
     const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
@@ -1416,7 +1420,7 @@ export function createItemCommands({
         ...gating,
         recordOutcomeCheck: outcomes.recordOutcomeCheck,
         ...createShapingControl({ board, records, reread, ...shapingControlDeps }),
-        ...createReleaseStep({ board, records, reread }),
+        ...releases,
         ...verifying,
         chooseRetro: retros.chooseRetro,
         retryRetro: retros.retryRetro,
@@ -1429,6 +1433,7 @@ export function createItemCommands({
             await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
             await retros.reconcileRetros();
+            await releases.reconcileReleaseContinuations();
             await outcomes.reconcileOutcomeChecks();
 
             const warnings = { ...board.snapshot().startCheckFailures };

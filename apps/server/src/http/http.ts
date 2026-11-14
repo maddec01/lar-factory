@@ -324,6 +324,11 @@ export function createBoardServer({
             what: 'the pending release step',
             run: forItem('Name the parent release step.', (id, input) => commands.completeReleaseStep(id, input)),
         },
+        '/api/resume-release': {
+            sampleWrite: 'fake',
+            what: 'the release continuation',
+            run: forItem('Name the parent release.', (id, input) => commands.resumeRelease(id, input)),
+        },
         '/api/stop-shaping': {
             sampleWrite: 'fake',
             what: 'the shaping stop',

@@ -48,5 +48,6 @@ export { workflowSteps } from './WorkflowSteps';
 export { ConceptBuild } from './ConceptBuild';
 
 export { HumanWaitAction } from './HumanWaitAction';
+export { ResumeRelease } from './ResumeRelease';
 
 export { conceptBuildWait } from './ConceptBuildProgress';

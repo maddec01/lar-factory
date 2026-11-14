@@ -601,4 +601,8 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'CREATE TABLE owner_waits(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,thread_id TEXT NOT NULL,request_id TEXT NOT NULL,notice TEXT) STRICT',
         ),
+    (db) =>
+        db.exec(
+            'CREATE TABLE release_continuations(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
+        ),
 ];

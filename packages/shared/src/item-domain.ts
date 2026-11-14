@@ -307,6 +307,7 @@ export interface Item {
     setAside?: boolean;
     supersededBy?: IssueRef & { workId: string };
     outcomeCheck?: { ready: boolean; digest: string; run: OutcomeCheckRun | null };
+    releaseContinuation?: { ready: boolean; digest: string; run: OutcomeCheckRun | null };
     releasePlan?: import('./release-plan.ts').ReleasePlan | null;
     retro?: import('./retro.ts').Retro | null;
     reconciliation?: import('./group-reconciliation.ts').ReconcileReport;

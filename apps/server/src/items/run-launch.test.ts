@@ -76,6 +76,12 @@ for (const kind of THREAD_KINDS)
             options: [{ id: 'effort', value: 'low' }],
         });
         expect(result.snapshot.kind).toBe(kind);
+
+        if (kind === 'build')
+            expect(result.snapshot).toMatchObject({
+                testRuntime: { node: process.execPath, version: process.version },
+            });
+
         expect(result.snapshot.roles['reviewer:code']).toMatchObject({
             model: { instanceId: 'codex', model: 'sol' },
             effort: 'high',

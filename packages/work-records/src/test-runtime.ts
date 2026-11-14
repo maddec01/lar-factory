@@ -1,24 +1,13 @@
-import { isRecord } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { isRepo } from '@lar-factory/shared/repository-settings';
+import type { TestRuntime as Runtime } from '@lar-factory/shared/run-settings';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, renameSync, writeFileSync, mkdirSync } from 'node:fs';
-import { delimiter, dirname, isAbsolute, join } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { delimiter, dirname, isAbsolute } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { checkCommand } from './check-runner.ts';
 import { trapTermination } from './process-group.ts';
-import type { TestRuntime as Runtime } from './test-runtime-records.ts';
 import { openWorkRecords, workRecordsPath } from './work-records.ts';
-
-const settings = (dir: string): Record<string, Runtime> => {
-    const file = join(dir, 'project-runtimes.json');
-    const value: unknown = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
-
-    if (!isRecord(value)) throw new Error('Invalid local project runtime settings.');
-
-    return value as Record<string, Runtime>;
-};
 
 function runtimeEnv(runtime: Runtime | undefined): NodeJS.ProcessEnv {
     if (
@@ -28,28 +17,26 @@ function runtimeEnv(runtime: Runtime | undefined): NodeJS.ProcessEnv {
         !isAbsolute(runtime.node) ||
         !/^v\d+\.\d+\.\d+$/.test(runtime.version)
     )
-        throw new Error(
-            'No valid project test runtime. Set it with lar-work test-runtime REPOSITORY --node /absolute/path/to/node --version vX.Y.Z; do not run tests until it is available.',
-        );
+        throw new Error('Build held: no valid frozen test runtime.');
 
     const actual = execFileSync(runtime.node, ['--version'], { encoding: 'utf8', timeout: 10000 }).trim();
 
     if (actual !== runtime.version)
         throw new Error(
-            `Project test runtime changed: expected ${runtime.version}, found ${actual}. Stop and restore the configured runtime.`,
+            `Build held: frozen test runtime mismatch: expected ${runtime.version}, found ${actual}. Tests were not executed.`,
         );
 
     const env = { ...process.env, PATH: `${dirname(runtime.node)}${delimiter}${process.env.PATH ?? ''}` };
     const resolved = execFileSync('node', ['-p', 'process.execPath'], { env, encoding: 'utf8', timeout: 10000 }).trim();
 
     if (realpathSync(resolved) !== realpathSync(runtime.node))
-        throw new Error('Configured runtime must provide node in its own bin directory.');
+        throw new Error('Build held: frozen runtime must provide node in its own bin directory.');
 
     return env;
 }
 
 /** The same checked local runtime wraps focused tests and recorded suites, for every build role. */
-export async function testRuntimeCommand(command: string, args: string[]): Promise<number> {
+export async function testRuntimeCommand(args: string[]): Promise<number> {
     try {
         const separator = args.indexOf('--');
         const { values, positionals } = parseArgs({
@@ -58,44 +45,16 @@ export async function testRuntimeCommand(command: string, args: string[]): Promi
             options: {
                 'data-dir': { type: 'string' },
                 role: { type: 'string' },
-                node: { type: 'string' },
-                version: { type: 'string' },
+                'run-id': { type: 'string' },
                 record: { type: 'boolean' },
                 live: { type: 'boolean' },
                 reason: { type: 'string' },
             },
         });
 
-        if (positionals.length !== 1) throw new Error('Name a work ID (run-test) or repository (test-runtime).');
+        if (positionals.length !== 1) throw new Error('Name a work ID (run-test).');
 
         const dir = values['data-dir'] ?? boardDataDir();
-        const saved = settings(dir);
-
-        if (command === 'test-runtime') {
-            const repository = positionals[0]!.toLowerCase();
-
-            if (!isRepo(repository)) throw new Error('Name a valid project repository.');
-
-            if (values.node || values.version) {
-                const runtime = { node: values.node!, version: values.version! };
-
-                runtimeEnv(runtime);
-                saved[repository] = runtime;
-                mkdirSync(dir, { recursive: true });
-
-                const file = join(dir, 'project-runtimes.json');
-                const temp = `${file}.${process.pid}.tmp`;
-
-                writeFileSync(temp, JSON.stringify(saved, null, 2), { mode: 0o600 });
-                renameSync(temp, file);
-            }
-
-            runtimeEnv(saved[repository]);
-            process.stdout.write(`${JSON.stringify(saved[repository])}\n`);
-
-            return 0;
-        }
-
         const words = separator < 0 ? [] : args.slice(separator + 1);
 
         if (!words.length || !values.role) throw new Error('Expected run-test ID --role ROLE [--record] -- COMMAND.');
@@ -104,11 +63,7 @@ export async function testRuntimeCommand(command: string, args: string[]): Promi
         let env: NodeJS.ProcessEnv;
 
         try {
-            const repository = records.read(positionals[0]!).repository;
-            const runtime = saved[repository.toLowerCase()];
-
-            env = runtimeEnv(runtime);
-            records.requireTestRuntime(positionals[0]!, runtime!);
+            env = runtimeEnv(records.testRuntime(positionals[0]!, values['run-id'] ?? process.env.LAR_FACTORY_RUN_ID));
         } finally {
             records.close();
         }
@@ -146,7 +101,7 @@ export async function testRuntimeCommand(command: string, args: string[]): Promi
             termination.dispose();
         }
     } catch (error) {
-        process.stderr.write(`lar-work: project test runtime: ${(error as Error).message}\n`);
+        process.stderr.write(`lar-work: build held: test runtime: ${(error as Error).message}\n`);
 
         return 1;
     }

@@ -1,5 +1,7 @@
 import {
     effectiveVocabulary,
+    deskItems,
+    deskWait,
     normalizeItems,
     type Item,
     type NeedsYouCause,
@@ -1354,3 +1356,57 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
     assert.equal(shown().briefApproval, undefined);
     assert.equal(shown().briefReviewing, true);
 });
+
+for (const kind of ['concept', 'feature'] as const)
+    for (const asked of ['parent', 'members'] as const)
+        test(`${kind} batch desk projection comes from current Doubt and gates when ${asked} asked`, async () => {
+            const records = await open();
+            const parent = records.create({ title: 'Group', repository: REPO, kind });
+            const parts = ['One', 'Two'].map((title) =>
+                records.createPart({
+                    parentId: parent.workId,
+                    parentRevision: records.read(parent.workId).revision,
+                    title,
+                    repository: REPO,
+                    kind: 'build',
+                    body: completeBrief('Build it'),
+                    blockerIds: [],
+                }),
+            );
+            const ids = asked === 'parent' ? [parent.workId] : parts.map((p) => p.workId);
+
+            for (const id of ids) records.waitForUser(id, records.read(id).revision, 'Approve briefs in the board');
+
+            const project = () => recordItems(records, [], [REPO]);
+
+            assert.deepEqual(
+                deskItems({ items: project() }, false).map((i) => i.id),
+                [],
+            );
+            for (const part of parts) {
+                const input = records.doubtPackage(part.workId);
+
+                records.recordDoubt(part.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+            }
+
+            const items = project();
+            const desk = deskItems({ items }, false);
+
+            assert.deepEqual(
+                desk.map((i) => i.id),
+                [parent.workId],
+            );
+            assert.equal(deskWait(desk[0]!, false, items).label, 'Approve briefs');
+            records.setBody(
+                parts[0]!.workId,
+                records.read(parts[0]!.workId).revision,
+                'brief',
+                completeBrief('Changed'),
+            );
+            assert.equal(
+                deskItems({ items: project() }, false).some(
+                    (i) => deskWait(i, false, project()).label === 'Approve briefs',
+                ),
+                false,
+            );
+        });

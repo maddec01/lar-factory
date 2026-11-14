@@ -102,9 +102,6 @@ export function pendingBriefBatch(parent: Item, all: readonly Item[]): Item[] {
             part.passingBrief === false &&
             !part.briefChangesRequested,
     );
-    const requested =
-        /approve.*brief|brief.*approval/i.test(parent.needsYou?.reason ?? '') ||
-        parts.some((part) => part.briefApproval);
 
-    return requested && parts.length && !parts.some((part) => part.briefReviewing) ? parts : [];
+    return parts.length && parts.every((part) => part.briefApproval && !part.briefReviewing) ? parts : [];
 }

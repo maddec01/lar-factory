@@ -265,7 +265,9 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
-            (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
+            (!!staleGate ||
+                (!!parent && !!records.currentDoubt(record.workId)) ||
+                /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
             (!!staleGate || matchesScope);
         let approvalDisplay: ReturnType<WorkRecords['displayGate']> | undefined;
 

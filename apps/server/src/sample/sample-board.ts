@@ -31,6 +31,7 @@ import { sampleDelivery } from './sample-delivery.ts';
 import { sampleGrowingConcept } from './sample-growing-concept.ts';
 import { sampleRetro } from './sample-retro.ts';
 import { sampleReviewControls } from './sample-review-controls.ts';
+import { sampleRuntimeBatch } from './sample-runtime-batch.ts';
 import { sampleVerification } from './sample-verification.ts';
 
 /** All writable sample dependencies live here. No real source, tracker or T3 command is reachable from them. */
@@ -40,6 +41,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const repos = sampleRepositories(tracker, dir);
     const records = await openWorkRecords(join(dir, 'work-records.db'));
     const delivery = sampleDelivery(records);
+    const runtimeBatch = sampleRuntimeBatch(records);
     const growingConcept = sampleGrowingConcept(records);
     const approval = sampleApproval(records);
     const sources = new Map(repos().map(({ repo }) => [repo, fakeItemSource(tracker, repo)]));
@@ -79,7 +81,9 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
                 if (!ticket)
-                    return approval.project(reviewControls.project(growingConcept.project(delivery.project(item))));
+                    return runtimeBatch.project(
+                        approval.project(reviewControls.project(growingConcept.project(delivery.project(item)))),
+                    );
 
                 return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
@@ -244,6 +248,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             );
         },
         sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action === 'runtime-batch') {
+                const ids = runtimeBatch.seed(repos()[0]!.repo);
+
+                reread();
+
+                return { status: 200, body: { ...ids, error: null } };
+            }
+
             if (input.action === 'growing-concept') {
                 const workId = growingConcept.seed(repos().map((repo) => repo.repo));
 

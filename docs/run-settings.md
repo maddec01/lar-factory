@@ -53,6 +53,14 @@ sources have a SHA-256 text digest, and the snapshot retains the complete text,
 including for never reviewers. This preserves evidence across package upgrades
 as well as Settings edits. Project skills are frozen in the same snapshot.
 
+For build runs the recorder also resolves `testRuntime: {node, version}` from
+local app data's saved project runtime or the Node resolved from the board environment's PATH.
+Callers cannot supply that field. Every role and slice uses it via `run-test`,
+with `LAR_FACTORY_RUN_ID` or `--run-id` selecting the owning frozen run. A later
+Project setting change applies only to new runs. A runtime mismatch holds tests
+with its reason before executing them; agents never register runtimes or ask
+Pedro to configure one. Runtime selection never inspects repository files.
+
 Reuse the same `runId` on retry and handoff, with the current work revision.
 The existing snapshot is returned without rereading Settings or bumping the
 revision; changed input cannot replace it. Reusing the ID for a different kind

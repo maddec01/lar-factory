@@ -29,7 +29,15 @@ test.each(['concept', 'linked'])('%s batch approval appears once on the parent d
         needsYou: notice,
     });
     const parts = ['A1', 'A2', 'B1'].map((title) =>
-        work({ id: title, title, parentId: parent.id, kind: 'build', status: 'Queued', passingBrief: false }),
+        work({
+            id: title,
+            title,
+            parentId: parent.id,
+            kind: 'build',
+            status: 'Queued',
+            passingBrief: false,
+            briefApproval: { digest: title, reason: 'Review current brief' },
+        }),
     );
     const all = [parent, ...parts];
 

@@ -15,7 +15,9 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         parent &&
         pendingBriefBatch(parent, all).some((part) => part.id === item.id) &&
         (!question || question.pendingRequest?.kind === 'brief-approval') &&
-        (!item.needsYou || /approve.*brief|brief.*approval/i.test(item.needsYou.reason))
+        (!item.needsYou ||
+            item.needsYou.reason === item.briefApproval?.reason ||
+            /approve.*brief|brief.*approval/i.test(item.needsYou.reason))
     )
         return null;
 

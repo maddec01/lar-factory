@@ -1,6 +1,7 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
 import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
+import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
@@ -44,6 +45,9 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
             action: questionThreadAction(question),
         };
 
+    if (releaseContinuationReady(item, all))
+        return { label: 'Release', action: { kind: 'details' as const, label: 'Resume release' } };
+
     if (stopped)
         return {
             label: 'Run stopped',
@@ -76,6 +80,9 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
 /** A gate's full brief belongs in the Brief section and T3, not a flattened wait notice. */
 export function questionWaitReason(item: Item): string {
+    if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
+        return 'The duplicate T3 approval question is superseded by the board release step. Continue through the board.';
+
     if (item.briefApproval) return item.briefApproval.reason;
 
     const thread = openQuestionThread(item);

@@ -165,6 +165,7 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
                           id: request.id,
                           threadId: request.threadId,
                           kind: request.kind,
+                          ...(request.questions ? { questions: request.questions } : {}),
                           ...(request.ownerTitle ? { ownerTitle: request.ownerTitle } : {}),
                       },
                   }

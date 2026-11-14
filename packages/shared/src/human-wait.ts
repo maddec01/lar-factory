@@ -2,6 +2,7 @@ import { deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
 import { prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
+import { releaseNeedsPedro, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-domain.ts';
@@ -37,6 +38,10 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         return null;
 
     const waiting =
+        releaseNeedsPedro(item, all) ||
+        (item.status !== 'Done' &&
+            Array.isArray(item.threads) &&
+            item.threads.some((thread) => !thread.observedAt && supersededReleaseQuestion(item, thread))) ||
         outcomeNeedsPedro(item, all) ||
         retroWaits(item.retro) ||
         !!pendingPedroReleaseStep(item.releasePlan) ||

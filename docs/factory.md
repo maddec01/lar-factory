@@ -643,6 +643,27 @@ A blocker means merged work, not released software. `set-release-plan ID
 an `outcomeCheck` describing the final observable check. These records belong
 to a linked-work or concept parent. `complete-release-step` records the named
 step's done evidence and identity after preceding steps are done.
+Pedro's release steps, gates, Verify results and Outcome approvals use board
+buttons. Owners save the step or wait and end the turn; they never open a T3
+question for the same approval. A duplicate release question is shown as
+superseded by the board step, including after its receipt is recorded.
+
+Completing a release step atomically saves its continuation intent when the next
+Agent step is eligible. The board resumes the recorded group owner (or decision
+owner), with durable command/message IDs reused after an uncertain response or
+restart. It also recovers an eligible continuation from older saved receipts.
+Before dispatch, it reads the exact owner's current T3 projection. For a duplicate
+approval question, every question must match a completed Pedro step and any
+manifest/SHA pins must appear in its receipt. The board forwards that receipt as
+answers through T3's supported `runtime-request.respond` command; its ID is stable
+per continuation/request. It sends no tool-approval decision. Mixed requests,
+different manifests and ordinary product questions remain Answer in T3.
+The owner continues ordered Agent steps using actual release evidence; the final
+receipt unlocks the existing durable Outcome dispatch below. Changed inputs or
+independent human holds stop the continuation. After delivery, a parent offers
+Resume release for this same owner instead of launching another shaping thread.
+Explicit retries check current T3 activity and consume the parent revision;
+uncertain sends retain their IDs, accepted sends are not automatically repeated.
 `record-outcome-check` records passed or failed with evidence after all steps and release.
 Once every active part is complete and all release steps have receipts, the board
 queues one durable Outcome check to the group owner (or its decision owner), for

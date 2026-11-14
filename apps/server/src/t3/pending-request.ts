@@ -46,6 +46,13 @@ export function pendingRequest(
         id: request.id,
         threadId: shell.id,
         kind: approval ? 'tool-approval' : gate ? 'brief-approval' : 'question',
+        ...(questions.length > 1
+            ? {
+                  questions: questions.map((question) =>
+                      typeof question.question === 'string' ? question.question : '',
+                  ),
+              }
+            : {}),
         ...(typeof shell.title === 'string' && shell.title.trim() ? { ownerTitle: shell.title } : {}),
         ...(summary ? { summary } : {}),
     };

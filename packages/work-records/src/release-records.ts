@@ -64,6 +64,7 @@ export function releaseRecords(
     database: Database,
     read: (id: string) => WorkRecord,
     validateOutcome: (id: string, digest?: string) => void,
+    queueContinuation: (id: string) => unknown,
 ): ReleaseRecords {
     const { db } = database;
     const save = (id: string, revision: number, change: (current: ReleasePlan | null) => ReleasePlan) =>
@@ -171,32 +172,38 @@ export function releaseRecords(
                 return { steps, outcomeCheck: { what, result: 'pending', evidence: null } };
             }),
         completeReleaseStep: (id, revision, stepId, by, proof) =>
-            save(id, revision, (current) => {
-                const plan = required(current);
-                const index = plan.steps.findIndex((step) => step.id === stepId);
+            database.write(() => {
+                const plan = save(id, revision, (current) => {
+                    const plan = required(current);
+                    const index = plan.steps.findIndex((step) => step.id === stepId);
 
-                if (index < 0) invalid('Unknown release step ID.');
+                    if (index < 0) invalid('Unknown release step ID.');
 
-                if (plan.steps.slice(0, index).some((step) => !step.done))
-                    invalid('Complete preceding release steps first.');
+                    if (plan.steps.slice(0, index).some((step) => !step.done))
+                        invalid('Complete preceding release steps first.');
 
-                if (
-                    plan.steps[index]!.shipsWith?.some(
-                        (member) =>
-                            !db
-                                .prepare(
-                                    "SELECT 1 FROM work_records WHERE work_id = ? AND parent_id = ? AND kind = 'build' AND set_aside_at IS NULL",
-                                )
-                                .get(member, id),
+                    if (
+                        plan.steps[index]!.shipsWith?.some(
+                            (member) =>
+                                !db
+                                    .prepare(
+                                        "SELECT 1 FROM work_records WHERE work_id = ? AND parent_id = ? AND kind = 'build' AND set_aside_at IS NULL",
+                                    )
+                                    .get(member, id),
+                        )
                     )
-                )
-                    invalid('Reconcile removed release members before recording release evidence.');
+                        invalid('Reconcile removed release members before recording release evidence.');
 
-                const done = evidence(by, proof);
+                    const done = evidence(by, proof);
 
-                plan.steps[index]!.done = done;
-                plan.outcomeCheck.result = 'pending';
-                plan.outcomeCheck.evidence = null;
+                    plan.steps[index]!.done = done;
+                    plan.outcomeCheck.result = 'pending';
+                    plan.outcomeCheck.evidence = null;
+
+                    return plan;
+                });
+
+                queueContinuation(id);
 
                 return plan;
             }),

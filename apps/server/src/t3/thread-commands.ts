@@ -12,6 +12,7 @@ export type ThreadCommand = {
 } & (
     | { type: 'thread.settle' | 'thread.archive' | 'thread.delete' }
     | { type: 'run.interrupt'; runId: string }
+    | { type: 'runtime-request.respond'; requestId: string; answers: Record<string, string> }
     | {
           type: 'message.dispatch';
           createdBy: 'user';

@@ -54,6 +54,7 @@ import { requireProductQuestion } from './product-question.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import { reconciliationRecords, type ReconciliationRecords } from './reconciliation.ts';
 import { expectRevision } from './record-revision.ts';
+import { releaseContinuationRecords } from './release-continuation.ts';
 import { releaseRecords, releaseMemberHolds, storedRelease, type ReleaseRecords } from './release-records.ts';
 import { releaseStepRecords, type ReleaseStepRecords } from './release-steps.ts';
 import type { Retention } from './retention.ts';
@@ -439,6 +440,10 @@ export interface WorkRecords
     reviewerSelection: ReturnType<typeof reviewSelectionRecords>['reviewerSelection'];
     recordSelectedReviewRound: ReturnType<typeof reviewSelectionRecords>['recordSelectedReviewRound'];
     outcomeCheck: ReturnType<typeof outcomeRecords>['outcomeCheck'];
+    releaseContinuation: ReturnType<typeof releaseContinuationRecords>['releaseContinuation'];
+    retryReleaseContinuation: ReturnType<typeof releaseContinuationRecords>['retryReleaseContinuation'];
+    prepareReleaseContinuation: ReturnType<typeof releaseContinuationRecords>['prepareReleaseContinuation'];
+    releaseContinuationDelivered: ReturnType<typeof releaseContinuationRecords>['releaseContinuationDelivered'];
     prepareOutcomeCheck: ReturnType<typeof outcomeRecords>['prepareOutcomeCheck'];
     outcomeCheckDelivered: ReturnType<typeof outcomeRecords>['outcomeCheckDelivered'];
     pendingGateResumes: ReturnType<typeof gateResumeRecords>['pendingGateResumes'];
@@ -1326,6 +1331,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...reviewSelectionRecords(database, () => records),
         ...gateResumeRecords(database),
         ...outcomeRecords(database, () => records),
+        ...releaseContinuationRecords(database, () => records),
         ...blockerDeclarationRecords(database, () => records),
         ...groupProjectionRecords(database, () => records),
         chooseStructure: (id) =>
@@ -1349,6 +1355,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             database,
             (id) => fromRow(find(id)),
             (id, digest) => outcomeRecords(database, () => records).validateOutcomeInput(id, digest),
+            (id) => records.prepareReleaseContinuation(id),
         ),
         ...releaseStepRecords(() => records),
         ...reconciliationRecords(database, () => records),

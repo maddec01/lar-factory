@@ -46,6 +46,7 @@ export * from './start-action.ts';
 export * from './concept-build.ts';
 
 export * from './release-plan.ts';
+export * from './release-continuation.ts';
 export { humanWait } from './human-wait.ts';
 export * from './retro.ts';
 

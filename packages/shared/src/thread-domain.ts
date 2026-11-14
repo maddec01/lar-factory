@@ -3,6 +3,7 @@
 import { type BoardData, type ModelSelection } from './board-domain.ts';
 import { reservesBuildSlot } from './build-capacity.ts';
 import { type Item } from './item-domain.ts';
+import { supersededReleaseQuestion } from './release-continuation.ts';
 import type { RoleRunFinish } from './run-settings.ts';
 import type { ThreadActivity } from './thread-activity.ts';
 
@@ -59,6 +60,8 @@ export interface ItemThread {
         kind: 'question' | 'tool-approval' | 'brief-approval';
         /** T3's title of the exact owner, including delegated roles. */
         ownerTitle?: string;
+        /** Separate question texts let the desk preserve an unrelated question in a mixed request. */
+        questions?: string[];
     };
     /** Set while T3 can't be read: when the board last saw this state. */
     observedAt?: string;
@@ -87,6 +90,9 @@ export const isLiveThread = (thread: ItemThread): boolean =>
 
 /** Resume a shaping session only once its current thread family is known to have ended. */
 export function canResumeShaping(item: Item): boolean {
+    if (item.releasePlan && item.subIssues?.total > 0 && item.subIssues.completed === item.subIssues.total)
+        return false;
+
     if (item.status !== 'Shaping' || item.needsYou || !Array.isArray(item.threads) || !item.threads.length)
         return false;
 
@@ -197,6 +203,7 @@ export function openQuestionThread(item: Item) {
         ? ownerThreads(item).find(
               (thread) =>
                   (thread.state === 'needs you' || (thread.childNeedsYou && thread.pendingRequest)) &&
+                  !supersededReleaseQuestion(item, thread) &&
                   !thread.observedAt,
           )
         : undefined;

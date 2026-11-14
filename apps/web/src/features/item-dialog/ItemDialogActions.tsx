@@ -9,6 +9,8 @@ import {
     needsAnswer,
     nextAction,
     shapingOwner,
+    releaseContinuationReady,
+    openQuestionThread,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
@@ -23,6 +25,7 @@ import {
     StartBuild,
     StartOrAfter,
     hasLiveThread,
+    ResumeRelease,
     useShownStatus,
 } from '@/features/items';
 import type { ItemState } from '@/features/items';
@@ -39,6 +42,9 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
     if (item.setAside) return LATEST_THREAD;
 
     const linkedBeside = latestThread(item);
+
+    if (releaseContinuationReady(item, data.items) && !openQuestionThread(item))
+        return { control: <ResumeRelease item={item} data={data} /> };
 
     if (item.conceptBuild && ['Ready', 'In progress', 'Review'].includes(item.status)) return { control: null };
 

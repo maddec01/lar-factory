@@ -1,4 +1,4 @@
-import { itemName, needsAnswer, questionWaitReason } from '@lar-factory/shared';
+import { itemName, needsAnswer, questionWaitReason, supersededReleaseQuestion } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
@@ -24,6 +24,9 @@ const LABELS: Record<NeedsYouOffer, string> = {
 
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
+
+    if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
+        return <NeedsYouNotice reason={questionWaitReason(item)} />;
 
     if (!item.needsYou) {
         return needsAnswer(item) ? (

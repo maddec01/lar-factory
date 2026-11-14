@@ -198,3 +198,23 @@ test('concurrent head inspection identifies a pending read for automatic UI retr
     expect((await first).status).toBe(200);
     expect((await s.commands.inspectVerification(s.item.id)).status).toBe(200);
 });
+
+test('the build activity guard clears after the same owner and delegated work settle', async () => {
+    const s = await setup();
+    const updated = new Date().toISOString();
+
+    s.item.threads = [
+        { id: 'same-build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated },
+    ];
+    s.reread();
+    expect((await s.commands.inspectVerification(s.item.id)).body).toMatchObject({
+        error: 'Wait for current build activity before recording Verify.',
+    });
+    s.item.threads = [{ id: 'same-build', title: 'Build', purpose: 'build', state: 'running', updated }];
+    s.reread();
+
+    const context = await s.context();
+
+    expect(context).toMatchObject({ testSteps: '1. Press the button.' });
+    expect((await s.commands.recordVerification(s.item.id, { ...context, result: 'pass' })).status).toBe(200);
+});

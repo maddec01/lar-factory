@@ -46,14 +46,24 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
     const { read, refresh } = useItemDetails(item.id, item.updatedAt);
     const edit = useDescriptionEdit(item.id, read, refresh);
     const seenRevision = useRef(item.revision);
+    const gateState = JSON.stringify([
+        item.staleGate,
+        item.passingBrief,
+        item.briefApproval?.digest,
+        item.briefReviewing,
+    ]);
+    const seenGate = useRef(gateState);
 
     useEffect(() => {
         const changed = seenRevision.current !== item.revision;
 
-        seenRevision.current = item.revision;
+        const gateChanged = seenGate.current !== gateState;
 
-        if (changed && item.buildPhase === 'review' && !edit.editing) void refresh();
-    }, [item.revision, item.buildPhase, edit.editing, refresh]);
+        seenRevision.current = item.revision;
+        seenGate.current = gateState;
+
+        if (changed && (item.buildPhase === 'review' || item.staleGate || gateChanged) && !edit.editing) void refresh();
+    }, [item.revision, item.buildPhase, item.staleGate, gateState, edit.editing, refresh]);
 
     const [expanded, toggleExpanded] = useExpand();
 

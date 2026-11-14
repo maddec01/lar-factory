@@ -48,7 +48,7 @@ test('S05 R2-001: linked parent has no Approve brief card or delivery gate', asy
     expect(() => records.displayGate(parent.workId)).toThrow(/parent|delivery/);
 });
 
-test('S05 R2-002: an invalid gate remains actionable when confirmed scope awaits a matching brief', async () => {
+test('S05 R2-002: a mismatched brief stays held until its replacement has current Doubt', async () => {
     const records = await fixture();
     const work = records.create({ title: 'Reader', repository: 'fake/b', kind: 'build', status: 'Ready' });
 
@@ -76,8 +76,8 @@ test('S05 R2-002: an invalid gate remains actionable when confirmed scope awaits
     const shown = recordItems(records, [], ['fake/b']).find((r) => r.id === work.workId)!;
 
     expect(shown.passingBrief).toBe(false);
-    expect(shown.briefApproval?.reason).toContain('scope');
-    expect(shown.needsYou).toBeTruthy();
+    expect(shown.briefApproval).toBeUndefined();
+    expect(shown.briefReviewing).toBe(true);
 });
 
 test('S05 R2-001: linked parent details use the group map and child batch control instead of an own-brief button', async () => {

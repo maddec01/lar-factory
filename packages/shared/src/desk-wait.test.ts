@@ -195,3 +195,27 @@ test('a board approval reaches desk placement independently of the stored stage'
     expect(placementOf(work, { all: [work], unavailable: false }).sections).toContain('desk');
     expect(deskWait(work)).toEqual({ label: 'Approve brief', action: { kind: 'details', label: 'Approve brief' } });
 });
+
+test('Doubt reviewing is an automatic wait in Build with no human approval action', () => {
+    const work = item({ status: 'Needs you', buildPhase: 'implement', briefReviewing: true });
+
+    expect(placementOf(work, { unavailable: false, all: [work] }).sections).toEqual(['build']);
+    expect(nextAction(work)).toBeNull();
+});
+
+test('an unrelated T3 question remains actionable while a revised brief waits for Doubt', () => {
+    const work = item({
+        status: 'Needs you',
+        briefReviewing: true,
+        threads: [
+            {
+                ...stopped,
+                state: 'needs you',
+                pendingRequest: { id: 'independent-question', threadId: 'build', kind: 'question' },
+            },
+        ],
+    });
+
+    expect(placementOf(work, { unavailable: false, all: [work] }).sections).toContain('desk');
+    expect(nextAction(work)).toMatchObject({ label: 'Answer in T3', threadId: 'build' });
+});

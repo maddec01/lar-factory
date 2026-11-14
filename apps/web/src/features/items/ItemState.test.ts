@@ -121,3 +121,14 @@ test('re-gating an active build keeps Build progress while its human wait says A
 
     expect(stateOf(subject)).toMatchObject({ progressStage: 'Build', word: 'Approve brief' });
 });
+
+test('an amended brief awaiting current Doubt says Doubt reviewing in Build', () => {
+    const subject = item('I_sample14', {
+        status: 'Needs you',
+        briefReviewing: true,
+        briefApproval: undefined,
+        buildPhase: 'implement',
+    });
+
+    expect(stateOf(subject)).toMatchObject({ word: 'Doubt reviewing', progressStage: 'Build' });
+});

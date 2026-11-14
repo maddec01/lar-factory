@@ -24,7 +24,7 @@ export function VerifyBuild({ item }: { item: Item }) {
 
     const request = JSON.stringify([item.id, currentHead, attempt]);
     const loading = awaiting && inspected?.request !== request;
-    const context = !loading ? inspected?.context : undefined;
+    const context = inspected?.request === request ? inspected.context : undefined;
 
     useEffect(() => {
         if (!awaiting) return;
@@ -39,7 +39,11 @@ export function VerifyBuild({ item }: { item: Item }) {
 
             receive(result);
 
-            if (result.verificationPending || result.error === 'A Verify action is pending.') {
+            if (
+                result.verificationPending ||
+                result.error === 'A Verify action is pending.' ||
+                result.error === 'Wait for current build activity before recording Verify.'
+            ) {
                 setError(null);
                 retry = setTimeout(() => setAttempt((value) => value + 1), 500);
 
@@ -80,6 +84,7 @@ export function VerifyBuild({ item }: { item: Item }) {
     const latest = item.verification.latest;
     const resume = item.verification.resume;
 
+    const historyHead = context?.head ?? currentHead ?? item.verification.head;
     const results = item.verification.history ?? (latest ? [latest] : []);
     const history = results.length > 0 && (
         <Disclosure label="Verify results" presentation="section" defaultOpen>
@@ -87,6 +92,7 @@ export function VerifyBuild({ item }: { item: Item }) {
                 <VerifyEvidence key={result.id}>
                     {result.result === 'pass' ? 'Passed' : 'Failed'} by {result.by} at{' '}
                     {new Date(result.at).toLocaleString()} · Tested head {result.head.slice(0, 7)}
+                    {historyHead && result.head !== historyHead ? ` · superseded by ${historyHead.slice(0, 7)}` : ''}
                     {result.note ? ` · ${result.note}` : ''}
                 </VerifyEvidence>
             ))}

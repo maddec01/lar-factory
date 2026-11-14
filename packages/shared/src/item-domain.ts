@@ -323,6 +323,7 @@ export interface Item {
     passingBrief?: boolean;
     briefChangesRequested?: true;
     staleGate?: 'brief' | 'sources' | 'approval';
+    briefReviewing?: true;
     briefApproval?: { reason: string; digest?: string };
     publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & {
         recoverable?: boolean;

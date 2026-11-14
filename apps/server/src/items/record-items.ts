@@ -284,6 +284,16 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }
         }
 
+        const briefReviewing =
+            !changesRequested &&
+            !group &&
+            !done &&
+            !gate.current &&
+            !!records.body(record.workId, 'brief') &&
+            !records.currentDoubt(record.workId);
+
+        if (briefReviewing) briefApproval = false;
+
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -336,6 +346,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 }),
             revision: record.revision,
             passingBrief: gate.current,
+            ...(briefReviewing && { briefReviewing: true as const }),
             ...(staleGate && { staleGate }),
             ...(changesRequested && { briefChangesRequested: true as const }),
             ...(briefApproval && {
@@ -382,7 +393,12 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             records.launchIntents({ workId: record.workId }),
         );
 
-        if (needsYou && !parentApprovalWait) item.needsYou = needsYou;
+        if (
+            needsYou &&
+            !parentApprovalWait &&
+            !(briefReviewing && /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''))
+        )
+            item.needsYou = needsYou;
 
         if (item.briefApproval && !item.needsYou)
             item.needsYou = {

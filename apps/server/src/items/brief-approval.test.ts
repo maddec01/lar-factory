@@ -471,3 +471,46 @@ test.each(['accepted', 'unconfirmed'] as const)(
         expect(send).toHaveBeenCalledTimes(outcome === 'accepted' ? 1 : 2);
     },
 );
+
+test('S03 single amended build approval durably resumes its build owner even with a newer shaping thread', async () => {
+    const s = await setup();
+    const id = s.ids[0]!;
+
+    s.records.setBuildBranch(id, s.records.read(id).revision, 'build/same');
+    s.records.addThread(id, s.records.read(id).revision, 'build-owner', 'build');
+    s.records.addThread(id, s.records.read(id).revision, 'newer-shaping', 'shape');
+    s.records.waitForUser(id, s.records.read(id).revision, 'Approve amended brief');
+
+    const board = createBoardState({ items: [{ id }], repos: [] } as never);
+    const send = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'unconfirmed', reason: 'Connection lost' }));
+    const deps = {
+        board,
+        records: s.records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        identity: () => 'Pedro',
+        send,
+    };
+    const commands = createBriefApproval(deps);
+    const inspected = await commands.inspectBrief(id, {});
+    const approval = (inspected.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect((await commands.approveBrief(id, approval)).status).toBe(200);
+    expect(s.records.read(id)).toMatchObject({ status: 'In progress', needsYou: null });
+    expect(send.mock.calls[0]![0]).toMatchObject({ threadId: 'build-owner' });
+    expect(s.records.pendingGateResumes()).toHaveLength(1);
+
+    const records = await openWorkRecords(join(opened.at(-1)!.dir, 'work.db'));
+
+    opened.push({ dir: opened.at(-1)!.dir, records });
+
+    const retry = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'accepted', sequence: 1 }));
+    const restarted = createBriefApproval({ ...deps, records, send: retry });
+
+    await restarted.reconcileBriefApprovals();
+    await restarted.reconcileBriefApprovals();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(retry.mock.calls[0]![0]).toEqual(send.mock.calls[0]![0]);
+    expect(records.pendingGateResumes()).toEqual([]);
+});

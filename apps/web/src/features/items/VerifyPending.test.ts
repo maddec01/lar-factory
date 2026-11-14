@@ -73,3 +73,37 @@ test('a failed Verify read describes unread instructions instead of claiming the
     expect(button('Pass').disabled).toBe(true);
     expect(button('Re-read PR head').disabled).toBe(false);
 });
+
+test('Verify retries a current-build guard when activity settles without a new head or manual reread', async () => {
+    let active = true;
+
+    fetchMock.mockImplementation(
+        async (url: string) =>
+            new Response(
+                JSON.stringify(
+                    url === '/api/inspect-verification'
+                        ? active
+                            ? { error: 'Wait for current build activity before recording Verify.' }
+                            : {
+                                  verification: {
+                                      head: 'a'.repeat(40),
+                                      pr: `${item.repo}#8`,
+                                      revision: 5,
+                                      testSteps: 'Press Say hello.',
+                                      by: 'Pedro',
+                                  },
+                                  error: null,
+                              }
+                        : board,
+                ),
+            ),
+    );
+    await mountPage(board);
+    await open();
+    expect(button('Pass').disabled).toBe(true);
+    active = false;
+    await settle(() => vi.advanceTimersByTime(500));
+    expect(text(panel())).toContain('Press Say hello.');
+    expect(text(panel())).not.toContain('Wait for current build activity');
+    expect(button('Pass').disabled).toBe(false);
+});

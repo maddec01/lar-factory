@@ -101,6 +101,8 @@ export function RecordText({
               )
               .map((part) => part.id)
         : [];
+    const reviewing =
+        item.briefReviewing || pendingBriefs.some((id) => items.find((part) => part.id === id)?.briefReviewing);
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
         record.bodyKind === 'map'
@@ -125,7 +127,8 @@ export function RecordText({
                 <BriefChangeHistory itemId={item.id} requests={record.briefChangeRequests} refresh={refresh} />
             )}
             <ExportedLine exported={exported} />
-            {!item.setAside && pendingBriefs.length > 0 && (
+            {reviewing && <Text role="status">Doubt reviewing</Text>}
+            {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
             {!group &&
@@ -133,6 +136,7 @@ export function RecordText({
                 record.bodyKind === 'brief' &&
                 record.body &&
                 !item.briefChangesRequested &&
+                !item.briefReviewing &&
                 item.passingBrief === false &&
                 item.status !== 'Done' && <ApproveBrief itemId={item.id} onApproved={refresh} />}
             {!spec && (

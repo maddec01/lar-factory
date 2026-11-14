@@ -8,6 +8,8 @@
 
 import {
     deskItems,
+    openQuestionThread,
+    questionOwnerParent,
     groupState,
     retroWaits,
     deskParentName,
@@ -36,7 +38,15 @@ import {
 } from '@/features/items';
 import { RowKind, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { boardStatusState, DeskCard as Card, DeskPrProgress, DeskHint, DeskSection, noteBoardPlaces } from '@/ui/board';
+import {
+    ApprovalWait,
+    boardStatusState,
+    DeskCard as Card,
+    DeskPrProgress,
+    DeskHint,
+    DeskSection,
+    noteBoardPlaces,
+} from '@/ui/board';
 
 /**
  * The line beside the card's action: nothing when that action answers the question, else the merge state and checks of the PR Open PR opens, or the status's hint. The checks
@@ -113,6 +123,8 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
     const wait = deskWait(item, useActivityUnavailable(), data.items);
     const followups = retroWaits(item.retro);
+    const requestOwner = openQuestionThread(item) ?? openQuestionThread(questionOwnerParent(item, data.items) ?? item);
+    const approval = requestOwner?.pendingRequest?.kind === 'tool-approval' ? requestOwner : undefined;
     const picked = useItemDialogStore((state) => state.itemId === item.id);
 
     return (
@@ -129,6 +141,16 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             details={
                 !followups && (
                     <>
+                        {approval && (
+                            <ApprovalWait
+                                owner={
+                                    approval.pendingRequest?.ownerTitle ??
+                                    approval.pendingRequest?.threadId ??
+                                    approval.title
+                                }
+                                summary={approval.questionSummary}
+                            />
+                        )}
                         <AzureFields azure={item.azure} />
                         <Progress item={item} data={data} />
                     </>

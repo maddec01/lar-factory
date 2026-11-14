@@ -155,7 +155,16 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
             id,
             title: typeof shell.title === 'string' ? shell.title : id,
             state,
-            ...(request ? { pendingRequest: { id: request.id, threadId: request.threadId, kind: request.kind } } : {}),
+            ...(request
+                ? {
+                      pendingRequest: {
+                          id: request.id,
+                          threadId: request.threadId,
+                          kind: request.kind,
+                          ...(request.ownerTitle ? { ownerTitle: request.ownerTitle } : {}),
+                      },
+                  }
+                : {}),
             ...(request?.summary ? { questionSummary: request.summary } : {}),
             ...(questionSummary(shell.pendingRuntimeRequest)
                 ? { questionSummary: questionSummary(shell.pendingRuntimeRequest) }

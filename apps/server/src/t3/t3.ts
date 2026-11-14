@@ -65,7 +65,7 @@ export async function startThread(
 
         // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
         if (existing) {
-            const result = await send(project, message, selection, existing, 'approval-required');
+            const result = await send(project, message, selection, existing, found.runtimeMode);
 
             return result.uncertain && !context ? UNCERTAIN : result;
         }

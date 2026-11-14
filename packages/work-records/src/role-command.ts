@@ -156,6 +156,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
                 `${JSON.stringify(
                     {
                         clientRequestId: attempt.executionId,
+                        runtimeMode: 'inherit',
                         target: {
                             providerInstanceId: selection.instanceId,
                             model: selection.model,

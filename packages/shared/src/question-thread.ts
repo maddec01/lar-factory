@@ -7,14 +7,7 @@ export function questionThreadAction(thread: ItemThread | undefined) {
 
     return {
         kind: 'thread' as const,
-        label:
-            request?.kind === 'tool-approval'
-                ? 'Resolve approval'
-                : request?.kind === 'brief-approval'
-                  ? 'Approve brief'
-                  : thread
-                    ? 'Answer in T3'
-                    : 'Open thread',
+        label: request?.kind === 'brief-approval' ? 'Approve brief' : thread ? 'Answer in T3' : 'Open thread',
         threadId: request?.threadId ?? thread?.id,
     };
 }

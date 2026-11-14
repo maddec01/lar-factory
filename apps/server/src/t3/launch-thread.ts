@@ -44,7 +44,8 @@ export const resumeLaunch = async (request: ThreadLaunchRequest, commandId: stri
     return result.thread ? result : { ...result, uncertain: true };
 };
 
-/** One launch under one command ID, which the server can replay if it loses its answer. A lost answer never sends a new one. */
+/** T3 requires a concrete runtimeMode (no inherit): callers forward its project default; see docs/t3-access.md.
+ * One launch under one command ID, which the server can replay if it loses its answer. A lost answer never sends a new one. */
 export async function launchThread(
     projectId: string,
     text: string,

@@ -13,12 +13,11 @@ another provider, requested model options or an isolated worktree require
 `delegate_task`. Call `orchestrator_capabilities` once before the first child.
 Put settings in `target.options`; compare returned provider/model/options with
 the request. Report mismatches and wait for resolution; never substitute.
-Preserve choices through retries and handoff.
+Leave owner runtime unset; roles inherit T3 access.
 
 Pass each role its instruction path, work ID, repository, exact data folder/CLI,
 required evidence and this guide, including **Wait for delegated work**.
-Report in plain active sentences and consistent project terms. Cite evidence
-and uncertainty; omit filler, praise and generic conclusions. Use sentence-case
+Report plainly with evidence and uncertainty. Use sentence-case
 headings, straight quotes and restrained formatting. Return at most 300 words
 and paths instead of whole files, logs or screenshots. Authors of
 repository prose additionally read [Write prose](write-prose.md); editing agent

@@ -27,7 +27,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
                 request?.kind === 'brief-approval'
                     ? 'Approve brief'
                     : request?.kind === 'tool-approval'
-                      ? 'Tool approval'
+                      ? 'Approval in T3'
                       : 'Question',
             action: questionThreadAction(question),
         };

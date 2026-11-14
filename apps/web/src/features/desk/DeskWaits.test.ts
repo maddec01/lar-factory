@@ -18,7 +18,7 @@ const card = () => $('.desk-card')!;
 test.each([
     ['question', 'Question', 'Answer in T3'],
     ['brief-approval', 'Approve brief', 'Approve brief'],
-    ['tool-approval', 'Tool approval', 'Resolve approval'],
+    ['tool-approval', 'Approval in T3', 'Answer in T3'],
 ] as const)('the %s card names its wait and links its exact request owner', async (kind, label, action) => {
     await mountPage(
         board({
@@ -109,7 +109,7 @@ test('a stopped build reaches the desk, keeps its Build row and offers the retry
 
 test.each([
     ['brief-approval', 'Approve brief'],
-    ['tool-approval', 'Resolve approval'],
+    ['tool-approval', 'Answer in T3'],
 ] as const)('a concept part opens its inherited %s from the desk', async (kind, label) => {
     const data = board({ status: 'Needs you', parentId: 'concept', threads: [] });
 
@@ -235,4 +235,47 @@ test('a linked parent notice is the same human wait on the desk and in its group
     await settle(() => (group.querySelector('[data-dossier-open]') as HTMLButtonElement).click());
     expect(text(group.querySelector('[data-attention-row="you"]'))).toContain('Review notice');
     expect(text(group)).not.toContain('Nothing holds this up');
+});
+
+test('tool approval names the delegated owner and request, then leaves the desk when resolved', async () => {
+    const data = board({
+        status: 'Shaping',
+        threads: [
+            {
+                ...thread,
+                state: 'running',
+                childNeedsYou: true,
+                pendingRequest: {
+                    id: 'approval',
+                    threadId: 'child',
+                    kind: 'tool-approval',
+                    ownerTitle: 'Explore sandbox',
+                },
+                questionSummary: 'Allow reading the sandbox folder?',
+            },
+        ],
+    });
+
+    await mountPage(data);
+    expect(text(card())).toContain('Approval in T3');
+    expect(text(card())).toContain('Explore sandbox');
+    expect(text(card())).toContain('Allow reading the sandbox folder?');
+    expect(card().querySelector<HTMLAnchorElement>('[data-open-thread]')!.href).toBe(
+        't3code://threads/sample-environment/child',
+    );
+    expect([...card().querySelectorAll('button')].map(text)).not.toContain('Approve');
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() =>
+        useBoardStore.getState().receive({
+            ...data,
+            items: data.items.map((item) => ({
+                ...item,
+                threads: [{ ...thread, state: 'running', currentRunning: true }],
+            })),
+        }),
+    );
+    expect($('.desk-card')).toBeNull();
+    expect($('[data-stage="shaping"] [data-item="I_sample12"]')).not.toBeNull();
 });

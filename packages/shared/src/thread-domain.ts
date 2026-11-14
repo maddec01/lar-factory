@@ -49,13 +49,15 @@ export interface ItemThread {
     state: ThreadState;
     /** The thread's latest message, turn or runtime request time. */
     updated: string;
-    /** The pending request's question, when T3 supplies a summary. */
+    /** The pending question or approval's display text, when T3 supplies it. */
     questionSummary?: string;
     /** The exact unresolved request, including one owned by a delegated thread. */
     pendingRequest?: {
         id: string;
         threadId: string;
         kind: 'question' | 'tool-approval' | 'brief-approval';
+        /** T3's title of the exact owner, including delegated roles. */
+        ownerTitle?: string;
     };
     /** Set while T3 can't be read: when the board last saw this state. */
     observedAt?: string;

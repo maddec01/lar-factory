@@ -2,6 +2,7 @@ import type { GateEvidence, GateResult } from '@lar-factory/shared';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { agentRevision } from './agent-revision.ts';
+import { requireCompleteBrief } from './brief-completeness.ts';
 import type { BriefReviewRecords } from './brief-review.ts';
 import { checkBriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
@@ -196,6 +197,8 @@ export function gateRecords(
 
         if (scope && !checkBriefScope(scope.scope, brief ?? null).ok)
             invalid('The brief differs from confirmed scope. Run brief-scope-check before presenting its gate.');
+
+        requireCompleteBrief(record.kind, brief!);
 
         return makeGateDisplay(workId, record.revision, brief!);
     };

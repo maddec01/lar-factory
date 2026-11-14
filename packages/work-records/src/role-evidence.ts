@@ -103,6 +103,7 @@ export function roleFinish(attempt: RoleRun, input: unknown): RoleRunFinish {
 
     return {
         executionId: attempt.executionId,
+        ...(detail?.trim() && { summary: detail.slice(0, 10000) }),
         report,
         result: failure ? 'failed' : 'completed',
         ...(failure && { failure }),

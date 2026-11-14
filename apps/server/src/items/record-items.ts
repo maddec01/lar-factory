@@ -246,8 +246,10 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 ? null
                 : savedSpec;
         const gate = records.gate(record.workId);
+        const lastChangeRequest = records.briefChangeRequests(record.workId).at(-1);
+        const changesRequested = record.status === 'Shaping' && lastChangeRequest?.briefDigest === gate.briefDigest;
         const staleGate =
-            !group && !done && !gate.current && gate.evidence.length > 0
+            !changesRequested && !group && !done && !gate.current && gate.evidence.length > 0
                 ? gate.evidence.at(-1)!.briefDigest !== gate.briefDigest
                     ? ('brief' as const)
                     : gate.evidence.at(-1)!.reviewDigest &&
@@ -257,13 +259,31 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 : undefined;
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const matchesScope = !records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok;
-        const briefApproval =
+        let briefApproval =
+            !changesRequested &&
             !group &&
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
             (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
             (!!staleGate || matchesScope);
+        let approvalDisplay: ReturnType<WorkRecords['displayGate']> | undefined;
+
+        if (briefApproval && matchesScope) {
+            try {
+                approvalDisplay = records.displayGate(record.workId);
+            } catch (error) {
+                if (
+                    !(error instanceof WorkRecordError) ||
+                    error.code !== 'invalid' ||
+                    !error.message.startsWith('Incomplete ')
+                )
+                    throw error;
+
+                briefApproval = false;
+            }
+        }
+
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -317,9 +337,10 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             revision: record.revision,
             passingBrief: gate.current,
             ...(staleGate && { staleGate }),
+            ...(changesRequested && { briefChangesRequested: true as const }),
             ...(briefApproval && {
                 briefApproval: {
-                    ...(matchesScope && { digest: records.displayGate(record.workId).approvalDigest }),
+                    ...(approvalDisplay && { digest: approvalDisplay.approvalDigest }),
                     reason:
                         (!matchesScope
                             ? 'The current brief differs from confirmed scope. Its owner must update it before approval.'

@@ -319,6 +319,21 @@ export function createBoardServer({
             what: 'the pending release step',
             run: forItem('Name the parent release step.', (id, input) => commands.completeReleaseStep(id, input)),
         },
+        '/api/stop-shaping': {
+            sampleWrite: 'fake',
+            what: 'the shaping stop',
+            run: forItem('Name the shaping item.', (id) => commands.stopShaping(id)),
+        },
+        '/api/request-brief-changes': {
+            sampleWrite: 'fake',
+            what: 'the brief change request',
+            run: forItem('Name the brief.', (id, input) => commands.requestBriefChanges(id, input)),
+        },
+        '/api/retry-brief-changes': {
+            sampleWrite: 'fake',
+            what: 'the brief change request',
+            run: forItem('Name the brief.', (id) => commands.retryBriefChanges(id)),
+        },
         '/api/approve-brief': {
             sampleWrite: 'fake',
             what: 'the displayed brief approval',

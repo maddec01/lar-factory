@@ -12,7 +12,7 @@ const dirs: string[] = [];
 const stores: WorkRecords[] = [];
 const scope: BriefScope = {
     files: ['cli.js', 'test/cli.test.js'],
-    tests: ['Named/default/trimmed input and ignored extras.'],
+    tests: ['`test/cli.test.js`: Named/default/trimmed input and ignored extras.'],
     behaviour: ['Use greet(argv[2]); preserve the existing API.'],
     excluded: ['No README examples or dependencies.'],
     size: 'Small',
@@ -244,3 +244,17 @@ it('chooses from persisted confirmation, records Build and refuses to guess lega
     expect((await f.cli('choose-structure', f.id)).stdout).toBe(result.stdout);
     expect(f.records.read(f.id)).toMatchObject({ kind: 'build', revision: revision + 1 });
 }, 15000);
+
+it('brief-scope-check refuses missing named tests even when an empty confirmed test list matches', async () => {
+    const f = await fixture();
+    const withoutTests = { ...scope, tests: [] };
+
+    writeFileSync(f.file, JSON.stringify(withoutTests));
+    expect((await f.confirm()).code).toBe(0);
+    f.records.setBody(f.id, f.records.read(f.id).revision, 'brief', scopeMarkdown(withoutTests));
+
+    const result = await f.cli('brief-scope-check', f.id);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('named tests');
+});

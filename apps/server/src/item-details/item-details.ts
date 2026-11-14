@@ -47,6 +47,7 @@ import { saveAzureDescription } from '../azure/azure-writes.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import { readRepositorySetups } from '../config/repository-settings.ts';
 import { readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from '../github/github-details.ts';
+import { reviewerProgress } from './reviewers.ts';
 import { savedRunChoices } from './run-settings.ts';
 
 /** Reads one item's details, or says why it can't. */
@@ -158,9 +159,14 @@ export function recordDetails(records: WorkRecords, workId: string): RecordDetai
     const linked = records.children(workId).some((part) => part.kind !== 'slice');
     const bodyKind = linked ? 'map' : bodyKindOf(record.kind);
     const runs = savedRunChoices(records, workId);
+    const reviewers = reviewerProgress(records, workId);
 
     return {
         bodyKind,
+        ...(reviewers && { reviewers }),
+        ...(records.briefChangeRequests(workId).length
+            ? { briefChangeRequests: records.briefChangeRequests(workId) }
+            : {}),
         ...(runs.length ? { runSettings: runs } : {}),
         body: records.body(workId, bodyKind) ?? (linked ? records.body(workId, 'brief') : null) ?? '',
         ...(bodyKind === 'decision' ? { answer: records.body(workId, 'answer') ?? '' } : {}),

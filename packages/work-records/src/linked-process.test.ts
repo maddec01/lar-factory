@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { syncPartTickets } from './group-command.ts';
 import { syncSpecs } from './spec-sync.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
@@ -38,7 +39,7 @@ test('S05 R2-002: shared Dependency evidence preserves B/C approvals, while a ch
         parentId: g.workId,
         parentRevision: g.revision,
         kind: 'build',
-        body: 'Read v1.\nContracts: `greeting-v1`',
+        body: completeBrief('Read v1.\nContracts: `greeting-v1`'),
         blockerIds: [],
     });
     const c = records.createPart({
@@ -47,7 +48,7 @@ test('S05 R2-002: shared Dependency evidence preserves B/C approvals, while a ch
         parentId: g.workId,
         parentRevision: records.read(g.workId).revision,
         kind: 'build',
-        body: 'Show v1.\nContracts: `greeting-v1`',
+        body: completeBrief('Show v1.\nContracts: `greeting-v1`'),
         blockerIds: [b.workId],
     });
     const e = records.addDependency(g.workId, {
@@ -194,7 +195,7 @@ test('S05: atomic linked growth requests tickets per Settings, recovers an uncer
             title: `Part ${n}`,
             repository,
             kind: 'build',
-            body: `Deliver part ${n}.`,
+            body: completeBrief(`Deliver part ${n}.`),
             blockerIds: n ? [`$p${n - 1}`] : [],
         })),
     });

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { agentWrites } from './agent-writes.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
@@ -27,7 +28,7 @@ const fixture = async () => {
     const records = await open(path);
     const made = records.create({ title: 'Build', repository: 'test/repo', kind: 'build', ticket: 'test/repo#1' });
     const withPr = records.setPullRequest(made.workId, made.revision, 'test/repo#2');
-    const record = records.setBody(made.workId, withPr.revision, 'brief', 'Approved scope');
+    const record = records.setBody(made.workId, withPr.revision, 'brief', completeBrief('Approved scope'));
     const other = await open(path);
 
     return { path, records, other, record, agent: agentWrites(records) };
@@ -47,7 +48,7 @@ it.each([
     ['clear Needs you', (a, id, r) => a.clearNeedsYou(id, r)],
     ['wait for user', (a, id, r) => a.waitForUser(id, r, 'Approve this brief')],
     ['resume from user', (a, id, r) => a.resumeFromUser(id, r, 'Shaping')],
-    ['brief note', (a, id, r) => a.setBody(id, r, 'brief', 'Scope with a note')],
+    ['brief note', (a, id, r) => a.setBody(id, r, 'brief', completeBrief('Scope with a note'))],
     ['skills', (a, id, r) => a.snapshotSkills(id, r, [])],
     ['branch', (a, id, r) => a.setBuildBranch(id, r, 'build/example')],
     ['thread', (a, id, r) => a.addThread(id, r, 'builder', 'build')],
@@ -118,14 +119,16 @@ it('names every conflicting field and preserves both newer values', async () => 
 
 it('detects a field changed and restored, even across reopen', async () => {
     const { path, other, record } = await fixture();
-    const changed = other.setBody(record.workId, record.revision, 'brief', 'New scope');
+    const changed = other.setBody(record.workId, record.revision, 'brief', completeBrief('New scope'));
 
-    other.setBody(record.workId, changed.revision, 'brief', 'Approved scope');
+    other.setBody(record.workId, changed.revision, 'brief', completeBrief('Approved scope'));
 
     const reopened = agentWrites(await open(path));
 
-    expect(() => reopened.setBody(record.workId, record.revision, 'brief', 'Old author note')).toThrow(/body.brief/);
-    expect(reopened.body(record.workId, 'brief')).toBe('Approved scope');
+    expect(() => reopened.setBody(record.workId, record.revision, 'brief', completeBrief('Old author note'))).toThrow(
+        /body.brief/,
+    );
+    expect(reopened.body(record.workId, 'brief')).toBe(completeBrief('Approved scope'));
 });
 
 it.each([false, true])('rechecks after a writer races the guard; conflict=%s', async (conflicting) => {
@@ -167,7 +170,7 @@ it('rechecks structural invariants and keeps relationship changes atomic', async
         title: 'Part',
         repository: 'test/repo',
         kind: 'build',
-        body: 'Scope',
+        body: completeBrief('Scope'),
         blockerIds: [],
     });
 
@@ -180,7 +183,7 @@ it('rechecks structural invariants and keeps relationship changes atomic', async
             title: 'Duplicate attempt',
             repository: 'test/repo',
             kind: 'build',
-            body: 'Scope',
+            body: completeBrief('Scope'),
             blockerIds: [],
         }),
     ).toThrow(/children/);
@@ -301,7 +304,7 @@ it('requires a fresh decision when delivery or the approved brief changed', asyn
     const { records, other, record, agent } = await fixture();
     const digest = records.gate(record.workId).briefDigest!;
 
-    other.setBody(record.workId, record.revision, 'brief', 'Unapproved scope');
+    other.setBody(record.workId, record.revision, 'brief', completeBrief('Unapproved scope'));
     expect(() =>
         agent.recordGate(record.workId, record.revision, {
             briefDigest: digest,
@@ -348,9 +351,9 @@ it('refuses agent approval even after a Needs you round trip and an alleged Pedr
 it('rejects a displayed approval after a brief edit and restoration', async () => {
     const { records, other, record, agent } = await fixture();
     const display = agent.displayGate(record.workId);
-    const changed = other.setBody(record.workId, record.revision, 'brief', 'Changed scope');
+    const changed = other.setBody(record.workId, record.revision, 'brief', completeBrief('Changed scope'));
 
-    other.setBody(record.workId, changed.revision, 'brief', display.brief);
+    other.setBody(record.workId, changed.revision, 'brief', completeBrief(display.brief));
     expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
     expect(records.gate(record.workId).evidence).toEqual([]);
 });
@@ -358,8 +361,13 @@ it('rejects a displayed approval after a brief edit and restoration', async () =
 it('refuses retried displayed approval after sibling contracts change until Doubt runs again', async () => {
     const { records, other, record, agent } = await fixture();
     const sibling = records.create({ title: 'Sibling', repository: record.repository, kind: 'build' });
-    const siblingBrief = records.setBody(sibling.workId, sibling.revision, 'brief', 'Files: `src/shared.ts`');
-    const work = records.setBody(record.workId, record.revision, 'brief', 'Files: `src/shared.ts`');
+    const siblingBrief = records.setBody(
+        sibling.workId,
+        sibling.revision,
+        'brief',
+        completeBrief('Files: `src/shared.ts`'),
+    );
+    const work = records.setBody(record.workId, record.revision, 'brief', completeBrief('Files: `src/shared.ts`'));
     const input = records.doubtPackage(work.workId);
 
     records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Compatible changes.', [
@@ -369,7 +377,12 @@ it('refuses retried displayed approval after sibling contracts change until Doub
     const display = agent.displayGate(work.workId);
 
     other.observe(work.workId, work.revision, { of: 'pr', state: 'open' });
-    other.setBody(sibling.workId, siblingBrief.revision, 'brief', 'Files: `src/shared.ts`\nContracts: `new-contract`');
+    other.setBody(
+        sibling.workId,
+        siblingBrief.revision,
+        'brief',
+        completeBrief('Files: `src/shared.ts`\nContracts: `new-contract`'),
+    );
     expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
     expect(records.gate(work.workId).evidence).toEqual([]);
 });

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { openWorkRecords, type WorkKind } from './work-records.ts';
 
 const CLI = join(import.meta.dirname, 'cli.ts');
@@ -1130,7 +1131,7 @@ it('keeps the brief gate local and refuses removed refinement publication comman
     const data = tempDir();
     const records = await openWorkRecords(join(data, 'work-records.db'));
     const made = records.create({ title: 'Search', repository: 'team/app', kind: 'build' });
-    const work = records.setBody(made.workId, made.revision, 'brief', 'Find saved searches.');
+    const work = records.setBody(made.workId, made.revision, 'brief', completeBrief('Find saved searches.'));
 
     records.close();
 
@@ -1141,7 +1142,7 @@ it('keeps the brief gate local and refuses removed refinement publication comman
 
     const input = await larWork(data, 'doubt-package', work.workId);
 
-    expect(input.record.brief).toBe('Find saved searches.');
+    expect(input.record.brief).toBe(completeBrief('Find saved searches.'));
     expect((await larWork(data, 'build-overlap', work.workId)).record.overlaps).toEqual([]);
     expect(
         await larWork(
@@ -1379,7 +1380,14 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
         ticket: 'example/widget#7',
     });
 
-    record = records.setBody(record.workId, record.revision, 'brief', 'Trusted brief.');
+    record = records.setBody(
+        record.workId,
+        record.revision,
+        'brief',
+        completeBrief(
+            '## Done when\nTrusted brief.\n### Tests\n`test/widget.test.ts`: preserves trusted values.\n## Scope\n### Files\n`widget.ts`',
+        ),
+    );
 
     const state = records.specState(record.workId);
 
@@ -1498,7 +1506,7 @@ it(
             for (let index = 0; index < 2; index++) {
                 const work = records.create({ title: `Build ${index}`, repository: 'fake/app', kind: 'build' });
 
-                records.setBody(work.workId, work.revision, 'brief', `Complete brief ${index}.`);
+                records.setBody(work.workId, work.revision, 'brief', completeBrief(`Complete brief ${index}.`));
 
                 const input = records.doubtPackage(work.workId);
 
@@ -1519,7 +1527,7 @@ it(
 
             const last = records.read(ids[1]!);
 
-            records.setBody(last.workId, last.revision, 'brief', 'Changed after display.');
+            records.setBody(last.workId, last.revision, 'brief', completeBrief('Changed after display.'));
 
             const approve = (digest: string) =>
                 larWork(
@@ -1593,7 +1601,7 @@ it('work-order prints a human report or JSON and requires a group ID', async () 
         title: 'Implement',
         kind: 'build',
         repository: 'example/b',
-        body: 'Exact brief',
+        body: completeBrief('Exact brief'),
         blockerIds: [],
     });
 
@@ -1606,7 +1614,11 @@ it('work-order prints a human report or JSON and requires a group ID', async () 
     expect(text.stdout).toContain('Implement');
     expect(text.stdout).toContain('Status is Queued.');
     expect(json.code).toBe(0);
-    expect(json.record[0]).toMatchObject({ workId: part.workId, brief: 'Exact brief', status: 'Queued' });
+    expect(json.record[0]).toMatchObject({
+        workId: part.workId,
+        brief: completeBrief('Exact brief'),
+        status: 'Queued',
+    });
     expect((await larWork(data, 'work-order')).code).toBe(2);
 });
 

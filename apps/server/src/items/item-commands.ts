@@ -93,6 +93,7 @@ import { createPrMerge } from './pr-merge.ts';
 import { createReleaseStep } from './release-step.ts';
 import { createRetro } from './retro.ts';
 import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
+import { createShapingControl } from './stop-shaping.ts';
 import { createVerification } from './verification.ts';
 import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
@@ -105,7 +106,10 @@ export interface Reply {
 
 export interface ItemCommands {
     completeReleaseStep(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    stopShaping(itemId: string): Promise<Reply>;
     inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    requestBriefChanges(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    retryBriefChanges(itemId: string): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryRetro(itemId: string): Promise<Reply>;
@@ -232,6 +236,7 @@ export interface ItemCommandsDeps {
     resumeLaunch?: typeof resumeLaunch;
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
+    shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
     briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity' | 'send'>;
     showThread?: typeof lookupThread;
     /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
@@ -397,6 +402,7 @@ export function createItemCommands({
     runLaunchDeps,
     verificationDeps,
     briefApprovalDeps,
+    shapingControlDeps,
     retroDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
@@ -1402,6 +1408,7 @@ export function createItemCommands({
 
     return {
         ...gating,
+        ...createShapingControl({ board, records, reread, ...shapingControlDeps }),
         ...createReleaseStep({ board, records, reread }),
         ...verifying,
         chooseRetro: retros.chooseRetro,

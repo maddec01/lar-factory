@@ -6,12 +6,14 @@ import { reviewSelection } from './run-settings-input.ts';
 import type { NewReviewRound, WorkRecords } from './work-records.ts';
 
 interface Selection {
+    selectedAt?: string;
     workId: string;
     runId?: string;
     base: string;
     head: string;
     reviewers: {
         id: string;
+        name?: string;
         triggerVersion: 1;
         outcome: 'matched' | 'unmatched' | 'uncertain';
         rule: string;
@@ -28,6 +30,27 @@ const invalid = (message: string): never => {
 
 export function reviewSelectionRecords(database: Database, get: () => WorkRecords) {
     return {
+        reviewerSelection: (id: string) =>
+            database.read(() => {
+                get().read(id);
+
+                const row = database.db
+                    .prepare('SELECT content FROM reviewer_selections WHERE work_id=? ORDER BY rowid DESC LIMIT 1')
+                    .get(id);
+
+                if (!row) return null;
+
+                const selection = JSON.parse(String(row.content)) as Selection;
+
+                return {
+                    ...selection,
+                    selectedAt: selection.selectedAt ?? '1970-01-01T00:00:00.000Z',
+                    reviewers: selection.reviewers.map((reviewer) => ({
+                        ...reviewer,
+                        name: reviewer.name ?? reviewer.id,
+                    })),
+                };
+            }),
         saveReviewerSelection: (id: string, input: Selection) =>
             database.write(() => {
                 if (
@@ -56,9 +79,22 @@ export function reviewSelectionRecords(database: Database, get: () => WorkRecord
 
                 const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');
 
-                database.db
+                const prior = database.db
+                    .prepare('SELECT content FROM reviewer_selections WHERE work_id=? ORDER BY rowid DESC LIMIT 1')
+                    .get(id);
+                const previous = prior ? (JSON.parse(String(prior.content)) as Selection) : null;
+                const selectedAt =
+                    previous?.head === input.head && previous.base === input.base && previous.runId === input.runId
+                        ? (previous.selectedAt ?? new Date().toISOString())
+                        : new Date().toISOString();
+                const inserted = database.db
                     .prepare('INSERT OR IGNORE INTO reviewer_selections(digest,work_id,content) VALUES (?,?,?)')
-                    .run(digest, id, JSON.stringify(input));
+                    .run(digest, id, JSON.stringify({ ...input, selectedAt }));
+
+                if (inserted.changes)
+                    database.db
+                        .prepare('UPDATE work_records SET revision=revision+1,updated_at=? WHERE work_id=?')
+                        .run(new Date().toISOString(), id);
             }),
         recordSelectedReviewRound: (id: string, revision: number, input: NewReviewRound) =>
             database.write(() => {

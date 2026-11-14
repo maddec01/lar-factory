@@ -106,8 +106,106 @@ export function createBriefApproval({
         reread();
     };
 
+    const sendingChanges = new Set<string>();
+    const deliver = async (id: string) => {
+        for (const request of records!.briefChangeRequests(id)) {
+            if (request.delivery.sent) continue;
+
+            const delivery = request.delivery;
+
+            if (sendingChanges.has(delivery.commandId)) continue;
+
+            sendingChanges.add(delivery.commandId);
+
+            try {
+                const result = await send({
+                    type: 'message.dispatch',
+                    createdBy: 'user',
+                    creationSource: 'web',
+                    commandId: delivery.commandId,
+                    threadId: delivery.threadId,
+                    messageId: delivery.messageId,
+                    attachments: [],
+                    dispatchMode: { type: 'queue_after_active' },
+                    text: `Brief changes requested for work ${delivery.workIds?.join(', ') ?? id} by ${request.by} at ${request.at}:\n${request.note}\nContinue shaping this same item. Keep prior approvals as history. Save the corrected brief, run Doubt and present its gate for approval through board buttons.`,
+                });
+
+                records!.briefChangesDelivered(
+                    id,
+                    request.requestId,
+                    result.outcome,
+                    result.outcome === 'accepted' ? undefined : result.reason,
+                );
+
+                if (result.outcome !== 'accepted')
+                    throw new Error(`Change request saved. ${result.reason} Retry sending it to the shaping owner.`);
+
+                const owner = records!.read(delivery.ownerWorkId ?? id);
+
+                if (
+                    owner.status === 'Needs you' &&
+                    !owner.needsYouCauses.length &&
+                    /approve.*brief|brief.*approval/i.test(owner.needsYou ?? '')
+                )
+                    records!.resumeFromUser(owner.workId, owner.revision, 'Shaping');
+            } finally {
+                sendingChanges.delete(delivery.commandId);
+            }
+        }
+    };
+
     return {
         reconcileBriefApprovals,
+        retryBriefChanges: (id: string) =>
+            run(async () => {
+                current([id]);
+                await deliver(id);
+                reread();
+
+                return {};
+            }),
+        requestBriefChanges: (id: string, input: Record<string, unknown>) =>
+            run(async () => {
+                const request = typeof input.requestId === 'string' ? requests.get(input.requestId) : undefined;
+
+                if (
+                    !request ||
+                    Date.now() - request.at > 600000 ||
+                    request.manifest.digest !== input.digest ||
+                    !request.manifest.members.some(({ display }) => display.workId === id)
+                )
+                    throw new Error('Display the current brief before requesting changes.');
+
+                const ids = request.manifest.members.map(({ display }) => display.workId);
+
+                current(ids);
+                records!.requestBriefChanges(
+                    request.manifest.members.map(({ display }) => display),
+                    input.note as string,
+                    identity(),
+                );
+                requests.delete(String(input.requestId));
+                reread();
+
+                const deliveryErrors: string[] = [];
+                const notified = new Set<string>();
+
+                for (const member of ids) {
+                    const delivery = records!.briefChangeRequests(member).at(-1)!.delivery;
+
+                    if (notified.has(delivery.threadId)) continue;
+
+                    notified.add(delivery.threadId);
+
+                    try {
+                        await deliver(member);
+                    } catch (error) {
+                        deliveryErrors.push((error as Error).message);
+                    }
+                }
+
+                return { changesRequested: true, deliveryErrors };
+            }),
         inspectBrief: (id: string, input: Record<string, unknown>) =>
             run(async () => {
                 const ids = input.workIds === undefined ? [id] : input.workIds;

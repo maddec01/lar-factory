@@ -14,7 +14,7 @@
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Modal, useModalClose } from '@lar-works/design-system';
-import { type ComponentProps, useEffect } from 'react';
+import { type ComponentProps, useEffect, useRef } from 'react';
 
 import { ItemDialogContent } from './ItemDialogContent';
 import { useItemDialogStore } from './ItemDialogStore';
@@ -45,6 +45,16 @@ function GuardedContent(props: Omit<ComponentProps<typeof ItemDialogContent>, 'o
 function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; now: number; close: () => void }) {
     const { read, refresh } = useItemDetails(item.id, item.updatedAt);
     const edit = useDescriptionEdit(item.id, read, refresh);
+    const seenRevision = useRef(item.revision);
+
+    useEffect(() => {
+        const changed = seenRevision.current !== item.revision;
+
+        seenRevision.current = item.revision;
+
+        if (changed && item.buildPhase === 'review' && !edit.editing) void refresh();
+    }, [item.revision, item.buildPhase, edit.editing, refresh]);
+
     const [expanded, toggleExpanded] = useExpand();
 
     return (

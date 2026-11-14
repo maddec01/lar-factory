@@ -13,7 +13,7 @@ const dirs: string[] = [];
 const stores: WorkRecords[] = [];
 const scope: BriefScope = {
     files: ['cli.js'],
-    tests: [],
+    tests: ['`test/cli.test.js`: greets the first argument.'],
     behaviour: ['Greet the first argument.'],
     excluded: [],
     size: 'Small',

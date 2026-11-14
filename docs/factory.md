@@ -163,6 +163,21 @@ Your desk definition excludes grouped work; it must change with that behavior.
 
 ## Settings and roles
 
+For Node projects, `lar-work test-runtime REPOSITORY --node /absolute/bin/node
+--version vX.Y.Z` saves an explicit test runtime in local app data's
+`project-runtimes.json`. No repository guidance/config file is detected or read
+for runtime selection. Builder, slices, checks and approver run every test with
+`lar-work run-test ID --role ROLE [--record] -- COMMAND`. Focused red/green and
+recorded suites receive the same validated executable directory on PATH. A build
+and its slices pin the first validated runtime; a later configuration change
+refuses further tests until that runtime is restored. Missing
+or changed runtimes stop the test before execution and require the owner to wait
+in Needs you. Non-test checks retain `run-check`.
+
+Reviewer selection is saved before launching reviews. Item details show every
+selected/skipped reviewer, its selection reason, live execution status and
+terminal result or recorded verdict, updating as review progresses.
+
 The [run settings contract](run-settings.md) freezes Settings before board launches,
 validates model capabilities, and records requested versus reported execution.
 Threads pass the snapshot to every delegated role and snapshot-linked review.
@@ -331,6 +346,19 @@ An interrupted command is unfinished, never passed. The stage ends with accepted
 evidence or a saved question, not with a product commit.
 
 ### Brief
+
+Gate presentation checks completeness before offering single or batch approval.
+Bug briefs name cause, evidence, affected files, a named regression test and
+red-before-green; Feature and Improvement briefs name acceptance, affected files
+or areas and named tests. Empty/placeholding sections fail with the missing
+section names. Generic Build/Issue delivery briefs use the same acceptance, affected files and named-tests checks. Linked parents have no delivery gate.
+Doubt judges the substance after this mechanical check.
+
+The displayed approval offers Request changes for one brief or the whole batch.
+The board records the operator, time and note, returns each item to Shaping and
+sends the note to its recorded shaping owner, falling back to the group/decision owner. A batch sends one change note per owner, separately from approval notifications. Existing approvals remain history;
+the request itself invalidates none. Failed delivery remains visible and retryable.
+Active shaping offers Stop: interrupt its owner and retain the item and records.
 
 Settled work starts brief drafting. The owner reads accepted answers, evidence,
 affected sibling contracts and the Project's `domainDocs` setting. It saves

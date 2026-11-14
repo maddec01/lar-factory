@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { agentWrites } from './agent-writes.ts';
+import { requireCompleteBrief } from './brief-completeness.ts';
 import { scopeMarkdown } from './brief-scope.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
@@ -53,6 +54,14 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
                   : confirmed;
 
         if (!result) throw new Error('No confirmed scope. Run confirm-scope at understanding confirmation.');
+
+        if (
+            command === 'brief-scope-check' &&
+            'ok' in result &&
+            result.ok &&
+            !records.children(id).some((child) => child.kind !== 'slice')
+        )
+            requireCompleteBrief(records.read(id).kind, records.body(id, 'brief') ?? '');
 
         process.stdout.write(
             values.markdown && 'scope' in result ? scopeMarkdown(result.scope) : `${JSON.stringify(result, null, 2)}\n`,

@@ -205,7 +205,9 @@ export function runSettingsRecords(
         finishRoleRun: (workId, revision, input) =>
             database.write(() => {
                 expected(workId, revision);
-                runObject(input, ['executionId', 'report', 'result', 'failure']);
+                runObject(input, ['executionId', 'report', 'result', 'failure', 'summary']);
+
+                const summary = input.summary === undefined ? undefined : runText(input.summary);
 
                 const old = execution(workId, runText(input.executionId));
 
@@ -236,7 +238,8 @@ export function runSettingsRecords(
                     if (
                         JSON.stringify(old.report) !== JSON.stringify(report) ||
                         old.result !== input.result ||
-                        old.failure !== failure
+                        old.failure !== failure ||
+                        old.summary !== summary
                     )
                         invalidRun('A completed role execution is immutable; record a new attempt.');
 
@@ -245,6 +248,7 @@ export function runSettingsRecords(
 
                 const run: RoleRun = {
                     ...old,
+                    ...(summary && { summary }),
                     report,
                     actual: report?.actual ?? null,
                     result: input.result,

@@ -28,6 +28,7 @@ import { roleCommand } from './role-command.ts';
 import { runSettingsCommand } from './run-settings-command.ts';
 import { scopeCommand } from './scope-command.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
+import { testRuntimeCommand } from './test-runtime.ts';
 import { verificationCommand } from './verification-command.ts';
 import { workOrder, workOrderReport } from './work-order.ts';
 import {
@@ -369,6 +370,12 @@ Verify evidence, local only
                                     Refused for agents: Pedro records Verify in the board.
                                     A board failure needs a note and resumes the same build
                                     through the board. Agents never invent Pedro's result.
+
+Project test runtime
+  test-runtime REPOSITORY --node /absolute/bin/node --version vX.Y.Z
+                                    Save the project runtime in local app data only.
+  run-test ID --role ROLE [--record] [--live] [--reason WHY] -- COMMAND
+                                    All test runs use this runtime or stop; --record uses run-check.
 
 Brief gate
   gate <work-id>                    Reread the ticket Spec, then print the brief digest,
@@ -1153,6 +1160,8 @@ async function run(
 async function main(args: string[]): Promise<number> {
     if (['create-parts', 'sync-blockers', 'refresh-projections', 'sync-part-tickets'].includes(args[0] ?? ''))
         return groupCommand(args[0]!, args.slice(1));
+
+    if (args[0] === 'run-test' || args[0] === 'test-runtime') return testRuntimeCommand(args[0], args.slice(1));
 
     if (args[0] === 'role-launch' || args[0] === 'role-finish') return roleCommand(args[0], args.slice(1));
 

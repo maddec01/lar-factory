@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { scopeMarkdown, type BriefScope } from './brief-scope.ts';
 import { gateManifest } from './gate-batch.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -43,11 +44,21 @@ async function fixture(captured = false) {
             kind: 'build',
         });
 
-        records.setBody(work.workId, work.revision, 'brief', `Complete brief ${i}.\nFiles: \`src/part-${i}.ts\``);
+        records.setBody(
+            work.workId,
+            work.revision,
+            'brief',
+            completeBrief(`Complete brief ${i}.\nFiles: \`src/part-${i}.ts\``),
+        );
 
         if (captured) {
             records.confirmScope(work.workId, records.read(work.workId).revision, scopeFor(i), 'Pedro', 'Yes.');
-            records.setBody(work.workId, records.read(work.workId).revision, 'brief', scopeMarkdown(scopeFor(i)));
+            records.setBody(
+                work.workId,
+                records.read(work.workId).revision,
+                'brief',
+                completeBrief(scopeMarkdown(scopeFor(i))),
+            );
         }
 
         ids.push(work.workId);
@@ -116,9 +127,19 @@ it.each(['brief', 'kind', 'Doubt'] as const)(
         const id = ids.at(-1)!;
         const work = records.read(id);
 
-        if (change === 'brief') records.setBody(id, work.revision, 'brief', 'One changed word.');
-        else if (change === 'kind') records.update(id, work.revision, { kind: 'bug' });
-        else {
+        if (change === 'brief') records.setBody(id, work.revision, 'brief', completeBrief('One changed word.'));
+        else if (change === 'kind') {
+            const bug = records.update(id, work.revision, { kind: 'bug' });
+
+            records.setBody(
+                id,
+                bug.revision,
+                'brief',
+                completeBrief(
+                    '## Done when\nComplete the bug fix.\n## Scope\n### Files\n`src/part-7.ts`\n## Cause\nA stale value.\n## Evidence\nReproduction returns the stale value.\n## Regression test\n`test/part.test.ts`: rejects stale values.\n## Red-before-green\nFails before the fix, then passes.',
+                ),
+            );
+        } else {
             const input = records.doubtPackage(id);
 
             records.recordDoubt(id, input.packageDigest, 'Fresh Doubt', 'New review result.', []);
@@ -208,9 +229,9 @@ it('rejects the whole batch after an edited brief is restored and Doubt renewed'
     const manifest = records.gateBatch(ids);
     const id = ids.at(-1)!;
     const brief = records.body(id, 'brief')!;
-    const changed = records.setBody(id, records.read(id).revision, 'brief', 'Changed scope.');
+    const changed = records.setBody(id, records.read(id).revision, 'brief', completeBrief('Changed scope.'));
 
-    records.setBody(id, changed.revision, 'brief', brief);
+    records.setBody(id, changed.revision, 'brief', completeBrief(brief));
     review();
     expect(() => approve(manifest)).toThrow(/conflicting fields: body.brief/);
     empty();
@@ -229,7 +250,7 @@ it.each([0, 1, 2, 3, 4, 5, 6, 7])(
         expect(() => records.gateBatch(ids)).toThrow(/brief differs from confirmed scope/);
         expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
         empty();
-        records.setBody(id, records.read(id).revision, 'brief', scopeMarkdown(amended));
+        records.setBody(id, records.read(id).revision, 'brief', completeBrief(scopeMarkdown(amended)));
         review();
         expect(approve().gates).toHaveLength(8);
     },

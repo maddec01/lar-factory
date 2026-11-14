@@ -30,6 +30,7 @@ import { sampleControls } from './sample-controls.ts';
 import { sampleDelivery } from './sample-delivery.ts';
 import { sampleGrowingConcept } from './sample-growing-concept.ts';
 import { sampleRetro } from './sample-retro.ts';
+import { sampleReviewControls } from './sample-review-controls.ts';
 import { sampleVerification } from './sample-verification.ts';
 
 /** All writable sample dependencies live here. No real source, tracker or T3 command is reachable from them. */
@@ -45,6 +46,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const items = mergeSources(sources, new Map([...sources.values()].map((source) => [source, 'issues' as const])));
     const vocabulary = sampleVocabulary(tracker);
     let tickets: Item[] = [];
+    const reviewControls = sampleReviewControls(records);
     const verification = sampleVerification(
         records,
         () => tickets,
@@ -76,7 +78,8 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             items: projected.map((item) => {
                 const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
-                if (!ticket) return approval.project(growingConcept.project(delivery.project(item)));
+                if (!ticket)
+                    return approval.project(reviewControls.project(growingConcept.project(delivery.project(item))));
 
                 return verification.project({
                     ...(item.recorded === false ? { ...ticket, recorded: false } : item),
@@ -125,10 +128,19 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         offerModelChoices: () => board.snapshot().modelChoices,
         clearedFailuresFile: null,
         verificationDeps: verification.dependencies,
+        shapingControlDeps: {
+            send: async (command) => {
+                if (command.type === 'run.interrupt') reviewControls.stop(command.threadId);
+
+                return verification.dependencies.send!(command);
+            },
+            projection: async () => ({ runs: [{ id: 'sample-shaping-run', status: 'running' }] }),
+        },
         briefApprovalDeps: {
             refresh: (id) => refreshSpecs(records, { provider, dir, workId: id }),
             sync: () => syncSpecs(records, { provider, dir }),
             identity: () => 'Sample Pedro',
+            send: verification.dependencies.send,
         },
         retroDeps: {
             send: verification.dependencies.send,
@@ -237,6 +249,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 reread();
 
                 return { status: 200, body: { workId, error: null } };
+            }
+
+            if (input.action === 'review-controls') {
+                const ids = reviewControls.seed(repos()[0]!.repo);
+
+                reread();
+
+                return { status: 200, body: { ...ids, error: null } };
             }
 
             if (input.action === 'delivery') {

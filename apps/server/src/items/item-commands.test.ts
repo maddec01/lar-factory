@@ -92,6 +92,8 @@ function approveBuild(records: WorkRecords, id: string) {
         approvedBy: 'test',
         evidence: 'Approved fixture.',
     });
+
+    if (records.read(id).status === 'Shaping') records.update(id, records.read(id).revision, { status: 'Ready' });
 }
 
 function refineConcept(records: WorkRecords, id: string) {
@@ -3002,6 +3004,7 @@ test('decision-authored drafts cannot launch through a forged Ready status', asy
         approvedBy: 'Pedro',
         evidence: 'Code checked, Doubt clean; yes.',
     });
+    records.update(build.workId, records.read(build.workId).revision, { status: 'Ready' });
     assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
 });
 

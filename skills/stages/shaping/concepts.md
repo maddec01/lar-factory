@@ -42,12 +42,10 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
    scope change once; reuse answers already given. The map plans investigation,
    without committing the user to implementation.
 
-2. Make a decision record for each decision you can phrase now:
-   `bash <this skill>/shared/scripts/slice.sh <concept work ID> "<title>" <file> --kind decision --repository <owner/repo> [--blocked-by <work ID>]...`,
-   where the file's first line is `Method: grill`, `prototype`, `research` or
-   `task`, followed by the question. The command creates the complete part in
-   Queued, with its parent and blockers; the rest stays in Fog. Name the
-   repository where the decision belongs, even when it differs from the concept.
+2. Create the currently known decisions with one `create-parts` batch per
+   [Structure](shared/issue-tracker/structure.md), including the current map.
+   Each decision body starts `Method: grill`, `prototype`, `research` or `task`,
+   then its question. Name its repository; leave unphrased questions in Fog.
 3. Start each research decision now, in the background, with the
    [research](research-question.md) step.
 4. Keep the concept in Shaping while decisions are open. Each grill,

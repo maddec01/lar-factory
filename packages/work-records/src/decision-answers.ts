@@ -179,6 +179,12 @@ export function incorporateDecisionAnswers(db: DatabaseSync, conceptId: string, 
                     : null,
             },
         });
+
+        if (decisionAnswerIncorporated(db, versions(db, workId).at(-1)!, Number(drafts.written)))
+            db.prepare(
+                "UPDATE work_records SET status='Done',finished_at=coalesce(finished_at,?),needs_you=NULL,queue_order=NULL WHERE work_id=?",
+            ).run(new Date().toISOString(), workId);
+
         touched.push(workId);
     }
 

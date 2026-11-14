@@ -83,12 +83,14 @@ it('holds missing/stale gates, unmet blockers and a concept with an open pre-tas
     const gate = records.gate(build).passing!.gateId;
 
     records.setBody(build, rev(build), 'brief', 'Changed');
-    expect(() => records.prepareBuild(build, rev(build), capacity)).toThrow('current passing gate');
+    expect(records.read(build).status).toBe('Shaping');
+    expect(() => records.prepareBuild(build, rev(build), capacity)).toThrow('Only Ready builds');
     records.recordGate(build, rev(build), {
         briefDigest: records.gate(build).briefDigest!,
         approvedBy: 'Pedro',
         evidence: 'Yes',
     });
+    records.update(build, rev(build), { status: 'Ready' });
     expect(() => records.prepareBuild(build, rev(build), { ...capacity, expectedGateId: gate })).toThrow('changed');
 
     const blocker = ready('Contract');

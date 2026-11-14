@@ -339,3 +339,34 @@ it('refuses an upgrade while a structural writer owns the lease', async () => {
     upgraded.close();
     old.close();
 });
+
+it('nested mutations use savepoints and never expose or commit a partial group', async () => {
+    const path = join(tempDir(), 'nested-group.db');
+    const database = await openDatabase(path, { migrations: [NOTES] });
+    const observer = new DatabaseSync(path);
+
+    try {
+        const before = database.changes();
+
+        expect(() =>
+            database.write(() => {
+                database.write(() => database.db.prepare('INSERT INTO notes VALUES (?)').run('first'));
+                expect(noteTexts(observer)).toEqual([]);
+                expect(database.changes()).toBe(before);
+                expect(() =>
+                    database.write(() => {
+                        database.db.prepare('INSERT INTO notes VALUES (?)').run('second');
+                        throw new Error('refused nested part');
+                    }),
+                ).toThrow('refused nested part');
+                expect(noteTexts(database.db)).toEqual(['first']);
+                throw new Error('refused whole group');
+            }),
+        ).toThrow('refused whole group');
+        expect(noteTexts(observer)).toEqual([]);
+        expect(database.changes()).toBe(before);
+    } finally {
+        observer.close();
+        database.close();
+    }
+});

@@ -170,7 +170,7 @@ it('keeps standalone completion unchanged and refuses release plans on a private
     expect(f.records.completion(concept.workId).reasons).toEqual(['No delivery planned.']);
 });
 
-it('invalidates Doubt for changed release contracts, while release progress preserves it', async () => {
+it('keeps a part approval current for unrelated release progress and parent Outcome checks', async () => {
     const f = await fixture();
     const part = f.records.children(f.id)[0]!;
 
@@ -182,7 +182,7 @@ it('invalidates Doubt for changed release contracts, while release progress pres
     f.step('stage');
     expect(f.records.doubtPackage(part.workId).packageDigest).toBe(original.packageDigest);
     f.records.setReleasePlan(f.id, f.revision(), { ...plan, outcomeCheck: 'Changed required check.' });
-    expect(f.records.doubtPackage(part.workId).packageDigest).not.toBe(original.packageDigest);
+    expect(f.records.doubtPackage(part.workId).packageDigest).toBe(original.packageDigest);
 });
 
 it('round trips parent release commands in an isolated data folder', async () => {

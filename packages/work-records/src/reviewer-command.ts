@@ -65,7 +65,18 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
                 : reviewer;
         });
 
-        records.setBuildPhase(workId, records.read(workId).revision, 'review');
+        const selection = {
+            workId,
+            ...(runId && { runId }),
+            base: base!,
+            head: head!,
+            root,
+            triggerVersion: 1,
+            complete: diff.complete,
+            reviewers,
+        };
+
+        records.saveReviewerSelection(workId, selection);
 
         await refreshBoards(workId, parsed.values['data-dir']);
 

@@ -5,6 +5,7 @@ import { WorkRecordError, type Database } from './database.ts';
 import type { DecisionAnswers } from './decision-answers.ts';
 import type { DependencyRecords } from './dependencies.ts';
 import { storedRelease } from './release-records.ts';
+import { cites, contractText } from './review-dependencies.ts';
 import { storedScope } from './scope-records.ts';
 import type { WorkRecord } from './work-records.ts';
 
@@ -45,6 +46,7 @@ export interface OrderingReason {
 }
 export interface DoubtReview {
     reviewId: string;
+    dependencyVersion?: 1;
     packageDigest: string;
     identity: string;
     evidence: string;
@@ -150,7 +152,7 @@ export function briefReviewRecords(
 
         return false;
     };
-    const buildPackage = (workId: string): DoubtPackage => {
+    const buildPackage = (workId: string, legacy = false): DoubtPackage => {
         const sources = new Map<string, ReviewSource>();
         const sourceOf = (record: WorkRecord): ReviewSource => {
             const prior = sources.get(record.workId);
@@ -251,6 +253,50 @@ export function briefReviewRecords(
 
         // Delivery progress changes the package's display, not its reviewed contracts.
         const dependencySpecs = (items: ReviewSource['dependencies']) =>
+            items.map(({ dependencyId, need, owner, contract }) => ({ dependencyId, need, owner, contract }));
+        const releaseSpec = (plan: import('@lar-factory/shared').ReleasePlan | null) =>
+            plan && { steps: plan.steps.map(({ done: _, ...step }) => step), outcomeCheck: plan.outcomeCheck.what };
+        const sourceSpec = (item: ReviewSource, own = false) => ({
+            workId: item.workId,
+            repository: item.repository,
+            kind: item.kind,
+            request: own ? item.request : undefined,
+            brief: own ? brief : contractText(item.bodies.find((b) => b.body === 'brief')?.markdown ?? ''),
+            confirmedScope: own ? item.confirmedScope : undefined,
+            dependencies: own ? dependencySpecs(item.dependencies.filter((d) => d.blocks.includes(workId))) : undefined,
+        });
+        // Keep the broad package for semantic review, but approval depends only on named inputs.
+        // Incorporation timestamps, map prose, unrelated answers and sibling Notes are not contracts.
+        const referenced = (item: ReviewSource) => cites(brief!, item.workId, item.title);
+        const contracts = [
+            ...new Map(
+                [...content.siblings, ...content.overlapping, ...content.blockers]
+                    .filter(
+                        (item) =>
+                            referenced(item) ||
+                            own.named.contracts.some((name) => item.named.contracts.includes(name)) ||
+                            content.overlaps.some((o) => o.otherWorkId === item.workId && o.files.length),
+                    )
+                    .map((item) => [item.workId, item]),
+            ).values(),
+        ].sort((a, b) => a.workId.localeCompare(b.workId));
+        const reviewed = {
+            workId,
+            source: sourceSpec(own, true),
+            decisions: content.decisions.filter(referenced).map((item) => ({
+                workId: item.workId,
+                answer: item.answer?.current?.text ?? item.answer?.replacement?.text ?? null,
+            })),
+            contracts: contracts.map((item) => sourceSpec(item)),
+            blockers: own.blockers,
+            dependencies: dependencySpecs(content.dependencies),
+            releaseContracts:
+                content.releasePlan?.steps
+                    .filter((step) => step.shipsWith?.includes(workId) || cites(brief!, step.id))
+                    .map(({ done: _, ...step }) => step) ?? [],
+        };
+
+        const legacyDependencies = (items: ReviewSource['dependencies']) =>
             items.map((item) =>
                 Object.fromEntries(
                     Object.entries(item).filter(
@@ -259,27 +305,27 @@ export function briefReviewRecords(
                     ),
                 ),
             );
-        const releaseSpec = (plan: import('@lar-factory/shared').ReleasePlan | null) =>
-            plan && { steps: plan.steps.map(({ done: _, ...step }) => step), outcomeCheck: plan.outcomeCheck.what };
-        const sourceSpec = (item: ReviewSource) => ({
+        const legacySpec = (item: ReviewSource) => ({
             ...item,
             releasePlan: releaseSpec(item.releasePlan),
-            dependencies: dependencySpecs(item.dependencies),
+            dependencies: legacyDependencies(item.dependencies),
         });
-        const reviewed = {
-            ...content,
-            releasePlan: releaseSpec(content.releasePlan),
-            concept: content.concept && sourceSpec(content.concept),
-            source: sourceSpec(content.source),
-            decisions: content.decisions.map(sourceSpec),
-            siblings: content.siblings.map(sourceSpec),
-            overlapping: content.overlapping.map(sourceSpec),
-            blockers: content.blockers.map(sourceSpec),
-            dependencies: dependencySpecs(content.dependencies),
-            overlaps: undefined,
-        };
+        const old = legacy
+            ? {
+                  ...content,
+                  releasePlan: releaseSpec(content.releasePlan),
+                  concept: content.concept && legacySpec(content.concept),
+                  source: legacySpec(content.source),
+                  decisions: content.decisions.map(legacySpec),
+                  siblings: content.siblings.map(legacySpec),
+                  overlapping: content.overlapping.map(legacySpec),
+                  blockers: content.blockers.map(legacySpec),
+                  dependencies: legacyDependencies(content.dependencies),
+                  overlaps: undefined,
+              }
+            : null;
 
-        return { ...content, packageDigest: digest(reviewed) };
+        return { ...content, packageDigest: digest(legacy ? old : reviewed) };
     };
     const current = (workId: string): DoubtReview | null => {
         const row = db
@@ -292,6 +338,40 @@ export function briefReviewRecords(
 
         return review.packageDigest === buildPackage(workId).packageDigest ? review : null;
     };
+
+    // Rebind only reviews still proven current under the previous algorithm. Already stale evidence stays stale.
+    const oldReviews = db
+        .prepare('SELECT review_id,work_id,content FROM doubt_reviews')
+        .all()
+        .filter((row) => !JSON.parse(String(row.content)).dependencyVersion);
+
+    if (oldReviews.length)
+        database.write(() => {
+            for (const row of oldReviews) {
+                const id = String(row.work_id);
+
+                if (!bodies.all(id).some((b) => b.body === 'brief' && String(b.markdown).trim())) continue;
+
+                const review = JSON.parse(String(row.content)) as DoubtReview;
+                const current = buildPackage(id);
+
+                if (
+                    review.packageDigest !== current.packageDigest &&
+                    review.packageDigest !== buildPackage(id, true).packageDigest
+                )
+                    continue;
+
+                db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
+                    JSON.stringify({ ...review, dependencyVersion: 1, packageDigest: current.packageDigest }),
+                    String(row.review_id),
+                );
+                db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=? AND review_digest=?').run(
+                    current.packageDigest,
+                    id,
+                    review.packageDigest,
+                );
+            }
+        });
 
     return {
         doubtPackage: (id) => database.read(() => buildPackage(id)),
@@ -326,6 +406,7 @@ export function briefReviewRecords(
 
                 const review = {
                     reviewId: randomUUID(),
+                    dependencyVersion: 1 as const,
                     packageDigest,
                     identity: text(identity),
                     evidence: text(evidence),

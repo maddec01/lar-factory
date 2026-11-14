@@ -571,4 +571,18 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(`
         CREATE TABLE group_reconciliation(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, baseline TEXT NOT NULL, completed TEXT NOT NULL, pending TEXT NOT NULL) STRICT;
     `),
+    (db) =>
+        db.exec(`
+        CREATE TABLE reviewer_selections(digest TEXT PRIMARY KEY,work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,content TEXT NOT NULL) STRICT;
+        CREATE TRIGGER journal_reviewer_selection AFTER INSERT ON reviewer_selections BEGIN
+            INSERT INTO write_dirty VALUES('work',NEW.work_id,'reviewSelection') ON CONFLICT DO NOTHING;
+        END;
+        CREATE TABLE map_history(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,written INTEGER NOT NULL,markdown TEXT NOT NULL,recorded_at TEXT NOT NULL,PRIMARY KEY(work_id,written)) STRICT;
+        CREATE TRIGGER retain_map BEFORE UPDATE ON bodies WHEN OLD.body='map' AND OLD.markdown<>NEW.markdown BEGIN
+            INSERT INTO map_history VALUES(OLD.work_id,OLD.written,OLD.markdown,strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+        END;
+        CREATE TABLE gate_resumes(batch_digest TEXT NOT NULL,work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE,thread_id TEXT NOT NULL,command_id TEXT NOT NULL,message_id TEXT NOT NULL,sent INTEGER NOT NULL,error TEXT,PRIMARY KEY(batch_digest,thread_id)) STRICT;
+        CREATE TABLE part_ticket_requests(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, request_id TEXT NOT NULL UNIQUE) STRICT;
+        CREATE TABLE group_projections(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, body TEXT NOT NULL, sources TEXT NOT NULL, PRIMARY KEY(work_id,body)) STRICT;
+    `),
 ];

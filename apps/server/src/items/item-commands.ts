@@ -232,7 +232,7 @@ export interface ItemCommandsDeps {
     resumeLaunch?: typeof resumeLaunch;
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
-    briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity'>;
+    briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity' | 'send'>;
     showThread?: typeof lookupThread;
     /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
     recoverThread?: (
@@ -1410,6 +1410,7 @@ export function createItemCommands({
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
             pushStarts();
+            await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
             await retros.reconcileRetros();
 

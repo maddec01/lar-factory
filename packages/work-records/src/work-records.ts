@@ -21,10 +21,13 @@ import { dirname, join } from 'node:path';
 import type { StatementSync } from 'node:sqlite';
 
 import { agentRevision } from './agent-revision.ts';
+import { blockerDeclarationRecords } from './blocker-declarations.ts';
 import { validateBlockers } from './blocker-graph.ts';
 import { briefReviewRecords, type BriefReviewRecords } from './brief-review.ts';
+import { chooseStructure } from './choose-structure.ts';
 import { conceptRunRecords, type ConceptRunRecords } from './concept-build.ts';
 import { partCreator, type NewPart } from './create-part.ts';
+import { partBatchRecords } from './create-parts.ts';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import {
     decisionAnswers,
@@ -37,6 +40,8 @@ import {
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { readFactorySettings } from './factory-settings.ts';
 import { gateRecords, type GateRecords } from './gate-records.ts';
+import { gateResumeRecords } from './gate-resume.ts';
+import { groupProjectionRecords, saveProjection } from './group-projections.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -46,6 +51,7 @@ import { releaseStepRecords, type ReleaseStepRecords } from './release-steps.ts'
 import type { Retention } from './retention.ts';
 import { retitleRecords, type RetitleRecords } from './retitle.ts';
 import { retroRecords, type RetroRecords } from './retro-records.ts';
+import { reviewSelectionRecords } from './review-selection-records.ts';
 import { checkRecordedEscalation, type ReviewEscalation } from './reviewer-escalation.ts';
 import { reviewSelection } from './run-settings-input.ts';
 import { runSettingsRecords, savedRun, type RunSettingsRecords } from './run-settings.ts';
@@ -416,6 +422,17 @@ export interface WorkRecords
     ) => { record: WorkRecord; created: boolean };
     create(record: NewWorkRecord): WorkRecord;
     /** Atomically creates a Queued delivery part in its named repository. */
+    saveReviewerSelection: ReturnType<typeof reviewSelectionRecords>['saveReviewerSelection'];
+    recordSelectedReviewRound: ReturnType<typeof reviewSelectionRecords>['recordSelectedReviewRound'];
+    pendingGateResumes: ReturnType<typeof gateResumeRecords>['pendingGateResumes'];
+    gateResumeResult: ReturnType<typeof gateResumeRecords>['gateResumeResult'];
+    createParts: ReturnType<typeof partBatchRecords>['createParts'];
+    partTicketRequests: ReturnType<typeof partBatchRecords>['partTicketRequests'];
+    syncBlockers: ReturnType<typeof blockerDeclarationRecords>['syncBlockers'];
+    mapHistory: ReturnType<typeof groupProjectionRecords>['mapHistory'];
+    groupProjectionChanges: ReturnType<typeof groupProjectionRecords>['groupProjectionChanges'];
+    refreshProjections: ReturnType<typeof groupProjectionRecords>['refreshProjections'];
+    chooseStructure(workId: string): ReturnType<typeof chooseStructure>;
     createPart(part: NewPart): WorkRecord;
     /** Throws `not-found` when no record has `workId`. */
     read(workId: string): WorkRecord;
@@ -731,7 +748,9 @@ function checkReference(reference: unknown, what: 'ticket' | 'PR'): string {
 const checkTicket = (ticket: unknown): string => checkReference(ticket, 'ticket');
 
 /** Throws unless a record of `kind` holds `body`. */
-function checkHolds(kind: WorkKind, body: Body): void {
+function checkHolds(kind: WorkKind, body: Body, linked = false): void {
+    if (body === 'map' && linked && !['decision', 'slice'].includes(kind)) return;
+
     const holder = BODY_HOLDERS[body];
 
     if (holder ? kind !== holder : kind === 'concept' || kind === 'decision') {
@@ -1281,6 +1300,28 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const publications = publicationRecords(database, (id) => fromRow(find(id)), recordDependencyTicket, gates);
 
     const records: WorkRecords = {
+        ...partBatchRecords(database, () => records, dataDir),
+        ...reviewSelectionRecords(database, () => records),
+        ...gateResumeRecords(database),
+        ...blockerDeclarationRecords(database, () => records),
+        ...groupProjectionRecords(database, () => records),
+        chooseStructure: (id) =>
+            database.write(() => {
+                const confirmed = records.confirmedScope(id);
+
+                if (!confirmed) throw invalid('No confirmed scope.');
+
+                const choice = chooseStructure(confirmed.scope);
+                const r = records.read(id);
+
+                if (['decision', 'slice'].includes(r.kind)) throw invalid('Choose structure for delivery work.');
+
+                const kind = choice.structure === 'concept' ? 'concept' : 'build';
+
+                if (r.kind !== kind) records.update(id, r.revision, { kind });
+
+                return choice;
+            }),
         ...releaseRecords(database, (id) => fromRow(find(id))),
         ...releaseStepRecords(() => records),
         ...reconciliationRecords(database, () => records),
@@ -1500,7 +1541,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     if (row.build_phase || row.pull_request || row.skills || hasRounds.get(workId))
                         checkBuilt(nextKind);
 
-                    for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
+                    for (const { body } of bodyNames.all(workId))
+                        checkHolds(
+                            nextKind,
+                            body as Body,
+                            !row.parent_id && childRows.all(workId).some((r) => r.kind !== 'slice'),
+                        );
 
                     if (row.fog_gone_at && nextKind !== 'concept')
                         throw invalid(`The concept ${workId} has its Fog recorded gone, so it stays a concept.`);
@@ -1509,6 +1555,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                     if (held) throw invalid(held);
                 }
+
+                if (
+                    nextStatus === 'Queued' &&
+                    row.status === 'Shaping' &&
+                    db.prepare("SELECT 1 FROM brief_gates WHERE work_id=? AND source IN ('gate','user')").get(workId) &&
+                    !gates.gate(workId).current
+                )
+                    throw invalid('Changed approved drafts stay Shaping until their gate.');
 
                 const moved = nextStatus ?? row.status;
 
@@ -1718,17 +1772,36 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const name = checkOneOf(BODIES, body, 'body');
             const text = checkText(markdown, name);
 
-            return change(workId, revision, (row, touched) => {
-                checkHolds(row.kind, name);
-                writeBody(workId, name, text);
+            return database.write(() => {
+                const result = change(workId, revision, (row, touched) => {
+                    checkHolds(row.kind, name, !row.parent_id && childRows.all(workId).some((r) => r.kind !== 'slice'));
 
-                if ((name === 'answer' || name === 'domain-drafts') && row.parent_id) touched.push(row.parent_id);
+                    const previous = bodyText.get(workId, name)?.markdown;
+                    const changed = previous !== undefined && previous !== text;
 
-                if (name === 'answer') recordDecisionAnswer(db, workId, row.revision + 1, text);
+                    writeBody(workId, name, text);
 
-                if (name === 'map') touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
+                    if ((name === 'answer' || name === 'domain-drafts') && row.parent_id) touched.push(row.parent_id);
 
-                return {};
+                    if (name === 'answer') recordDecisionAnswer(db, workId, row.revision + 1, text);
+
+                    if (name === 'map') touched.push(...incorporateDecisionAnswers(db, workId, row.revision + 1));
+
+                    if (row.kind === 'decision' && changed && ['answer', 'domain-drafts'].includes(name))
+                        return { status: 'Shaping', finished_at: null };
+
+                    return name === 'brief' &&
+                        changed &&
+                        ['Ready', 'Queued'].includes(row.status) &&
+                        !row.build_phase &&
+                        !row.pull_request
+                        ? { status: 'Shaping' }
+                        : {};
+                });
+
+                saveProjection(database, records, workId, name);
+
+                return result;
             });
         },
         restoreImported: (workId, revision, imported) => {

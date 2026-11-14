@@ -13,6 +13,7 @@ import {
     type GateBatchEvidence,
 } from './gate-batch.ts';
 import { makeGateDisplay, verifyGateDisplay, type GateDisplay, type GateApproval } from './gate-display.ts';
+import { queueGateResume } from './gate-resume.ts';
 import { storedScope } from './scope-records.ts';
 import { queueTicketSpec } from './spec-records.ts';
 import type { WorkRecord } from './work-records.ts';
@@ -63,6 +64,11 @@ export function gateRecords(
 ): GateRecords {
     const { db } = database;
     const find = (workId: string) => readRecord(workId);
+    const parent = (id: string) =>
+        !!db.prepare("SELECT 1 FROM work_records WHERE parent_id=? AND kind<>'slice' LIMIT 1").get(id);
+    const delivery = (id: string) => {
+        if (parent(id)) invalid('A linked parent has no delivery gate; approve only its builds.');
+    };
     const expected = (workId: string, revision: number) => {
         const record = find(workId);
 
@@ -113,12 +119,16 @@ export function gateRecords(
         const matchesReview =
             !passed?.review_digest || reviews.currentDoubt(workId)?.packageDigest === passed.review_digest;
         const passing =
-            matchesScope && matchesReview ? (evidence.find((item) => item.gateId === passed?.gate_id) ?? null) : null;
+            !parent(workId) && matchesScope && matchesReview
+                ? (evidence.find((item) => item.gateId === passed?.gate_id) ?? null)
+                : null;
 
         return { briefDigest, current: passing !== null, passing, evidence };
     };
     const saveGate = (workId: string, revision: number, value: GateApproval): GateEvidence => {
         const record = expected(workId, revision);
+
+        delivery(workId);
 
         keys(value, ['briefDigest', 'approvedBy', 'evidence', 'approvalDigest', 'reviewDigest', 'batchDigest']);
 
@@ -175,6 +185,8 @@ export function gateRecords(
         return item;
     };
     const displayGate = (workId: string): GateDisplay => {
+        delivery(workId);
+
         const record = find(workId);
         const brief = body(workId, 'brief');
 
@@ -264,6 +276,14 @@ export function gateRecords(
                     }),
                 );
 
+                for (const { display } of displayed.members)
+                    queueGateResume(database, find(display.workId), {
+                        briefDigest: display.briefDigest,
+                        batchDigest: displayed.digest,
+                        approvedBy,
+                        evidence,
+                    });
+
                 return {
                     digest: displayed.digest,
                     manifest: displayed,
@@ -283,13 +303,22 @@ export function gateRecords(
 
                 if (!review) invalid('Run Doubt on the current doubt-package and record-doubt before approval.');
 
-                return saveGate(display.workId, display.sourceRevision, {
+                const result = saveGate(display.workId, display.sourceRevision, {
                     briefDigest: display.briefDigest,
                     approvedBy,
                     evidence,
                     approvalDigest,
                     reviewDigest: review!.packageDigest,
                 });
+
+                queueGateResume(database, find(display.workId), {
+                    briefDigest: display.briefDigest,
+                    approvalDigest,
+                    approvedBy,
+                    evidence,
+                });
+
+                return result;
             }),
     };
 }

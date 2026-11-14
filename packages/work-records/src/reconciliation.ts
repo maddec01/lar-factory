@@ -76,7 +76,7 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
                                 'SELECT content FROM confirmed_scopes WHERE work_id = ? ORDER BY revision DESC LIMIT 1',
                             )
                             .get(workId)?.content ?? null,
-                    map: r.kind === 'concept' ? records.body(workId, 'map') : null,
+                    map: workId === id ? records.body(workId, 'map') : null,
                     ticket: records.specState(workId).base,
                     ticketHeld: records.specState(workId).held,
                     startingContext: records.initialContext(workId),

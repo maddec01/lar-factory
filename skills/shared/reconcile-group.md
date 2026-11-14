@@ -22,6 +22,11 @@ for each overlap. After source edits, rerun Doubt and [Gate](../gate.md) for
 affected briefs needing approval. Stop in Needs you through Questions for Pedro's
 board approval, then resume reconciliation.
 
+Use `sync-blockers` for declarations. For stale current-answer/map sources, use
+`refresh-projections GROUP_ID --file F`: `{revisions:{ID:N},answers:{ID:text},map?}`
+with all group revisions and reviewed current prose. Refresh affected answers and
+map together; historical answers remain. Commands hold stale projections until refreshed.
+
 Save release order with `set-release-plan`: `shipsWith` names delivery work IDs;
 `who` is `Pedro` for human steps, `Agent` for automated ones. Record release
 evidence with `complete-release-step`, then the Outcome check; merges alone

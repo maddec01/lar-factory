@@ -155,13 +155,14 @@ export function recordDetails(records: WorkRecords, workId: string): RecordDetai
         throw error;
     }
 
-    const bodyKind = bodyKindOf(record.kind);
+    const linked = records.children(workId).some((part) => part.kind !== 'slice');
+    const bodyKind = linked ? 'map' : bodyKindOf(record.kind);
     const runs = savedRunChoices(records, workId);
 
     return {
         bodyKind,
         ...(runs.length ? { runSettings: runs } : {}),
-        body: records.body(workId, bodyKind) ?? '',
+        body: records.body(workId, bodyKind) ?? (linked ? records.body(workId, 'brief') : null) ?? '',
         ...(bodyKind === 'decision' ? { answer: records.body(workId, 'answer') ?? '' } : {}),
         context: records.initialContext(workId),
         buildPhase: record.buildPhase,

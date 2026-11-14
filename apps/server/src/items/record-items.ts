@@ -223,13 +223,20 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                   ? (ticket?.map ?? parseConceptMap(''))
                   : ticket?.map;
         const group = record.kind === 'concept' || work.length > 0;
-        const derivedStatus = group
-            ? completionOf(record).complete
-                ? 'Done'
-                : record.status === 'Done'
-                  ? 'In progress'
-                  : record.status
-            : record.status;
+        const parentApprovalWait =
+            group &&
+            record.status === 'Needs you' &&
+            record.needsYouCauses.length === 0 &&
+            /approve.*brief|brief.*approval/i.test(record.needsYou ?? '');
+        const derivedStatus = parentApprovalWait
+            ? 'Shaping'
+            : group
+              ? completionOf(record).complete
+                  ? 'Done'
+                  : record.status === 'Done'
+                    ? 'In progress'
+                    : record.status
+              : record.status;
         const done = derivedStatus === 'Done' || (isDone(record) && !group);
         const sync = trackerState(record.workId);
         const savedSpec = records.specState(record.workId);
@@ -240,7 +247,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 : savedSpec;
         const gate = records.gate(record.workId);
         const staleGate =
-            !done && !gate.current && gate.evidence.length > 0
+            !group && !done && !gate.current && gate.evidence.length > 0
                 ? gate.evidence.at(-1)!.briefDigest !== gate.briefDigest
                     ? ('brief' as const)
                     : gate.evidence.at(-1)!.reviewDigest &&
@@ -249,12 +256,14 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                       : ('approval' as const)
                 : undefined;
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
+        const matchesScope = !records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok;
         const briefApproval =
+            !group &&
             !done &&
             !gate.current &&
             !!records.body(record.workId, 'brief') &&
             (!!staleGate || /approve.*brief|brief.*approval/i.test(record.needsYou ?? '')) &&
-            (!records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok);
+            (!!staleGate || matchesScope);
         const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
         const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
         const item: Item = {
@@ -310,9 +319,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             ...(staleGate && { staleGate }),
             ...(briefApproval && {
                 briefApproval: {
-                    digest: records.displayGate(record.workId).approvalDigest,
+                    ...(matchesScope && { digest: records.displayGate(record.workId).approvalDigest }),
                     reason:
-                        staleGateReason({ staleGate }) ??
+                        (!matchesScope
+                            ? 'The current brief differs from confirmed scope. Its owner must update it before approval.'
+                            : staleGateReason({ staleGate })) ??
                         (activeBuild
                             ? 'The brief changed during Build. Review and approve the new brief.'
                             : 'Review the complete brief before it becomes Ready.'),
@@ -350,7 +361,15 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             records.launchIntents({ workId: record.workId }),
         );
 
-        if (needsYou) item.needsYou = needsYou;
+        if (needsYou && !parentApprovalWait) item.needsYou = needsYou;
+
+        if (item.briefApproval && !item.needsYou)
+            item.needsYou = {
+                reason: item.briefApproval.reason,
+                offers: [],
+                causes: [],
+                ticketOpen: records.observations(record.workId).some((o) => o.of === 'ticket' && o.state === 'open'),
+            };
 
         return item;
     };

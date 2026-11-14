@@ -26,9 +26,12 @@ Each returns verdict (`approve` or `changes`), findings and not-checked evidence
 Explain rejected findings. Before assigning accepted findings to the
 [Fixer](../agents/fixer.md), save HEAD as the round base and call
 `lar-work record-review-round <work ID> --revision N --file <json>` with base,
-runId when supplied, selection evidence, reviewer verdicts (`skipped` with reason
-in `notChecked` for skips), unchecked evidence and findings (`open`, or `rejected`
-with reason). Mark fixes with `lar-work set-disposition ... --disposition fixed`.
+runId when supplied, reviewer verdicts, findings and optional `notChecked` text.
+The command fills each reviewer's selection/escalation and skip reason from the
+saved `select-reviewers` result; omit unchecked notes when none (`""` is accepted).
+Example: `{"base":"<saved HEAD>","reviewers":[{"axis":"code","verdict":"approve","findings":[]}]}`.
+Record every reviewer that ran; configured skips are filled automatically. Findings are `open`,
+or `rejected` with reason. Mark fixes with `lar-work set-disposition ... --disposition fixed`.
 
 Round 2: rerun only reviewers with fixed findings, in parallel, with the same
 inputs/instructions, their fixed findings and `git diff <round base>..HEAD`:

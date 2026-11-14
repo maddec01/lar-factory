@@ -224,7 +224,7 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
     expect((await f.cli('confirmed-scope', other.workId)).code).toBe(1);
 }, 15000);
 
-it('chooses from persisted confirmation without changing records or guessing legacy scope', async () => {
+it('chooses from persisted confirmation, records Build and refuses to guess legacy scope', async () => {
     const f = await fixture();
 
     expect((await f.cli('choose-structure', f.id)).code).toBe(1);
@@ -242,5 +242,5 @@ it('chooses from persisted confirmation without changing records or guessing leg
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({ structure: 'linked' });
     expect((await f.cli('choose-structure', f.id)).stdout).toBe(result.stdout);
-    expect(f.records.read(f.id).revision).toBe(revision);
+    expect(f.records.read(f.id)).toMatchObject({ kind: 'build', revision: revision + 1 });
 }, 15000);

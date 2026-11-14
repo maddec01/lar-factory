@@ -123,6 +123,7 @@ test('a tracker edit wins a waiting write, preserves Ready and records the repla
         approvedBy: 'user',
         evidence: 'Passed again',
     });
+    f.records.update(record.workId, f.records.read(record.workId).revision, { status: 'Ready' });
     f.edit({ body: formatTicketSpec('Edited on tracker.', 'Authored request.'), title: 'New title', version: '3' });
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     expect(f.writes).toHaveLength(2); // The second write marks the retained tracker Spec out of date.

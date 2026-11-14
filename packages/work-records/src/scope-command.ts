@@ -3,7 +3,6 @@ import { parseArgs } from 'node:util';
 
 import { agentWrites } from './agent-writes.ts';
 import { scopeMarkdown } from './brief-scope.ts';
-import { chooseStructure } from './choose-structure.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
 /** Local-only scope commands; checking and rendering never mutate or contact a tracker. */
@@ -50,7 +49,7 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
             command === 'brief-scope-check'
                 ? records.briefScopeCheck(id)
                 : command === 'choose-structure' && confirmed
-                  ? chooseStructure(confirmed.scope)
+                  ? records.chooseStructure(id)
                   : confirmed;
 
         if (!result) throw new Error('No confirmed scope. Run confirm-scope at understanding confirmation.');

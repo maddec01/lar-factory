@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
-import { openWorkRecords, type WorkRecords } from './work-records.ts';
+import { openWorkRecords, type WorkRecords, type WorkRecord } from './work-records.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
 
@@ -29,7 +29,7 @@ async function fixture() {
 
     records.setBody(group.workId, group.revision, 'map', '## Destination\nReconnect safely.');
 
-    const part = (n: number, kind: 'decision' | 'build') =>
+    const part = (n: number, kind: 'decision' | 'build'): WorkRecord =>
         records.createPart({
             parentId: group.workId,
             parentRevision: records.read(group.workId).revision,
@@ -39,7 +39,7 @@ async function fixture() {
             body:
                 kind === 'decision'
                     ? 'Method: grill\nChoose connection policy.'
-                    : `## What\nReconnect ${n}.\nFiles: \`src/${n}.ts\`\nContracts: \`connection-${n}\``,
+                    : `Answers: \`${decisions[0]!.workId}\`\n## What\nReconnect ${n}.\nFiles: \`src/${n}.ts\`\nContracts: \`connection-${n}\`\nBlocked by: none`,
             blockerIds: [],
         });
     const decisions = [0, 1, 2].map((n) => part(n, 'decision'));
@@ -69,6 +69,18 @@ async function fixture() {
     };
     const clean = () => {
         review();
+        records.refreshProjections(
+            group.workId,
+            Object.fromEntries(records.list({}).map((r) => [r.workId, r.revision])),
+            {
+                map: records.body(group.workId, 'map')!,
+                answers: Object.fromEntries(
+                    decisions
+                        .filter((d) => records.decisionAnswer(d.workId).current)
+                        .map((d) => [d.workId, records.decisionAnswer(d.workId).current!.text]),
+                ),
+            },
+        );
 
         let result = records.reconcile(group.workId);
 

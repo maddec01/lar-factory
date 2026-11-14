@@ -4,23 +4,24 @@ Retitle with `lar-work retitle ID --revision N --title X`; `title-history ID`
 keeps old names and projection failures. Ticket titles queue under the existing
 Spec setting and Access; never edit the tracker directly.
 
-A concept or linked-work parent owns delivery parts. Create each part with
-`bash <this skill>/shared/scripts/slice.sh <parent> "<title>" <body-file> --kind decision|build --repository <owner/repo> [--blocked-by <work>]...`.
-It prints the work ID; keep it. This uses `lar-work create-part --parent ID
---revision N --title X --repository R --kind build|decision --file F
-[--blocked-by ID]...`, where N is the parent's last-read revision. The named
-repository, body, parent, blockers and Queued state are saved in one transaction.
-Any failure saves nothing. Builds wait
-for shaping and their gate before Ready. Ordinary standalone captures still start
-in List. No later `set-parent` or Status write is needed to finish a new part.
+A concept or linked-work parent owns delivery parts. For group growth, use
+`lar-work create-parts PARENT --revision N --file F` once, not a per-part loop.
+F supplies `{map,parts:[{key,title,repository,kind,body,blockerIds,ticketRequestId?}]}`;
+`$key` names a new blocker and `${key}` in text inserts its work ID. Ticket UUID
+requests, all records, map and blockers commit together. Provider failures retain
+requests: retry `sync-part-tickets PARENT`. Ordinary captures stay in List;
+new parts are Queued for shaping, changed drafts are Shaping until their gate.
 
-Buildable work, including bugs, features, improvements and issues, owns private
-slices. Call `slice.sh` without `--kind` or `--repository` for these: they stay in
-the parent's repository and are private implementation records, not delivery parts.
-Record a later blocker with `lar-work add-blocker <work ID> --revision N
---blocker <work ID>`, and drop one with `remove-blocker`. Self, cycle and
-redundant edges are refused; read the implying path and keep only necessary
-edges. `children`, `blockers` and `dependents` read the structure.
+Declare `Blocked by:` with backtick unique work titles or `none` in each brief.
+Keep work IDs in local map declarations. Settings supply build ticket requests.
+`lar-work sync-blockers PARENT --file F` derives the graph; F is
+`{revisions:{ID:N}}` for the parent, declared members and edge endpoints.
+Normalize legacy prose declarations first. Never add or remove delivery edges by hand.
+Cycles, retired or redundant blockers refuse the transaction. `children`,
+`blockers` and `dependents` read it. Use Dependencies for other teams.
+
+Private implementation slices use `slice.sh` without `--kind` or `--repository`;
+they stay in their build's repository and never become delivery parts.
 
 Set aside with `lar-work set-aside ID --revision N --file F`. F lists every
 dependent `{workId,revision,action,reason}`; action is `remove`, `hold` or

@@ -115,6 +115,7 @@ test("Start build moves its concept's work record to In progress, writes nothing
                 approvedBy: 'Pedro',
                 evidence: 'Doubt clean; approved.',
             });
+            records.update(work.workId, records.read(work.workId).revision, { status: 'Ready' });
         },
         board.id(12),
         (item) => item.passingBrief === true,

@@ -199,7 +199,7 @@ it('preserves one approved manifest through all members waiting, resuming and re
             batchDigest: manifest.digest,
             approvalDigest: member.display.approvalDigest,
         });
-        expect(records.read(member.display.workId)).toMatchObject({ status: 'Shaping', needsYou: null });
+        expect(records.read(member.display.workId)).toMatchObject({ status: 'Ready', needsYou: null });
     }
 });
 

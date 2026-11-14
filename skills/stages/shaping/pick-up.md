@@ -27,9 +27,9 @@ Send it through Gate again with new final confirmation before marking it Ready. 
 
 ## Explore
 
-Read existing project instructions when present,
-neighboring code conventions, its glossary and relevant ADRs at the paths
-supplied from local Project settings,
+Follow project instructions already supplied. Do not search for repository guidance or config files
+in the checkout or its parents. Read neighboring code, the glossary and relevant ADRs
+at paths supplied from local Project settings,
   and the code this work touches, and returns ≤300 words in
   the project's vocabulary: what exists, where, and
   what the work would change. By default it runs no test suite, build, typecheck
@@ -43,4 +43,4 @@ supplied from local Project settings,
   repositories, and `bash <this skill>/shared/scripts/repo-config.sh <owner/repo>`
   (or an Azure repository's origin URL or `<org>/<project>/<repo>`) prints
   one's local machine settings. The checkout may be another repository's.
-  Missing instructions, glossary or ADRs never block shaping.
+  Missing glossary or ADRs never block shaping.

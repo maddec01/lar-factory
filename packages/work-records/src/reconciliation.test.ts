@@ -184,7 +184,7 @@ test('superseded endpoint, sibling contract removal and scope changes reopen Dou
     expect(records.gate(consumer.workId).current).toBe(false);
 }, 20000);
 
-test('cross-repository contract and same-repository file overlap need an edge or current Doubt explanation', async () => {
+test('contract-only overlaps accept Doubt reasons while same-repository file conflicts require blockers', async () => {
     const { records, group, builds, review } = await fixture();
 
     for (const n of [0, 2, 3])
@@ -206,6 +206,11 @@ test('cross-repository contract and same-repository file overlap need an edge or
     result = records.reconcile(group.workId);
     expect(result.items.filter((i) => i.kind === 'overlap')).toHaveLength(2);
     review();
+    expect(records.reconcile(group.workId).items.filter((i) => i.kind === 'overlap')).toHaveLength(1);
+
+    const three = builds[3]!.workId;
+
+    records.addBlocker(three, records.read(three).revision, zero);
     expect(records.reconcile(group.workId).items.filter((i) => i.kind === 'overlap')).toEqual([]);
 }, 20000);
 

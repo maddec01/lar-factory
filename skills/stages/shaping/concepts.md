@@ -26,9 +26,8 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 - <each glossary entry and ADR draft settled so far, with its decision's title>, or "none"
 ```
 
-The board generates the graph from the parts' records, blockers and recorded
-Dependencies. Never write nodes, edges, statuses or queue flags into map prose;
-record those facts with `lar-work` instead.
+Commands generate Parts, status, Spec/gate state, phase and graph from records.
+Write only narrative and destination; never per-part state in map prose.
 
 The user's original text stays in the record's initial context. Follow the local
 [domain-doc setting](shared/domain-docs-setting.md). With it OFF,

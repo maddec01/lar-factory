@@ -3,9 +3,9 @@ Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTR
 # Doubt
 
 Disprove the exact `lar-work doubt-package <work ID>` against each repository,
-never the shaping conversation. Read existing project instructions, glossary,
-relevant ADRs and the code named in Notes for the builder. Use supplied domain-doc
-setting/paths; missing evidence is not checked, never inferred approval.
+never the shaping conversation. Follow supplied instructions; do not discover guidance. Do not search for repository guidance or config files
+in checkouts, parents or home folders. Read named code and supplied domain-doc paths;
+missing evidence is not approval.
 Run `lar-work brief-scope-check <work ID>` first; missing confirmation or drift
 is an incomplete finding. Check destination, current answers, siblings/overlaps,
 files/contracts, blockers, Dependencies and release constraints together. Challenge

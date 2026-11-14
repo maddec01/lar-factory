@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { briefScopeClaims, type BriefScope } from './brief-scope.ts';
+import { contractReferences } from './contract-references.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { DecisionAnswers } from './decision-answers.ts';
 import type { DependencyRecords } from './dependencies.ts';
@@ -46,7 +47,7 @@ export interface OrderingReason {
 }
 export interface DoubtReview {
     reviewId: string;
-    dependencyVersion?: 1;
+    dependencyVersion?: 1 | 2;
     packageDigest: string;
     identity: string;
     evidence: string;
@@ -152,7 +153,7 @@ export function briefReviewRecords(
 
         return false;
     };
-    const buildPackage = (workId: string, legacy = false): DoubtPackage => {
+    const buildPackage = (workId: string, legacy = false, overlapDependencies = false): DoubtPackage => {
         const sources = new Map<string, ReviewSource>();
         const sourceOf = (record: WorkRecord): ReviewSource => {
             const prior = sources.get(record.workId);
@@ -268,14 +269,24 @@ export function briefReviewRecords(
         // Keep the broad package for semantic review, but approval depends only on named inputs.
         // Incorporation timestamps, map prose, unrelated answers and sibling Notes are not contracts.
         const referenced = (item: ReviewSource) => cites(brief!, item.workId, item.title);
+        const consumed = contractReferences(
+            brief!,
+            [...content.siblings, ...content.overlapping, ...content.blockers].map((item) => ({
+                workId: item.workId,
+                title: item.title,
+                brief: item.bodies.find((b) => b.body === 'brief')?.markdown ?? '',
+            })),
+            false,
+        );
         const contracts = [
             ...new Map(
                 [...content.siblings, ...content.overlapping, ...content.blockers]
-                    .filter(
-                        (item) =>
-                            referenced(item) ||
-                            own.named.contracts.some((name) => item.named.contracts.includes(name)) ||
-                            content.overlaps.some((o) => o.otherWorkId === item.workId && o.files.length),
+                    .filter((item) =>
+                        overlapDependencies
+                            ? referenced(item) ||
+                              own.named.contracts.some((name) => item.named.contracts.includes(name)) ||
+                              content.overlaps.some((o) => o.otherWorkId === item.workId && o.files.length)
+                            : consumed.includes(item.workId),
                     )
                     .map((item) => [item.workId, item]),
             ).values(),
@@ -288,7 +299,7 @@ export function briefReviewRecords(
                 answer: item.answer?.current?.text ?? item.answer?.replacement?.text ?? null,
             })),
             contracts: contracts.map((item) => sourceSpec(item)),
-            blockers: own.blockers,
+            blockers: overlapDependencies ? own.blockers : undefined,
             dependencies: dependencySpecs(content.dependencies),
             releaseContracts:
                 content.releasePlan?.steps
@@ -343,7 +354,7 @@ export function briefReviewRecords(
     const oldReviews = db
         .prepare('SELECT review_id,work_id,content FROM doubt_reviews')
         .all()
-        .filter((row) => !JSON.parse(String(row.content)).dependencyVersion);
+        .filter((row) => JSON.parse(String(row.content)).dependencyVersion !== 2);
 
     if (oldReviews.length)
         database.write(() => {
@@ -357,12 +368,13 @@ export function briefReviewRecords(
 
                 if (
                     review.packageDigest !== current.packageDigest &&
-                    review.packageDigest !== buildPackage(id, true).packageDigest
+                    review.packageDigest !== buildPackage(id, true).packageDigest &&
+                    review.packageDigest !== buildPackage(id, false, true).packageDigest
                 )
                     continue;
 
                 db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
-                    JSON.stringify({ ...review, dependencyVersion: 1, packageDigest: current.packageDigest }),
+                    JSON.stringify({ ...review, dependencyVersion: 2, packageDigest: current.packageDigest }),
                     String(row.review_id),
                 );
                 db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=? AND review_digest=?').run(
@@ -406,7 +418,7 @@ export function briefReviewRecords(
 
                 const review = {
                     reviewId: randomUUID(),
-                    dependencyVersion: 1 as const,
+                    dependencyVersion: 2 as const,
                     packageDigest,
                     identity: text(identity),
                     evidence: text(evidence),

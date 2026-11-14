@@ -1,4 +1,5 @@
 import { validateBlockers } from './blocker-graph.ts';
+import { groupContractReferences } from './contract-references.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import { expectRevision } from './record-revision.ts';
 import type { WorkRecord, WorkRecords } from './work-records.ts';
@@ -101,12 +102,41 @@ export function blockerDeclarations(records: WorkRecords, id: string) {
 
         declarations.set(workId, ids);
     }
+
+    const contracts = groupContractReferences(records, members);
+
+    if (contracts.unresolved.length)
+        invalid(
+            `Normalize contract source declarations (Produces or No ordering needed): ${contracts.unresolved.map((r) => `${r.workId}: ${r.contract}`).join(', ')}.`,
+        );
+
+    for (const [workId, refs] of contracts.references) {
+        if (refs.length) declarations.set(workId, [...new Set([...(declarations.get(workId) ?? []), ...refs])].sort());
+    }
     for (const [workId, ids] of declarations)
         for (const blockerId of ids) {
             const r = records.read(blockerId);
 
             if (r.setAside || r.supersededBy) invalid(`Replace retired blocker ${blockerId} declared by ${workId}.`);
         }
+
+    const route = (start: string, end: string, skip: string, seen = new Set<string>()): boolean => {
+        if (seen.has(start)) return false;
+
+        seen.add(start);
+
+        return (declarations.get(start) ?? records.blockers(start).map((r) => r.workId)).some(
+            (next) => `${start}:${next}` !== skip && (next === end || route(next, end, skip, seen)),
+        );
+    };
+
+    for (const [workId, refs] of contracts.references)
+        for (const ref of refs)
+            if (route(workId, ref, `${workId}:${ref}`))
+                declarations.set(
+                    workId,
+                    declarations.get(workId)!.filter((id) => id !== ref),
+                );
 
     return declarations;
 }

@@ -1,5 +1,7 @@
 import type { GateEvidence } from '@lar-factory/shared';
 
+import { groupMembers } from './blocker-declarations.ts';
+import { blockerPath, groupContractReferences } from './contract-references.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import type { WorkRecords } from './work-records.ts';
 
@@ -54,6 +56,23 @@ export function prepareBuildClaim(
     if (work.needsYou && !input.recovery) refuse(`Needs you: ${work.needsYou}`);
 
     if (records.specState(workId).held) refuse('Resolve the changed ticket Spec before Start build.');
+
+    const review = records.doubtPackage(workId);
+
+    if (review.overlaps.some((overlap) => !overlap.ordered && overlap.files.length))
+        refuse('File overlap needs an ordering blocker before Start build.');
+
+    let root = work;
+
+    while (root.parentId) root = records.read(root.parentId);
+
+    const contracts = groupContractReferences(records, groupMembers(records, root.workId, true));
+
+    if (
+        contracts.unresolved.some((ref) => ref.workId === workId) ||
+        (contracts.references.get(workId) ?? []).some((producer) => !blockerPath(records, workId, producer))
+    )
+        refuse('Resolve contract sources and consumer blockers before Start build.');
 
     if (records.waitingOn(workId).length) refuse('The recorded blockers or Dependencies are not complete.');
 

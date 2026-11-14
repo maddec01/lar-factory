@@ -44,6 +44,7 @@ import { readFactorySettings } from './factory-settings.ts';
 import { gateRecords, type GateRecords } from './gate-records.ts';
 import { gateResumeRecords } from './gate-resume.ts';
 import { groupProjectionRecords, saveProjection } from './group-projections.ts';
+import { projectMapParts } from './map-parts.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { outcomeRecords } from './outcome-records.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
@@ -1352,13 +1353,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...trackerCache(database),
         ...retitleRecords(database, (workId) => fromRow(find(workId))),
         ...answers,
-        ...mergeBuildRecords(database, {
-            read: (id) => fromRow(find(id)),
-            body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
-            initialContext: (id) => records.initialContext(id),
-            writeBody,
-        }),
-        ...setAsideRecords(database, (id) => fromRow(find(id))),
+        ...mergeBuildRecords(
+            database,
+            {
+                read: (id) => fromRow(find(id)),
+                body: (id, body) => (bodyText.get(id, body)?.markdown as string | undefined) ?? null,
+                initialContext: (id) => records.initialContext(id),
+                writeBody,
+            },
+            answers,
+        ),
+        ...setAsideRecords(database, (id) => fromRow(find(id)), answers),
         ...specRecords(database, (workId) => fromRow(find(workId))),
         ...publications,
         ...gates,
@@ -1891,7 +1896,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 const row = bodyText.get(workId, name);
 
-                return row ? String(row.markdown) : null;
+                return row
+                    ? name === 'map'
+                        ? projectMapParts(records, workId, String(row.markdown))
+                        : String(row.markdown)
+                    : null;
             }),
         setBuildPhase: (workId, revision, phase) => {
             const checked = checkOneOf(BUILD_PHASES, phase, 'build phase');

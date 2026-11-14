@@ -103,7 +103,10 @@ test('S06: only cited answers and named sibling contracts invalidate approval', 
     records.setBody(d.workId, d.revision, 'answer', 'Use a fragment.');
 
     const b = part('b02 producer', 'Contracts: `greeting-v1`\n## Done when\nProduce v1.\n## Notes\nUse sample.');
-    const consumer = part('b09 proof', `Answers: \`${d.workId}\`\nContracts: \`greeting-v1\`\nProve v1.`);
+    const consumer = part(
+        'b09 proof',
+        `Answers: \`${d.workId}\`\nConsumes: \`${b.workId}\`\nContracts: \`greeting-v1\`\nProve v1.`,
+    );
 
     approve(consumer.workId);
     records.setBody(
@@ -194,7 +197,7 @@ test('S06: fourteen-part growth commits records, ticket requests, graph and map 
     expect(result.parts).toHaveLength(14);
     expect(records.children(g.workId)).toHaveLength(14);
     expect(records.partTicketRequests(g.workId)).toHaveLength(14);
-    expect(records.body(g.workId, 'map')).toBe(input.map);
+    expect(records.body(g.workId, 'map')).toContain(input.map);
     expect(records.blockers(result.parts[13]!.workId).map((b) => b.workId)).toEqual([result.parts[12]!.workId]);
     expect(() => records.createParts(g.workId, g.revision, input)).toThrow(/revision/);
     expect(records.children(g.workId)).toHaveLength(14);

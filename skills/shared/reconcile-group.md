@@ -24,8 +24,8 @@ board approval, then resume reconciliation.
 
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use
 `refresh-projections GROUP_ID --file F`: `{revisions:{ID:N},answers:{ID:text},map?}`
-with all group revisions and reviewed current prose. Refresh affected answers and
-map together; historical answers remain. Commands hold stale projections until refreshed.
+with all group revisions. Refresh answers and narrative together; commands reject
+stale exact brief quotes and generate map part state. History remains.
 
 Before ending a shaping turn, settle factory details (fixtures, files,
 presentation) yourself. Remove resolved Fog; record `set-fog --fog gone` when

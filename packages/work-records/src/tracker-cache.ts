@@ -70,7 +70,7 @@ export const trackerDigest = (value: unknown) => createHash('sha256').update(JSO
 const invalid = (message: string): never => {
     throw new WorkRecordError('invalid', message);
 };
-const publicMap = (map: string) => map.replace(/^## Domain docs\s*\n[\s\S]*?(?=^## |$(?![\s\S]))/gim, '');
+const publicMap = (map: string) => map.replace(/^## (?:Domain docs|Parts)\s*\n[\s\S]*?(?=^## |$(?![\s\S]))/gim, '');
 
 export function trackerCache(database: Database): TrackerCache {
     const { db } = database;

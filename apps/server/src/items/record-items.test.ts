@@ -1410,3 +1410,42 @@ for (const kind of ['concept', 'feature'] as const)
                 false,
             );
         });
+
+test('S06: an unknown-provenance ticket edit stays on Your desk until board acceptance', async () => {
+    const records = await open();
+    let x = records.create({ title: 'x envelope', repository: REPO, kind: 'build' });
+
+    x = records.attachTicket(x.workId, x.revision, `${REPO}#891`);
+    records.setBody(x.workId, x.revision, 'brief', completeBrief('Extensible envelope.'));
+
+    const state = records.specState(x.workId);
+
+    records.saveSpecState(x.workId, state.generation, {
+        ...state,
+        held: { title: 'x envelope', body: 'Authorized created ticket.', version: '2', digest: 'unknown' },
+    });
+
+    let items = recordItems(records, [], [REPO]);
+
+    assert.equal(
+        deskItems({ items }, false).some((i) => i.id === x.workId),
+        true,
+    );
+    assert.equal(
+        deskWait(
+            items.find((i) => i.id === x.workId)!,
+            false,
+            items,
+        ).label,
+        'Ticket edit',
+    );
+
+    const held = records.specState(x.workId);
+
+    records.saveSpecState(x.workId, held.generation, { ...held, held: null });
+    items = recordItems(records, [], [REPO]);
+    assert.equal(
+        deskItems({ items }, false).some((i) => i.id === x.workId),
+        false,
+    );
+});

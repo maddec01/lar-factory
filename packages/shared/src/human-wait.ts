@@ -8,6 +8,8 @@ import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-dom
 
 /** The same human wait determines desk placement and group attention. */
 export function humanWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    if (item.ticketEditHeld) return deskWait(item, unavailable, all);
+
     const parent = all.find((candidate) => candidate.id === item.parentId);
     const question = openQuestionThread(item);
 

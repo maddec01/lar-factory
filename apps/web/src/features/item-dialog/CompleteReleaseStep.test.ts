@@ -176,3 +176,50 @@ test('an Outcome without an agent owner reaches the desk and records evidence th
     ]);
     expect(text(form)).toContain('The delivered composition changed.');
 });
+
+test('failed composition offers a fix proposal with evidence and no replacement-pass form', async () => {
+    const item = {
+        ...parent,
+        releasePlan: {
+            steps: [],
+            outcomeCheck: {
+                what: 'A factory → B consumer → C display composition',
+                result: 'failed' as const,
+                evidence: {
+                    by: 'Outcome owner',
+                    at: '2026-11-14T15:02:18Z',
+                    evidence: 'C has no B→C accepted-text input.',
+                },
+            },
+        },
+        outcomeCheck: { ready: true, digest: 'failed-composition', run: null },
+    };
+    const board = fresh({ ...sample, items: [item] });
+
+    fetchMock.mockImplementation(
+        async () => new Response(JSON.stringify({ ...board, error: 'Lost response; retry uses the same request.' })),
+    );
+    await mountPage(board);
+
+    const actions = [...document.querySelectorAll<HTMLButtonElement>('.desk button')].filter(
+        (b) => b.textContent === 'Propose fix part',
+    );
+
+    expect(actions).toHaveLength(1);
+    await settle(() => actions[0]!.click());
+
+    const dialog = document.querySelector('[data-item-dialog]')!;
+
+    expect(text(dialog)).toContain('C has no B→C accepted-text input.');
+    expect(dialog.querySelector('[data-outcome-form]')).toBeNull();
+
+    const fix = dialog.querySelector('[data-outcome-fix]')!;
+
+    expect(text(fix)).toContain('Doubt');
+    await settle(() => fix.querySelector('button')!.click());
+    expect(posted().at(-1)).toEqual([
+        '/api/propose-outcome-fix',
+        { itemId: item.id, revision: 12, inputDigest: 'failed-composition' },
+    ]);
+    expect(text(fix)).toContain('Lost response');
+});

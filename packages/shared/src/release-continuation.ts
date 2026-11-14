@@ -44,6 +44,7 @@ export function releaseRecoveryAvailable(item: Item, all: readonly Item[]): bool
         !item.setAside &&
         item.status !== 'Done' &&
         !!item.releasePlan &&
+        item.releasePlan.outcomeCheck.result !== 'failed' &&
         (item.kind === 'concept' || item.flow === 'linked') &&
         (item.releaseContinuation?.ready === true ||
             (parts.some((part) => part.kind === 'build') &&

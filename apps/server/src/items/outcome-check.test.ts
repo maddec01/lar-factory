@@ -107,7 +107,78 @@ test('lost Outcome dispatch responses retry after restart with exactly the same 
         await restarted.reconcileOutcomeChecks();
         await restarted.reconcileOutcomeChecks();
         expect(send).toHaveBeenCalledTimes(2);
+        expect(send.mock.calls[0]![0]).toMatchObject({ text: expect.stringContaining('local static HTTP server') });
         expect(send.mock.calls[1]![0]).toEqual(send.mock.calls[0]![0]);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('failed Outcome dispatches a fix proposal only from the board action and reuses uncertain IDs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'outcome-fix-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    try {
+        const id = records.create({
+            title: 'Linked greeting',
+            repository: 'fake/app',
+            kind: 'feature',
+            status: 'In progress',
+        }).workId;
+        const at = () => records.read(id).revision;
+
+        records.addThread(id, at(), 'owner', 'shape');
+
+        const part = records.createPart({
+            parentId: id,
+            parentRevision: at(),
+            title: 'C',
+            repository: 'fake/app',
+            kind: 'build',
+            body: 'Blocked by: none',
+            blockerIds: [],
+        });
+
+        records.setPullRequest(part.workId, part.revision, 'fake/app#1');
+        records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
+        records.setReleasePlan(id, at(), { steps: [], outcomeCheck: 'B→C composition' });
+        records.recordOutcomeCheck(id, at(), 'failed', 'Outcome owner', 'displayGreeting(element) has no B input.');
+
+        const reread = () => board.update({ items: recordItems(records, [], ['fake/app']) });
+        const board = createBoardState({
+            items: recordItems(records, [], ['fake/app']),
+            repos: [{ repo: 'fake/app' }],
+        } as BoardData);
+        const send = vi
+            .fn<NonNullable<Parameters<typeof createOutcomeCheck>[0]['send']>>()
+            .mockResolvedValueOnce({ outcome: 'unconfirmed', reason: 'Lost response' })
+            .mockResolvedValue({ outcome: 'accepted', sequence: 1 });
+        const commands = createOutcomeCheck({ board, records, reread, send });
+
+        await commands.reconcileOutcomeChecks();
+        expect(send).not.toHaveBeenCalled();
+
+        const request = () => ({ revision: at(), inputDigest: records.outcomeCheck(id).digest });
+
+        expect((await commands.proposeOutcomeFix(id, { ...request(), revision: at() - 1 })).status).toBe(409);
+        expect((await commands.proposeOutcomeFix(id, request())).status).toBe(409);
+
+        const restarted = createOutcomeCheck({ board, records, reread, send });
+
+        expect((await restarted.proposeOutcomeFix(id, request())).status).toBe(200);
+        expect((await restarted.proposeOutcomeFix(id, request())).status).toBe(200);
+        expect(send).toHaveBeenCalledTimes(2);
+        expect(send.mock.calls[0]![0]).toEqual(send.mock.calls[1]![0]);
+        expect(send.mock.calls[1]![0]).toMatchObject({
+            threadId: 'owner',
+            text: expect.stringContaining('create-parts'),
+        });
+        expect(send.mock.calls[1]![0]).toMatchObject({
+            text: expect.stringContaining('displayGreeting(element) has no B input.'),
+        });
+        expect(records.releasePlan(id)?.outcomeCheck.result).toBe('failed');
+        expect(records.children(id)).toHaveLength(1);
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

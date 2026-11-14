@@ -21,6 +21,7 @@ import { gateWorkIds } from './gate-batch.ts';
 import { groupCommand } from './group-command.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { requireHumanAction } from './human-action.ts';
+import { publicationBodyCommand } from './publication-body.ts';
 import { releaseCommand } from './release-command.ts';
 import { retroCommand } from './retro-command.ts';
 import { selectReviewersCommand } from './reviewer-command.ts';
@@ -55,6 +56,10 @@ const HELP = `Usage: lar-work <command> [options]
 
 Reads and changes the factory's work records in the work-record database, which
 it opens directly. It works from any folder, with or without the board app.
+
+PR description
+  pr-body --file BODY --to OUTPUT [--test-steps STEPS]
+                                    Generate the canonical Test steps section for create/update.
 
 Confirmed scope, local only
   confirm-scope <work-id> --revision N --file F --identity person --evidence response
@@ -1156,6 +1161,8 @@ async function run(
 }
 
 async function main(args: string[]): Promise<number> {
+    if (args[0] === 'pr-body') return publicationBodyCommand(args.slice(1));
+
     if (['create-parts', 'sync-blockers', 'refresh-projections', 'sync-part-tickets'].includes(args[0] ?? ''))
         return groupCommand(args[0]!, args.slice(1));
 

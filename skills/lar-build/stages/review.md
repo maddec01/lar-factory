@@ -42,3 +42,5 @@ fixes (unreviewed) to Approve; each reviewer's latest round is its final result.
 End after round 1 if nothing was fixed, otherwise after round 2. Stop every
 reported UI process only after confirming it still holds its ownership evidence,
 even when a later thread does the cleanup. Continue to [Approve](approve.md).
+
+Preserve Code’s `consumption: [{source,input,test,evidence}]` in its reviewer entry.

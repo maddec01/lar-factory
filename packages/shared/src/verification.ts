@@ -36,18 +36,54 @@ export function verificationProblem(item: Pick<Item, 'verification'>, head: stri
     return undefined;
 }
 
-/** Read only the PR's Test steps section, preserving its Markdown. */
-export function verificationTestSteps(body: string): string {
+/** One parser/heading contract for both generated PR bodies and Verify. */
+export const TEST_STEPS_HEADING = 'Test steps';
+export const TEST_STEPS_EXPECTED =
+    'Expected a Markdown heading: ## Test steps (also accepts Test, Testing, Verify steps or Manual checks), followed by manual checks with observable results.';
+
+export function verificationSection(body: string): { start: number; end: number } | null {
     const lines = body.split(/\r?\n/);
-    const start = lines.findIndex((line) => /^#{1,6}\s+Test steps\s*$/i.test(line));
+    let fence: string | undefined;
+    let start = -1;
+    let level = 0;
 
-    if (start < 0) return '';
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
 
-    const level = lines[start]!.match(/^#+/)![0].length;
-    const end = lines.findIndex((line, i) => i > start && new RegExp(`^#{1,${level}}\\s+`).test(line));
+        if (marker) {
+            if (!fence) fence = marker;
+            else if (marker[0] === fence[0] && marker.length >= fence.length) fence = undefined;
 
-    return lines
-        .slice(start + 1, end < 0 ? undefined : end)
-        .join('\n')
-        .trim();
+            continue;
+        }
+
+        if (fence) continue;
+
+        const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+
+        if (!heading) continue;
+
+        if (start >= 0 && heading[1]!.length <= level) return { start, end: i };
+
+        if (start < 0 && /^(Test steps|Test|Testing|Verify steps|Manual checks)$/i.test(heading[2]!)) {
+            start = i;
+            level = heading[1]!.length;
+        }
+    }
+
+    return start < 0 ? null : { start, end: lines.length };
+}
+
+/** Preserve Markdown within the manual checks section. */
+export function verificationTestSteps(body: string): string {
+    const section = verificationSection(body);
+
+    return section
+        ? body
+              .split(/\r?\n/)
+              .slice(section.start + 1, section.end)
+              .join('\n')
+              .trim()
+        : '';
 }

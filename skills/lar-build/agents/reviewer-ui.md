@@ -26,6 +26,9 @@ app it names while its processes still run and it reloads the worktree's files
 live (a dev server); otherwise start it again. Open only the screens the fix
 diff touches.
 
+For local static output, use `python3 -m http.server 0 --bind 127.0.0.1 --directory <folder>`
+and its printed HTTP URL in T3 preview, then stop the server; never launch another browser or import tools from other checkouts.
+
 On every changed screen:
 
 - walk the brief's flow as its user: what they see, what they can do, and what

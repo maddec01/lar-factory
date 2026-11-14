@@ -1,0 +1,36 @@
+## What
+Show the accepted greeting in a tiny static sandbox page.
+
+## Done when
+### Behaviour
+- Display the accepted "Hello, Pedro!" greeting in a tiny static sim-891.html fixture.
+### Tests
+- test/sim-891/view.test.mjs: the accepted fixed greeting is displayed as exactly "Hello, Pedro!".
+- Preserve all existing greeting APIs/tests, Hello, friend! behavior, index.html and its keyboard behavior.
+
+## Scope
+### Files
+- src/sim-891/view.mjs
+- sim-891.html
+### Size
+
+### Excluded
+- Cross-clone source imports; fixtures carry the contract.
+- Changes to existing greeting APIs/tests, Hello, friend! behavior, index.html or its keyboard behavior.
+- Service, auth, internet calls, secrets, dependency changes, production deployment and follow-ups.
+
+## Verify
+yes: sim-891.html visibly displays the accepted "Hello, Pedro!" greeting; index.html and its keyboard behavior remain unchanged.
+
+## Confirmed
+The fixed greeting contract and preservation constraints were confirmed by Pedro. This repository's part has no open product decisions.
+
+## Notes for the builder
+Contracts: `accepted greeting text`
+Consumes: `Consume the v1 greeting envelope in B · S05 round 2 final repeat 4`
+Blocked by: `Consume the v1 greeting envelope in B · S05 round 2 final repeat 4`
+
+The consumer is maddec01/lar-factory-sim-891-s05-b#16. The static fixture uses an accepted greeting fixture. The parent's release plan owns combined sandbox activation and Outcome checks.
+
+## Domain docs
+none

@@ -112,3 +112,60 @@ test('a missing group owner returns an actionable check rather than manufacturin
     f.release();
     expect(f.records.prepareOutcomeCheck(f.group)).toMatchObject({ ready: true, run: null });
 });
+
+test('failed Outcome repair is explicit, digest-bound and durable; new parts still need the normal gate', async () => {
+    const f = await setup();
+
+    f.merge();
+    f.release();
+
+    const original = f.records.prepareOutcomeCheck(f.group).run!;
+
+    f.records.outcomeCheckDelivered(f.group, original.commandId, 'accepted');
+    f.records.recordOutcomeCheck(
+        f.group,
+        f.at(),
+        'failed',
+        'Outcome owner',
+        'C cannot consume B output.',
+        original.digest,
+    );
+    expect(f.records.prepareOutcomeCheck(f.group).run).toMatchObject({ commandId: original.commandId });
+    expect(() => f.records.prepareOutcomeFix(f.group, f.at() - 1, original.digest)).toThrow('revision');
+    expect(() => f.records.prepareOutcomeFix(f.group, f.at(), 'stale')).toThrow('current failed Outcome');
+
+    const fix = f.records.prepareOutcomeFix(f.group, f.at(), original.digest);
+
+    expect(fix.threadId).toBe('group-owner');
+    expect(fix.commandId).not.toBe(original.commandId);
+
+    const reopened = await openWorkRecords(f.path);
+
+    opened.push(reopened);
+    expect(reopened.prepareOutcomeFix(f.group, f.at(), original.digest)).toEqual(fix);
+    reopened.outcomeFixDelivered(f.group, fix.commandId, 'accepted');
+    expect(reopened.outcomeCheck(f.group).run?.fixProposal?.sent).toBe(true);
+    expect(reopened.releasePlan(f.group)?.outcomeCheck.result).toBe('failed');
+
+    const parts = reopened.createParts(f.group, f.at(), {
+        map: '## Destination\nRepair B→C dataflow.',
+        parts: [
+            {
+                key: 'fix',
+                title: 'Feed B accepted text into C',
+                repository: 'sample/repo',
+                kind: 'build',
+                body: 'Blocked by: none',
+                blockerIds: [],
+            },
+        ],
+    });
+
+    expect(parts).toBeTruthy();
+
+    const part = reopened.children(f.group).find((p) => p.title === 'Feed B accepted text into C')!;
+
+    expect(reopened.gate(part.workId).current).toBe(false);
+    expect(reopened.outcomeCheck(f.group).ready).toBe(false);
+    expect(reopened.completion(f.group).complete).toBe(false);
+});

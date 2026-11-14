@@ -1,4 +1,4 @@
-import { Alert, Button, Field, Inline, Input, Stack } from '@lar-works/design-system';
+import { Alert, Button, Field, Inline, Input, Stack, Text } from '@lar-works/design-system';
 import { useId } from 'react';
 
 import { buttonKind } from './ButtonKinds';
@@ -49,6 +49,32 @@ export function OutcomeForm({
                     Outcome failed
                 </Button>
             </Inline>
+        </Stack>
+    );
+}
+
+export function OutcomeFix({
+    pending,
+    error,
+    sent,
+    onPropose,
+}: {
+    pending: boolean;
+    error?: string | null;
+    sent: boolean;
+    onPropose: () => void;
+}) {
+    return (
+        <Stack space="tight" data-outcome-fix>
+            <Text>
+                The owner will propose a fix part, run Doubt and bring its brief back for board approval before a build
+                starts.
+            </Text>
+            {sent && <Text tone="muted">Fix proposal requested. The failed Outcome evidence stays recorded.</Text>}
+            {error && <Alert tone="danger">{error}</Alert>}
+            <Button {...buttonKind('main')} disabled={pending || sent} loading={pending} onClick={onPropose}>
+                {sent ? 'Fix proposal requested' : 'Propose fix part'}
+            </Button>
         </Stack>
     );
 }

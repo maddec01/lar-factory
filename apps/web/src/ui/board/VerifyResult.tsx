@@ -1,3 +1,4 @@
+import { TEST_STEPS_EXPECTED } from '@lar-factory/shared';
 import {
     Alert,
     Button,
@@ -41,7 +42,7 @@ export function VerifyResult({ head, testSteps, loading, pending, error, note, o
                 ) : testSteps ? (
                     <RichText text={testSteps} format="markdown" />
                 ) : (
-                    <Text tone="muted">No Test steps found in the PR. Ask for them in the failure note.</Text>
+                    <Text tone="muted">No Test steps found in the PR. {TEST_STEPS_EXPECTED}</Text>
                 )}
             </Disclosure>
             {head && (

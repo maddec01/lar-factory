@@ -32,6 +32,21 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
             action: { kind: 'details' as const, label: 'Accept dependency proof' },
         };
 
+    if (outcomeNeedsPedro(item, all) && item.releasePlan?.outcomeCheck.result === 'failed') {
+        const fix = item.outcomeCheck?.run?.fixProposal;
+
+        if (fix?.sent)
+            return {
+                label: `Outcome failed: ${item.releasePlan.outcomeCheck.what}`,
+                action: { kind: 'thread' as const, threadId: fix.threadId, label: 'Resume fix proposal in T3' },
+            };
+
+        return {
+            label: `Outcome failed: ${item.releasePlan.outcomeCheck.what}`,
+            action: { kind: 'details' as const, label: 'Propose fix part' },
+        };
+    }
+
     if (outcomeNeedsPedro(item, all))
         return { label: 'Outcome check', action: { kind: 'details' as const, label: 'Record Outcome' } };
 

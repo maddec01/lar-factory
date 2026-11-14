@@ -47,3 +47,7 @@ Contracts: `<shared contract name>`, ... (or none)
 - ADRs: <each ADR to write, as an ADR-FORMAT.md draft>, or "none"
 
 ```
+
+A `Consumes:` declaration needs a `Consumption test:` JSON line per source:
+`{source,test,output,input}`: exact reference, named test case, producer shape or
+producer golden fixture, and consumer public input. Gate completeness enforces it.

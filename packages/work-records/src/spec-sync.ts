@@ -39,11 +39,21 @@ const markdown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fen
 const azure = (repository: string) => repository.split('/').length !== 2;
 const toMarkdown = (text: string, repository: string) =>
     azure(repository) && /<\/?[a-z][^>]*>/i.test(text) ? markdown.turndown(text) : text;
+const normalizeRequest = (text: string) =>
+    text
+        .replace(/<!-- lar-factory:create [^\n]*? -->/g, '')
+        .replace(/[ \t]+$/gm, '')
+        .trimEnd();
 const checkpoint = (ticket: StructureTicket): SpecRemote => ({
     body: ticket.body,
     title: ticket.title ?? '',
     version: ticket.version,
-    digest: sha(JSON.stringify([withoutSpecFreshness(stripTrackerStructure(ticket.body)), ticket.title ?? ''])),
+    digest: sha(
+        JSON.stringify([
+            normalizeRequest(withoutSpecFreshness(stripTrackerStructure(ticket.body))),
+            ticket.title ?? '',
+        ]),
+    ),
     editorWrite: ticket.editorWrite,
     titleEditorWrite: ticket.titleEditorWrite,
 });
@@ -51,11 +61,7 @@ const changed = (repository: string, base: SpecRemote, remote: SpecRemote) =>
     azure(repository) ? remote.version !== base.version : remote.digest !== base.digest;
 
 function content(ticket: Pick<StructureTicket, 'body'>) {
-    return readTicketSpec(
-        stripTrackerStructure(ticket.body)
-            .replace(/<!-- lar-factory:create [^\n]*? -->/g, '')
-            .trimEnd(),
-    );
+    return readTicketSpec(normalizeRequest(stripTrackerStructure(ticket.body)));
 }
 
 function outgoing(ticket: StructureTicket, spec: string, savedOriginal?: string): string {
@@ -179,7 +185,7 @@ async function readFresh(
                 return ticket;
             }
 
-            const bodyChanged = startingContext !== records.initialContext(workId);
+            const bodyChanged = normalizeRequest(startingContext) !== normalizeRequest(records.initialContext(workId));
             const titleChanged = remote.title !== record.title;
 
             if (
@@ -671,8 +677,21 @@ export function activeSpecState(records: WorkRecords, workId: string, options: S
 
 /** A successful local conversion already wrote a gated Spec through the shared create machinery. */
 export function rememberCreatedSpec(records: WorkRecords, workId: string, ticket: StructureTicket): void {
+    if (typeof ticket.body !== 'string' || typeof ticket.title !== 'string') return;
+
     const state = records.specState(workId);
     const parsed = content(ticket);
+
+    if (!parsed.marked) {
+        // Trust only our exact write; a create response with different content is not authorization.
+        if (
+            normalizeRequest(parsed.spec) === normalizeRequest(records.initialContext(workId)) &&
+            ticket.title === records.read(workId).title
+        )
+            save(records, workId, { ...state, base: checkpoint(ticket), startingContext: parsed.spec });
+
+        return;
+    }
 
     if (parsed.marked)
         save(records, workId, {

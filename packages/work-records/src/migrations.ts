@@ -633,4 +633,5 @@ export const MIGRATIONS: readonly Migration[] = [
             }
         }
     },
+    (db) => db.exec('ALTER TABLE review_axes ADD COLUMN consumption TEXT'),
 ];

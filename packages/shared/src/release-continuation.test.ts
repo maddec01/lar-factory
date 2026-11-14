@@ -3,7 +3,7 @@ import { expect, test } from 'vite-plus/test';
 import { deskWait, questionWaitReason } from './desk-wait.ts';
 import { humanWait } from './human-wait.ts';
 import type { Item } from './item-domain.ts';
-import { releaseApprovalStep } from './release-continuation.ts';
+import { releaseApprovalStep, releaseRecoveryAvailable } from './release-continuation.ts';
 
 const parent = (done: boolean) =>
     ({
@@ -89,3 +89,14 @@ test.each([false, true])(
         expect(deskWait(item, false, parts).action?.label).toBe(done ? 'Resume release' : 'Mark release step done');
     },
 );
+
+test('failed Outcome cannot offer Resume release as an ungated retry', () => {
+    const item = parent(true);
+
+    item.releasePlan!.steps = [];
+    item.releasePlan!.outcomeCheck.result = 'failed';
+    item.releaseContinuation = { ready: false, digest: 'failed', run: null };
+    expect(
+        releaseRecoveryAvailable(item, [{ id: 'C', parentId: item.id, kind: 'build', status: 'Done' } as Item]),
+    ).toBe(false);
+});

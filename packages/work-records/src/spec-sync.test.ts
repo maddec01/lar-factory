@@ -637,9 +637,19 @@ test('a changed brief marks the retained approved ticket Spec out of date, then 
 test('S05-F2-002: generated dependency status supersedes legacy prose without changing brief or approval', async () => {
     const f = await fixture();
     const id = f.record.workId;
-    const { brief, briefDigest } = JSON.parse(
+    const savedFixture = JSON.parse(
         readFileSync(new URL('../../shared/test/s05-consumer-brief.json', import.meta.url), 'utf8'),
     ) as { brief: string; briefDigest: string };
+    const brief =
+        savedFixture.brief +
+        '\nConsumption test: ' +
+        JSON.stringify({
+            source: 'Produce the v1 greeting fixture',
+            test: 'test/sim-891/consumer.test.mjs: feeds numeric v1 envelope into consumer',
+            output: '{version:1,message:string}',
+            input: 'consume(envelope)',
+        }) +
+        '\n';
     const db = new DatabaseSync(f.path);
 
     db.prepare("UPDATE bodies SET markdown=? WHERE work_id=? AND body='brief'").run(brief, id);
@@ -662,7 +672,7 @@ test('S05-F2-002: generated dependency status supersedes legacy prose without ch
 
     const before = f.records.gate(id);
 
-    expect(before.briefDigest).toBe(briefDigest);
+    expect(before.briefDigest).not.toBe(savedFixture.briefDigest);
 
     const approval = f.records.displayGate(id).approvalDigest;
 

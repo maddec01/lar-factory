@@ -29,6 +29,7 @@ import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
 import { sampleDelivery } from './sample-delivery.ts';
 import { sampleGrowingConcept } from './sample-growing-concept.ts';
+import { sampleOutcome } from './sample-outcome.ts';
 import { sampleRetro } from './sample-retro.ts';
 import { sampleReviewControls } from './sample-review-controls.ts';
 import { sampleRuntimeBatch } from './sample-runtime-batch.ts';
@@ -51,6 +52,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const vocabulary = sampleVocabulary(tracker);
     let tickets: Item[] = [];
     const reviewControls = sampleReviewControls(records);
+    const failedOutcome = sampleOutcome(records);
     const verification = sampleVerification(
         records,
         () => tickets,
@@ -255,6 +257,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             );
         },
         sampleControl: async (input: Record<string, unknown>) => {
+            if (input.action === 'failed-outcome') {
+                const workId = failedOutcome(repos()[0]!.repo);
+
+                reread();
+
+                return { status: 200, body: { workId, error: null } };
+            }
+
             if (input.action === 'shaping-runtime') {
                 const ids = shapingRuntime(repos()[0]!.repo);
 

@@ -1,8 +1,11 @@
+import { consumptionTests } from './consumption-tests.ts';
 import { WorkRecordError } from './database.ts';
 
 /** Presence is mechanical; Doubt still judges whether the claims are true and sufficient. */
 export function requireCompleteBrief(kind: string, brief: string): void {
     if (['concept', 'decision', 'slice'].includes(kind)) return;
+
+    consumptionTests(brief);
 
     const sections = new Map<string, string[]>();
     let heading = '';

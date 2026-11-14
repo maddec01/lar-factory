@@ -105,7 +105,7 @@ test('S06: only cited answers and named sibling contracts invalidate approval', 
     const b = part('b02 producer', 'Contracts: `greeting-v1`\n## Done when\nProduce v1.\n## Notes\nUse sample.');
     const consumer = part(
         'b09 proof',
-        `Answers: \`${d.workId}\`\nConsumes: \`${b.workId}\`\nContracts: \`greeting-v1\`\nProve v1.`,
+        `Answers: \`${d.workId}\`\nConsumes: \`${b.workId}\`\nContracts: \`greeting-v1\`\nProve v1.\nConsumption test: ${JSON.stringify({ source: b.workId, test: 'test/proof.test.ts: feeds envelope into proof', output: 'greeting-v1 envelope', input: 'prove(envelope)' })}`,
     );
 
     approve(consumer.workId);

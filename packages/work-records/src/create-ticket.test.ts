@@ -1,5 +1,5 @@
 import type { RepoConfig, TicketCreationOptions, TrackerLabels } from '@lar-factory/shared';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vite-plus/test';
 import { createAgentTicket } from './agent-tracker-writes.ts';
 import { agentWrites } from './agent-writes.ts';
 import { captureWork, createRecordTicket, recordTicketPreview } from './create-ticket.ts';
+import { refreshSpecs } from './spec-sync.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
@@ -709,3 +710,33 @@ test.each([false, true])(
         }
     },
 );
+
+test('S05-F4-003 the board’s exact freshly created Feature is not an unknown-provenance edit', async () => {
+    const { records, deps, repo, writes } = await setup();
+    const description = readFileSync(new URL('../test/briefs/s05-final4-description.txt', import.meta.url), 'utf8');
+    const result = await captureWork(
+        {
+            requestId: SECOND,
+            draft: { repo: REPO, kind: 'feature', title: 'Linked greeting', description, createIssue: true },
+        },
+        deps,
+    );
+
+    expect(result.status).toBe(200);
+
+    const id = result.body.record!.workId;
+    const created = writes.at(-1)!;
+    const remote = { repository: REPO, number: 13, title: 'Linked greeting', body: String(created[2]), version: '1' };
+    const provider = { ...deps.provider, readSpec: async () => remote };
+
+    for (const body of [remote.body, remote.body.replace(/<!-- lar-factory:create [^\n]* -->/g, '').trimEnd() + '\n']) {
+        remote.body = body;
+        await refreshSpecs(records, { workId: id, provider, setups: [repo.setup!] });
+        expect(records.specState(id).held).toBeNull();
+        expect(records.specState(id).warning).toBeNull();
+    }
+    remote.body += '\nExternal scope change';
+    await refreshSpecs(records, { workId: id, provider, setups: [repo.setup!] });
+    expect(records.specState(id).held).not.toBeNull();
+    expect(records.initialContext(id)).toBe(description.trim());
+});

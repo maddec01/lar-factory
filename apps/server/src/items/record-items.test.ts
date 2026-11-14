@@ -1555,7 +1555,7 @@ test('stale approval names the changed cited answer, contract or brief', async (
     const build = part(
         'A2',
         'build',
-        `${completeBrief('Trim labels.')}\nConsumes: \`${contract}\`\nChosen answer: ${decision}`,
+        `${completeBrief('Trim labels.')}\nConsumes: \`${contract}\`\nChosen answer: ${decision}\nConsumption test: ${JSON.stringify({ source: contract, test: 'test/labels.test.ts: feeds greeting into label', output: 'greeting string', input: 'label(greeting)' })}`,
     );
     const write = (id: string, body: 'brief' | 'answer', text: string) => records.setBody(id, revision(id), body, text);
     const approve = () => {

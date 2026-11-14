@@ -123,10 +123,15 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
             try {
                 result = records.finishRoleRun(workId, revision(), finish);
             } catch (error) {
-                return hold(finish.failure ?? (error as Error).message);
+                throw new Error(
+                    `Agent hold: ${(error as Error).message} Retry role-finish with the matching terminal T3 result.`,
+                );
             }
 
-            if (finish.failure) return hold(finish.failure);
+            if (finish.failure)
+                throw new Error(
+                    `Agent hold: ${finish.failure} Resolve the role evidence and retry; do not ask Pedro to repair bookkeeping.`,
+                );
 
             await refreshBoards(workId, values['data-dir']);
             process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

@@ -6,10 +6,31 @@ import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
 
+/** Closure alone is insufficient: evidence must be available for Pedro to inspect and accept. */
+export const dependencyProofs = (item: Item) =>
+    item.status === 'Done' || item.setAside
+        ? []
+        : (item.blockers ?? []).flatMap((blocker) => {
+              const d = blocker.dependency;
+
+              return d &&
+                  !d.met &&
+                  d.evidence.trim() &&
+                  ((!d.ticket && !d.named.length) || ['closed', 'merged'].includes(d.observation?.kind ?? ''))
+                  ? [d]
+                  : [];
+          });
+
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
     if (item.ticketEditHeld)
         return { label: 'Ticket edit', action: { kind: 'details' as const, label: 'Review ticket edit' } };
+
+    if (dependencyProofs(item).length)
+        return {
+            label: 'Accept dependency proof',
+            action: { kind: 'details' as const, label: 'Accept dependency proof' },
+        };
 
     if (outcomeNeedsPedro(item, all))
         return { label: 'Outcome check', action: { kind: 'details' as const, label: 'Record Outcome' } };

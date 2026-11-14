@@ -1,6 +1,6 @@
 # Checks
 
-Input: recorded PR and approver recommendation. Output: current-head required
+Input: recorded PR and approved brief. Output: current-head required
 check results and handback Status, or a saved failure and retry count.
 
 Call `watch_pull_request` on the PR; T3 wakes you when checks finish, someone
@@ -11,7 +11,7 @@ with `configuration.isBlocking` true is a required check whose `status` is
 `approved` or `notApplicable` when green, `rejected` when failed, and `queued`
 or `running` while it runs. Then:
 
-- **Required checks green**: after failed Verify, return to **Verify** on this PR; only Pedro records the head-bound pass in the board. Status writes cannot replace it. Run `status.sh` now to set **Verify** or **Ready to merge** as recommended,
+- **Required checks green**: after failed Verify, return to **Verify** on this PR; only Pedro records the head-bound pass in the board. Status writes cannot replace it. Run `status.sh` now to set **Verify** or **Ready to merge** per the approved brief's Verify decision, never a recommendation. Change it only by amending through Doubt and a board gate,
   `unwatch_pull_request`, end the turn. The board resumes this thread for
   [Retro](retro.md) only after the delivery PR is confirmed merged and the record is **Done**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
@@ -21,7 +21,7 @@ or `running` while it runs. Then:
   tree before handback. It records its own reuse reasons or reruns only checks
   it cannot justify, without restarting reviews or repeating unaffected checks.
   Then have the CI fixer update the PR's Checks section from the record and
-  use the updated status recommendation. Then restart **Checks**.
+  retain the approved Verify decision. Then restart **Checks**.
 - **Anything else** (checks running, a comment or review, a non-required check
   failing, a run cancelled by a newer run on the same head):
   end your turn only while required checks are pending. Non-required checks never block the status or start a fix.

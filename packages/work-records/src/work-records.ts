@@ -73,6 +73,7 @@ import type { StructureTicket } from './tracker-sync.ts';
 import { userWaitRecords, type UserWaitRecords } from './user-wait.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
 import { verificationRecords, type VerificationRecords } from './verification-records.ts';
+import { briefVerify } from './verify-requirement.ts';
 
 export type { BuildInput, BuildPreparation } from './prepare-build.ts';
 export type { NewPart } from './create-part.ts';
@@ -1615,15 +1616,26 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 const moved = nextStatus ?? row.status;
 
-                if (moved === 'Ready to merge') {
+                const verify = ['Verify', 'Ready to merge'].includes(moved) ? briefVerify(database, workId) : null;
+
+                if (verify && (!verify.approved || !gates.gate(workId).current))
+                    throw invalid('A changed Verify decision needs Doubt and an approved brief gate.');
+
+                if (moved === 'Verify' && verify?.required === false)
+                    throw invalid(
+                        'The approved brief says Verify: no. Recommendations are notes; amend through Doubt and a gate to change it.',
+                    );
+
+                if (moved === 'Ready to merge' && verify?.required !== false) {
                     const evidence = db
-                        .prepare('SELECT head, latest, invalidated FROM verification WHERE work_id=?')
+                        .prepare('SELECT head, latest, invalidated FROM verification WHERE work_id=? AND required=1')
                         .get(workId);
                     const latest = evidence?.latest ? JSON.parse(String(evidence.latest)) : null;
 
                     if (
-                        evidence &&
-                        (evidence.invalidated ||
+                        (evidence || verify?.required) &&
+                        (!evidence ||
+                            evidence.invalidated ||
                             !evidence.head ||
                             latest?.head !== evidence.head ||
                             latest?.pr !== row.pull_request ||
@@ -1986,7 +1998,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 return {
                     pull_request: reference,
                     ...(row.status === 'Ready to merge' &&
-                    db.prepare('SELECT 1 FROM verification WHERE work_id=?').get(workId)
+                    db.prepare('SELECT 1 FROM verification WHERE work_id=? AND required=1').get(workId)
                         ? { status: 'Verify' as const }
                         : {}),
                 };

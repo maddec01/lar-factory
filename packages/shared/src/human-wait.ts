@@ -1,4 +1,4 @@
-import { deskWait } from './desk-wait.ts';
+import { dependencyProofs, deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
 import { prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
@@ -9,7 +9,7 @@ import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-dom
 
 /** The same human wait determines desk placement and group attention. */
 export function humanWait(item: Item, unavailable = false, all: readonly Item[] = []) {
-    if (item.ticketEditHeld) return deskWait(item, unavailable, all);
+    if (item.ticketEditHeld || dependencyProofs(item).length) return deskWait(item, unavailable, all);
 
     const parent = all.find((candidate) => candidate.id === item.parentId);
     const question = openQuestionThread(item);

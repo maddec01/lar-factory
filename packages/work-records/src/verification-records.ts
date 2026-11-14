@@ -36,7 +36,7 @@ export function verificationRecords(database: Database, read: (id: string) => Wo
         const row = db.prepare('SELECT * FROM verification WHERE work_id=?').get(id);
 
         return {
-            required: !!row,
+            required: !!row?.required,
             invalidated: !!row?.invalidated,
             head: (row?.head as string | null) ?? null,
             latest: row?.latest ? JSON.parse(String(row.latest)) : null,

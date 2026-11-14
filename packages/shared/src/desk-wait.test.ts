@@ -219,3 +219,44 @@ test('an unrelated T3 question remains actionable while a revised brief waits fo
     expect(placementOf(work, { unavailable: false, all: [work] }).sections).toContain('desk');
     expect(nextAction(work)).toMatchObject({ label: 'Answer in T3', threadId: 'build' });
 });
+
+test('S05 dependency acceptance waits require proof and delivery, and vanish when proof is rejected', () => {
+    const dependency = {
+        dependencyId: 'proof',
+        revision: 11,
+        owner: 'external team',
+        need: 'Numeric v1 greeting proof',
+        ticket: 'fake/c#18',
+        named: [],
+        evidence: 'Inspected exact fixture and predicate.',
+        met: null,
+        needsReview: false,
+        observation: {
+            subject: 'fake/c#18',
+            kind: 'closed' as const,
+            detail: null,
+            observedAt: '2026-11-14T12:26:41.137Z',
+            lastGood: null,
+        },
+    };
+    const work = item({
+        status: 'Ready',
+        linkedPrs: [],
+        blockers: [{ number: 18, repo: 'fake/c', state: 'open', dependency }],
+    });
+
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).toContain('desk');
+    expect(deskWait(work)).toEqual({
+        label: 'Accept dependency proof',
+        action: { kind: 'details', label: 'Accept dependency proof' },
+    });
+    for (const change of [
+        { evidence: '' },
+        { met: { by: 'Pedro', at: 'now' } },
+        { observation: { ...dependency.observation, kind: 'reopened' as const } },
+    ]) {
+        const cleared = { ...work, blockers: [{ ...work.blockers[0]!, dependency: { ...dependency, ...change } }] };
+
+        expect(placementOf(cleared, { all: [cleared], unavailable: false }).sections).not.toContain('desk');
+    }
+});

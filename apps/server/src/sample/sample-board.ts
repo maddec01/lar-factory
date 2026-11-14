@@ -149,6 +149,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             send: verification.dependencies.send,
         },
         outcomeDeps: { send: verification.dependencies.send },
+        readRoleProjection: async (id) => ({ thread: { id }, subagents: [], runs: [] }),
         releaseDeps: {
             send: verification.dependencies.send,
             readProjection: async (id) => ({ thread: { id }, runtimeRequests: [], turnItems: [], runs: [] }),

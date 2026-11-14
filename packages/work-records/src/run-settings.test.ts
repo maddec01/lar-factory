@@ -401,3 +401,43 @@ it('S08 F06: reconciliation terminates an unbound launch after its owner ends, p
     records.reconcileRoleRuns(workId, { ownerEnded: true });
     expect(revision()).toBe(before);
 });
+
+it('S05 F3: only the matching terminal T3 result can replace inferred abandonment, once', async () => {
+    const { records, workId, revision } = await fixture();
+    const snapshot = records.snapshotRun(workId, revision(), input());
+
+    records.startRoleRun(workId, revision(), { runId: snapshot.runId, executionId: 'approver', role: 'approver' });
+    records.reconcileRoleRuns(workId, { ownerEnded: true });
+
+    const finish: RoleRunFinish = {
+        executionId: 'approver',
+        result: 'completed',
+        summary: 'PR delivered',
+        report: {
+            source: 't3',
+            reference: 'node:delegated-task:command%3Amcp%3Afixture%3Adelegate-task%3Aapprover',
+            actual: snapshot.roles.approver,
+        },
+    };
+
+    expect(() =>
+        records.finishRoleRun(workId, revision(), { ...finish, report: { ...finish.report!, reference: 'unrelated' } }),
+    ).toThrow('immutable');
+    expect(() => records.finishRoleRun(workId, revision(), finish)).not.toThrow();
+    expect(records.runSettings(workId).roleRuns[0]).toMatchObject({
+        result: 'completed',
+        failure: null,
+        summary: 'PR delivered',
+    });
+    expect(() => records.finishRoleRun(workId, revision(), { ...finish, summary: 'Changed real result' })).toThrow(
+        'immutable',
+    );
+    expect(() =>
+        records.waitForUser(
+            workId,
+            revision(),
+            'role-finish cannot save a completed role execution: bookkeeping conflict',
+        ),
+    ).toThrow(/agent|system|technical/i);
+    expect(records.read(workId).needsYou).toBeNull();
+});

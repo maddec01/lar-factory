@@ -5,6 +5,16 @@ import type { WorkRecords } from './work-records.ts';
 
 /** Product questions belong on the desk; delivery ordering belongs in the blocker graph. */
 export function requireProductQuestion(records: WorkRecords, workId: string, reason: string): void {
+    if (
+        /role-finish|completed role execution is immutable|abandoned execution|bookkeeping|reconciliation.*(?:failed|failure|conflict)/i.test(
+            reason,
+        )
+    )
+        throw new WorkRecordError(
+            'invalid',
+            'Technical role bookkeeping is an agent/system hold. Resolve its execution evidence; do not set Needs you.',
+        );
+
     const plan = records.releasePlan(workId);
     const pedroSteps = plan?.steps.filter((step) => step.who.trim().toLowerCase() === 'pedro');
     const represented = pedroSteps?.find((step) => !step.done) ?? pedroSteps?.at(-1);

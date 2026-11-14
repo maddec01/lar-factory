@@ -160,7 +160,7 @@ Approval waits derive from current Doubt and gate records, never notice wording.
 The item also stays in its group or ordinary stage section. A card names the item,
 its Project and its concept or parent when present. It says what is needed and
 offers an action that works from the desk: Answer in T3, Approve brief,
-Verify, Merge PR, Choose follow-ups, Recheck access or Start again. Answer opens the exact unresolved
+Verify, Merge PR, Accept dependency proof, Choose follow-ups, Recheck access or Start again. Dependency acceptance names the waiting build, owner and need, and opens its existing Mark met control. It clears when met or the pending proof is withdrawn/rejected; closure alone is not acceptance. Answer opens the exact unresolved
 question. Merge uses the same guarded merge action as item details.
 
 Questions and tool approvals are answered in T3, through the exact owner thread
@@ -919,11 +919,11 @@ fixes and out-of-scope work. It closes only its own ticket when applicable,
 never the concept parent. It records `pullRequest` with `set-pr` immediately
 and links the PR to the thread. Ticketless builds can deliver PRs.
 
-The approver recommends Verify for visible changes, the brief's Verify request,
-auth, permissions, migrations, deployment, unchecked areas, open findings or
-failures, or unreviewed blocker/should fixes. Otherwise it recommends Ready to
-merge. Verify includes numbered Test steps with observable results. A configured
-skipped review is disclosed; its absence alone does not force Verify.
+The approved brief's Verify decision determines the handback. Verify: yes includes
+numbered Test steps with observable results; Verify: no goes to Ready to merge.
+An approver may note another recommended check, but it never adds a human wait.
+Changing Verify requires a brief amendment through Doubt and a board gate.
+Skipped reviews, unchecked areas and findings are disclosed without overriding it.
 
 A conflict or failing check returns to fixer and reassessment. After two failed
 restarts, or a delivery rule/access refusal only Pedro can resolve, the item
@@ -935,7 +935,7 @@ run; approval here is an agent assessment, not Pedro's gate approval or merge.
 
 Phase `checks` watches the PR and reads required checks on its current head.
 While they run, the board says Waiting for required checks without a desk card.
-Green required checks apply the approver's recommendation. Non-required failures
+Green required checks apply the approved brief's Verify decision. Non-required failures
 do not start a fixer or block that transition.
 The builder writes Verify or Ready to merge before ending its turn when checks
 are green, including after a CI fix. Finished runs clear their tool activity;
@@ -1153,3 +1153,10 @@ Today: `docs/plan.md` still describes structural tracker publication and recover
 The README and current `sync-structure` command suspend those writes. This target
 keeps structure local; it does not restore publication or invent sharing. Ticket
 creation and approved ordinary build Specs remain separate supported writes.
+
+Role reconciliation reads the matching child's terminal T3 result before inferring
+abandonment. Successful results retain report, actual settings and summary even
+when the owner continuation starts before the next board read. An inferred
+abandonment can be replaced once by that attempt's real terminal result; genuine
+finished results stay immutable. Missing/conflicting bookkeeping evidence is an
+agent/system hold with a retry reason, never Needs you for Pedro.

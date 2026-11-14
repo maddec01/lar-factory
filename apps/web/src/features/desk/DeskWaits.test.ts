@@ -339,3 +339,53 @@ test.each(['concept', 'linked'])('%s batch has one Approve card naming parent an
 
     expect(useItemDialogStore.getState().itemId).toBe(parent.id);
 });
+
+test('S05 F3: Accept dependency proof names the dependency and waiting build, opens Mark met, and clears on acceptance or rejection', async () => {
+    const dependency = {
+        dependencyId: 'external-proof',
+        revision: 11,
+        owner: 'sandbox external team',
+        need: 'Numeric v1 greeting proof',
+        ticket: 'fake/c#18',
+        named: [],
+        evidence: 'Inspected v1 artifact; numeric version and two-field schema passed.',
+        met: null,
+        needsReview: false,
+        observation: {
+            subject: 'fake/c#18',
+            kind: 'closed' as const,
+            detail: null,
+            observedAt: '2026-11-14T12:26:41.137Z',
+            lastGood: null,
+        },
+    };
+    const blocker = { number: 18, repo: 'fake/c', state: 'open' as const, title: 'External v1 proof', dependency };
+    const data = board({ status: 'Ready', title: 'Consume the v1 greeting', threads: [], blockers: [blocker] });
+
+    await mountPage(data);
+    expect(text(card())).toContain('Accept dependency proof');
+    expect(text(card())).toContain('sandbox external team');
+    expect(text(card())).toContain('Numeric v1 greeting proof');
+    expect(text(card())).toContain('Consume the v1 greeting');
+
+    const accept = [...card().querySelectorAll('button')].find((button) => text(button) === 'Accept dependency proof')!;
+
+    expect(accept).toBeDefined();
+    await settle(() => accept.click());
+    expect(text($('[data-item-dialog]'))).toContain('Mark met');
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    for (const change of [{ met: { by: 'Pedro', at: '2026-11-14T12:26:41.137Z' } }, { evidence: '' }]) {
+        await settle(() =>
+            useBoardStore.getState().receive({
+                ...data,
+                items: data.items.map((item) => ({
+                    ...item,
+                    blockers: [{ ...blocker, dependency: { ...dependency, ...change } }],
+                })),
+            }),
+        );
+        expect($('.desk-card')).toBeNull();
+    }
+});

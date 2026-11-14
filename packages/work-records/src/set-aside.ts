@@ -1,6 +1,8 @@
 import { validateBlockers } from './blocker-graph.ts';
 import { WorkRecordError, type Database } from './database.ts';
+import type { DecisionAnswers } from './decision-answers.ts';
 import { expectRevision } from './record-revision.ts';
+import { assertRetirementAllowed } from './retirement.ts';
 import type { WorkRecord } from './work-records.ts';
 
 export type DependentResolution = {
@@ -14,7 +16,11 @@ export interface SetAsideRecords {
 }
 
 /** Reviews every incoming edge and commits its disposition with the retirement. */
-export function setAsideRecords(database: Database, read: (id: string) => WorkRecord): SetAsideRecords {
+export function setAsideRecords(
+    database: Database,
+    read: (id: string) => WorkRecord,
+    answers: DecisionAnswers,
+): SetAsideRecords {
     const { db } = database;
 
     return {
@@ -26,6 +32,8 @@ export function setAsideRecords(database: Database, read: (id: string) => WorkRe
 
                 if (record.setAside)
                     throw new WorkRecordError('invalid', `The work record ${workId} is already set aside.`);
+
+                assertRetirementAllowed(database, record, answers);
 
                 if (!Array.isArray(resolutions))
                     throw new WorkRecordError('invalid', 'Dependent resolutions must be a list.');

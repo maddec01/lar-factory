@@ -1,6 +1,7 @@
 import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
 import { createHash } from 'node:crypto';
 
+import { staleAnswerQuotes } from './answer-quotes.ts';
 import { groupMembers } from './blocker-declarations.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import { expectRevision } from './record-revision.ts';
@@ -24,7 +25,6 @@ function sources(records: WorkRecords, groupId: string, ownerId: string): Source
                     .blockers(r.workId)
                     .map((b) => b.workId)
                     .sort(),
-                status: r.kind === 'decision' || r.workId === groupId ? undefined : r.status,
                 answer:
                     r.kind === 'decision' && r.workId !== ownerId
                         ? (records.decisionAnswer(r.workId).current?.text ??
@@ -70,8 +70,11 @@ export function groupProjectionRecords(database: Database, get: () => WorkRecord
         mapHistory: (id: string) =>
             database.read(() =>
                 database.db
-                    .prepare('SELECT written,markdown,recorded_at FROM map_history WHERE work_id=? ORDER BY written')
-                    .all(id)
+                    .prepare(`SELECT written,markdown,recorded_at FROM map_history WHERE work_id=?
+                     UNION ALL SELECT b.written,b.markdown,r.updated_at AS recorded_at
+                     FROM bodies b JOIN work_records r USING(work_id) WHERE b.work_id=? AND b.body='map'
+                     ORDER BY written`)
+                    .all(id, id)
                     .map((row) => ({
                         written: Number(row.written),
                         text: String(row.markdown),
@@ -118,6 +121,12 @@ export function groupProjectionRecords(database: Database, get: () => WorkRecord
 
                 if (!input || typeof input.answers !== 'object' || !input.answers || Array.isArray(input.answers))
                     throw new WorkRecordError('invalid', 'Supply current answers and optional map.');
+
+                if (staleAnswerQuotes(records, groupId, input.answers).length)
+                    throw new WorkRecordError(
+                        'invalid',
+                        'Answer quote no longer appears in the current brief; repair current answers before refreshing projections.',
+                    );
 
                 for (const [id, answer] of Object.entries(input.answers)) {
                     if (

@@ -122,7 +122,7 @@ it('proposes same-file ordering across concepts and standalone work, and require
     expect(records.currentDoubt(api.workId)?.identity).toBe('Doubt');
 });
 
-it('invalidates Doubt and an earlier gate after a sibling contract changes, preserving the approved Spec', async () => {
+it('invalidates Doubt and an earlier gate after a cited sibling contract changes, preserving the approved Spec', async () => {
     const { records, concept, api, client } = await fixture();
     const dependency = records.addDependency(concept.workId, {
         need: 'CORS',
@@ -143,12 +143,19 @@ it('invalidates Doubt and an earlier gate after a sibling contract changes, pres
     work = records.attachTicket(api.workId, work.revision, 'fake/api#12');
 
     // Ticket attachment is not brief content; refresh the review before the gate.
+    records.setBody(
+        api.workId,
+        records.read(api.workId).revision,
+        'brief',
+        `${records.body(api.workId, 'brief')}\nConsumes: \`${client.workId}\``,
+    );
+
     const reviewed = records.doubtPackage(api.workId);
 
     records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Compatible.', [
         { otherWorkId: client.workId, reason: 'Independent additive behavior.' },
     ]);
-    records.recordGate(api.workId, work.revision, {
+    records.recordGate(api.workId, records.read(api.workId).revision, {
         briefDigest: records.gate(api.workId).briefDigest!,
         approvedBy: 'Pedro',
         evidence: 'Yes',

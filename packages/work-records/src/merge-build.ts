@@ -1,6 +1,8 @@
 import { validateBlockers } from './blocker-graph.ts';
 import { WorkRecordError, type Database } from './database.ts';
+import type { DecisionAnswers } from './decision-answers.ts';
 import { expectRevision } from './record-revision.ts';
+import { assertRetirementAllowed } from './retirement.ts';
 import type { Body, WorkRecord } from './work-records.ts';
 
 interface BuildMerge {
@@ -20,7 +22,7 @@ interface Storage {
 }
 
 /** Contract two proposed builds atomically, preserving both records and their tickets. */
-export function mergeBuildRecords(database: Database, storage: Storage): MergeBuildRecords {
+export function mergeBuildRecords(database: Database, storage: Storage, answers: DecisionAnswers): MergeBuildRecords {
     const { db } = database;
     const refuse = (message: string): never => {
         throw new WorkRecordError('invalid', message);
@@ -37,6 +39,8 @@ export function mergeBuildRecords(database: Database, storage: Storage): MergeBu
                     refuse('A merge needs into and affected-record revisions.');
 
                 const target = storage.read(input.into);
+
+                assertRetirementAllowed(database, source, answers);
 
                 if (source.workId === target.workId) refuse('A build cannot be merged into itself.');
 

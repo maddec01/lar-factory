@@ -68,17 +68,31 @@ these declarations, with `{revisions:{ID:N}}` for the group, declared records
 and all edge endpoints. It rejects stale revisions, retired prerequisites,
 cycles and redundant edges together. Missing or conflicting declarations remain holds. Normalize older free prose to declarations;
 never guess relationships or add delivery edges by hand. `reconcile` reports
-declared/stored differences as mechanical holds.
+declared/stored differences as mechanical holds. Brief `Contracts:` names shared
+contracts, `Produces:` identifies their producer, and `Consumes:` names work titles
+or IDs. Delivery-section citations and map Parts references also identify consumed
+outputs. Shared labels without an identified producer remain unresolved contract-source
+holds. `sync-blockers` derives consumer→producer prerequisites, retaining a transitive
+path instead of redundant edges. A consuming brief may record
+``No ordering needed: `reference`: reason`` (work title, ID or contract name).
+Overlap alone never adds an approval dependency; an actually cited contract still does.
+A part named by an unanswered decision stays a candidate with its holds; set-aside
+refuses early retirement.
 
 Current answer and map prose keeps source fingerprints. Changes to decisions,
-briefs (including Notes), membership, blockers or build stages make that prose
+briefs (including Notes), membership or blockers make that prose
 require review independently of brief approval. `refresh-projections GROUP
 --file F` saves `{revisions:{ID:N},answers:{ID:text},map?}` against every group
 revision and captures all reviewed projections together. Answer versions and
 `map-history GROUP` retain history. The command checks source freshness; the
-owner still checks semantic agreement. A map write settles incorporated decisions
+owner still checks semantic agreement. Exact quotes in current answers are checked
+against their referenced parts' current briefs, including Notes; a stale quote
+holds reconciliation and rejects projection refresh atomically. Historical text stays. A map write settles incorporated decisions
 immediately. Editing a delivery draft moves it to Shaping until its new gate;
-it cannot be silently requeued after an approved draft changes.
+it cannot be silently requeued after an approved draft changes. Map reads replace
+legacy Parts prose with record-derived status, gate, Spec state and phase; agents
+write narrative and destination only. Map history retains original prose. Work-order
+labels absorbed builds Merged into the survivor and distinguishes ordinary Set aside.
 
 Records hold product content. Launch/handoff environment and frozen model/role
 contracts stay in thread prompts and run-settings records. All body writes,
@@ -128,7 +142,8 @@ separately, a generated Work map, buildable order and all wait reasons. Each par
 shows whether it is queued. A completed part stays available in its group's
 history.
 
-Your desk lists everything waiting on Pedro, of any Kind and at any stage.
+Your desk lists everything waiting on Pedro, of any Kind and at any stage, including
+held ticket edits requiring the board's Accept edit or Keep current action.
 A pending group brief batch has one Approve briefs card naming the parent and its
 members, rather than separate member approval cards. Current Doubt and missing or
 invalid gates determine that batch, whether the approval notice is on the parent

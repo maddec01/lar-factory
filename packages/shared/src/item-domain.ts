@@ -315,6 +315,7 @@ export interface Item {
     completion?: { complete: boolean; reasons: string[] };
     conceptBuild?: ConceptBuildPlan;
     refinement?: { complete: boolean; reasons: string[] };
+    ticketEditHeld?: true;
     specSync?: { pending: boolean; error: string | null; warning: string | null };
     sync?: { state: 'saved' | 'pending' | 'error' | 'conflict'; message?: string };
     /** Public tracker structure, also present before this machine queues the issue. */

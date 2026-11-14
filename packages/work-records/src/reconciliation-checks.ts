@@ -1,7 +1,9 @@
 import { readTicketSpec } from '@lar-factory/shared';
 import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
 
+import { staleAnswerQuotes } from './answer-quotes.ts';
 import { blockerDeclarations, missingBlockerDeclarations } from './blocker-declarations.ts';
+import { blockerPath, groupContractReferences } from './contract-references.ts';
 import { fogChecks } from './fog-checks.ts';
 import { projectionChecks } from './group-projections.ts';
 import type { WorkRecord, WorkRecords } from './work-records.ts';
@@ -18,6 +20,35 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
             .filter((r) => r.kind !== 'slice')
             .flatMap((r) => [r, ...all(r.workId)]);
     const members = all(groupId);
+
+    const contracts = groupContractReferences(records, [records.read(groupId), ...members]);
+
+    for (const ref of contracts.unresolved)
+        add(
+            'blocker',
+            `contract-source:${ref.workId}:${ref.contract}`,
+            ref.workId,
+            `Unresolved contract source for ${ref.contract}; declare Produces on its producer or No ordering needed with a reason on the consuming brief.`,
+            ref.candidates,
+        );
+    for (const [workId, refs] of contracts.references)
+        for (const producer of refs)
+            if (!blockerPath(records, workId, producer))
+                add(
+                    'blocker',
+                    `contract-blocker:${workId}:${producer}`,
+                    workId,
+                    `Consumer cites ${records.read(producer).title}'s output without a blocker; run sync-blockers or record No ordering needed with a reason.`,
+                    [producer],
+                );
+    for (const quote of staleAnswerQuotes(records, groupId))
+        add(
+            'map',
+            `answer-quote:${quote.workId}:${quote.partId}`,
+            quote.workId,
+            `Current answer quote no longer appears in ${records.read(quote.partId).title}'s current brief; refresh the answer and retain history.`,
+            quote.quotes,
+        );
 
     try {
         const declarations = blockerDeclarations(records, groupId);
@@ -103,7 +134,9 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
                     );
 
                 for (const overlap of input.overlaps.filter(
-                    (o) => !o.ordered && !review?.ordering.some((o2) => o2.otherWorkId === o.otherWorkId),
+                    (o) =>
+                        !o.ordered &&
+                        (o.files.length > 0 || !review?.ordering.some((o2) => o2.otherWorkId === o.otherWorkId)),
                 )) {
                     const pair = [id, overlap.otherWorkId].sort().join(':');
 

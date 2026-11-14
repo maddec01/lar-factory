@@ -66,7 +66,10 @@ export function workOrder(records: WorkRecords, groupId: string): OrderedWork[] 
                         : [`Dependency ${wait.dependencyId}: ${wait.reasons.join(' ')}`],
                 );
 
-            if (record.setAside) waits.push('Set aside.');
+            if (record.setAside)
+                waits.push(
+                    record.supersededBy ? `Merged into ${records.read(record.supersededBy).title}.` : 'Set aside.',
+                );
             else if (!complete) {
                 if (record.needsYou) waits.push(record.needsYou);
 

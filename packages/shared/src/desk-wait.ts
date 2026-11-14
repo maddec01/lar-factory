@@ -7,6 +7,9 @@ import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread }
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    if (item.ticketEditHeld)
+        return { label: 'Ticket edit', action: { kind: 'details' as const, label: 'Review ticket edit' } };
+
     if (outcomeNeedsPedro(item, all))
         return { label: 'Outcome check', action: { kind: 'details' as const, label: 'Record Outcome' } };
 

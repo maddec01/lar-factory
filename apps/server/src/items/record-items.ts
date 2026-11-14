@@ -343,6 +343,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             ...(ticket?.tracker && { tracker: ticket.tracker }),
             ...(sync && { sync }),
             ...(disagreement && { kindDisagreement: disagreement }),
+            ...(savedSpec.held && { ticketEditHeld: true as const }),
             ...(spec &&
                 (spec.pending !== null || spec.error || spec.warning) && {
                     specSync: { pending: spec.pending !== null, error: spec.error, warning: spec.warning },

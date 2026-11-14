@@ -28,6 +28,9 @@ assert {p.name for p in stages.iterdir()} == {
 pick_up=(stages/'pick-up.md').read_text()
 assert 'Do not search for repository guidance or config files' in pick_up
 assert 'Read existing project instructions when present' not in pick_up
+doubt=(stages/'doubt.md').read_text()
+assert 'Do not search for repository guidance or config files' in doubt
+assert 'Read existing project instructions' not in doubt
 def hashes(root):
  return {p.relative_to(root): hashlib.sha256(p.read_bytes()).hexdigest()
          for p in root.rglob('*') if p.is_file()}

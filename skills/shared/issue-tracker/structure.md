@@ -16,9 +16,11 @@ Declare `Blocked by:` with backtick unique work titles or `none` in each brief.
 Keep work IDs in local map declarations. Settings supply build ticket requests.
 `lar-work sync-blockers PARENT --file F` derives the graph; F is
 `{revisions:{ID:N}}` for the parent, declared members and edge endpoints.
-Normalize legacy prose declarations first. Never add or remove delivery edges by hand.
-Cycles, retired or redundant blockers refuse the transaction. `children`,
-`blockers` and `dependents` read it. Use Dependencies for other teams.
+Declare shared contract ownership with `Produces:` and consuming work with `Consumes:`
+(backtick contract names and work titles). `Contracts:` names used contracts.
+`sync-blockers` also derives cited output prerequisites; ambiguous sources hold.
+An independent consumer records ``No ordering needed: `reference`: reason`` in its brief.
+Normalize legacy declarations; never edit delivery edges by hand. Use Dependencies for other teams.
 
 Private implementation slices use `slice.sh` without `--kind` or `--repository`;
 they stay in their build's repository and never become delivery parts.
@@ -26,7 +28,7 @@ they stay in their build's repository and never become delivery parts.
 Set aside with `lar-work set-aside ID --revision N --file F`. F lists every
 dependent `{workId,revision,action,reason}`; action is `remove`, `hold` or
 `replace` (also `blockerId,blockerRevision`). Conflicting fields abort all writes.
-Use `set-aside-history ID` for the retained reasons.
+Unanswered decisions naming the candidate prevent retirement; `set-aside-history ID` retains reasons.
 
 Merge proposed builds with `lar-work merge-build ID --revision N --file F`.
 F is `{into,revisions:{ID:N},dependencyRevisions:{ID:N}}`: read the survivor,

@@ -1,4 +1,5 @@
-// The item dialog's description edit: Edit opens it on the loaded description, Save posts the draft as Markdown to the
+// The item dialog's description edit: Edit opens it on the loaded description's prose, keeping its hidden markup (the
+// factory's structure comment) aside, and Save posts the draft as Markdown with that markup put back after it to the
 // board, which writes it to GitHub or Azure DevOps, then reads the details again and closes it; a failed save keeps the
 // draft and its error. A save whose reload fails closes it too and keeps the Markdown it wrote, which stands for the
 // description until a reload goes through, so the dialog shows it and Edit opens on it rather than on the old text, and
@@ -12,11 +13,22 @@ import { useCallback, useState } from 'react';
 import { postAction } from '@/services/board/board.service';
 import { forgetItemDetails, type ItemDetailsRead } from '@/services/items/items.hooks';
 
+/** HTML comments in a description: the factory's and a tracker's bookkeeping, which a reader never sees. */
+const HIDDEN = /<!--[\s\S]*?-->/g;
+
+/** The body without its hidden markup: what the dialog shows and edits, so a body of only markup reads as none. */
+export const proseOf = (body: string): string => body.replace(HIDDEN, '').trim();
+
+/** The body's hidden markup, one comment a line, which a save puts back after the edited prose. */
+const hiddenOf = (body: string): string => (body.match(HIDDEN) ?? []).join('\n');
+
 interface Editing {
     /** The editor's Markdown of the description it opened on; null until it reports it. */
     baseline: string | null;
     /** The Markdown as last edited; null before the first edit. */
     draft: string | null;
+    /** The body's hidden markup, which the editor leaves out and the save puts back after the prose. */
+    hidden: string;
     saving: boolean;
     error: string | null;
 }
@@ -60,7 +72,14 @@ export function useDescriptionEdit(
         saving: state?.saving ?? false,
         error: state?.error ?? null,
         saved,
-        start: () => setState({ baseline: null, draft: null, saving: false, error: null }),
+        start: () =>
+            setState({
+                baseline: null,
+                draft: null,
+                hidden: hiddenOf(saved ?? (read.state === 'loaded' ? read.details.body : '')),
+                saving: false,
+                error: null,
+            }),
         cancel: () => setState(null),
         change,
         setBaseline,
@@ -70,7 +89,7 @@ export function useDescriptionEdit(
             const { bodyField, revision } = read.details;
             const save: DescriptionSave = {
                 itemId,
-                body: state.draft,
+                body: state.hidden ? `${state.draft.trimEnd()}\n\n${state.hidden}\n` : state.draft,
                 ...(bodyField && { bodyField }),
                 ...(revision !== undefined && { revision }),
             };

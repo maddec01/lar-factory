@@ -85,12 +85,12 @@ test('row, group details and expanded build header share Auto-build delivery sta
     await mountPage(fresh({ ...sample, items: [parent, ...parts] }));
     expect(text($('[data-item="delivery"]'))).toContain('2 builds running · 1 waiting');
 
-    expect(text($('.desk-card[data-item="delivery"] .desk-next'))).toBe('2 builds running · 1 waiting');
+    expect(text($('.desk-row[data-item="delivery"] [data-desk-more]'))).toBe('2 builds running · 1 waiting');
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
 
     await settle(() => useItemDialogStore.getState().open(parent.id));
-    expect(text($('[data-group-status]'))).toBe('2 builds running · 1 waiting');
+    // The group's status reads in the summary line, where the header's group status used to sit.
     expect(text($('[data-item-summary]'))).toContain('2 builds running · 1 waiting');
     expect(text($('[data-concept-build-run]'))).not.toContain('Not started');
     await settle(() => useItemDialogStore.getState().open(parts[0]!.id));
@@ -121,7 +121,7 @@ test('a stale Ready gate explains the hold on its row, desk and details and offe
 
     await mountPage(fresh({ ...sample, items: [stale] }));
     expect(text($('[data-stale-gate="stale"]'))).toBe(reason);
-    expect(text($('.desk-card[data-item="stale"]'))).toContain('Approve brief');
+    expect(text($('.desk-row[data-item="stale"]'))).toContain('Approve brief');
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
 

@@ -110,7 +110,8 @@ test('an unresolved empty discussion offers older comments and only claims no co
     expect(text($('[data-comments]'))).toBe('CommentsLoad older comments');
     expect(authors()).toHaveLength(0);
     await settle(() => loadMore()!.click());
-    expect(text($('[data-comments]'))).toBe('CommentsNo comments.');
+    // With no comments left to load, the dialog drops the Comments section rather than saying there are none.
+    expect($('[data-comments]')).toBeNull();
     expect(loadMore()).toBeUndefined();
 });
 

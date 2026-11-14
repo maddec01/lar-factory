@@ -44,14 +44,15 @@ export function ItemRelations({
     if (read.state === 'failed') return null;
 
     if (read.state === 'loading')
-        return item.subIssues.total > item.slices.length ? (
+        return item.kind !== 'concept' && item.subIssues.total > item.slices.length ? (
             <DetailsSection heading="Sub-tickets">
                 <Placeholder />
             </DetailsSection>
         ) : null;
 
     const { attachments, blockers, related, relationsError } = read.details;
-    const subTickets = sidebarSubTickets(item, read.details.subTickets);
+    // A concept's dialog lists its parts in its Parts section, so the side doesn't list them again.
+    const subTickets = item.kind === 'concept' ? [] : sidebarSubTickets(item, read.details.subTickets);
     const sprint = item.currentSprint;
     const current = sprint ? subTickets.filter((s) => sprint.childNumbers.includes(s.number)) : subTickets;
     const other = sprint ? subTickets.filter((s) => !sprint.childNumbers.includes(s.number)) : [];

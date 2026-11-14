@@ -2,6 +2,7 @@
 export {
     AddItemButton,
     CreateIssueChoice,
+    AddItemModes,
     DraftFields,
     DraftTicketPart,
     PanelField,
@@ -18,6 +19,8 @@ export {
     BoardCounter,
     CounterAge,
     CounterDash,
+    CounterWords,
+    QuietGlyph,
     CounterEmpty,
     CounterFigure,
     CounterGroup,
@@ -67,7 +70,7 @@ export {
 } from './Dossier';
 export { ItemFields, ItemTitle, RepoIdentity, TitleLink } from './ItemParts';
 export { NeedsYouNotice, NeedsYouResult } from './NeedsYou';
-export { PartKindLabel, PartRow, PartsList, PartTrack, PartWaits, ShowDoneToggle, ThreadLine } from './PartsList';
+export { PartKindIcon, PartKindLabel, PartRow, PartsList, PartWaits, ShowDoneToggle, ThreadLine } from './PartsList';
 export {
     ChecksState,
     PullRequestList,
@@ -98,7 +101,6 @@ export {
     RowFoot,
     RowGlyph,
     RowIdentity,
-    RowKindCell,
     RowOpen,
     RowSecondLine,
     RowSide,
@@ -112,9 +114,8 @@ export {
     StageRowItem,
     UsageFigures,
 } from './StageRow';
-export { StageTrack } from './StageTrack';
 export { ActionError, StartGroup, StartHold, StartLine, StartNote, StartTag } from './StartControls';
-export { boardColor, boardStatusState, sliceProgressLabel, stageColor, statusColor } from './StatusColors';
+export { boardColor, boardStatusState, statusColor } from './StatusColors';
 export { StatusGlyph, StatusGlyphSlot } from './StatusGlyph';
 export { EarlierThread, EarlierThreadList } from './Threads';
 export {
@@ -147,6 +148,7 @@ export {
     WarningNote,
 } from './ItemDialog';
 export {
+    AddDescription,
     AttachmentLink,
     ChangeFailed,
     CheckRun,
@@ -178,7 +180,6 @@ export {
     PartsProgress,
     ProgressActivity,
     ProgressCount,
-    SliceChip,
     SliceChips,
     WorkflowSteps,
 } from './ItemProgress';
@@ -199,7 +200,7 @@ export {
     SetupStep,
 } from './Onboarding';
 export { conceptIcons } from './ConceptIcons';
-export { KindBadge } from './KindBadge';
+export { KindBadge, KindMark } from './KindBadge';
 
 export { DossierParentContext, DossierStates } from './DossierContext';
 export {
@@ -224,7 +225,6 @@ export {
 export { ConceptBuildRun } from './ConceptBuildRun';
 export { ReleaseProgress } from './ReleaseProgress';
 
-export { GroupStatus } from './ItemDialog';
 export { RetroChoices } from './RetroChoices';
 
 export { ReleaseStepForm } from './ReleaseStepForm';

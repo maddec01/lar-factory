@@ -8,9 +8,8 @@ import {
     MessagesSquareIcon,
     ShapesIcon,
 } from '@lar-works/design-system/icons';
-import { type ReactNode, useContext } from 'react';
+import type { ReactNode } from 'react';
 
-import { PartTiles } from './PartTiles';
 import { pickedRow, ROW_OPENS } from './RowStyles';
 
 const KIND_ICON = {
@@ -24,6 +23,13 @@ const KIND_ICON = {
 
 /** What a dossier's part is: a decision's method, or a build. */
 export type PartKind = keyof typeof KIND_ICON;
+
+/** A part's method or kind as its icon alone, such as a row's kind mark draws. */
+export function PartKindIcon({ kind }: { kind: PartKind }) {
+    const Icon = KIND_ICON[kind];
+
+    return <Icon aria-hidden="true" />;
+}
 
 /** A part's method or kind with its icon, in the one place and style every dossier surface shows it. */
 export function PartKindLabel({
@@ -56,14 +62,10 @@ export function PartsList({
     /** The parts, one PartRow each. */
     children: ReactNode;
 }) {
-    const tiles = useContext(PartTiles);
-
     return (
         <div className="grid gap-1">
-            <ol
-                className={`m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-x-4 p-0 ${tiles ? 'gap-y-1.5' : 'gap-y-1'}`}
-                data-parts-list
-            >
+            {/* One column of rounded rows, as a lane's, so a part reads as a row of work, not a card. */}
+            <ol className="m-0 grid list-none gap-0.5 p-0" data-parts-list>
                 {children}
             </ol>
             {showDone}
@@ -135,13 +137,8 @@ export function PartRow({
     /** What sits under the row, such as Start's message. */
     foot?: ReactNode;
 }) {
-    const tile = useContext(PartTiles) ? `border-line border ${picked ? '' : 'bg-surface-card'}` : '';
-
     return (
-        <li
-            data-part={id}
-            className={`hover:bg-fill-hover @container rounded-md px-3 py-2 ${tile} ${pickedRow(picked)}`}
-        >
+        <li data-part={id} className={`hover:bg-fill-hover @container rounded-lg px-3 py-2 ${pickedRow(picked)}`}>
             <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
                 <button
                     type="button"
@@ -174,16 +171,6 @@ export function PartRow({
             {foot && <span className="block pt-1 pl-5 empty:hidden">{foot}</span>}
         </li>
     );
-}
-
-/** A part's stage track in its meta line, at a fixed width so the tracks line up. */
-export function PartTrack({
-    children,
-}: {
-    /** The part's StageTrack. */
-    children: ReactNode;
-}) {
-    return <span className="w-28 shrink-0">{children}</span>;
 }
 
 /** What a part waits on, beside its action, truncating. */

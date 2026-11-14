@@ -103,11 +103,12 @@ export function AgentWorkNote({ item }: { item: Item }) {
               ? 'Build ready to merge'
               : item.verification?.latest?.result === 'fail'
                 ? 'Fixing failed Verify'
-                : item.kind === 'concept'
-                  ? 'No direct agent work yet'
-                  : owner
-                    ? `Shaped in ${owner.kind} thread`
-                    : 'No agent work yet';
+                : owner
+                  ? `Shaped in ${owner.kind} thread`
+                  : undefined;
+
+    // With no agent work there is nothing to say under the title, so the header stays one line.
+    if (!none && s !== 'unavailable' && item.usageState !== 'loading') return null;
 
     return (
         <Text variant="caption" tone="muted" data-agent-work-note>

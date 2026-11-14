@@ -1,5 +1,6 @@
 import {
     effectiveIssueSettings,
+    onAzure,
     trackerCapabilities,
     writeAccessProblem,
     type RepoConfig,
@@ -176,7 +177,7 @@ export function CreateIssueBox({
                 <Checkbox
                     id="item-create-issue"
                     name="createIssue"
-                    label="Create issue"
+                    label={`Create ${onAzure(repo.repo) ? 'Azure DevOps work item' : 'GitHub issue'}`}
                     checked={checked}
                     disabled={disabled || !!reason}
                     aria-describedby={reason ? 'item-create-reason' : undefined}

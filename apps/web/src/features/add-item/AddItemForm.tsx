@@ -52,6 +52,9 @@ export function AddItemForm() {
     const [repo, setRepo] = useState(kept?.repo ?? data.repos[0]?.repo ?? '');
     const [itemKind, setKind] = useState(kept?.kind ?? '');
     const [createChoice, setCreateChoice] = useState(kept?.createChoice ?? null);
+    // A submit with no title or kind says so under that field, in the design system's error, not the browser's bubble.
+    const [titleMissing, setTitleMissing] = useState(false);
+    const [kindMissing, setKindMissing] = useState(false);
     const selected = data.repos.find((r) => r.repo === repo) ?? data.repos[0];
     const form = useRef<HTMLFormElement>(null);
     const kindSelect = useRef<HTMLButtonElement>(null);
@@ -80,16 +83,21 @@ export function AddItemForm() {
         event.preventDefault();
 
         const form = event.currentTarget;
+        const title = form.elements.namedItem('title');
+        const noTitle = title instanceof HTMLInputElement && !title.value.trim();
 
-        void submit(valuesOf(form, description.current, createChoice)).then(() => {
-            if (
-                useAddItemStore.getState().submission.phase === 'editing' &&
-                form.isConnected &&
-                form.reportValidity() &&
-                !itemKind
-            )
-                kindSelect.current?.focus();
-        });
+        // What the form can tell is missing is said under its field before anything is sent.
+        if (noTitle || !itemKind) {
+            setTitleMissing(noTitle);
+            setKindMissing(!itemKind);
+
+            if (noTitle) (title as HTMLInputElement).focus();
+            else kindSelect.current?.focus();
+
+            return;
+        }
+
+        void submit(valuesOf(form, description.current, createChoice));
     };
 
     return (
@@ -100,6 +108,7 @@ export function AddItemForm() {
             aria-busy={phase === 'pending'}
             onSubmit={onSubmit}
             onInput={() => {
+                setTitleMissing(false);
                 edit();
                 keepForm();
             }}
@@ -111,28 +120,32 @@ export function AddItemForm() {
                 main={
                     <>
                         <NoProjectNotice />
-                        <Input
-                            id="item-title"
-                            name="title"
-                            presentation="title"
-                            required
-                            maxLength={256}
-                            autoComplete="off"
-                            defaultValue={kept?.title}
-                            aria-label="Title"
-                            placeholder="Title"
-                        />
+                        {/* A labelled field, as the details' are, so the one required input reads as one. */}
+                        <PanelField heading="Title" htmlFor="item-title">
+                            <Input
+                                id="item-title"
+                                name="title"
+                                required
+                                maxLength={256}
+                                autoComplete="off"
+                                defaultValue={kept?.title}
+                                placeholder="What needs doing?"
+                                invalid={titleMissing}
+                                aria-describedby={titleMissing ? 'item-title-error' : undefined}
+                            />
+                            {titleMissing && (
+                                <Text variant="caption" tone="danger" id="item-title-error">
+                                    Give the item a title.
+                                </Text>
+                            )}
+                        </PanelField>
                         <MarkdownEditor
                             label="Description"
-                            placeholder="Add a description… - for a list, 1. for steps, # for a heading"
+                            placeholder="Description"
                             value={kept?.description ?? ''}
                             onChange={onDescription}
                             disabled={locked}
-                            fill="wide"
                         />
-                        <Text variant="caption" tone="muted">
-                            Formats as you type · saved as Markdown
-                        </Text>
                         {data.capture?.enabled !== false && <FormResult id="item-result" text={message} />}
                     </>
                 }
@@ -148,9 +161,18 @@ export function AddItemForm() {
                                 name="kind"
                                 placeholder="Choose a kind"
                                 value={itemKind}
-                                onChange={setKind}
+                                onChange={(kind) => {
+                                    setKindMissing(false);
+                                    setKind(kind);
+                                }}
                                 options={KIND_CHOICES}
+                                aria-describedby={kindMissing ? 'item-kind-error' : undefined}
                             />
+                            {kindMissing && (
+                                <Text variant="caption" tone="danger" id="item-kind-error">
+                                    Choose bug, feature or improvement.
+                                </Text>
+                            )}
                         </PanelField>
                         {selected && data.capture?.enabled !== false && (
                             <IssueFields

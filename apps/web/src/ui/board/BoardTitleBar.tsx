@@ -47,9 +47,10 @@ export function BoardTitleBar({ home, search, status, actions, settings }: Board
 
 export type RefreshHealth = 'waiting' | 'live' | 'stale' | 'disconnected';
 
+// A live board's light is neutral, so the bar's one colour is need you's; trouble takes its tone.
 const tones: Record<RefreshHealth, StatusTone> = {
     waiting: 'neutral',
-    live: 'success',
+    live: 'neutral',
     stale: 'warning',
     disconnected: 'danger',
 };
@@ -59,8 +60,6 @@ interface RefreshIndicatorProps {
     health: RefreshHealth;
     /** What the time says, such as "12s" or "Stale · 2m"; hidden on a narrow bar, where the dot speaks alone. */
     label: ReactNode;
-    /** A count of reads landed while this page was open: each new one pings the dot once, while live. */
-    landed: number;
     /** The tooltip's two lines: when the board last read, then how it reads or what went wrong. */
     detail: string;
     /** More on the health, in the tooltip. */
@@ -68,12 +67,14 @@ interface RefreshIndicatorProps {
 }
 
 /**
- * How fresh the board is, first in the title bar's status group: a dot in the health's colour (amber when stale, red
- * while the page has lost the board server) and the time since the last read, with more in a glass tooltip. A tab
- * stop, so keyboard users reach its tooltip. It names its health in `data-health`. Each newer read pings the dot once
- * (`refreshed-ping` in refreshed.css), which pauses behind an open overlay as the design system's loops do.
+ * How fresh the board is, first in the title bar's status group, only while it is not live: a dot in the health's
+ * colour (amber when stale, red while the page has lost the board server) and the time since the last read, with more
+ * in a glass tooltip. A tab stop, so keyboard users reach its tooltip. It names its health in `data-health`.
  */
-export function RefreshIndicator({ health, label, landed, detail, secondaryDetail }: RefreshIndicatorProps) {
+export function RefreshIndicator({ health, label, detail, secondaryDetail }: RefreshIndicatorProps) {
+    // A live board takes no room on the bar: only a stale or failing read shows its light and words.
+    if (health === 'live') return null;
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -82,17 +83,8 @@ export function RefreshIndicator({ health, label, landed, detail, secondaryDetai
                     data-health={health}
                     className="refreshed text-fg-muted focus-ring inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-xs whitespace-nowrap tabular-nums"
                 >
-                    <span className="relative grid size-2.5 place-items-center">
-                        {landed > 0 && health === 'live' && (
-                            <span
-                                key={landed}
-                                data-ping
-                                className="bg-success absolute size-1.5 rounded-full motion-safe:animate-[refreshed-ping_1.2s_var(--ease-standard)_forwards]"
-                            />
-                        )}
-                        <StatusIndicator size="sm" tone={tones[health]} />
-                    </span>
-                    {/* As wide as "59m ago", so the strip holds still as the time ticks; longer words widen it. */}
+                    <StatusIndicator size="sm" tone={tones[health]} />
+                    {/* Its words, as wide as "59m ago" at least, so the strip holds still as the time ticks. */}
                     <span className="@max-3xl:sr-only @3xl:min-w-[7ch]">{label}</span>
                 </span>
             </TooltipTrigger>

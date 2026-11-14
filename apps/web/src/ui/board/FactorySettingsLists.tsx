@@ -1,5 +1,8 @@
 import { Button, Disclosure, OptionSelect, Text } from '@lar-works/design-system';
+import { CopyPlus } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
+
+import { buttonKind } from './ButtonKinds';
 
 type ChoiceProps = {
     label: string;
@@ -81,17 +84,27 @@ export function FactoryReviewerRow({
     return (
         <section className="factory-reviewer-row" aria-label={`${name} reviewer`}>
             <div className="factory-reviewer-summary">
+                {/* A packaged reviewer is the usual case and says nothing more; a custom one says it is yours. */}
                 <div className="factory-reviewer-name">
                     <Text variant="label">{name}</Text>
-                    <Text variant="caption" tone="muted">
-                        {packaged ? 'Packaged' : 'Custom'}
-                    </Text>
+                    {!packaged && (
+                        <Text variant="caption" tone="muted">
+                            Custom
+                        </Text>
+                    )}
                 </div>
                 <div className="factory-reviewer-controls">
                     {mode}
                     <div className="factory-settings-actions">
                         {packaged ? (
-                            <Button variant="secondary" onClick={onDuplicate}>
+                            <Button
+                                {...buttonKind('control')}
+                                leftIcon={<CopyPlus />}
+                                iconOnly
+                                aria-label={`Duplicate ${name}`}
+                                title="Duplicate to make your own"
+                                onClick={onDuplicate}
+                            >
                                 Duplicate
                             </Button>
                         ) : (

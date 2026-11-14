@@ -17,7 +17,7 @@
     /* Not started or stopped (off): listed, queued, an idle or stopped agent. */
     --color-board-idle: var(--color-line-strong);
     /* A stage the work has already passed, on a stage track. */
-    --color-board-past: color-mix(in srgb, var(--color-fg) 28%, transparent);
+    --color-board-past: color-mix(in srgb, var(--color-fg) 40%, transparent);
 }
 
 :root {

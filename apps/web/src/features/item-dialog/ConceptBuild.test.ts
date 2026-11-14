@@ -106,7 +106,7 @@ test('a ready concept has one group start per surface and its parts retain manua
 
     await settle(() => row.querySelector<HTMLButtonElement>('[data-dossier-open]')!.click());
     expect([...row.querySelectorAll('button')].filter((b) => text(b) === 'Start concept builds')).toHaveLength(1);
-    expect([...row.querySelectorAll('button')].some((b) => text(b) === 'Start build')).toBe(true);
+    expect([...row.querySelectorAll('button')].some((b) => text(b) === 'Build')).toBe(true);
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
 
@@ -150,10 +150,11 @@ test('compact disabled starts show their hold next to the action', async () => {
 test.each(['running', 'paused'] as const)('the %s concept header describes the run', async (state) => {
     await show({ run: { state, startedAt: '2026-01-01', prepared: {} }, holds: [], members: [] });
 
-    const header = text($('[data-item-dialog] header'));
+    // The run's state reads in the summary line under the title, with the concept's other facts.
+    const summary = text($('[data-item-dialog] [data-item-summary]'));
 
-    expect(header).toContain(state === 'running' ? 'Concept builds running' : 'Concept builds paused');
-    expect(header).not.toContain('No direct agent work yet');
+    expect(summary).toContain(state === 'running' ? 'Concept builds running' : 'Concept builds paused');
+    expect(text($('[data-item-dialog]'))).not.toContain('No direct agent work yet');
 });
 
 test.each(['running', 'paused'] as const)(
@@ -196,8 +197,13 @@ test.each(['running', 'paused'] as const)(
 
         holdPosts(data);
         await mountPage(data);
-        expect(text($('[data-ready-build-controls]'))).toContain('3 building · limit 4');
-        expect($('[data-ready-build-controls]')!.getAttribute('title') ?? '').not.toContain('exceed');
+
+        // Build's header carries the shared occupancy; Ready keeps only what starts builds.
+        const controls = $('[data-stage="build"] [data-stage-controls]')!;
+
+        expect(text(controls)).toContain('3 building · limit 4');
+        expect(text($('[data-ready-build-controls]'))).not.toContain('building');
+        expect(controls.querySelector('[title]')?.getAttribute('title') ?? '').not.toContain('exceed');
 
         const { useItemDialogStore } = await import('./ItemDialogStore');
 

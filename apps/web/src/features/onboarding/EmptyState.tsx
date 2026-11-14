@@ -12,7 +12,6 @@ export function EmptyState() {
         <EmptyBoard data-empty-state>
             <EmptyStateMessage
                 size="start"
-                product="factory"
                 // The page's heading is "Lar Factory" (BoardShell); this is its one section.
                 level="h2"
                 artwork={<BrandMark label="Lar" size="lg" />}

@@ -15,6 +15,7 @@ export function Pane({
     id,
     title,
     status,
+    glyph,
     running,
     count,
     right,
@@ -24,6 +25,8 @@ export function Pane({
     id: string;
     title: string;
     status?: Status;
+    /** The section's glyph when it has no status of its own, from the board's glossary. */
+    glyph?: ReactNode;
     running?: boolean;
     count: number;
     right?: ReactNode;
@@ -35,7 +38,7 @@ export function Pane({
         <StagePane
             id={id}
             title={title}
-            glyph={status && <StatusGlyph status={status} running={running} />}
+            glyph={status ? <StatusGlyph status={status} running={running} /> : glyph}
             count={count}
             right={right}
             empty={empty || undefined}
@@ -51,7 +54,7 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
     const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
 
     return (
-        <StagePaneEmpty>
+        <StagePaneEmpty quiet={!reading && !filtered}>
             {reading ? <Loading presentation="inline" label="Loading projects…" /> : filtered ? children : none}
         </StagePaneEmpty>
     );

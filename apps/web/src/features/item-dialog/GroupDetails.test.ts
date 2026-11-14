@@ -72,6 +72,9 @@ async function show(data: BoardData, body = '') {
     await settle(() => useItemDialogStore.getState().open(parent.id));
 }
 
+/** A group's status reads in the dialog's summary line, as every item's does. */
+const groupStatus = () => text($('[data-item-dialog] [data-item-summary]'));
+
 test.each(['feature', 'concept'] as const)(
     'a delivered %s parent shows delivery, clickable parts and release evidence',
     async (kind) => {
@@ -79,7 +82,7 @@ test.each(['feature', 'concept'] as const)(
 
         const dialog = $('[data-item-dialog]')!;
 
-        expect(text(dialog.querySelector('[data-group-status]'))).toBe('Delivered');
+        expect(groupStatus()).toContain('Delivered');
         expect(text(dialog)).toContain('2 of 2 builds done');
         expect(text(dialog)).toContain('Delivery complete');
         expect(dialog.querySelector('[data-steps]')).toBeNull();
@@ -98,14 +101,14 @@ test.each(['feature', 'concept'] as const)(
         expect(text(parts[0])).toContain('Server build');
         await settle(() => parts[0]!.click());
         expect(text($('[data-item-dialog] header'))).toContain('Server build');
-        expect($('[data-item-dialog] [data-group-status]')).toBeNull();
+        expect(groupStatus()).not.toContain('Delivered');
         expect($('[data-item-dialog] [data-steps]')).not.toBeNull();
     },
 );
 
 test('merged parts do not make a parent Delivered while a release step remains', async () => {
     await show(group('feature', false));
-    expect(text($('[data-group-status]'))).toBe('Waiting on release step');
+    expect(groupStatus()).toContain('Waiting on release step');
     expect(text($('[data-release-progress]'))).toContain('Activation pending.');
     expect(text($('[data-release-progress]'))).toContain('Pending');
 });
@@ -128,7 +131,7 @@ test('the header counts running builds and then waits for Outcome after release'
     );
 
     await show({ ...data, items });
-    expect(text($('[data-group-status]'))).toBe('2 builds running');
+    expect(groupStatus()).toContain('2 builds running');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
 
@@ -148,7 +151,7 @@ test('the header counts running builds and then waits for Outcome after release'
             ),
         }),
     );
-    expect(text($('[data-group-status]'))).toBe('Waiting on Outcome check');
+    expect(groupStatus()).toContain('Waiting on Outcome check');
 });
 
 test('a large group keeps part holds folded and batch review before delivery details', async () => {
@@ -195,7 +198,8 @@ test('a large group keeps part holds folded and batch review before delivery det
 
     expect(disclosure, 'per-part holds have a counted disclosure').not.toBeNull();
     expect(text(disclosure.querySelector('summary'))).toBe('20 parts and their holds');
-    expect(disclosure.open).toBe(false);
+    // Parts that wait on you open the list, so what asks for you shows without a click.
+    expect(disclosure.open).toBe(true);
     expect(disclosure.querySelectorAll('[data-row-open]')).toHaveLength(20);
 
     const holds = dialog.querySelector<HTMLDetailsElement>('[data-concept-build-run] details')!;
@@ -211,7 +215,8 @@ test('a large group keeps part holds folded and batch review before delivery det
     ).toBeTruthy();
     expect([...review.querySelectorAll('button')].some((button) => text(button) === 'Approve briefs')).toBe(true);
     await settle(() => disclosure.querySelector('summary')!.click());
-    expect(disclosure.open).toBe(true);
+    expect(disclosure.open).toBe(false);
+    await settle(() => disclosure.querySelector('summary')!.click());
     await settle(() => disclosure.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });

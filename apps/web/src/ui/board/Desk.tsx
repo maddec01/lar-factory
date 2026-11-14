@@ -1,76 +1,60 @@
-import {
-    CardHeader,
-    EmptyState,
-    ScrollRow,
-    ScrollRowArrows,
-    SectionTitle,
-    StatusIndicator,
-    useScrollRow,
-} from '@lar-works/design-system';
+import { Button, EmptyState, SectionTitle } from '@lar-works/design-system';
 import type { StatusState } from '@lar-works/design-system';
-import { CardBase } from '@lar-works/design-system/primitives';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { useArrival } from './BoardLife';
+import { buttonKind } from './ButtonKinds';
+import { pickedRow } from './RowStyles';
+import { RowFirst, RowOpen, RowSide, RowTitleCell } from './StageRow';
 
 interface DeskSectionProps {
     /** The section's heading, such as "Your desk". */
     title: string;
-    /** How many cards show; with none, `empty` says why in one muted line. */
+    /** How many rows show; with none, `empty` says why in one muted line. */
     count: number;
-    /** The first read may still add cards; hide its provisional zero. */
+    /** The first read may still add rows; hide its provisional zero. */
     loading?: boolean;
     /** What the section says when nothing awaits you. */
     empty?: ReactNode;
-    /** The cards, one DeskCard each. */
+    /** The rows, one DeskCard each. */
     children?: ReactNode;
-    /** The arrows that scroll the row when its cards overflow. */
-    backLabel?: string;
-    /** The fade's scroll button's accessible name, when the cards overflow. */
-    forwardLabel?: string;
 }
 
-/** "Your desk": the items awaiting your action as cards in one row (the design system's ScrollRow, under a section
- *  title as Section draws it) that scrolls sideways, fading at the edges with more beyond them, with arrows beside the
- *  title that scroll it. An empty desk is one muted line under its title. Its heading is `#desk-h`. */
-export function DeskSection({
-    title,
-    count,
-    loading = false,
-    empty,
-    children,
-    backLabel = 'Previous cards',
-    forwardLabel = 'Next cards',
-}: DeskSectionProps) {
-    const { setRow, scroll, canScrollBack, canScrollForward } = useScrollRow<HTMLUListElement>(count);
+/** "Your desk": the items awaiting your action, as a list of rounded rows on the stage rows' columns, under a section
+ *  title as Section draws it, so every request shows at once without scrolling sideways. It is the board's one loud
+ *  surface: its rows sit in one rounded panel, an even amber tint and the attention bar, with no outline, on the lanes'
+ *  grid. Past five it shows its first five rows and
+ *  Show all, so the board under it stays in reach. An empty desk is one muted line under its title. Its heading is
+ *  `#desk-h`. */
+export function DeskSection({ title, count, loading = false, empty, children }: DeskSectionProps) {
+    const [all, setAll] = useState(false);
 
     return (
-        <section className="desk grid shrink-0 gap-3" aria-labelledby="desk-h">
-            <SectionTitle
-                id="desk-h"
-                level="h2"
-                title={title}
-                count={count}
-                countLoading={loading}
-                actions={
-                    canScrollBack || canScrollForward ? (
-                        <ScrollRowArrows
-                            size="sm"
-                            onScroll={scroll}
-                            canScrollBack={canScrollBack}
-                            canScrollForward={canScrollForward}
-                            backLabel={backLabel}
-                            forwardLabel={forwardLabel}
-                        />
-                    ) : undefined
-                }
-            />
+        <section className="desk @container grid shrink-0 gap-1" aria-labelledby="desk-h">
+            <div className="flex min-h-10 items-center px-3 py-1">
+                <SectionTitle id="desk-h" level="h2" title={title} count={count} countLoading={loading} />
+            </div>
             {count ? (
-                <ScrollRow ref={setRow} label={title}>
-                    {children}
-                </ScrollRow>
+                <>
+                    <ol
+                        aria-label={title}
+                        className="attention-flat m-0 grid list-none gap-0.5 rounded-xl p-0"
+                        data-collapsed={(!all && count > 5) || undefined}
+                    >
+                        {children}
+                    </ol>
+                    {!all && count > 5 && (
+                        <span className="desk-show-all px-3 pt-1">
+                            <Button {...buttonKind('other')} onClick={() => setAll(true)}>
+                                Show all {count}
+                            </Button>
+                        </span>
+                    )}
+                </>
             ) : (
-                <EmptyState size="inline" title={empty} />
+                <div className="px-3">
+                    <EmptyState size="inline" title={empty} />
+                </div>
             )}
         </section>
     );
@@ -83,12 +67,12 @@ interface DeskCardProps {
     picked: boolean;
     /** Called as the reader opens the item dialog. */
     onOpen: () => void;
-    /** The first row: where the item comes from. */
+    /** Where the item comes from: its source and project, a RowSource. */
     source: ReactNode;
-    /** The item's kind, a badge. */
-    kind: ReactNode;
-    /** How long the item has waited. */
-    age: ReactNode;
+    /** The item's kind, a quiet mark before its title. */
+    kind?: ReactNode;
+    /** The lane the item sits in, such as "Build", which the row names before its status. */
+    stage?: string | undefined;
     /** The item's title. */
     title: ReactNode;
     /** The title's full text, which names the card. */
@@ -99,7 +83,7 @@ interface DeskCardProps {
     members?: string[];
     /** More about the item under its title, such as a work item's fields. */
     details?: ReactNode;
-    /** The status's glyph, only where there is no `statusState` (whose light is drawn instead). */
+    /** The status's glyph, only where there is no `statusState` (the row's amber bar marks it instead). */
     statusIcon: ReactNode;
     /** The next step, in words. */
     status: string;
@@ -107,17 +91,15 @@ interface DeskCardProps {
     statusState?: StatusState;
     /** Beside the status: the next step, such as a DeskHint. */
     next?: ReactNode;
-    /** The card's actions, at its foot's end: `sm` buttons, the next step tinted. */
+    /** The row's actions, at its end: `sm` buttons, the next step tinted. */
     actions: ReactNode;
 }
 
 /**
- * An item on your desk, the design system's card in the attention recipe (an amber edge, a 3px amber bar down its
- * leading edge and a faint wash from it), opening the item dialog from anywhere on it but its actions. Every card has
- * the same rows, and every card in the row its tallest's height, so they line up across cards: source, kind and age;
- * the title, up to two lines; any tracker fields; then, at the card's foot, the status and next step and the card's
- * actions. The card whose dialog shows takes the current edge. A card that lands on the desk after the board has
- * shown pulses its edge once (BoardLife).
+ * An item on your desk as a rounded row on the stage rows' columns, in the desk's attention panel: its status light,
+ * kind and title and what it belongs to, its project, then its lane and status, and its actions at the end. Under the
+ * title, quiet, come the next step and any details. A click anywhere on it but its actions opens the item dialog. The row whose dialog shows takes the current wash; one that
+ * lands on the desk after the board has shown slides in and flashes (BoardLife).
  */
 export function DeskCard({
     item,
@@ -125,7 +107,7 @@ export function DeskCard({
     onOpen,
     source,
     kind,
-    age,
+    stage,
     title,
     name,
     parentName,
@@ -140,50 +122,47 @@ export function DeskCard({
     const arrived = useArrival('desk', item);
 
     return (
-        <CardBase
-            as="li"
-            className="desk-card w-[min(22rem,calc(100vw-4.5rem))] shrink-0 snap-start"
+        <li
             data-item={item}
-            data-arrived={arrived ? '' : undefined}
-            label={name}
-            onOpen={onOpen}
-            attention="warning"
-            selected={picked}
-            padding="sm"
-            header={
-                <CardHeader
-                    eyebrow={
-                        <span className="desk-meta contents">
-                            {source}
-                            {kind}
-                            <span className="ml-auto shrink-0">{age}</span>
-                        </span>
-                    }
-                    title={<span title={name}>{title}</span>}
-                    titleLines={2}
-                />
-            }
-            footer={
-                <>
-                    {statusState ? (
-                        <StatusIndicator state={statusState} label={status} />
-                    ) : (
-                        <span className="text-fg inline-flex shrink-0 items-center gap-1.5 text-xs font-medium">
-                            {statusIcon}
-                            {status}
-                        </span>
-                    )}
-                    <span className="desk-next text-fg-muted flex min-w-0 flex-1 items-center text-xs tabular-nums">
-                        {next}
-                    </span>
-                </>
-            }
-            actions={<span className="desk-actions contents">{actions}</span>}
+            data-arrived={arrived ? 'above' : undefined}
+            data-attention
+            className="desk-row @container"
         >
-            {parentName && <p className="text-fg-muted text-xs">Part of {parentName}</p>}
-            {!!members?.length && <p className="text-fg-muted text-xs wrap-anywhere">Briefs: {members.join(' · ')}</p>}
-            {details}
-        </CardBase>
+            <div className={`hover:bg-fill-hover rounded-lg py-1.5 transition-colors ${pickedRow(picked)}`}>
+                <RowFirst>
+                    <RowOpen onOpen={onOpen}>
+                        {/* The amber bar marks the row; a glyph shows only where the row has no state light. */}
+                        <span className="grid size-6 place-items-center" data-glyph>
+                            {!statusState && statusIcon}
+                        </span>
+                        {source}
+                        <RowTitleCell>
+                            {kind}
+                            <span className="text-fg min-w-0 truncate text-sm leading-7" title={name} data-title>
+                                {title}
+                            </span>
+                            {parentName && (
+                                <span className="text-fg-muted min-w-0 shrink truncate text-xs" data-part-of>
+                                    in {parentName}
+                                </span>
+                            )}
+                        </RowTitleCell>
+                        <span data-col="state" className="flex min-w-0 items-center gap-x-2 leading-4">
+                            {stage && <span className="min-w-0 truncate">{status ? `${stage} ·` : stage}</span>}
+                            <span className="text-warning-fg shrink-0 font-medium" data-state>
+                                {status}
+                            </span>
+                        </span>
+                    </RowOpen>
+                    <RowSide>{actions}</RowSide>
+                </RowFirst>
+                <div className="desk-more text-fg-muted grid gap-1 text-xs empty:hidden" data-desk-more>
+                    {next}
+                    {!!members?.length && <p className="m-0 wrap-anywhere">Briefs: {members.join(' · ')}</p>}
+                    {details}
+                </div>
+            </div>
+        </li>
     );
 }
 

@@ -109,7 +109,10 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
                       : run?.state === 'running'
                         ? 'Concept builds running'
                         : pending.length
-                          ? `${plural(pending.length, 'part')} remaining`
+                          ? // Done over all its parts, those off the board included, as the board's parts count says it.
+                            parent.subIssues?.total
+                              ? `${parent.subIssues.completed}/${parent.subIssues.total} parts done`
+                              : `${parts.length - pending.length}/${parts.length} parts done`
                           : parent.subIssues?.total > parts.length
                             ? 'Some parts are outside the board'
                             : progress.total

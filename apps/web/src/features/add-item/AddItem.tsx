@@ -1,6 +1,6 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 
-import { noneOnboarded, repoName } from '@lar-factory/shared';
+import { repoName } from '@lar-factory/shared';
 import { Button, Modal, Text, ViewToggle } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
@@ -14,7 +14,7 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 import { useExpand } from '@/shared/dialogs/useExpand';
-import { AddItemButton, buttonKind, PanelField, TicketSearchPane } from '@/ui/board';
+import { AddItemButton, AddItemModes, buttonKind, PanelField, TicketSearchPane } from '@/ui/board';
 
 /** Find a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
 function PickTicketPane() {
@@ -91,21 +91,17 @@ function AddItemDialog() {
             <Modal.Content
                 id="add-item-dialog"
                 title="Add item"
-                description={description}
                 aria-describedby="add-item-description"
                 presentation="paned"
                 expanded={expanded}
-                fitsContent={false}
-                headerActions={
-                    <>
-                        <PaneSwitch />
-                        <ExpandButton expanded={expanded} toggle={toggleExpanded} />
-                    </>
-                }
+                // Content-sized until expanded, so an empty draft opens as a compact form; Expand gives it the window.
+                fitsContent={!expanded}
+                headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
             >
-                <span id="add-item-description" hidden>
-                    {description}
-                </span>
+                {/* The panes' switch and what the shown one does lead the body, so the header stays one line. */}
+                <AddItemModes description={<span id="add-item-description">{description}</span>}>
+                    <PaneSwitch />
+                </AddItemModes>
                 {/* A new draft remounts the form, which clears its fields. */}
                 {pane === 'pick' ? <PickTicketPane /> : <AddItemForm key={draft} />}
             </Modal.Content>
@@ -115,7 +111,6 @@ function AddItemDialog() {
 
 export function AddItem() {
     const { open, setOpen } = useAddItemStore();
-    const none = useBoardStore((state) => noneOnboarded(state.data));
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -136,7 +131,7 @@ export function AddItem() {
                 label="Add item"
                 title="Add item (⌘N)"
                 keyShortcuts="Meta+N"
-                waits={none}
+                waits
                 onOpen={() => setOpen(true)}
             />
             {open && <AddItemDialog />}

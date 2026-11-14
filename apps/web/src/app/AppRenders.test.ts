@@ -78,18 +78,15 @@ async function mounted(data: BoardData) {
     };
 }
 
-test('a tick that changes nothing renders no glyph, and the ages on the desk and in the Queue still move', async () => {
+test('a tick that changes nothing renders no glyph, and the ages in the Queue still move', async () => {
     const { tickAt } = await mounted(boardOf([running('I_build', 'In progress'), queued, awaiting], 100_000));
-    const deskAge = () => text($('.desk-card .desk-meta'));
 
     expect(text($('.queue-age'))).toBe('just now');
-    expect(deskAge()).toContain('just now');
     expect($('.lar-status-spin'), 'the running row spins').not.toBeNull();
 
     await tickAt(NOW + 2 * HOUR);
     expect(glyphRenders).toBe(0);
     expect(text($('.queue-age'))).toBe('2h ago');
-    expect(deskAge()).toContain('2h ago');
 });
 
 test('the tick that makes the read stale stops the spinner, keeps T3’s activity and puts work at Verify back on the desk', async () => {
@@ -108,7 +105,7 @@ test('the tick that makes the read stale stops the spinner, keeps T3’s activit
     const { tickAt } = await mounted(
         boardOf([running('I_build', 'In progress', titles), running('I_verify', 'Verify')], 60),
     );
-    const onDesk = () => $$('.desk-card').map((card) => card.getAttribute('data-item'));
+    const onDesk = () => $$('.desk-row').map((card) => card.getAttribute('data-item'));
 
     expect($('.lar-status-spin')).not.toBeNull();
     expect(text($('[data-activity="working"] [data-action]'))).toBe('Run the tests');

@@ -32,7 +32,6 @@ export { PrAction } from './PrLink';
 export { PrList } from './PrList';
 export { RowActions } from './RowActions';
 export { SliceBar, SliceList } from './SliceParts';
-export { shownSliceProgress } from './SliceProgress';
 export { SourceIcon } from './SourceIcon';
 export { StartAfterError, StartOrAfter } from './StartAfter';
 export { StartBuild } from './StartBuild';

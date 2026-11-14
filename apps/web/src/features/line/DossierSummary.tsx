@@ -164,7 +164,12 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         ...(parent.refinement?.complete ? [{ words: 'Refined', tone: 'success' as const, refined: true }] : []),
         ...(noDelivery(parent) ? [{ words: 'no delivery planned', tone: 'neutral' as const }] : []),
         ...count(m.fog.length, m.fog.length === 1 ? 'open question' : 'open questions', 'neutral', <CircleHelp />),
-        ...count(m.unroutedFog.length, 'Fog to reconcile', 'warning', <CircleHelp />),
+        ...count(
+            m.unroutedFog.length,
+            m.unroutedFog.length === 1 ? 'question to route' : 'questions to route',
+            'warning',
+            <CircleHelp />,
+        ),
     ];
 }
 

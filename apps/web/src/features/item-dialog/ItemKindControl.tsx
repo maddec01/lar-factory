@@ -11,10 +11,11 @@ import { KIND_BADGES } from '@/features/items';
 import { SAMPLE_READ_ONLY } from '@/services/board/board.service';
 import { buttonKind, ChangeFailed } from '@/ui/board';
 
+// Each kind's icon and name without its hue: the dialog marks kind without colour, as the board does.
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
-    const { name, icon: Icon, hue } = KIND_BADGES[value]!;
+    const { name, icon: Icon } = KIND_BADGES[value]!;
 
-    return { value, label: name, hue, icon: <Icon aria-hidden="true" /> };
+    return { value, label: name, icon: <Icon aria-hidden="true" /> };
 });
 
 /**
@@ -48,8 +49,9 @@ export function ItemKindControl({ item, fallback }: { item: Item; fallback: Reac
 
     return (
         <span data-kind-control>
+            {/* An inline select, its icon and word in the text colour, as the board marks kind without colour. */}
             <OptionSelect
-                presentation="badge"
+                presentation="inline"
                 ref={control}
                 writesOnPick
                 label="Kind"

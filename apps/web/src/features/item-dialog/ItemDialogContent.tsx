@@ -9,7 +9,6 @@ import { canStopShaping } from './can-stop-shaping';
 import { CompleteReleaseStep } from './CompleteReleaseStep';
 import { ConceptParts } from './ConceptParts';
 import { isGroupParent } from './group-parent';
-import { GroupDetails } from './GroupDetails';
 import { ItemAside } from './ItemAside';
 import { ItemComments } from './ItemComments';
 import { ItemDescription } from './ItemDescription';
@@ -102,7 +101,6 @@ export function ItemDialogContent({
             headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
             headerDetails={
                 <>
-                    {group && <GroupDetails item={item} />}
                     <AgentWork item={item} label={item.kind === 'concept' ? 'Direct work' : undefined} />
                     {(!group || item.usageState === 'loading' || item.usageState === 'failed') && (
                         <AgentWorkNote item={item} />
@@ -114,14 +112,17 @@ export function ItemDialogContent({
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
                 <ItemDialogBody fill={fill} data-item-body>
+                    {/* What waits on you leads the body, before where the work stands. */}
+                    {!item.setAside && <NeedsYou item={item} data={data} />}
                     {!group && !item.setAside && <ItemProgress item={item} />}
+                    {/* What its agents do now, right after where the work stands, before the ticket's own facts. */}
+                    <ItemAgents item={item} />
                     {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                     {item.shapingCleanupProblem && (
                         <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
                     {!item.setAside && (
                         <>
-                            <NeedsYou item={item} data={data} />
                             <VerifyBuild item={item} />
                             <RetroFollowups item={item} />
                         </>
@@ -175,7 +176,6 @@ export function ItemDialogContent({
                         <MainColumnSlot>
                             <Stack>
                                 <ItemMeta item={item} read={read} refresh={refresh} now={now} />
-                                <ItemAgents item={item} />
                                 <EarlierThreads item={item} data={data} />
                             </Stack>
                         </MainColumnSlot>

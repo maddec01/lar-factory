@@ -21,7 +21,6 @@ import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './Dossi
 import { PartStart } from './PartStart';
 import { figuresOf, opensItem } from './RowDetails';
 import { YOURS, lastSeen } from './StageStatus';
-import { Track } from './StageTrack';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { PartKindLabel } from './WorkMapParts';
 import {
@@ -42,9 +41,7 @@ import {
 import {
     PartRow as DesignPartRow,
     PartsList as DesignPartsList,
-    PartTrack,
     PartWaits,
-    RefButton,
     RowCount,
     ShowDoneToggle,
     ThreadLine as DesignThreadLine,
@@ -81,8 +78,8 @@ function ThreadLine({ part }: { part: Part }) {
     );
 }
 
-/** The one thing a part asks next: its item details, or its Start (or Start after while it waits). Otherwise its thread,
- *  when it has one, or while its status says one works on it, and what it waits on beside that. */
+/** The one thing a part asks next: its thread when it waits on you, or its Start unless other work holds it. Otherwise
+ *  its thread, when it has one, or while its status says one works on it, and what it waits on beside that. */
 function Action({ part, data }: { part: Part; data: BoardData }) {
     const { status } = part.item;
     const { working } = useShownStatus(part.item);
@@ -91,14 +88,12 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
     if (!done && working)
         return <OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} />;
 
-    if (!done && YOURS.includes(status))
-        return (
-            <RefButton title={itemName(part.item)} onOpen={() => open(part.item)}>
-                Open item details
-            </RefButton>
-        );
+    // A part that waits on you opens its thread, as the desk's row does; its row opens its details.
+    if (!done && YOURS.includes(status)) return <OpenThread item={part.item} data={data} />;
 
-    if (!done && (status === 'Ready' || status === 'Queued')) return <PartStart part={part} data={data} />;
+    // A part held by other work says so in its state and offers no start, as a lane's blocked row.
+    if (!done && (status === 'Ready' || status === 'Queued'))
+        return openWaits(part).length ? null : <PartStart part={part} data={data} />;
 
     const waiting = !done && openWaits(part).length > 0;
 
@@ -121,16 +116,15 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
 function PartRow({ part, data, home }: { part: Part; data: BoardData; home: string }) {
     const { item } = part;
     const isPicked = usePicked(item);
-    const waits = openWaits(part);
     const shown = useShownStatus(item);
-    const running = useStatusActivity();
     const s = figuresOf(item, data);
     const activity = useActivityState(item);
     const still = useActivityStill(item);
     // The one presenter's word, the same a row and the dialog say for this part.
     const word = shown.word;
     const slices = item.slices.length;
-    const hasThreadLine = !!activity || !!shownThread(part, shown.working) || waits.length > 0;
+    // Its state already names what it waits on, so the thread line says only what a thread does.
+    const hasThreadLine = !!activity || !!shownThread(part, shown.working);
 
     return (
         <DesignPartRow
@@ -143,16 +137,6 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
                 <>
                     <PartKindLabel kind={part.kind} />
                     {repoKey(item) !== home && <RepoCell item={item} />}
-                    {!item.setAside && (
-                        <PartTrack>
-                            <Track
-                                status={isDone(item) ? 'Done' : item.status}
-                                running={running(item)}
-                                label={word}
-                                waiting={waits.length > 0}
-                            />
-                        </PartTrack>
-                    )}
                     <span>
                         {retiredPartLabel(item) ?? (isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word))}
                     </span>

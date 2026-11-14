@@ -3,15 +3,13 @@
 
 import { SegmentedProgress, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { ChevronRightIcon } from '@lar-works/design-system/icons';
-import { BadgeBase as Badge } from '@lar-works/design-system/primitives';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { PartTiles } from './PartTiles';
 import { pickedRow, ROW_OPENS } from './RowStyles';
 
 const stop = (event: MouseEvent) => event.stopPropagation();
 
-/** A dossier, a tile on its section's card like a stage row, named by `label`; `id` names it as `data-dossier`. */
+/** A dossier, a line on its section's card like a stage row, named by `label`; `id` names it as `data-dossier`. */
 export function DossierRow({
     id,
     label,
@@ -25,17 +23,13 @@ export function DossierRow({
     children: ReactNode;
 }) {
     return (
-        <article
-            className="border-line bg-surface-sunken @container overflow-hidden rounded-lg border"
-            data-dossier={id}
-            aria-label={label}
-        >
+        <article className="@container" data-dossier={id} aria-label={label}>
             {children}
         </article>
     );
 }
 
-/** The dossiers in the dock, apart by gaps. */
+/** The dossiers in the dock, rounded rows a hair apart. */
 export function DossierList({
     children,
 }: {
@@ -43,7 +37,7 @@ export function DossierList({
     children: ReactNode;
 }) {
     return (
-        <div className="grid gap-1.5" data-dossiers>
+        <div className="grid gap-0.5" data-dossiers>
             {children}
         </div>
     );
@@ -80,10 +74,11 @@ export function DossierToggle({
 }
 
 /** A dossier's line: a click anywhere on it but its controls goes to `onClick`; `title` gives what its chips and threads
- *  say. */
+ *  say; `attention` marks one with work that waits on you, as a stage row's. */
 export function DossierLine({
     item,
     picked,
+    attention = false,
     title,
     onClick,
     children,
@@ -92,6 +87,8 @@ export function DossierLine({
     item: string;
     /** The item the dialog shows now. */
     picked: boolean;
+    /** Some of its work waits on you. */
+    attention?: boolean;
     /** What its chips and threads say, as the line's tooltip. */
     title?: string | undefined;
     /** Called with a click anywhere on the line but its controls. */
@@ -103,8 +100,9 @@ export function DossierLine({
         <div
             onClick={onClick}
             data-item={item}
+            data-attention={attention || undefined}
             title={title}
-            className={`hover:bg-fill-hover cursor-pointer py-2 ${pickedRow(picked)}`}
+            className={`hover:bg-fill-hover cursor-pointer rounded-lg py-2 ${pickedRow(picked)}`}
         >
             {children}
         </div>
@@ -147,7 +145,7 @@ export function DossierTitle({
             }}
             title={name}
             data-title
-            className={`text-fg w-full min-w-0 rounded-xs text-left text-sm leading-5 font-medium wrap-anywhere hover:underline ${ROW_OPENS}`}
+            className={`text-fg min-w-0 flex-1 rounded-xs text-left text-sm leading-5 wrap-anywhere hover:underline ${ROW_OPENS}`}
         >
             {children}
         </button>
@@ -200,8 +198,9 @@ export function DossierRepos({
 /** A dossier chip's tone. */
 export type DossierChipTone = 'warning' | 'danger' | 'neutral' | 'accent' | 'success';
 
-/** The dossier's first chip whole, at its full width, and how many `more` its line's tooltip names. Its clicks stay
- *  there. */
+/** The dossier's first chip whole, at its full width, as its icon and words (in the foreground when it asks something
+ *  of you), then how many `more` there are, which they name on hover, so the row keeps to one summary. Its clicks
+ *  stay there. */
 export function DossierChips({
     first,
     more,
@@ -212,21 +211,22 @@ export function DossierChips({
     more: string[];
 }) {
     return (
-        <span onClick={stop} className="flex min-w-0 flex-wrap items-center gap-1" data-chips>
-            <Badge
-                tone={first.tone}
-                className="whitespace-nowrap tabular-nums"
+        <span onClick={stop} className="flex min-w-0 flex-wrap items-center gap-2" data-chips>
+            <span
+                className={`flex items-center gap-1.5 whitespace-nowrap tabular-nums [&>svg]:size-3.5 ${first.tone === 'warning' || first.tone === 'danger' ? 'text-fg' : 'text-fg-muted'}`}
                 data-chip
+                data-tone={first.tone}
                 data-refined={first.refined || undefined}
             >
                 {first.icon}
                 {first.words}
-            </Badge>
-            {more.map((words) => (
-                <Badge key={words} tone="neutral" data-chips-more>
-                    {words}
-                </Badge>
-            ))}
+            </span>
+            {/* The rest are in the line's tooltip, so the row keeps to one summary. */}
+            {more.length > 0 && (
+                <span className="text-fg-muted text-xs whitespace-nowrap" title={more.join(' · ')} data-chips-more>
+                    +{more.length} more
+                </span>
+            )}
         </span>
     );
 }
@@ -320,7 +320,7 @@ export function PartsBar({
     );
 }
 
-/** What an expanded dossier holds, under its line; its parts are tiles on the dossier's tile. */
+/** What an expanded dossier holds, in a rounded panel under its line; its parts are rows, as a lane's. */
 export function DossierBody({
     children,
 }: {
@@ -328,8 +328,8 @@ export function DossierBody({
     children: ReactNode;
 }) {
     return (
-        <div className="border-line grid gap-3 border-t p-3" data-dossier-body>
-            <PartTiles value>{children}</PartTiles>
+        <div className="grid gap-3 rounded-xl border p-3" data-dossier-body>
+            {children}
         </div>
     );
 }

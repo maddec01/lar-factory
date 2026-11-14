@@ -130,10 +130,14 @@ beforeEach(() => {
     fetchMock.mockClear();
     vi.stubGlobal('EventSource', FakeEventSource);
     vi.stubGlobal('fetch', fetchMock);
-    // jsdom has no layout: scrolling does nothing, and nothing prefers reduced motion.
+    // jsdom has no layout: scrolling does nothing, nothing prefers reduced motion, and the window is desktop-wide.
     vi.stubGlobal('scrollTo', vi.fn());
     vi.stubGlobal('scrollBy', vi.fn());
-    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
+    vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query.includes('min-width'),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+    }));
     // The design system's stubs (src/test/setup.ts) give elements a scrollIntoView that does nothing; a test reads
     // its calls.
     vi.spyOn(HTMLElement.prototype, 'scrollIntoView');

@@ -264,18 +264,21 @@ test('spend shows the known figures with a plus while some usage is unavailable,
     ).toBeTruthy();
 });
 
-test('spend shows a dash with no figures known and usage unavailable, and its panel says usage is unavailable', async () => {
+test('spend shows a dash with no figures known and usage unavailable while the first read runs, its panel says usage is unavailable, and it goes once the read settles with nothing priced', async () => {
     const data = structuredClone(completeSample);
 
     data.items = [];
     data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
-    await mountPage(data);
+    await mountPage({ ...data, firstRead });
     expect(value(counter('spend'))).toBe('–');
 
     const pop = await openCounter('spend');
 
     expect(head(pop)).toBe('Agent spendUnavailable');
     expect(text(pop.querySelector('p'))).toBe('Usage is unavailable, so nothing is priced.');
+    await close();
+    await push(data);
+    expect(counter('spend'), 'a counter shows only while it has something to count').toBeUndefined();
 });
 
 test('unavailable usage takes precedence over loading', async () => {

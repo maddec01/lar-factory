@@ -27,7 +27,8 @@ import { conceptIcons } from '@/ui/board';
 
 const PANES = ['shaping', 'ready', 'build'];
 const SHAPING = [130];
-const BUILD = [31, 149, 34, 147, 142, 141, 150, 30];
+// Build's own work first, furthest along first, then what waits on Your desk, in its order.
+const BUILD = [149, 150, 30, 31, 34, 147, 142, 141];
 const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
 const row = (id: string) =>
     $(`:is([data-stage="shaping"], [data-stage="ready"], [data-stage="build"]) li[data-item="${id}"]`)!;
@@ -154,7 +155,8 @@ test('Build’s header counts the factory’s builds against the automatic build
     const header = $('[data-stage="build"] header .build-limit')!;
 
     expect(text(header), 'In progress and Review count').toBe('+38 building · limit 2 · 6 over the limit');
-    expect(text($('[data-ready-build-controls]'))).toContain('+38 building · limit 2 · 6 over the limit');
+    // Build's header carries the occupancy; Ready's controls keep only what starts builds.
+    expect(text($('[data-ready-build-controls]'))).toBe('Auto-build');
     expect(header.getAttribute('title')).toContain(
         'At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.',
     );
@@ -287,12 +289,12 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
         error: null,
         board: { ...blocked, armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } },
     });
-    expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts build after #202 ✓', 'true']);
+    expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
     expect(after().title).toBe('Starts by itself once #202 completes. Pressing it again disarms it');
     await press(after());
     expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'I_sample13' }]);
     await answer({ error: null, board: { ...blocked, armed: {} } });
-    expect(text(after()), 'the row already says what blocks it').toBe('Start build after #202');
+    expect(text(after()), 'the row already says what blocks it').toBe('Start after #202');
     expect(after().title, 'nothing starts by itself until it is armed').toBe(
         'Pick a model to start it once #202 completes',
     );
@@ -515,7 +517,8 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
 
     await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
     expect(slices()).toEqual({
-        segments: ['ready', 'active', 'waiting', 'off', 'waiting'],
+        // A slice blocked by another reads grey, as amber is kept for what waits on you.
+        segments: ['ready', 'active', 'off', 'off', 'off'],
         count: '1/5 slices',
         next: 'blocked Issue 67 +2 more',
     });
@@ -610,7 +613,7 @@ test('the status tooltip follows the latest real thread across shaping and build
             );
 
             if (status === 'Shaping' && state === 'needs you') {
-                expect($(`.desk-card[data-item="${id}"]`)).not.toBeNull();
+                expect($(`.desk-row[data-item="${id}"]`)).not.toBeNull();
             } else expect(activity(), `${status}: ${state}`).toBe(expected);
         }
         await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
@@ -755,7 +758,7 @@ test.each(['Verify', 'Ready to merge'] as const)(
         const running = threads('running', { currentRunning: true });
         const receive = async (data: BoardData) =>
             settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
-        const desk = () => $('.desk-card[data-item="I_sample13"]');
+        const desk = () => $('.desk-row[data-item="I_sample13"]');
 
         await mountPage(at(running));
         expect(desk()).toBeNull();
@@ -769,7 +772,7 @@ test.each(['Verify', 'Ready to merge'] as const)(
         ]);
         await receive(at(threads('done'), { slices: [] }));
         expect(text(desk())).toContain('Review PR');
-        expect(text(desk()!.querySelector('.desk-actions'))).toContain('Review PR');
+        expect(text(desk()!.querySelector('[data-col="side"]'))).toContain('Review PR');
         expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
         expect(posted()).toEqual([]);
         await receive(at(running));
@@ -777,7 +780,8 @@ test.each(['Verify', 'Ready to merge'] as const)(
         await settle(async () =>
             (await import('@/services/board/board.hooks')).useBoardStore.getState().fail('HTTP 502'),
         );
-        expect(text(desk())).toContain('Review PR');
+        // Disconnected, the row offers no Review PR button; Verify's status names the step instead.
+        expect(text(desk())).toContain(status === 'Verify' ? 'Verify build' : 'Review PR');
         expect(posted()).toEqual([]);
     },
 );
@@ -812,19 +816,21 @@ describe('the activity line', () => {
 
     test('five minutes with no action reads Quiet, unless a tool still runs', async () => {
         await mountPage(at({ activity: acting('Read a.ts', 295) }));
-        expect(text(state('I_sample13'))).toBe('Implementing');
+        // While its sentence says what the thread does, the state's place holds the row's cost.
+        expect(line()!.dataset.activity).toBe('working');
+        expect(text(state('I_sample13'))).toBe('$1.85');
         await settle(() => vi.advanceTimersByTime(5_000));
         expect(line()!.dataset.activity).toBe('quiet');
         expect(lineText(), 'with no second age').toBe('No action for 5m');
         expect(line()!.querySelector('[data-action]')!.className).toContain('text-fg');
         expect(line()!.querySelector('[data-action]')!.className).not.toContain('text-warning-fg');
         expect(line()!.querySelector('[data-mark]')!.className).toContain('border-warning-fg');
-        expect(text(state('I_sample13'))).toBe('Idle');
+        expect(text(state('I_sample13'))).toBe('$1.85');
         expect(moving(), 'a quiet thread is still at work').not.toBeNull();
         await settle(async () =>
             (await store()).receive(at({ activity: acting('pnpm test', 1800, { toolRunning: true }) })),
         );
-        expect(text(state('I_sample13'))).toBe('Implementing');
+        expect(line()!.dataset.activity, 'a running tool keeps it working').toBe('working');
         expect(lineText()).toContain('pnpm test');
     });
 
@@ -865,7 +871,7 @@ describe('the activity line', () => {
         const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
 
         await mountPage(at());
-        expect(text(state('I_sample13'))).toBe('Implementing');
+        expect(text(state('I_sample13'))).toBe('$1.85');
         expect(moving()).not.toBeNull();
         // The system time alone moves, as the page's poll would bring the sample back.
         vi.setSystemTime(NOW + ACTIVITY_STALE_MS - 1_000);
@@ -885,7 +891,7 @@ describe('the activity line', () => {
             ),
         );
         expect(line()!.dataset.activity).toBe('working');
-        expect(text(state('I_sample13'))).toBe('Implementing');
+        expect(text(state('I_sample13'))).toBe('$1.85');
     });
 });
 
@@ -988,10 +994,11 @@ test('status icons require current execution and suppress unavailable, cached, h
         await settle(() => useBoardStore.getState().receive(next));
         expect(motion(), `after ${label}`).toHaveLength(0);
         expect($('[data-stage="build"] header .lar-status-spin'), `after ${label}`).toBeNull();
+        // With nothing building, the title bar leaves its building counter out.
         expect(
             $$('[data-slot=toolbar-counter]')
-                .find((counter) => counter.textContent!.startsWith('building:'))!
-                .querySelector('.lar-status-spin'),
+                .find((counter) => counter.textContent!.startsWith('building:'))
+                ?.querySelector('.lar-status-spin') ?? null,
             `after ${label}`,
         ).toBeNull();
     }

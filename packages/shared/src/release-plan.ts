@@ -1,3 +1,6 @@
+import type { Item } from './item-domain.ts';
+import { isLiveThread } from './thread-domain.ts';
+
 /** Local delivery evidence for a concept or linked-work parent. Step order is execution order. */
 export interface ReleaseEvidence {
     by: string;
@@ -31,4 +34,43 @@ export function pendingPedroReleaseStep(plan: ReleasePlan | null | undefined) {
     const step = plan?.steps.find((step) => !step.done);
 
     return step && isPedroReleaseStep(step) ? step : undefined;
+}
+
+/** Stored before dispatch; retries after a lost response reuse both T3 identities. */
+export interface OutcomeCheckRun {
+    digest: string;
+    ownerWorkId: string;
+    threadId: string;
+    commandId: string;
+    messageId: string;
+    requestedAt: string;
+    sent: boolean;
+    error: string | null;
+    rejected?: boolean;
+}
+
+/** A missing owner, failed check, failed dispatch or owner that ended without evidence returns to Pedro. */
+export function outcomeNeedsPedro(item: Item, all: readonly Item[] = []): boolean {
+    if (!item.outcomeCheck?.ready) return false;
+
+    const run = item.outcomeCheck.run;
+
+    if (!run || run.error || item.releasePlan?.outcomeCheck.result === 'failed') return true;
+
+    const owner = all.find((candidate) => candidate.id === run.ownerWorkId);
+    const thread = Array.isArray(owner?.threads)
+        ? owner.threads.find((thread) => thread.id === run.threadId)
+        : undefined;
+
+    if (!owner || (Array.isArray(owner.threads) && !thread)) return true;
+
+    return (
+        !!thread &&
+        !isLiveThread(thread) &&
+        !thread.hasRunningChildren &&
+        !thread.observedAt &&
+        ['done', 'stopped'].includes(thread.state ?? '') &&
+        !!thread.updated &&
+        Date.parse(thread.updated) >= Date.parse(run.requestedAt)
+    );
 }

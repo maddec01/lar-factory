@@ -71,3 +71,20 @@ test('the expanded panel has one progress status and only shows capacity when it
 
     expect(full.querySelectorAll('[data-shared-build-capacity]')).toHaveLength(1);
 });
+
+test('a completed scheduling run never presents Pause or Start again', () => {
+    const markup = renderToStaticMarkup(
+        createElement(ConceptBuildRun, {
+            plan: { run: { state: 'completed', startedAt: '2026-11-14', prepared: {} }, members: [], holds: [] },
+            pending: false,
+            error: null,
+            onChange: () => {},
+            startLabel: 'Start concept builds',
+            capacity: null,
+        }),
+    );
+
+    expect(markup).toContain('All planned builds complete.');
+    expect(markup).not.toContain('Paused');
+    expect(markup).not.toContain('<button');
+});

@@ -314,6 +314,11 @@ export function createBoardServer({
             what: 'the exact brief for approval',
             run: forItem('Name the brief to display.', (id, input) => commands.inspectBrief(id, input)),
         },
+        '/api/record-outcome-check': {
+            sampleWrite: 'fake',
+            what: 'the Outcome check',
+            run: forItem('Name the parent Outcome check.', (id, input) => commands.recordOutcomeCheck(id, input)),
+        },
         '/api/complete-release-step': {
             sampleWrite: 'fake',
             what: 'the pending release step',

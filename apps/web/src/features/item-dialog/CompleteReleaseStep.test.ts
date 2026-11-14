@@ -120,3 +120,52 @@ test('a release-step board approval displays its actor, timestamp and exact evid
     expect(text(dialog)).toContain('Approved manifest 123.');
     expect(dialog.querySelector(`time[datetime="${at}"]`)).not.toBeNull();
 });
+
+test('an Outcome without an agent owner reaches the desk and records evidence through a board button', async () => {
+    const item = {
+        ...parent,
+        releasePlan: { ...parent.releasePlan, steps: [] },
+        outcomeCheck: { ready: true, digest: 'composition-1', run: null },
+    };
+    const board = fresh({ ...sample, items: [item] });
+
+    fetchMock.mockImplementation(
+        async () => new Response(JSON.stringify({ ...board, error: 'The delivered composition changed.' })),
+    );
+    await mountPage(board);
+
+    const action = [...document.querySelectorAll<HTMLButtonElement>('.desk button')].find(
+        (button) => button.textContent === 'Record Outcome',
+    );
+
+    expect(action).toBeTruthy();
+    await settle(() => action!.click());
+
+    const form = document.querySelector('[data-outcome-form]')!;
+
+    expect(form).not.toBeNull();
+
+    const input = form.querySelector('input')!;
+
+    await settle(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+            input,
+            'Merged A+B composition passed.',
+        );
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await settle(() =>
+        [...form.querySelectorAll('button')].find((button) => button.textContent === 'Outcome passed')!.click(),
+    );
+    expect(posted().at(-1)).toEqual([
+        '/api/record-outcome-check',
+        {
+            itemId: item.id,
+            revision: 12,
+            inputDigest: 'composition-1',
+            result: 'passed',
+            evidence: 'Merged A+B composition passed.',
+        },
+    ]);
+    expect(text(form)).toContain('The delivered composition changed.');
+});

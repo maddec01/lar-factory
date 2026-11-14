@@ -1,13 +1,22 @@
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
-import { questionOwnerParent, questionThreadAction } from './question-thread.ts';
-import { pendingPedroReleaseStep } from './release-plan.ts';
+import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
+import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
-    if (item.briefApproval)
+    if (outcomeNeedsPedro(item, all))
+        return { label: 'Outcome check', action: { kind: 'details' as const, label: 'Record Outcome' } };
+
+    if (pendingBriefBatch(item, all).length)
+        return { label: 'Approve briefs', action: { kind: 'details' as const, label: 'Approve briefs' } };
+
+    const parent = all.find((candidate) => candidate.id === item.parentId);
+    const inBatch = parent && pendingBriefBatch(parent, all).some((part) => part.id === item.id);
+
+    if (item.briefApproval && !inBatch)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
 
     if (retroWaits(item.retro))

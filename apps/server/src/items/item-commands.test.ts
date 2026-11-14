@@ -20,7 +20,7 @@ import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands, type ItemCommands, type ItemCommandsDeps } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
 import { NO_THREAD } from './needs-you-causes.ts';
-import { observeRecords } from './observe-records.ts';
+import { finishCompleted, observeRecords } from './observe-records.ts';
 import { archivedItems, recordItems } from './record-items.ts';
 
 const WEB = 'contoso/Fabrikam/web';
@@ -1525,7 +1525,9 @@ function recordedCommands(
         startAnswer = () => null,
         resumeLaunch,
         clearedFailuresFile = null,
+        outcomeSend,
     }: {
+        outcomeSend?: NonNullable<ItemCommandsDeps['briefApprovalDeps']>['send'];
         clearedFailuresFile?: string | null;
         cleanupChoice?: () => ShapingThreadCleanup;
         startAnswer?: () => StartResult | null;
@@ -1556,6 +1558,7 @@ function recordedCommands(
     const started: string[] = [];
     const commands = createItemCommands({
         clearedFailuresFile,
+        outcomeDeps: { send: outcomeSend },
         factoryContext: null,
         checkoutOf: async () => '/repo',
         inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }),
@@ -3151,5 +3154,58 @@ for (const purpose of ['shape', 'build'] as const) {
         await commands.reconcileStarts(board.snapshot().items);
         assert.equal(launched, 1);
         assert.equal(records.launchIntents({ workId: work.workId, unresolved: true }).length, 1);
+    });
+}
+
+for (const kind of ['concept', 'feature'] as const) {
+    test(`automatically dispatches the ${kind} Outcome once and completes after evidence`, async () => {
+        const records = await openRecords();
+        const parent = records.create({ title: 'Composition', repository: WEB, kind, status: 'In progress' });
+        const id = parent.workId;
+        const revision = () => records.read(id).revision;
+
+        if (kind === 'concept') records.setFogGone(id, revision(), true);
+
+        records.addThread(id, revision(), 'group-owner', 'shape');
+
+        const part = records.createPart({
+            parentId: id,
+            parentRevision: revision(),
+            title: 'Part',
+            repository: WEB,
+            kind: 'build',
+            body: 'Blocked by: none',
+            blockerIds: [],
+        });
+
+        records.setPullRequest(part.workId, part.revision, `${WEB}#91`);
+        records.setReleasePlan(id, revision(), { steps: [], outcomeCheck: 'Check merged composition.' });
+
+        const send = vi.fn(async () => ({ outcome: 'accepted' as const, sequence: 1 }));
+        const s = recordedCommands(records, { outcomeSend: send });
+
+        await s.commands.reconcileStarts(s.board.snapshot().items);
+        assert.equal(send.mock.calls.length, 0);
+        records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
+        s.reread();
+        await s.commands.reconcileStarts(s.board.snapshot().items);
+        assert.equal(send.mock.calls.length, 1);
+        assert.match(JSON.stringify(send.mock.calls), /group-owner/);
+
+        const restarted = recordedCommands(records, { outcomeSend: send });
+
+        await restarted.commands.reconcileStarts(restarted.board.snapshot().items);
+        assert.equal(send.mock.calls.length, 1);
+        records.recordOutcomeCheck(
+            id,
+            revision(),
+            'passed',
+            'Outcome owner',
+            'Exact merged composition passed.',
+            records.outcomeCheck(id).digest,
+        );
+        finishCompleted(records, [WEB]);
+        assert.equal(records.read(id).status, 'Done');
+        assert.ok(records.read(id).finishedAt);
     });
 }

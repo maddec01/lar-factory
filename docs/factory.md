@@ -129,6 +129,9 @@ shows whether it is queued. A completed part stays available in its group's
 history.
 
 Your desk lists everything waiting on Pedro, of any Kind and at any stage.
+A pending group brief batch has one Approve briefs card naming the parent and its
+members, rather than separate member approval cards. It opens the existing exact
+batch display and board approval buttons; unfinished Doubt remains an agent wait.
 This includes concepts, linked-work parents, decisions, builds and slice questions.
 The item also stays in its group or ordinary stage section. A card names the item,
 its Project and its concept or parent when present. It says what is needed and
@@ -602,6 +605,16 @@ an `outcomeCheck` describing the final observable check. These records belong
 to a linked-work or concept parent. `complete-release-step` records the named
 step's done evidence and identity after preceding steps are done.
 `record-outcome-check` records passed or failed with evidence after all steps and release.
+Once every active part is complete and all release steps have receipts, the board
+queues one durable Outcome check to the group owner (or its decision owner), for
+concepts and linked work alike. T3 dispatch retries reuse the stored command and
+message IDs. The owner checks actual merged revisions together and records commands,
+results and merged SHAs with `--input-digest` from that dispatch. Changed delivery
+inputs reject the receipt. Passing evidence lets the board finish the parent.
+A missing owner, dispatch error, failed check or owner ending without evidence
+puts Record Outcome on Your desk and in the parent dialog. Pedro records passed
+or failed with evidence through that board button. Reconcile reports the pending
+Outcome as a mechanical hold; merges alone never establish its result.
 A future Outcome criterion never holds refinement. The board shows planned
 checks separately and reaches release/Outcome waits only after delivery builds complete.
 A changed plan needs fresh evidence; previous versions remain in the database.
@@ -623,7 +636,7 @@ Today: the board generates map parts, live status, queue membership, gate state
 and blocker/Dependency edges from the records. Map prose supplies destination,
 choices and boundaries, never graph facts or Dependencies. `children` is verbose
 JSON; there is no compact CLI view or dependency-aware queue order. `refinement`,
-`completion` and `waiting-on` exist. Release steps and Outcome check evidence do not participate in structured completion.
+`completion` and `waiting-on` exist. Release steps and Outcome check evidence participate in structured completion; the board dispatches the final check after its prerequisites complete.
 
 ### One action, shared capacity and Auto-build
 
@@ -633,7 +646,10 @@ Every prerequisite needing Pedro, including external Dependency acceptance,
 must already be met. Remaining automatic release waits are shown before Start.
 The action saves `buildRun: running` with the prepared record
 revisions. Pause concept builds stops future starts and preserves active work.
-A new scope change pauses the run until affected gates pass again.
+A new scope change pauses the run until affected gates pass again. The run compares
+scheduling contracts (parts, scope, gate digests and blockers); projection whitespace
+and Notes do not change its authorization. Once all parts are complete the build
+run is completed, while release and Outcome may still wait.
 
 The scheduler never builds an ungated Queued record. A running concept starts
 all eligible Ready builds together up to the shared capacity. Blockers determine

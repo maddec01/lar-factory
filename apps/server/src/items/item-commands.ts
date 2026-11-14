@@ -89,6 +89,7 @@ import { importPickedTicket } from './import-ticket.ts';
 import type { ItemSource } from './item-source.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
+import { createOutcomeCheck } from './outcome-check.ts';
 import { createPrMerge } from './pr-merge.ts';
 import { createReleaseStep } from './release-step.ts';
 import { createRetro } from './retro.ts';
@@ -105,6 +106,7 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+    recordOutcomeCheck(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     completeReleaseStep(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     stopShaping(itemId: string): Promise<Reply>;
     inspectBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
@@ -234,6 +236,7 @@ export interface ItemCommandsDeps {
     /** Starts a T3 thread; tests stand in for t3. */
     startThread?: typeof startThread;
     resumeLaunch?: typeof resumeLaunch;
+    outcomeDeps?: Pick<Parameters<typeof createOutcomeCheck>[0], 'send'>;
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
@@ -404,11 +407,13 @@ export function createItemCommands({
     briefApprovalDeps,
     shapingControlDeps,
     retroDeps,
+    outcomeDeps,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
     readPr = (repo, number) => observePr(repo, number),
 }: ItemCommandsDeps): ItemCommands {
     const gating = createBriefApproval({ board, records, reread, ...briefApprovalDeps });
+    const outcomes = createOutcomeCheck({ board, records, reread, ...outcomeDeps });
     const retros = createRetro({ board, records, reread, ...retroDeps });
     const verifying = createVerification({ board, records, reread, ...verificationDeps });
     const merging = createPrMerge({
@@ -1408,6 +1413,7 @@ export function createItemCommands({
 
     return {
         ...gating,
+        recordOutcomeCheck: outcomes.recordOutcomeCheck,
         ...createShapingControl({ board, records, reread, ...shapingControlDeps }),
         ...createReleaseStep({ board, records, reread }),
         ...verifying,
@@ -1420,6 +1426,7 @@ export function createItemCommands({
             await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
             await retros.reconcileRetros();
+            await outcomes.reconcileOutcomeChecks();
 
             const warnings = { ...board.snapshot().startCheckFailures };
 

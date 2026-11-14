@@ -1,14 +1,25 @@
 import { deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
 import { prReadiness } from './presentation.ts';
-import { delegatedBriefApproval } from './question-thread.ts';
-import { pendingPedroReleaseStep } from './release-plan.ts';
+import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
+import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-domain.ts';
 
 /** The same human wait determines desk placement and group attention. */
 export function humanWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    const parent = all.find((candidate) => candidate.id === item.parentId);
     const question = openQuestionThread(item);
+
+    if (
+        parent &&
+        pendingBriefBatch(parent, all).some((part) => part.id === item.id) &&
+        (!question || question.pendingRequest?.kind === 'brief-approval') &&
+        (!item.needsYou || /approve.*brief|brief.*approval/i.test(item.needsYou.reason))
+    )
+        return null;
+
+    if (pendingBriefBatch(item, all).length) return deskWait(item, unavailable, all);
 
     if (item.briefReviewing && !item.needsYou && (!question || question.pendingRequest?.kind === 'brief-approval'))
         return null;
@@ -22,6 +33,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         return null;
 
     const waiting =
+        outcomeNeedsPedro(item, all) ||
         retroWaits(item.retro) ||
         !!pendingPedroReleaseStep(item.releasePlan) ||
         !!item.briefApproval ||

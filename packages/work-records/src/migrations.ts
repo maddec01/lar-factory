@@ -593,4 +593,8 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'CREATE TABLE test_runtimes(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
+    (db) =>
+        db.exec(
+            'CREATE TABLE outcome_runs(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
+        ),
 ];

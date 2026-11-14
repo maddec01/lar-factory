@@ -142,3 +142,46 @@ it('keeps private slices inside their active build, without pausing the concept 
     expect(records.setConceptBuildRun(group, change(group), 'running').run?.state).toBe('running');
     expect(records.read(slice).status).toBe('Queued');
 });
+
+it('keeps scheduling after projection whitespace and completes the run after the last merge', async () => {
+    const { records, group, build, change, prepare } = await fixture();
+
+    prepare();
+    records.setBody(group, change(group), 'map', 'Approved destination\n');
+    records.setConceptBuildRun(group, change(group), 'running');
+    records.setBody(group, change(group), 'map', 'Approved destination');
+    records.reconcileConceptBuildRuns();
+    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
+    records.setPullRequest(build, change(build), 'example/b#1');
+    records.observe(build, change(build), { of: 'pr', state: 'merged' });
+    records.reconcileConceptBuildRuns();
+    expect(records.conceptBuildPlan(group).run?.state).toBe('completed');
+    expect(records.conceptBuildPlan(group).holds).toEqual([]);
+});
+
+it('ignores generated map status prose while preserving destination and decision contracts', async () => {
+    const { records, group, change, prepare } = await fixture();
+
+    prepare();
+    records.setBody(
+        group,
+        change(group),
+        'map',
+        '## Destination\nApproved destination\n\n## Map\nFirst build: Ready\n',
+    );
+    records.setConceptBuildRun(group, change(group), 'running');
+    records.setBody(
+        group,
+        change(group),
+        'map',
+        '## Destination\nApproved destination\n\n## Map\nFirst build: In progress',
+    );
+    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
+    records.setBody(
+        group,
+        change(group),
+        'map',
+        '## Destination\nChanged destination\n\n## Map\nFirst build: In progress',
+    );
+    expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
+});

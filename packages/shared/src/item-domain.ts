@@ -2,6 +2,7 @@ import { type Kind } from './board-domain.ts';
 // Instructions sent to work threads; separate from board copy.
 import type { ConceptBuildPlan } from './concept-build.ts';
 import type { KindDisagreement } from './kind-disagreement.ts';
+import type { OutcomeCheckRun } from './release-plan.ts';
 import { type ItemThread, type NeedsYouOffer, type NeedsYouCause } from './thread-domain.ts';
 
 export const STATUSES = [
@@ -305,6 +306,7 @@ export interface Item {
     retiredParts?: Item[];
     setAside?: boolean;
     supersededBy?: IssueRef & { workId: string };
+    outcomeCheck?: { ready: boolean; digest: string; run: OutcomeCheckRun | null };
     releasePlan?: import('./release-plan.ts').ReleasePlan | null;
     retro?: import('./retro.ts').Retro | null;
     reconciliation?: import('./group-reconciliation.ts').ReconcileReport;

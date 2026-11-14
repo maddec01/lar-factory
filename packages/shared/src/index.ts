@@ -56,6 +56,6 @@ export * from './group-capacity.ts';
 
 export * from './part-order.ts';
 export * from './retired-part.ts';
-export { shapingOwner } from './question-thread.ts';
+export { pendingBriefBatch, shapingOwner } from './question-thread.ts';
 
 export { conceptFog, itemFog } from './concept-fog.ts';

@@ -20,6 +20,28 @@ const work = (change: Partial<Item> = {}): Item => ({
 });
 const question = { id: 'question', state: 'needs you' } as ItemThread;
 const notice = { reason: 'Approve the brief', offers: [], causes: [], ticketOpen: true };
+
+test.each(['concept', 'linked'])('%s batch approval appears once on the parent desk card', (kind) => {
+    const parent = work({
+        id: 'parent',
+        kind: kind === 'concept' ? 'concept' : 'feature',
+        flow: 'linked',
+        needsYou: notice,
+    });
+    const parts = ['A1', 'A2', 'B1'].map((title) =>
+        work({ id: title, title, parentId: parent.id, kind: 'build', status: 'Queued', passingBrief: false }),
+    );
+    const all = [parent, ...parts];
+
+    expect(deskItems({ items: all }, false).map((item) => item.id)).toEqual(['parent']);
+    expect(deskWait(parent, false, all)).toEqual({
+        label: 'Approve briefs',
+        action: { kind: 'details', label: 'Approve briefs' },
+    });
+    for (const part of parts) part.briefApproval = { reason: 'Approve brief', digest: part.id };
+    expect(deskItems({ items: all }, false).map((item) => item.id)).toEqual(['parent']);
+});
+
 const kinds: [string, Partial<Item>, Item[]][] = [
     ['single issue', {}, []],
     ['bug', { kind: 'bug' }, []],
@@ -205,4 +227,59 @@ test('a decision-owned child gate appears once on its build with concept identit
     expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
     owner.threads = [{ ...question, questionSummary: 'Which colour should we use?' }];
     expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
+});
+
+test('Outcome is an agent wait until a failed check, dispatch failure or owner ending without evidence', () => {
+    const parent = work({
+        id: 'parent',
+        kind: 'concept',
+        outcomeCheck: {
+            ready: true,
+            digest: 'input',
+            run: {
+                digest: 'input',
+                ownerWorkId: 'parent',
+                threadId: 'owner',
+                commandId: 'command',
+                messageId: 'message',
+                requestedAt: '2026-11-14T10:00:00Z',
+                sent: true,
+                error: null,
+            },
+        },
+        releasePlan: { steps: [], outcomeCheck: { what: 'Check composition', result: 'pending', evidence: null } },
+        threads: [{ id: 'owner', state: 'running', updated: '2026-11-14T10:01:00Z' } as ItemThread],
+    });
+
+    expect(deskItems({ items: [parent] }, false)).toEqual([]);
+    parent.threads = [{ id: 'owner', state: 'done', updated: '2026-11-14T09:59:00Z' } as ItemThread];
+    expect(deskItems({ items: [parent] }, false)).toEqual([]);
+    parent.threads[0]!.updated = '2026-11-14T10:01:00Z';
+    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
+    expect(deskWait(parent, false, [parent]).action?.label).toBe('Record Outcome');
+    parent.threads[0]!.queued = true;
+    expect(deskItems({ items: [parent] }, false)).toEqual([]);
+    parent.threads[0]!.queued = undefined;
+    parent.threads[0]!.hasLiveChildren = true;
+    expect(deskItems({ items: [parent] }, false)).toEqual([]);
+    parent.threads = 'unavailable';
+    parent.outcomeCheck!.run!.error = 'T3 refused the command';
+    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
+});
+
+test('a batch suppresses member approvals while preserving an unrelated member tool request', () => {
+    const parent = work({ id: 'parent', kind: 'concept', needsYou: notice });
+    const part = work({
+        id: 'part',
+        kind: 'build',
+        parentId: parent.id,
+        passingBrief: false,
+        briefApproval: { reason: 'Approve brief' },
+        threads: [{ ...question, pendingRequest: { id: 'tool', threadId: 'question', kind: 'tool-approval' } }],
+    });
+    const all = [parent, part];
+
+    expect(deskItems({ items: all }, false)).toEqual(all);
+    expect(deskWait(parent, false, all).label).toBe('Approve briefs');
+    expect(deskWait(part, false, all).label).toBe('Approval in T3');
 });

@@ -331,6 +331,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             retro: records.retro(record.workId),
             completion: completionOf(record),
             releasePlan: records.releasePlan(record.workId),
+            ...(group && { outcomeCheck: records.outcomeCheck(record.workId) }),
             ...(record.kind === 'concept'
                 ? {
                       refinement: records.refinement(record.workId),

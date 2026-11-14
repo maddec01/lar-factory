@@ -30,7 +30,8 @@ export function ConceptBuildRun({
     onChange: (state: 'running' | 'paused') => void;
 }) {
     const running = plan.run?.state === 'running';
-    const finished = Boolean(progress?.total && progress.complete === progress.total);
+    const finished =
+        plan.run?.state === 'completed' || Boolean(progress?.total && progress.complete === progress.total);
 
     const action = (
         <Button
@@ -71,11 +72,13 @@ export function ConceptBuildRun({
             <Text variant="caption" tone="muted" role="status" data-concept-build-progress>
                 {progress && progress.total > 0
                     ? `${progress.building} building · ${progress.waiting} waiting · ${progress.complete}/${progress.total} complete`
-                    : running
-                      ? 'Starts unblocked builds as shared capacity becomes available.'
-                      : plan.run
-                        ? 'Paused · active builds continue.'
-                        : 'No builds started.'}
+                    : plan.run?.state === 'completed'
+                      ? 'All planned builds complete.'
+                      : running
+                        ? 'Starts unblocked builds as shared capacity becomes available.'
+                        : plan.run
+                          ? 'Paused · active builds continue.'
+                          : 'No builds started.'}
             </Text>
             {capacity && (
                 <Text variant="caption" tone="muted" data-shared-build-capacity>

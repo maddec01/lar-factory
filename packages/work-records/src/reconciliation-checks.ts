@@ -215,5 +215,14 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
             );
     }
 
+    if (records.outcomeCheck(groupId).ready)
+        add(
+            'release',
+            `outcome:${groupId}`,
+            groupId,
+            'Delivery and release are complete; the Outcome check still needs evidence. Run the owner check or record its result on the board.',
+            [],
+        );
+
     return items;
 }

@@ -9,7 +9,8 @@ and board-recorded approval, or a Needs you wait.
    For grouped or overlapping work, follow [Reconcile group](shared/reconcile-group.md).
    Run `lar-work build-overlap <work ID>`. Review declared Files/Contracts and
    semantic conflicts, including other concepts and standalone work. Record
-   ordering with `lar-work add-blocker`, or save reasons as
+   ordering in brief/map declarations and run `sync-blockers` on the parent or
+   standalone ID, or save reasons as
    `[ {"otherWorkId":"ID","reason":"why no ordering is needed"} ]`.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
    gets that exact package, repository paths, resolved domain-doc setting/paths,
@@ -23,10 +24,10 @@ and board-recorded approval, or a Needs you wait.
    verbatim; ask Pedro to use Approve brief in the board. Wait in Needs you
    using the single wait command in Questions. Feedback
    returns to Shaping and Doubt. Reshape always requires renewed approval. Keep approval in gate evidence, never Confirmed.
-   For a concept, inspect `lar-work gate-batch --file ids.json`: complete briefs,
+   For grouped work, inspect `lar-work gate-batch --file ids.json`: complete briefs,
    source revisions, approval/batch digests and current immutable Doubt results.
-   Only Pedro's **Approve brief** action in the board records approval. For a concept,
-   **Approve briefs** displays and approves its complete batch atomically; any
+   Only Pedro's **Approve brief** action in the board records approval. For a group,
+   **Approve briefs** holds only parts needing approval and approves that batch atomically; any
    stale text, revision or Doubt result rejects the whole batch. Agent
    `record-gate` and `record-gate-batch` calls refuse: use the one Needs you wait
    command in Questions, ask Pedro to approve in the board, and stop. A Verify note,

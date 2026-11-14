@@ -29,25 +29,20 @@ If this answer supersedes another, use `supersede-answer` per
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
    and, with domain docs ON, the drafts it settled, or "none"
    (`--body domain-drafts`). With domain docs OFF, save "none" and create no drafts.
-2. Turn fog that cleared into new decision records, through [Concepts](concepts.md). When part of
-   the destination is fully decided, make a build record for it
-   (`slice.sh <concept work ID> "<title>" <brief file> --kind build --repository <owner/repo> [--blocked-by <work ID>]...`) with a
-   brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
-   build needs. Create drafts Queued with body, parent and blockers. After saving the map,
-   follow [Brief](brief.md), check code evidence, run Doubt and [Gate](gate.md)
-   for each, then set Ready. Answers, prose dependencies and decision completion
-   never approve briefs. Record ordering with `lar-work add-blocker`; use
-   Dependencies for other teams.
+2. Turn cleared fog into decisions and settled scope into build briefs with
+   one `create-parts` batch per [Structure](shared/issue-tracker/structure.md).
+   Declare blockers in briefs and use `sync-blockers`; never edit delivery edges
+   by hand. Run [Brief](brief.md), code evidence, Doubt and [Gate](gate.md) for
+   affected builds. Answers and decision completion never approve briefs.
 3. Save the concept's map. Put only results needed to explain parts or
    relationships in Decisions so far; keep the full answer in the decision
-   record. Copy its drafts into Domain docs and remove cleared fog. Save changed
-   blockers and Dependencies in records, never map prose. Once no Fog is left, record it with
+   record. Copy its drafts into Domain docs and remove cleared fog. Sync declared blockers and save Dependencies in records. Once no Fog is left, record it with
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision with [Research](research-question.md);
 other decisions stay Queued for Start decision. After these changes, follow
 [Reconcile group](shared/reconcile-group.md), including the saved map. A proposed build
-stays Queued until [Brief](brief.md) and [Gate](gate.md) make it Ready.
+starts Queued; changed drafts stay Shaping until [Gate](gate.md) makes them Ready.
 Ask only for expanded scope, new decisions or changes to active builds. Changed
 briefs need fresh Doubt and a gate; retain the last approved ticket Spec meanwhile.
 Use `lar-work completion ID` and `lar-work refinement PARENT` and address their

@@ -7,7 +7,7 @@ import { type WorkRecords } from './work-records.ts';
 
 const active = ['kind', 'setAsideAt', 'finishedAt'];
 const build = [...active, 'buildBranch'];
-const review = [...build, 'pullRequest', 'body.brief', 'reviewRounds', 'runSettings'];
+const review = [...build, 'reviewSelection', 'pullRequest', 'body.brief', 'reviewRounds', 'runSettings'];
 
 /** Command adapter: preserve each intent and let the strict store reject a race during reapplication. */
 export function agentWrites(records: WorkRecords): WorkRecords {
@@ -91,6 +91,8 @@ export function agentWrites(records: WorkRecords): WorkRecords {
             ),
         setPullRequest: (id, rev, pr) =>
             apply(id, rev, [...build, 'pullRequest', 'observations.pr'], (r) => records.setPullRequest(id, r, pr)),
+        recordSelectedReviewRound: (id, rev, round) =>
+            apply(id, rev, review, (r) => records.recordSelectedReviewRound(id, r, round)),
         recordReviewRound: (id, rev, round) => apply(id, rev, review, (r) => records.recordReviewRound(id, r, round)),
         setFindingDisposition: (id, rev, ref, disposition, reason) =>
             apply(id, rev, review, (r) => records.setFindingDisposition(id, r, ref, disposition, reason)),

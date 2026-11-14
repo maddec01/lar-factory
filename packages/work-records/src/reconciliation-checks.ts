@@ -1,6 +1,8 @@
 import { readTicketSpec } from '@lar-factory/shared';
 import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
 
+import { blockerDeclarations, missingBlockerDeclarations } from './blocker-declarations.ts';
+import { projectionChecks } from './group-projections.ts';
 import type { WorkRecord, WorkRecords } from './work-records.ts';
 
 type Check = Omit<ReconcileItem, 'digest'>;
@@ -15,6 +17,48 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
             .filter((r) => r.kind !== 'slice')
             .flatMap((r) => [r, ...all(r.workId)]);
     const members = all(groupId);
+
+    try {
+        const declarations = blockerDeclarations(records, groupId);
+
+        for (const missing of missingBlockerDeclarations(records, groupId, declarations))
+            add(
+                'blocker',
+                `blocker-declaration:${missing.workId}`,
+                missing.workId,
+                'Normalize legacy blocker prose to a brief or local map declaration before syncing edges.',
+                [],
+            );
+        for (const [id, declared] of declarations) {
+            const stored = records
+                .blockers(id)
+                .map((b) => b.workId)
+                .sort();
+
+            if (JSON.stringify(declared) !== JSON.stringify(stored))
+                add(
+                    'blocker',
+                    `declared-blockers:${id}`,
+                    id,
+                    'Stored blockers differ from brief/map declarations; run sync-blockers.',
+                    [JSON.stringify({ declared, stored })],
+                );
+        }
+    } catch (error) {
+        add('blocker', `declared-blockers:${groupId}`, groupId, (error as Error).message, []);
+    }
+
+    items.push(...projectionChecks(records, groupId));
+    for (const request of records.partTicketRequests(groupId))
+        if (!request.ticket)
+            add(
+                'ticket',
+                `ticket-request:${request.workId}`,
+                request.workId,
+                'Requested ticket is pending; retry sync-part-tickets.',
+                [request.requestId],
+            );
+
     const route = (start: string, end: string, skip?: string): boolean => {
         const queue = [start],
             seen = new Set<string>();

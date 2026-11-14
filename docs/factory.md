@@ -53,6 +53,33 @@ output. Their CLI spelling may change only with this document.
 | `lar-work select-reviewers ID --diff-base SHA --diff-head SHA`   | Reads the saved reviewer settings and exact diff; writes `reviewSelection` with matcher version, matching evidence and a run/skip reason for every reviewer.                                                                                                                                                                                                                                                                     |
 | `lar-work record-gate-batch --file F`                            | Takes a displayed manifest of IDs, digests, Doubt results and Pedro's explicit approval. Rechecks every revision and digest before recording all gates. Any mismatch records none.                                                                                                                                                                                                                                               |
 
+`create-parts GROUP --revision N --file F` is implemented for concept and linked
+parents. F contains `{map,parts:[{key,title,repository,kind,body,blockerIds,
+ ticketRequestId?}]}`. `$key` names a new blocker; `${key}` in text inserts its
+work ID. One transaction saves every record, its Queued state, local map,
+blockers and durable ticket requests supplied by Settings. Tracker calls follow
+that commit; `sync-part-tickets GROUP` recovers the same requests after failure.
+An external tracker cannot join SQLite's transaction; no partial local group is
+published while parts are being inserted.
+
+Briefs declare `Blocked by:` with backtick unique work titles or `none`; legacy
+work IDs are also accepted. Local maps may declare `Blocker: `consumer ID`<-`prerequisite ID``. `sync-blockers GROUP --file F` derives the stored graph from
+these declarations, with `{revisions:{ID:N}}` for the group, declared records
+and all edge endpoints. It rejects stale revisions, retired prerequisites,
+cycles and redundant edges together. Missing or conflicting declarations remain holds. Normalize older free prose to declarations;
+never guess relationships or add delivery edges by hand. `reconcile` reports
+declared/stored differences as mechanical holds.
+
+Current answer and map prose keeps source fingerprints. Changes to decisions,
+briefs (including Notes), membership, blockers or build stages make that prose
+require review independently of brief approval. `refresh-projections GROUP
+--file F` saves `{revisions:{ID:N},answers:{ID:text},map?}` against every group
+revision and captures all reviewed projections together. Answer versions and
+`map-history GROUP` retain history. The command checks source freshness; the
+owner still checks semantic agreement. A map write settles incorporated decisions
+immediately. Editing a delivery draft moves it to Shaping until its new gate;
+it cannot be silently requeued after an approved draft changes.
+
 The same command layer serves the board and skills. It owns transitions,
 completion, capacity reservations, graph validation, ordering and reviewer selection.
 `record-stage` validates the transition and derives Status and the Needs you
@@ -840,6 +867,29 @@ project defaults and model choices independently of tracker reads. A disabled
 Shape shows its reason beside the control. Diagnostics shows the authenticated
 T3 project connection separately from the CLI and board server; Run checks opens
 a fresh connection. Retained observations never authorize a launch.
+
+A delivery approval binds its brief and confirmed scope, cited decision answers,
+named sibling contracts/file overlaps, declared prerequisites, its blocking
+Dependency contracts and release steps that name it. Unrelated group growth,
+map edits, sibling Notes, Dependency rollout evidence and other parts' release
+steps do not invalidate it. Doubt still displays the whole affected group for
+semantic review. A still-current approval from the prior digest format migrates
+only after rechecking its original digest; stale evidence stays stale.
+
+Linked parents have no delivery gate or parent Approve brief card; only their
+builds do. Every invalid delivery gate has an Approve brief desk notice, including
+while its old brief awaits a confirmed-scope amendment. That notice names the
+scope repair needed before approval can succeed. Board single/batch approval
+moves eligible members to Ready in its gate transaction and queues a durable
+notification to the same owner. Lost notifications retry the same T3 command on
+refresh, including after a board restart. Active builds keep their thread/branch.
+
+`choose-structure` records Concept for an open multi-repository destination and
+Build for settled linked work or a standalone delivery. `select-reviewers` saves
+its exact diff/run-bound output with the Review phase. `record-review-round`
+fills per-reviewer selection, escalation and configured skip reasons from that
+output, validates verdicts against it, and treats empty unchecked notes as absent.
+Round two uses that recorded selection for the reviewers checking fixes.
 
 ## Skill context by thread kind
 

@@ -40,6 +40,8 @@ function gate(records: WorkRecords, workId: string): void {
         approvedBy: 'reviewer',
         evidence: 'Passed.',
     });
+
+    if (records.read(workId).status === 'Shaping') records.update(workId, at(records, workId), { status: 'Ready' });
 }
 
 /** A Ready build with a brief; `gated` false leaves its gate unpassed. */
@@ -414,7 +416,7 @@ test('a Ready build a blocker held starts once the blocker completes', async () 
     assert.deepEqual(s.started, [blocked]);
 });
 
-test('a pause stays while its build is set aside, its brief lacks a passing gate or its record can’t be read', async () => {
+test('a pause survives set-aside; an edited brief leaves Auto-build until its new gate', async () => {
     const s = await setUp();
     const { records } = s;
     const failing = ready(records, 'Failing');
@@ -438,7 +440,8 @@ test('a pause stays while its build is set aside, its brief lacks a passing gate
     records.setBody(failing, at(records, failing), 'brief', 'A changed brief.');
     s.reread();
     await s.pass();
-    assert.deepEqual(pass(s)?.paused, paused, 'an edited brief with no gate yet keeps the pause');
+    assert.equal(records.read(failing).status, 'Shaping');
+    assert.deepEqual(pass(s)?.paused, {}, 'reshaping leaves Auto-build; the gate card owns its wait');
 
     await s.stop();
 
@@ -456,7 +459,7 @@ test('a pause stays while its build is set aside, its brief lacks a passing gate
     const restarted = await setUp({ dir: s.dir, records: failingReads });
 
     await restarted.pass();
-    assert.deepEqual(pass(restarted)?.paused, paused, 'a read that fails keeps the pause');
+    assert.deepEqual(pass(restarted)?.paused, {}, 'an unavailable read never restores a cleared pause');
     unreadable = false;
     gate(records, failing);
     restarted.reread();

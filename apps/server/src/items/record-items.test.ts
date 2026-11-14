@@ -719,7 +719,7 @@ test('concept counts completed decision facts while its Status remains Shaping, 
             shown(first.workId).labels,
             shown(first.workId).completion,
         ],
-        ['decision', 'Shaping', [], { complete: true, reasons: [] }],
+        ['decision', 'Done', [], { complete: true, reasons: [] }],
     );
     assert.equal(shown(second.workId).completion?.complete, false);
     assert.deepEqual(
@@ -1136,7 +1136,7 @@ for (const status of ['Ready', 'Queued'] as const) {
 
         const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
-        assert.equal(item.status, status);
+        assert.equal(item.status, 'Shaping');
         assert.equal(item.passingBrief, false);
         assert.equal(item.staleGate, 'brief');
         assert.equal(item.briefApproval!.reason, 'Gate out of date: brief changed since approval');
@@ -1144,7 +1144,7 @@ for (const status of ['Ready', 'Queued'] as const) {
     });
 }
 
-test('a changed source invalidates a reviewed gate without claiming that its brief text changed', async () => {
+test('an unrelated concept map edit preserves a reviewed gate', async () => {
     const records = await open();
     let work = records.create({ title: 'Source hold', repository: REPO, kind: 'build', status: 'Ready' });
 
@@ -1172,9 +1172,9 @@ test('a changed source invalidates a reviewed gate without claiming that its bri
 
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
-    assert.equal(item.passingBrief, false);
-    assert.equal(item.staleGate, 'sources');
-    assert.equal(item.briefApproval!.reason, 'Gate out of date: brief sources changed since approval');
+    assert.equal(item.passingBrief, true);
+    assert.equal(item.staleGate, undefined);
+    assert.equal(item.briefApproval, undefined);
 });
 
 test('withdrawn approval asks for a new gate without claiming the brief or sources changed', async () => {

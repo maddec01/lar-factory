@@ -21,7 +21,9 @@ test('linked work reviews its parent scope and ships-with pair without treating 
                 parentId: g.workId,
                 parentRevision: records.read(g.workId).revision,
                 kind: 'build',
-                body: n === 1 ? 'Files: `src/server.ts`' : 'Files: `src/client.ts`',
+                body:
+                    `Parent contract: \`${g.workId}\`\n` +
+                    (n === 1 ? 'Files: `src/server.ts`' : 'Files: `src/client.ts`'),
                 blockerIds: [],
             }),
         );

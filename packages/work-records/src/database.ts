@@ -93,16 +93,22 @@ function tooNew(version: number, known: number, path: string): WorkRecordError {
 }
 
 function transaction<T>(db: DatabaseSync, change: () => T): T {
-    db.exec('BEGIN IMMEDIATE');
+    const nested = db.isTransaction;
+
+    db.exec(nested ? 'SAVEPOINT lar_write' : 'BEGIN IMMEDIATE');
 
     try {
         const result = change();
 
-        db.exec('COMMIT');
+        db.exec(nested ? 'RELEASE lar_write' : 'COMMIT');
 
         return result;
     } catch (error) {
-        if (db.isTransaction) db.exec('ROLLBACK');
+        if (db.isTransaction) {
+            db.exec(nested ? 'ROLLBACK TO lar_write' : 'ROLLBACK');
+
+            if (nested) db.exec('RELEASE lar_write');
+        }
 
         throw error;
     }
@@ -270,17 +276,18 @@ export async function openDatabase(
         db,
         write: (change) => {
             try {
+                const outer = !db.isTransaction;
                 const result = transaction(db, () =>
                     checked(() => {
                         const result = change();
 
-                        if (hasWriteJournal) flushWriteJournal(db);
+                        if (outer && hasWriteJournal) flushWriteJournal(db);
 
                         return result;
                     }),
                 );
 
-                committed++;
+                if (outer) committed++;
 
                 return result;
             } catch (error) {

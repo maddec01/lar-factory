@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { userInfo } from 'node:os';
 
 import type { BoardState } from '../board/board-state.ts';
+import { sendThreadCommand } from '../t3/thread-commands.ts';
 import type { Reply } from './item-commands.ts';
 
 interface Dependencies {
@@ -13,6 +14,7 @@ interface Dependencies {
     refresh?: (id: string) => Promise<unknown>;
     sync?: () => Promise<unknown>;
     identity?: () => string;
+    send?: typeof sendThreadCommand;
 }
 
 /** Only the board's displayed, one-use request can approve; client identity and evidence are ignored. */
@@ -23,6 +25,7 @@ export function createBriefApproval({
     refresh = (id) => refreshSpecs(records!, { workId: id }),
     sync = () => syncSpecs(records!),
     identity = () => userInfo().username,
+    send = sendThreadCommand,
 }: Dependencies) {
     const requests = new Map<string, { at: number; manifest: ReturnType<WorkRecords['gateBatch']> }>();
     const run = async (action: () => Promise<object>): Promise<Reply> => {
@@ -42,13 +45,69 @@ export function createBriefApproval({
                 !board.find(id) ||
                 record.finishedAt ||
                 record.setAside ||
-                ['concept', 'decision', 'slice'].includes(record.kind)
+                ['concept', 'decision', 'slice'].includes(record.kind) ||
+                records!.children(id).some((r) => r.kind !== 'slice')
             )
                 throw new Error('Only an unfinished brief on this board can be approved.');
         }
     };
 
+    const sending = new Set<string>();
+    const reconcileBriefApprovals = async () => {
+        for (const delivery of records?.pendingGateResumes() ?? []) {
+            if (sending.has(delivery.commandId)) continue;
+
+            const owner = records!.read(delivery.workId);
+
+            if (
+                owner.setAside ||
+                records!.threads(owner.workId).find((t) => t.threadId === delivery.threadId)?.deletedAt
+            )
+                continue;
+
+            sending.add(delivery.commandId);
+
+            try {
+                const answer = await send({
+                    type: 'message.dispatch',
+                    createdBy: 'user',
+                    creationSource: 'web',
+                    commandId: delivery.commandId,
+                    messageId: delivery.messageId,
+                    threadId: delivery.threadId,
+                    attachments: [],
+                    dispatchMode: { type: 'queue_after_active' },
+                    text: `The board approved brief batch ${delivery.digest} for work ${owner.workId}. Read the recorded gates; continue this same owner and reconcile the group. Approval is recorded; do not ask Pedro to approve it in chat or start another owner.`,
+                });
+
+                records!.gateResumeResult(
+                    delivery.commandId,
+                    answer.outcome,
+                    answer.outcome === 'accepted' ? undefined : answer.reason,
+                );
+
+                const current = records!.read(owner.workId);
+
+                if (
+                    answer.outcome === 'accepted' &&
+                    current.status === 'Needs you' &&
+                    current.needsYouCauses.length === 0 &&
+                    /approve.*brief|brief.*approval/i.test(current.needsYou ?? '')
+                )
+                    records!.resumeFromUser(
+                        current.workId,
+                        current.revision,
+                        current.buildBranch || current.buildPhase ? 'In progress' : 'Shaping',
+                    );
+            } finally {
+                sending.delete(delivery.commandId);
+            }
+        }
+        reread();
+    };
+
     return {
+        reconcileBriefApprovals,
         inspectBrief: (id: string, input: Record<string, unknown>) =>
             run(async () => {
                 const ids = input.workIds === undefined ? [id] : input.workIds;
@@ -124,6 +183,7 @@ export function createBriefApproval({
                 }
                 reread();
                 await sync();
+                await reconcileBriefApprovals();
                 reread();
 
                 return { approval };

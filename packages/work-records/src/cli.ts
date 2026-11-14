@@ -18,6 +18,7 @@ import { checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
 import { exportMarkdown } from './export.ts';
 import { gateWorkIds } from './gate-batch.ts';
+import { groupCommand } from './group-command.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { requireHumanAction } from './human-action.ts';
 import { releaseCommand } from './release-command.ts';
@@ -154,6 +155,7 @@ Run settings, local only
                                     Record actual settings from a T3 report and the result.
 
 Group upkeep, local and deterministic (no tracker reads)
+  map-history <group-id>            Print retained earlier map prose.
   reconcile <group-id>              List changed sources and mechanical holds as a fingerprinted checklist.
   resolve-reconcile <group-id> --item KEY --digest H --evidence TEXT
                                     Record a source-change review. Mechanical holds require their fix.
@@ -193,6 +195,22 @@ Changes
                                     markdown in F as its initial context. Status
                                     defaults to List. create alone stays local.
                                     --request-id ID reuses a capture on reruns.
+  create-parts <group-id> --revision N --file F
+                                    Atomically save {map,parts:[{key,title,repository,kind,
+                                    body,blockerIds,ticketRequestId?}]}. $key names a new
+                                    blocker; \${key} in text inserts its work ID. Each build
+                                    declares Blocked by: backtick IDs or none. Ticket UUID
+                                    requests commit locally; provider writes retry safely.
+  sync-part-tickets <group-id>      Retry durable ticket requests after local growth commits.
+  sync-blockers <group-id> --file F Sync brief Blocked by declarations and map
+                                    Blocker: consumer-ID <- prerequisite-ID lines. F is
+                                    {revisions:{ID:N}} for group and edge endpoints.
+                                    Cycles, retired and redundant blockers reject all writes.
+  refresh-projections <group-id> --file F
+                                    Save reviewed current prose together: {revisions:{ID:N},
+                                    answers:{ID:text},map?}. All group revisions required.
+                                    Old answers remain history. Reconcile checks sources
+                                    behind current answers and stage prose independently.
   create-part --parent ID --revision N --title X --repository R --kind build|decision
               --file F [--blocked-by ID]...
                                     Atomically create a Queued delivery part with its
@@ -326,6 +344,8 @@ Content
                                     keeps the earlier one as history.
   pr-history <work-id>              Print the PRs the record held before its current one.
   record-review-round <work-id> --revision N --file F
+                                    Fills selection/escalation/skip reasons from saved
+                                    select-reviewers output; empty unchecked notes are omitted.
                                     Record the build's next review round from the
                                     JSON in F: {"base": sha, "reviewers": [{"axis",
                                     "verdict", "notChecked"?, "escalation"?, "findings": [{"severity",
@@ -527,6 +547,7 @@ const TAKES_WORK_ID = [
     'waiting-on',
     'work-order',
     'reconcile',
+    'map-history',
     'resolve-reconcile',
     'release-steps',
     'concept-build-plan',
@@ -762,6 +783,8 @@ async function run(
         case 'resolve-failure':
             return records.resolveFailure(workId!, need(values, 'reason'));
 
+        case 'map-history':
+            return records.mapHistory(workId!);
         case 'reconcile':
             return records.reconcile(workId!);
         case 'resolve-reconcile':
@@ -1034,7 +1057,7 @@ async function run(
         case 'pr-history':
             return records.replacedPullRequests(workId!);
         case 'record-review-round':
-            return records.recordReviewRound(workId!, revision(), readRound(values));
+            return records.recordSelectedReviewRound(workId!, revision(), readRound(values));
         case 'set-disposition':
             return records.setFindingDisposition(
                 workId!,
@@ -1128,6 +1151,9 @@ async function run(
 }
 
 async function main(args: string[]): Promise<number> {
+    if (['create-parts', 'sync-blockers', 'refresh-projections', 'sync-part-tickets'].includes(args[0] ?? ''))
+        return groupCommand(args[0]!, args.slice(1));
+
     if (args[0] === 'role-launch' || args[0] === 'role-finish') return roleCommand(args[0], args.slice(1));
 
     if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
@@ -1200,6 +1226,7 @@ async function main(args: string[]): Promise<number> {
             await refreshBoards(workId!, values['data-dir']);
 
         const validationCommand = [
+            'map-history',
             'reconcile',
             'resolve-reconcile',
             'release-steps',

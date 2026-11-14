@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
+import type { sendThreadCommand } from '../t3/thread-commands.ts';
 import { createBriefApproval } from './brief-approval.ts';
 
 const opened: { dir: string; records: WorkRecords }[] = [];
@@ -134,4 +135,106 @@ test('failed source refresh cannot record a gate', async () => {
     s.refresh.mockRejectedValueOnce(new Error('Tracker unavailable'));
     expect((await s.commands.approveBrief(s.ids[0]!, preview)).status).toBe(409);
     expect(s.records.gate(s.ids[0]!).evidence).toEqual([]);
+});
+
+test('S06 batch approval readies Queued children and automatically notifies their waiting owner', async () => {
+    const s = await setup();
+    let parent = s.records.create({
+        title: 'Greeting exchange',
+        repository: 'fake/app',
+        kind: 'concept',
+        status: 'Shaping',
+    });
+
+    parent = s.records.addThread(parent.workId, parent.revision, 'owner-thread', 'shape');
+    s.records.waitForUser(parent.workId, parent.revision, 'Approve briefs in the board');
+    for (const id of s.ids) {
+        s.records.setParent(id, s.records.read(id).revision, parent.workId);
+        s.records.update(id, s.records.read(id).revision, { status: 'Queued' });
+    }
+    for (const id of s.ids) {
+        const input = s.records.doubtPackage(id);
+
+        s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Group checked.', []);
+    }
+
+    const send = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'accepted' as const, sequence: 1 }));
+    const board = createBoardState({
+        items: [...s.ids, parent.workId].map((id) => ({ id }) as Item),
+        repos: [],
+        firstRead: { settled: true },
+    } as never);
+    const commands = createBriefApproval({
+        board,
+        records: s.records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        identity: () => 'Pedro',
+        send,
+    });
+    const preview = await commands.inspectBrief(s.ids[0]!, { workIds: s.ids });
+    const approval = (preview.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect((await commands.approveBrief(s.ids[0]!, approval)).status).toBe(200);
+    expect(s.ids.map((id) => s.records.read(id).status)).toEqual(['Ready', 'Ready']);
+    expect(s.records.read(parent.workId)).toMatchObject({ status: 'Shaping', needsYou: null });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+        threadId: 'owner-thread',
+        type: 'message.dispatch',
+        text: expect.stringContaining('approved'),
+    });
+});
+
+test('a recorded approval retries its same owner notification after an unconfirmed send and board restart', async () => {
+    const s = await setup();
+    const id = s.ids[0]!;
+
+    s.records.addThread(id, s.records.read(id).revision, 'same-owner', 'shape');
+
+    const board = createBoardState({
+        items: s.ids.map((id) => ({ id }) as Item),
+        repos: [],
+        firstRead: { settled: true },
+    } as never);
+    const send = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'unconfirmed', reason: 'Connection lost' }));
+    const commands = createBriefApproval({
+        board,
+        records: s.records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        identity: () => 'Pedro',
+        send,
+    });
+    const inspected = await commands.inspectBrief(id, {});
+    const preview = (inspected.body as { approval: { requestId: string; digest: string } }).approval;
+
+    expect((await commands.approveBrief(id, preview)).status).toBe(200);
+    expect(s.records.read(id).status).toBe('Ready');
+    expect(s.records.pendingGateResumes()).toHaveLength(1);
+
+    const firstCommand = send.mock.calls[0]![0];
+    const dir = opened.at(-1)!.dir;
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    opened.push({ dir, records });
+
+    const retry = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'accepted', sequence: 1 }));
+    const restarted = createBriefApproval({
+        board,
+        records,
+        reread: vi.fn(),
+        refresh: s.refresh,
+        sync: s.sync,
+        send: retry,
+    });
+
+    await restarted.reconcileBriefApprovals();
+    await restarted.reconcileBriefApprovals();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(retry.mock.calls[0]![0]).toMatchObject({ commandId: firstCommand.commandId, threadId: 'same-owner' });
+    expect(records.pendingGateResumes()).toEqual([]);
+    expect(records.gate(id).evidence).toHaveLength(1);
 });

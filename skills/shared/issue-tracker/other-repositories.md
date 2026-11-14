@@ -8,10 +8,9 @@ connected to this one.
 - An onboarded repository is one the user can change. A Connection grants no
   permission to act. When the work needs a change in a connected onboarded
   repository, describe the required part and shape it within the user's authorized scope.
-  Ask only when it adds scope the user has not authorized. Make it with
-  `slice.sh <parent> "<title>" <brief-file> --kind build --repository <owner/repo>
-  [--blocked-by <work ID>]...` under its concept or linked-work parent, and
-  shape it in that repository. An onboarded
+  Ask only when it adds scope the user has not authorized. Include all known
+  parts in one `create-parts` batch under the concept or linked-work parent,
+  per [Structure](structure.md), and shape each in its repository. An onboarded
   repository that isn't connected comes into play only when the user names it.
 - In a repository that is not onboarded, read code, docs and tickets for
   context and write nothing there. When required work is there, keep refining

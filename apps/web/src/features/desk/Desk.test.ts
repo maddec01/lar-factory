@@ -24,10 +24,21 @@ const withItem = (id: string, change: Partial<Item>): BoardData => ({
     items: sample.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
 });
 
-test('a Verify card for an issue whose PR has no checks and conflicts says its merge state', async () => {
+test('a Verify card for an issue whose PR has no checks and conflicts says the conflict once, as its wait, and opens the PR', async () => {
     await mountPage();
-    expect(nextLine('I_sample28')).toBe('Resolve conflicts');
+    expect(text(card('I_sample28').querySelector('[data-state]'))).toMatch(/^Resolve conflicts · /);
+    expect(nextLine('I_sample28'), 'the wait already says it').toBe('');
+    expect(text(card('I_sample28').querySelector('[data-col="side"] a, [data-col="side"] button'))).toBe('Open PR');
+    expect(text(card('I_sample28')), 'no checks yet, in words').toContain('No checks yet');
     expect(checksWord('I_sample28'), 'no checks to draw').toBe('');
+});
+
+test('a Verify card whose checks failed says so as its wait, its button reviewing them', async () => {
+    await mountPage();
+    expect(text(card('I_sample27').querySelector('[data-state]'))).toMatch(/^Checks failed · /);
+    expect(text(card('I_sample27').querySelector('[data-col="side"] a, [data-col="side"] button'))).toBe(
+        'Review failed checks',
+    );
 });
 
 test('a Verify card whose PR checks were read shows them in its head in place of the next-step line', async () => {
@@ -431,7 +442,7 @@ test('review progress identifies the delivery PR, updates without a dialog and m
 test.each([
     ['loading', { pipelineUnread: true, checks: null, checkProgress: undefined }, 'Loading checks…'],
     ['unread source checks', { checks: null, checkProgress: undefined }, 'Loading checks…'],
-    ['zero checks', { checks: null, checkProgress: { state: 'current' } }, 'No checks reported. 0 total.'],
+    ['zero checks', { checks: null, checkProgress: { state: 'current' } }, 'No checks yet'],
     ['unavailable', { checks: null, checkProgress: { state: 'unavailable' } }, 'Check evidence unavailable.'],
     ['retained counts', { checkProgress: { state: 'stale' } }, 'Stale check observation.'],
     [

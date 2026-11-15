@@ -2,12 +2,10 @@
 // place of each finished part, and each arrow's line.
 
 import type { BoardData, WorkMapPrerequisite } from '@lar-factory/shared';
-import { itemName, needsAnswer, plural, projectWorkMap, repoKey } from '@lar-factory/shared';
+import { itemName, plural, projectWorkMap, repoKey } from '@lar-factory/shared';
 
 import type { Part } from './DossierParts';
-import { DECISION_KINDS, isHistory, partActivity, partWaves, upstreamOf } from './DossierParts';
-import { startable } from './PartAvailability';
-import { YOURS } from './StageStatus';
+import { DECISION_KINDS, isHistory, partWaves, upstreamOf } from './DossierParts';
 import { MAP_NODE_HEIGHT } from '@/ui/board';
 
 const DECISIONS = 'Decisions';
@@ -18,17 +16,29 @@ const HISTORY = 'history';
 const keyOf = (p: Part) => p.item.id;
 
 const LABEL_W = 116;
+/** The cards' least height, room for a three-line title; layout() takes the height its cards measure at. */
 const NODE_H = MAP_NODE_HEIGHT;
-/** The room between two nodes in a column: room for an arrow's 16px label with 8px on each side. */
-const GAP = 32;
-const PAD = 18;
-const MIN_COL = 268;
+/** The room between two nodes in a column, where an arrow over a column runs. */
+const GAP = 24;
+/** The room above a lane's first row and below its last: the lane fits its cards closely. */
+const PAD = 12;
+const TOP = PAD;
+const MIN_COL = 252;
 const MAX_COL = 340;
-/** The history group's height, and the room above and below it. */
-const GROUP_H = 36;
+/** A column's gutter each side of its card. */
+const GUTTER = 14;
+/** How far the next column shows past the frame's edge when the map scrolls: its gutter and the card's edge, short of
+ *  the card's text (items.css pads a card 16px). */
+const PEEK = GUTTER + 12;
+/** The history toggle's line, and the room above and below it. */
+const GROUP_H = 28;
 const GROUP_PAD = 8;
+/** An arrow label's line ("2 completed prerequisites"), and the room below it, so it sits in a gap of its own; a lane
+ *  whose cards take one keeps its PAD above it too, so the label never sits tight under the frame or the lane's rule. */
+const EDGE_LABEL_H = 16;
+const EDGE_LABEL_ROOM = EDGE_LABEL_H + 6;
 
-export { DECISIONS, GAP, GROUP_H, HISTORY, keyOf, LABEL_W, NODE_H, PREREQUISITES };
+export { DECISIONS, GROUP_H, HISTORY, keyOf, LABEL_W, PREREQUISITES };
 
 export interface Placed {
     key: string;
@@ -44,18 +54,8 @@ interface Edge {
     label?: string;
     names?: string;
     kind?: 'blocker' | 'dependency';
+    /** A rail from the history group: false while one of the parts it stands for was set aside, not completed. */
     complete?: boolean;
-}
-
-/** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
-function urgency(p: Part): number {
-    if (needsAnswer(p.item)) return 0;
-
-    if (partActivity(p).kind === 'working') return 2;
-
-    if (YOURS.includes(p.item.status)) return 1;
-
-    return startable(p) ? 3 : 4;
 }
 
 /** The arrows among `parts` with the history group in place of each finished part, one per pair, counting the parts it stands for. */
@@ -102,14 +102,12 @@ function edgesOf(parts: Part[], check: boolean): Edge[] {
         const retired = [...via].some((part) => part.item.setAside);
 
         if (from === HISTORY) {
-            const complete = !retired;
-
             return {
                 from,
                 to,
                 kind,
-                complete,
-                label: plural(via.size, complete ? 'completed prerequisite' : 'past prerequisite'),
+                complete: !retired,
+                label: plural(via.size, retired ? 'past prerequisite' : 'completed prerequisite'),
                 names,
             };
         }
@@ -120,20 +118,40 @@ function edgesOf(parts: Part[], check: boolean): Edge[] {
     });
 }
 
-export function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
+/**
+ * Where everything sits on a map `width` wide whose cards are `nodeH` tall: the project lanes first, the dossier's own
+ * (`home`) leading, then the other projects in the board's order, then Decisions, so every map reads the same way.
+ * A lane whose first-row card takes an arrow label from the history group starts lower, so the label sits in a gap of
+ * its own; labels of arrows into the group take a line above it, one per column.
+ */
+export function layout(
+    parts: Part[],
+    data: BoardData,
+    width: number,
+    check: boolean,
+    { home = '', nodeH = NODE_H }: { home?: string; nodeH?: number } = {},
+) {
     const graph = projectWorkMap(parts.map((p) => p.item));
     const offset = graph.prerequisites.length ? 1 : 0;
     const current = parts.filter((p) => !isHistory(p));
     const depth = partWaves(current);
     const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
-    const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...current.map(laneOf)];
-    const first = (lane: string) => Math.min(...current.filter((p) => laneOf(p) === lane).map(urgency));
-    const lanes = [...new Set(named)]
-        .filter((l) => current.some((p) => laneOf(p) === l))
-        .sort((a, b) => first(a) - first(b));
+    const named = [home, ...data.repos.map((r) => r.repo), ...current.map(laneOf), DECISIONS];
+    const lanes = [...new Set(named.filter((lane) => lane !== DECISIONS)), DECISIONS].filter((l) =>
+        current.some((p) => laneOf(p) === l),
+    );
+    const edges = edgesOf(parts, check);
+    const labelledFrom = new Set(edges.filter((e) => e.from === HISTORY && e.label).map((e) => e.to));
     const cols = Math.max(1, Math.max(-1, ...depth.values()) + 1 + offset + (check ? 1 : 0));
-    const colW = Math.min(MAX_COL, Math.max(MIN_COL, Math.floor((width - LABEL_W) / cols)));
-    const nodeW = colW - 28;
+    const room = Math.max(MIN_COL, width - LABEL_W);
+    // Wider than the frame, the columns share its room so the frame's edge shows only the next card's edge, its padding
+    // under the frame's fade, never its text: at rest and at each column the map snaps to as it scrolls.
+    const shown = Math.max(1, Math.floor((room - PEEK) / MIN_COL));
+    const colW =
+        cols <= Math.floor(room / MIN_COL)
+            ? Math.min(MAX_COL, Math.floor(room / cols))
+            : Math.floor((room - PEEK) / shown);
+    const nodeW = colW - 2 * GUTTER;
     const placed: Placed[] = [];
     const bands: { lane: string; top: number; height: number }[] = [];
     let top = 0;
@@ -145,11 +163,11 @@ export function layout(parts: Part[], data: BoardData, width: number, check: boo
                 part: null,
                 prerequisite,
                 col: 0,
-                x: LABEL_W + 14,
-                y: PAD + row * (NODE_H + GAP),
+                x: LABEL_W + GUTTER,
+                y: TOP + row * (nodeH + GAP),
             }),
         );
-        top = PAD * 2 + graph.prerequisites.length * NODE_H + (graph.prerequisites.length - 1) * GAP;
+        top = TOP + PAD + graph.prerequisites.length * nodeH + (graph.prerequisites.length - 1) * GAP;
         bands.push({ lane: PREREQUISITES, top: 0, height: top });
     }
 
@@ -157,6 +175,8 @@ export function layout(parts: Part[], data: BoardData, width: number, check: boo
         const here = current.filter((p) => laneOf(p) === lane);
         const inCol = (c: number) => here.filter((p) => depth.get(keyOf(p))! + offset === c);
         const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
+        const first = Array.from({ length: cols }, (_, c) => inCol(c)[0]).filter(Boolean);
+        const lead = first.some((p) => labelledFrom.has(keyOf(p!))) ? TOP + EDGE_LABEL_ROOM : TOP;
 
         for (let c = 0; c < cols; c++) {
             inCol(c).forEach((p, r) =>
@@ -164,55 +184,90 @@ export function layout(parts: Part[], data: BoardData, width: number, check: boo
                     key: keyOf(p),
                     part: p,
                     col: c,
-                    x: LABEL_W + c * colW + 14,
-                    y: top + PAD + r * (NODE_H + GAP),
+                    x: LABEL_W + c * colW + GUTTER,
+                    y: top + lead + r * (nodeH + GAP),
                 }),
             );
         }
 
-        const height = PAD * 2 + rows * NODE_H + (rows - 1) * GAP;
+        const height = lead + PAD + rows * nodeH + (rows - 1) * GAP;
 
         bands.push({ lane, top, height });
         top += height;
     });
 
-    const lanesEnd = check ? Math.max(top, PAD * 2 + NODE_H) : top;
+    const lanesEnd = check ? Math.max(top, TOP + PAD + nodeH) : top;
 
     if (check)
         placed.push({
             key: CHECK,
             part: null,
             col: cols - 1,
-            x: LABEL_W + (cols - 1) * colW + 14,
-            y: lanesEnd / 2 - NODE_H / 2,
+            x: LABEL_W + (cols - 1) * colW + GUTTER,
+            y: lanesEnd / 2 - nodeH / 2,
         });
 
+    // Arrows into the group carry their label just above it, in the column after their card; two in one column stack.
+    const at = new Map(placed.map((p) => [p.key, p]));
+    const intoGroup = new Map<number, number>();
+    const labels = edges.flatMap((e) => {
+        if (!e.label) return [];
+
+        if (e.from === HISTORY) {
+            const to = at.get(e.to);
+
+            return to ? [{ edge: e, left: to.x, top: to.y - EDGE_LABEL_ROOM + 2, maxWidth: nodeW }] : [];
+        }
+
+        const from = at.get(e.from);
+
+        if (!from) return [];
+
+        const line = intoGroup.get(from.col) ?? 0;
+
+        intoGroup.set(from.col, line + 1);
+
+        return [{ edge: e, left: from.x + nodeW + 16, top: line, maxWidth: colW - 24 }];
+    });
+    const groupLines = Math.max(0, ...intoGroup.values());
+    const groupY = lanesEnd + GROUP_PAD + groupLines * EDGE_LABEL_ROOM;
     const history = parts.length > current.length;
     const fullWidth = Math.max(LABEL_W + cols * colW, width);
 
     return {
         placed,
         bands,
-        edges: edgesOf(parts, check),
+        cols,
+        edges,
+        // A label into the group counts its line from the group up.
+        labels: labels.map((l) =>
+            l.edge.from === HISTORY ? l : { ...l, top: groupY - GROUP_PAD - (l.top + 1) * EDGE_LABEL_ROOM + 4 },
+        ),
         nodeW,
+        nodeH,
         colW,
         width: fullWidth,
-        groupY: lanesEnd + GROUP_PAD,
-        height: lanesEnd + (history ? GROUP_H + GROUP_PAD * 2 : 0),
+        groupY,
+        height: groupY - GROUP_PAD + (history ? GROUP_H + GROUP_PAD * 2 : 0),
     };
 }
 
-/** An arrow's line; the group's run in the gutter beside a column, so none passes behind a node. */
+/** An arrow's line between two placed nodes, or a history rail: from its label ("2 completed prerequisites") down the
+ *  gutter before the card it leads to, so it stops at the card it serves rather than running down the map like a column
+ *  rule, or from a card's end down the gutter after it into the group, so none passes behind a node. */
 export function edgeLine(m: ReturnType<typeof layout>, from: Placed | undefined, to: Placed | undefined) {
-    if (!from && to) {
-        const y = to.y + NODE_H / 2,
-            gx = to.x - 14;
+    const h = m.nodeH;
 
-        return `M${gx} ${m.groupY} L${gx} ${y + 8} Q${gx} ${y} ${gx + 8} ${y} L${to.x - 2} ${y}`;
+    if (!from && to) {
+        const y = to.y + h / 2,
+            gx = to.x - GUTTER,
+            label = to.y - EDGE_LABEL_ROOM + 2 + EDGE_LABEL_H / 2;
+
+        return `M${gx} ${label} L${gx} ${y - 8} Q${gx} ${y} ${gx + 8} ${y} L${to.x - 2} ${y}`;
     }
 
     if (from && !to) {
-        const y = from.y + NODE_H / 2,
+        const y = from.y + h / 2,
             x = from.x + m.nodeW,
             gx = x + 10;
 
@@ -222,29 +277,30 @@ export function edgeLine(m: ReturnType<typeof layout>, from: Placed | undefined,
     if (!from || !to) return null;
 
     const x1 = from.x + m.nodeW,
-        y1 = from.y + NODE_H / 2,
+        y1 = from.y + h / 2,
         x2 = to.x - 2,
-        y2 = to.y + NODE_H / 2,
+        y2 = to.y + h / 2,
         mid = (x1 + x2) / 2;
     // Over a column, the arrow leaves from the node's foot and runs in the gap under the row, not behind a node.
     const sx = x1 - 20,
-        wy = from.y + NODE_H + GAP / 2;
+        wy = from.y + h + GAP / 2;
 
     return to.col - from.col > 1
-        ? `M${sx} ${from.y + NODE_H} L${sx} ${wy - 6} Q${sx} ${wy} ${sx + 6} ${wy} L${x2 - 30} ${wy} C${x2 - 12} ${wy} ${x2 - 18} ${y2} ${x2} ${y2}`
+        ? `M${sx} ${from.y + h} L${sx} ${wy - 6} Q${sx} ${wy} ${sx + 6} ${wy} L${x2 - 30} ${wy} C${x2 - 12} ${wy} ${x2 - 18} ${y2} ${x2} ${y2}`
         : `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
 }
 
-/** How the group sums itself up: its settled decisions and finished builds, each left out at zero. */
+/** How the group sums itself up: its settled decisions, its finished builds and the parts set aside, each left out at
+ *  zero. */
 export const historyText = (parts: Part[]) => {
-    const retired = parts.filter((p) => p.item.setAside).length;
+    const setAside = parts.filter((p) => p.item.setAside).length;
     const decisions = parts.filter((p) => !p.item.setAside && DECISION_KINDS.includes(p.kind)).length;
-    const builds = parts.length - decisions - retired;
+    const builds = parts.length - decisions - setAside;
 
     return [
         decisions && plural(decisions, 'settled decision'),
         builds && plural(builds, 'finished build'),
-        retired && plural(retired, 'retired part'),
+        setAside && `${setAside} set aside`,
     ]
         .filter(Boolean)
         .join(' · ');

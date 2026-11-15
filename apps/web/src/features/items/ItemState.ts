@@ -20,6 +20,8 @@ import {
     itemActivityLine,
     itemActivityThread,
     openBlockers,
+    plural,
+    startAfterRef,
     prReadiness,
     workingAgain,
 } from '@lar-factory/shared';
@@ -192,7 +194,10 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
               ? 'Working'
               : item.status
         : item.status;
-    const blockedWord = `Blocked · starts after ${blockers.map((blocker) => blockerRef(item, blocker)).join(', ')}`;
+    // Work without a number goes by a count, so a long title never fills the row; the dialog names each blocker.
+    const blockedWord = blockers.every((blocker) => blocker.number || blocker.dependency)
+        ? `Blocked · starts after ${blockers.map((blocker) => blockerRef(item, blocker)).join(', ')}`
+        : `Blocked · starts after ${(blockers.length === 1 && startAfterRef(item, inputs.all)) || plural(blockers.length, 'part')}`;
     const stageWord = blockers.length ? blockedWord : (stageReadiness?.word ?? (prMerged ? MERGED : statusWord));
     const said = execution && execution !== 'starting' && execution !== 'unavailable' ? execution : undefined;
     const wait =

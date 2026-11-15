@@ -3,7 +3,6 @@
 // thread is its newest item thread.
 
 import {
-    blockerRef,
     comparePartOrder,
     ownerThreads,
     currentBuildThread,
@@ -180,10 +179,6 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
 /** What still holds a part back: the issues it's blocked by that are open, while no thread has taken it on. */
 export const openWaits = (part: Part): Blocker[] => (started(part.item) ? [] : openBlockers(part.item));
 
-/** The issues `item` waits on, as one list of refs, another repository's without its owner. */
-export const waitText = (item: Item, blockers: readonly Blocker[]) =>
-    blockers.map((b) => blockerRef(item, b, true)).join(', ');
-
 /** Group roots and off-board parents' parts, where the root or a part is in the main area's scope. */
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {
     const shown = new Set(items.map((i) => i.id));
@@ -199,5 +194,4 @@ export const unreadParts = (parent: Item, parts: readonly Part[]): number =>
     Math.max(parent.subIssues.total, parts.length) - parts.length;
 
 /** Why a count holds parts no list shows, in the same words wherever the count is. */
-export const unreadPartsText = (missing: number): string =>
-    `${plural(missing, 'part')} ${missing === 1 ? 'isn’t' : 'aren’t'} on the board: archived, or in a project removed from the board`;
+export const unreadPartsText = (missing: number): string => `${plural(missing, 'part')} not on this board`;

@@ -1,17 +1,15 @@
 import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-/** The group finished history folds into at `top`: a button within the visible frame that shows or hides the
- *  finished parts. The frame's container width and the sticky button keep its label beside the history as the map scrolls. */
+/** The finished history's quiet toggle at `top`: one muted line on the lane names' left edge, its done glyph, what
+ *  it holds ("3 settled decisions · 17 finished builds") and Show or Hide with its chevron. It stays there, inside the
+ *  visible frame, as the map scrolls sideways. */
 export function MapHistoryGroup({
     open,
     top,
     height,
-    dim,
     glyph,
-    text,
-    showLabel,
-    hideLabel,
+    children,
     onToggle,
     onHover,
 }: {
@@ -21,45 +19,36 @@ export function MapHistoryGroup({
     top: number;
     /** Its height in pixels. */
     height: number;
-    /** Faint, as another node is hovered. */
-    dim: boolean;
-    /** The group's glyph. */
+    /** The group's glyph, a done StatusGlyph. */
     glyph: ReactNode;
-    /** The group's text, such as "4 finished". */
-    text: string;
-    /** The button's accessible name while hidden. */
-    showLabel: string;
-    /** The button's accessible name while shown. */
-    hideLabel: string;
+    /** What the group holds, such as "3 settled decisions · 17 finished builds". */
+    children: string;
     /** Called as the reader shows or hides the finished parts. */
     onToggle: () => void;
-    /** Called as the pointer enters or leaves. */
+    /** Called as the pointer enters or leaves, marking the cards that follow the finished parts. */
     onHover: (hovered: boolean) => void;
 }) {
     return (
-        <div className="absolute inset-x-0" style={{ top, height }}>
+        <div className="absolute inset-x-0 flex items-center" style={{ top, height }}>
             <button
                 type="button"
                 aria-expanded={open}
+                aria-label={`${open ? 'Hide' : 'Show'} ${children}`}
                 onClick={onToggle}
                 data-map-history
                 onMouseEnter={() => onHover(true)}
                 onMouseLeave={() => onHover(false)}
-                className={`border-line bg-surface-raised hover:bg-fill-hover focus-ring sticky left-3 flex h-full w-[calc(100cqw-1.5rem)] items-center gap-2 rounded-lg border px-2.5 text-left text-xs shadow-(--shadow-raised) transition-opacity ${dim ? 'opacity-40' : ''}`}
+                // The list's toggle: muted 12px text, a hover fill, its words on the lane names' 12px edge.
+                className="text-fg-muted hover:bg-fill-hover focus-ring sticky left-1 flex max-w-[calc(100cqw-0.5rem)] min-w-0 items-center gap-1.5 rounded-xs px-2 py-1 text-left text-xs"
             >
-                {glyph}
-                <span className="min-w-0 truncate font-medium">{text}</span>
-                <span className="text-fg-muted inline-flex shrink-0 items-center gap-1">
+                <span className="flex shrink-0">{glyph}</span>
+                <span className="min-w-0 truncate">{children}</span>
+                <span className="inline-flex shrink-0 items-center gap-0.5">
+                    {open ? 'Hide' : 'Show'}
                     {open ? (
-                        <>
-                            {hideLabel}
-                            <ChevronDownIcon className="size-3.5" />
-                        </>
+                        <ChevronDownIcon aria-hidden="true" className="size-3.5" />
                     ) : (
-                        <>
-                            {showLabel}
-                            <ChevronRightIcon className="size-3.5" />
-                        </>
+                        <ChevronRightIcon aria-hidden="true" className="size-3.5" />
                     )}
                 </span>
             </button>

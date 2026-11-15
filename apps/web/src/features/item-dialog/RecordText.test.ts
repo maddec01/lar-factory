@@ -40,6 +40,8 @@ test.each(['map', 'brief'] as const)(
         expect(text(body)).toContain('Send <fragment> to <placeholder>. Keep <code> literal.');
         expect(text(body?.querySelector('code'))).toBe('<code>');
         expect(body?.querySelector('fragment, placeholder')).toBeNull();
+        // A concept's record is its concept map, never "Map", which names the board's view of its parts.
+        expect(text($('[data-item-dialog] [data-record]'))).toMatch(bodyKind === 'map' ? /^Concept map/ : /^Brief/);
     },
 );
 

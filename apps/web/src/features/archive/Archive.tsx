@@ -1,9 +1,7 @@
-// Settings › Archive: each piece of work off the board, set aside or finished and hidden by retention, with Export
-// markdown, Restore for set-aside work and Close ticket while its ticket is open, and this Mac's retention setting. A
-// new automatic deletion names the work it would delete now and saves only on its own confirm. Restore and a saved setting
-// read Archive again.
+// Settings › Archive: this Mac's retention setting, whose new automatic deletion names the work it would delete now and
+// saves only on its own confirm. A saved setting reads Archive again. Each archived row's actions are ArchiveActions'.
 
-import { clock, day, plural, type Item, type RetentionState } from '@lar-factory/shared';
+import { clock, day, plural, type RetentionState } from '@lar-factory/shared';
 import {
     Alert,
     Button,
@@ -19,61 +17,11 @@ import {
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { ExportedLine, ExportMarkdown, type Exported } from '@/features/item-dialog';
-import { useAbandonStore } from '@/features/items';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Choice } from '@/shared/settings/SettingControls';
-import { ActionStack, buttonKind, SettingConfirm, SettingLastRun } from '@/ui/board';
-
-/** Export markdown, Restore for set-aside work, and Close ticket while the board sees its ticket open. */
-export function ArchiveActions({ item }: { item: Item }) {
-    const [exported, setExported] = useState<Exported>({ state: 'idle' });
-    const [restoring, setRestoring] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const closeable = item.archived?.setAside && item.archived.ticketOpen && item.number > 0 && !item.abandonRefusal;
-    const restore = async () => {
-        setRestoring(true);
-        setError(null);
-
-        const result = await postAction('/api/restore', { itemId: item.id });
-
-        // A restored item leaves Archive with this row, once Archive is read again.
-        if (!result.error) await useArchiveStore.getState().load();
-
-        flushSync(() => {
-            receive(result);
-            setRestoring(false);
-            setError(result.error);
-        });
-    };
-
-    return (
-        <ActionStack below={<ExportedLine exported={exported} />} error={error}>
-            <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
-            {closeable && (
-                <Button
-                    {...buttonKind('other')}
-                    data-archive-close={item.id}
-                    onClick={() => useAbandonStore.getState().askClose(item)}
-                >
-                    Close ticket
-                </Button>
-            )}
-            {item.archived?.setAside && (
-                <Button
-                    {...buttonKind('other')}
-                    data-restore={item.id}
-                    loading={restoring}
-                    onClick={() => void restore()}
-                >
-                    Restore
-                </Button>
-            )}
-        </ActionStack>
-    );
-}
+import { buttonKind, SettingConfirm, SettingLastRun } from '@/ui/board';
 
 /** What saving a automatic deletion asks before it saves: the work it would delete now. */
 type Due = { workId: string; title: string }[];
@@ -164,9 +112,13 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
     return (
         <Stack space="group" data-retention>
             <InsetPanel presentation="settings">
-                <FieldRow label="Hide finished and set-aside work after">
+                {/* Two flat rows whose day fields line up at their end, the deletion's choice before its field. */}
+                <FieldRow id="retention-hide" label="Hide finished and set-aside work after">
                     <FormUnit unit="days">
                         <Input
+                            type="number"
+                            min={0}
+                            step={1}
                             inputMode="numeric"
                             aria-label="Days before hiding"
                             value={hide}
@@ -175,7 +127,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                         />
                     </FormUnit>
                 </FieldRow>
-                <FieldRow label="Delete hidden work">
+                <FieldRow id="retention-delete" label="Delete hidden work">
                     <Choice
                         label="Delete hidden work"
                         value={deleting ? 'delete' : 'keep'}
@@ -185,13 +137,16 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                             setDue(null);
                         }}
                         options={[
-                            { value: 'keep', label: 'Keep it' },
-                            { value: 'delete', label: 'Delete it after' },
+                            { value: 'keep', label: 'Never' },
+                            { value: 'delete', label: 'After' },
                         ]}
                     />
                     {deleting && (
                         <FormUnit unit="days">
                             <Input
+                                type="number"
+                                min={0}
+                                step={1}
                                 inputMode="numeric"
                                 aria-label="Days before deleting"
                                 value={deleteAfter}

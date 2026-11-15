@@ -42,13 +42,14 @@ export type ProjectIconSource =
 /** The palette's hues in the order the repositories take them (by their place in the board's list). */
 const PLACE_HUES = Object.keys(categoricalHues) as CategoricalHue[];
 
-/** The square and its type on the board's icon scale: `sm` 14px (a chip's), `md` 16px (a row's) and `lg` 20px. Its
- *  initial or monogram is 12px (the meta size), so a small square shows one character and only `lg` two; an emoji
+/** The square and its type on the board's icon scale: `sm` 14px (a chip's), `md` 16px (a row's, a list of projects'
+ *  and a navigation pane's) and `lg` 20px. Its corners round in step with its size, so a small tile stays a square.
+ *  Its initial or monogram is 12px (the meta size), so a small square shows one character and only `lg` two; an emoji
  *  fills about as much of its square as a lucide icon's strokes do, so a row's icons line up. */
 const SIZES = {
-    sm: { square: 'size-3.5 text-xs', emoji: 'text-xs', graphemes: 1 },
-    md: { square: 'size-4 text-xs', emoji: 'text-sm', graphemes: 1 },
-    lg: { square: 'size-5 text-xs', emoji: 'text-base', graphemes: 2 },
+    sm: { square: 'size-3.5 rounded-sm text-xs', emoji: 'text-xs', graphemes: 1 },
+    md: { square: 'size-4 rounded-sm text-xs', emoji: 'text-sm', graphemes: 1 },
+    lg: { square: 'size-5 rounded-md text-xs', emoji: 'text-base', graphemes: 2 },
 };
 
 export type ProjectIconSize = keyof typeof SIZES;
@@ -97,9 +98,39 @@ const LucideIcon = lazy<ComponentType<ComponentProps<typeof DynamicIcon>>>(() =>
     ),
 );
 
+/** The share of clear pixels past which an image is a glyph on a clear ground rather than a tile of its own: a rounded
+ *  tile's corners leave about 3% clear, lar-platform's L about 17%. */
+const CLEAR_GROUND = 0.1;
+
+/** Whether an image is drawn on a clear ground: a glyph such as lar-platform's, whose strokes run to its edges, rather
+ *  than a tile of its own, read from a 32px copy of it. Unreadable reads as a tile. */
+function clearGround(image: HTMLImageElement): boolean {
+    try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+
+        canvas.width = 32;
+        canvas.height = 32;
+
+        if (!context) return false;
+
+        context.drawImage(image, 0, 0, 32, 32);
+
+        const pixels = context.getImageData(0, 0, 32, 32).data;
+        let clear = 0;
+
+        for (let alpha = 3; alpha < pixels.length; alpha += 4) if (pixels[alpha]! < 32) clear++;
+
+        return clear / (32 * 32) > CLEAR_GROUND;
+    } catch {
+        return false;
+    }
+}
+
 function Favicon({ src }: { src: string }) {
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState(false);
+    const [inset, setInset] = useState(false);
 
     if (failed) return null;
 
@@ -108,9 +139,15 @@ function Favicon({ src }: { src: string }) {
             src={src}
             alt=""
             hidden={!loaded}
-            onLoad={() => setLoaded(true)}
+            onLoad={(event) => {
+                setInset(clearGround(event.currentTarget));
+                setLoaded(true);
+            }}
             onError={() => setFailed(true)}
-            className={`${OVERLAY} object-contain${loaded ? '' : ' hidden'}`}
+            // On the ink tile every image shares, in place of the overlay's raised surface. An image with its own
+            // tile fills the square; a glyph on a clear ground sits inset on the ink, so the square's rounded corners
+            // never cut its strokes.
+            className={`bg-board-icon-tile absolute inset-0 size-full object-contain${inset ? ' p-[15%]' : ''}${loaded ? '' : ' hidden'}`}
         />
     );
 }
@@ -147,14 +184,14 @@ export function ProjectIcon({
     name: string;
     /** The project's place among the board's repositories, which picks its hue; none mutes it. */
     place?: number | undefined;
-    /** The square's size on the board's icon scale: `sm` 14px, `md` 16px (a row's) or `lg` 20px. */
+    /** The square's size on the board's icon scale: `sm` 14px, `md` 16px (a row's, a project list's) or `lg` 20px. */
     size: ProjectIconSize;
 } & DataAttributes) {
     const { square, emoji, graphemes: shown } = SIZES[size];
     const own = place === undefined ? null : PLACE_HUES[place % PLACE_HUES.length]!;
     const hue = (color: ProjectIconColor) => T3_HUES[color] ?? own;
     const tinted = (h: CategoricalHue | null, recipe: string) => (h ? `${HUES[h]} ${recipe}` : 'text-fg-muted');
-    const shared = `${square} relative grid shrink-0 place-items-center overflow-hidden rounded-md leading-none font-semibold`;
+    const shared = `${square} relative grid shrink-0 place-items-center overflow-hidden leading-none font-semibold`;
 
     if (icon?.kind === 'emoji')
         return (
@@ -188,6 +225,11 @@ export function ProjectIcon({
                 {firstGraphemes(name, 1).toUpperCase()}
             </span>
             {icon?.kind === 'favicon' && <Favicon key={icon.src} src={icon.src} />}
+            {/* Every image sits on one tile: the ink fill under it and a hairline ring over its edge, the same size and
+                shape as the other squares, so a white or clear favicon reads like the rest in either theme. */}
+            {icon?.kind === 'favicon' && (
+                <span className="ring-line pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset [[data-project-icon]:not(:has(img:not([hidden])))>&]:hidden" />
+            )}
             {icon?.kind === 'lucide' && (
                 // The colour is the wrapper's and the icon draws in currentColor, so a container that recolours every
                 // svg in it (a palette row's icon box) can't turn it into its own colour. The wrapper draws nothing of

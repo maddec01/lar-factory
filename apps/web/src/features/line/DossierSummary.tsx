@@ -148,7 +148,7 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         ...(parent.reconciliation?.items.length
             ? [
                   {
-                      words: `Out of date: ${plural(parent.reconciliation.items.length, 'item')}`,
+                      words: 'Concept map needs updating',
                       tone: 'warning' as const,
                   },
               ]

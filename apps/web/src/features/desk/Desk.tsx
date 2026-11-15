@@ -124,7 +124,7 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
                       ? 'Check evidence unavailable.'
                       : pr.checks
                         ? counts(pr.checks)
-                        : 'No checks reported. 0 total.'
+                        : 'No checks yet'
             }
             note={
                 [

@@ -1,6 +1,8 @@
 // The work record's own text in the item dialog, ahead of any ticket's: a concept's map, a decision's text or any other
 // record's brief, with its build phase, review rounds and the initial context it began with, folded. Export markdown
-// writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
+// writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't. A record with no
+// text yet is one quiet line; beside a Spec, the Spec's heading row carries Export and the record shows only what else it
+// holds.
 import {
     buildActivity,
     buildPhaseLabel,
@@ -9,20 +11,20 @@ import {
     type Item,
     type RecordDetails,
 } from '@lar-factory/shared';
-import { Alert, EmptyState, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
+import { Alert, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { ApproveBrief } from './ApproveBrief';
 import { BriefChangeHistory } from './BriefChangeHistory';
 import { DependencyStatus } from './DependencyStatus';
+import { exportMarkdown } from './ExportRecord';
 import { isGroupParent } from './group-parent';
 import { SavedRunSettings } from './SavedRunSettings';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { postAction } from '@/services/board/board.service';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import { buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
 
-const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Map', decision: 'Decision' };
+const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Concept map', decision: 'Decision' };
 
 export type Exported =
     | { state: 'idle' | 'exporting' }
@@ -38,20 +40,12 @@ export function ExportMarkdown({
     exported: Exported;
     setExported: (e: Exported) => void;
 }) {
-    const run = async () => {
-        setExported({ state: 'exporting' });
-
-        const result = await postAction<{ paths: string[] }>('/api/item-export', { itemId });
-
-        setExported(
-            result.error || !result.paths
-                ? { state: 'failed', error: result.error ?? 'The board didn’t say what it wrote.' }
-                : { state: 'done', paths: result.paths },
-        );
-    };
-
     return (
-        <Button {...buttonKind('other')} loading={exported.state === 'exporting'} onClick={() => void run()}>
+        <Button
+            {...buttonKind('other')}
+            loading={exported.state === 'exporting'}
+            onClick={() => void exportMarkdown(itemId, setExported)}
+        >
             Export markdown
         </Button>
     );
@@ -114,14 +108,36 @@ export function RecordText({
               : record.body;
     const buildPhase = item.buildPhase === undefined ? record.buildPhase : item.buildPhase;
     const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
+    // What the record holds besides its text: a Spec's record shows only these, under the Spec's own heading row.
+    const extras =
+        Boolean(record.briefChangeRequests) ||
+        Boolean(reviewing) ||
+        (!item.setAside && pendingBriefs.length > 0) ||
+        Boolean(record.reviewers) ||
+        Boolean(record.runSettings) ||
+        Boolean(buildPhase) ||
+        record.reviewRounds.length > 0;
+    // No text yet: one quiet line says who writes it, with no heading or Export over nothing.
+    const unwritten = !spec && !answer && !body;
+
+    // With a Spec, the Spec's heading row carries Export, so a record with nothing else to show adds nothing.
+    if (spec && !extras && !(record.bodyKind === 'brief' && item.blockers.some((b) => b.dependency))) return null;
 
     return (
         <MainSection
             as="section"
             header={
-                <SectionHeader heading={title}>
-                    <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
-                </SectionHeader>
+                unwritten ? (
+                    <Text variant="caption" tone="muted" data-record-unwritten>
+                        {record.bodyKind === 'brief'
+                            ? 'No brief yet. Shaping writes it.'
+                            : `No ${title.toLowerCase()} yet.`}
+                    </Text>
+                ) : (
+                    <SectionHeader heading={title} prose>
+                        {!spec && <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />}
+                    </SectionHeader>
+                )
             }
             data-record
         >
@@ -142,15 +158,9 @@ export function RecordText({
                 !item.briefReviewing &&
                 item.passingBrief === false &&
                 item.status !== 'Done' && <ApproveBrief itemId={item.id} onApproved={refresh} />}
-            {!spec && (
+            {!spec && !unwritten && (
                 <div data-record-body>
-                    {answer ? (
-                        <MarkdownDiagrams text={answer} />
-                    ) : body ? (
-                        <MarkdownDiagrams text={body} />
-                    ) : (
-                        <EmptyState size="inline" title={`No ${title.toLowerCase()} written yet.`} />
-                    )}
+                    <MarkdownDiagrams text={answer || body!} />
                 </div>
             )}
             {!spec && answer && body && (

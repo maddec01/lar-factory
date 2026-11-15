@@ -94,13 +94,14 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                     {...buttonKind('other')}
                     aria-expanded={open}
                     aria-controls={detailsId}
+                    title="What blocks the merge"
                     onClick={() => {
                         // A new attempt, so a reopened panel reads afresh.
                         setAttempt((n) => n + 1);
                         setOpen(!open);
                     }}
                 >
-                    Readiness details
+                    Checks
                 </Button>
             }
             details={
@@ -109,14 +110,14 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                         id={detailsId}
                         status={
                             disconnected
-                                ? 'Readiness unavailable: disconnected.'
+                                ? 'Checks unavailable: disconnected.'
                                 : stale
                                   ? 'Refreshing current revision. Previous evidence is stale.'
                                   : evidence?.available
                                     ? pr.sourceRevision && evidence.sourceRevision !== pr.sourceRevision
-                                        ? 'Source revision changed. Refresh readiness.'
+                                        ? 'Source revision changed. Refresh checks.'
                                         : pr.isDraft || pr.state !== 'open' || evidence.blockers.length
-                                          ? 'Readiness blocked.'
+                                          ? 'Not ready to merge.'
                                           : 'Ready to merge based on this observation.'
                                     : evidence?.reason
                         }
@@ -132,7 +133,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                         note="T3 Azure PR context is unsupported; evidence comes from Azure."
                         refresh={
                             <Button {...buttonKind('other')} onClick={() => setAttempt((n) => n + 1)}>
-                                Refresh readiness
+                                Refresh checks
                             </Button>
                         }
                     />

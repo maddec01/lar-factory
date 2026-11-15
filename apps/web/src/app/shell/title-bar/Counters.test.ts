@@ -195,35 +195,96 @@ test('shipped lists this week’s delivered builds, newest first', async () => {
 
     const pop = await openCounter('shipped');
 
-    expect(head(pop)).toBe('Shipped3Last 7 days');
-    expect(rows().map((r) => r.split(' ')[0])).toEqual(['#5', '#40', '#181']);
+    expect(head(pop)).toBe('Shipped16Last 7 days');
+    expect(rows().map((r) => /^(#\d+|Part \d+)/.exec(r)![1])).toEqual([
+        '#5',
+        '#40',
+        'Part 23',
+        'Part 17',
+        'Part 20',
+        'Part 19',
+        '#181',
+        'Part 21',
+        'Part 18',
+        'Part 16',
+        'Part 13',
+        '#292',
+        '#291',
+        '#144',
+        '#290',
+        'Part 2',
+    ]);
 });
 
-test('spend lists every priced item, highest cost first, with its cost', async () => {
+test('spend lists every priced item, highest cost first, with its cost and project, the total saying what it covers and its foot that it is an estimate', async () => {
     await mountPage(completeSample);
+    expect(value(counter('spend')), 'the bar gives whole dollars').toBe('$489');
 
     const pop = await openCounter('spend');
 
-    expect(head(pop)).toBe('Agent spend$198.70');
-    expect(rows()).toHaveLength(16);
+    expect(head(pop)).toBe('Agent spend37 items$489 · All open work, and recently finished work');
+    expect(rows()).toHaveLength(37);
+    expect(pop.querySelector('li [data-project-icon]'), 'each row names its project').not.toBeNull();
     expect(rows().slice(0, 3)).toEqual([
-        '#150 Direct streaming from away, with automatic port mapping$46.90',
-        '#5 Crash when a server goes offline mid-playback$41.20',
-        '#40 Resume from the stored position$27.00',
+        '#150 Direct streaming from away, with automatic port mappinglar-server$46.90',
+        '#5 Crash when a server goes offline mid-playbacklar-apple$41.20',
+        '#269 Prepare signed household records and share secrets for every server a household ownslar-server$39.40',
     ]);
 
     const costs = rows().map((row) => Number(/\$([\d.]+)$/.exec(row)![1]));
 
     expect(costs).toEqual([...costs].sort((a, b) => b - a));
     expect(text(pop)).not.toMatch(/and \d+ more|Top 5/);
-    expect(foot(pop)).toBe('16 priced items, an API estimate.');
+    expect(foot(pop)).toBe('An estimate at API prices.');
+});
+
+test('a counter’s rows name a ticketless concept part as its row does, give a title two lines, and set the age apart from the project by one dot', async () => {
+    await mountPage({
+        ...completeSample,
+        items: completeSample.items.map((item) => (item.number === 150 ? { ...item, number: 0, partOrder: 15 } : item)),
+    });
+
+    const pop = await openCounter('spend');
+
+    expect(rows()[0]).toMatch(/^Part 15 Direct streaming/);
+    expect(pop.querySelector('[data-counter-title]')!.className).toContain('line-clamp-2');
+    await close();
+
+    const shipped = await openCounter('shipped');
+    const sub = shipped.querySelector('li [data-counter-title]')!.nextElementSibling!;
+
+    expect([...sub.children].map((child) => text(child)).slice(-2)[0], 'the dot stands alone').toBe('·');
+});
+
+test('spend says what it covers from the retention setting', async () => {
+    await mountPage({ ...completeSample, retention: { hideAfterDays: 7, deleteAfterDays: null } });
+    expect(head(await openCounter('spend'))).toBe(
+        'Agent spend37 items$489 · All open work, and work finished in the last 7 days',
+    );
+});
+
+test('while usage is summed again, the bar keeps the last complete total, never the part summed so far', async () => {
+    await mountPage(completeSample);
+    expect(value(counter('spend'))).toBe('$489');
+
+    const loading = structuredClone(completeSample);
+
+    loading.items[0] = {
+        ...loading.items[0]!,
+        stats: { agentMs: 60_000, tokens: 1000, costUsd: 1000 },
+        usageState: 'loading',
+    };
+    await push(loading);
+    expect(value(counter('spend')), 'no partial sum and no plus').toBe('$489');
+    expect(nameOf(counter('spend'))).toContain('The last complete total. Usage is still loading.');
+    expect(head(await openCounter('spend')), 'the panel gives the part summed so far').toMatch(/so far/);
 });
 
 test('while the first read could add items, a count with none is a dash, one with items its number, and empty panels show the loader', async () => {
     const data = structuredClone(completeSample);
 
     await mountPage({ ...data, items: data.items.filter((i) => i.status === 'Done'), firstRead });
-    expect(counters().slice(0, 4).map(value)).toEqual(['–', '–', '–', '3']);
+    expect(counters().slice(0, 4).map(value)).toEqual(['–', '–', '–', '16']);
     for (const label of ['need you', 'shaping', 'building'] as const) {
         expect(nameOf(counter(label))).toBe(`${label}: Still loading projects`);
 
@@ -263,11 +324,11 @@ test('spend shows the known figures with a plus while some usage is unavailable,
 
     data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState: 'failed' };
     await mountPage(data);
-    expect(value(counter('spend'))).toMatch(/^\$[\d.,]+\+$/);
+    expect(value(counter('spend'))).toMatch(/^\$[\d,]+\+$/);
 
     const pop = await openCounter('spend');
 
-    expect(head(pop)).toMatch(/^Agent spend\$[\d.,]+ so far$/);
+    expect(head(pop)).toMatch(/^Agent spend\d+ items\$[\d.,]+ so far · All open work, and recently finished work$/);
     expect(text(pop)).toContain('$200.00');
     expect(foot(pop)).toBe('Partial figures. Some usage is unavailable.');
     expect(

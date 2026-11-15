@@ -140,26 +140,29 @@
     }
 }
 
-/* Concept identity and its consequential control each keep a full line on compact boards. */
+/* A concept's row has no neighbours in its pane, so what it does next takes whatever room its title leaves, instead
+   of a lane's fixed activity track; its progress and end keep the lanes' tracks, so they still line up. */
+[data-dossier] .row-first > .row-cols {
+    flex: 0 1 auto;
+}
+[data-dossier] .row-first > .row-meta {
+    flex: 1 1 0;
+    /* A row with nothing at work keeps its tracks at the row's end, as every other row does. */
+    justify-content: end;
+    /* Never narrower than its tracks, so the title gives way first and nothing leaves the row. */
+    min-width: min-content;
+    max-width: none;
+    grid-template-columns: minmax(14rem, 1fr) 10rem 8.5rem;
+}
+[data-dossier] .row-meta > :first-child:not([data-col='progress'], .row-meta-end) {
+    justify-self: end;
+}
+
+/* On compact boards a concept keeps its one line: its title gives way first, then its other projects, and what it does
+   next keeps a readable name beside its parts bar, count and cost. */
 @container (width < 64rem) {
-    [data-dossier] .row-first {
-        display: block;
-    }
-    [data-dossier] .row-cols > [data-title-cell] {
-        padding-right: 0;
-    }
-    [data-dossier] .row-cols > [data-title-cell] > [data-title] {
-        display: block;
-        overflow: visible;
-        -webkit-line-clamp: unset;
-        white-space: normal;
-    }
-    [data-dossier] .row-side {
-        position: static;
-        width: auto;
-        max-width: 100%;
-        margin-top: --spacing(2);
-        padding-left: calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
+    [data-dossier] .row-first > .row-meta {
+        grid-template-columns: minmax(9rem, 1fr) 9rem 6rem;
     }
 }
 
@@ -215,10 +218,20 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 
 /* On a row, in the item dialog and in a counter's list the project's icon is a quiet mark beside its name, without its
-   colour; List and Settings keep its colour, where telling projects apart is the point. */
+   colour; List and Settings keep its colour, where telling projects apart is the point. On a light page a project's own
+   image, often a dark tile, is the darkest thing on its line, so it fades further there, to sit under the title it marks;
+   a drawn icon or initial keeps its weight. */
 :is(.row-cols, .desk-tile, .list-row, [data-dossier], [data-item-dialog], [data-counter-list]) [data-project-icon] {
     filter: grayscale(1);
     opacity: 0.75;
+
+    &:has(img:not([hidden])) {
+        opacity: 0.5;
+
+        @variant dark {
+            opacity: 0.75;
+        }
+    }
 }
 
 /* A lane row's facts sit together at its end, on fixed tracks so every lane's columns line up and nothing moves on
@@ -307,15 +320,6 @@ li.desk-row:has([data-row-open]:focus-visible) {
     min-width: 0;
 }
 
-/* A List row whose item has no recognised kind and no source mark keeps no slot for them, so its number starts on the
-   pane's edge. */
-.list-row:not(:has(> :first-child :is(svg, [role='img']))) {
-    grid-template-columns: minmax(0, max-content) minmax(0, auto) minmax(0, 1fr);
-}
-.list-row:not(:has(> :first-child :is(svg, [role='img']))) > :first-child {
-    display: none;
-}
-
 /* A row with nothing at work and no progress keeps only its end track, so its title has the room. */
 .row-meta:not(:has(> :not(.row-meta-end))) {
     grid-template-columns: minmax(8.5rem, max-content);
@@ -366,13 +370,8 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 @media (hover: hover) {
     @container (width >= 41.25rem) {
-        :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side,
-        [data-part] [data-part-action],
-        .row-meta-end,
-        .row-cols > [data-col='state'],
-        [data-part] :is([data-part-usage], [data-part-meta]) {
-            transition: opacity var(--motion-duration-fast) var(--ease-standard);
-        }
+        /* Only the action fades, and only in: the facts under it step aside at once and the action leaves at once, so
+           the two never read on top of each other mid-way, however a pointer or focus moves. */
         :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side,
         [data-part] [data-part-action] {
             opacity: 0;
@@ -386,6 +385,7 @@ li.desk-row:has([data-row-open]:focus-visible) {
         [data-dossier] .row-first:has([data-dossier-tools]) > .row-side,
         [data-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])) [data-part-action] {
             opacity: 1;
+            transition: opacity var(--motion-duration-fast) var(--ease-standard);
         }
         :is([data-stage] li[data-item], [data-dossier] .row-first):is(
                 :hover,
@@ -405,4 +405,46 @@ li.desk-row:has([data-row-open]:focus-visible) {
 /* Whatever opens an item on click (a row, a card, a part, a fold) shows the pointer; buttons keep their own cursor. */
 :is(.row-cols, .row-meta, .desk-tile, .list-row, [data-part] [data-row-open], [data-dossier-open]) {
     cursor: pointer;
+}
+
+/* A part's project and state sit on two fixed tracks at its end, so projects line up down the list however long a state
+   is; the state says the short form ("After #139"), and the part's dialog names the rest. */
+@container (width >= 41.25rem) {
+    [data-part] [data-part-meta] {
+        display: grid;
+        grid-template-columns: 8rem 8rem;
+        column-gap: --spacing(3);
+    }
+    [data-part] [data-part-meta] > [data-repo-cell] {
+        grid-column: 1;
+        justify-self: start;
+        min-width: 0;
+        max-width: 100%;
+    }
+    [data-part] [data-part-meta] > :not([data-repo-cell]) {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* A lane row with progress but nothing at work keeps no empty activity track, so its title has that room; its progress
+   and end stay on the same right-anchored tracks as its neighbours'. */
+.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
+    grid-template-columns: 10rem 8.5rem;
+}
+.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) > [data-col='progress'] {
+    grid-column: 1;
+}
+.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) > .row-meta-end {
+    grid-column: 2;
+}
+@container (width < 80rem) {
+    .row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
+        grid-template-columns: 9.5rem 8rem;
+    }
 }

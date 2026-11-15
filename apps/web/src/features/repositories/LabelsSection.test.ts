@@ -154,7 +154,11 @@ async function openDialog(board: BoardData): Promise<void> {
             .click(),
     );
     await settle(() => vi.advanceTimersByTime(50));
-    await settle(() => buttonIn($(`.settings-row[data-row="repo-${board.repos[0]!.repo}"]`)!, 'Open project')!.click());
+    await settle(() =>
+        $(`.settings-row[data-row="repo-${board.repos[0]!.repo}"]`)!
+            .querySelector<HTMLButtonElement>('[data-settings-row-open]')!
+            .click(),
+    );
     await settle(() => vi.advanceTimersByTime(50));
 }
 

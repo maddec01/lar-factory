@@ -4,7 +4,6 @@ import type { BoardData } from '@lar-factory/shared';
 import {
     needsAnswer,
     UNREADABLE,
-    retiredPartLabel,
     blockerGroups,
     canRetryBuild,
     currentBuildThread,
@@ -20,11 +19,11 @@ import { open, usePicked, waitsOn } from './DossierHelpers';
 import type { Part } from './DossierParts';
 import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './DossierParts';
 import { PartStart } from './PartStart';
+import { partState } from './PartState';
 import { figuresOf, opensItem } from './RowDetails';
 import { YOURS, lastSeen } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
 import {
-    conceptBuildWait,
     AzureFields,
     OpenThread,
     RepoCell,
@@ -113,7 +112,7 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
 
 /** One part of the parts list: one button opens its details from its title, stage track, status and Azure fields; what
  *  it asks next sits beside that button, then a second line of its slice bar and count, thread, PR and agent figures, and
- *  its start's message or error under that. `home` is the dossier's own repository, which needs no naming. */
+ *  its start's message or error under that. `home` is the dossier's own repository, which a part in it names quietly. */
 function PartRow({ part, data, home }: { part: Part; data: BoardData; home: string }) {
     const { item } = part;
     const isPicked = usePicked(item);
@@ -140,15 +139,9 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
             name={<PartName part={part} />}
             meta={
                 <>
-                    {repoKey(item) !== home && <RepoCell item={item} />}
-                    {asksYou ? (
-                        <WaitWord>{word}</WaitWord>
-                    ) : (
-                        <span>
-                            {retiredPartLabel(item) ??
-                                (isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word))}
-                        </span>
-                    )}
+                    {/* Every part names its project, the concept's own quietly, so no row reads with a gap. */}
+                    <RepoCell item={item} home={repoKey(item) === home} />
+                    {asksYou ? <WaitWord>{word}</WaitWord> : <span>{partState(item, data, word)}</span>}
                     <AzureFields azure={item.azure} />
                 </>
             }
@@ -202,14 +195,18 @@ export function PartsList({ parts, data, home }: { parts: Part[]; data: BoardDat
     const [showDone, setShowDone] = useState(false);
     const shown = parts.filter((p) => showDone || !isDone(p.item));
     const done = parts.filter((p) => isDone(p.item)).length;
-    const historyName = parts.some((part) => part.item.setAside) ? 'past parts' : 'done';
+    const retired = parts.filter((p) => isDone(p.item) && p.item.setAside).length;
+    // The fold says what it holds, so its count adds up with the row's "parts done": done parts, then retired ones.
+    const history = [done - retired && `${done - retired} done`, retired && `${retired} set aside`]
+        .filter(Boolean)
+        .join(' and ');
 
     return (
         <DesignPartsList
             showDone={
                 done > 0 && (
                     <ShowDoneToggle open={showDone} onToggle={() => setShowDone(!showDone)}>
-                        {showDone ? `Hide ${done} ${historyName}` : `Show ${done} ${historyName}`}
+                        {`${showDone ? 'Hide' : 'Show'} ${history}`}
                     </ShowDoneToggle>
                 )
             }

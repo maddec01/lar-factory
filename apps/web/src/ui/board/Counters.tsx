@@ -1,5 +1,8 @@
-import { Popover, StatusPopoverContent, ToolbarCounter } from '@lar-works/design-system';
-import { type ReactNode, useState } from 'react';
+import { Popover, PopoverHeader, ToolbarCounter } from '@lar-works/design-system';
+import { scrollFadeClassName, useScrollFade } from '@lar-works/design-system/primitives';
+import { type ReactNode, useRef, useState } from 'react';
+
+import { tooltipWhenCut } from './TooltipWhenCut';
 
 interface BoardCounterProps {
     /** The status's glyph, in its own colour. */
@@ -20,7 +23,7 @@ interface BoardCounterProps {
     /** The popover's title. */
     title: string;
     /** How many items it lists, quietly after the title. */
-    count?: number;
+    count?: number | string;
     /** A muted line under the title, such as a limit or a total. */
     detail?: ReactNode;
     /** A note under the list, on a divider. */
@@ -33,8 +36,7 @@ interface BoardCounterProps {
 }
 
 /** One title-bar counter: the design system's ToolbarCounter (a glyph, a tabular figure and an optional build track,
- *  with its glass tooltip) opening a wide status popover (384px) of everything behind the number. Its list sits in
- *  `data-counter-list`, so an app's tests can find it without depending on the classes behind it. */
+ *  with its glass tooltip) opening a CounterPopover of everything behind the number. */
 export function BoardCounter({
     icon,
     value,
@@ -64,12 +66,66 @@ export function BoardCounter({
             {...(track && { track })}
             {...(width && { width })}
         >
-            <StatusPopoverContent width="wide" title={title} count={count} detail={detail} footer={foot}>
+            <CounterPopover title={title} count={count} detail={detail} foot={foot}>
+                {children}
+            </CounterPopover>
+        </ToolbarCounter>
+    );
+}
+
+/**
+ * A counter's popover, the design system's status popover as its parts (a PopoverHeader over rows that scroll, fading at
+ * their edges, and a muted foot on a divider), opening under its counter from the counter's start, as the title bar's
+ * counters sit at its left: a status popover's end alignment would push it to the window's edge. It is 30rem wide on a
+ * desktop window (items.css), so its rows keep their titles' ends. Its list sits in `data-counter-list`, so an app's
+ * tests can find it without depending on the classes behind it.
+ */
+function CounterPopover({
+    title,
+    count,
+    detail,
+    foot,
+    children,
+}: Pick<BoardCounterProps, 'title' | 'count' | 'detail' | 'foot' | 'children'>) {
+    const content = useRef<HTMLDivElement>(null);
+    const { setViewport } = useScrollFade();
+
+    return (
+        <Popover.Content
+            ref={content}
+            // Focus lands on the popover itself, which its title names, rather than on the rows' scroller, so opening it
+            // never rings the whole list.
+            onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                content.current?.focus();
+            }}
+            side="bottom"
+            align="start"
+            sideOffset={8}
+            height="capped"
+            layout="fill"
+            presentation="flush"
+        >
+            <PopoverHeader title={title} count={count} detail={detail} />
+            {/* Focusable, so rows past the cap scroll from the keyboard too. */}
+            <div
+                ref={setViewport}
+                tabIndex={0}
+                className={`${scrollFadeClassName} focus-ring-inset flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2 ${foot ? '' : 'rounded-b-[inherit]'}`}
+            >
                 <div data-counter-list className="contents">
                     {children}
                 </div>
-            </StatusPopoverContent>
-        </ToolbarCounter>
+            </div>
+            {foot && (
+                <div
+                    data-slot="status-popover-footer"
+                    className="border-line text-fg-muted shrink-0 border-t px-4 py-2 text-xs"
+                >
+                    {foot}
+                </div>
+            )}
+        </Popover.Content>
     );
 }
 
@@ -105,8 +161,8 @@ interface CounterItemProps {
     leading: ReactNode;
     /** The item's title. */
     title: ReactNode;
-    /** Under the title: CounterAge, or a figure such as its spend. */
-    trailing: ReactNode;
+    /** At the row's end: a figure such as its spend, or what it waits for. */
+    trailing?: ReactNode;
     /** Called as the reader picks the item, closing the panel. */
     onOpen: () => void;
     /** A quiet line under the title, such as its project. */
@@ -115,31 +171,42 @@ interface CounterItemProps {
 
 /** One item in a panel, as a menu's row; picking it closes the panel and opens the item. */
 export function CounterItem({ item, label, leading, title, trailing, onOpen, sub }: CounterItemProps) {
+    // The title in full on hover, only while its two lines cut it off.
+    const whenCut = tooltipWhenCut(label, (row) => row.querySelector('[data-counter-title]'));
+
     return (
         <li>
             <Popover.Close asChild aria-label={undefined} aria-description={label}>
                 <button
                     type="button"
                     onClick={onOpen}
+                    onPointerEnter={whenCut}
                     data-item={item}
-                    className="text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-8 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-md px-2 py-1 text-left text-sm outline-none"
+                    className={`text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-8 w-full cursor-pointer ${trailing ? 'grid-cols-[auto_minmax(0,1fr)_auto]' : 'grid-cols-[auto_minmax(0,1fr)]'} items-start gap-x-2.5 rounded-md px-2 py-1 text-left text-sm outline-none`}
                 >
-                    <span className="flex items-center gap-2">{leading}</span>
-                    {/* One line: the title takes the room, its project and age quiet at the end. */}
-                    <span className="grid min-w-0">
-                        <span className={sub ? 'truncate' : 'line-clamp-2'}>{title}</span>
+                    {/* The marks and the figure sit on the title's first line, however many lines it takes. */}
+                    <span className="flex h-5 items-center gap-2">{leading}</span>
+                    {/* The title on up to two lines across the row, its project (and age) quiet under it; every row
+                        keeps room for two title lines, so the rows down the list have one height. */}
+                    <span className={`grid min-w-0 content-start ${sub ? 'min-h-14' : 'min-h-10'}`}>
+                        <span className="line-clamp-2 wrap-anywhere" data-counter-title>
+                            {title}
+                        </span>
                         {sub && <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs">{sub}</span>}
                     </span>
-                    <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
-                        {trailing}
-                    </span>
+                    {/* At one width down the list, so every title gives way at the same place. */}
+                    {trailing && (
+                        <span className="text-fg-muted flex h-5 min-w-16 items-center justify-end gap-1.5 text-xs tabular-nums">
+                            {trailing}
+                        </span>
+                    )}
                 </button>
             </Popover.Close>
         </li>
     );
 }
 
-/** A row's repository, its icon and name, then its age. */
+/** A row's repository, its icon and name, then its age after a dot, each on the line's one gap. */
 export function CounterAge({
     icon,
     name,
@@ -149,7 +216,7 @@ export function CounterAge({
     icon: ReactNode;
     /** The repository's name, giving way first, in full on hover. */
     name?: string | undefined;
-    /** The item's age, such as "3h"; none where the list's heading already says what matters. */
+    /** The item's age, such as "3h ago"; none where the row's end already says what matters. */
     age?: string | undefined;
 }) {
     return (
@@ -160,7 +227,8 @@ export function CounterAge({
                     {name}
                 </span>
             )}
-            {age && <span className="whitespace-nowrap">{name ? `· ${age}` : age}</span>}
+            {age && name && <span aria-hidden="true">·</span>}
+            {age && <span className="whitespace-nowrap">{age}</span>}
         </>
     );
 }
@@ -219,21 +287,17 @@ export function CounterDash() {
     return <span className="text-fg-muted font-normal">–</span>;
 }
 
-/** A figure that covers only part of what it sums, marked with a plus: amber while some of it is unavailable, muted
- *  while some is still loading. */
+/** A figure that covers only part of what it sums, as some of it is unavailable, marked with an amber plus. */
 export function CounterPartial({
     figure,
-    unavailable,
 }: {
     /** The figure. */
     figure: string;
-    /** Some of it is unavailable, rather than still loading: the plus turns amber. */
-    unavailable: boolean;
 }) {
     return (
         <>
             {figure}
-            <span className={`font-normal ${unavailable ? 'text-warning-fg' : 'text-fg-muted'}`}>+</span>
+            <span className="text-warning-fg font-normal">+</span>
         </>
     );
 }

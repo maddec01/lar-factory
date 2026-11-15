@@ -13,7 +13,10 @@ import { buttonKind } from '@/ui/board';
 /** The card's action, and Open thread as a square icon in the right corner unless it is the action. `quiet` draws a
  *  next step outlined, as on Your desk, where its rows' amber bar already says it waits on you. */
 export function HumanWaitAction({ item, data, quiet = false }: { item: Item; data: BoardData; quiet?: boolean }) {
-    const action = deskWait(item, useActivityUnavailable(), data.items).action;
+    const wait = deskWait(item, useActivityUnavailable(), data.items);
+    const { action } = wait;
+    // A required verification is done in the dialog, unless a failed check or a conflict comes first.
+    const verifies = wait.label === 'Verify build' && !!item.verification?.required;
 
     if (action?.kind === 'start-again') return <StartAgain item={item} data={data} />;
 
@@ -21,13 +24,13 @@ export function HumanWaitAction({ item, data, quiet = false }: { item: Item; dat
 
     if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} />;
 
-    if ((item.status === 'Verify' && item.verification?.required) || action?.kind === 'details')
+    if (verifies || action?.kind === 'details')
         return (
             <Button
                 {...buttonKind(quiet ? 'open' : 'next')}
                 onClick={() => useItemDialogStore.getState().open(item.id)}
             >
-                {item.status === 'Verify' ? 'Verify build' : action?.label}
+                {action?.kind === 'details' ? action.label : 'Verify build'}
             </Button>
         );
 

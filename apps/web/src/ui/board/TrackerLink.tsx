@@ -10,6 +10,7 @@ export function TrackerLink({
     href,
     icon,
     name,
+    note,
 }: {
     /** The ticket's address. */
     href: string;
@@ -17,13 +18,15 @@ export function TrackerLink({
     icon: ReactNode;
     /** The tracker's name, such as "GitHub". */
     name: string;
+    /** A word on the ticket after "Open in …" in the tooltip, such as that its plan is saved on this Mac. */
+    note?: string | undefined;
 }) {
     return (
         <a
             href={href}
             target="_blank"
             rel="noopener"
-            title={`Open in ${name}`}
+            title={note ? `Open in ${name}. ${note}` : `Open in ${name}`}
             className="text-fg-muted hover:text-fg focus-ring inline-flex shrink-0 items-center gap-0.5 rounded-xs text-xs transition-colors [&_svg]:size-3.5"
             data-ticket-link
         >

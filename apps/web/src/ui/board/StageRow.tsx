@@ -2,7 +2,7 @@
 // first line in columns that line up down the whole board, one button that opens the item's details with the row's
 // action beside it, and under it a second line on the same columns.
 
-import { Tooltip, TooltipPopup, TooltipTrigger, Loading } from '@lar-works/design-system';
+import { Loading } from '@lar-works/design-system';
 import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
@@ -79,32 +79,21 @@ export function RowFirst({
     );
 }
 
-/** A row's first line's cells as the one button that opens its item. */
+/** A row's first line's cells as the one button that opens its item. Its project chip names the project whole on
+ *  hover only while the name is cut, so the row carries no tooltip of its own repeating it. */
 export function RowOpen({
     onOpen,
     children,
-    repository,
 }: {
-    /** The full repository name, available on row hover and keyboard focus. */
-    repository?: string;
     /** Called as the reader opens the item. */
     onOpen: () => void;
     /** The first line's cells. */
     children: ReactNode;
 }) {
-    const button = (
+    return (
         <button type="button" data-row-open data-meta onClick={onOpen} className={`row-cols ${ROW_OPENS}`}>
             {children}
         </button>
-    );
-
-    return repository ? (
-        <Tooltip>
-            <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipPopup>{repository}</TooltipPopup>
-        </Tooltip>
-    ) : (
-        button
     );
 }
 
@@ -207,12 +196,15 @@ export function RowState({
 /** A Queue row's state: how long it has waited. */
 export function QueueAge({
     children,
+    title,
 }: {
     /** How long the row has waited. */
     children: ReactNode;
+    /** What the age counts from, on hover. */
+    title?: string;
 }) {
     return (
-        <span className="queue-age shrink-0 tabular-nums" data-state>
+        <span className="queue-age shrink-0 tabular-nums" data-state title={title}>
             {children}
         </span>
     );

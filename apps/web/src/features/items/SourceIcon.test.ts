@@ -66,5 +66,9 @@ test.each<[Item['status'], string, number, string, string | undefined]>([
     expect(sourceIn($('[data-item-summary]'))).toBe('Saved only on this machine.');
     await push(board({ ...item, number, url }));
     expect(sourceIn(row)).toBe(label);
-    expect(sourceIn($('[data-item-summary]'))).toBe(label);
+    // The dialog shows one tracker mark: the ticket's link, which names where it is saved.
+    expect(sourceIn($('[data-item-summary]'))).toBeUndefined();
+    expect($('[data-item-summary] [data-ticket-link]')?.getAttribute('title')).toBe(
+        `Open in ${label ? 'Azure DevOps' : 'GitHub'}`,
+    );
 });

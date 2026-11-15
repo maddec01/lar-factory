@@ -22,6 +22,7 @@ import { createItemCommands } from '../items/item-commands.ts';
 import { mergeSources } from '../items/item-sources.ts';
 import { recordItems } from '../items/record-items.ts';
 import { fakeItemSource } from './fake-item-source.ts';
+import { fakeRepo } from './fake-tracker-seed.ts';
 import { createFakeTracker } from './fake-tracker.ts';
 import { sampleProvider, sampleRepositories, sampleVocabulary } from './sample-adapters.ts';
 import { sampleApproval } from './sample-approval.ts';
@@ -29,7 +30,10 @@ import { sampleBriefApproval } from './sample-brief-approval.ts';
 import { sampleControls } from './sample-controls.ts';
 import { sampleDelivery } from './sample-delivery.ts';
 import { sampleGrowingConcept } from './sample-growing-concept.ts';
+import { sampleLocalPlanning } from './sample-local-planning.ts';
 import { sampleOutcome } from './sample-outcome.ts';
+import { samplePartThreads } from './sample-part-threads.ts';
+import { samplePullRequests } from './sample-pull-requests.ts';
 import { sampleRetro } from './sample-retro.ts';
 import { sampleReviewControls } from './sample-review-controls.ts';
 import { sampleRuntimeBatch } from './sample-runtime-batch.ts';
@@ -39,6 +43,13 @@ import { sampleVerification } from './sample-verification.ts';
 /** All writable sample dependencies live here. No real source, tracker or T3 command is reachable from them. */
 export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     const tracker = createFakeTracker({ mode: 'sample' });
+    let remapped = JSON.stringify(fixture);
+
+    for (const repo of fixture.repos) remapped = remapped.replaceAll(repo.repo, fakeRepo(repo.repo));
+
+    const localPlanning = sampleLocalPlanning(JSON.parse(remapped) as BoardData);
+    const partThreads = samplePartThreads(JSON.parse(remapped) as BoardData);
+    const pullRequests = samplePullRequests(sampleActivityFrom(JSON.parse(remapped) as BoardData, Date.now()));
     const dir = boardDataDir();
     const repos = sampleRepositories(tracker, dir);
     const records = await openWorkRecords(join(dir, 'work-records.db'));
@@ -81,23 +92,29 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
 
         board.update({
             repos: configs,
-            items: projected.map((item) => {
-                const ticket = byTicket.get(`${item.repo}#${item.number}`);
+            items: localPlanning.project(
+                projected.map((item) => {
+                    const ticket = byTicket.get(`${item.repo}#${item.number}`);
 
-                if (!ticket)
-                    return runtimeBatch.project(
-                        approval.project(reviewControls.project(growingConcept.project(delivery.project(item)))),
+                    if (!ticket)
+                        return runtimeBatch.project(
+                            approval.project(reviewControls.project(growingConcept.project(delivery.project(item)))),
+                        );
+
+                    return verification.project(
+                        partThreads.project(
+                            pullRequests.project({
+                                ...(item.recorded === false ? { ...ticket, recorded: false } : item),
+                                parentId: ticket.parentId ? (shownIds.get(ticket.parentId) ?? ticket.parentId) : null,
+                                parent: ticket.parent,
+                                subIssues: ticket.subIssues,
+                                tracker: ticket.tracker,
+                                blockers: ticket.blockers,
+                            }),
+                        ),
                     );
-
-                return verification.project({
-                    ...(item.recorded === false ? { ...ticket, recorded: false } : item),
-                    parentId: ticket.parentId ? (shownIds.get(ticket.parentId) ?? ticket.parentId) : null,
-                    parent: ticket.parent,
-                    subIssues: ticket.subIssues,
-                    tracker: ticket.tracker,
-                    blockers: ticket.blockers,
-                });
-            }),
+                }),
+            ),
         });
         board.push();
     };
@@ -186,10 +203,6 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             },
         },
     );
-    let remapped = JSON.stringify(fixture);
-
-    for (const repo of fixture.repos)
-        remapped = remapped.replaceAll(repo.repo, `lar-factory-sample/${repo.repo.split('/')[1]}`);
 
     board.update({
         ...sampleActivityFrom(JSON.parse(remapped) as BoardData, Date.now()),
@@ -204,6 +217,10 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         itemDetails: {
             ...details,
             async details(item: Item) {
+                const local = localPlanning.details(item);
+
+                if (local) return local;
+
                 const read = await details.details(item);
                 const record = recordDetails(records, item.id);
 

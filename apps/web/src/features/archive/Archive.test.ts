@@ -1,10 +1,10 @@
-// Settings › Archive: set-aside and hidden work with Export markdown, Restore and Close ticket, and the retention
-// setting, whose automatic deletion names the work it would delete and saves only on its own confirm.
+// Settings › Archive: set-aside and finished work, each in its section, one line a row, with Restore and a More menu of Export markdown and
+// Close ticket, and the retention setting, whose automatic deletion names the work it would delete and saves only on its own confirm.
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, $$, fetchMock, mountPage, chooseOption, sample, settle, text } from '@/test/PageTest';
+import { $, $$, fetchMock, mountPage, chooseOption, pressMenu, sample, settle, text } from '@/test/PageTest';
 
 const base = sample.items.find((i) => i.id === 'I_sample13')!;
 const archived = (id: string, title: string, archivedAs: Item['archived'], change: Partial<Item> = {}): Item => ({
@@ -30,6 +30,12 @@ const withRetention = (change: Partial<BoardData> = {}): BoardData => ({
 
 const row = (id: string) => $(`.settings-row[data-row="${id}"]`)!;
 const button = (scope: Element, label: string) => [...scope.querySelectorAll('button')].find((b) => text(b) === label);
+/** Opens a row's More menu and gives its entries' names. */
+const more = async (id: string) => {
+    await pressMenu(row(id).querySelector(`[data-archive-more="${id.replace('archived-', '')}"]`)!);
+
+    return $$<HTMLElement>('[role="menu"] [role="menuitem"]');
+};
 const posted = (path: string) =>
     fetchMock.mock.calls
         .filter(([url]) => url === path)
@@ -84,7 +90,11 @@ test('Restore posts the work, and the row leaves Archive as Archive is read agai
 
 test('Close ticket asks as Abandon’s own step does, and closes only on its confirm', async () => {
     await openArchive(withRetention(), { '/api/close-ticket': () => ({ error: null }) });
-    await settle(() => button(row('archived-W_aside'), 'Close ticket')!.click());
+
+    const entries = await more('archived-W_aside');
+
+    expect(entries.map(text)).toEqual(['Export markdown', 'Close ticket']);
+    await settle(() => entries.find((entry) => text(entry) === 'Close ticket')!.click());
 
     const confirm = $('#abandon-dialog')!;
 
@@ -114,11 +124,13 @@ test('a automatic deletion names the work it would delete and saves only on its 
 
     const setting = $('[data-retention]')!;
 
-    await chooseOption(document.querySelector('[data-retention] [role="combobox"]')!, 'Delete it after');
+    await chooseOption(document.querySelector('[data-retention] [role="combobox"]')!, 'After');
     await settle(() => $<HTMLButtonElement>('[data-save-retention]')!.click());
     expect(posted('/api/retention')).toEqual([{ hideAfterDays: 7, deleteAfterDays: 30, confirmed: false }]);
     expect(text($('[data-delete-confirm]'))).toContain('Shipped');
-    expect(text(row('archived-W_done')), 'its Export markdown is still there').toContain('Export markdown');
+    expect((await more('archived-W_done')).map(text), 'its Export markdown is still there').toEqual([
+        'Export markdown',
+    ]);
     await settle(() => $<HTMLButtonElement>('[data-confirm-delete]')!.click());
     expect(posted('/api/retention').at(-1)).toEqual({ hideAfterDays: 7, deleteAfterDays: 30, confirmed: true });
     expect($('.settings-row[data-row="archived-W_done"]')).toBeNull();
@@ -126,4 +138,32 @@ test('a automatic deletion names the work it would delete and saves only on its 
         'deleted 1 record.',
     );
     expect(text($('[data-last-delete]'))).toContain('Kept W_done. It owns the slice W_slice, which is kept.');
+});
+
+test('each row is one line in its section: the title truncates, its project, then Restore and the More menu; only a state its section doesn’t say', async () => {
+    await openArchive(withRetention());
+
+    const aside = row('archived-W_aside');
+    const done = row('archived-W_done');
+    const sectionOf = (el: Element) => text(el.closest('section')?.querySelector('h2, h3'));
+
+    expect(aside.querySelector('[data-archive-title]')!.getAttribute('title')).toBe('#41 Put away');
+    expect(text(aside.querySelector('[data-archive-line]')), 'its section already says Set aside').toBe(
+        '#41 Put awaylar-server',
+    );
+    // Where each ticket is saved leads the line, as it did before: on a board that mixes trackers, GitHub's mark too.
+    expect(done.querySelector('[data-archive-line] [role="img"]')?.getAttribute('aria-label')).toBe(
+        'GitHub issue. Saved on GitHub.',
+    );
+    expect(sectionOf(aside)).toBe('Set aside');
+    expect(sectionOf(done)).toBe('Finished');
+    expect(aside.querySelector('[data-archive-state]')).toBeNull();
+    expect(text(done.querySelector('[data-archive-state]')), 'the day it finished').not.toMatch(/Finished/);
+    expect(
+        [...aside.querySelectorAll('[data-slot="settings-row-control"] button')].map(
+            (b) => text(b) || b.getAttribute('aria-label'),
+        ),
+    ).toEqual(['Restore', 'More for Put away']);
+    expect(aside.querySelector('[data-restore]')!.getAttribute('data-kind'), 'a quiet App control').toBe('control');
+    expect(text(done), 'finished work has no Restore').not.toContain('Restore');
 });

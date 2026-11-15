@@ -131,6 +131,9 @@ test('a stale Ready gate explains the hold on its row, desk and details and offe
     const { useItemDialogStore } = await import('./ItemDialogStore');
 
     await settle(() => useItemDialogStore.getState().open(stale.id));
-    expect(text($('[data-item-summary]'))).toContain(reason);
+    expect(text($('[data-item-summary]')), 'the summary says it short, its reason in full on hover').toContain(
+        'Approval out of date',
+    );
+    expect($(`[data-item-summary] [title="${reason}"]`)).not.toBeNull();
     expect(text($('[data-item-dialog]'))).toContain('Approve brief');
 });

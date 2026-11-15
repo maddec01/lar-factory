@@ -3,14 +3,13 @@
 import type { IssueRef, Item } from '@lar-factory/shared';
 import { Disclosure, PageError, Stack } from '@lar-works/design-system';
 
-import { Placeholder } from './DetailsParts';
 import { sidebarSubTickets } from './Relations';
 import { AzureFields } from '@/features/items';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { AttachmentLink, DetailsSection, SprintCount, TicketLink, TicketLinkList } from '@/ui/board';
 
-/** Named work item links share the child list's native fields and completion marks. */
-function TicketLinks({ tickets }: { tickets: IssueRef[] }) {
+/** Named work item links share the child list's native fields and completion marks; a `row` each in the main column. */
+export function TicketLinks({ tickets, row = false }: { tickets: IssueRef[]; row?: boolean }) {
     return (
         <TicketLinkList>
             {tickets.map((s) => (
@@ -22,6 +21,7 @@ function TicketLinks({ tickets }: { tickets: IssueRef[] }) {
                     reference={`#${s.number}`}
                     title={s.title}
                     fields={<AzureFields azure={s.azure} />}
+                    presentation={row ? 'row' : 'stacked'}
                 />
             ))}
         </TicketLinkList>
@@ -36,23 +36,23 @@ export function ItemRelations({
     item,
     read,
     refresh,
+    subTicketsShown = true,
 }: {
     item: Item;
     read: ItemDetailsRead;
     refresh: () => Promise<boolean>;
+    /** The sidebar lists the sub-tickets; false when the main column's Parts section already does. */
+    subTicketsShown?: boolean;
 }) {
     if (read.state === 'failed') return null;
 
-    if (read.state === 'loading')
-        return item.kind !== 'concept' && item.subIssues.total > item.slices.length ? (
-            <DetailsSection heading="Sub-tickets">
-                <Placeholder />
-            </DetailsSection>
-        ) : null;
+    // Sub-tickets show once they load; the main column's loading line stands for them until then.
+    if (read.state === 'loading') return null;
 
     const { attachments, blockers, related, relationsError } = read.details;
     // A concept's dialog lists its parts in its Parts section, so the side doesn't list them again.
-    const subTickets = item.kind === 'concept' ? [] : sidebarSubTickets(item, read.details.subTickets);
+    const subTickets =
+        item.kind === 'concept' || !subTicketsShown ? [] : sidebarSubTickets(item, read.details.subTickets);
     const sprint = item.currentSprint;
     const current = sprint ? subTickets.filter((s) => sprint.childNumbers.includes(s.number)) : subTickets;
     const other = sprint ? subTickets.filter((s) => !sprint.childNumbers.includes(s.number)) : [];

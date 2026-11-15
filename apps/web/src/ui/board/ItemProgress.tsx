@@ -2,7 +2,7 @@
 // piece of work's slices as chips under their count.
 
 import { SegmentedProgress } from '@lar-works/design-system';
-import { ChevronRightIcon } from '@lar-works/design-system/icons';
+import { ChevronRightIcon, CirclePauseIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
@@ -42,7 +42,11 @@ export function WorkflowSteps({
     at,
     name,
     ordinal,
+    held,
 }: {
+    /** What holds the work, such as "Blocked by Part 15": the current step wears the paused glyph and the off tone, so
+     *  the line agrees with the sidebar's Blocked; absent while nothing holds it. */
+    held?: string | undefined;
     /** The workflow's active steps, each with its label (for assistive technology) and title (its name under it). */
     steps: readonly { title: string; label: string }[];
     /** The current step's index. */
@@ -59,26 +63,55 @@ export function WorkflowSteps({
             data-steps
         >
             <span className="sr-only">{ordinal ? `${ordinal}: ${name}` : name}</span>
-            {/* Every step named in order, the past quiet, the current one marked in its colour, what's to come faint. */}
-            {steps.map((step, i) => (
-                // A plain first step's label starts on the gutter; a current one's fill does, as no fill crosses it.
-                <li
-                    key={step.title}
-                    className={`flex items-center gap-1 ${i === 0 && at !== 0 ? '-ml-2' : ''}`}
-                    aria-label={step.label}
-                >
-                    {i > 0 && <ChevronRightIcon aria-hidden="true" className="text-fg-muted size-3" />}
-                    {i === at ? (
-                        // The sidebar's status says its state, so the step names where the work is, without a second light.
-                        <span className="bg-fill-muted text-fg rounded-md px-2 py-0.5 font-medium" data-step-names>
-                            {step.title}
-                        </span>
-                    ) : (
-                        <span className={`px-2 py-0.5 ${i < at ? 'text-fg-soft' : 'text-fg-muted'}`}>{step.title}</span>
-                    )}
-                </li>
-            ))}
+            {/* Every step named in order, the past quiet, the current one marked in its colour, what's to come faint.
+                Every step keeps the same place whichever is current, so the line never moves between dialogs: each
+                has the pill's padding and room for its name in the current one's weight, and the first one's name
+                always starts on the gutter (a current one's fill hangs into it). */}
+            {steps.map((step, i) => {
+                const current = i === at;
+
+                return (
+                    <li
+                        key={step.title}
+                        className={`flex items-center gap-1 ${i === 0 ? '-ml-2' : ''}`}
+                        aria-label={step.label}
+                    >
+                        {i > 0 && <ChevronRightIcon aria-hidden="true" className="text-fg-muted size-3" />}
+                        {current ? (
+                            // The sidebar's status says its state, so the step names where the work is, without a second
+                            // light. Held, it isn't "you are here, fine": no fill, a dashed outline, the paused glyph and the
+                            // off tone, as Blocked reads.
+                            <span
+                                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${held ? 'text-fg-muted outline-line-strong outline-1 -outline-offset-1 outline-dashed' : 'bg-fill-muted text-fg font-medium'}`}
+                                title={held}
+                                data-step-names
+                                data-step-held={held ? '' : undefined}
+                            >
+                                {held && <CirclePauseIcon aria-hidden="true" className="size-3 shrink-0" />}
+                                <StepName title={step.title} />
+                                {held && <span className="sr-only">, held: {held}</span>}
+                            </span>
+                        ) : (
+                            <span className={`px-2 py-0.5 ${i < at ? 'text-fg-soft' : 'text-fg-muted'}`}>
+                                <StepName title={step.title} />
+                            </span>
+                        )}
+                    </li>
+                );
+            })}
         </ol>
+    );
+}
+
+/** A step's name, as wide as it is in the current step's weight, so marking it current never widens it. */
+function StepName({ title }: { title: string }) {
+    return (
+        <span
+            className="inline-flex flex-col after:invisible after:h-0 after:overflow-hidden after:font-medium after:content-[attr(data-title)]"
+            data-title={title}
+        >
+            {title}
+        </span>
     );
 }
 

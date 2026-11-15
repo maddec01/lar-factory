@@ -39,6 +39,44 @@ test.each([
     expect(deskWait(item({ status }))).toEqual({ label, action: { kind: 'pr', label: action } });
 });
 
+test.each([
+    [
+        'Verify',
+        { checks: { passed: 2, failed: 1, running: 0, total: 3, since: null } },
+        'Checks failed',
+        'Review failed checks',
+    ],
+    [
+        'Ready to merge',
+        { checks: { passed: 2, failed: 1, running: 0, total: 3, since: null } },
+        'Checks failed',
+        'Review failed checks',
+    ],
+    ['Verify', { mergeState: 'conflicts', checks: null }, 'Resolve conflicts', 'Open PR'],
+    ['Ready to merge', { mergeState: 'conflicts' }, 'Resolve conflicts', 'Open PR'],
+] as const)('%s with a PR that %o waits on "%s" and its button "%s"', (status, pr, label, action) => {
+    const work = item({
+        status,
+        linkedPrs: [{ ...item().linkedPrs[0]!, ...pr }] as Item['linkedPrs'],
+    });
+
+    expect(deskWait(work)).toEqual({ label, action: { kind: 'pr', label: action } });
+});
+
+test('a failed check comes before a conflict, and an unread PR leaves the step its own wait', () => {
+    const pr = item().linkedPrs[0]!;
+    const both = {
+        ...pr,
+        mergeState: 'conflicts',
+        checks: { passed: 0, failed: 1, running: 0, total: 1, since: null },
+    };
+
+    expect(deskWait(item({ status: 'Verify', linkedPrs: [both] as Item['linkedPrs'] })).label).toBe('Checks failed');
+    expect(
+        deskWait(item({ status: 'Verify', linkedPrs: [{ ...both, pipelineUnread: true }] as Item['linkedPrs'] })).label,
+    ).toBe('Verify build');
+});
+
 test.each(['single', 'linked'] as const)('a stopped %s build stays in its section and reaches the desk', (flow) => {
     const work = item({ flow, threads: [stopped] });
 

@@ -119,7 +119,7 @@ test.each([
 });
 
 test.each([['running'], ['needs you']] as const)(
-    'a Queued item with a %s thread offers its thread action instead of Shape, and neither Move to List nor Abandon',
+    'a Queued item with a %s thread offers its thread action instead of Shape, and neither Move to the List nor Abandon',
     async (state) => {
         await mountPage(withThreads('I_sample05', [thread('live', state)]));
         await openItem('I_sample05');
@@ -251,25 +251,25 @@ test('a failed Start build shows in the dialog and offers Retry start', async ()
     expect(text(button('start', 'I_sample13'))).toBe('Retry start');
 });
 
-test('Move to List in the dialog shows the item in the list, says so, and moves focus to Queue', async () => {
+test('Move to the List in the dialog shows the item in the list, says so, and moves focus to Queue', async () => {
     holdPosts();
     await mountPage();
     await openItem('I_sample05');
     await press(button('back-to-list', 'I_sample05'));
-    expect(text(button('back-to-list', 'I_sample05'))).toBe('Moving to List…');
+    expect(text(button('back-to-list', 'I_sample05'))).toBe('Moving to the List…');
     expect(posted()).toEqual([['/api/back-to-list', { itemId: 'I_sample05' }]]);
     await answer({ error: null, board: moved('I_sample05', 'List') });
-    expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);
+    expect(text(toast())).toMatch(/^Moved #129 .* to the List\. View item$/);
     expect(document.activeElement).toBe(button('queue', 'I_sample05'));
 });
 
-test('a failed Move to List is a toast, and focus goes back to Move to List', async () => {
+test('a failed Move to the List is a toast, and focus goes back to Move to the List', async () => {
     holdPosts();
     await mountPage();
     await openItem('I_sample05');
     await press(button('back-to-list', 'I_sample05'));
     await answer({ error: 'GitHub is down.' }, 502);
-    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to List\. GitHub is down\.$/);
+    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to the List\. GitHub is down\.$/);
     expect(document.activeElement).toBe(button('back-to-list', 'I_sample05'));
 });
 
@@ -664,7 +664,9 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     holdPosts();
     await mountPage(withDependency(dependencyBlocker('closed')));
     await openItem('I_sample13');
-    expect(text(inDialog('[data-item-summary] > div'))).toContain('Blocked · starts after Dependency on server team');
+    // What holds it, in short, as its row says it; in full on its tooltip.
+    expect(text(inDialog('[data-item-summary] > div'))).toBe('StatusWaits on server team');
+    expect(inDialog('[data-item-summary] > div [title*="Dependency on server team"]')).not.toBeNull();
     expect(text(section('Dependencies').querySelector('[data-dependency-owner]'))).toBe(
         'Dependency on server team · not met',
     );
@@ -686,7 +688,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
     );
-    expect(footerControls()).toEqual(['Open thread', 'Start after Dependency on server team']);
+    expect(footerControls()).toEqual(['Open thread', 'Start when unblocked']);
     expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe(
         'Pick a model to start it once you mark the Dependency on server team met',
     );
@@ -908,13 +910,36 @@ test('while T3 can’t be read, known figures stay and say they are last known',
     const meta = text(inDialog('[data-meta]'));
     const figures = inDialog('aside [data-agent-work]')!;
 
-    expect([...figures.children].map(text), 'the sidebar lists its own figures, then says they are last known').toEqual(
-        ['Agent time1m', 'Tokens1K', 'Cost$1.00', 'Direct work · Last known'],
+    expect(
+        [...figures.children].map(text),
+        'the sidebar heads the concept’s own figures, then says they are last known',
+    ).toEqual(['This concept', 'Agent time1m', 'Tokens1K', 'Cost$1.00', 'Last known']);
+    // The total follows them under its own heading, one labelled row per figure; its tooltip names each and says they
+    // are last known.
+    expect([...inDialog('aside [data-concept-work]')!.children].map(text)).toEqual([
+        'Including parts',
+        'Agent time2m',
+        'Tokens2K',
+        'Cost$3.00',
+    ]);
+    expect(meta).not.toContain('Total');
+    expect(inDialog('[data-concept-work]')?.getAttribute('title')).toMatch(
+        /^Agent time 2m · Tokens 2K · Cost \$3\.00\. Last known/,
     );
-    expect(meta).toContain('With partsAgent time 2m · 2K tokens · $3.00');
-    expect(meta).toContain('last known');
     expect(meta).not.toContain('Agent work unavailable.');
     expect(figures.title).toMatch(/Last known figures from 3 Nov, \d\d:\d\d: T3 Code’s usage can’t be read now\./);
+});
+
+test('a concept with no agent work of its own says so, then lists its parts’ figures as labelled rows', async () => {
+    await mountPage(conceptBoard(undefined, stats(2)));
+    await openItem(CONCEPT);
+
+    const figures = [...inDialog('aside [data-agent-work]')!.parentElement!.querySelectorAll('[data-agent-work]')];
+
+    expect(figures.map((f) => [...f.children].map(text))).toEqual([
+        ['This concept', 'No agent work of its own'],
+        ['Including parts', 'Agent time1m', 'Tokens1K', 'Cost$2.00'],
+    ]);
 });
 
 const withoutFigures = (usageState: 'failed' | 'loading') => {

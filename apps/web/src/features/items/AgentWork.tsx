@@ -13,11 +13,11 @@ import { FigureRows } from '@/ui/board';
 export const INCOMPLETE_TOTAL = 'Some agent usage is not available yet.';
 
 /**
- * Agent time, tokens and cost, in the board's order, as one small muted line after any `label`, with the wall time while
- * the work runs (a still item's "elapsed" would read as a clock still going); each named in the tooltip; nothing
- * when no thread worked on the item or T3's database can't be read. While T3 can't be read, the board keeps the figures
- * it last saw, and the line says so. `stats` shows other figures than the item's own; `only` shows it only in a narrow
- * or a wide container.
+ * Agent time, tokens and cost: as one short muted figure after any `label`, the cost (or the agent time with no cost),
+ * with every figure named in its tooltip; or as `rows`, one per figure under `label` as their heading, with the wall
+ * time while the work runs (a still item's "elapsed" would read as a clock still going). Nothing when no thread worked
+ * on the item or T3's database can't be read. While T3 can't be read, the board keeps the figures it last saw, and the tooltip says so. `stats` shows other
+ * figures than the item's own; `only` shows it only in a narrow or a wide container.
  */
 export function AgentWork({
     item,
@@ -42,13 +42,13 @@ export function AgentWork({
     if (!s || s === 'unavailable' || !hasFigures(s)) return null;
 
     const old = !s.frozen ? lastKnown : null;
-    const figures: [label: string, value: string, unit: string][] = [];
+    const figures: [label: string, value: string][] = [];
 
-    figures.push(['Agent time', duration(s.agentMs), ''], ['Tokens', formatTokens(s.tokens), ' tokens']);
+    figures.push(['Agent time', duration(s.agentMs)], ['Tokens', formatTokens(s.tokens)]);
 
-    if (s.costUsd !== undefined) figures.push(['Cost', formatUsd(s.costUsd), '']);
+    if (s.costUsd !== undefined) figures.push(['Cost', formatUsd(s.costUsd)]);
 
-    if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' elapsed']);
+    if (s.wallMs) figures.push(['Wall time', duration(s.wallMs)]);
 
     const shown = figures.filter(([name]) => name !== 'Wall time' || running);
 
@@ -64,11 +64,14 @@ export function AgentWork({
                     label: name === 'Wall time' ? 'Since start' : name,
                     value: `${v}${name === 'Cost' && s.incomplete ? '+' : ''}`,
                 }))}
-                note={
-                    [label, old && 'Last known', s.incomplete && 'Incomplete'].filter(Boolean).join(' · ') || undefined
-                }
+                heading={label}
+                note={[old && 'Last known', s.incomplete && 'Incomplete'].filter(Boolean).join(' · ') || undefined}
             />
         );
+
+    // One short figure, so a fact's value never wraps: the cost, or the agent time when it has none; the rest is in the
+    // tooltip.
+    const cost = shown.find(([name]) => name === 'Cost');
 
     return (
         <Text
@@ -78,16 +81,12 @@ export function AgentWork({
             data-agent-work
             data-only={only}
             data-last-known={old ? '' : undefined}
-            title={[figures.map(([k, v]) => `${k} ${v}`).join(' · '), old, s.incomplete && INCOMPLETE_TOTAL]
-                .filter(Boolean)
-                .join('. ')}
+            title={title}
             numeric
             only={only}
         >
             {label && `${label}: `}
-            {shown.map(([name, v, unit]) => (name === 'Agent time' ? `Agent time ${v}` : v + unit)).join(' · ')}
-            {old && ' · last known'}
-            {s.incomplete && ' · incomplete'}
+            {cost ? `${cost[1]}${s.incomplete ? '+' : ''}` : `Agent time ${duration(s.agentMs)}`}
         </Text>
     );
 }

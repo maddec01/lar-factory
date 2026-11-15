@@ -5,8 +5,9 @@ import { itemName } from '@lar-factory/shared';
 import { open } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import type { Part } from './DossierParts';
+import { PartTitle } from './PartTitle';
 import { RowKindMark } from './RowIdentity';
-import { ItemTitle, SourceIcon, ItemStatusGlyph } from '@/features/items';
+import { SourceIcon, ItemStatusGlyph } from '@/features/items';
 import { PartLink as DesignPartLink, PartName as DesignPartName, RefButton } from '@/ui/board';
 
 /** Text with its `#n` and `owner/repo#n` references as buttons that open the item. */
@@ -40,7 +41,7 @@ export function PartName({ part }: { part: Part }) {
             }
             glyph={<ItemStatusGlyph item={part.item} />}
         >
-            <ItemTitle item={part.item} />
+            <PartTitle item={part.item} />
         </DesignPartName>
     );
 }

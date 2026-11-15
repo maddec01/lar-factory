@@ -3,7 +3,6 @@
 
 import type { Item, ItemStats, LinkedPr } from '@lar-factory/shared';
 import { duration, formatTokens, formatUsd, itemMembers, prLabel } from '@lar-factory/shared';
-import { Loading } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { useActivityStill } from './useActivityState';
@@ -42,8 +41,20 @@ export function RowSecondLine({
     );
 }
 
-/** The agent figures, from the same fields AgentCell reads: the cost on the row, with time · tokens · cost in its tooltip; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label, which keeps naming the usage read while it loads. Usage T3 couldn't read, with no figures known, says it's unavailable rather than nothing. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
-export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; total?: boolean }) {
+/** The agent figures, from the same fields AgentCell reads: the cost on the row (every figure when `full`), with time · tokens · cost in its tooltip; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label, which keeps naming the usage read while it loads. Usage T3 couldn't read, with no figures known, says it's unavailable rather than nothing. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
+export function Figures({
+    s,
+    item,
+    total,
+    full = false,
+}: {
+    s: ItemStats | null;
+    item: Item;
+    total?: boolean;
+    /** Every figure on the line, "2h 29m · 64.8M tokens · $29.12", where there is room for them, as a concept
+     *  dialog's part has. */
+    full?: boolean;
+}) {
     const lastKnown = useLastKnown(item);
     const data = useBoardStore((state) => state.data);
     const still = useActivityStill(item);
@@ -53,7 +64,8 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
     const none = !s || (!hasFigures(s) && (loading || !s.incomplete));
 
     if (none) {
-        if (loading) return <Loading presentation="inline" label={LOADING} title={LOADING} still={still} />;
+        // Only the spinner, in the cost's room, with its words in the tooltip: a cost-width slot never holds cut words.
+        if (loading) return <UsageFigures title={LOADING} updating={LOADING} still={still} />;
 
         return usageUnreadable(item) ? <UsageFigures title={UNAVAILABLE} text={UNAVAILABLE} /> : <span />;
     }
@@ -61,7 +73,11 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
     const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;
     const all = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), cost].filter(Boolean).join(' · ') : null;
     // The row says the cost, the figure that matters at a glance; time and tokens are in its tooltip. With no cost, time.
-    const text = all && (cost ?? duration(s.agentMs));
+    const text =
+        all &&
+        (full
+            ? [duration(s.agentMs), `${formatTokens(s.tokens)} tokens`, cost].filter(Boolean).join(' · ')
+            : (cost ?? duration(s.agentMs)));
     const title = s.frozen
         ? `Agent time · tokens · cost, as it stood at merge: ${all}`
         : [

@@ -1,32 +1,20 @@
-// Everything the board search lists for a query, in list order: actions, then the filters, then Settings entries and
-// tickets once there is a query. Tokens narrow tickets alone, and Search all tickets lists what they hide. Tickets are
-// the board's items, Done's only within its 7-day window. Archive stays off the board data, so nothing archived shows.
+// Everything the board search lists for a query, in list order: actions, then the filters, then tickets once there is a
+// query (SearchTickets.tsx), those on the board and then the List's, then Settings entries. Tokens narrow tickets alone,
+// and Search all tickets lists what they hide. Tickets are the board's items, Done's only within its 7-day window.
+// Archive stays off the board data, so nothing archived shows.
 
-import {
-    byFlowOrder,
-    deskItems,
-    deskWait,
-    inRepo,
-    isRecentlyDone,
-    placementOf,
-    readingScope,
-    ref,
-    repoKey,
-    repoName,
-    shownRepo,
-} from '@lar-factory/shared';
+import { readingScope, repoName, shownRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Archive, Inbox, ListX, Search, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
+import { Archive, Inbox, ListX, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
 import type { LucideIcon } from '@lar-works/design-system/icons';
 
-import { KindIcon } from './BoardFilters';
 import { matchingGroups, wordsOf } from './SearchOptions';
 import type { SearchGroup, SearchOption } from './SearchOptions';
+import { ticketGroups, ticketOptions } from './SearchTickets';
+import { settingMatches } from './SettingMatches';
 import { useAddItemStore } from '@/features/add-item';
-import { kindFilterOf, rowFilter } from '@/features/filters';
 import type { ItemFilters } from '@/features/filters';
-import { useItemDialogStore } from '@/features/item-dialog';
-import { matchesSearch, useListStore } from '@/features/list';
+import { useListStore } from '@/features/list';
 import { ProjectIcon, projectSettings } from '@/features/repositories';
 import { pages, settingsData, useSettingsStore } from '@/features/settings';
 import type { PagesInput } from '@/features/settings';
@@ -42,6 +30,8 @@ export interface SearchInput {
     filters: ItemFilters;
     /** Whether Search all tickets was chosen for this query. */
     widened: boolean;
+    /** Whether More settings was chosen for this query, listing every Settings match. */
+    allSettings?: boolean;
     /** The groups that set the filters. */
     filterGroups: readonly SearchGroup[];
     /** Whether any filter token is on, Scope included. */
@@ -50,6 +40,8 @@ export interface SearchInput {
     update: UpdateButtonAction;
     /** What `settingsOptions` lists, which the query doesn't change. */
     settingOptions: SearchOption[];
+    /** The word the board's rows say for an item (the item presenter's); its recorded status without one. */
+    wordOf?: (item: Item) => string;
 }
 
 export interface SearchHandlers {
@@ -59,6 +51,8 @@ export interface SearchHandlers {
     clear: () => void;
     /** Lists the tickets the tokens hide. */
     widen: () => void;
+    /** Lists every Settings match. */
+    moreSettings?: () => void;
 }
 
 const icon = (Icon: LucideIcon) => <Icon aria-hidden="true" />;
@@ -143,7 +137,8 @@ export function settingsOptions(
     const projects = data.repos
         .filter((repo) => repo.setup)
         .flatMap(({ repo }) => {
-            const name = shownRepo(repo);
+            // Its short name, as the board names it; the full one stays searchable.
+            const name = repoName(repo, data.repos);
             const entry = {
                 icon: <ProjectIcon repo={repo} size="md" />,
                 select: () =>
@@ -154,12 +149,19 @@ export function settingsOptions(
             };
 
             return [
-                { ...entry, value: `project:${repo}`, name: `Settings for ${name}`, hint: 'Project settings' },
+                {
+                    ...entry,
+                    value: `project:${repo}`,
+                    name: `Settings for ${name}`,
+                    hint: 'Project settings',
+                    keywords: shownRepo(repo),
+                },
                 ...projectSettings(repo).map((setting) => ({
                     ...entry,
                     value: `project:${repo}:${setting.id}`,
                     name: setting.label,
                     hint: name,
+                    keywords: shownRepo(repo),
                 })),
             ];
         });
@@ -167,104 +169,25 @@ export function settingsOptions(
     return [...general, ...projects];
 }
 
-const ticketValue = (item: Item) => `ticket:${item.id}`;
-
-/** The board's lanes by name, as their headings read. */
-const LANES: Record<string, string> = {
-    queue: 'Queue',
-    shaping: 'Shaping',
-    ready: 'Ready to build',
-    build: 'Build',
-    dock: 'Concepts',
-};
-
-/** The lane a desk item sits in on the board, as its desk card names it. */
-const laneOf = (item: Item, data: BoardData): string => {
-    const lane = placementOf(item, {
-        starts: data.startProgress?.[item.id],
-        unavailable: false,
-        all: data.items,
-    }).sections.find((section) => section !== 'desk');
-
-    return (lane && LANES[lane]) ?? item.status;
-};
-
-/** A ticket as a board row reads: its kind, then its number and title; at its end its project and what it waits for
- *  when it is on Your desk (`yours`), else its status. */
-function ticketOption(item: Item, data: BoardData, leave: SearchHandlers['leave'], yours: boolean): SearchOption {
-    return {
-        value: ticketValue(item),
-        name: item.number ? `${ref(item)} ${item.title}` : item.title,
-        // An item on Your desk says its stage, then what it waits for in the desk's words; any other its status.
-        meta: [
-            repoName(repoKey(item), data.repos),
-            yours ? laneOf(item, data) : item.status,
-            yours && deskWait(item, false, data.items).label,
-        ]
-            .filter((word, i, words) => word && words.indexOf(word) === i)
-            .join(' · '),
-        icon: <KindIcon choice={kindFilterOf(item)} />,
-        select: () => leave(() => useItemDialogStore.getState().open(item.id)),
-    };
-}
-
-function ticketOptions(
-    { data, now, query, scope, filters, widened }: SearchInput,
-    { leave, widen }: SearchHandlers,
-): SearchOption[] {
-    const words = wordsOf(query);
-    const shows = rowFilter(filters, data.repos);
-    const kept = (item: Item) => (!scope || inRepo(item, scope)) && shows(item);
-    const hits = data.items
-        .filter(
-            (item) =>
-                (item.status !== 'Done' || isRecentlyDone(item, now)) &&
-                words.every((word) => matchesSearch(item, word)),
-        )
-        .sort(byFlowOrder);
-    const shown = hits.filter(kept);
-    const hidden = hits.filter((item) => !kept(item));
-    const desk = new Set(deskItems(data, false).map((item) => item.id));
-    const option = (item: Item) => ticketOption(item, data, leave, desk.has(item.id));
-
-    if (widened) return [...shown, ...hidden].map(option);
-
-    return [
-        ...shown.map(option),
-        ...(hidden.length
-            ? [
-                  {
-                      value: 'tickets:all',
-                      name: 'Search all tickets',
-                      hint: `${hidden.length} more`,
-                      icon: icon(Search),
-                      select: () => {
-                          widen();
-
-                          return ticketValue(hidden[0]!);
-                      },
-                  },
-              ]
-            : []),
-    ];
-}
-
-/** What the dialog lists for `input`, and whether the first read may still add tickets to it. */
+/** What the dialog lists for `input`, and whether the first read may still add tickets to it: actions and filters,
+ *  then the items (what a query is usually for), then a few Settings matches. */
 export function searchResults(
     input: SearchInput,
     handlers: SearchHandlers,
 ): { groups: SearchGroup[]; reading: boolean } {
-    const { data, query, scope, widened, filterGroups, settingOptions } = input;
+    const { data, query, scope, widened, filterGroups } = input;
     const typed = wordsOf(query).length > 0;
-    const options: SearchGroup[] = [
-        { label: 'Actions', options: actions(input, handlers) },
-        ...filterGroups,
-        ...(typed ? [{ label: 'Settings', options: settingOptions }] : []),
-    ];
     const tickets = typed ? ticketOptions(input, handlers) : [];
+    const settings = typed
+        ? settingMatches(input.settingOptions, input.query, input.allSettings ?? false, handlers.moreSettings)
+        : [];
 
     return {
-        groups: [...matchingGroups(options, query), ...(tickets.length ? [{ label: 'Items', options: tickets }] : [])],
+        groups: [
+            ...matchingGroups([{ label: 'Actions', options: actions(input, handlers) }, ...filterGroups], query),
+            ...ticketGroups(tickets, data),
+            ...(settings.length ? [{ label: 'Settings', options: settings }] : []),
+        ],
         reading: typed && readingScope(data, widened ? undefined : (scope ?? undefined)),
     };
 }

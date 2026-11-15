@@ -61,12 +61,12 @@ export function ChecksBar({ checks, still = false }: { checks: CheckCounts; stil
 
 /** The checks as a card's mini track: its `step` (such as "Verify"), then the pull request's mark with `word` (such as
  *  "1 failed"), in the danger colour when a check failed, so the PR's state reads at a glance. */
-export function CardChecks({ checks, step, word }: { checks: CheckCounts; step: string; word: string }) {
+export function CardChecks({ checks, step, word }: { checks: CheckCounts; step?: string; word: string }) {
     const summary = checksSummary(checks);
 
     return (
         <span className="text-fg-muted inline-flex items-center gap-2 text-xs" title={summary}>
-            <span aria-hidden="true">{step}</span>
+            {step && <span aria-hidden="true">{step}</span>}
             <span
                 aria-hidden="true"
                 className={`inline-flex items-center gap-1 ${checks.failed ? 'text-danger-fg' : ''}`}

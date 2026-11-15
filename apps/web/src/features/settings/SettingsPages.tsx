@@ -184,7 +184,8 @@ export function pages(input: PagesInput): Page[] {
             id: 'archive',
             label: 'Archive',
             icon: <Archive />,
-            description: 'Work off the board: set aside, or finished and hidden, kept on this Mac until you delete it.',
+            description:
+                'Work off the board: set aside, or finished and hidden, kept until you delete it or your retention setting does.',
             groups: archiveGroups(data, input.archive),
         },
         {

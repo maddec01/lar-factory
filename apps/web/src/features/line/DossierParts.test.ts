@@ -20,6 +20,8 @@ import {
 import type { Part } from './DossierParts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
+/** The sample's later groups: the ticketless household concept, an Apple part whose parent is closed, and Azure items with tasks. */
+const LATER_GROUPS = [0, 109, 5116, 5672, 5661, 6318, 6167, 6164, 6163];
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
 const child = (number: number, parent: Item, change: Partial<Item> = {}): Item => ({
     ...byNumber(129),
@@ -34,7 +36,7 @@ const child = (number: number, parent: Item, change: Partial<Item> = {}): Item =
 });
 
 test('explicit groups and off-board parents’ parts have dossiers in board order', () => {
-    expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([22, 200, 23, 180]);
+    expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([22, 200, 23, 180, ...LATER_GROUPS]);
 
     const parent = { ...byNumber(150), flow: 'linked' as const };
     const withChild = [...items.map((item) => (item.id === parent.id ? parent : item)), child(151, parent)];
@@ -42,7 +44,7 @@ test('explicit groups and off-board parents’ parts have dossiers in board orde
     expect(
         dossiersOf(withChild, withChild).map((d) => d.parent.number),
         'coupled work',
-    ).toEqual([22, 200, 23, 150, 180]);
+    ).toEqual([22, 200, 23, 150, 180, ...LATER_GROUPS]);
 
     const listed = withChild.map((i) =>
         i.number === 150 ? { ...i, status: 'List' as const } : i.number === 180 ? { ...i, status: 'Done' as const } : i,
@@ -51,7 +53,7 @@ test('explicit groups and off-board parents’ parts have dossiers in board orde
     expect(
         dossiersOf(listed, listed).map((d) => d.parent.number),
         'List stays grouped; a fully finished group leaves the dock',
-    ).toEqual([22, 200, 23, 150]);
+    ).toEqual([22, 200, 23, 150, ...LATER_GROUPS]);
 });
 
 test('a dossier shows where its parent or any part is in the scope', () => {
@@ -59,8 +61,8 @@ test('a dossier shows where its parent or any part is in the scope', () => {
 
     expect(
         dossiersOf(apple, items).map((d) => d.parent.number),
-        '#180 through its Apple build #40',
-    ).toEqual([22, 23, 180]);
+        '#180 through its Apple build #40, and the household concept through its Apple parts',
+    ).toEqual([22, 23, 180, 0, 109]);
     expect(dossiersOf([], items)).toEqual([]);
 });
 

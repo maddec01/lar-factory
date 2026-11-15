@@ -7,7 +7,7 @@ import { custom, type Group, type Row, type SettingsData } from './SettingsModel
 import { useSettingsStore } from './SettingsStore';
 import { stoppedAt, useWizardStore } from '@/features/onboarding';
 import { ProjectIcon } from '@/features/repositories';
-import { buttonKind } from '@/ui/board';
+import { buttonKind, SettingsRowOpen } from '@/ui/board';
 
 const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current sprint' } as const;
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
@@ -18,33 +18,32 @@ function onboardingDescription(progress: OnboardingProgress): string {
     return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
-/** Projects with their provider and work source. Read setups open a page, onboarding offers Resume; Resume and Add
+/** Projects with their provider and work source. A read setup's row opens its page, onboarding offers Resume; Resume and Add
  *  project open the setup as a pane in place of this section. */
 export function repositoryGroup(data: SettingsData): Group {
     const onboarded: Row[] = data.repos.map((r) => ({
         id: `repo-${r.repo}`,
         title: shownRepo(r.repo),
-        icon: <ProjectIcon repo={r.repo} size="sm" />,
+        icon: <ProjectIcon repo={r.repo} size="md" />,
         description: (
             <>
                 {itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
             </>
         ),
+        // The whole row opens the project's page.
         control: custom(() =>
             r.setup ? (
-                <Button
-                    {...buttonKind('other', { size: 'md' })}
-                    onClick={() => useSettingsStore.getState().openProject(r.repo)}
-                >
-                    Open project
-                </Button>
+                <SettingsRowOpen
+                    label={`Open ${shownRepo(r.repo)}`}
+                    onOpen={() => useSettingsStore.getState().openProject(r.repo)}
+                />
             ) : null,
         ),
     }));
     const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
         id: `repo-${repo}`,
         title: shownRepo(repo),
-        icon: <ProjectIcon repo={repo} size="sm" />,
+        icon: <ProjectIcon repo={repo} size="md" />,
         description: onboardingDescription(progress),
         control: custom(() => (
             <Button
@@ -59,7 +58,7 @@ export function repositoryGroup(data: SettingsData): Group {
     return {
         // Keep the project group title when search opens this section directly.
         title: 'Projects',
-        description: 'Settings stay on this machine. Projects need no factory files.',
+        description: 'Project settings are saved on this Mac.',
         rows: [...onboarded, ...onboarding],
         action: (
             <Button {...buttonKind('other')} onClick={() => useWizardStore.getState().start('settings')}>

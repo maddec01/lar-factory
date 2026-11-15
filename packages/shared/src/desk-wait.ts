@@ -23,6 +23,31 @@ export const dependencyProofs = (item: Item) =>
                   : [];
           });
 
+/**
+ * What holds a PR at Verify or Ready to merge before anything else: a failed check, then a conflict with main. The wait
+ * says what is wrong and its button where it is put right, so the card's foot and its button never say the same words.
+ */
+function prBlocker(item: Item) {
+    if (item.status !== 'Verify' && item.status !== 'Ready to merge') return null;
+
+    if (nextAction(item)?.kind !== 'pr') return null;
+
+    const pr = item.linkedPrs[0];
+
+    if (!pr || pr.state !== 'open' || pr.pipelineUnread) return null;
+
+    if (prReadiness(item)?.state === 'failed')
+        return {
+            label: 'Checks failed',
+            action: { kind: 'pr' as const, label: 'Review failed checks', threadId: undefined },
+        };
+
+    if (pr.mergeState === 'conflicts')
+        return { label: 'Resolve conflicts', action: { kind: 'pr' as const, label: 'Open PR', threadId: undefined } };
+
+    return null;
+}
+
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
     if (item.ticketEditHeld)
@@ -98,6 +123,11 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
     if (item.needsYou?.offers.includes('start-again'))
         return { label: 'Start failed', action: { kind: 'start-again' as const, label: 'Start again' } };
+
+    // A failed check or a conflict holds the PR whatever its step, so the wait and its button both name it first.
+    const blocker = prBlocker(item);
+
+    if (blocker) return blocker;
 
     if (item.status === 'Verify') return { label: 'Verify build', action: nextAction(item) };
 

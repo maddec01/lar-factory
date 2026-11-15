@@ -1,32 +1,44 @@
 // Start build on a Ready item, on the line and in the item dialog: today's Start with its model menu, posting to
 // /api/start-build. Open thread takes its place while the item has a running, queued or needs-you thread, and Start after
 // while an issue it's blocked by is open. It's disabled, its title saying why, while its repository is still
-// onboarding or T3 has no project for its repository.
+// onboarding or T3 has no project for its repository; blocked work then shows Start after, disabled, not Build.
 
-import { startActionChoice, buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
+import {
+    startActionChoice,
+    buildAccessProblem,
+    openBlockers,
+    sameRepo,
+    type BoardData,
+    type Item,
+} from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
+import { useId } from 'react';
 
 import { ICON } from './ButtonIcons';
 import { HumanWaitAction } from './HumanWaitAction';
 import { hasLiveThread } from './ItemThreads';
 import { OpenThread } from './OpenThread';
 import { useOnRow } from './RowContext';
-import { StartOrAfter } from './StartAfter';
-import { useButtonKind } from '@/ui/board';
+import { HeldStartAfter, StartOrAfter } from './StartAfter';
+import { StartHold, useButtonKind } from '@/ui/board';
 
 /** The shared action choice names the build on every surface. */
 export function StartBuild({
     item,
     data,
     linkedBeside,
+    captionReason = false,
 }: {
     item: Item;
     data: BoardData;
     linkedBeside?: string | undefined;
+    /** Shows why it's disabled as a quiet caption beside it, as the dialog's footer does; elsewhere the title says. */
+    captionReason?: boolean;
 }) {
     const kindOf = useButtonKind();
     const short = useOnRow();
     const onRow = short;
+    const reasonId = useId();
     const { label } = startActionChoice(item, 'build');
 
     if (item.briefApproval) return <HumanWaitAction item={item} data={data} />;
@@ -37,18 +49,41 @@ export function StartBuild({
     const setup = data.repos.find((repo) => sameRepo(repo.repo, item.repo))?.setup;
     const problem = setup && buildAccessProblem(setup.access);
 
-    if (problem)
+    // In the dialog's footer the reason it's disabled shows beside it as a quiet caption; elsewhere its title says.
+    const reason =
+        problem && captionReason ? (
+            <StartHold id={reasonId} caption>
+                {problem}
+            </StartHold>
+        ) : undefined;
+
+    // Blocked work says what it starts after, as every blocked start does, never a disabled Build: disabled while builds
+    // lack access, its title saying why. One armed before access lapsed still shows, so it can be disarmed.
+    if (problem && openBlockers(item).length && !data.armed?.[item.id])
         return (
-            <Button
-                {...kindOf(onRow ? 'open' : 'main')}
-                leftIcon={ICON.play}
-                disabled
-                title={problem}
-                data-build-unavailable={item.id}
-            >
-                {label}
-            </Button>
+            <HeldStartAfter item={item} data={data} kind="build" reason={problem} unavailable>
+                {reason}
+            </HeldStartAfter>
         );
 
-    return <StartOrAfter item={item} data={data} kind="build" linkedBeside={linkedBeside} />;
+    if (problem)
+        return (
+            <>
+                <Button
+                    {...kindOf(onRow ? 'open' : 'main')}
+                    leftIcon={ICON.play}
+                    disabled
+                    title={problem}
+                    aria-describedby={reason && reasonId}
+                    data-build-unavailable={item.id}
+                >
+                    {label}
+                </Button>
+                {reason}
+            </>
+        );
+
+    return (
+        <StartOrAfter item={item} data={data} kind="build" linkedBeside={linkedBeside} captionReason={captionReason} />
+    );
 }

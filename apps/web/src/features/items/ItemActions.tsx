@@ -7,6 +7,7 @@ import { useId, useRef } from 'react';
 
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
+import { ICON } from './ButtonIcons';
 import { askAbandon, backToList, queueItem } from './CardActions';
 import { closeKeepingFocus } from '@/features/notices';
 import { ActionError as DesignActionError, useButtonKind } from '@/ui/board';
@@ -20,6 +21,8 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
     return (
         <Button
             {...kindOf('main')}
+            // The same icon treatment as Shape and Build beside it: the Queued status's clock.
+            leftIcon={ICON.queue}
             data-queue={item.id}
             aria-label={`${verb} ${itemName(item)}`}
             {...writeState(data, action)}
@@ -41,11 +44,11 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
             {...kindOf('other')}
             pendingLook
             data-back-to-list={item.id}
-            aria-label={`${moving ? 'Moving' : 'Move to List'} ${itemName(item)}`}
+            aria-label={`${moving ? 'Moving' : 'Move to the List'} ${itemName(item)}`}
             {...writeState(data, action)}
             onClick={() => void backToList(item.id)}
         >
-            {moving ? 'Moving to List…' : 'Move to List'}
+            {moving ? 'Moving to the List…' : 'Move to the List'}
         </Button>
     );
 }

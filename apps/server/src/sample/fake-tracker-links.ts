@@ -16,6 +16,7 @@ export function fakeTrackerLinks(repositories: () => Map<string, FakeRepository>
         title: item.title,
         url: item.url!,
         state: item.state,
+        ...(item.azure && { azure: item.azure }),
     });
     const part = (issue: FakeIssue): TrackerPart => ({
         url: issue.item.url!,
@@ -60,14 +61,17 @@ export function fakeTrackerLinks(repositories: () => Map<string, FakeRepository>
             const { item, details } = projected;
             const parent = all().find((candidate) => candidate.item.id === item.parentId);
             const children = all().filter((candidate) => candidate.item.parentId === item.id);
+            // A build's slices show in its slice bar: as GitHub's read does, they neither link it nor count as parts.
+            const slices = new Set(item.slices.map((slice) => `${slice.repo}#${slice.number}`));
+            const parts = children.filter((child) => !slices.has(`${child.item.repo}#${child.item.number}`));
             const blockers = item.blockers.map(get);
             const related = (details.related ?? []).map(get);
 
             item.parent = parent ? reference(parent) : null;
-            item.flow = item.kind === 'concept' || parent || children.length ? 'linked' : 'single';
+            item.flow = item.kind === 'concept' || parent || parts.length ? 'linked' : 'single';
             item.subIssues = {
-                total: children.length,
-                completed: children.filter((child) => child.item.state === 'closed').length,
+                total: parts.length,
+                completed: parts.filter((child) => child.item.state === 'closed').length,
             };
             item.blockers = blockers.map(reference);
             item.labelColors = Object.fromEntries(

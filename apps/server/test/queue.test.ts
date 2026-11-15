@@ -103,14 +103,14 @@ test('Queue and Back to List reject requests from other pages and sample mode', 
     const response = await backToList(sample, 'I_sample01');
 
     assert.equal(response.status, 403);
-    assert.equal((await response.json()).error, 'Moving items back to List is disabled in sample mode.');
+    assert.equal((await response.json()).error, 'Moving items back to the List is disabled in sample mode.');
     assert.equal((await sample.calls()).length, 0);
 });
 
 const startItem = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');
 
 test('Back to List is refused while a Start is in flight, uncertain or done for the item', async (t) => {
-    const refused = 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
+    const refused = 'Start is running or has run for this item. Check its T3 thread before moving it back to the List.';
     const board = await startBoard(
         t,
         { items: [boardIssue(12, 'Queued')], t3: { delay: 300 } },

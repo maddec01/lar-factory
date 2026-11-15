@@ -22,10 +22,29 @@ export function StartNote({ children }: { children: ReactNode }) {
     return <span className="basis-full">{children}</span>;
 }
 
-/** A disabled start's visible, accessible reason; narrow rows give it a separate line. */
-export function StartHold({ id, children }: { id: string; children: ReactNode }) {
+/** A disabled start's visible, accessible reason: on a row, a line of its own under the start (narrow rows give it a
+ *  separate line); as a `caption`, where a dialog's footer sets it, a quiet muted line beside the buttons, before them,
+ *  wrapping rather than widening the footer. */
+export function StartHold({
+    id,
+    caption = false,
+    children,
+}: {
+    id: string;
+    /** Sets it as a quiet caption before the buttons, as the dialog's footer does. */
+    caption?: boolean;
+    children: ReactNode;
+}) {
     return (
-        <span id={id} data-start-hold className="basis-full">
+        <span
+            id={id}
+            data-start-hold
+            className={
+                caption
+                    ? 'text-fg-muted order-first max-w-sm min-w-0 flex-[1_1_12rem] text-right text-xs text-pretty'
+                    : 'basis-full'
+            }
+        >
             {children}
         </span>
     );

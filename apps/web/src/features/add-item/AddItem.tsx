@@ -76,7 +76,9 @@ function useDescription(): string {
     const selected = repos.find((r) => r.repo === values?.repo) ?? repos[0];
     const where = selected ? ` in ${repoName(selected.repo, repos)}` : '';
 
-    return pane === 'pick' ? 'Find a ticket to add or open in List.' : `Record work${where} and add it to List.`;
+    return pane === 'pick'
+        ? 'Find a ticket to add or open on the List.'
+        : `Record work${where} and add it to the List.`;
 }
 
 /** The open dialog; each opening starts at the normal size. */

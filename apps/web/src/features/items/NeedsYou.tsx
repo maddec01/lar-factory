@@ -26,7 +26,7 @@ import { buttonKind, NeedsYouNotice, NeedsYouResult } from '@/ui/board';
 const LABELS: Record<NeedsYouOffer, string> = {
     'start-again': 'Start again',
     'back-to-queue': 'Back to Queue',
-    'back-to-list': 'Move to List',
+    'back-to-list': 'Move to the List',
     'reopen-pr': 'Reopen PR',
     'replace-pr': 'Start a replacement build',
     'keep-working': 'Keep working',
@@ -48,13 +48,14 @@ const REVIEW_ASKS: Record<string, string> = {
 export function useNoticeTakesAction(item: Item): boolean {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
     const items = useBoardStore((state) => state.data.items);
-    const action = deskWait(item, useActivityUnavailable(), items).action;
+    const wait = deskWait(item, useActivityUnavailable(), items);
+    const { action } = wait;
 
     if (cleanupResult || item.needsYou) return false;
 
     // An action that only opens this item (approving a brief, recording an outcome, a required verification) is done
     // in the dialog's own sections, so the notice leaves it to them and the footer keeps its status actions.
-    if (action?.kind === 'details' || (item.status === 'Verify' && item.verification?.required)) return false;
+    if (action?.kind === 'details' || (wait.label === 'Verify build' && item.verification?.required)) return false;
 
     if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
         return false;

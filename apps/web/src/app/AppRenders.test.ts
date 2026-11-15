@@ -87,6 +87,7 @@ test('a tick that changes nothing renders no glyph, and the ages in the Queue st
     await tickAt(NOW + 2 * HOUR);
     expect(glyphRenders).toBe(0);
     expect(text($('.queue-age'))).toBe('2h ago');
+    expect($('.queue-age')!.title, 'its tooltip says what the age counts from').toMatch(/^(Added|Changed) 2h ago$/);
 });
 
 test('the tick that makes the read stale stops the spinner, keeps T3’s activity and puts work at Verify back on the desk', async () => {

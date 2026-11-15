@@ -1,6 +1,9 @@
+import { CheckIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
+import { ItemTitle } from './ItemParts';
+import { ROW_OPENS } from './RowStyles';
 
 /** The meta area under the summary: wrapping facts, then an optional notice on a full-width row of its own. */
 export function MetaArea({
@@ -106,21 +109,71 @@ export function SprintCount({
     );
 }
 
-/** The work an item waits on, struck through once closed. */
+/** The work an item still waits on, each led by its reference and wrapping to two lines, opening its item when it is on
+ *  the board; then the done prerequisites under a quiet count, each named on one muted line behind a small success
+ *  check, its full name in its tooltip. */
 export function WaitsOnList({
     items,
+    done,
 }: {
-    /** The work the item waits on, each with whether it is closed. */
-    items: readonly { key: string; title: string; closed: boolean }[];
+    /** The open work the item waits on: its reference ("#139", "Part 15"), its title and what opens it. */
+    items: readonly { key: string; reference?: string | undefined; title: string; onOpen?: (() => void) | undefined }[];
+    /** The done prerequisites: their count, such as "2 prerequisites done", and each one's reference and title. */
+    done?:
+        | { text: string; items: readonly { key: string; reference?: string | undefined; title: string }[] }
+        | undefined;
 }) {
     return (
-        <ul className="m-0 grid list-none gap-1.5 p-0 text-sm" data-waits-on>
-            {items.map((item) => (
-                <li key={item.key} className={item.closed ? 'text-fg-muted line-through' : ''}>
-                    {item.title}
-                </li>
-            ))}
-        </ul>
+        <div className="grid min-w-0 gap-1.5 text-sm" data-waits-on>
+            {items.length > 0 && (
+                <ul className="m-0 grid min-w-0 list-none gap-1.5 p-0">
+                    {items.map((item) => {
+                        const name = item.reference ? `${item.reference} ${item.title}` : item.title;
+                        const text = (
+                            <span className="line-clamp-2 wrap-anywhere">
+                                <ItemTitle reference={item.reference} title={item.title} />
+                            </span>
+                        );
+
+                        return (
+                            <li key={item.key} title={name} className="min-w-0">
+                                {item.onOpen ? (
+                                    <button
+                                        type="button"
+                                        onClick={item.onOpen}
+                                        className={`hover:bg-fill-hover -mx-1 block w-[calc(100%+0.5rem)] rounded-xs px-1 text-left ${ROW_OPENS}`}
+                                        data-waits-on-open
+                                    >
+                                        {text}
+                                    </button>
+                                ) : (
+                                    text
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+            {done && (
+                <div className="grid min-w-0 gap-1 pt-0.5" data-waits-on-done>
+                    <span className="text-fg-muted truncate text-xs">{done.text}</span>
+                    <ul className="m-0 grid min-w-0 list-none gap-0.5 p-0">
+                        {done.items.map((item) => (
+                            <li
+                                key={item.key}
+                                title={item.reference ? `${item.reference} ${item.title}` : item.title}
+                                className="text-fg-muted grid min-w-0 grid-cols-[0.875rem_minmax(0,1fr)] items-center gap-1.5 text-xs leading-5"
+                            >
+                                <CheckIcon aria-hidden className="stroke-success size-3.5" />
+                                <span className="truncate">
+                                    <ItemTitle reference={item.reference} title={item.title} />
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -134,6 +187,27 @@ export function ChipGroup({
 } & DataAttributes) {
     return (
         <span {...data} className="contents">
+            {children}
+        </span>
+    );
+}
+
+/** A tracker's label or tag as a quiet outlined chip, as the List draws them, so a tag such as "Blocked" never reads as
+ *  a board state; `title` names where it comes from, such as "Azure DevOps tag: Blocked". */
+export function TrackerTag({
+    title,
+    children,
+}: {
+    /** Where the tag comes from and its name, as its tooltip. */
+    title: string;
+    /** The tag's LabelChip. */
+    children: ReactNode;
+}) {
+    return (
+        <span
+            title={title}
+            className="[&_[data-label-chip]]:text-fg-muted inline-flex max-w-full min-w-0 [&_[data-label-chip]]:bg-transparent [&_[data-label-chip]]:font-normal [&_[data-label-chip]_*]:pointer-events-none"
+        >
             {children}
         </span>
     );

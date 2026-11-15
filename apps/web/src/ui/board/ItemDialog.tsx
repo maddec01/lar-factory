@@ -3,21 +3,22 @@
 
 import { Alert } from '@lar-works/design-system';
 import { linkRecipe } from '@lar-works/design-system/primitives';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { ButtonDensityProvider } from './ButtonDensity';
 import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
 
 /**
- * The item's properties at the top of the dialog's sidebar, a label beside each value: its status, where its ticket
- * lives, its kind and its parent, then its ticket `actions`.
+ * The item's properties at the top of the dialog's sidebar, a label beside each value, each on one line: its status,
+ * where its ticket lives, its kind and its parent, then a quiet `note` and its ticket `actions` on a Ticket row.
  */
 export function ItemSummary({
     status,
     project,
     kind,
     parent,
+    note,
     actions,
     ...data
 }: {
@@ -29,7 +30,9 @@ export function ItemSummary({
     kind: ReactNode;
     /** The item's parent, a SummaryParent. */
     parent?: ReactNode;
-    /** The ticket's actions. */
+    /** A quiet line under the properties, such as why its plan isn't on its tracker yet. */
+    note?: ReactNode;
+    /** The ticket's actions, short buttons such as Attach and Create, or the panel one of them opened. */
     actions: ReactNode;
 } & DataAttributes) {
     return (
@@ -38,12 +41,27 @@ export function ItemSummary({
             <AsideProp label="Project">{project}</AsideProp>
             <AsideProp label="Kind">{kind}</AsideProp>
             {parent && <AsideProp label="Part of">{parent}</AsideProp>}
-            <div className="flex flex-wrap items-start gap-2 empty:hidden">{actions}</div>
+            {note && <span className="text-fg-muted min-w-0 truncate text-xs leading-5 empty:hidden">{note}</span>}
+            {/* A property row of its own, label and buttons on the columns above; an opened panel takes the full width.
+                It shows only while it holds a button or a panel. */}
+            <div
+                className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 pt-1 text-xs has-[section]:grid-cols-[minmax(0,1fr)] [&:has(section)>[data-label]]:hidden [&:not(:has(button,section))]:hidden"
+                data-ticket-actions
+            >
+                <span className="text-fg-muted leading-7" data-label>
+                    Ticket
+                </span>
+                {/* Quiet buttons, the first one's word on the values' column, as the properties above read. */}
+                <span className="flex min-w-0 flex-wrap items-center gap-1 [&>[data-slot=button]:first-child]:-ml-2.75 [&>section]:basis-full">
+                    {actions}
+                </span>
+            </div>
         </div>
     );
 }
 
-/** One property in the dialog's sidebar: its muted label in a fixed column, its value beside it. */
+/** One property in the dialog's sidebar: its muted label in a fixed column, its value beside it, the label on the value's
+ *  first line when the value runs longer. */
 function AsideProp({
     label,
     children,
@@ -54,44 +72,55 @@ function AsideProp({
     children: ReactNode;
 }) {
     return (
-        <div className="grid min-h-6 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-3 text-xs">
-            <span className="text-fg-muted">{label}</span>
-            <span className="text-fg flex min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">{children}</span>
+        <div className="grid min-h-6 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 text-xs">
+            <span className="text-fg-muted leading-6">{label}</span>
+            <span className="text-fg flex min-h-6 min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">
+                {children}
+            </span>
         </div>
     );
 }
 
-/** The summary's status word, in the text colour. */
+/** The summary's status word, in the text colour, on one line. */
 export function SummaryStatus({
     children,
     title,
 }: {
     /** Secondary context, such as a recorded workflow stage. */
-    title?: string;
+    title?: string | undefined;
     /** The status word. */
     children: ReactNode;
 }) {
     return (
-        <span title={title} className="text-fg font-medium">
+        <span title={title} className="text-fg min-w-0 truncate font-medium">
             {children}
         </span>
     );
 }
 
-/** A dependency holding the item, as the board's blocked rows show it: the waiting light and what it waits on. */
+/** What holds the item, as the board's blocked rows show it: the waiting light and a short word, `title` in full. */
 export function SummaryBlocked({
+    title,
     children,
 }: {
-    /** The dependency holding the item. */
+    /** What holds it in full. */
+    title?: string | undefined;
+    /** The short word, such as "Blocked". */
     children: ReactNode;
 }) {
-    return <StateWord state="waiting">{children}</StateWord>;
+    return (
+        <StateWord state="waiting" title={title}>
+            {children}
+        </StateWord>
+    );
 }
 
-/** The item's parent: `prefix` ("Part of"), then its `name`, linked when `href` opens it. */
+/** The item's parent: `prefix` ("Part of"), then its whole `name`, wrapping over as many lines as it takes, a link that
+ *  opens it in the dialog (`onOpen`), else its page (`href`); plain text with neither. */
 export function SummaryParent({
     prefix,
     name,
+    onOpen,
     href,
     ...data
 }: {
@@ -99,18 +128,29 @@ export function SummaryParent({
     prefix: string;
     /** The parent's name. */
     name: string;
-    /** The parent's page; the name is plain text without one. */
+    /** Opens the parent in the dialog, when it is on the board. */
+    onOpen?: (() => void) | undefined;
+    /** The parent's page, when it isn't on the board; the name is plain text without either. */
     href?: string | undefined;
 } & DataAttributes) {
     return (
-        <p {...data} className="m-0 min-w-0 wrap-anywhere">
+        <p {...data} className="m-0 min-w-0 py-1 leading-4 wrap-break-word">
             <span className="sr-only">{prefix} </span>
-            {href ? (
+            {onOpen ? (
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    className={`focus-ring text-left ${linkRecipe.accent}`}
+                    data-parent-open
+                >
+                    {name}
+                </button>
+            ) : href ? (
                 <a href={href} target="_blank" rel="noopener" className={linkRecipe.accent}>
                     {name}
                 </a>
             ) : (
-                name
+                <span>{name}</span>
             )}
         </p>
     );
@@ -186,7 +226,9 @@ export function ItemDialogColumns({
 }
 
 /** The dialog's main column: what waits on you, where the work stands, what its agents do, then the record, description
- *  and comments, one under another; filling, its open editor takes the height the rest leave. */
+ *  and comments, one under another; filling, its open editor takes the height the rest leave. Every section shares one
+ *  content width: its prose fills the column, as its lists and headers do, so a description ends where the parts list
+ *  above it does; the column stops at a reading width of its own, so a wide dialog never runs a line too long. */
 export function ItemMainColumn({
     fill,
     children,
@@ -198,7 +240,7 @@ export function ItemMainColumn({
 }) {
     return (
         <div
-            className={`@split:col-start-1 @split:row-start-1 min-w-0 gap-5 ${fill ? 'flex min-h-0 flex-col' : 'grid grid-cols-[minmax(0,1fr)] content-start'}`}
+            className={`@split:col-start-1 @split:row-start-1 max-w-[52rem] min-w-0 gap-5 [--container-reading:100%] ${fill ? 'flex min-h-0 flex-col' : 'grid grid-cols-[minmax(0,1fr)] content-start'}`}
             data-item-main
         >
             {children}
@@ -207,21 +249,55 @@ export function ItemMainColumn({
 }
 
 /** The sidebar beside the main column, once there is room: a softly filled card with a hairline edge, so it reads as its own
- *  panel on any screen, its groups (properties, figures, people and dates, threads) split by full-width dividers. */
+ *  panel on any screen, its groups (properties, figures, people and dates, threads) split by full-width dividers. While
+ *  it fits the dialog's scroll area it stays in view as a long record scrolls beside it. */
 export function ItemDialogAside({
     children,
 }: {
     /** The sidebar's sections. */
     children: ReactNode;
 }) {
+    const [ref, fits] = useFitsScrollArea();
+
     return (
         <aside
-            className="@split:col-start-2 @split:row-start-1 bg-fill-muted border-line divide-line grid min-w-0 grid-cols-[minmax(0,1fr)] content-start divide-y self-start rounded-xl border shadow-(--shadow-raised) [&>*]:px-4 [&>*]:py-3"
+            ref={ref}
+            className="@split:col-start-2 @split:row-start-1 @split:data-fits:sticky @split:data-fits:top-0 bg-fill-muted border-line divide-line grid min-w-0 grid-cols-[minmax(0,1fr)] content-start divide-y self-start rounded-xl border shadow-(--shadow-raised) [&>*]:px-4 [&>*]:py-3"
             data-item-aside
+            data-fits={fits || undefined}
         >
             {children}
         </aside>
     );
+}
+
+/** Whether the element fits the height of the dialog body it scrolls in, inside its padding, kept up as either resizes:
+ *  a sidebar taller than that scrolls with the rest, so none of it is ever out of reach. */
+function useFitsScrollArea() {
+    const ref = useRef<HTMLElement>(null);
+    const [fits, setFits] = useState(false);
+
+    useEffect(() => {
+        const element = ref.current;
+        const area = element?.closest<HTMLElement>('[data-slot="modal-body"]');
+
+        if (!element || !area || typeof ResizeObserver === 'undefined') return;
+
+        const measure = () => {
+            const style = getComputedStyle(area);
+            const room = area.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+
+            setFits(element.offsetHeight <= room);
+        };
+        const observer = new ResizeObserver(measure);
+
+        observer.observe(element);
+        observer.observe(area);
+
+        return () => observer.disconnect();
+    }, []);
+
+    return [ref, fits] as const;
 }
 
 /** The item's agent figures in the sidebar, time, tokens and cost, under its properties; nothing when there are none. */
@@ -231,25 +307,35 @@ export function AsideFigures({
     /** The figures and any note on them. */
     children: ReactNode;
 }) {
-    return <div className="grid min-w-0 gap-1 empty:hidden [&_[data-agent-work]]:leading-5">{children}</div>;
+    return <div className="grid min-w-0 gap-3 empty:hidden [&_[data-agent-work]]:leading-5">{children}</div>;
 }
 
-/** The item's agent figures as sidebar properties, one labelled row each, with any `note` (such as that they are the last
- *  known) muted under them; `title` gives them in full. */
+/** The item's agent figures as sidebar properties, one labelled row each in the same grid as Status and Project, under
+ *  any `heading` that says whose they are ("This concept", "Including parts"), with any `note` (such as that they are
+ *  the last known) muted under them; `title` gives them in full. */
 export function FigureRows({
     rows,
     title,
+    heading,
     note,
+    ...data
 }: {
-    /** The figures, each its label and value. */
+    /** The figures, each its label and value, such as "Agent time" and "2h 29m". */
     rows: { label: string; value: string }[];
     /** The figures in full, as their tooltip. */
-    title: string;
+    title?: string | undefined;
+    /** Whose figures they are, over them, such as "This concept". */
+    heading?: string | undefined;
     /** A word on the figures, such as "Last known". */
     note?: string | undefined;
-}) {
+} & DataAttributes) {
     return (
-        <div className="grid min-w-0 gap-1 tabular-nums" title={title} data-agent-work>
+        <div className="grid min-w-0 gap-1 tabular-nums" title={title || undefined} data-agent-work {...data}>
+            {heading && (
+                <span className="text-fg-muted text-xs leading-6 font-medium" data-figures-heading>
+                    {heading}
+                </span>
+            )}
             {rows.map((row) => (
                 <AsideProp key={row.label} label={row.label}>
                     {row.value}

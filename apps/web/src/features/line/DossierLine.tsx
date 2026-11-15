@@ -21,6 +21,7 @@ import {
     ConceptBuild,
     AzureFields,
     hasFigures,
+    usageLoading,
     ItemTitle,
     shownStatus,
     useShownStatus,
@@ -98,7 +99,8 @@ function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
     const shown = useShownStatus(n.part?.item ?? parent);
     const word = { you: n.waitLabel ?? shown.word, start: 'Next', moving: 'Moving', none: '' }[n.tone];
 
-    return <DossierNext word={word} yours={n.tone === 'you'} unseen={n.tone === 'start'} text={n.text} />;
+    // "Next" shows, quietly, so the part the owner can start reads as the concept's next step.
+    return <DossierNext word={word} yours={n.tone === 'you'} strong={n.tone === 'start'} text={n.text} />;
 }
 
 /** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, `note` follows its title, and `tools`, an expanded dossier's view controls, sit in the action slot beside any Start. */
@@ -135,6 +137,7 @@ export function DossierLine({
         : undefined;
 
     const figures = figuresOf(parent, data, true);
+    const runHeld = !!parent.conceptBuild?.holds.length && parent.conceptBuild.run?.state !== 'running';
 
     return (
         <Line
@@ -156,9 +159,12 @@ export function DossierLine({
                             <AzureFields azure={parent.azure} />
                         </DossierFields>
                         <DossierNote>{note}</DossierNote>
-                        <DossierRepos>{repos}</DossierRepos>
                     </DossierTitleCell>
                     <RowSource item={parent} />
+                    {/* The other projects follow the concept's own, as a lane row names its project after its title. */}
+                    {/* Its most important chip reads on the title's line, so the row's end keeps one fact (the
+                        cost) and nothing is folded into a tooltip alone; what waits on you is the row's next step. */}
+                    <DossierRepos chip={n.tone !== 'you' && <Chips chips={chips.slice(0, 1)} />}>{repos}</DossierRepos>
                 </RowCells>
                 <RowMeta>
                     {acts ? (
@@ -181,11 +187,17 @@ export function DossierLine({
                     <RowMetaEnd>
                         <DossierStates>
                             {!acts && <DossierState item={parent} />}
-                            {/* What waits on you is already the row's next step; other chips are in its tooltip. */}
-                            {n.tone !== 'you' && <Chips chips={chips.slice(0, 1)} />}
+                            {/* A held run with nothing starting or moving says so on the collapsed row, quietly; while a
+                                part can start or moves, the row's Next says that instead. The expanded concept says why. */}
+                            {runHeld && n.tone === 'none' && (
+                                <span title="Concept builds are held. Open the concept to see why.">
+                                    Build all held
+                                </span>
+                            )}
+                            {/* The end holds the cost (or the age); the first chip reads on the title's line. */}
                             <Figures s={figures} item={parent} total />
                             {/* With nothing else at its end, a row says how long since it moved, as a lane row does. */}
-                            {!(figures && hasFigures(figures)) && (
+                            {!(figures && hasFigures(figures)) && !usageLoading(parent, data) && (
                                 <QueueAge>
                                     <Age at={parent.updatedAt} />
                                 </QueueAge>
@@ -196,7 +208,9 @@ export function DossierLine({
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
                 <RowSide passEmpty>
                     {tools && <DossierTools>{tools}</DossierTools>}
-                    {parent.conceptBuild ? (
+                    {/* A concept's run offers Build all when it can act; while it's held, the part that can start
+                        is the row's action instead. */}
+                    {parent.conceptBuild && !runHeld ? (
                         <ConceptBuild item={parent} compact />
                     ) : (
                         n.part && n.tone === 'start' && <PartStart part={n.part} data={data} />

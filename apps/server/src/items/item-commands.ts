@@ -286,7 +286,7 @@ const BACK_TO_LIST: Move = {
     action: 'back to List',
     from: 'Queued',
     to: 'List',
-    refused: (status) => `Only Queued items can be moved back to List; this one is in ${status}.`,
+    refused: (status) => `Only Queued items can be moved back to the List; this one is in ${status}.`,
 };
 
 /** A refused Start ran no t3: one of the repository project's checks failed. */
@@ -607,7 +607,7 @@ export function createItemCommands({
             recordedStart(itemId);
 
         if (started && action === 'back to List')
-            return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
+            return 'Start is running or has run for this item. Check its T3 thread before moving it back to the List.';
 
         if (started && action === 'abandon')
             return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';

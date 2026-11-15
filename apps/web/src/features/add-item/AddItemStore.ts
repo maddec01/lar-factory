@@ -117,7 +117,7 @@ export const useAddItemStore = create<AddItemState>()(
 
                 set({
                     submission: { phase: 'pending', attempt },
-                    message: retrying ? 'Finishing this submission…' : 'Adding it to List…',
+                    message: retrying ? 'Finishing this submission…' : 'Adding it to the List…',
                 });
                 // A poll that started before this write would bring older data than its answer.
                 useBoardStore.getState().beginWrite();

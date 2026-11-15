@@ -130,3 +130,17 @@
         font-size: var(--text-sm);
     }
 }
+
+/* A settings row that opens a page of its own (SettingsRowOpen): its chevron's target covers the row, which shows the
+   hover wash and the chevron's focus ring as its own. */
+.settings-row:has(> * [data-settings-row-open]) {
+    position: relative;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-fast) var(--ease-standard);
+}
+.settings-row:has(> * [data-settings-row-open]):hover {
+    background-color: var(--color-fill-hover);
+}
+.settings-row:has(> * [data-settings-row-open]):hover [data-settings-row-open] {
+    color: var(--color-fg);
+}

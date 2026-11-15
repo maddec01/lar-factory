@@ -12,9 +12,10 @@ import { boardSections, formatUsd, plural, readingScope, usageFailed, usageIncom
 import type { Item, Status } from '@lar-factory/shared';
 import { Loading, StatusIndicator } from '@lar-works/design-system';
 import { CircleDollarSign } from '@lar-works/design-system/icons';
+import { useState } from 'react';
 
 import { List } from './CounterParts';
-import { spendFace } from './SpendFace';
+import { spendFace, spendScope } from './SpendFace';
 import { StatusGlyph, useBuilds, useItemStates } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
@@ -50,12 +51,13 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
         data.items.some(usageFailed);
     const usageStillLoading = !unavailable && (!data.firstRead.settled || data.items.some(usageIncomplete));
     const reading = readingScope(data);
-    const spend = spendFace(
-        formatUsd(costs.reduce((t, c) => t + c.cost, 0)),
-        costs.length > 0,
-        unavailable,
-        usageStillLoading,
-    );
+    const total = costs.reduce((t, c) => t + c.cost, 0);
+    // The last total summed with nothing loading or unavailable, which the bar keeps while a read sums again.
+    const [settled, setSettled] = useState<number | null>(null);
+
+    if (!unavailable && !usageStillLoading && settled !== total) setSettled(total);
+
+    const spend = spendFace({ total, known: costs.length > 0, unavailable, loading: usageStillLoading, settled });
     const glyph = (status: Status) => (
         <StatusGlyph status={status} running={status === 'In progress' && builds.running > 0} />
     );
@@ -177,6 +179,11 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                             count={countFor(s.done.length)}
                             detail="Last 7 days"
                             hint={hintFor(s.done.length, 'Done in the last 7 days')}
+                            foot={
+                                s.done.length
+                                    ? 'Newest first. Work leaves this list 7 days after it’s done.'
+                                    : undefined
+                            }
                         >
                             {listOf(s.done, 'Nothing shipped this week.')}
                         </Counter>
@@ -186,23 +193,20 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                         <Counter
                             label="spend"
                             value={spend.value}
-                            width="figure"
                             fold="wide"
                             title="Agent spend"
-                            detail={spend.sub}
+                            count={costs.length ? plural(costs.length, 'item') : undefined}
+                            // What the total covers beside it; the foot says it is an estimate.
+                            detail={
+                                costs.length ? `${spend.sub} · ${spendScope(data.retention?.hideAfterDays)}` : spend.sub
+                            }
                             icon={
                                 <QuietGlyph>
                                     <CircleDollarSign strokeWidth={2.25} />
                                 </QuietGlyph>
                             }
-                            hint={spend.notice ?? 'Agent cost on open and recent items, an API estimate'}
-                            foot={
-                                spend.partial
-                                    ? spend.notice
-                                    : costs.length
-                                      ? `${plural(costs.length, 'priced item')}, an API estimate.`
-                                      : undefined
-                            }
+                            hint={spend.hint ?? 'Agent cost on open and recent items, an API estimate'}
+                            foot={spend.notice ?? (costs.length ? 'An estimate at API prices.' : undefined)}
                         >
                             {costs.length ? (
                                 <List

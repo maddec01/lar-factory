@@ -492,6 +492,16 @@ describe('placementOf', () => {
             }
         });
 
+        test('leaves a group on the List until one of its parts moves on', () => {
+            const parent = work({ id: 'concept', flow: 'linked', status: 'List' });
+            const listed = part({ status: 'List' });
+            const done = part({ id: 'done-part', status: 'Done' });
+
+            assert.deepEqual(sections(parent, { all: [parent] }), [], 'a linked List item with no parts on the board');
+            assert.deepEqual(sections(parent, { all: [parent, listed, done] }), []);
+            assert.deepEqual(place(part({ status: 'List' })), { sections: [] }, 'a List part outside its group');
+        });
+
         test('a part with a missing parent stays grouped', () => {
             assert.deepEqual(place(part({ status: 'Ready' })), { sections: ['dock'] });
         });
@@ -541,9 +551,9 @@ describe('placementOf', () => {
         });
     });
 
-    test('single List work has no stage row; an unqueued concept stays grouped', () => {
+    test('List work has no stage row, grouped or not', () => {
         assert.deepEqual(sections(work({ status: 'List' })), []);
-        assert.deepEqual(sections(concept({ status: 'List' })), ['dock']);
+        assert.deepEqual(sections(concept({ status: 'List' })), []);
     });
 });
 

@@ -311,7 +311,11 @@ const WIDE: BoardData = withItems([
     item('K1', { number: 1, title: 'Match kept', kind: 'bug' }),
     item('H1', { number: 2, title: 'Match hidden', kind: 'feature' }),
 ]);
-const tickets = () => groups().find(([label]) => label === 'Items')?.[1];
+const tickets = () => {
+    const found = groups().filter(([label]) => label === 'On the board' || label === 'List');
+
+    return found.length ? found.flatMap(([, names]) => names as string[]) : undefined;
+};
 
 test('choosing a ticket closes the dialog and opens its item dialog, which returns the focus to the field', async () => {
     await mountPage(WIDE);
@@ -336,7 +340,7 @@ test('tokens narrow tickets only, and Search all tickets lists the rest until th
     await openDialog();
     await type('match');
     expect(tickets()).toEqual(['#1 Match kept', 'Search all tickets']);
-    expect(groups().find(([label]) => label === 'Settings')?.[1]).toContain('Open items full-size with List');
+    expect(groups().find(([label]) => label === 'Settings')?.[1]).toContain('Match item size to the List');
     await settle(() => option('Search all tickets').click());
     expect(tickets()).toEqual(['#1 Match kept', '#2 Match hidden']);
     expect(saved()).toEqual({ kinds: ['bug'], labels: [] });

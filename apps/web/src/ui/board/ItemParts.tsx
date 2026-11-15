@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
+import { tooltipWhenCut } from './TooltipWhenCut';
 
 /** A title with its ticket's reference (`#12`) before it, muted, the way the board lists every item; captured work has
  *  no reference. */
@@ -65,12 +66,10 @@ export function TitleLink({
 const identities = {
     row: 'flex min-w-0 items-center gap-1',
     map: 'inline-flex min-w-0 max-w-full items-center gap-1.5',
-    wrap: 'inline-flex min-w-0 items-center gap-2',
 } as const;
 
 /** A repository's project icon and name together, the name truncating: in a row's line, or roomier on the work map,
- *  where `title` names it in full. `wrap` is roomier still and wraps the name, anywhere if it must, for a line that
- *  says more than the name, such as an archived item's repository, number and state. */
+ *  its tooltip giving the name whole only while it is cut off. */
 export function RepoIdentity({
     icon,
     name,
@@ -82,19 +81,17 @@ export function RepoIdentity({
     icon: ReactNode;
     /** The repository's name, truncating. */
     name: string;
-    /** The name in full, as its tooltip; a truncating name is its own tooltip by default. */
+    /** The name in full, as its tooltip at all times; without it, a truncating name is its own tooltip while cut off. */
     title?: string;
-    /** `row` in a row's line, `map` roomier on the work map, `wrap` when the name may wrap. */
-    presentation?: 'row' | 'map' | 'wrap';
+    /** `row` in a row's line, `map` roomier on the work map. */
+    presentation?: 'row' | 'map';
 } & DataAttributes) {
+    const whenCut = title === undefined ? tooltipWhenCut(name) : undefined;
+
     return (
-        <span
-            {...data}
-            title={title ?? (presentation === 'wrap' ? undefined : name)}
-            className={identities[presentation]}
-        >
+        <span {...data} title={title} onPointerEnter={whenCut} onFocus={whenCut} className={identities[presentation]}>
             {icon}
-            <span className={presentation === 'wrap' ? 'min-w-0 wrap-anywhere' : 'min-w-0 truncate'}>{name}</span>
+            <span className="min-w-0 truncate">{name}</span>
         </span>
     );
 }

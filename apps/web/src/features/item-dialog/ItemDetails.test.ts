@@ -4,7 +4,7 @@
 
 import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
-import { expect, test } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 
 import { $, $$, detailsReply, detailsRead, fetchMock, mountPage, push, sample, settle, text } from '@/test/PageTest';
 
@@ -61,9 +61,11 @@ test('a failed read shows its error in the modal and the board data stays visibl
         'I_sample13',
         new Response(JSON.stringify({ error: 'Item details aren’t available yet.' }), { status: 501 }),
     );
+    // One line where the loading line sat: what failed, Try again and the ticket in its tracker, the reason on its tooltip.
     expect(text(inDialog('[data-details-error]'))).toBe(
-        'Couldn’t load the detailsItem details aren’t available yet.Try again',
+        'Couldn’t load details: Item details aren’t available yet.·Try again·Open in GitHub',
     );
+    expect(inDialog('[data-details-error] [title]')?.getAttribute('title')).toBe('Item details aren’t available yet.');
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
     expect(text(inDialog('[data-slices] p'))).toBe('1/3 slices done');
     expect(inDialog('[aria-busy="true"]')).toBeNull();
@@ -258,4 +260,70 @@ test('build checks load once on expansion and retain the empty result on reopen'
         section.dispatchEvent(new Event('toggle'));
     });
     expect(calls()).toHaveLength(1);
+});
+
+test('a group of tracker sub-tickets holds their place with a placeholder line each until a slow read gives up', async () => {
+    const held = holdReads();
+    const data: BoardData = {
+        ...sample,
+        items: sample.items
+            .filter((i) => i.parentId !== 'I_sample13')
+            .map((i) =>
+                i.id === 'I_sample13' ? { ...i, kind: 'concept' as const, subIssues: { total: 3, completed: 1 } } : i,
+            ),
+    };
+
+    await mountPage(data);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    try {
+        await openItem('I_sample13');
+
+        const placeholders = () => inDialog('[data-concept-parts] [data-ticket-placeholders]');
+
+        expect(placeholders()?.children, 'one line for each known sub-ticket').toHaveLength(3);
+        expect(placeholders()!.closest('[role="status"]')?.getAttribute('aria-label')).toBe('Loading 3 sub-tickets');
+        // A request still pending after 12 seconds stands for a failure: the placeholders and the loading line give way
+        // together to Try again and the ticket in its tracker.
+        await settle(() => vi.advanceTimersByTime(12_000));
+        expect(placeholders()).toBeNull();
+        expect(inDialog('[data-details-loading]')).toBeNull();
+        expect(text(inDialog('[data-details-error]'))).toBe(
+            'Couldn’t load details: It took too long to answer.·Try again·Open in GitHub',
+        );
+    } finally {
+        vi.useRealTimers();
+    }
+
+    expect(held.has('I_sample13')).toBe(true);
+});
+
+test('while the details load, the description keeps its heading with its ticket’s link beside it and the loading line under it, says a slow read can take a while, and holds its place with a short skeleton', async () => {
+    const held = holdReads();
+
+    await mountPage();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    try {
+        await openItem('I_sample13');
+
+        const loading = () => inDialog('[data-details-loading]');
+
+        // The ticket's page is a click away from the start, not only once the read gives up.
+        expect(text(loading())).toBe('DescriptionOpen in GitHubLoading details from GitHub…');
+        // The loading line sits under the heading, where the text will start; the link keeps the heading's end.
+        expect(text(loading()!.querySelector('[data-details-loading-line]'))).toBe('Loading details from GitHub…');
+        expect(loading()!.querySelector('a[data-details-open]')?.getAttribute('href')).toMatch(
+            /^https:\/\/github\.com\//,
+        );
+        expect(loading()!.querySelectorAll('[data-details-skeleton] [data-slot="skeleton"]')).toHaveLength(3);
+        await settle(() => vi.advanceTimersByTime(5000));
+        expect(text(loading())).toBe('DescriptionOpen in GitHubLoading details from GitHub…This can take a while.');
+    } finally {
+        vi.useRealTimers();
+    }
+
+    await reply(held, 'I_sample13');
+    expect(inDialog('[data-details-loading]')).toBeNull();
+    expect(description()).not.toBeNull();
 });

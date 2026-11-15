@@ -20,6 +20,7 @@ import type { FilterToken } from './BoardFilters';
 import { searchResults, settingsOptions } from './SearchResults';
 import { useFilterGroups, useFilterTokens } from './useFilterTokens';
 import { useScopeStore, useShownScope } from '@/features/filters';
+import { useItemStates } from '@/features/items';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
@@ -46,6 +47,8 @@ function Dialog({
     const [query, setQuery] = useState('');
     // Whether Search all tickets was chosen for this query.
     const [widened, setWidened] = useState(false);
+    // Whether More settings was chosen for this query.
+    const [allSettings, setAllSettings] = useState(false);
     const data = useBoardStore((state) => state.data);
     const now = useBoardStore((state) => state.now);
     const app = !!boardApp();
@@ -55,6 +58,7 @@ function Dialog({
         () => settingsOptions(data, { app, targets, version }, leave),
         [data, app, targets, version, leave],
     );
+    const stateOf = useItemStates();
     const { groups, reading } = searchResults(
         {
             data,
@@ -63,12 +67,14 @@ function Dialog({
             scope: useShownScope(),
             filters: useScopeStore((state) => state.filters),
             widened,
+            allSettings,
             filterGroups: useFilterGroups(),
             filtering: tokens.length > 0,
             update: useUpdateStep(),
             settingOptions,
+            wordOf: (item) => stateOf(item).word,
         },
-        { leave, clear, widen: () => setWidened(true) },
+        { leave, clear, widen: () => setWidened(true), moreSettings: () => setAllSettings(true) },
     );
     const options = groups.flatMap((group) => group.options);
 
@@ -81,6 +87,7 @@ function Dialog({
             onQueryChange={(next) => {
                 setQuery(next);
                 setWidened(false);
+                setAllSettings(false);
             }}
             tokens={tokens}
             onBackspaceEmpty={() => tokens.at(-1)?.remove?.onRemove()}
@@ -105,6 +112,7 @@ function Dialog({
                             onClick={() => {
                                 setQuery('');
                                 setWidened(false);
+                                setAllSettings(false);
                             }}
                         >
                             Clear search

@@ -1,4 +1,4 @@
-import { itemRepoNames, placementOf } from '@lar-factory/shared';
+import { placementOf, shortAgo } from '@lar-factory/shared';
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
@@ -43,6 +43,7 @@ import {
     checksCount,
     prChecks,
 } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
 import {
     QueueAge,
     QueuePlace,
@@ -108,8 +109,18 @@ const sliceNote = (item: Item) => {
 
     return [
         ...b.map((s) => ({ s, word: 'blocked', tone: 'blocked' as const })),
-        ...a.map((s) => ({ s, word: 'active', tone: 'active' as const })),
+        ...a.map((s) => ({ s, word: 'working', tone: 'active' as const })),
     ];
+};
+
+/** The slice note: the first blocked slice by name, so the row says what's stuck, then how many more are blocked and
+ *  how many work, in counts that can't be misread ("Bandwidth probe blocked · 2 working"); every name in the tooltip. */
+const sliceCounts = (note: ReturnType<typeof sliceNote>) => {
+    const blocked = note.filter((n) => n.tone === 'blocked').length;
+    const working = note.length - blocked;
+    const rest = [blocked > 1 && `${blocked - 1} more blocked`, working > 0 && `${working} working`].filter(Boolean);
+
+    return { name: note[0]!.s.title, more: rest.length ? ` · ${rest.join(' · ')}` : undefined };
 };
 
 /** The stages a board section is named for: Shaping, Ready to build and Build. */
@@ -155,10 +166,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     return (
         <StageRowItem item={item.id} picked={isPicked} attention={yours}>
             <RowFirst>
-                <RowOpen
-                    repository={itemRepoNames(item, data.repos)}
-                    onOpen={() => useItemDialogStore.getState().open(item.id)}
-                >
+                <RowOpen onOpen={() => useItemDialogStore.getState().open(item.id)}>
                     {n === undefined ? (
                         <RowGlyph>{!plainGlyph && <ItemStatusGlyph item={item} />}</RowGlyph>
                     ) : (
@@ -182,8 +190,8 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         note[0] && (
                             <RowSliceNote
                                 title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}
-                                first={{ word: note[0].word, tone: note[0].tone, title: note[0].s.title }}
-                                more={note.length > 1 ? ` +${note.length - 1}` : undefined}
+                                first={{ word: note[0].word, tone: note[0].tone, title: sliceCounts(note).name }}
+                                more={sliceCounts(note).more}
                             />
                         )
                     )}
@@ -233,9 +241,9 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                                 )}
                             </>
                         ) : (
-                            <QueueAge>
-                                <Age at={item.updatedAt} />
-                            </QueueAge>
+                            // A Queue row's age is the item's own, since it was added; its last change is often only
+                            // a sync's, the same for every row. The board keeps no time it was queued.
+                            <AddedAge item={item} />
                         )}
                         <AzureFields azure={item.azure} />
                     </RowMetaEnd>
@@ -261,4 +269,13 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             )}
         </StageRowItem>
     );
+}
+
+/** A Queue row's age, since the item was added, which its tooltip says in words ("Added 3d ago"); an item with no
+ *  time it was added counts from its last change. */
+function AddedAge({ item }: { item: Item }) {
+    const now = useBoardStore((state) => state.now);
+    const ago = shortAgo(item.createdAt ?? item.updatedAt, now);
+
+    return <QueueAge title={item.createdAt ? `Added ${ago}` : `Changed ${ago}`}>{ago}</QueueAge>;
 }

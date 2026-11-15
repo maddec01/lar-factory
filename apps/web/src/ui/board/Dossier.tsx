@@ -117,7 +117,7 @@ export function DossierTitleCell({
     children: ReactNode;
 }) {
     return (
-        <span className="flex min-w-0 flex-wrap items-center gap-2" data-line="1" data-title-cell>
+        <span className="flex min-w-0 items-center gap-2" data-line="1" data-title-cell>
             {children}
         </span>
     );
@@ -180,17 +180,23 @@ export function DossierNote({
 /** The repositories its parts work in beyond its own. */
 export function DossierRepos({
     children,
+    chip,
 }: {
     /** The other repositories, in words. */
     children: string;
+    /** The concept's most important chip, such as "Concept map needs updating", after them on the title's line. */
+    chip?: ReactNode;
 }) {
+    if (!children && !chip) return null;
+
     return (
-        <span
-            data-col="repos"
-            className="text-fg-muted min-w-16 shrink-[100] truncate empty:hidden"
-            title={children || undefined}
-        >
-            {children}
+        <span data-col="repos" className="flex min-w-0 items-center gap-3 overflow-hidden">
+            {children && (
+                <span className="text-fg-muted min-w-16 shrink-[100] truncate" title={children}>
+                    {children}
+                </span>
+            )}
+            {chip && <span className="flex min-w-0 shrink items-center overflow-hidden [&_*]:truncate">{chip}</span>}
         </span>
     );
 }
@@ -251,8 +257,11 @@ export function DossierNext({
     word,
     yours = false,
     unseen = false,
+    strong = false,
     text,
 }: {
+    /** What's next is the owner's to start: its text reads at the row's full strength. */
+    strong?: boolean;
     /** The word that names what's next, such as "Next". */
     word?: string | undefined;
     /** What's next waits on you: the word takes the warning tone. */
@@ -273,7 +282,7 @@ export function DossierNext({
                         {word}
                     </span>
                 )}
-                <span className="min-w-0 truncate" title={text}>
+                <span className={`min-w-0 truncate ${strong ? 'text-fg' : ''}`} title={text}>
                     {text}
                 </span>
             </span>
@@ -329,16 +338,25 @@ export function PartsBar({
 
 /** What an expanded dossier holds, indented under its line as a row's slices are; its parts are rows, as a lane's. */
 export function DossierBody({
+    tools,
     children,
 }: {
+    /** The parts' view controls, at the body's top right under a quiet "Parts" label, so the row above keeps its edge. */
+    tools?: ReactNode;
     /** What the expanded dossier holds. */
     children: ReactNode;
 }) {
     return (
         <div
-            className="ml-9 grid gap-3 pt-1 pb-2 [&>:not(:has(ol,ul))]:pr-3 [&>:not(:has(ol,ul))]:pl-5"
+            className="ml-9 grid gap-2 pt-1 pb-2 [&>*]:pr-3 [&>*]:pl-9 [&>:has(>ol,>ul)]:pr-0 [&>:has(>ol,>ul)]:pl-6"
             data-dossier-body
         >
+            {tools && (
+                <div className="flex min-h-7 items-center justify-between gap-3" data-dossier-view>
+                    <span className="text-fg-muted text-xs">Parts</span>
+                    {tools}
+                </div>
+            )}
             {children}
         </div>
     );

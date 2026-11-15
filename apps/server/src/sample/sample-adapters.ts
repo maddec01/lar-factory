@@ -1,4 +1,4 @@
-import { trackerKind, type RepoConfig } from '@lar-factory/shared';
+import { onAzure, trackerKind, type RepoConfig } from '@lar-factory/shared';
 import type { VocabularyReads } from '@lar-factory/shared/publication-settings';
 import { readRepositorySetups, saveLocalSetup, saveOnboarded } from '@lar-factory/shared/repository-settings';
 import type { StructureProvider, StructureTicket } from '@lar-factory/work-records/tracker-sync';
@@ -19,7 +19,9 @@ export function sampleRepositories(tracker: Tracker, dir: string): () => RepoCon
             {
                 projectId: `sample-${config.repo.split('/')[1]}`,
                 role: config.role,
-                itemSource: { kind: 'issues' },
+                itemSource: onAzure(config.repo)
+                    ? { kind: 'azure-board', team: config.team ?? 'App' }
+                    : { kind: 'issues' },
                 domainDocs: { kind: 'off' },
                 skills: [],
                 structureSync: false,

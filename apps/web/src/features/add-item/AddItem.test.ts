@@ -134,7 +134,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
     expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
     expect(editorArea().getAttribute('contenteditable'), 'the description locks with them').toBe('false');
     expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
-    expect(result().textContent).toBe('Adding it to List…');
+    expect(result().textContent).toBe('Adding it to the List…');
 
     const item = { ...sample.items[0]!, id: 'work-501', title: 'Playback stalls', number: 0, url: null };
     const board = { ...sample, items: [...sample.items, item] };
@@ -146,9 +146,9 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
     const toast = $('[data-slot="toast"][role="status"] [data-toast]')!;
 
-    expect(toast.textContent).toBe('Added Playback stalls to List. View item Queue');
+    expect(toast.textContent).toBe('Added Playback stalls to the List. View item Queue');
     expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added Playback stalls');
-    expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
+    expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List21');
 });
 
 test('a refused submission keeps the draft for editing', async () => {
@@ -193,7 +193,7 @@ test('with no repository onboarded the title bar offers no Add item, but it stay
         await push(data);
         await settle(() => addButton().click());
         await settle(() => vi.advanceTimersByTime(50));
-        expect(dialog()!.textContent).toContain('Record work and add it to List.');
+        expect(dialog()!.textContent).toContain('Record work and add it to the List.');
         expect(hint()).toBeNull();
         expect(field('item-repo').hasAttribute('aria-describedby')).toBe(false);
         expect(submit().disabled).toBe(true);
@@ -254,7 +254,7 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
     expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(
         expect.arrayContaining(['min-h-0', 'overflow-y-auto']),
     );
-    expect(dialog()!.textContent).toContain('Find a ticket to add or open in List.');
+    expect(dialog()!.textContent).toContain('Find a ticket to add or open on the List.');
     expect(text($('#pick-ticket'))).toContain('Find an open ticket');
     expect(text($('#pick-ticket'))).toContain('tickets by title or #number.');
     expect(text($('#pick-ticket'))).not.toContain('Find tickets outside your list');
@@ -299,7 +299,7 @@ test('picking a new ticket closes the dialog and announces it, and one on the bo
     expect(calls('/api/pick-ticket')).toEqual([['/api/pick-ticket', { repo: 'maddec01/lar-server', number: 8 }]]);
     expect(dialog()).toBeNull();
     expect(text($('[data-slot="toast"][role="status"] [data-toast]'))).toBe(
-        'Added #8 Seek stalls to List. View item Queue',
+        'Added #8 Seek stalls to the List. View item Queue',
     );
 
     await settle(() => addButton().click());

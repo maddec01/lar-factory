@@ -19,6 +19,7 @@ export function PullRequestList({
 export function PullRequestRow({
     href,
     label,
+    title,
     checks,
     readiness,
     details,
@@ -27,6 +28,8 @@ export function PullRequestRow({
     href: string;
     /** The pull request's label, such as `#42`. */
     label: string;
+    /** The pull request in full, as the label's tooltip, such as "PR #42 (draft)". */
+    title?: string | undefined;
     /** Its checks, a ChecksState, or where it ended, a PullRequestState. */
     checks?: ReactNode;
     /** Its readiness, a PullRequestReadiness. */
@@ -41,8 +44,10 @@ export function PullRequestRow({
                 href={href}
                 target="_blank"
                 rel="noopener"
-                className="min-w-0 flex-1 basis-24 font-medium wrap-anywhere hover:underline"
+                title={title}
+                className="mr-auto shrink-0 font-medium hover:underline"
             >
+                <span className="sr-only">Pull request </span>
                 {label}
             </a>
             {checks}
@@ -80,10 +85,13 @@ export function ChecksState({
     );
 }
 
-/** Where a pull request ended, in place of its checks: `merged` in the board's done colour, `closed` off. */
+/** Where a pull request stands when it has no checks to show, or where it ended: `merged` in the board's done colour,
+ *  `closed` and `draft` off, `open` ready. */
 const PULL_REQUEST_LIGHT = {
     merged: { state: 'ready', color: 'var(--color-board-done)', words: 'Merged' },
     closed: { state: 'off', words: 'Closed' },
+    open: { state: 'ready', words: 'Open' },
+    draft: { state: 'off', words: 'Draft' },
 } as const;
 
 /** A merged or closed pull request's state as the status-word rule draws it, ChecksState's look: its light and word,
@@ -133,10 +141,11 @@ export function PullRequestReadiness({
     details?: ReactNode;
 }) {
     return (
-        <div className="text-fg-muted basis-full text-xs">
-            {toggle}
-            {details}
-        </div>
+        <>
+            {/* The toggle ends the card's one line; what it shows takes the card's foot. */}
+            <span className="ml-auto shrink-0">{toggle}</span>
+            {details && <div className="text-fg-muted basis-full text-xs">{details}</div>}
+        </>
     );
 }
 

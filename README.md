@@ -8,14 +8,14 @@
 <p align="center">Your software factory, running on your Mac.</p>
 
 <p align="center">
-  <a href="https://github.com/maddec01/lar-factory/releases/latest"><strong>Download</strong></a> ·
+  <a href="https://github.com/maddec01/lar-factory/releases"><strong>Download</strong></a> (nightly builds) ·
   <a href="https://lar.works/factory">Website</a>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/board-dark.webp">
-    <img src=".github/readme/board-light.webp" width="100%" alt="The Lar Factory board: your desk with items that need an answer or a build to verify, the queue of issues waiting to be shaped, and the items being shaped with their progress and cost">
+    <img src=".github/readme/board-light.webp" width="100%" alt="The Lar Factory board: your desk with items that need an answer or a build to verify, the queue of issues waiting to be shaped, and the items being shaped">
   </picture>
 </p>
 
@@ -40,7 +40,8 @@ board, start a build when it's ready, and merge every pull request yourself.
 
 ## Get started
 
-1. Download the Mac app (Apple silicon) from [GitHub Releases](https://github.com/maddec01/lar-factory/releases/latest).
+1. Download the latest nightly build of the Mac app (Apple silicon) from
+   [GitHub Releases](https://github.com/maddec01/lar-factory/releases).
 2. Install and open [T3 Code](https://t3.codes): Factory's agents run there, with the models and access
    you set up.
 3. Sign in to your tracker with `gh auth login` (GitHub) or `az login` (Azure DevOps).

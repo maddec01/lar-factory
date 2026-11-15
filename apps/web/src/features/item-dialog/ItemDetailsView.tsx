@@ -1,7 +1,7 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
 // kind control, labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
-// sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
-// description's place; the board's own fields never wait. Once they load, Edit opens the description editor in the
+// sub-tickets in its sidebar. While the details load only the board's own facts show, with one quiet loading line in the
+// description's place, and a failed read shows its error there; the board's own fields never wait. Once they load, Edit opens the description editor in the
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
@@ -10,15 +10,16 @@ import type { Item, ItemDetails } from '@lar-factory/shared';
 import { Inline, Person } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
-import { ConceptState, ConceptWork } from './ConceptParts';
-import { Placeholder, When } from './DetailsParts';
+import { ConceptState } from './ConceptParts';
+import { When } from './DetailsParts';
 import { ItemKindFeedback } from './ItemKindControl';
 import { ItemLabels } from './ItemLabels';
 import { KindNotice } from './KindNotice';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { DetailFact as Fact, MetaArea } from '@/ui/board';
 
-/** A fact from the details: a placeholder while they load, nothing once they failed or hold none. */
+/** A fact from the details: nothing until they load (the main column's one loading line stands for them), nothing once
+ *  they failed or hold none. */
 function FromDetails({
     read,
     label,
@@ -28,14 +29,7 @@ function FromDetails({
     label: string;
     show: (d: ItemDetails) => ReactNode;
 }) {
-    if (read.state === 'loading')
-        return (
-            <Fact label={label}>
-                <Placeholder />
-            </Fact>
-        );
-
-    if (read.state === 'failed') return null;
+    if (read.state !== 'loaded') return null;
 
     const shown = show(read.details);
 
@@ -108,13 +102,16 @@ export function ItemMeta({
                     <When iso={item.updatedAt} now={now} />
                 </Fact>
             )}
-            {item.kind === 'concept' && item.status !== 'Done' && !item.releasePlan && item.refinement && (
-                <Fact label="Refinement">
-                    <ConceptState state={item.refinement} />
-                </Fact>
-            )}
-
-            {item.kind === 'concept' && <ConceptWork item={item} />}
+            {/* The parts' delivery line already says what's left to decide once the concept has parts. */}
+            {item.kind === 'concept' &&
+                item.status !== 'Done' &&
+                !item.releasePlan &&
+                item.refinement &&
+                !item.completion && (
+                    <Fact label="Decisions">
+                        <ConceptState state={item.refinement} />
+                    </Fact>
+                )}
         </MetaArea>
     );
 }

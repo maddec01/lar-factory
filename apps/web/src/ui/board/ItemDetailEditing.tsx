@@ -61,7 +61,8 @@ export function SpecSync({
     children?: ReactNode;
 }) {
     return (
-        <div className="grid gap-2 text-sm" data-spec-sync>
+        // Nothing to say takes no row, so a Spec's first heading sits as close under its label as a Brief's does.
+        <div className="grid gap-2 text-sm empty:hidden" data-spec-sync>
             {status && (
                 <p className="m-0" role="status">
                     {status}

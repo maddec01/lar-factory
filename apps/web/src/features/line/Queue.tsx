@@ -21,7 +21,7 @@ export function Queue({ rows, shows }: { rows: Row[]; shows: (row: Row) => boole
             count={shown.length}
             empty={
                 !shown.length && (
-                    <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from List.">
+                    <PaneEmpty filtered={rows.length > 0} none="Queue empty. Queue items from the List.">
                         Nothing queued matches.
                     </PaneEmpty>
                 )

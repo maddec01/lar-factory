@@ -1,4 +1,4 @@
-// Queue, Move to List and Abandon from the item dialog: each posts to its endpoint, shows its own pending state,
+// Queue, Move to the List and Abandon from the item dialog: each posts to its endpoint, shows its own pending state,
 // then the result as a toast or an error, and keeps focus in the dialog.
 // Ported from the card action cases of test/render.test.ts.
 
@@ -37,12 +37,12 @@ test('Queue shows pending state, then leaves Shape reachable without an overlay'
     expect(text(button('abandon', 'I_sample01')), 'Abandon isn’t relabelled').toBe('Abandon');
 
     await answer({ error: null, board: moved('I_sample01', 'Queued') });
-    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List3');
+    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List19');
     expect(toast()).toBeNull();
     expect(text(button('start', 'I_sample01'))).toBe('Shape');
 });
 
-test('a failed Move to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
+test('a failed Move to the List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
     holdPosts();
     await mountPage();
     await openItem('I_sample05');
@@ -50,10 +50,10 @@ test('a failed Move to List shows as a toast naming the item, which stays until 
     await answer({ error: 'Couldn’t set List. GitHub is down.' }, 502);
     expect(toast()!.getAttribute('role')).toBe('alert');
     expect(toast()!.dataset.toastColor, 'a failure is red').toBe('danger');
-    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to List\. Couldn’t set List\. GitHub is down\.$/);
+    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to the List\. Couldn’t set List\. GitHub is down\.$/);
     expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
     expect($('[data-item-dialog] [data-action-error]'), 'the dialog shows no inline error').toBeNull();
-    expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to List');
+    expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to the List');
     await settle(() => vi.advanceTimersByTime(60_000));
     expect(toast(), 'a failure stays').not.toBeNull();
 
@@ -137,7 +137,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the c
     expect(text(button('queue', 'I_sample01')), 'Queue isn’t relabelled').toBe('Queue');
 
     await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
-    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List3');
+    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List19');
     expect(toast()!.querySelector('a, [data-view-item]'), 'the toast gives the result').toBeNull();
     expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
@@ -256,7 +256,7 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
     expect(posted()).toEqual([]);
     await press(
         $$<HTMLButtonElement>('#needs-you-dialog [data-slot="modal-footer"] button').find(
-            (el) => text(el) === 'Move to List',
+            (el) => text(el) === 'Move to the List',
         )!,
     );
     expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');

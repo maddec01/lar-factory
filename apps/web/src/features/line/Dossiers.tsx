@@ -43,7 +43,19 @@ const ABOVE_MAP = ['you'];
 const BELOW_MAP = ['dependencies', 'fog'];
 
 /** What an expanded dossier holds, at its natural height: its parts as a Work map or a list, with what keeps them moving. */
-function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[]; data: BoardData; view: View }) {
+function DossierBody({
+    parent,
+    parts,
+    data,
+    view,
+    onView,
+}: {
+    parent: Item;
+    parts: Part[];
+    data: BoardData;
+    view: View;
+    onView: (view: View) => void;
+}) {
     const find: FindRef = (repo = parent.repo ?? '', n) =>
         data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
     const missing = unreadParts(parent, parts);
@@ -51,23 +63,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
     const { sync: _, ...unsynced } = parent;
 
     return (
-        <Body>
-            {parent.conceptBuild && <ConceptBuild item={parent} showAction={false} holdsSummarized />}
-            {noDelivery(parent) && (
-                <Text variant="caption" tone="muted" data-no-delivery>
-                    {NO_DELIVERY}
-                </Text>
-            )}
-            <StructureSync item={unsynced} />
-            <GroupUpkeep
-                report={parent.reconciliation}
-                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
-            />
-            <ReleaseProgress
-                plan={parent.releasePlan}
-                remaining={parent.completion?.reasons}
-                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
-            />
+        <Body tools={<ViewToggle view={view} onView={onView} />}>
             {/* Each part shows once, on the map or in the list, with its holds; around it only the concept's own question,
                 what it depends on and what it doesn't know yet. */}
             <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
@@ -82,6 +78,24 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                     {unreadPartsText(missing)}
                 </Text>
             )}
+            {/* Then the concept's housekeeping, one quiet line each: its builds and holds, delivery, sync and upkeep. */}
+            {parent.conceptBuild && <ConceptBuild item={parent} showAction={false} holdsSummarized />}
+            {noDelivery(parent) && (
+                <Text variant="caption" tone="muted" data-no-delivery>
+                    {NO_DELIVERY}
+                </Text>
+            )}
+            <StructureSync item={unsynced} />
+            <GroupUpkeep
+                report={parent.reconciliation}
+                parts={parts.filter((part) => !part.item.setAside).map((part) => part.item.id)}
+                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
+            />
+            <ReleaseProgress
+                plan={parent.releasePlan}
+                remaining={parent.completion?.reasons}
+                name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
+            />
             <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
         </Body>
     );
@@ -125,16 +139,12 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
                     )
                 }
                 onClick={orphanPart ? () => open(parent) : toggle}
-                note={!orphanPart && on && <LocalPlanning item={parent} />}
-                tools={
-                    orphanPart ? (
-                        <OpenThread item={parent} data={data} />
-                    ) : (
-                        on && <ViewToggle view={view} onView={setView} />
-                    )
-                }
+                note={!orphanPart && <LocalPlanning item={parent} />}
+                tools={orphanPart && <OpenThread item={parent} data={data} />}
             />
-            {!orphanPart && on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
+            {!orphanPart && on && (
+                <DossierBody parent={parent} parts={parts} data={data} view={view} onView={setView} />
+            )}
         </Row>
     );
 }

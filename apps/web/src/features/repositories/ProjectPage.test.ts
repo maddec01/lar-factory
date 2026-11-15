@@ -100,7 +100,7 @@ async function openRepositories(board: BoardData): Promise<void> {
 
 async function openEdit(board: BoardData): Promise<void> {
     await openRepositories(board);
-    await settle(() => buttonIn(row(), 'Open project')!.click());
+    await settle(() => row().querySelector<HTMLButtonElement>('[data-settings-row-open]')!.click());
 }
 
 const discovery = {
@@ -179,7 +179,11 @@ test('a blank Team shows an error and sends no request', async () => {
     const sent = serve(board);
 
     await openRepositories(board);
-    await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Open project')!.click());
+    await settle(() =>
+        $(`.settings-row[data-row="repo-${repo}"]`)!
+            .querySelector<HTMLButtonElement>('[data-settings-row-open]')!
+            .click(),
+    );
 
     const input = setting('itemSource').querySelector<HTMLInputElement>('input')!;
 

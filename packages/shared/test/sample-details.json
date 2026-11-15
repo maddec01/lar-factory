@@ -227,5 +227,748 @@
         "comments": [],
         "hasOlderComments": false,
         "olderCursor": null
+    },
+    "azure:contoso/5116": {
+        "body": "<p><b>Small fixes</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 3,
+        "sections": [
+            {
+                "title": "Acceptance Criteria",
+                "body": "<ul><li>Given a signed-in customer, the screen loads in under a second.</li><li>The old screen is removed.</li></ul>",
+                "format": "html"
+            }
+        ],
+        "author": "Robin de Vries",
+        "assignees": ["Alex Morgan"],
+        "createdAt": "2026-07-10T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7001,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7001",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7002,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7002",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7003,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7003",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7004,
+                "title": "Unit tests",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7004",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7005,
+                "title": "Copy and translations (NL/EN)",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7005",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7006,
+                "title": "Accessibility pass",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7006",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7007,
+                "title": "Analytics events",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7007",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7008,
+                "title": "QA on test devices",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7008",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7009,
+                "title": "Release note",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7009",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7010,
+                "title": "Fix spacing on small phones",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7010",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7011,
+                "title": "Empty state",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7011",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7012,
+                "title": "Error state",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7012",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/5672": {
+        "body": "<p><b>Billing Revamp: invoice history page with filters per period</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 4,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Sam Rivera"],
+        "createdAt": "2026-08-11T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7013,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7013",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7014,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7014",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7015,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7015",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7016,
+                "title": "Unit tests",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7016",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7017,
+                "title": "Copy and translations (NL/EN)",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7017",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/5661": {
+        "body": "<p><b>Rekeningoverzicht: show pending transfers under the balance and explain when they settle</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 5,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Alex Morgan"],
+        "createdAt": "2026-09-12T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7018,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7018",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7019,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7019",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7020,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7020",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Alex Morgan"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6318": {
+        "body": "<p><b>Push notification preferences per account</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 6,
+        "sections": [
+            {
+                "title": "Acceptance Criteria",
+                "body": "<ul><li>Given a signed-in customer, the screen loads in under a second.</li><li>The old screen is removed.</li></ul>",
+                "format": "html"
+            }
+        ],
+        "author": "Robin de Vries",
+        "assignees": ["Jordan Lee"],
+        "createdAt": "2026-07-13T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7021,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7021",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Jordan Lee"
+                }
+            },
+            {
+                "number": 7022,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7022",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Jordan Lee"
+                }
+            },
+            {
+                "number": 7023,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7023",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Jordan Lee"
+                }
+            },
+            {
+                "number": 7024,
+                "title": "Unit tests",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7024",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Jordan Lee"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6167": {
+        "body": "<p><b>Onboarding: identity check retry flow</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 7,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Sam Rivera"],
+        "createdAt": "2026-08-14T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7025,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7025",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7026,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7026",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            },
+            {
+                "number": 7027,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7027",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Sam Rivera"
+                }
+            }
+        ],
+        "comments": [
+            {
+                "id": "6167-2",
+                "author": "Sam Rivera",
+                "createdAt": "2026-10-17T10:05:00Z",
+                "body": "<div>Waiting on the identity provider to enable the retry endpoint on test.</div>",
+                "format": "html"
+            }
+        ],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6164": {
+        "body": "<p><b>[Timeboxed] Investigate why the dashboard takes more than four seconds to load on older Android phones</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 8,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Jordan Lee"],
+        "createdAt": "2026-09-15T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7028,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7028",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Jordan Lee"
+                }
+            },
+            {
+                "number": 7029,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7029",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "To Do",
+                    "assignee": "Jordan Lee"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6163": {
+        "body": "<p><b>Instellingenpagina: switch language without restarting the app</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 9,
+        "sections": [
+            {
+                "title": "Acceptance Criteria",
+                "body": "<ul><li>Given a signed-in customer, the screen loads in under a second.</li><li>The old screen is removed.</li></ul>",
+                "format": "html"
+            }
+        ],
+        "author": "Robin de Vries",
+        "assignees": ["Alex Morgan"],
+        "createdAt": "2026-07-16T08:15:00Z",
+        "iteration": "Mobile App\\Sprint 18",
+        "area": "Mobile App\\App",
+        "subTickets": [
+            {
+                "number": 7030,
+                "title": "Design review",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7030",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7031,
+                "title": "Build the screen",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7031",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "closed",
+                "azure": {
+                    "type": "Task",
+                    "state": "Done",
+                    "assignee": "Alex Morgan"
+                }
+            },
+            {
+                "number": 7032,
+                "title": "API endpoint",
+                "url": "https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/7032",
+                "repo": "contoso/Mobile%20App/mobile-app",
+                "state": "open",
+                "azure": {
+                    "type": "Task",
+                    "state": "In Progress",
+                    "assignee": "Alex Morgan"
+                }
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/4870": {
+        "body": "<p><b>🚀🚀🚀🚀============ Everything above this line is the current sprint ============</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 10,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": [],
+        "createdAt": "2026-08-17T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/5833": {
+        "body": "<p><b>Export transactions as CSV from the backoffice so support can answer statement questions faster</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 11,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Sam Rivera"],
+        "createdAt": "2026-09-18T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6765": {
+        "body": "<p><b>Biometric sign-in on tablets</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 12,
+        "sections": [
+            {
+                "title": "Acceptance Criteria",
+                "body": "<ul><li>Given a signed-in customer, the screen loads in under a second.</li><li>The old screen is removed.</li></ul>",
+                "format": "html"
+            }
+        ],
+        "author": "Robin de Vries",
+        "assignees": ["Jordan Lee"],
+        "createdAt": "2026-07-19T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6766": {
+        "body": "<p><b>Billing Revamp: VAT breakdown on invoices</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 13,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": [],
+        "createdAt": "2026-08-20T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6774": {
+        "body": "<p><b>Kostenoverzicht</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 14,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Alex Morgan"],
+        "createdAt": "2026-09-21T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/5793": {
+        "body": "<p><b>Refactor the payments module into its own package before the card work starts</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 15,
+        "sections": [
+            {
+                "title": "Acceptance Criteria",
+                "body": "<ul><li>Given a signed-in customer, the screen loads in under a second.</li><li>The old screen is removed.</li></ul>",
+                "format": "html"
+            }
+        ],
+        "author": "Robin de Vries",
+        "assignees": [],
+        "createdAt": "2026-07-22T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6841": {
+        "body": "<p><b>Dark mode for the backoffice</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 16,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": ["Sam Rivera"],
+        "createdAt": "2026-08-23T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "azure:contoso/6842": {
+        "body": "<p><b>Accessibility review of the sign-up journey with VoiceOver and TalkBack</b></p><p>As a customer I want this to work the way the rest of the app does, so I don't have to call support.</p><ul><li>Works in light and dark mode</li><li>Texts in Dutch and English</li><li>Tracked in analytics as a screen view</li></ul><p>Designs: <a href=\"https://dev.azure.com/contoso/Mobile%20App/_wiki/wikis/Mobile-App.wiki/12/Designs\">Mobile App wiki</a></p>",
+        "format": "html",
+        "bodyField": "System.Description",
+        "revision": 17,
+        "sections": [],
+        "author": "Robin de Vries",
+        "assignees": [],
+        "createdAt": "2026-09-24T08:15:00Z",
+        "iteration": "Mobile App",
+        "area": "Mobile App\\App",
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "I_sample29": {
+        "body": "After the server upgrade, play a 10-bit HEVC title on a physical iPhone over cellular and at home. Record the result in #92.",
+        "format": "markdown",
+        "author": "maddec01",
+        "assignees": [],
+        "createdAt": "2026-10-09T11:02:00Z",
+        "subTickets": [],
+        "blockers": [
+            {
+                "number": 108,
+                "title": "Upgrade FFmpeg on the deployed server",
+                "url": "https://github.com/maddec01/lar-apple/issues/108",
+                "repo": "maddec01/lar-apple",
+                "state": "closed"
+            }
+        ],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "42a26ff6-44ae-5dcc-b615-e6a344637997": {
+        "record": {
+            "bodyKind": "map",
+            "body": "## Destination\n\nA family member opens one invitation link, installs the app if needed and joins the household's server. When every saved address of that server stops answering, the app finds its current addresses in the household registry on lar.works and reconnects to the same server identity, without the owner sending a new invitation.\n\n## Decisions\n\n- The registry accepts signed household records only from servers holding a valid server pass; only devices holding the household's share secret can read them.\n- Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.\n- A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the households the person belongs to.\n- Every invitation is one lar.works link that carries the whole invitation in the URL fragment, so lar.works never receives it.\n- When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.\n\n## Boundaries\n\n- Public server listings, media relay, billing changes and server backups.\n- Adding a device while the platform is down on clients other than Apple's.\n- Testing on an IPv6-only network.\n\n## Check\n\nReleased apps join, recover and sign in against the live platform and a household server.\n\n- A phone on cellular without the app joins through an emailed invitation link.\n- After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.\n- A device with no saved server signs in with Lar and connects at home and on cellular.\n",
+            "context": "",
+            "buildPhase": null,
+            "reviewRounds": []
+        },
+        "body": "",
+        "format": "markdown",
+        "author": null,
+        "assignees": [],
+        "createdAt": null,
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "79839d93-d1a7-59f1-b5c0-0973f550f344": {
+        "record": {
+            "bodyKind": "brief",
+            "body": "## Goal\n\nA device with no saved server signs in with a Lar account first, then lists and joins the household's servers.\n\n## Acceptance\n\n- The sign-in sheet opens once and returns to the app.\n- Each household shows its servers; picking one connects to it.\n- Apple TV shows a code instead.\n\n## Blockers\n\n- Look up a household's current servers in the registry when every saved address fails (lar-apple#139)\n",
+            "context": "",
+            "buildPhase": null,
+            "reviewRounds": []
+        },
+        "body": "",
+        "format": "markdown",
+        "author": null,
+        "assignees": [],
+        "createdAt": null,
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
+    },
+    "ee2d5cc6-435a-5ae2-a951-47f4ebbe246c": {
+        "record": {
+            "bodyKind": "decision",
+            "body": "Method: task\n\nRelease both apps on TestFlight and put the install link on the invitation page.",
+            "context": "",
+            "buildPhase": null,
+            "reviewRounds": []
+        },
+        "body": "",
+        "format": "markdown",
+        "author": null,
+        "assignees": [],
+        "createdAt": null,
+        "subTickets": [],
+        "comments": [],
+        "hasOlderComments": false,
+        "olderCursor": null
     }
 }

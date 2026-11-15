@@ -5,6 +5,7 @@
 // second track of its own for the slices. A chip for each slice follows, so what the bar shows is also readable; each opens its ticket, so the sidebar doesn't list them again. A
 // concept has no step of its own to show: it shows its parts done, and why the count holds parts its list doesn't.
 
+import { blockedText, openBlockers } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import {
@@ -36,6 +37,8 @@ export function ItemProgress({ item }: { item: Item }) {
     const concept = item.kind === 'concept';
     const parts = concept && item.subIssues.total > 0;
     const missing = parts ? unreadParts(item, partsOf(item, items)) : 0;
+    // The same test the summary's Status uses for Blocked.
+    const held = !item.setAside && (shown.blocked || openBlockers(item).length > 0);
 
     if (at < 0 && !item.slices.length && !parts) return null;
 
@@ -61,6 +64,8 @@ export function ItemProgress({ item }: { item: Item }) {
                     at={at}
                     name={shown.progressStage}
                     ordinal={`Stage ${at + 1} of ${steps.length}`}
+                    // Held as the sidebar's Status says Blocked, so the line never reads as ready to go.
+                    held={held ? (blockedText(item) ?? 'Blocked') : undefined}
                 />
             )}
             {at >= 0 && !item.slices.length && feedback.running && (

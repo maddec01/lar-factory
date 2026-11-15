@@ -24,9 +24,9 @@ test('groups affected briefs by work ID, retaining equal titles without showing 
 
     root.innerHTML = renderToStaticMarkup(createElement(GroupUpkeep, { report, name: () => 'Reconnect' }));
     expect(root.querySelectorAll('summary')).toHaveLength(1);
-    expect(root.querySelector('summary')?.textContent).toBe(
-        '10 briefs to re-check: answers or sibling contracts changed',
-    );
+    expect(root.querySelector('summary')?.textContent).toBe('Concept map needs updating · 10 records affected');
+    expect(root.textContent).toContain('10 briefs to re-check after changed answers');
+    expect(root.textContent).not.toContain('sibling contracts');
     expect(root.querySelectorAll('li')).toHaveLength(10);
     expect(root.textContent).not.toContain('rerun Doubt');
 });

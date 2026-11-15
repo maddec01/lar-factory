@@ -1,5 +1,5 @@
-// The item dialog's footer actions: the one action the item's state asks for, with Open thread beside it, and Move to
-// List and Abandon at its left. Stopped work the board can't restart asks to be resumed in T3, as its primary action.
+// The item dialog's footer actions: the one action the item's state asks for, with Open thread beside it, and
+// Abandon and Move to List at its left. Stopped work the board can't restart asks to be resumed in T3, as its primary action.
 
 import {
     canResumeShaping,
@@ -74,21 +74,21 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
             if (hasLiveThread(item)) return LATEST_THREAD;
 
             return {
-                control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} />,
+                control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} captionReason />,
             };
         case 'Ready':
             return hasLiveThread(item)
                 ? LATEST_THREAD
-                : { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} /> };
+                : { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} captionReason /> };
         case 'Shaping':
             return canResumeShaping(item)
                 ? {
-                      control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} />,
+                      control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} captionReason />,
                   }
                 : LATEST_THREAD;
         case 'In progress':
             return canRetryBuild(item)
-                ? { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} /> }
+                ? { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} captionReason /> }
                 : LATEST_THREAD;
         case 'Review':
             return LATEST_THREAD;
@@ -140,18 +140,17 @@ export function StatusActions({
     );
 }
 
-/** Move to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
+/** Abandon, then Move to List, so Abandon keeps the footer's first slot whichever shows; a Start in flight, uncertain
+ *  or done, or a thread at work on the item, takes them away. */
 export function MoveActions({ item, data }: { item: Item; data: BoardData }) {
     const moves = useMovesItem(item, data);
 
     if (!moves) return null;
 
-    if (item.status === 'List') return <AbandonButton item={item} data={data} />;
-
     return (
         <>
-            <BackToListButton item={item} data={data} />
             <AbandonButton item={item} data={data} />
+            {item.status !== 'List' && <BackToListButton item={item} data={data} />}
         </>
     );
 }

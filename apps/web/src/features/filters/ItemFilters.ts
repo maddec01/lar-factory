@@ -60,7 +60,7 @@ export const headingOf = (rows: readonly Item[]): string => {
 };
 
 /** The kind filter a row counts under. An item with no kind badge counts as No kind. */
-export const kindFilterOf = (item: Pick<Item, 'kind'>): KindFilter => (isKindFilter(item.kind) ? item.kind : 'no-kind');
+const kindFilterOf = (item: Pick<Item, 'kind'>): KindFilter => (isKindFilter(item.kind) ? item.kind : 'no-kind');
 
 /** Whether a row stays: it matches any chosen kind and any chosen label. */
 export const rowFilter =

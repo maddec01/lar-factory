@@ -46,7 +46,7 @@ test('a poll that started before the page’s own write doesn’t bring back old
 
     const inList = () => text($('.title-bar .list-button'));
 
-    expect(inList()).toBe('List3');
+    expect(inList()).toBe('List19');
     await settle(() => answerPoll());
-    expect(inList(), 'still Queued').toBe('List3');
+    expect(inList(), 'still Queued').toBe('List19');
 });

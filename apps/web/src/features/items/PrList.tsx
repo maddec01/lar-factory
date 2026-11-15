@@ -18,12 +18,17 @@ export function PrList({ item, checks }: { item: Item; checks?: ReactNode }) {
                     <PullRequestRow
                         key={pr.number}
                         href={pr.url}
-                        label={prLabel(pr).replace(/ \(merged\)$/i, '')}
+                        // Its number beside the pull request icon; the state beside it says merged, closed or draft.
+                        label={`#${pr.number}`}
+                        title={prLabel(pr)}
+                        // Its checks while it has some; else where it stands, so the card always says one state.
                         checks={
-                            pr.state === 'merged' ? (
-                                <PullRequestState state="merged" />
+                            pr.state !== 'open' ? (
+                                <PullRequestState state={pr.state} />
+                            ) : state ? (
+                                <ChecksState state={state} />
                             ) : (
-                                state && <ChecksState state={state} />
+                                <PullRequestState state={pr.isDraft ? 'draft' : 'open'} />
                             )
                         }
                         readiness={<PrReadiness item={item} pr={pr} />}

@@ -41,18 +41,17 @@ export const generalGroups = (data: SettingsData): Group[] => [
         rows: [
             {
                 id: 'match-list-size',
-                keywords: 'match List size Open items expanded',
-                title: 'Open items full-size with List',
-                description: 'Match the List’s window size when opening an item.',
-                control: custom(() => (
-                    <DialogPreference preference="matchList" label="Open items full-size with List" />
-                )),
+                keywords: 'match List size Open items full-size expanded full window',
+                title: 'Match item size to the List',
+                description: 'An item opened from the List fills the window while the List does.',
+                control: custom(() => <DialogPreference preference="matchList" label="Match item size to the List" />),
             },
             {
                 id: 'open-list-expanded',
-                title: 'Open List expanded',
-                description: 'Use the full window when opening List.',
-                control: custom(() => <DialogPreference preference="openList" label="Open List expanded" />),
+                keywords: 'expanded full window',
+                title: 'Open the List full-size',
+                description: 'The List fills the window when it opens.',
+                control: custom(() => <DialogPreference preference="openList" label="Open the List full-size" />),
             },
         ],
     },

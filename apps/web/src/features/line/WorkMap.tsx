@@ -1,10 +1,11 @@
 // A dossier's map, its current work first: a Decisions lane, a Builds lane for the dossier's own repository and a lane
 // for each other repository, named by its project icon and name, parts placed left to right by what they wait on, arrows between them, ending in the end-to-end check when one is written. Finished history folds into
-// one group below, which every arrow to or from a finished part starts or ends on, labelled with how many parts it stands for and naming them on hover and focus.
+// one group below, which every arrow to or from a finished part starts or ends on as a quiet rail, labelled with how many parts it stands for
+// and naming them on hover and focus. Every card is as tall as the tallest needs, at least a three-line title's room.
 
-import { ref } from '@lar-factory/shared';
+import { itemName, ref } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
-import { useId, useState } from 'react';
+import { useId, useLayoutEffect, useState } from 'react';
 
 import { CompactWorkMap } from './CompactWorkMap';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
@@ -12,7 +13,6 @@ import type { Part } from './DossierParts';
 import { useWidth } from './useWidth';
 import {
     DECISIONS,
-    GAP,
     GROUP_H,
     HISTORY,
     LABEL_W,
@@ -34,6 +34,8 @@ import {
     MapLaneName,
     MapNode,
     MapPrerequisiteNode,
+    MAP_NODE_HEIGHT,
+    measureMapCards,
     WorkMapFrame,
 } from '@/ui/board';
 
@@ -53,16 +55,37 @@ export function WorkMap({
     const [hover, setHover] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
+    const [nodeH, setNodeH] = useState(MAP_NODE_HEIGHT);
+
+    // Every card takes the height its tallest needs, measured before the map paints, so their edges line up with no
+    // empty band in a short one; a change in what a card says measures again.
+    useLayoutEffect(() => {
+        const needed = measureMapCards(box.current);
+
+        // oxlint-disable-next-line react/set-state-in-effect -- the cards' height is read from the laid-out DOM, before paint
+        if (needed !== nodeH) setNodeH(needed);
+    }, [box, parts, check, data, width, nodeH]);
 
     if (!parts.length && !check) return null;
 
-    const m = layout(parts, data, width, Boolean(check));
+    const m = layout(parts, data, width, Boolean(check), { home, nodeH });
     const compact = width > 0 && width < 600;
     const at = new Map(m.placed.map((p) => [p.key, p]));
-    const near = (key: string) =>
-        !hover ||
-        key === hover ||
+    // The nodes an arrow joins to the hovered one, which take a stronger edge; the hovered one keeps its own hover.
+    const related = (key: string) =>
+        !!hover &&
+        key !== hover &&
         m.edges.some((e) => (e.from === hover && e.to === key) || (e.to === hover && e.from === key));
+    // What finished work each node follows or comes before, also in its tooltip beside its rail's label.
+    const followed = new Map<string, string>();
+
+    for (const e of m.edges) {
+        const [key, said] = e.from === HISTORY ? [e.to, `After ${e.label}`] : [e.from, e.label];
+
+        if (e.label && (e.from === HISTORY || e.to === HISTORY))
+            followed.set(key, [followed.get(key), `${said}: ${e.names}`].filter(Boolean).join(' · '));
+    }
+
     const builds = parts
         .filter((p) => p.kind === 'build' && !isHistory(p))
         .map((p) => ref(p.item))
@@ -77,6 +100,7 @@ export function WorkMap({
             <MapCanvas
                 width={compact ? width : m.width}
                 height={compact ? (history.length ? GROUP_H + 16 : 0) : m.height}
+                snap={compact ? undefined : { step: m.colW, count: m.cols }}
             >
                 {!compact &&
                     m.bands.map((b, n) => (
@@ -125,54 +149,52 @@ export function WorkMap({
                                               a?.prerequisite?.blocker.state === 'closed',
                                     lit,
                                     dim: !!hover && !lit,
+                                    rail: e.from === HISTORY || e.to === HISTORY,
                                 },
                             ];
                         })}
                     />
                 )}
                 {!compact &&
-                    m.edges.map((e) => {
-                        if (!e.label) return null;
-
-                        const to = at.get(e.to),
-                            from = at.get(e.from);
-                        const place = to
-                            ? // In the gap over the node it leads to, 8px from each node.
-                              { left: to.x, top: to.y - GAP + 8, width: m.nodeW }
-                            : from
-                              ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 }
-                              : null;
-
-                        return (
-                            place && (
-                                <MapEdgeLabel
-                                    key={`${e.from}-${e.to}`}
-                                    edge={`${e.from} ${e.to}`}
-                                    label={e.label}
-                                    names={e.names ?? ''}
-                                    left={place.left}
-                                    top={place.top}
-                                    maxWidth={place.width}
-                                    onOpen={() => setShowHistory(true)}
-                                />
-                            )
-                        );
-                    })}
+                    m.labels.map(({ edge, left, top, maxWidth }) => (
+                        <MapEdgeLabel
+                            key={`${edge.from}-${edge.to}`}
+                            edge={`${edge.from} ${edge.to}`}
+                            label={edge.label!}
+                            names={edge.names ?? ''}
+                            left={left}
+                            top={top}
+                            maxWidth={maxWidth}
+                            onOpen={() => setShowHistory(true)}
+                        />
+                    ))}
                 {!compact &&
                     m.placed.map((p) => (
                         <MapNode
                             key={p.key}
+                            name={
+                                p.part
+                                    ? itemName(p.part.item)
+                                    : (p.prerequisite?.title ?? (check ? `Outcome check: ${check.title}` : ''))
+                            }
                             left={p.x}
                             top={p.y}
-                            dim={!near(p.key)}
+                            related={related(p.key)}
                             onHover={(on) => setHover(on ? p.key : null)}
                         >
                             {p.prerequisite ? (
-                                <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} />
+                                <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} height={m.nodeH} />
                             ) : p.part ? (
-                                <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
+                                <PartNode
+                                    part={p.part}
+                                    data={data}
+                                    width={m.nodeW}
+                                    height={m.nodeH}
+                                    home={home}
+                                    history={followed.get(p.key)}
+                                />
                             ) : (
-                                check && <CheckNode check={check} width={m.nodeW} after={builds} />
+                                check && <CheckNode check={check} width={m.nodeW} height={m.nodeH} after={builds} />
                             )}
                         </MapNode>
                     ))}
@@ -181,14 +203,12 @@ export function WorkMap({
                         open={showHistory}
                         top={compact ? 8 : m.groupY}
                         height={GROUP_H}
-                        dim={!near(HISTORY)}
-                        glyph={<StatusGlyph status="Done" />}
-                        text={historyText(history)}
-                        showLabel="Show"
-                        hideLabel="Hide"
                         onToggle={() => setShowHistory(!showHistory)}
+                        glyph={<StatusGlyph status="Done" size="sm" />}
                         onHover={(on) => setHover(on ? HISTORY : null)}
-                    />
+                    >
+                        {historyText(history)}
+                    </MapHistoryGroup>
                 )}
             </MapCanvas>
             {showHistory && (

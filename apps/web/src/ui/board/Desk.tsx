@@ -1,4 +1,4 @@
-import { EmptyState, SectionTitle, StatusIndicator } from '@lar-works/design-system';
+import { SectionTitle, StatusIndicator } from '@lar-works/design-system';
 import type { StatusState } from '@lar-works/design-system';
 import { Children, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
@@ -8,7 +8,7 @@ import { useArrival } from './BoardLife';
 interface DeskSectionProps {
     /** The section's heading, such as "Your desk". */
     title: string;
-    /** How many rows show; with none, `empty` says why in one muted line. */
+    /** How many rows show; with none, `empty` says why, muted beside the title. */
     count: number;
     /** The first read may still add rows; hide its provisional zero. */
     loading?: boolean;
@@ -20,8 +20,8 @@ interface DeskSectionProps {
 
 /** "Your desk": the items awaiting your action, as a grid of cards under a section title, the board's one loud surface:
  *  each card an even amber tint with a hairline of the same tone, so what waits on you is the first thing the eye
- *  finds. It shows two rows of cards and Show more, so the lanes under it stay in reach. An empty desk is one
- *  muted line under its title. Its heading is `#desk-h`. */
+ *  finds. It shows two rows of cards and Show more, so the lanes under it stay in reach. An empty desk is its title
+ *  line alone, saying why beside the title. Its heading is `#desk-h`. */
 export function DeskSection({ title, count, loading = false, empty, children }: DeskSectionProps) {
     const [all, setAll] = useState(false);
     const grid = useRef<HTMLOListElement>(null);
@@ -54,25 +54,29 @@ export function DeskSection({ title, count, loading = false, empty, children }: 
     return (
         <section className="desk grid shrink-0 scroll-mt-16 gap-3" aria-labelledby="desk-h">
             <div className="flex min-h-9 items-center justify-between gap-3 pr-3 pl-4">
-                <SectionTitle
-                    id="desk-h"
-                    level="h2"
-                    title={title}
-                    icon={<StatusIndicator state={count ? 'waiting' : 'off'} />}
-                    count={count}
-                    countLoading={loading}
-                />
+                <div className="flex min-w-0 items-center gap-3">
+                    <SectionTitle
+                        id="desk-h"
+                        level="h2"
+                        title={title}
+                        icon={<StatusIndicator state={count ? 'waiting' : 'off'} />}
+                        count={count}
+                        countLoading={loading}
+                    />
+                    {/* An empty desk says why beside its title, quiet, so the lanes come straight after it. */}
+                    {!count && (
+                        <span className="text-fg-muted flex min-w-0 items-center truncate text-xs" data-desk-empty>
+                            {empty}
+                        </span>
+                    )}
+                </div>
                 {/* A quiet header control on the rows' right gutter, as Auto-build is. */}
                 {hidden > 0 && <DeskShowMore onClick={() => setAll(true)}>Show {hidden} more</DeskShowMore>}
             </div>
-            {count ? (
+            {count > 0 && (
                 <ol ref={grid} aria-label={title} className="desk-grid m-0 list-none p-0">
                     {Children.toArray(children).slice(0, shown)}
                 </ol>
-            ) : (
-                <div className="px-3">
-                    <EmptyState size="inline" title={empty} />
-                </div>
             )}
         </section>
     );

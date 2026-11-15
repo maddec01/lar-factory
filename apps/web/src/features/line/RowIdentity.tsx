@@ -3,6 +3,7 @@
 
 import { isBuild, onAzure } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
+import { TicketIcon } from '@lar-works/design-system/icons';
 import { memo } from 'react';
 
 import { partKind, partLabel } from './DossierParts';
@@ -14,28 +15,37 @@ export const RowKind = memo(function RowKind({ item }: { item: Item }) {
     return <RowKindMark item={item} labelled="fact" />;
 });
 
-/** A row's kind as its muted icon before the title, named on hover; its empty room for an item with no recognised kind. */
+/** A row's kind as its muted icon before the title, named on hover; its empty room for an item with no recognised kind.
+ *  Work that links others reads as Linked work, as its group's line names it. A `listed` row (one away from its group,
+ *  in the List or search) reads one way in both: its kind first, as its dialog's Kind names it, then Linked work, and a
+ *  neutral ticket glyph rather than empty room. */
 export const RowKindMark = memo(function RowKindMark({
     item,
     labelled = false,
+    listed = false,
 }: {
     item: Item;
     labelled?: boolean | 'fact';
+    listed?: boolean;
 }) {
-    if (item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
+    const kind = KIND_BADGES[item.kind];
+
+    if (!(listed && kind) && item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
         return (
             <KindMark name="Linked work" labelled={labelled}>
                 <conceptIcons.linkedWork aria-hidden="true" />
             </KindMark>
         );
 
-    const kind = KIND_BADGES[item.kind];
-
     // A decision or a build has no kind badge of its own: its method's or Build's icon marks it.
     if (!kind)
         return item.kind === 'decision' || item.kind === 'build' || isBuild(item) ? (
             <KindMark name={partLabel(partKind(item))} labelled={labelled}>
                 <PartKindIcon kind={partKind(item)} />
+            </KindMark>
+        ) : listed ? (
+            <KindMark name="Ticket">
+                <TicketIcon aria-hidden="true" />
             </KindMark>
         ) : (
             // A ticket with no kind keeps the slot, quiet, rather than a mark that would read as a checkbox.

@@ -131,7 +131,7 @@ export async function readOnboardedConfigs(
         const setup = settings.find((s) => sameRepo(s.repo, repo));
 
         if (!setup?.itemSource) {
-            problems.push({ repo, problem: 'Choose the team whose work appears in the list.' });
+            problems.push({ repo, problem: 'Choose the team whose work appears on the List.' });
             continue;
         }
 

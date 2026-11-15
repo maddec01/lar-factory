@@ -18,8 +18,14 @@ export function AttachTicket({ item }: { item: Item }) {
 
     if (!open)
         return (
-            <Button {...buttonKind('other')} data-attach-ticket={item.id} onClick={() => setOpen(true)}>
-                Attach a ticket
+            <Button
+                // A quiet control, as the sidebar's other properties are values, not calls to act.
+                {...buttonKind('control')}
+                data-attach-ticket={item.id}
+                title="Attach an existing ticket"
+                onClick={() => setOpen(true)}
+            >
+                Attach
             </Button>
         );
 

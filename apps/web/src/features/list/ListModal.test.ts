@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, moved, mountPage, push, sample, settle, text } from '@/test/PageTest';
+import { $, $$, moved, mountPage, push, sample, settle, text, textBesideIcon } from '@/test/PageTest';
 
 afterEach(() => {
     delete (Element.prototype as Partial<Element>).getAnimations;
@@ -21,6 +21,14 @@ const active = () =>
     groups()
         .filter((b) => b.getAttribute('aria-current') === 'page')
         .map((b) => text(b.querySelector('.name')));
+/** The sample's Azure DevOps List items, in backlog priority, which sorts the List while the board reads a backlog. */
+const azure = sample.items.filter((i) => i.azure).map((i) => i.id);
+/** The sample without its Azure DevOps project, whose List sorts by recency. */
+const github = {
+    ...sample,
+    repos: sample.repos.filter((r) => r.items !== 'azure-board'),
+    items: sample.items.filter((i) => !i.azure),
+};
 const closeTop = () =>
     settle(() => $$<HTMLButtonElement>('[role="dialog"] button[aria-label="Close"]').at(-1)!.click());
 
@@ -38,25 +46,33 @@ const press = (el: Element) =>
 test('choosing a repository in the left pane shows only its items on the right', async () => {
     await mountPage();
     await open();
-    expect(rows()).toEqual(['I_sample02', 'I_sample01', 'I_sample03', 'I_sample04']);
+    expect(rows()).toEqual([...azure, 'I_sample01', 'I_sample02', 'I_sample04', 'I_sample03', 'I_sample29']);
     await settle(() => group('lar-apple').click());
-    expect(rows()).toEqual(['I_sample03']);
+    expect(rows()).toEqual(['I_sample03', 'I_sample29']);
     expect(group('lar-apple').getAttribute('aria-current')).toBe('page');
     await settle(() => group('All projects').click());
-    expect(rows()).toHaveLength(4);
+    expect(rows()).toHaveLength(20);
 });
 
 test('the repositories go by their items in the list, most first, whatever the config’s order', async () => {
     await mountPage({ ...sample, repos: [...sample.repos].reverse() });
     await open();
     expect(counts()).toEqual([
-        ['All projects', '4'],
+        ['All projects', '20'],
+        ['mobile-app', '15'],
         ['lar-server', '3'],
-        ['lar-apple', '1'],
+        ['lar-apple', '2'],
+        ['lar-platform', '0'],
     ]);
     // The order holds while the search changes the counts.
     await type('subtitle');
-    expect(counts().map(([name]) => name)).toEqual(['All projects', 'lar-server', 'lar-apple']);
+    expect(counts().map(([name]) => name)).toEqual([
+        'All projects',
+        'mobile-app',
+        'lar-server',
+        'lar-apple',
+        'lar-platform',
+    ]);
 });
 
 test('the list modal starts on the board’s scope', async () => {
@@ -67,7 +83,7 @@ test('the list modal starts on the board’s scope', async () => {
     await closeTop();
     await open();
     expect(active()).toEqual(['lar-apple']);
-    expect(rows()).toEqual(['I_sample03']);
+    expect(rows()).toEqual(['I_sample03', 'I_sample29']);
 });
 
 test('All projects keeps a loading cue and no count under the rows that landed until the first read settles', async () => {
@@ -92,8 +108,8 @@ test('All projects keeps a loading cue and no count under the rows that landed u
     ).toEqual(['All projects', '']);
     await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
     expect($('[data-list-modal] [data-reading]')).toBeNull();
-    expect(header()).toMatch(/All projects\d/);
-    expect(counts()[0]).toEqual(['All projects', '4']);
+    expect(header(), 'the left pane counts it, once').not.toMatch(/All projects\d/);
+    expect(counts()[0]).toEqual(['All projects', '20']);
 });
 
 test('the search filters the right pane and the counts on the left follow it', async () => {
@@ -103,8 +119,10 @@ test('the search filters the right pane and the counts on the left follow it', a
     expect(rows()).toEqual(['I_sample03']);
     expect(counts()).toEqual([
         ['All projects', '1'],
+        ['mobile-app', '0'],
         ['lar-server', '0'],
         ['lar-apple', '1'],
+        ['lar-platform', '0'],
     ]);
     await settle(() => group('lar-server').click());
     expect(rows()).toEqual([]);
@@ -137,7 +155,7 @@ test('Scope board scopes the board to the chosen repository, and is only there f
 });
 
 test('the sort menu reorders the items', async () => {
-    await mountPage();
+    await mountPage(github);
     await open();
 
     const sort = $<HTMLButtonElement>('[data-list-modal] .sort button')!;
@@ -149,10 +167,10 @@ test('the sort menu reorders the items', async () => {
 
     expect(options.map(text)).toEqual(['Recently updated', 'Oldest', 'Title', 'Backlog priority']);
     await settle(() => options[1]!.click());
-    expect(rows()).toEqual(['I_sample04', 'I_sample03', 'I_sample01', 'I_sample02']);
+    expect(rows()).toEqual(['I_sample29', 'I_sample04', 'I_sample03', 'I_sample01', 'I_sample02']);
     await press($('[data-list-modal] .sort button')!);
     await settle(() => $$<HTMLElement>('[role="menuitemradio"]')[2]!.click());
-    expect(rows()).toEqual(['I_sample01', 'I_sample03', 'I_sample04', 'I_sample02']);
+    expect(rows()).toEqual(['I_sample01', 'I_sample29', 'I_sample03', 'I_sample04', 'I_sample02']);
 });
 
 test('an item opens the item dialog over the list modal, and closing it comes back to the list as it was', async () => {
@@ -215,7 +233,7 @@ test('Add item opens the Add item flow over the list modal, and closing it hands
     expect(document.activeElement, 'focus goes back to Add item').toBe(add);
 });
 
-test('Azure List defaults to backlog priority and retains native work item fields alongside factory status', async () => {
+test('Azure List defaults to backlog priority and keeps the work item’s state and assignee in its row’s tooltip, its type only where the kind mark does not say it', async () => {
     const azure = { type: 'Product Backlog Item', state: 'Committed', assignee: 'Ana Silva' };
     const data = {
         ...sample,
@@ -228,7 +246,59 @@ test('Azure List defaults to backlog priority and retains native work item field
     await open();
     expect(text($('[data-list-modal] .sort button'))).toBe('Backlog priority');
     expect(rows()).toEqual(['I_sample01', 'I_sample02']);
-    expect(text($('[data-list-modal] [data-azure]'))).toBe('Product Backlog Item · Committed · Ana Silva');
+    expect($('[data-list-modal] [data-azure]'), 'no second line').toBeNull();
+
+    for (const row of document.querySelectorAll<HTMLElement>('[data-list-modal] .list-row'))
+        expect(row.title.split('\n')[1]).toMatch(/Committed · Ana Silva$/);
+});
+
+test('a row names its project in a column of its own after its labels, only while the rows come from more than one project', async () => {
+    const parts = (row: Element) =>
+        [...row.children].map((child) =>
+            child.hasAttribute('data-row-labels') ? 'labels' : child.hasAttribute('data-row-project') ? 'project' : '',
+        );
+
+    await mountPage();
+    await open();
+
+    const row = $('[data-list-modal] button[data-item="I_sample03"]')!;
+
+    expect(parts(row).filter(Boolean), 'labels, then the project column').toEqual(['labels', 'project']);
+    expect(textBesideIcon(row.querySelector('[data-row-project]'))).toBe('lar-apple');
+    await settle(() => group('lar-server').click());
+    expect($('[data-list-modal] [data-row-project]'), 'one project picked').toBeNull();
+});
+
+test('a row marks its kind as search does: its kind before Linked work, and a ticket glyph for no kind', async () => {
+    const mark = (id: string) =>
+        $(`[data-list-modal] button[data-item="${CSS.escape(id)}"] [data-kind-mark]`)?.getAttribute('aria-label');
+
+    await mountPage({
+        ...sample,
+        items: sample.items.map((item) =>
+            item.id === 'I_sample02' ? { ...item, kind: 'issue' as const, flow: 'single' as const } : item,
+        ),
+    });
+    await open();
+    expect(mark('azure:contoso/5672'), 'a linked Feature').toBe('Feature');
+    expect(mark('I_sample02'), 'no kind').toBe('Ticket');
+});
+
+test('a row with no labels gives their cell to its title, so its title runs on where theirs would be', async () => {
+    const cells = (id: string) => $(`[data-list-modal] button[data-item="${id}"]`)!.children;
+
+    await mountPage();
+    await open();
+    expect(cells('I_sample03')[2]!.hasAttribute('data-row-labels'), 'labels in their cell').toBe(true);
+    expect(cells('I_sample29')[1]!.className, 'no labels').toContain('col-span-2');
+    expect(cells('I_sample29')[2]!.hasAttribute('data-row-labels'), 'no labels cell').toBe(false);
+});
+
+test('All projects leaves out the project column when every row comes from one project', async () => {
+    await mountPage({ ...sample, items: sample.items.filter((item) => item.repo === 'maddec01/lar-server') });
+    await open();
+    expect(rows().length).toBeGreaterThan(0);
+    expect($('[data-list-modal] [data-row-project]'), 'every row from one project').toBeNull();
 });
 
 test('the saved List opening preference applies each time while permitting Restore', async () => {

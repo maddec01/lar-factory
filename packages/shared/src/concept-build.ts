@@ -21,28 +21,44 @@ export interface ConceptBuildPlan {
     }[];
 }
 
-/** Count each waiting decision and gate once, keeping detailed reasons available separately. */
+const DEPENDENCY = /^Dependency on (?:[^/:\s]+\/)?([^:\s]+):/;
+
+/**
+ * What the concept's builds wait on, in words the owner reads at a glance: decisions by whether they have started
+ * ("2 decisions not started"), approvals, a Dependency by its project, and a count of anything else. Each decision and
+ * gate counts once; the detailed reasons stay available separately.
+ */
 export function conceptBuildHoldSummary(plan: ConceptBuildPlan): string {
-    const decisions = new Set<string>();
+    const decisions = new Map<string, string>();
     const gates = new Set<string>();
+    const dependencies = new Set<string>();
     const other = new Set<string>();
 
     for (const hold of plan.holds) {
         const member = plan.members.find((member) => member.workId === hold.workId);
+        const dependency = DEPENDENCY.exec(hold.reason);
 
-        if (member?.kind === 'decision') decisions.add(hold.workId);
+        if (member?.kind === 'decision') decisions.set(hold.workId, member.status);
         else if (/approved gate/.test(hold.reason)) gates.add(hold.workId);
+        else if (dependency) dependencies.add(dependency[1]!);
         else other.add(hold.workId);
     }
     // A gate can also have a status or notice hold for the same build.
     for (const id of gates) other.delete(id);
 
     const words = (count: number, name: string) => `${count} ${name}${count === 1 ? '' : 's'}`;
+    const notStarted = [...decisions.values()].filter((status) => status === 'Queued' || status === 'List').length;
+    const open = decisions.size - notStarted;
     const parts = [
-        decisions.size && words(decisions.size, 'decision'),
-        gates.size && words(gates.size, 'gate'),
+        notStarted && `${words(notStarted, 'decision')} not started`,
+        open && `${words(open, 'open decision')}`,
+        gates.size && words(gates.size, 'approval'),
+        dependencies.size &&
+            `${dependencies.size === 1 ? 'a dependency' : 'dependencies'} on ${[...dependencies].join(', ')}`,
         other.size && words(other.size, 'other hold'),
-    ].filter(Boolean);
+    ].filter(Boolean) as string[];
 
-    return parts.length ? `Waiting on ${parts.join(' and ')}` : '';
+    return parts.length
+        ? `Waiting on ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}`
+        : '';
 }

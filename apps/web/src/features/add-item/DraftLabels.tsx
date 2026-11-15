@@ -3,13 +3,12 @@
 
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Button, HiddenField, Inline, LabelChip, Popover } from '@lar-works/design-system';
-import { ChevronDown } from '@lar-works/design-system/icons';
+import { HiddenField, Inline, LabelChip, Popover } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { LabelPicker } from '@/shared/labels/LabelPicker';
-import { buttonKind, PanelField } from '@/ui/board';
+import { PanelField, PanelPicker } from '@/ui/board';
 
 const has = (labels: readonly string[], name: string) => labels.some((label) => sameLabel(label, name));
 const without = (labels: readonly string[], gone: readonly string[]) => labels.filter((label) => !has(gone, label));
@@ -65,47 +64,48 @@ export function DraftLabels({
             {picked.map((name) => (
                 <HiddenField key={name} name={has(typed, name) ? 'newLabels' : 'labels'} value={name} />
             ))}
-            <Inline as="span" wrap align="center" space="tight">
-                {picked.map((name) => (
-                    <LabelChip
-                        key={name}
-                        label={name}
-                        color={colorOf(read, name)}
-                        note={has(typed, name) ? 'new' : undefined}
-                    />
-                ))}
-                <Popover>
-                    <Popover.Trigger asChild>
-                        <Button {...buttonKind('other', { size: 'md' })} rightIcon={<ChevronDown />}>
-                            {picked.length ? 'Edit' : `Add ${noun}`}
-                        </Button>
-                    </Popover.Trigger>
-                    <Popover.Content side="bottom" align="start">
-                        <LabelPicker
-                            heading={heading}
-                            choices={choices}
-                            picked={picked}
-                            locked={locked}
-                            onToggle={(name) =>
-                                change(() => setPicked(has(picked, name) ? without(picked, [name]) : [...picked, name]))
-                            }
-                            create={{
-                                noun,
-                                problem: nameProblem,
-                                note: `The new ${noun} is created when the ticket submits.`,
-                                refused: writeAccessProblem(repo.repo, 'manage-labels', setup?.access ?? {}, {
-                                    azureReadOnly: setup?.azureReadOnly,
-                                }),
-                                onCreate: (name) =>
-                                    change(() => {
-                                        setTyped([...typed, name]);
-                                        setPicked([...picked, name]);
-                                    }),
-                            }}
+            {/* The picks as chips, then the picker as wide as the selects around it. */}
+            {picked.length > 0 && (
+                <Inline as="span" wrap align="center" space="tight">
+                    {picked.map((name) => (
+                        <LabelChip
+                            key={name}
+                            label={name}
+                            color={colorOf(read, name)}
+                            note={has(typed, name) ? 'new' : undefined}
                         />
-                    </Popover.Content>
-                </Popover>
-            </Inline>
+                    ))}
+                </Inline>
+            )}
+            <Popover>
+                <Popover.Trigger asChild>
+                    <PanelPicker>{picked.length ? `Edit ${heading.toLowerCase()}` : `Add ${noun}`}</PanelPicker>
+                </Popover.Trigger>
+                <Popover.Content side="bottom" align="start">
+                    <LabelPicker
+                        heading={heading}
+                        choices={choices}
+                        picked={picked}
+                        locked={locked}
+                        onToggle={(name) =>
+                            change(() => setPicked(has(picked, name) ? without(picked, [name]) : [...picked, name]))
+                        }
+                        create={{
+                            noun,
+                            problem: nameProblem,
+                            note: `The new ${noun} is created when the ticket submits.`,
+                            refused: writeAccessProblem(repo.repo, 'manage-labels', setup?.access ?? {}, {
+                                azureReadOnly: setup?.azureReadOnly,
+                            }),
+                            onCreate: (name) =>
+                                change(() => {
+                                    setTyped([...typed, name]);
+                                    setPicked([...picked, name]);
+                                }),
+                        }}
+                    />
+                </Popover.Content>
+            </Popover>
         </PanelField>
     );
 }

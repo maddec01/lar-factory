@@ -147,11 +147,25 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
     }
 }
 
-/** Grouped parents and parts stay in the dock; other work keeps its ordinary stage and desk placement. */
+/** A group still on the List: its head is, and none of its parts on the board has moved past the List. */
+function groupOnList(item: Item, all: readonly Item[]): boolean {
+    const head = all.find((parent) => parent.id === item.parentId && parent.id !== item.id && grouped(parent)) ?? item;
+
+    return (
+        head.status === 'List' &&
+        !all.some((part) => part.parentId === head.id && part.status !== 'List' && part.status !== 'Done')
+    );
+}
+
+/**
+ * Grouped parents and parts stay in the dock, unless their group hasn't left the List; other work keeps its ordinary
+ * stage and desk placement.
+ */
 export function placementOf(item: Item, { starts, unavailable, all }: PlacementFacts): Placement {
     const stage = stageSection(item, starts);
     const dock =
         grouped(item) &&
+        !groupOnList(item, all) &&
         (item.status !== 'Done' ||
             all.some((other) => other.id === item.parentId || (other.parentId === item.id && other.status !== 'Done')));
 
@@ -411,9 +425,9 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
             const queue = action === 'back-to-queue';
 
             return {
-                question: queue ? `Move ${name} back to Queue?` : `Move ${name} to List?`,
+                question: queue ? `Move ${name} back to Queue?` : `Move ${name} to the List?`,
                 detail: sentences(
-                    `This moves the item to ${queue ? 'Queued' : 'List'}.`,
+                    `This moves the item to ${queue ? 'Queued' : 'the List'}.`,
                     item.kind === 'build' ? 'Its slices and build progress reset.' : '',
                     told.length || !item.number
                         ? `${ticket} Its PR doesn’t change.`

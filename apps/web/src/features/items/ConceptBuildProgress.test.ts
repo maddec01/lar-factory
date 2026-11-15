@@ -46,11 +46,11 @@ test('separates active work, capacity waits and PR merge waits, using confirmed 
         complete: 0,
         names: 'Building',
     });
-    expect(conceptBuildWait(items[1]!, board)).toBe('Waiting for shared build capacity.');
-    expect(conceptBuildWait(items[2]!, board)).toBe('Waiting for PR merge.');
+    expect(conceptBuildWait(items[1]!, board)).toBe('Waiting for a build slot');
+    expect(conceptBuildWait(items[2]!, board)).toBe('Waiting for merge');
     items[2]!.status = 'Done';
     expect(conceptBuildProgress(parent, board).complete).toBe(0);
-    expect(conceptBuildWait(items[2]!, board)).toBe('Waiting for provider-confirmed merge.');
+    expect(conceptBuildWait(items[2]!, board)).toBe('Waiting for merge');
     parent.conceptBuild!.members[2]!.complete = true;
     expect(conceptBuildProgress(parent, board)).toMatchObject({ complete: 1, waiting: 1 });
 });
@@ -58,9 +58,9 @@ test('separates active work, capacity waits and PR merge waits, using confirmed 
 test('names paused runs, gate holds and scheduler failures ahead of a capacity wait', () => {
     const { items, board } = data('paused');
 
-    expect(conceptBuildWait(items[1]!, board)).toContain('Paused');
+    expect(conceptBuildWait(items[1]!, board)).toBe('Paused');
     items[1]!.passingBrief = false;
-    expect(conceptBuildWait(items[1]!, board)).toContain('approved gate');
+    expect(conceptBuildWait(items[1]!, board)).toBe('Needs a fresh approval');
     board.autoBuildPass = { paused: { Waiting: 'Fix access.' }, wouldStart: 0, waitsForRefinement: [] };
     expect(conceptBuildWait(items[1]!, board)).toBe('Start paused: Fix access.');
 });

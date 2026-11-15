@@ -105,8 +105,9 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
         !writeAccessProblem(repo.repo, 'tag-ticket', access, safety) &&
         (read.labels.length > 0 || !writeAccessProblem(repo.repo, 'manage-labels', access, safety));
 
+    // On the details panel's one rhythm (DraftFields): 16px between fields.
     return (
-        <Stack>
+        <Stack space="section">
             {read.problems.length > 0 && (
                 <Text variant="caption" tone="muted" role="status">
                     Some issue options couldn’t be read. You can still submit the title and description.

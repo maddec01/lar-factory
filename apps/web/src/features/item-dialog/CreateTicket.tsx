@@ -1,4 +1,4 @@
-import { writeAccessProblem, type Item } from '@lar-factory/shared';
+import { onAzure, writeAccessProblem, type Item } from '@lar-factory/shared';
 import { Alert, Button, FormFieldset, Inline, Stack, Text } from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react';
@@ -62,14 +62,18 @@ export function CreateTicket({ item }: { item: Item }) {
         return (
             <Button
                 ref={trigger}
-                {...buttonKind('other')}
+                // A quiet control, as the sidebar's other properties are values, not calls to act.
+                {...buttonKind('control')}
                 data-create-ticket={item.id}
+                title={
+                    item.repo && onAzure(item.repo) ? 'Create a work item in Azure DevOps' : 'Create an issue on GitHub'
+                }
                 onClick={() => {
                     setRead(null);
                     setOpen(true);
                 }}
             >
-                Create issue
+                Create
             </Button>
         );
 

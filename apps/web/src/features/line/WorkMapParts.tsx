@@ -17,28 +17,30 @@ import {
 import { statusStateColors } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
-import type { Part, PartActivity, PartKind } from './DossierParts';
-import { DECISION_KINDS, isDone, openWaits, partActivity, partLabel, threadsOf, waitText } from './DossierParts';
+import { ActivityLine } from './ActivityLine';
+import type { Part, PartKind } from './DossierParts';
+import { DECISION_KINDS, isDone, openWaits, partActivity, partLabel, threadsOf } from './DossierParts';
+import { ACTIVITY_WORD, GATE_WORDS, partDetail, RUNS } from './MapCardFacts';
 import { PartStart } from './PartStart';
+import { partState } from './PartState';
 import { lastSeen } from './StageStatus';
-import { NODE_H } from './WorkMapLayout';
+import { useActivityState } from './useActivityState';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     CardActions,
-    conceptBuildWait,
     HumanWaitAction,
     AzureFields,
     ItemStatusGlyph,
     ItemTitle,
     OpenThread,
     SliceBar,
-    SourceIcon,
     StatusGlyph,
     useActivityUnavailable,
     useShownStatus,
     STATUS_COLOR,
     workflowSteps,
     stepName,
+    SourceIcon,
     checksWord,
     prChecks,
 } from '@/features/items';
@@ -59,7 +61,7 @@ function PartKindLabel({ kind }: { kind: PartKind }) {
     return <DesignPartKindLabel kind={kind}>{partLabel(kind)}</DesignPartKindLabel>;
 }
 
-/** Another repository's identity, its project icon and name together; the corner's source icon says where the ticket lives instead. */
+/** A repository's identity, its project icon and name together, as a lane's label and a history row name it. */
 export function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) {
     return (
         <DesignRepoIdentity
@@ -72,42 +74,25 @@ export function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) 
     );
 }
 
-const ACTIVITY_WORD: Record<PartActivity['kind'], string | null> = {
-    'needs you': 'Question',
-    working: 'Working',
-    'child waiting': 'Child waiting',
-    stopped: 'Run stopped',
-    finished: 'Run finished',
-    none: null,
-};
-/** The statuses where a finished run is news: work it should still be doing. */
-const RUNS: string[] = ['Shaping', 'In progress', 'Review'];
-
-/** What runs below a part now, and any slice held up: its active slices, else its child or background work. */
-function partDetail({ item }: Part, { kind, thread }: PartActivity): string[] {
-    const active = item.slices.filter((s) => s.progress === 'active').length;
-    const blocked = item.slices.filter((s) => s.progress === 'blocked').length;
-
-    return [
-        ...(active
-            ? [`${plural(active, 'slice')} active`]
-            : kind === 'working' && thread?.hasRunningChildren
-              ? ['child work running']
-              : []),
-        ...(blocked ? [`${plural(blocked, 'slice')} blocked`] : []),
-    ];
-}
-
-export function PartNode({ part, data, width, home }: { part: Part; data: BoardData; width: number; home: string }) {
+export function PartNode({
+    part,
+    data,
+    width,
+    height,
+    home,
+    history,
+}: {
+    part: Part;
+    data: BoardData;
+    width: number;
+    /** The map's card height, which its tallest card needs. */
+    height: number;
+    home: string;
+    /** The finished parts it followed, counted and named, for its tooltip rather than a label over every column. */
+    history?: string | undefined;
+}) {
     const { item } = part;
     const record = projectWorkMap([item]).nodes[0]!;
-    const recordState = [
-        item.partOrder ? `Part ${item.partOrder}` : null,
-        record.queued ? (item.status === 'Queued' ? 'Queued' : null) : 'Not queued',
-        record.gate === 'not applicable' ? null : `Gate ${record.gate}`,
-    ]
-        .filter(Boolean)
-        .join(' · ');
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
     const open = openWaits(part);
     const complete = isDone(item);
@@ -120,6 +105,23 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const wait = humanWait(item, unavailable, data.items);
     const asks = !!wait;
     const attention = asks ? 'asks' : open.length ? 'waits' : 'default';
+    // Its one state, in the words its parts list row says: a question, else what holds it ("Blocked by Part 15"), else
+    // the presenter's stage word. The head shows no stage word of its own, so the card never says two things.
+    const status = wait && !complete ? wait.label : partState(item, data, shown.stageWord);
+    const held = /^(Blocked|Waits on|Waiting)/.test(status);
+    // Its lane names its project; a decision made in another project names that one under its title, beside the queue
+    // and gate facts its work record holds.
+    const otherProject = DECISION_KINDS.includes(part.kind) && repoKey(item) !== home;
+    const recordState = [
+        record.queued ? null : 'Not queued',
+        record.gate === 'not applicable' ? null : GATE_WORDS[record.gate],
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    // While its thread is at work, what it does now takes a line of its own, as its parts-list row shows it.
+    const activityState = useActivityState(item);
+    // Blocked or waiting on other work, its step and track go quiet so the foot's "Blocked by #139" is its state.
+    const quiet = !complete && !asks && (held || attention === 'waits');
     let action: ReactNode = null;
 
     if (complete) action = null;
@@ -128,8 +130,6 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
 
     // Each card has one labelled thread action. Only a current question asks for an answer.
     const opensThread = threadsOf(item).length > 0 && !action;
-    // The node says what its thread does beside its status, so the status leaves that out.
-    const status = complete ? 'Complete' : wait ? wait.label : (conceptBuildWait(item, data) ?? shown.stageWord);
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
     // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
     const word =
@@ -143,20 +143,15 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                   ? null
                   : ACTIVITY_WORD[activity.kind];
     const seen = word && activity.thread ? lastSeen(activity.thread) : '';
-    // One waiting reason: a question, else what blocks it, else a blocked slice over a waiting child.
-    const waits = !asks && open.length ? `Waiting on ${waitText(item, open)}` : null;
     const detail = partDetail(part, activity);
     const heldBySlice = activity.kind === 'child waiting' && item.slices.some((s) => s.progress === 'blocked');
-    // One fact once: a run says In progress already, and an activity the status says, or that the wait replaces, is left out.
-    const facts = waits
-        ? status.startsWith('Blocked')
-            ? [status]
-            : [status, waits]
-        : [
-              ...(status === 'In progress' && activity.kind === 'working' ? [] : [status]),
-              ...(word && word !== status && !heldBySlice ? [`${word}${seen}`] : []),
-              ...detail,
-          ];
+    // One fact once: a run says In progress already, and an activity the status already says is left out; what its
+    // thread does always shows, held or not.
+    const facts = [
+        ...(status === 'In progress' && activity.kind === 'working' ? [] : [status]),
+        ...(word && word !== status && !heldBySlice ? [`${word}${seen}`] : []),
+        ...detail,
+    ];
     // The head's checks already say how the pipeline stands, so a fact about the checks would say it twice.
     const state = facts.filter((fact) => !(checks && fact.startsWith('Checks '))).join(' · ');
 
@@ -164,8 +159,9 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
         <MapPartNode
             id={item.id}
             width={width}
-            height={NODE_H}
+            height={height}
             attention={attention}
+            held={quiet}
             track={
                 checks ? (
                     // In review the PR's checks are what move, as on a desk card: its step, the PR's mark and its checks.
@@ -176,7 +172,11 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                             steps={steps.length}
                             at={at}
                             color={
-                                shown.progressState ? statusStateColors[shown.progressState] : STATUS_COLOR[item.status]
+                                quiet
+                                    ? statusStateColors.off
+                                    : shown.progressState
+                                      ? statusStateColors[shown.progressState]
+                                      : STATUS_COLOR[item.status]
                             }
                             label={`Step ${at + 1} of ${steps.length}: ${steps[at]}`}
                             step={stepName(steps[at]!)}
@@ -194,7 +194,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             }
             picked={isPicked}
             openLabel={`Open ${ref(item)}`}
-            title={`${itemName(item)} · ${state}`}
+            title={[itemName(item), ...facts, history].filter(Boolean).join(' · ')}
             onOpen={() => useItemDialogStore.getState().open(item.id)}
             source={<SourceIcon item={item} corner />}
             head={
@@ -202,10 +202,6 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                     <PartKindLabel kind={part.kind} />
                     <AzureFields azure={item.azure} />
                 </>
-            }
-            repository={
-                DECISION_KINDS.includes(part.kind) &&
-                repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />
             }
             // A card's action reads as a desk card's: named, outlined, never the rows' icon-only form.
             action={
@@ -216,7 +212,11 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             name={<ItemTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
+            // A ticket's #number leads its title; a part without one says its part number under it.
+            reference={!item.number && item.partOrder ? `Part ${item.partOrder}` : ''}
+            repository={otherProject && <RepoIdentity repo={repoKey(item)} data={data} />}
             recordState={recordState}
+            activity={!complete && activityState && <ActivityLine item={item} />}
             waitReason={record.waits.join(' · ')}
             slices={!checks && item.slices.length > 0 && <SliceBar item={item} />}
         />
@@ -251,11 +251,21 @@ export function HistoryRow({ part, after, data, home }: { part: Part; after: Par
     );
 }
 
-export function CheckNode({ check, width, after }: { check: EndToEndCheck; width: number; after: string }) {
+export function CheckNode({
+    check,
+    width,
+    height,
+    after,
+}: {
+    check: EndToEndCheck;
+    width: number;
+    height: number;
+    after: string;
+}) {
     return (
         <MapCheckNode
             width={width}
-            height={NODE_H}
+            height={height}
             label="Outcome check"
             title={check.title}
             glyph={<StatusGlyph status="Queued" size="sm" />}

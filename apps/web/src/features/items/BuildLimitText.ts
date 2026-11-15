@@ -1,8 +1,9 @@
 // The builds that count toward the build limit and what each is doing, from the one item-state presenter, so the Build
 // heading, the title bar's Building counter and the rows under them say the same, in numbers a reader can add up.
-// Capacity and execution are different: recorded builds count toward the shared limit even while idle.
+// Capacity and execution are different: recorded builds count toward the shared limit even while idle, and a build at
+// work the records don't hold takes no slot, so the count names it apart ("0 of 2 build slots · 2 more working").
 
-import { buildsAtWork, limitNumber } from '@lar-factory/shared';
+import { buildsAtWork, limitNumber, plural } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import { useBoardUnavailable, useItemStates } from './ItemState';
@@ -50,17 +51,28 @@ export function useBuilds(): {
     const items = buildsAtWork(data, unavailable);
     const shown = items.map(states);
     const limit = data.buildLimit && limitNumber(data.buildLimit);
+    // Builds at work that hold no slot, such as work the board has no record of starting: the count says them apart,
+    // so "0 of 2 build slots" never sits over rows that say Working with nothing to explain it.
+    const counted = new Set(items.map((item) => item.id));
+    const atWork = (state: ItemState) => state.running || state.execution === 'working' || state.word === 'Working';
+    const unslotted = data.items.filter(
+        (item) => !counted.has(item.id) && BUILD_STATUSES.includes(item.status) && atWork(states(item)),
+    ).length;
+    const more = unslotted ? ` · ${unslotted} more working` : '';
 
     return {
         items,
         running: shown.filter((state) => state.running).length,
         limit,
-        text: buildsAgainstLimit(shown, limit),
+        text: `${buildsAgainstLimit(shown, limit)}${unslotted ? `; ${plural(unslotted, 'more build')} working without a slot, which the board's records don't hold` : ''}`,
         occupancy:
             limit === undefined
-                ? `${items.length} building`
+                ? `${items.length} building${more}`
                 : items.length > limit
-                  ? `${items.length} building · ${items.length - limit} over the limit`
-                  : `${items.length} of ${limit} build slots`,
+                  ? `${items.length} building · ${items.length - limit} over the limit${more}`
+                  : `${items.length} of ${limit} build slots${more}`,
     };
 }
+
+/** The statuses of a build under way, whose rows sit in the Build lane. */
+const BUILD_STATUSES: readonly Item['status'][] = ['In progress', 'Review', 'Verify', 'Ready to merge'];

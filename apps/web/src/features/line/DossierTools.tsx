@@ -22,17 +22,15 @@ export function ViewToggle({ view, onView }: { view: View; onView: (v: View) => 
     );
 }
 
-/** Where the concept's planning lives, as a quiet label; hovering or focusing it reads the whole note. */
+/** A concept whose planning on this Mac failed to save speaks up beside its title; planning kept on this Mac as usual
+ *  says so only in the source mark's tooltip, so the line doesn't shift when the row opens. */
 export function LocalPlanning({ item }: { item: Item }) {
-    if (!item.sync || item.sync.state === 'saved') return null;
+    if (item.sync?.state !== 'error' && item.sync?.state !== 'conflict') return null;
 
     const note = ['Planning is saved on this Mac.', item.sync.message].filter(Boolean).join(' ');
 
     return (
-        <PlanningNote
-            note={note}
-            role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : 'note'}
-        >
+        <PlanningNote note={note} role="status">
             On this Mac
         </PlanningNote>
     );

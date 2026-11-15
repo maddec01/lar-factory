@@ -1,2 +1,3 @@
-export { ArchiveActions, RetentionSetting } from './Archive';
-export { archivedAs } from './ArchivedStatus';
+export { RetentionSetting } from './Archive';
+export { ArchiveActions } from './ArchiveActions';
+export { archivedAs, archiveSection } from './ArchivedStatus';

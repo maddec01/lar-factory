@@ -35,10 +35,13 @@
 }
 
 /* Your desk's cards: four across, each an even amber tint with a hairline of its tone and the cards' 12px radius, so
-   what waits on you is the board's one warm surface. A hovered card warms a little. */
+   what waits on you is the board's one warm surface. A hovered card warms a little. Cards in a row stretch to the
+   tallest, everything they say kept, and every card's foot (its wait word and action) sits at its bottom, so the feet of
+   a row share one baseline. */
 .desk-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    align-items: stretch;
     gap: --spacing(3);
 }
 @media (width >= 80rem) {
@@ -60,9 +63,17 @@
     cursor: pointer;
 }
 
+/* A card's action reads on one line whether it is a button or a link (Open PR, Review failed checks), so their labels
+   share the UI text's line height and sit on the same baseline across a row of cards. */
+.desk-tile [data-col='side'] [data-slot='button'],
+.desk-tile [data-col='side'] [data-slot='dropdown-trigger'] {
+    line-height: var(--text-ui--line-height);
+}
+
 /* The board's one card, on Your desk and in a concept's work map alike: the cards' 12px radius, a hairline, and a
    thicker bar down its leading edge in the colour of what it needs (amber waits on you, the accent works, green is
-   done); a card that waits on you takes an even amber tint too, and one held by other work a dashed edge. */
+   done); a card that waits on you takes an even amber tint too, and one held by other work a thin dashed edge, with no
+   bar, a step firmer than the hairline so its dashes read on a white card yet stay quiet. */
 .board-card {
     position: relative;
     overflow: hidden;
@@ -89,7 +100,7 @@
 }
 .board-card[data-card-tone='held'] {
     border-style: dashed;
-    border-color: var(--color-line-strong);
+    border-color: var(--color-line-control);
 }
 
 /* The confirmation includes the full provider URL and source revision. */
@@ -219,6 +230,12 @@ aside[data-item-aside]:empty {
     margin-inline: calc(-1 * --spacing(3));
 }
 
+/* An item opened from the List takes its place: the List stays open under the item's backdrop, hidden, so a shorter
+   item dialog never shows its rows around its edges, and it comes back as the item closes. */
+[data-list-modal][data-under-item] {
+    visibility: hidden;
+}
+
 /* A dialog footer with nothing to do takes no band: the ticket's link lives beside its project in the sidebar. */
 [data-slot='modal-footer']:not(:has(button, a)) {
     display: none;
@@ -260,4 +277,104 @@ aside[data-item-aside]:empty {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+}
+
+/* A map card's title takes up to three lines, so a long one reads whole rather than leaving a blank band over the foot;
+   the card's tighter top and bottom make the room within its fixed height (MAP_NODE_HEIGHT). */
+[data-map-part].desk-tile {
+    padding-block: --spacing(2);
+}
+/* The source tab sits in the card's top right corner (SourceIcon's `corner`, 8px in and 20px wide), so the head ends 8px
+   short of it and its track never runs under the tab. */
+[data-map-part] [data-card-head] {
+    padding-right: calc(--spacing(2) + --spacing(5) + --spacing(2) - (--spacing(4) - 1px));
+}
+/* A card held by other work keeps its step and track in the muted text and the neutral state colour (WorkMapParts), so
+   its foot ("Blocked by #139") reads as its one state while the head stays readable. */
+/* A card's thread activity keeps to one line: its words give way first, ending in an ellipsis, with its age and agents
+   beside them; the line's tooltip says it in full. */
+[data-map-activity] [data-activity] {
+    flex-wrap: nowrap;
+}
+[data-map-part] [data-title] {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+[data-map-part]:has([data-map-slices]) [data-title] {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+/* A map card's foot shows one thing at a time, so neither is clipped: its state at rest, and its action in the state's
+   place, from the state's left edge, on hover, focus or while its menu is open, as a row's action takes its state's
+   place. Without a pointer that hovers, the action stays. */
+[data-map-part] :has(> [data-col='side']) {
+    position: relative;
+}
+[data-map-part] [data-col='side'] {
+    position: absolute;
+    /* Below the foot's top padding, so the action sits where the state does. */
+    inset-block: --spacing(1) 0;
+    left: 0;
+    max-width: 100%;
+}
+[data-map-part] [data-col='side']:empty {
+    display: none;
+}
+@media (hover: hover) {
+    [data-map-part] :is([data-col='side'], [data-col='state']) {
+        transition: opacity var(--motion-duration-fast) var(--ease-standard);
+    }
+    [data-map-part] [data-col='side'] {
+        opacity: 0;
+    }
+    [data-map-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])) [data-col='side'] {
+        opacity: 1;
+    }
+    [data-map-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])):has([data-col='side'] > *)
+        [data-col='state'] {
+        opacity: 0;
+    }
+}
+@media (hover: none) {
+    [data-map-part]:has([data-col='side'] > *) [data-col='state'] {
+        visibility: hidden;
+    }
+}
+
+/* Hovering a map card lights its arrows; the cards at their other ends take the muted text colour as their edge, so the
+   related work stands out while every card stays readable. */
+[data-map-related] .board-card {
+    border-color: var(--color-fg-muted);
+}
+
+/* A title-bar counter's list (shipped, spend, need you…) is 30rem wide on a desktop window, past the status popover's
+   24rem, so a row's title keeps the end that tells it from its neighbours; it never runs past the window. */
+[role='dialog']:has([data-counter-list]) {
+    width: min(30rem, calc(100vw - 2rem));
+}
+/* It takes focus as it opens, so its title names it, without a ring around the whole panel. */
+[role='dialog']:has([data-counter-list]):focus-visible {
+    outline: none;
+}
+/* Its rows are two or three lines tall, so its fade is a short edge cue: 1rem, under the 1.5rem every popover's list
+   has, which leaves the last row it shows readable while the list plainly goes on past it. */
+[data-scroll-fade]:has(> [data-counter-list]) {
+    scroll-padding-block: 1rem;
+    mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black min(1rem, var(--scroll-fade-top, 0px)),
+        black calc(100% - min(1rem, var(--scroll-fade-bottom, 0px))),
+        transparent
+    );
+}
+[data-scroll-fade]:has(> [data-counter-list]):focus-visible {
+    mask-image: none;
+}
+
+/* A part in the concept's own project names it too, quieter than a project of its own, so every parts-list row has its
+   project and none reads with a gap. */
+[data-part-meta] > [data-repo-cell][data-repo-home] {
+    color: var(--color-fg-muted);
 }

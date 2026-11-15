@@ -105,7 +105,9 @@ test('a ready concept has one group start per surface and its parts retain manua
     const row = $(`[data-dossier="${concept.id}"]`)!;
 
     await settle(() => row.querySelector<HTMLButtonElement>('[data-dossier-open]')!.click());
-    expect([...row.querySelectorAll('button')].filter((b) => text(b) === 'Start concept builds')).toHaveLength(1);
+    // The row offers the run in one short word; its title says the whole action.
+    expect([...row.querySelectorAll('button')].filter((b) => text(b) === 'Build all')).toHaveLength(1);
+    expect(row.querySelector('[data-concept-build-action] button')?.getAttribute('title')).toBe('Start concept builds');
     expect([...row.querySelectorAll('button')].some((b) => text(b) === 'Build')).toBe(true);
 
     const { useItemDialogStore } = await import('./ItemDialogStore');
@@ -114,14 +116,14 @@ test('a ready concept has one group start per surface and its parts retain manua
 
     const dialog = $('[data-item-dialog]')!;
 
-    expect(text(dialog)).toContain('0 of 3 builds done');
+    expect(text(dialog.querySelector('[data-concept-delivery]'))).toContain('0/3 builds done');
     expect(text(dialog)).not.toContain("Its build isn't Done.");
     expect(text(dialog)).not.toContain('With parts');
     expect([...dialog.querySelectorAll('button')].filter((b) => text(b) === 'Start concept builds')).toHaveLength(1);
     expect(text(dialog.querySelector('[data-slot="modal-footer"]'))).not.toContain('Start build');
 });
 
-test('compact disabled starts show their hold next to the action', async () => {
+test('a held run offers no start in the row; its holds read in the dialog', async () => {
     await show({
         run: null,
         holds: [{ workId: 'd', reason: 'Its confirmed answer is missing.' }],
@@ -138,13 +140,13 @@ test('compact disabled starts show their hold next to the action', async () => {
         ],
     });
 
-    const action = $('[data-concept-build-action]')!;
+    expect($('[data-dossier] [data-concept-build-action]')).toBeNull();
 
-    expect(text(action.querySelector('summary'))).toBe('Waiting on 1 decision');
-    expect(action.querySelector('details')?.open).toBe(false);
-    await settle(() => action.querySelector('summary')!.click());
-    expect(action.querySelector('details')?.open).toBe(true);
-    expect(text(action)).toContain('Its confirmed answer is missing.');
+    const run = $('[data-item-dialog] [data-concept-build-run]')!;
+
+    expect(text(run.querySelector('summary'))).toBe('Waiting on 1 open decision');
+    await settle(() => run.querySelector('summary')!.click());
+    expect(text(run)).toContain('Its confirmed answer is missing.');
 });
 
 test.each(['running', 'paused'] as const)('the %s concept header describes the run', async (state) => {
@@ -261,9 +263,9 @@ test('the concept shows active builds, total progress and an explicit capacity w
         },
         parts,
     );
-    expect(text($('[data-concept-build-progress]'))).toBe('1 building · 1 waiting · 0/2 complete');
+    expect(text($('[data-concept-build-progress]'))).toBe('1 building · 1 waiting');
     expect($('[data-concept-build-run]')!.querySelectorAll('[role="status"]')).toHaveLength(1);
-    expect(text($('[data-concept-parts]'))).toContain('Waiting for shared build capacity.');
+    expect(text($('[data-concept-parts]'))).toContain('Waiting for a build slot');
 });
 
 test.each([
@@ -321,7 +323,7 @@ test.each([
     const actions = [...$('[data-concept-build-run]')!.querySelectorAll('button')].map(text);
 
     expect(actions).toEqual(label ? [label] : []);
-    expect(text($('[data-concept-build-progress]'))).toContain(`2 building · ${waiting ? 1 : 0} waiting`);
+    expect(text($('[data-concept-build-progress]'))).toBe(waiting ? '2 building · 1 waiting' : '2 building');
 
     if (!label) expect($('[data-concept-build-action]')).toBeNull();
 });

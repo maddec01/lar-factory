@@ -47,7 +47,13 @@ export function StagePane({
     const headingId = `${id}-h`;
 
     return (
-        <section data-stage={id} data-empty={collapsed || undefined} aria-labelledby={headingId} className="min-w-0">
+        <section
+            data-stage={id}
+            data-empty={collapsed || undefined}
+            aria-labelledby={headingId}
+            // Collapsed lanes one after another sit closer, as header lines in a list, keeping their controls.
+            className={`min-w-0 ${collapsed ? '[[data-empty]+&]:-mt-2' : ''}`}
+        >
             <header className="flex min-h-9 items-center py-1 pr-3 pl-4">
                 <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <SectionTitle id={headingId} level="h3" title={title} icon={glyph} count={count} />

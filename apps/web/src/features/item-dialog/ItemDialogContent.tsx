@@ -7,7 +7,7 @@ import { Modal } from '@lar-works/design-system';
 
 import { canStopShaping } from './can-stop-shaping';
 import { CompleteReleaseStep } from './CompleteReleaseStep';
-import { ConceptParts } from './ConceptParts';
+import { ConceptParts, ConceptWork } from './ConceptParts';
 import { isGroupParent } from './group-parent';
 import { ItemAside } from './ItemAside';
 import { ItemComments } from './ItemComments';
@@ -21,6 +21,7 @@ import { RecordText } from './RecordText';
 import { hasRelations } from './Relations';
 import { RetroFollowups } from './RetroFollowups';
 import { StopShaping } from './StopShaping';
+import { useConceptTotal } from './useConceptTotal';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import { useMovesItem } from './useMovesItem';
 import {
@@ -36,7 +37,7 @@ import {
     StartAfterError,
     StartMessage,
 } from '@/features/items';
-import { ItemAgents, isDone, partsOf } from '@/features/line';
+import { ItemAgents, isDone, partRef, partsOf } from '@/features/line';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 import {
@@ -92,12 +93,35 @@ export function ItemDialogContent({
     const moves = useMovesItem(item, data);
     // A question's or pull request's notice carries the main action beside its words, so the footer doesn't repeat it.
     const noticeActs = useNoticeTakesAction(item) && !item.setAside;
+    // A concept's own figures say whose they are only beside its total with its parts.
+    const total = useConceptTotal(item);
+
+    // A group's record is its map, the long read, after its parts; while its briefs wait for the user's approval, the
+    // review leads instead.
+    const groupRecord = record && (record.body?.trim() || record.answer?.trim()) && (
+        <RecordText
+            item={item}
+            record={record}
+            refresh={refresh}
+            spec={read.state === 'loaded' && Boolean(read.details.spec)}
+        />
+    );
+    // The same briefs the record offers to approve: build work, not decisions, that hasn't passed and isn't sent back.
+    const reviewFirst = data.items.some(
+        (part) =>
+            part.parentId === item.id &&
+            part.passingBrief === false &&
+            !part.briefChangesRequested &&
+            !['concept', 'decision', 'slice'].includes(part.kind) &&
+            part.status !== 'Done',
+    );
 
     return (
         <Modal.Content
-            title={`${itemName(item)}`}
+            title={partRef(item) ? `${partRef(item)} ${item.title}` : itemName(item)}
             presentation="workspace"
-            fitsContent={read.state !== 'loading' && !fill}
+            // Sized to what it shows, loading or not, so a loading line never sits over a full-height empty sheet.
+            fitsContent={!fill}
             data-item-dialog
             expanded={expanded}
             focusFirstField={false}
@@ -130,18 +154,13 @@ export function ItemDialogContent({
                                     <RetroFollowups item={item} />
                                 </>
                             )}
-                            {group && record && (record.body?.trim() || record.answer?.trim()) && (
-                                <RecordText
-                                    item={item}
-                                    record={record}
-                                    refresh={refresh}
-                                    spec={read.state === 'loaded' && Boolean(read.details.spec)}
-                                />
-                            )}
+                            {/* A group leads with where its work stands, its parts and then its builds; its map, the long
+                                read, follows them. */}
+                            {group && reviewFirst && groupRecord}
+                            {group && <ConceptParts item={item} data={data} openPart={openPart} read={read} />}
                             {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && (
                                 <ConceptBuild item={item} />
                             )}
-                            {group && <ConceptParts item={item} data={data} openPart={openPart} />}
                             <ReleaseProgress
                                 outcomeControls={
                                     !item.setAside && (
@@ -157,6 +176,7 @@ export function ItemDialogContent({
                                 name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
                             />
                             {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
+                            {group && !reviewFirst && groupRecord}
                             {record && !group && (
                                 <RecordText
                                     item={item}
@@ -193,15 +213,14 @@ export function ItemDialogContent({
                             read={read}
                             refresh={refresh}
                             relations={aside}
+                            openPart={openPart}
                             lead={
                                 <>
-                                    <ItemSummary item={item} />
+                                    <ItemSummary item={item} openPart={openPart} />
                                     <AsideFigures>
-                                        <AgentWork
-                                            rows
-                                            item={item}
-                                            label={item.kind === 'concept' ? 'Direct work' : undefined}
-                                        />
+                                        {/* A concept's own figures, then its total with its parts, each named. */}
+                                        <AgentWork rows item={item} label={total ? 'This concept' : undefined} />
+                                        <ConceptWork item={item} />
                                         {(!group || item.usageState === 'loading' || item.usageState === 'failed') && (
                                             <AgentWorkNote item={item} />
                                         )}
@@ -218,8 +237,9 @@ export function ItemDialogContent({
                 leading={
                     (moves || canStopShaping(item)) && (
                         <DialogActions presentation="leading">
-                            <StopShaping item={item} />
+                            {/* Abandon first, so it keeps one place whatever else shows. */}
                             <MoveActions item={item} data={data} />
+                            <StopShaping item={item} />
                         </DialogActions>
                     )
                 }

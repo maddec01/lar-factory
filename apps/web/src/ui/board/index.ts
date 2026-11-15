@@ -7,10 +7,11 @@ export {
     DraftFields,
     DraftTicketPart,
     PanelField,
+    PanelPicker,
     TicketSearch,
     TicketSearchPane,
 } from './AddItem';
-export { ActionStack, SettingConfirm, SettingLastRun } from './Archive';
+export { ActionStack, ArchiveLine, SettingConfirm, SettingLastRun } from './Archive';
 export { scrollBoardToTop } from './BoardScroll';
 export { BoardContent, BoardShell, ReadingLine } from './BoardShell';
 export { BoardTitleBar, type RefreshHealth, RefreshIndicator } from './BoardTitleBar';
@@ -32,7 +33,7 @@ export {
 export { noteBoardPlaces } from './BoardLife';
 export { bringDeskIntoView, DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
-export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote } from './List';
+export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote, ListResults, ListRowGrid } from './List';
 export { LoadingScreen } from './LoadingScreen';
 export { ReleaseNotes, UpdatePill } from './UpdatePill';
 export { BoardWarning, BoardWarnings, ToolMissing } from './Warnings';
@@ -71,6 +72,7 @@ export {
 export { ItemFields, ItemTitle, RepoIdentity, TitleLink } from './ItemParts';
 export { NeedsYouNotice, NeedsYouResult } from './NeedsYou';
 export { PartKindIcon, PartKindLabel, PartRow, PartsList, PartWaits, ShowDoneToggle, ThreadLine } from './PartsList';
+export { PartColumnsRow } from './PartColumns';
 export {
     ChecksState,
     PullRequestList,
@@ -123,6 +125,7 @@ export { EarlierThread, EarlierThreadList } from './Threads';
 export {
     HistoryRow,
     MAP_NODE_HEIGHT,
+    measureMapCards,
     MapBand,
     MapCanvas,
     MapCheckNode,
@@ -159,7 +162,9 @@ export {
     CheckRun,
     ChipGroup,
     DetailFact,
+    DetailsLoading,
     DetailsSection,
+    DetailsUnavailable,
     EditActions,
     EditorSlot,
     FactList,
@@ -168,7 +173,6 @@ export {
     InlineList,
     KindQuestion,
     LabelEditorPanel,
-    MainColumnSlot,
     MainSection,
     MetaArea,
     OutgoingTicket,
@@ -178,6 +182,8 @@ export {
     TextSection,
     TicketLink,
     TicketLinkList,
+    TicketLinkPlaceholders,
+    TrackerTag,
     WaitsOnList,
 } from './ItemDetails';
 export {
@@ -190,7 +196,7 @@ export {
     WorkflowSteps,
 } from './ItemProgress';
 export { ProjectIcon, type ProjectIconSize, type ProjectIconSource } from './ProjectIcon';
-export { OpenSettingsButton } from './Settings';
+export { OpenSettingsButton, SettingsRowOpen } from './Settings';
 export { CreateLabelForm, TrackerLabelEditor, TrackerLabelList, TrackerLabelRow } from './TrackerLabels';
 export { VocabularyMore, VocabularyRow, VocabularySuggestion } from './Vocabulary';
 export {

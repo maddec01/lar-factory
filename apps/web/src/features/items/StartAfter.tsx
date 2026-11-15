@@ -11,12 +11,13 @@ import {
     openBlockerRefs,
     openBlockers,
     ref,
+    startAfterRef,
     startHold,
     startRequest,
 } from '@lar-factory/shared';
 import { Button, DropdownMenu } from '@lar-works/design-system';
 import { ChevronDownIcon } from '@lar-works/design-system/icons';
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactElement } from 'react';
 import { flushSync } from 'react-dom';
 
 import { writeState } from './ActionAvailability';
@@ -30,8 +31,8 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { ActionError, StartAfterButton, StartLine, StartHold, useButtonKind } from '@/ui/board';
 
-/** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
-const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
+/** The open blocker Start after waits for in full, the last one when several are open; null once none is. */
+const startsAfter = (item: Item): string | null => openBlockerRefs(item).at(-1) ?? null;
 
 /** What the title says Start after waits for: every open blocker's work, and the user's mark on each unmet Dependency. */
 function waitsFor(item: Item): string {
@@ -58,7 +59,7 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
     });
 }
 
-/** Start after #n, or Starts after #n ✓ while armed, a Start. */
+/** Start after #n (or Part n, or Start when unblocked), or Starts after #n ✓ while armed, a Start. */
 function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: StartKind }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
@@ -69,7 +70,8 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
     if (!after) return null;
 
     const armed = !!data.armed?.[item.id];
-    const { label } = startActionChoice(item, kind, { prerequisite: after, armed });
+    // The button names it shortly (#n, Part n, or when unblocked); its tooltip names every blocker in full.
+    const { label } = startActionChoice(item, kind, { prerequisite: startAfterRef(item, data.items), armed });
     const writes = pending ? { 'aria-disabled': true as const } : writeState(data);
     const held = Boolean(writes['aria-disabled']);
     const run = async (choice: ModelChoice | undefined | null) => {
@@ -142,8 +144,8 @@ const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does its
  * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
  * it. While a blocker holds it, Start after takes its place. While only the repository holds it, Start shows
- * disabled, with the hold's reason beside it; an armed start would fail then, so none is offered, but one armed
- * before the hold still shows while a blocker is open, so it can be disarmed. Beside text that names the blockers,
+ * disabled, with the hold's reason beside it; an armed start would fail then, so a blocked item's Start after shows
+ * disabled with that reason, but one armed before the hold still shows while a blocker is open, so it can be disarmed. Beside text that names the blockers,
  * The action always names the work and prerequisite.
  */
 export function StartOrAfter({
@@ -151,11 +153,14 @@ export function StartOrAfter({
     data,
     kind = 'refine',
     linkedBeside,
+    captionReason = false,
 }: {
     item: Item;
     data: BoardData;
     kind?: StartKind;
     linkedBeside?: string | undefined;
+    /** Sets a hold's reason as a quiet caption beside it, as the dialog's footer does, not on a line under it. */
+    captionReason?: boolean;
 }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
@@ -166,6 +171,17 @@ export function StartOrAfter({
     if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} kind={kind} />;
 
     const hold = startHold(data, item.repo);
+
+    // Blocked and held by its repository too, it names what it starts after as every blocked start does, disabled, with
+    // the hold's reason beside it.
+    if (hold && openBlockers(item).length)
+        return (
+            <HeldStartAfter item={item} data={data} kind={kind} reason={hold}>
+                <StartHold id={reasonId} caption={captionReason}>
+                    {hold}
+                </StartHold>
+            </HeldStartAfter>
+        );
 
     if (!hold) return <StartControl item={item} data={data} kind={kind} linkedBeside={linkedBeside} />;
 
@@ -181,7 +197,52 @@ export function StartOrAfter({
             >
                 {label}
             </Button>
-            <StartHold id={reasonId}>{hold}</StartHold>
+            <StartHold id={reasonId} caption={captionReason}>
+                {hold}
+            </StartHold>
+        </>
+    );
+}
+
+/**
+ * Start after for blocked work that can't be armed yet, because its repository holds starts or builds lack access:
+ * disabled, in the words every blocked start uses ("Start after #139"), its title saying why. `children` is the reason
+ * as a line beside it, where the surface shows one; the button points at it as its description.
+ */
+export function HeldStartAfter({
+    item,
+    data,
+    kind,
+    reason,
+    children,
+    unavailable,
+}: {
+    item: Item;
+    data: BoardData;
+    kind: StartKind;
+    reason: string;
+    children?: ReactElement<{ id: string }> | undefined;
+    /** Set when build access holds it, as `data-build-unavailable`, as the disabled Build it replaces was marked. */
+    unavailable?: boolean;
+}) {
+    const kindOf = useButtonKind();
+    const onRow = useOnRow();
+    const { label } = startActionChoice(item, kind, { prerequisite: startAfterRef(item, data.items), armed: false });
+
+    return (
+        <>
+            <StartAfterButton
+                {...kindOf(onRow ? 'open' : 'main')}
+                leftIcon={ICON.play}
+                data-start={unavailable ? undefined : item.id}
+                data-build-unavailable={unavailable ? item.id : undefined}
+                disabled
+                title={reason}
+                aria-describedby={children?.props.id}
+            >
+                {label}
+            </StartAfterButton>
+            {children}
         </>
     );
 }

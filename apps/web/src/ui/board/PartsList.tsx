@@ -65,7 +65,11 @@ export function PartsList({
     return (
         <div className="grid gap-1">
             {/* One column of rounded rows, as a lane's, so a part reads as a row of work, not a card. */}
-            <ol className="m-0 grid list-none gap-0.5 p-0" data-parts-list>
+            {/* A concept dialog's PartColumnsRows share the list's columns, so their projects, costs and states line up. */}
+            <ol
+                className="m-0 grid list-none gap-0.5 p-0 has-[>[data-part-columns]]:grid-cols-[minmax(0,1fr)_auto_auto_auto] has-[>[data-part-columns]]:gap-x-3"
+                data-parts-list
+            >
                 {children}
             </ol>
             {showDone}
@@ -91,7 +95,7 @@ export function ShowDoneToggle({
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className="text-fg-muted hover:bg-fill-hover justify-self-start rounded-xs px-2 py-1 text-xs"
+            className="text-fg-muted hover:bg-fill-hover ml-1 justify-self-start rounded-xs px-2 py-1 text-xs"
         >
             {children}
         </button>
@@ -128,7 +132,7 @@ export function PartRow({
     name: ReactNode;
     /** Its kind, repository, track and status. */
     meta: ReactNode;
-    /** Its figures, such as cost, agent time and tokens, on their own line under its status. */
+    /** Its figures, such as its cost, on the row's one line in a fixed slot before its status. */
     usage?: ReactNode;
     /** What it asks next, beside the button. */
     action: ReactNode;
@@ -152,7 +156,7 @@ export function PartRow({
                     <span className="flex min-w-0 flex-1">{name}</span>
                     {/* Always its slot, so every part's state ends on one edge. */}
                     <span
-                        className="text-fg-soft ml-auto w-16 shrink-0 text-right text-xs tabular-nums"
+                        className="text-fg-soft ml-auto flex w-16 shrink-0 justify-end overflow-hidden text-right text-xs whitespace-nowrap tabular-nums"
                         data-part-usage
                     >
                         {usage}

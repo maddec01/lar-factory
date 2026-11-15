@@ -19,8 +19,8 @@ export function BoardIdle() {
                 title="Nothing in progress"
                 description={
                     listed
-                        ? 'Queue an item from List, or add one to List and queue it for shaping.'
-                        : 'Add work to List, then queue it for shaping.'
+                        ? 'Queue an item from the List, or add one to the List and queue it for shaping.'
+                        : 'Add work to the List, then queue it for shaping.'
                 }
                 actions={
                     <>
@@ -35,7 +35,7 @@ export function BoardIdle() {
                                 {...buttonKind('other', { size: 'md' })}
                                 onClick={() => useListStore.getState().setOpen(true)}
                             >
-                                Open List
+                                Open the List
                             </Button>
                         )}
                     </>

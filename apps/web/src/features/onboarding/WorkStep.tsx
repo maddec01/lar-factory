@@ -41,7 +41,7 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
         <SetupStep data-work-step presentation="form">
             <InsetPanel presentation="settings">
                 <FieldRow
-                    label="Show in List"
+                    label="Show on the List"
                     description={
                         !sources.length
                             ? 'refused' in detection.itemSources

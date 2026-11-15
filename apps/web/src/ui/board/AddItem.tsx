@@ -2,7 +2,7 @@
 // the panel's labelled fields and ticket part, the Create issue choice, and the Find a ticket pane with its search.
 
 import { FormResult, TitleBarLabel, Tooltip, TooltipPopup, TooltipTrigger, tabbable } from '@lar-works/design-system';
-import { SquarePenIcon } from '@lar-works/design-system/icons';
+import { ChevronDownIcon, SquarePenIcon } from '@lar-works/design-system/icons';
 import {
     ButtonBase as Button,
     FormFieldsetBase,
@@ -10,7 +10,7 @@ import {
     scrollFadeClassName,
     useScrollFade,
 } from '@lar-works/design-system/primitives';
-import type { KeyboardEvent, ReactNode, Ref } from 'react';
+import { type ComponentProps, forwardRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 
 import { buttonKind } from './ButtonKinds';
 import { DetailsHeading } from './ItemDetailSections';
@@ -124,7 +124,7 @@ export function DraftFields({
                     <aside
                         ref={detailsFadeRef}
                         aria-label={detailsLabel}
-                        className={`bg-surface-sunken @max-pane:overflow-visible my-4 mr-6 grid grid-cols-[minmax(0,1fr)] content-start gap-5 self-start overflow-y-auto rounded-xl p-4 ${scrollFadeClassName}`}
+                        className={`bg-surface-sunken @max-pane:overflow-visible my-4 mr-6 grid grid-cols-[minmax(0,1fr)] content-start gap-4 self-start overflow-y-auto rounded-xl p-4 ${scrollFadeClassName}`}
                     >
                         {details}
                     </aside>
@@ -133,6 +133,25 @@ export function DraftFields({
         </div>
     );
 }
+
+/** A details panel's picker that opens a popover, such as Add label: as wide and as tall as the selects above and below
+ *  it, its words at the start and its chevron at the end, as theirs are. A Popover's trigger (`asChild`) passes its
+ *  props through. */
+export const PanelPicker = forwardRef<HTMLButtonElement, Omit<ComponentProps<typeof Button>, 'className'>>(
+    function PanelPicker({ children, ...props }, ref) {
+        return (
+            <Button
+                ref={ref}
+                {...buttonKind('other', { size: 'md' })}
+                {...props}
+                rightIcon={<ChevronDownIcon />}
+                className="w-full justify-between font-normal"
+            >
+                {children}
+            </Button>
+        );
+    },
+);
 
 /**
  * A field of a details panel under its sentence-case `heading`, which labels the field `htmlFor` names; without
@@ -183,15 +202,15 @@ export function PanelField({
     );
 }
 
-/** The details panel's ticket part, ruled off from the fields above it: a ticket's own fields, or what a draft without
- *  one keeps. */
+/** The details panel's ticket part: a ticket's own fields, or what a draft without one keeps, on the panel's one 16px
+ *  rhythm between fields. */
 export function DraftTicketPart({
     children,
 }: {
     /** The ticket's own fields, or what a draft without one keeps. */
     children: ReactNode;
 }) {
-    return <div className="grid gap-3 pt-1">{children}</div>;
+    return <div className="grid gap-4">{children}</div>;
 }
 
 /** Create issue in the footer: its `checkbox`, then the `reason` it can't be ticked, kept to a readable width, and any

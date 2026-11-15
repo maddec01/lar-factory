@@ -49,6 +49,7 @@ export { ConceptBuild } from './ConceptBuild';
 export { HumanWaitAction } from './HumanWaitAction';
 export { ResumeRelease } from './ResumeRelease';
 
-export { conceptBuildWait } from './ConceptBuildProgress';
+export { partWait } from './ConceptBuildProgress';
+export { partRef } from './PartRef';
 export { SLOT_WAIT } from './ItemState';
 export { checksCount, checksWord, prChecks } from './PrChecks';

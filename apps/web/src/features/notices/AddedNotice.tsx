@@ -87,7 +87,7 @@ export function AddedNotice({ item }: { item: Item }) {
             <span role={failed ? 'alert' : 'status'}>
                 {result === 'added' ? (
                     <>
-                        Added <TitleLink item={item} /> to List.
+                        Added <TitleLink item={item} /> to the List.
                     </>
                 ) : result === 'pending' ? (
                     'Queueing…'

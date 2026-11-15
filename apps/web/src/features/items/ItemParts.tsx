@@ -1,7 +1,7 @@
 import type { AzureWorkItem, Item, Kind } from '@lar-factory/shared';
 // The bits every view draws for an item: its numbered title, title link, repository, kind badge and label chips. Slices,
 // pull requests, agent work and activity have files of their own.
-import { decisionMethodName, itemRepoNames, ref, repoKey, shortAgo } from '@lar-factory/shared';
+import { decisionMethodName, itemRepoNames, onAzure, ref, repoKey, shortAgo } from '@lar-factory/shared';
 import { Inline, LabelChip, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
@@ -15,15 +15,18 @@ import {
     KindBadge as HueBadge,
     RepoIdentity,
     TitleLink as DesignTitleLink,
+    TrackerTag,
 } from '@/ui/board';
 
-/** A row's or the item dialog's repository: its project icon and name, alike wherever it shows. Where the ticket is saved is SourceIcon's to say, beside it. */
-export function RepoCell({ item }: { item: Item }) {
+/** A row's or the item dialog's repository: its project icon and name, alike wherever it shows. Where the ticket is saved is SourceIcon's to say, beside it. A
+ *  `home` one is the concept's own, which a part shares, quieter than a project of the part's own (items.css). */
+export function RepoCell({ item, home = false }: { item: Item; home?: boolean }) {
     const repos = useBoardStore((state) => state.data.repos);
 
     return (
         <RepoIdentity
             data-repo-cell
+            data-repo-home={home || undefined}
             icon={<ProjectIcon repo={repoKey(item)} size="sm" />}
             name={itemRepoNames(item, repos)}
         />
@@ -72,12 +75,17 @@ export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode
     );
 }
 
-/** The item's shown labels as chips, in the tracker's colours. */
+/** The item's shown labels as quiet outlined chips with their tracker's colour dots, each named in its tooltip as its
+ *  tracker's ("Azure DevOps tag: Blocked"), so a tag never reads as a board state. */
 export function LabelChips({ item }: { item: LabelledItem }) {
+    const tracker = item.repo && onAzure(item.repo) ? 'Azure DevOps tag' : 'GitHub label';
+
     return (
         <>
             {useShownLabels(item).map((label) => (
-                <LabelChip key={label} label={label} color={item.labelColors?.[label]} />
+                <TrackerTag key={label} title={`${tracker}: ${label}`}>
+                    <LabelChip label={label} color={item.labelColors?.[label]} />
+                </TrackerTag>
             ))}
         </>
     );

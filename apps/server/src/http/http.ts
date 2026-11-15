@@ -473,9 +473,9 @@ export function createBoardServer({
         },
         '/api/back-to-list': {
             sampleWrite: 'refuse',
-            what: 'the item to move back to List',
-            disabled: 'Moving items back to List is disabled in sample mode.',
-            run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
+            what: 'the item to move back to the List',
+            disabled: 'Moving items back to the List is disabled in sample mode.',
+            run: forItem('Name the item to move back to the List.', (itemId) => commands.backToList(itemId)),
         },
         '/api/start': {
             sampleWrite: 'refuse',

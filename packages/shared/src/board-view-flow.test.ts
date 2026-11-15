@@ -44,7 +44,7 @@ for (const kind of ['concept', 'issue'] as const) {
                         `${kind} ${status}`,
                     ).toEqual([]);
 
-                    if (status !== 'Done') expect(sections).toContain('dock');
+                    if (status !== 'Done' && status !== 'List') expect(sections).toContain('dock');
 
                     if (['Needs you', 'Verify', 'Ready to merge'].includes(status)) expect(sections).toContain('desk');
                 }

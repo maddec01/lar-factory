@@ -23,8 +23,8 @@ export type Notice =
     | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; message: string }
     | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
-/** The destination uses the board's proper name, including List. */
-const destination = (to: Status) => to;
+/** The destination by the board's proper name, the List as "the List" in a sentence. */
+const destination = (to: Status) => (to === 'List' ? 'the List' : to);
 
 function toastOf(notice: Notice): Toast {
     const { item } = notice;

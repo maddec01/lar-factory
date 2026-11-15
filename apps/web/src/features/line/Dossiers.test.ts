@@ -292,14 +292,15 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
         'the next step cuts off, with its full text in its tooltip',
     ).toEqual(['#202 Sign-in screen', true]);
     await receive(withItem('I_sample12', { status: 'In progress', threads: [] }, withItem(C200, refined)));
-    expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
-    expect(more(), 'one chip; the others are in the tooltip').toBeNull();
+    // The first chip by priority reads on the title's line (the row's end keeps its one fact); the tooltip lists them all.
+    expect(chips(), 'the first chip shows beside the title').toEqual(['2 decisions']);
+    expect(header().querySelector('[data-col="repos"] [data-chips]'), 'on the title line, not the end').not.toBeNull();
+    expect(words(), 'an open decision over Refined').toMatch(/^2 decisions · Refined/);
     await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(chips(), 'Refined over fog').toEqual(['Refined']);
-    expect(words()).toContain('Refined · no delivery planned · 1 question to route');
+    expect(words(), 'Refined over fog').toMatch(/^Refined · no delivery planned · 1 question to route/);
     await receive(calm({ refinement: undefined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(chips(), 'fog with nothing above it').toEqual(['1 question to route']);
-    expect(more(), 'nothing more to count').toBeNull();
+    expect(words(), 'fog with nothing above it').toContain('1 question to route');
+    expect(words()).not.toContain('Refined');
     await receive(calm({ refinement: undefined }));
     expect(header().querySelector('[data-chips]'), 'no chips, no room').toBeNull();
 });
@@ -351,7 +352,7 @@ test('the blocked chip counts the blocked slices of unfinished parts', async () 
             calm({}),
         ),
     );
-    expect(chips(), 'with nothing above it, it shows').toEqual(['2 blocked']);
+    expect(header().getAttribute('title'), 'with nothing above it, it leads the tooltip').toMatch(/^2 blocked/);
 });
 
 const col = (name: string, id = C200) => header(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
@@ -496,10 +497,7 @@ test('once its blockers complete, Start build sends the build, and the header of
         withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()),
     );
     expect(text(startIn(col('side')))).toBe('Build');
-    expect(
-        next().querySelector('.sr-only')?.textContent,
-        'Next reads to a screen reader and leaves its room to the title',
-    ).toBe('Next');
+    expect(next().textContent?.startsWith('Next'), 'Next names the step the owner can start').toBe(true);
     await pressMenu(startIn(step('I_sample13'))!);
     expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
     await press(entries()[1]!);
@@ -588,6 +586,20 @@ test('the parts list keeps a build before a research decision blocked by that bu
     ).toEqual([build.id, research.id]);
 });
 
+test("every parts-list row names its project, the concept's own quietly, so no row reads with a gap", async () => {
+    const own = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [], repo: c200.repo! };
+    const other = { ...own, id: 'I_other', number: 901, repo: 'maddec01/lar-apple' };
+
+    await mountOpen({ ...sample, items: [c200, own, other] });
+
+    const project = (id: string) => step(id).querySelector<HTMLElement>('[data-part-meta] [data-repo-cell]');
+
+    expect(project(own.id), "the concept's own project").not.toBeNull();
+    expect(project(own.id)!.hasAttribute('data-repo-home'), 'named quietly').toBe(true);
+    expect(text(project(other.id))).toContain('lar-apple');
+    expect(project(other.id)!.hasAttribute('data-repo-home')).toBe(false);
+});
+
 /** #200 on its Work map with `parts` as its parts, in place of the sample's. */
 const conceptOf = (parts: Item[], change: Partial<Item> = {}): BoardData => ({
     ...fresh(),
@@ -664,7 +676,7 @@ test('map arrows meet the rendered cards at their vertical centres', async () =>
     expect(from.querySelector('[data-slice-bar]')).not.toBeNull();
 });
 
-test('a part waiting on a settled decision in the group keeps its edge, from the group, with its label', async () => {
+test('a part waiting on settled decisions in the group keeps a quiet rail from the group, with its label', async () => {
     const held = workPart('W_next', {
         status: 'In progress',
         blockers: [
@@ -677,40 +689,50 @@ test('a part waiting on a settled decision in the group keeps its edge, from the
         blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_next' }],
     });
     const map = await mapOpen(conceptOf([...fiveSettled, held, later], { map: { ...c200.map!, check: undefined } }));
+    const edges = () =>
+        [...map.querySelectorAll('path[data-edge]')]
+            .map((p) => String(p.getAttribute('data-edge')))
+            .sort((a, b) => a.localeCompare(b));
 
-    expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
-        'history W_next',
-        'W_next W_later',
-    ]);
+    expect(edges()).toEqual(['history W_next', 'W_next W_later']);
+    expect(map.querySelector('path[data-edge="history W_next"]')?.hasAttribute('data-edge-rail'), 'drawn quietly').toBe(
+        true,
+    );
 
     const label = () => map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+    const tooltip = (id: string) => map.querySelector(`[data-map-part="${id}"] [data-title]`)!.getAttribute('title');
 
     expect([text(label()), label().tagName, label().getAttribute('aria-label')]).toEqual([
         '2 completed prerequisites',
         'BUTTON',
         '2 completed prerequisites: Part W_s0, Part W_s1',
     ]);
+    expect(tooltip('W_next')).toContain('After 2 completed prerequisites: Part W_s0, Part W_s1');
+
+    // The rail runs from its label down to the card it serves, not up from the group past the lanes in between.
+    const rail = map.querySelector('path[data-edge="history W_next"]')!.getAttribute('d')!;
+    const ys = rail
+        .match(/-?\d+(?:\.\d+)?/g)!
+        .map(Number)
+        .filter((_, n) => n % 2 === 1);
+    const card = map.querySelector<HTMLElement>('[data-map-part="W_next"]')!;
+    const centre = Number.parseFloat(card.parentElement!.style.top) + Number.parseFloat(card.style.height) / 2;
+
+    expect(ys[0], 'starts level with its label').toBe(Number.parseFloat(label().style.top) + 8);
+    expect(Math.max(...ys), 'stops at the card').toBe(centre);
     await press(map.querySelector('[data-map-history]')!);
-    expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the edge').not.toBeNull();
+    expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the rail').not.toBeNull();
     await receive(
         conceptOf([...fiveSettled, { ...held, status: 'Done', completion: { complete: true, reasons: [] } }, later], {
             map: { ...c200.map!, check: undefined },
         }),
     );
-    expect(
-        [...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')),
-        'a board push moves it into the group',
-    ).toEqual(['history W_later']);
-
-    const single = map.querySelector('[data-edge-label="history W_later"]')!;
-
-    expect([text(single), single.getAttribute('aria-label')]).toEqual([
-        '1 completed prerequisite',
-        '1 completed prerequisite: Part W_next',
-    ]);
+    expect(edges(), 'a board push moves it into the group').toEqual(['history W_later']);
+    expect(text(map.querySelector('[data-edge-label="history W_later"]'))).toBe('1 completed prerequisite');
+    expect(tooltip('W_later')).toContain('After 1 completed prerequisite: Part W_next');
 });
 
-test('an edge label counts each finished blocker once, names them on focus, and shows them in history when pressed; an open blocker stays named', async () => {
+test('a card counts each finished blocker once in its tooltip, the history group shows them; an open blocker stays named', async () => {
     const closed = (workId: string) => ({
         number: 0,
         repo: c200.repo!,
@@ -732,25 +754,41 @@ test('an edge label counts each finished blocker once, names them on focus, and 
             map: { ...c200.map!, check: undefined },
         }),
     );
-    const label = map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+    const tooltip = map.querySelector('[data-map-part="W_next"] [data-title]')!.getAttribute('title');
 
-    expect(text(label), 'the same part listed twice counts once').toBe('2 completed prerequisites');
+    expect(tooltip, 'the same part listed twice counts once').toContain(
+        'After 2 completed prerequisites: Part W_s0, Part W_s1',
+    );
     expect(
         [...map.querySelectorAll('path[data-edge]')]
             .map((p) => p.getAttribute('data-edge'))
             .map(String)
             .sort(),
     ).toEqual(['W_open W_next', 'history W_next']);
-    expect(text(map.querySelector('[data-map-part="W_next"] [data-map-facts]'))).toBe(
-        'Blocked · starts after Part W_open',
-    );
-    await settle(() => label.focus());
-    await settle(() => vi.advanceTimersByTime(1000));
-    expect(text(document.querySelector('[role="tooltip"]')), 'focus shows the names').toBe('Part W_s0, Part W_s1');
+    expect(
+        text(map.querySelector('[data-edge-label="history W_next"]')),
+        'its label counts the same part once too',
+    ).toBe('2 completed prerequisites');
+    expect(text(map.querySelector('[data-map-part="W_next"] [data-map-facts]'))).toBe('Blocked by 1 part');
+    expect(
+        map.querySelector('[data-map-part="W_next"] [data-stage-track]'),
+        'every card keeps its stage track in its head',
+    ).not.toBeNull();
+    expect(
+        map.querySelector('[data-map-part="W_open"] [data-stage-track]'),
+        'work under way shows its step',
+    ).not.toBeNull();
+    expect(
+        map.querySelector('[data-map-part="W_next"]')?.hasAttribute('data-map-held'),
+        'a held card keeps its step and track, quiet beside its foot',
+    ).toBe(true);
+    expect(map.querySelector('[data-map-part="W_open"]')?.hasAttribute('data-map-held')).toBe(false);
     expect(map.querySelector('[data-history-part]')).toBeNull();
-    await press(label);
+    // The history's toggle reads as the parts list's: one quiet line that says what it shows.
+    expect(map.querySelector('[data-map-history]')!.getAttribute('aria-label')).toMatch(/^Show \d+ settled decisions$/);
+    await press(map.querySelector('[data-map-history]')!);
+    expect(map.querySelector('[data-map-history]')!.getAttribute('aria-label')).toMatch(/^Hide \d+ settled decisions$/);
     expect(map.querySelector('[data-history-part="W_s0"]')).not.toBeNull();
-    expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the edge').not.toBeNull();
 });
 
 test('a build whose planner ended while its child and background work run reads as working, never as done', async () => {
@@ -796,7 +834,7 @@ test('a finished part with work still running stays with current work', async ()
     );
 
     expect(map.querySelector('[data-map-history]')).toBeNull();
-    expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Complete · Working');
+    expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Done · Working');
 });
 
 /** The dossier's total, which reads on its first line beside its state. */
@@ -922,9 +960,11 @@ test('the live map follows recorded parts, blockers and gate changes while prose
     };
     const map = await mapOpen(conceptOf([first, next], change));
 
+    const tooltip = () => map.querySelector('[data-map-part="W_first"] [data-title]')!.getAttribute('title');
+
     expect(map.querySelector('path[data-edge="W_first W_next"]')).not.toBeNull();
-    expect(text(map.querySelector('[data-map-part="W_first"] [data-map-record-state]'))).toBe(
-        'Not queued · Gate not passed',
+    expect(tooltip(), 'the record facts are in the tooltip, the foot says one state').toContain(
+        'Not queued · Brief not approved',
     );
     expect(text(dossier())).not.toContain('Invented prose Dependency');
     await receive(
@@ -937,7 +977,7 @@ test('the live map follows recorded parts, blockers and gate changes while prose
         ),
     );
     expect(map.querySelector('path[data-edge="W_first W_next"]')).toBeNull();
-    expect(text(map.querySelector('[data-map-part="W_first"] [data-map-record-state]'))).toBe('Gate passed');
+    expect(tooltip()).not.toContain('Not queued');
     await receive(conceptOf([{ ...first, status: 'Ready', passingBrief: true }], change));
     expect(map.querySelector('[data-map-part="W_next"]')).toBeNull();
 });
@@ -977,9 +1017,12 @@ test('a group names its out-of-date checklist and ships-with release steps in ma
 
     await mountOpen(data);
     // The row keeps to one chip; every chip is named in its tooltip.
-    expect(header().getAttribute('title')).toContain('Out of date: 1 item');
+    expect(header().getAttribute('title')).toContain('Concept map needs updating');
     expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
-        '1 brief to re-check: answers or sibling contracts changed',
+        'Concept map needs updating · 1 part affected',
+    );
+    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
+        '1 brief to re-check after changed answers',
     );
     expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Ships with:');
     expect(text(dossier().querySelector('[data-release-steps]'))).toContain(members[0]!.title);

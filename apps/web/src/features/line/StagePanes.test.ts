@@ -151,6 +151,17 @@ test('a live board push moves a row between sections with no reload', async () =
     expect(inPane('build')).toContain(140);
 });
 
+test('Build’s header names a build at work that holds no slot apart from the slots it counts', async () => {
+    const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 50 } };
+
+    await mountPage(withItem('I_sample22', { recorded: false }, limited));
+
+    const header = $('[data-stage="build"] header .build-limit')!;
+
+    expect(text(header)).toMatch(/ of 50 build slots · 1 more working$/);
+    expect(header.getAttribute('title')).toContain('1 more build working without a slot');
+});
+
 test('Build’s header counts the factory’s builds against the automatic build limit, one bar per build past it', async () => {
     const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 2 } };
     const receive = async (data: BoardData) =>
@@ -532,14 +543,15 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
         // A slice blocked by another reads grey, as amber is kept for what waits on you.
         segments: ['ready', 'active', 'off', 'off', 'off'],
         count: '1/5 slices done',
-        next: 'blocked Issue 67 +2',
+        // The first blocked slice by name, then the rest in counts that can't be misread.
+        next: 'blocked Issue 67 · 1 more blocked · 1 working',
     });
 
     const sliceNote = meta('I_59').querySelector('[data-note]')!;
 
     expect(sliceNote.firstElementChild!.className, 'blocked reads in its colour').toContain('text-warning-fg');
     expect(sliceNote.getAttribute('title'), 'the rest are named on hover').toBe(
-        'blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66',
+        'blocked #67 Issue 67\nblocked #69 Issue 69\nworking #66 Issue 66',
     );
     expect(col('I_59', 'bar').querySelector('ol > li .lar-status-pulse'), 'the active slice pulses').not.toBeNull();
     expect(
@@ -604,9 +616,10 @@ test('the count unfolds the slice list under the row and folds it again, without
 });
 
 test('the status tooltip follows the latest real thread across shaping and build stages, wherever the row shows a state', async () => {
+    // #30 with no slices of its own, so only its thread says how it stands.
     const id = 'I_sample14';
 
-    await mountPage(withItem(id, { status: 'Shaping', threads: [] }));
+    await mountPage(withItem(id, { slices: [], status: 'Shaping', threads: [] }));
 
     /** The state's tooltip, or null where the row says no state, as its lane's heading already names it. */
     const activity = () => state(id)?.title ?? null;
@@ -616,7 +629,7 @@ test('the status tooltip follows the latest real thread across shaping and build
         // Shaping and Build name their stage, so a row with nothing more to say there shows no state.
         const named = status !== 'Review';
 
-        await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [] })));
+        await settle(() => useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: [] })));
         expect(activity(), `${status}: no thread`).toBe(named ? null : 'Not started');
         for (const [state, expected] of [
             ['running', 'Thread running'],
@@ -625,18 +638,21 @@ test('the status tooltip follows the latest real thread across shaping and build
             ['needs you', 'Thread needs you'],
         ] as const) {
             await settle(() =>
-                useBoardStore.getState().receive(withItem(id, { status, threads: [thread('t1', state)] })),
+                useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: [thread('t1', state)] })),
             );
 
             if (status === 'Shaping' && state === 'needs you') {
                 expect($(`.desk-row[data-item="${id}"]`)).not.toBeNull();
             } else expect(activity(), `${status}: ${state}`).toBe(expected);
         }
-        await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
+        await settle(() =>
+            useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: 'unavailable' })),
+        );
         expect(activity(), `${status}: unreadable thread`).toBe('Thread unavailable');
         await settle(() =>
             useBoardStore.getState().receive(
                 withItem(id, {
+                    slices: [],
                     status,
                     threads: [{ ...thread('t1', 'running'), observedAt: '2026-10-21T09:05:00.000Z' }],
                 }),

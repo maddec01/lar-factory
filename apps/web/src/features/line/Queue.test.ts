@@ -39,6 +39,8 @@ const press = async (el: HTMLElement) => {
     });
 };
 const sample05 = sample.items.find((i) => i.id === 'I_sample05')!;
+/** The sample's Queued work records outside any concept, which follow its Queued tickets. */
+const queuedRecords = sample.items.filter((i) => i.recorded && i.status === 'Queued' && !i.parentId).map((i) => i.id);
 /** A Queued decision under `parent`, a sample item's number. */
 const decision = (id: string, parent: number): Item => ({
     ...sample05,
@@ -64,7 +66,7 @@ test('a dossier’s parts are left out and show in the dossier; a Queued parent 
             decision('I_d999', 999),
         ],
     });
-    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21']);
+    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21', ...queuedRecords]);
 
     const openDossier = (id: string) =>
         settle(() => $<HTMLButtonElement>(`[data-dossier="${id}"] [data-dossier-open]`)!.click());
@@ -198,13 +200,13 @@ test('a Start that may have run hides Shape; closing its message leaves a tag', 
     expect(text(moved().querySelector('.started-tag.unsure'))).toBe('May have started');
 });
 
-test('Move to List from the dialog takes the item off the Queue', async () => {
+test('Move to the List from the dialog takes the item off the Queue', async () => {
     holdPosts();
     await mountPage();
     await settle(() => row('I_sample05').querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     await press(dialog()!.querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!);
     expect(posted()).toEqual([['/api/back-to-list', { itemId: 'I_sample05' }]]);
     await answer({ error: null, board: moved('I_sample05', 'List') });
-    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21']);
-    expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);
+    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21', ...queuedRecords]);
+    expect(text(toast())).toMatch(/^Moved #129 .* to the List\. View item$/);
 });

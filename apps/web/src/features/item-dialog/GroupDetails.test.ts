@@ -83,7 +83,7 @@ test.each(['feature', 'concept'] as const)(
         const dialog = $('[data-item-dialog]')!;
 
         expect(groupStatus()).toContain('Delivered');
-        expect(text(dialog)).toContain('2 of 2 builds done');
+        expect(text(dialog)).toContain('2/2 builds done');
         expect(text(dialog)).toContain('Delivery complete');
         expect(dialog.querySelector('[data-steps]')).toBeNull();
         for (const noise of [
@@ -94,6 +94,14 @@ test.each(['feature', 'concept'] as const)(
             'Planning is saved on this Mac',
         ])
             expect(text(dialog)).not.toContain(noise);
+
+        // The done parts fold under a toggle; open it before reading them.
+        const toggle = [...dialog.querySelectorAll<HTMLButtonElement>('[data-concept-parts] button')].find((b) =>
+            /^Show \d+ done/.test(text(b)),
+        );
+
+        expect(toggle).toBeDefined();
+        await settle(() => toggle!.click());
 
         const parts = dialog.querySelectorAll<HTMLButtonElement>('[data-concept-parts] [data-row-open]');
 
@@ -202,7 +210,7 @@ test('a large group lists its parts directly, keeps part holds folded and batch 
     const holds = dialog.querySelector<HTMLDetailsElement>('[data-concept-build-run] details')!;
 
     expect(holds.open).toBe(false);
-    expect(text(holds.querySelector('summary'))).toBe('Waiting on 20 gates');
+    expect(text(holds.querySelector('summary'))).toBe('Waiting on 20 approvals');
     expect(text(holds)).toContain(parts[0]!.needsYou!.reason.trim());
     expect(review.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(review.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -213,4 +221,21 @@ test('a large group lists its parts directly, keeps part holds folded and batch 
     expect([...review.querySelectorAll('button')].some((button) => text(button) === 'Approve briefs')).toBe(true);
     await settle(() => section.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
+});
+
+test('a concept’s part says its agent time, tokens and cost on its one line, in their own column', async () => {
+    const data = group('concept', false);
+    const part: Item = {
+        ...data.items[1]!,
+        status: 'In progress',
+        state: 'open',
+        completion: { complete: false, reasons: [] },
+        stats: { agentMs: 8_940_000, tokens: 64_800_000, costUsd: 29.12 },
+    };
+
+    await show(fresh({ ...data, items: [data.items[0]!, part, data.items[2]!] }));
+
+    const usage = $(`[data-part="${part.id}"] [data-part-cost]`);
+
+    expect(text(usage)).toBe('2h 29m · 64.8M tokens · $29.12');
 });

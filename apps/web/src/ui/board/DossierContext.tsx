@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export function DossierParentContext({ children }: { children: ReactNode }) {
     return (
-        <span className="min-w-0 whitespace-normal" data-parent-context>
+        <span className="block min-w-0 truncate" data-parent-context>
             {children}
         </span>
     );
@@ -11,7 +11,7 @@ export function DossierParentContext({ children }: { children: ReactNode }) {
 
 export function DossierStates({ children }: { children: ReactNode }) {
     return (
-        <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 [&_[data-state]]:whitespace-normal">
+        <span className="flex min-w-0 items-center justify-end gap-x-3 whitespace-nowrap [&>*]:min-w-0 [&>*]:truncate [&>*:first-child]:shrink-0">
             {children}
         </span>
     );

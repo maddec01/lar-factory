@@ -9,7 +9,19 @@ export function fakeItemSource(tracker: ReturnType<typeof createFakeTracker>, re
 
     return {
         name: repo,
-        read: async () => ({ title: repo, items: await tracker.list(repo) }),
+        // An Azure board source reads backlog items; their tasks show only as sub-tickets. A build's slices are never
+        // board items, as GitHub's read drops them.
+        read: async () => {
+            const items = await tracker.list(repo);
+            const slices = new Set(items.flatMap((item) => item.slices.map((s) => `${s.repo}#${s.number}`)));
+
+            return {
+                title: repo,
+                items: items.filter(
+                    (item) => item.azure?.type !== 'Task' && !slices.has(`${item.repo}#${item.number}`),
+                ),
+            };
+        },
         searchTickets: (requested, query) => {
             assertRepo(requested);
 

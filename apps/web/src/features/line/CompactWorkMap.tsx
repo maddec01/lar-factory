@@ -53,11 +53,11 @@ export function CompactWorkMap({
                         .join(', ')}
                 >
                     {node.prerequisite ? (
-                        <MapPrerequisiteNode prerequisite={node.prerequisite} width={cardWidth} />
+                        <MapPrerequisiteNode prerequisite={node.prerequisite} width={cardWidth} height={map.nodeH} />
                     ) : node.part ? (
-                        <PartNode part={node.part} data={data} width={cardWidth} home={home} />
+                        <PartNode part={node.part} data={data} width={cardWidth} height={map.nodeH} home={home} />
                     ) : check ? (
-                        <CheckNode check={check} width={cardWidth} after="" />
+                        <CheckNode check={check} width={cardWidth} height={map.nodeH} after="" />
                     ) : null}
                 </MapStackItem>
             ))}

@@ -1,5 +1,5 @@
 import { Button, Loading, SkeletonLoader } from '@lar-works/design-system';
-import { CircleAlertIcon, Plus } from '@lar-works/design-system/icons';
+import { Plus } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { buttonKind } from './ButtonKinds';
@@ -45,23 +45,37 @@ export function DetailsHeading({
     return <h2 className={headings[presentation]}>{children}</h2>;
 }
 
-/** A sidebar section, or a section of the body such as a concept's parts: its heading over its content. */
+/** A sidebar section, or a section of the body such as a concept's parts: its heading over its content. An `empty`
+ *  one is its heading line alone, saying so beside the heading as a main section's SectionHeader does. */
 export function DetailsSection({
     heading,
+    empty,
     children,
     ...data
 }: {
     /** The section's heading, a DetailsHeading; none when what sits just above already names it. */
     heading?: ReactNode;
+    /** What the section says when it has nothing to show, such as "No pull request yet.", muted beside its heading. */
+    empty?: ReactNode;
     /** The section's content. */
-    children: ReactNode;
+    children?: ReactNode;
 } & DataAttributes) {
     return (
         <section {...data} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
-            {heading && <DetailsHeading presentation="label">{heading}</DetailsHeading>}
+            {heading && empty ? (
+                <SectionHeader heading={heading} empty={empty} />
+            ) : (
+                heading && <DetailsHeading presentation="label">{heading}</DetailsHeading>
+            )}
+            {!heading && empty && <SectionEmpty>{empty}</SectionEmpty>}
             {children}
         </section>
     );
+}
+
+/** What an empty section says, muted, beside its heading or in its place. */
+function SectionEmpty({ children }: { children: ReactNode }) {
+    return <span className="text-fg-muted min-w-0 truncate text-sm">{children}</span>;
 }
 
 /** A section of the description, such as Acceptance Criteria: its muted heading over its text. */
@@ -113,13 +127,13 @@ export function MainSection({
     );
 }
 
-/** An empty description as its section's header alone: its `heading` ("Description"), "None yet." and Add. */
+/** An empty description as its section's header alone: its `heading` ("Description"), "No description yet." and Add. */
 export function AddDescription({ heading = 'Description', onAdd }: { heading?: string; onAdd: () => void }) {
     return (
         // The section's own header, as a written description's, so an empty one still reads as a section: its heading,
-        // a muted "None yet." and Add where Edit would be, in Edit's button.
+        // a muted "No description yet." and Add where Edit would be, in Edit's button.
         <div data-description>
-            <SectionHeader heading={heading} empty="None yet." prose>
+            <SectionHeader heading={heading} empty="No description yet." prose>
                 <Button {...buttonKind('other')} leftIcon={<Plus />} onClick={onAdd}>
                     Add
                 </Button>
@@ -158,7 +172,7 @@ export function SectionHeader({
                         {bar}
                     </span>
                 )}
-                {empty && <span className="text-fg-muted min-w-0 truncate text-sm">{empty}</span>}
+                {empty && <SectionEmpty>{empty}</SectionEmpty>}
             </span>
             {children && <span className="flex min-w-0 items-center gap-3">{children}</span>}
         </div>
@@ -238,64 +252,3 @@ export function DetailsLoading({
 
 /** The loading description's lines: a full one, a wide one and a shorter last, as a short paragraph runs. */
 const lineWidths = ['full', 'wide', 'medium'] as const;
-
-/**
- * One line in place of the details when they couldn't be read, or took too long: "Couldn’t load details · Try again ·
- * Open in Azure DevOps", naming the source once, in the link (or after the failure with no ticket to open), the
- * `reason` on its tooltip. It sits where the loading line sat, so the dialog keeps its size.
- */
-export function DetailsUnavailable({
-    source,
-    reason,
-    retrying = false,
-    onRetry,
-    href,
-}: {
-    /** Where the details come from, such as "Azure DevOps". */
-    source: string;
-    /** Why they couldn't be read, when known. */
-    reason?: string | undefined;
-    /** A retry is in flight. */
-    retrying?: boolean;
-    /** Called as the reader tries again. */
-    onRetry: () => void;
-    /** The ticket's page, opened by "Open in …"; none for work with no ticket. */
-    href?: string | undefined;
-}) {
-    return (
-        <div
-            role="alert"
-            className="text-fg-muted @split:col-start-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs"
-            data-details-error
-        >
-            <CircleAlertIcon aria-hidden="true" className="text-danger-fg size-3.5 shrink-0" />
-            <span className="text-fg-soft" title={reason}>
-                Couldn’t load details{href ? '' : ` from ${source}`}
-                {reason && <span className="sr-only">: {reason}</span>}
-            </span>
-            <span aria-hidden="true">·</span>
-            <button
-                type="button"
-                className={`text-fg-soft hover:text-fg rounded-xs underline-offset-2 hover:underline disabled:opacity-64 ${ROW_OPENS}`}
-                aria-busy={retrying}
-                disabled={retrying}
-                onClick={onRetry}
-            >
-                {retrying ? 'Trying again…' : 'Try again'}
-            </button>
-            {href && (
-                <>
-                    <span aria-hidden="true">·</span>
-                    <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener"
-                        className={`text-fg-soft hover:text-fg rounded-xs underline-offset-2 hover:underline ${ROW_OPENS}`}
-                    >
-                        Open in {source}
-                    </a>
-                </>
-            )}
-        </div>
-    );
-}

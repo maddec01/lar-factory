@@ -90,3 +90,7 @@ export const attentionToneState = {
 
 /** An attention row's tone, which colours the dot before its label. */
 export type AttentionTone = keyof typeof attentionToneState;
+
+/** The stroke of a hollow status mark (a quiet agent's ring, a slice's): 1.5px, between the design system's 1px hairline
+ *  and 2px border, so a 6–16px ring reads as a mark rather than an outline. */
+export const MARK_STROKE = 'border-[1.5px]';

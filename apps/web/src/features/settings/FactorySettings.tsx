@@ -8,20 +8,14 @@ import {
     type FactorySettingsState,
     type ThreadKind,
 } from '@lar-factory/shared/factory-settings';
-import { useSettingsDraft } from '@lar-works/design-system';
+import { Loading, useSettingsDraft } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { instructionText, prepareFactoryDraft } from './FactoryDraft';
 import { FactoryExecution } from './FactoryExecution';
 import { FactoryReviewer } from './FactoryReviewer';
-import { readFactorySettings, saveFactorySettings } from '@/services/settings/settings.service';
-import {
-    FactoryAction,
-    FactoryModelTable,
-    FactorySettingsGroup,
-    FactorySettingsLayout,
-    FactorySettingsNotice,
-} from '@/ui/board';
+import { readFactorySettings, saveFactorySettings, unreadable } from '@/services/settings/settings.service';
+import { FactoryAction, FactoryModelTable, FactorySettingsGroup, FactorySettingsLayout, LoadFailed } from '@/ui/board';
 
 const labels: Record<ThreadKind | (typeof FACTORY_ROLES)[number], string> = {
     shaping: 'Shaping',
@@ -67,7 +61,7 @@ function FactoryEditor({ initial }: { initial: FactorySettingsState }) {
             setDraft(result.settings);
             setTexts({});
         } catch (problem) {
-            const message = problem instanceof Error ? problem.message : 'Could not save settings.';
+            const message = problem instanceof Error ? problem.message : 'Couldn’t save settings.';
 
             setError(message);
             throw problem;
@@ -213,7 +207,8 @@ export function FactorySettingsSection() {
                 if (active) setState(value);
             },
             (problem: unknown) => {
-                if (active) setError(problem instanceof Error ? problem.message : 'Could not load settings.');
+                if (active)
+                    setError(problem instanceof Error ? problem.message : 'Couldn’t load reviewer and model settings.');
             },
         );
 
@@ -224,18 +219,16 @@ export function FactorySettingsSection() {
 
     return state ? (
         <FactoryEditor initial={state} />
+    ) : error ? (
+        <LoadFailed
+            what="reviewer and model settings"
+            reason={error === unreadable ? undefined : error}
+            onRetry={() => {
+                setError(null);
+                setAttempt(attempt + 1);
+            }}
+        />
     ) : (
-        <FactorySettingsNotice
-            retry={
-                error
-                    ? () => {
-                          setError(null);
-                          setAttempt(attempt + 1);
-                      }
-                    : undefined
-            }
-        >
-            {error ?? 'Loading reviewer and model settings…'}
-        </FactorySettingsNotice>
+        <Loading presentation="status" label="Loading reviewer and model settings…" />
     );
 }

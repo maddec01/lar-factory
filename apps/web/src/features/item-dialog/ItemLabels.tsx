@@ -2,7 +2,7 @@
 
 import { STRUCTURE_LABEL, kindLabels, sameRepo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Alert, IconButton, Inline, LabelChip, Popover, Text } from '@lar-works/design-system';
+import { Button, Inline, LabelChip, Loading, Text } from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
@@ -10,7 +10,7 @@ import { useLabelEdit } from './useLabelEdit';
 import { LabelChips, useShownLabels } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { LabelPicker } from '@/shared/labels/LabelPicker';
-import { ChipGroup, DetailFact as Fact, LabelEditorPanel } from '@/ui/board';
+import { ActionError, buttonKind, ChipGroup, DetailFact as Fact, LabelPickerPopover } from '@/ui/board';
 
 /**
  * The tracker's labels on the item, without those its row hides, and the picker that adds and removes them; linked-work
@@ -52,7 +52,7 @@ export function ItemLabels({ item }: { item: Item }) {
             <Inline as="span" wrap align="center" space="tight">
                 {shown.length === 0 && !linked && (
                     <Text as="span" variant="inherit" tone="muted">
-                        None
+                        {`No ${heading.toLowerCase()} yet.`}
                     </Text>
                 )}
                 {(shown.length > 0 || linked) && (
@@ -69,48 +69,36 @@ export function ItemLabels({ item }: { item: Item }) {
                     </ChipGroup>
                 )}
                 {!item.setAside && (
-                    <Popover open={open} onOpenChange={openChange}>
-                        <Popover.Trigger asChild>
-                            <IconButton
-                                variant="inline"
+                    <LabelPickerPopover
+                        open={open}
+                        onOpenChange={openChange}
+                        trigger={
+                            <Button
+                                {...buttonKind('control')}
+                                iconOnly
+                                leftIcon={<Pencil />}
                                 data-edit-labels
                                 title={problem ?? undefined}
                                 aria-label={`Edit ${heading.toLowerCase()}`}
-                                icon={<Pencil />}
                             />
-                        </Popover.Trigger>
-                        <Popover.Content side="bottom" align="start">
-                            <LabelEditorPanel>
-                                {edit.choices ? (
-                                    <LabelPicker
-                                        heading={heading}
-                                        choices={edit.choices}
-                                        picked={item.labels}
-                                        locked={kindLabels(item.kind, setup?.vocabulary)}
-                                        busy={edit.saving}
-                                        onToggle={(name) => void edit.toggle(name)}
-                                    />
-                                ) : (
-                                    !edit.error && (
-                                        <Text variant="caption" tone="muted" role="status">
-                                            Reading {noun}s…
-                                        </Text>
-                                    )
-                                )}
-                                {edit.error && (
-                                    <Alert size="sm" tone="danger">
-                                        {edit.error}
-                                    </Alert>
-                                )}
-                            </LabelEditorPanel>
-                        </Popover.Content>
-                    </Popover>
+                        }
+                        footer={edit.error && <ActionError>{edit.error}</ActionError>}
+                    >
+                        {edit.choices ? (
+                            <LabelPicker
+                                heading={heading}
+                                choices={edit.choices}
+                                picked={item.labels}
+                                locked={kindLabels(item.kind, setup?.vocabulary)}
+                                busy={edit.saving}
+                                onToggle={(name) => void edit.toggle(name)}
+                            />
+                        ) : (
+                            !edit.error && <Loading presentation="status" label={`Loading ${noun}s…`} />
+                        )}
+                    </LabelPickerPopover>
                 )}
-                {edit.error && !open && (
-                    <Alert size="sm" tone="danger">
-                        {edit.error}
-                    </Alert>
-                )}
+                {edit.error && !open && <ActionError>{edit.error}</ActionError>}
             </Inline>
         </Fact>
     );

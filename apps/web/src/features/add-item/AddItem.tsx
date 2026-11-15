@@ -129,13 +129,7 @@ export function AddItem() {
 
     return (
         <>
-            <AddItemButton
-                label="Add item"
-                title="Add item (⌘N)"
-                keyShortcuts="Meta+N"
-                waits
-                onOpen={() => setOpen(true)}
-            />
+            <AddItemButton label="Add item" title="Add item (⌘N)" keyShortcuts="Meta+N" onOpen={() => setOpen(true)} />
             {open && <AddItemDialog />}
         </>
     );

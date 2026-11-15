@@ -11,7 +11,7 @@ import {
     type Item,
     type RecordDetails,
 } from '@lar-factory/shared';
-import { Alert, Button, Disclosure, RichText, Text } from '@lar-works/design-system';
+import { Button, Disclosure, RichText, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { ApproveBrief } from './ApproveBrief';
@@ -22,7 +22,7 @@ import { isGroupParent } from './group-parent';
 import { SavedRunSettings } from './SavedRunSettings';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
-import { buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
+import { ActionError, buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
 
 const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Concept map', decision: 'Decision' };
 
@@ -60,12 +60,7 @@ export function ExportedLine({ exported }: { exported: Exported }) {
             </Text>
         );
 
-    if (exported.state === 'failed')
-        return (
-            <Alert size="sm" tone="danger">
-                {exported.error}
-            </Alert>
-        );
+    if (exported.state === 'failed') return <ActionError>{exported.error}</ActionError>;
 
     return null;
 }
@@ -128,11 +123,15 @@ export function RecordText({
             as="section"
             header={
                 unwritten ? (
-                    <Text variant="caption" tone="muted" data-record-unwritten>
-                        {record.bodyKind === 'brief'
-                            ? 'No brief yet. Shaping writes it.'
-                            : `No ${title.toLowerCase()} yet.`}
-                    </Text>
+                    <SectionHeader
+                        heading={title}
+                        empty={
+                            record.bodyKind === 'brief'
+                                ? 'No brief yet. Shaping writes it.'
+                                : `No ${title.toLowerCase()} yet.`
+                        }
+                        prose
+                    />
                 ) : (
                     <SectionHeader heading={title} prose>
                         {!spec && <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />}

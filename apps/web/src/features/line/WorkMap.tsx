@@ -17,12 +17,13 @@ import {
     HISTORY,
     LABEL_W,
     PREREQUISITES,
+    busLine,
     edgeLine,
     historyText,
     keyOf,
     layout,
 } from './WorkMapLayout';
-import { CheckNode, HistoryRow, PartNode, RepoIdentity } from './WorkMapParts';
+import { CheckNode, HistoryRow, PartNode, MapRepo } from './WorkMapParts';
 import { StatusGlyph } from '@/features/items';
 import {
     MapBand,
@@ -93,9 +94,28 @@ export function WorkMap({
         .replace(/, ([^,]*)$/, ' and $1');
     const history = parts.filter(isHistory);
     const ups = upstreamOf(parts);
+    // The group's line, which every rail rises from or ends on; lit with them while the group is hovered.
+    const railEnds = m.edges
+        .filter((e) => e.from === HISTORY || e.to === HISTORY)
+        .map((e) => ({ from: at.get(e.from), to: at.get(e.to) }));
+    const busD = busLine(m, railEnds);
+    const lanesEnd = m.bands.reduce((end, b) => Math.max(end, b.top + b.height), 0);
+    const bus = busD
+        ? [
+              {
+                  key: 'bus',
+                  d: busD,
+                  done: true,
+                  lit: hover === HISTORY,
+                  dim: !!hover && hover !== HISTORY,
+                  rail: true,
+                  bare: true,
+              },
+          ]
+        : [];
 
     return (
-        <WorkMapFrame frameRef={box}>
+        <WorkMapFrame frameRef={box} labelWidth={compact ? 0 : LABEL_W}>
             {compact && <CompactWorkMap map={m} width={width} check={check} data={data} home={home} />}
             <MapCanvas
                 width={compact ? width : m.width}
@@ -119,40 +139,50 @@ export function WorkMap({
                             ) : b.lane === home ? (
                                 <MapLaneName lane="builds">Builds</MapLaneName>
                             ) : (
-                                <RepoIdentity repo={b.lane} data={data} />
+                                <MapRepo repo={b.lane} data={data} />
                             )}
                         </MapBand>
                     ))}
+                {!compact && history.length > 0 && (
+                    // The lane names' column runs on under the history group, so what scrolls under it there hides
+                    // too; the group's toggle stays over it.
+                    <MapBand index={0} top={lanesEnd} height={m.height - lanesEnd} width={m.width} labelWidth={LABEL_W}>
+                        {null}
+                    </MapBand>
+                )}
                 {!compact && (
                     <MapEdges
                         width={m.width}
                         height={m.height}
                         markerId={marker}
-                        edges={m.edges.flatMap((e) => {
-                            const a = at.get(e.from),
-                                b = at.get(e.to);
-                            const d = edgeLine(m, a, b);
+                        edges={[
+                            ...m.edges.flatMap((e) => {
+                                const a = at.get(e.from),
+                                    b = at.get(e.to);
+                                const d = edgeLine(m, a, b);
 
-                            if (!d) return [];
+                                if (!d) return [];
 
-                            const lit = !!hover && (e.from === hover || e.to === hover);
+                                const lit = !!hover && (e.from === hover || e.to === hover);
 
-                            return [
-                                {
-                                    key: `${e.from} ${e.to}`,
-                                    d,
-                                    kind: e.kind,
-                                    done:
-                                        e.from === HISTORY
-                                            ? e.complete !== false
-                                            : (!!a?.part && isDone(a.part.item)) ||
-                                              a?.prerequisite?.blocker.state === 'closed',
-                                    lit,
-                                    dim: !!hover && !lit,
-                                    rail: e.from === HISTORY || e.to === HISTORY,
-                                },
-                            ];
-                        })}
+                                return [
+                                    {
+                                        key: `${e.from} ${e.to}`,
+                                        d,
+                                        kind: e.kind,
+                                        done:
+                                            e.from === HISTORY
+                                                ? e.complete !== false
+                                                : (!!a?.part && isDone(a.part.item)) ||
+                                                  a?.prerequisite?.blocker.state === 'closed',
+                                        lit,
+                                        dim: !!hover && !lit,
+                                        rail: e.from === HISTORY || e.to === HISTORY,
+                                    },
+                                ];
+                            }),
+                            ...bus,
+                        ]}
                     />
                 )}
                 {!compact &&

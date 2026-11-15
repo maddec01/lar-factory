@@ -9,11 +9,12 @@ afterEach(() => {
     delete (Element.prototype as Partial<Element>).getAnimations;
 });
 
-const listButton = () => $<HTMLButtonElement>('.title-bar button.list-button')!;
+const listButton = () => $<HTMLButtonElement>('.title-bar button[data-list-button]')!;
 const modal = () => $('[role="dialog"][data-list-modal]');
 const groups = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Projects"] button');
 const group = (name: string) => groups().find((b) => b.querySelector('.name')?.textContent === name)!;
-const counts = () => groups().map((b) => [text(b.querySelector('.name')), text(b.querySelector('.count'))]);
+const counts = () =>
+    groups().map((b) => [text(b.querySelector('.name')), text(b.querySelector('[data-slot="count"]'))]);
 const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item);
 const search = () => $<HTMLInputElement>('[data-list-modal] input[type="search"]')!;
 const open = () => settle(() => listButton().click());
@@ -99,15 +100,14 @@ test('All projects keeps a loading cue and no count under the rows that landed u
     const header = () => text($('[data-list-modal] span.sort')!.parentElement);
 
     expect(rows().length).toBeGreaterThan(0);
-    expect(text($('[data-list-modal] [data-reading]'))).toBe('Loading more Projects…');
-    expect($('[data-list-modal] [data-reading] [data-loader]')).not.toBeNull();
+    expect(text($('[data-list-modal] [role="status"]'))).toBe('Loading more projects…');
     expect(header(), 'no final-looking count').not.toMatch(/All projects\d/);
     expect(
         counts().find(([name]) => name === 'All projects'),
         'none in the left pane either',
     ).toEqual(['All projects', '']);
     await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
-    expect($('[data-list-modal] [data-reading]')).toBeNull();
+    expect($('[data-list-modal] [role="status"]')).toBeNull();
     expect(header(), 'the left pane counts it, once').not.toMatch(/All projects\d/);
     expect(counts()[0]).toEqual(['All projects', '20']);
 });

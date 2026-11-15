@@ -22,7 +22,7 @@ import { IssueDefaults } from './IssueDefaults';
 import { LabelsSection } from './LabelsSection';
 import { accessRows } from './RepositoryAccess';
 import { FieldRow } from '@/shared/settings/FieldRow';
-import { buttonKind } from '@/ui/board';
+import { buttonKind, RetryAction } from '@/ui/board';
 
 export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     const { repo } = setup;
@@ -192,11 +192,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                 title="Access"
                 data-access-settings
                 panel={false}
-                action={
-                    <Button {...buttonKind('other')} loading={running === 'recheck'} onClick={recheckAccess}>
-                        Recheck access
-                    </Button>
-                }
+                action={<RetryAction access busy={running === 'recheck'} onRetry={recheckAccess} />}
                 note={
                     errors.recheck && (
                         <Alert size="sm" tone="danger">

@@ -7,6 +7,7 @@ import { custom, type Group, type PagesInput, type Row } from './SettingsModel';
 import { BlockedReason, InstallState } from './SkillInstallStatus';
 import { TargetProgress } from './TargetProgress';
 import { TargetReaders } from './TargetReaders';
+import { LoadFailed, MetaLine } from '@/ui/board';
 
 /** Why a target can't be unticked, or nothing. */
 function lockedReason({ locked, instances }: TargetSnapshot): string | undefined {
@@ -58,21 +59,13 @@ export function bundledGroup({ data, version }: PagesInput): Group {
     // A Date is a day with no time zone, so it reads the same everywhere. Neither a date nor a version breaks across lines.
     const updated = (skill: BundledSkill) =>
         skill.date ? (
-            <>
-                {' '}
-                ·{' '}
-                <Text as="span" variant="inherit" nowrap>
-                    updated {day(skill.date, 'UTC')}
-                </Text>
-            </>
+            <Text as="span" variant="inherit" nowrap>
+                updated {day(skill.date, 'UTC')}
+            </Text>
         ) : skill.author === 'Lar' && version ? (
-            <>
-                {' '}
-                ·{' '}
-                <Text as="span" variant="inherit" nowrap>
-                    updated in Lar Factory {version}
-                </Text>
-            </>
+            <Text as="span" variant="inherit" nowrap>
+                updated in Lar Factory {version}
+            </Text>
         ) : null;
     const rows: Row[] = skills.length
         ? skills.map((skill) => ({
@@ -80,8 +73,7 @@ export function bundledGroup({ data, version }: PagesInput): Group {
               title: skill.name,
               description: (
                   <>
-                      {skill.author} · {skill.licence}
-                      {updated(skill)}
+                      <MetaLine parts={[skill.author, skill.licence, updated(skill)]} />
                       {skill.includedAuthors?.length ? (
                           <Text variant="caption" tone="muted">
                               Includes work by {skill.includedAuthors.join(', ')}.{' '}
@@ -107,10 +99,18 @@ export function bundledGroup({ data, version }: PagesInput): Group {
         : [
               {
                   id: 'bundled-unread',
-                  title: 'Couldn’t read the bundled skills',
+                  title: 'Couldn’t load the bundled skills',
                   noteOnly: true,
-                  description: 'The board server couldn’t read the app’s bundle, so it can’t credit them here.',
-                  control: custom(() => null),
+                  control: {
+                      type: 'row',
+                      render: () => (
+                          <LoadFailed
+                              size="compact"
+                              what="the bundled skills"
+                              reason="The board server couldn’t read the app’s bundle, so it can’t credit them here."
+                          />
+                      ),
+                  },
               },
           ];
 

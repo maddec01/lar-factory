@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import { useShownScope } from '@/features/filters';
 import { StatusGlyph } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { StagePane, StagePaneEmpty } from '@/ui/board';
+import { HeaderEmpty, StagePane } from '@/ui/board';
 
 export function Pane({
     id,
@@ -54,8 +54,8 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
     const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
 
     return (
-        <StagePaneEmpty quiet={!reading && !filtered}>
+        <HeaderEmpty quiet={!reading && !filtered}>
             {reading ? <Loading presentation="inline" label="Loading projects…" /> : filtered ? children : none}
-        </StagePaneEmpty>
+        </HeaderEmpty>
     );
 }

@@ -1,12 +1,12 @@
 // The item dialog's sidebar relations: children, named attachments, blockers and Related work.
 
 import type { IssueRef, Item } from '@lar-factory/shared';
-import { Disclosure, PageError, Stack } from '@lar-works/design-system';
+import { Disclosure } from '@lar-works/design-system';
 
 import { sidebarSubTickets } from './Relations';
 import { AzureFields } from '@/features/items';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
-import { AttachmentLink, DetailsSection, SprintCount, TicketLink, TicketLinkList } from '@/ui/board';
+import { AttachmentLink, DetailsSection, LoadFailed, SprintCount, TicketLink, TicketLinkList } from '@/ui/board';
 
 /** Named work item links share the child list's native fields and completion marks; a `row` each in the main column. */
 export function TicketLinks({ tickets, row = false }: { tickets: IssueRef[]; row?: boolean }) {
@@ -60,20 +60,13 @@ export function ItemRelations({
     return (
         <>
             {relationsError && (
-                <Stack role="alert">
-                    <PageError
-                        size="inline"
-                        title="Couldn’t load linked work items"
-                        description={relationsError}
-                        primaryAction={{ label: 'Try again', onAction: () => void refresh() }}
-                    />
-                </Stack>
+                <LoadFailed what="linked work items" reason={relationsError} onRetry={() => void refresh()} />
             )}
             {subTickets.length > 0 && (
                 <DetailsSection heading={sprint ? 'Children' : 'Sub-tickets'}>
                     {sprint && (
                         <SprintCount
-                            count={`This sprint: ${current.filter((s) => s.state === 'closed').length} of ${current.length} done`}
+                            count={`${current.filter((s) => s.state === 'closed').length} of ${current.length} done`}
                             name={sprint.name}
                         />
                     )}

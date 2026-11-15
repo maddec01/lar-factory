@@ -4,6 +4,8 @@ import { type ReactNode, useId } from 'react';
 
 import { buttonKind } from './ButtonKinds';
 import { DetailsSection } from './ItemDetailSections';
+import { ActionError } from './StartControls';
+import { useButtonKind } from './useButtonKind';
 import { workHoldReason } from './work-hold-reason';
 
 /** A concept's authorization and complete preflight, separate from its shaping action. */
@@ -46,6 +48,8 @@ export function ConceptBuildRun({
 
     const held = !running && plan.holds.length > 0;
     const heldId = useId();
+    // The row's Build all is a row action: tinted with the others on the row (TintedActions).
+    const kindOf = useButtonKind();
     // Held, it is an ordinary disabled button, not a washed-out Main, with why beside it.
     const action = (
         <Button
@@ -68,14 +72,14 @@ export function ConceptBuildRun({
         return (
             <div className="flex items-center gap-2" data-concept-build-action>
                 <Button
-                    {...buttonKind('main')}
+                    {...kindOf('main')}
                     loading={pending}
                     title={running ? 'Pause concept builds' : startLabel}
                     onClick={() => onChange(running ? 'paused' : 'running')}
                 >
                     {running ? 'Pause' : 'Build all'}
                 </Button>
-                {error && <Text role="alert">{error}</Text>}
+                {error && <ActionError>{error}</ActionError>}
             </div>
         );
 
@@ -110,7 +114,7 @@ export function ConceptBuildRun({
                         {summary}
                     </Text>
                 )}
-                {error && <Text role="alert">{error}</Text>}
+                {error && <ActionError>{error}</ActionError>}
             </div>
         );
     }
@@ -174,7 +178,7 @@ export function ConceptBuildRun({
                     )}
                 </div>
             )}
-            {error && <Text role="alert">{error}</Text>}
+            {error && <ActionError>{error}</ActionError>}
         </DetailsSection>
     );
 }

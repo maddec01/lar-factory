@@ -90,7 +90,7 @@ export function AddedNotice({ item }: { item: Item }) {
                         Added <TitleLink item={item} /> to the List.
                     </>
                 ) : result === 'pending' ? (
-                    'Queueing…'
+                    'Queuing…'
                 ) : result === 'success' ? (
                     <>
                         Moved <TitleLink item={item} /> to Queued.
@@ -102,7 +102,7 @@ export function AddedNotice({ item }: { item: Item }) {
             <span ref={view}>{<ViewButton item={item} />}</span>{' '}
             {eligible && result !== 'success' && (
                 <Button ref={queue} {...buttonKind('other')} aria-disabled={pending} onClick={() => void activate()}>
-                    {pending ? 'Queueing…' : 'Queue'}
+                    {pending ? 'Queuing…' : 'Queue'}
                 </Button>
             )}
         </>

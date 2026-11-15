@@ -86,7 +86,7 @@ test('ships-with links and delivery holds identify the affected parts by name', 
             remaining: ["Its Fog isn't gone.", `Its build ${app} isn't Done.`],
         }),
     );
-    expect(root.textContent).toContain('Ships with: Update server links + Read invitation links in the app');
+    expect(root.textContent).toContain('Ships withUpdate server links + Read invitation links in the app');
     expect(root.querySelector('summary')?.textContent).toContain('1 part not built yet');
     expect(root.querySelector('details')?.open).toBe(false);
     expect(root.querySelector('details li')?.textContent).toBe('Read invitation links in the app');

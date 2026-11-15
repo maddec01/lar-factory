@@ -1,5 +1,6 @@
 import {
-    Badge,
+    Button,
+    Count,
     Loading,
     SidebarNavigationItem,
     TitleBarLabel,
@@ -7,10 +8,13 @@ import {
     TooltipPopup,
     TooltipTrigger,
 } from '@lar-works/design-system';
-import { ButtonBase as Button, useScrollFade } from '@lar-works/design-system/primitives';
+import { useScrollFade } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
 import { buttonKind } from './ButtonKinds';
+import { OverflowCount } from './OverflowCount';
+import { QuietLabel } from './QuietLabel';
+import { pickedRow, ROW_BOX } from './RowStyles';
 
 interface ListButtonProps {
     /** The button's text, such as "List". */
@@ -31,12 +35,12 @@ export function ListButton({ label, icon, count, loadingLabel, onOpen }: ListBut
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...buttonKind('control')} className="list-button" leftIcon={icon} onClick={onOpen}>
+                <Button {...buttonKind('control')} data-list-button leftIcon={icon} onClick={onOpen}>
                     <TitleBarLabel>{label}</TitleBarLabel>
                     {count === undefined ? (
                         <Loading presentation="inline" title={loadingLabel} />
                     ) : (
-                        <Badge>{count}</Badge>
+                        <Count count={count} />
                     )}
                 </Button>
             </TooltipTrigger>
@@ -69,7 +73,7 @@ export function ListGroupItem({
         <SidebarNavigationItem active={active} onClick={onPick}>
             {icon}
             <span className="name min-w-0 flex-1 truncate text-left">{label}</span>
-            {count !== undefined && <span className="count text-fg-muted text-xs tabular-nums">{count}</span>}
+            <Count count={count} />
         </SidebarNavigationItem>
     );
 }
@@ -167,6 +171,8 @@ export function ListRowGrid({
 interface ListItemRowProps {
     /** The item's id, as `data-item`. */
     item: string;
+    /** The item the dialog shows now. */
+    picked?: boolean;
     /** Its title in full, and any facts its row leaves out (such as a work item's state and assignee), for the
      *  tooltip. */
     name: string;
@@ -174,16 +180,12 @@ interface ListItemRowProps {
     onOpen: () => void;
     /** Where the item comes from. */
     source: ReactNode;
-    /** The ticket's reference, such as "#61", before the title; none for an item with no ticket. */
-    reference?: string;
-    /** The item's title. */
-    title: string;
-    /** The repository's icon, when the list mixes repositories. */
-    repoIcon?: ReactNode;
-    /** The repository's name, in its own column before the age, when the list mixes repositories; empty otherwise. */
-    meta: string;
-    /** How long ago it changed, at the row's end. */
-    age?: string;
+    /** The item's title led by its reference, an ItemTitle. */
+    title: ReactNode;
+    /** Its project (a RepoCell), in its own column before the age, when the list mixes repositories. */
+    project?: ReactNode;
+    /** How long ago it changed (an Age), at the row's end. */
+    age?: ReactNode;
     /** Some row in the list has labels: the rows have a labels column, so labels start at one place down the list; a row
      *  with none gives its cell to its title. */
     labelColumn?: boolean;
@@ -204,13 +206,12 @@ interface ListItemRowProps {
  *  page. A row with no labels gives their cell to its title. Every row has one height. */
 export function ListItemRow({
     item,
+    picked = false,
     name,
     onOpen,
     source,
-    reference,
     title,
-    repoIcon,
-    meta,
+    project,
     age,
     labelColumn = false,
     labels = [],
@@ -225,16 +226,13 @@ export function ListItemRow({
             onClick={onOpen}
             data-item={item}
             title={name}
-            className="list-row hover:bg-fill-hover focus-ring-inset col-span-full -mx-3 grid h-9 min-w-0 grid-cols-subgrid items-center rounded-lg px-3 text-left whitespace-nowrap"
+            className={`list-row ${ROW_BOX} ${pickedRow(picked)} focus-ring-inset col-span-full -mx-3 grid h-9 min-w-0 grid-cols-subgrid items-center px-3 text-left whitespace-nowrap`}
         >
             {/* Room for a kind and a source mark, so every title starts on one line down the list. */}
             <span className="text-fg-muted flex items-center gap-2">{source}</span>
             {/* With no labels of its own, the title takes the labels' empty cell too. */}
             <span className={`flex min-w-0 items-center gap-3 ${labelColumn && !labels.length ? 'col-span-2' : ''}`}>
-                <span className="text-fg min-w-0 flex-1 truncate text-sm">
-                    {reference ? <span className="text-fg-muted">{reference} </span> : null}
-                    {title}
-                </span>
+                <span className="text-fg min-w-0 flex-1 truncate text-sm">{title}</span>
                 {note && (
                     <span className="text-fg-muted max-w-48 shrink-0 truncate text-xs" data-row-note>
                         {note}
@@ -243,40 +241,25 @@ export function ListItemRow({
             </span>
             {labelColumn && labels.length > 0 && (
                 <span
-                    className="text-fg-muted [&_[data-label-chip]]:text-fg-muted flex min-w-0 items-center gap-1.5 text-xs [&_[data-label-chip]]:bg-transparent [&_[data-label-chip]]:font-normal [&_[data-label-chip]_[style*='--status-dot']]:bg-[color-mix(in_oklab,var(--status-dot)_60%,var(--color-fg))] dark:[&_[data-label-chip]_[style*='--status-dot']]:bg-(--status-dot)"
+                    className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs"
                     title={labels.join('\n')}
                     data-row-labels
                 >
-                    {chip && <span className="flex max-w-40 min-w-0">{chip}</span>}
-                    {more.length > 0 && <span className="shrink-0 tabular-nums">+{more.length}</span>}
+                    {chip && (
+                        <span className="flex max-w-40 min-w-0">
+                            <QuietLabel>{chip}</QuietLabel>
+                        </span>
+                    )}
+                    {more.length > 0 && <OverflowCount n={more.length} />}
                 </span>
             )}
             {/* Its project in a column of its own, so it starts at one place on every row. */}
-            {meta && (
-                <span className="text-fg-soft flex min-w-0 items-center gap-1.5 text-xs" data-row-project>
-                    {repoIcon}
-                    <span className="min-w-0 truncate">{meta}</span>
+            {project && (
+                <span className="text-fg-soft flex min-w-0 text-xs" data-row-project>
+                    {project}
                 </span>
             )}
             <span className="text-fg-muted text-right text-xs tabular-nums">{age}</span>
         </button>
-    );
-}
-
-/** What the List says in place of items: nothing matches, nothing in List, or still loading. With `reading`, it
- *  follows items as more may arrive. */
-export function ListNote({
-    children,
-    reading = false,
-}: {
-    /** What the List says, such as "Nothing matches". */
-    children: ReactNode;
-    /** More items may still arrive: the note follows them. */
-    reading?: boolean;
-}) {
-    return (
-        <p className={`text-fg-muted m-0 p-4 text-sm ${reading ? '' : 'empty'}`} data-reading={reading || undefined}>
-            {children}
-        </p>
     );
 }

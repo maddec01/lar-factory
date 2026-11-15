@@ -6,6 +6,8 @@ import { TooltipPopupBase } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
 import { DetailsHeading } from './ItemDetailSections';
+import { MARK_STROKE } from './StatusColors';
+import { MetaDot } from './TextParts';
 
 /** What a thread's activity line says it is doing. */
 export type ActivityState = 'working' | 'quiet' | 'waiting' | 'stopped' | 'unavailable';
@@ -13,10 +15,10 @@ export type ActivityState = 'working' | 'quiet' | 'waiting' | 'stopped' | 'unava
 /** Quiet is hollow and stopped is square, so each reads apart from working without its colour. */
 const MARK: Record<ActivityState, string> = {
     working: 'rounded-full bg-board-active',
-    quiet: 'rounded-full border-[1.5px] border-warning-fg',
+    quiet: `rounded-full ${MARK_STROKE} border-warning-fg`,
     waiting: 'rounded-full bg-board-you',
     stopped: 'rounded-xs bg-board-idle',
-    unavailable: 'rounded-full border-[1.5px] border-board-idle',
+    unavailable: `rounded-full ${MARK_STROKE} border-board-idle`,
 };
 
 /** A path in the line's words as its file's name, such as "bitmap.ts"; the line's tooltip keeps the path. */
@@ -94,12 +96,12 @@ export function ActivityLine({
             <Words state={state}>{action}</Words>
             {age !== undefined && (
                 <span data-age className="shrink-0 tabular-nums">
-                    · {age}
+                    <MetaDot /> {age}
                 </span>
             )}
             {agents && (
                 <span data-agents className="shrink-0 tabular-nums">
-                    · {agents}
+                    <MetaDot /> {agents}
                 </span>
             )}
         </span>
@@ -155,7 +157,11 @@ export function AgentRow({
             <span className={`inline-block size-2 self-center ${MARK[state]}`} />
             <span className="flex min-w-0 gap-1.5">
                 <span className="min-w-0 truncate font-medium">{title}</span>
-                {model && <span className="text-fg-muted shrink-0">· {model}</span>}
+                {model && (
+                    <span className="text-fg-muted shrink-0">
+                        <MetaDot /> {model}
+                    </span>
+                )}
             </span>
             {age || <span />}
             {action && (

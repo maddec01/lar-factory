@@ -3,11 +3,12 @@
 // action beside it, and under it a second line on the same columns.
 
 import { Loading } from '@lar-works/design-system';
-import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
 import { useArrival } from './BoardLife';
-import { pickedRow, ROW_ACTION, ROW_OPENS } from './RowStyles';
+import { FoldToggle } from './FoldToggle';
+import { pickedRow, ROW_ACTION, ROW_BOX, ROW_OPENS } from './RowStyles';
+import { OneLineAction } from './StartAfterButton';
 import { StateWord } from './StateWord';
 
 /** A stage row, a line on its section's card: `item` names it as `data-item`, `picked` marks the item the dialog
@@ -20,8 +21,11 @@ export function StageRowItem({
     item,
     picked,
     attention = false,
+    part = false,
     children,
 }: {
+    /** A concept's part, in its parts box: also named as `data-part`. */
+    part?: boolean;
     /** The item, named as `data-item`. */
     item: string;
     /** The item the dialog shows now. */
@@ -38,11 +42,10 @@ export function StageRowItem({
             data-item={item}
             data-arrived={arrival?.from}
             data-attention={attention || undefined}
+            data-part={part ? item : undefined}
             className="@container"
         >
-            <div className={`hover:bg-fill-hover rounded-lg py-1.5 transition-colors ${pickedRow(picked)}`}>
-                {children}
-            </div>
+            <div className={`${ROW_BOX} py-1.5 ${pickedRow(picked)}`}>{children}</div>
         </li>
     );
 }
@@ -224,7 +227,7 @@ export function RowSide({
     if (!passEmpty)
         return (
             <span data-col="side" className={`row-side ${ROW_ACTION}`}>
-                {children}
+                <OneLineAction>{children}</OneLineAction>
             </span>
         );
 
@@ -236,7 +239,7 @@ export function RowSide({
                     if (event.target !== event.currentTarget) event.stopPropagation();
                 }}
             >
-                {children}
+                <OneLineAction>{children}</OneLineAction>
             </span>
         </span>
     );
@@ -279,59 +282,20 @@ export function RowProgress({
 }
 
 /** The last of a row's facts, its cost and state, flush with the row's end; a hovered row's action stands in their
- *  place. */
+ *  place. A `full` end says every agent figure, and its track takes their width (rows.css). */
 export function RowMetaEnd({
+    full = false,
     children,
 }: {
+    /** It holds every agent figure, not the cost alone. */
+    full?: boolean;
     /** The cost, then the state. */
     children: ReactNode;
 }) {
     return (
-        <span data-meta-end className="row-meta-end">
+        <span data-meta-end data-full={full || undefined} className="row-meta-end">
             {children}
         </span>
-    );
-}
-
-/** A row's second line: `bar` and `count` on the left, `children` in its text slot, then its pull requests and
- *  figures. A click on it beside its controls goes to `onClick`. */
-export function RowSecondLine({
-    bar,
-    count,
-    prs,
-    figures,
-    onClick,
-    children,
-}: {
-    /** A bar on the left, such as a SliceBar. */
-    bar?: ReactNode;
-    /** A RowCount or RowSliceToggle; with none, its cell stays empty. */
-    count?: ReactNode;
-    /** The pull requests, as PullRequestRefs. */
-    prs?: ReactNode;
-    /** Figures at the line's end. */
-    figures?: ReactNode;
-    /** Called with a click on the line beside its controls. */
-    onClick?: ((event: MouseEvent<HTMLElement>) => void) | undefined;
-    /** The line's text, after the bar and count. */
-    children?: ReactNode;
-}) {
-    return (
-        <div data-progress onClick={onClick} className={`row-second ${onClick ? 'cursor-pointer' : ''}`}>
-            <span data-col="next" className="flex min-w-0 flex-wrap items-center gap-3">
-                {children}
-            </span>
-            <span data-col="progress" className="flex min-w-0 items-center gap-2">
-                <span data-col="bar" className="min-w-0 flex-1">
-                    {bar}
-                </span>
-                {count || <span data-col="count" />}
-            </span>
-            <span data-col="pr" className="flex min-w-0 gap-2 overflow-hidden tabular-nums">
-                {prs}
-            </span>
-            <span data-col="figures">{figures}</span>
-        </div>
     );
 }
 
@@ -371,16 +335,9 @@ export function RowSliceToggle({
     children: ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            data-col="count"
-            className={`hover:text-fg flex h-4 items-center gap-1 justify-self-start rounded-xs tabular-nums ${ROW_OPENS}`}
-        >
+        <FoldToggle open={open} onToggle={onToggle} data-col="count">
             <span className="sr-only">{label}:</span> {children}
-            {open ? <ChevronDownIcon className="size-3" /> : <ChevronRightIcon className="size-3" />}
-        </button>
+        </FoldToggle>
     );
 }
 

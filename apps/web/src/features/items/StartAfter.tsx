@@ -87,7 +87,7 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
     if (armed) {
         return (
             <StartAfterButton
-                {...kindOf(onRow ? 'open' : 'main')}
+                {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 mark="✓"
                 data-start-after={item.id}
@@ -112,7 +112,7 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
         <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
             <DropdownMenu.Trigger asChild>
                 <StartAfterButton
-                    {...kindOf(onRow ? 'open' : 'main')}
+                    {...kindOf(onRow ? 'start' : 'main')}
                     leftIcon={ICON.play}
                     rightIcon={<ChevronDownIcon />}
                     data-start-after={item.id}
@@ -188,7 +188,7 @@ export function StartOrAfter({
     return (
         <>
             <Button
-                {...kindOf(onRow ? 'open' : 'main')}
+                {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 data-start={item.id}
                 disabled
@@ -232,7 +232,7 @@ export function HeldStartAfter({
     return (
         <>
             <StartAfterButton
-                {...kindOf(onRow ? 'open' : 'main')}
+                {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
                 data-start={unavailable ? undefined : item.id}
                 data-build-unavailable={unavailable ? item.id : undefined}

@@ -16,11 +16,16 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
 import { buttonKind, DraftFields, PanelField } from '@/ui/board';
 
-const KIND_CHOICES = ITEM_KINDS.map((value) => {
-    const { name, icon: Icon, hue } = KIND_BADGES[value]!;
+// Built on first render, not as the module loads: Settings' rows load the board's line, which loads this form while the
+// kind badges it reads may still be loading.
+const buildChoices = () =>
+    ITEM_KINDS.map((value) => {
+        const { name, icon: Icon, hue } = KIND_BADGES[value]!;
 
-    return { value, label: name, icon: <Icon />, hue };
-});
+        return { value, label: name, icon: <Icon />, hue };
+    });
+let choices: ReturnType<typeof buildChoices> | undefined;
+const kindChoices = () => (choices ??= buildChoices());
 
 /** The form's values, the editor's `description` and the Create issue `createChoice`, for the store to keep. */
 function valuesOf(form: HTMLFormElement, description: string, createChoice: boolean | null): DraftValues {
@@ -165,7 +170,7 @@ export function AddItemForm() {
                                     setKindMissing(false);
                                     setKind(kind);
                                 }}
-                                options={KIND_CHOICES}
+                                options={kindChoices()}
                                 aria-describedby={kindMissing ? 'item-kind-error' : undefined}
                                 invalid={kindMissing}
                             />

@@ -1,5 +1,8 @@
-import { ChevronDownIcon, ChevronRightIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
+
+import { FoldToggle } from './FoldToggle';
+import { COMPACT_ROW, pickedRow } from './RowStyles';
+import { MAP_LAYER } from './WorkMapLayers';
 
 /** The finished history's quiet toggle at `top`: one muted line on the lane names' left edge, its done glyph, what
  *  it holds ("3 settled decisions · 17 finished builds") and Show or Hide with its chevron. It stays there, inside the
@@ -30,28 +33,24 @@ export function MapHistoryGroup({
 }) {
     return (
         <div className="absolute inset-x-0 flex items-center" style={{ top, height }}>
-            <button
-                type="button"
-                aria-expanded={open}
-                aria-label={`${open ? 'Hide' : 'Show'} ${children}`}
-                onClick={onToggle}
-                data-map-history
+            {/* Opaque, so the group's line runs on from under it and rails scrolled past never show through its words. */}
+            {/* The board's fold, its words on the lane names' 12px edge. */}
+            <span
+                className={`bg-surface-page sticky left-1 ${MAP_LAYER.history} flex max-w-[calc(100cqw-0.5rem)] min-w-0 rounded-xs px-2 py-1`}
                 onMouseEnter={() => onHover(true)}
                 onMouseLeave={() => onHover(false)}
-                // The list's toggle: muted 12px text, a hover fill, its words on the lane names' 12px edge.
-                className="text-fg-muted hover:bg-fill-hover focus-ring sticky left-1 flex max-w-[calc(100cqw-0.5rem)] min-w-0 items-center gap-1.5 rounded-xs px-2 py-1 text-left text-xs"
             >
-                <span className="flex shrink-0">{glyph}</span>
-                <span className="min-w-0 truncate">{children}</span>
-                <span className="inline-flex shrink-0 items-center gap-0.5">
-                    {open ? 'Hide' : 'Show'}
-                    {open ? (
-                        <ChevronDownIcon aria-hidden="true" className="size-3.5" />
-                    ) : (
-                        <ChevronRightIcon aria-hidden="true" className="size-3.5" />
-                    )}
-                </span>
-            </button>
+                <FoldToggle
+                    open={open}
+                    label={`${open ? 'Hide' : 'Show'} ${children}`}
+                    onToggle={onToggle}
+                    data-map-history
+                >
+                    <span className="flex shrink-0">{glyph}</span>
+                    <span className="min-w-0 truncate">{children}</span>
+                    <span className="shrink-0">{open ? 'Hide' : 'Show'}</span>
+                </FoldToggle>
+            </span>
         </div>
     );
 }
@@ -77,6 +76,7 @@ export function MapHistoryList({
  *  repository, pull requests and thread. */
 export function HistoryRow({
     id,
+    picked,
     glyph,
     kind,
     name,
@@ -88,6 +88,8 @@ export function HistoryRow({
 }: {
     /** The part's item, named as `data-item`. */
     id: string;
+    /** The item the dialog shows now. */
+    picked: boolean;
     /** The part's status glyph. */
     glyph: ReactNode;
     /** The part's kind. */
@@ -107,7 +109,7 @@ export function HistoryRow({
 }) {
     return (
         <li
-            className="hover:bg-fill-hover grid min-h-12 min-w-0 grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 rounded-md px-3 py-2 text-sm"
+            className={`${COMPACT_ROW} ${pickedRow(picked)} grid min-h-12 min-w-0 grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-sm`}
             data-history-part={id}
         >
             {glyph}
@@ -116,7 +118,7 @@ export function HistoryRow({
                 type="button"
                 onClick={onOpen}
                 title={name}
-                className="focus-ring col-span-2 min-w-0 rounded-xs text-left wrap-anywhere hover:underline"
+                className="focus-ring col-span-2 min-w-0 rounded-xs text-left wrap-anywhere"
             >
                 {title}
             </button>

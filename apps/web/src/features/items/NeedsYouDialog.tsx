@@ -3,7 +3,7 @@
 
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
 import { needsYouPrompt } from '@lar-factory/shared';
-import { Alert, Button, DropdownMenu, ConfirmDialog, Modal, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, DropdownMenu, ConfirmDialog, Loading, Modal, Stack, Text } from '@lar-works/design-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { writeState } from './ActionAvailability';
@@ -226,7 +226,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                         <Text id="needs-you-detail" tone="muted">
                             {prompt.detail}
                         </Text>
-                        {checking && <Text role="status">Checking the branch and PR...</Text>}
+                        {checking && <Loading presentation="status" label="Checking the branch and PR…" />}
                         {inspection && !cleanup && (
                             <>
                                 {inspection.warning && (

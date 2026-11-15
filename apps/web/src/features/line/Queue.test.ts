@@ -98,7 +98,7 @@ test('a Queued item blocked by an open issue shows only Start after', async () =
 
     expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual([
         'Start after #202',
-        'open',
+        'start',
         true,
     ]);
     expect(text(row('I_sample05').querySelector('[data-blocked]'))).toBe('Blocked by #202 until it completes');

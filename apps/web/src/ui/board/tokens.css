@@ -29,3 +29,9 @@
         --color-board-review: oklch(0.7 0.1 var(--category-violet));
     }
 }
+
+/* The label column of an item's facts (its properties, Ticket, Threads) and a vocabulary row: one width, so their
+   values start at one place. */
+:root {
+    --fact-label: 5.5rem;
+}

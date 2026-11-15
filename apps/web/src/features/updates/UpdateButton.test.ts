@@ -67,11 +67,11 @@ function stubBridge(start: UpdateState) {
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
 }
 
-const control = () => $<HTMLButtonElement>('.title-bar .update-button')!;
+const control = () => $<HTMLButtonElement>('.title-bar [data-update-button]')!;
 const popover = () => $('[data-slot="popover-content"]');
 const confirmation = () => $('[data-restart-confirm]');
 const click = () => settle(() => control().click());
-const next = () => settle(() => $<HTMLButtonElement>('.update-next')!.click());
+const next = () => settle(() => $<HTMLButtonElement>('[data-update-next]')!.click());
 const answer = (label: string) =>
     settle(() =>
         [...confirmation()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!.click(),
@@ -133,10 +133,10 @@ test('the same anchored popover survives download progress and completion', asyn
     expect(control().getAttribute('aria-label')).toBe('Downloading 1.1.0 · 42%');
     expect(control().querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('42');
     expect(text(popover())).toContain('Downloading 1.1.0… 42%');
-    expect($('.update-next')).toBeNull();
+    expect($('[data-update-next]')).toBeNull();
     await push(downloaded);
     expect(popover()).toBe(details);
-    expect(text($('.update-next'))).toBe('Restart now');
+    expect(text($('[data-update-next]'))).toBe('Restart now');
 });
 
 test('an empty changelog leaves the versions and action usable', async () => {
@@ -144,7 +144,7 @@ test('an empty changelog leaves the versions and action usable', async () => {
     await mountPage();
     await click();
     expect(text(popover())).toContain('You have 1.0.0');
-    expect(text($('.update-next'))).toBe('Download');
+    expect(text($('[data-update-next]'))).toBe('Download');
 });
 
 test.each([idle, { ...idle, status: 'checking' as const }, { ...idle, enabled: false, status: 'disabled' as const }])(
@@ -241,7 +241,7 @@ test('a background check retains the restart indicator and blocks installation u
     await push({ ...downloaded, status: 'checking' });
     expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
     await click();
-    expect($<HTMLButtonElement>('.update-next')!.disabled).toBe(true);
+    expect($<HTMLButtonElement>('[data-update-next]')!.disabled).toBe(true);
     await next();
     expect(confirmation()).toBeNull();
     expect(bridge.installUpdate).not.toHaveBeenCalled();

@@ -176,7 +176,7 @@ test('Build’s header counts the factory’s builds against the automatic build
     // Build's header carries the occupancy; Ready's controls keep only what starts builds.
     expect(text($('[data-ready-build-controls]'))).toBe('Auto-build');
     expect(header.getAttribute('title')).toContain(
-        'At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.',
+        'At capacity, you can start an item over the limit; automatic starts wait for a slot.',
     );
     expect(header.getAttribute('title')).not.toContain('exceed');
     expect(header.querySelectorAll('.bar')).toHaveLength(5);
@@ -600,9 +600,9 @@ test('the count unfolds the slice list under the row and folds it again, without
     ]);
     // #145 is recorded active, but #140 still waits on #202, so it shows waiting.
     expect([...list('I_sample13')!.querySelectorAll('li')].map(text)).toEqual([
-        '#144Owner table and sign-upDone',
-        '#145Sign-in sessionsBlocked',
-        '#146Owner settings pageQueued',
+        '#144 Owner table and sign-upDone',
+        '#145 Sign-in sessionsBlocked',
+        '#146 Owner settings pageQueued',
     ]);
     expect(dialog()).toBeNull();
     await settle(async () =>
@@ -736,7 +736,7 @@ test('live slice transitions update the bar, expanded list and count without a r
         await settle(() => useBoardStore.getState().receive(data));
         expect(text(list()!.querySelectorAll('li')[1]!)).toMatch(
             new RegExp(
-                `#101Issue 101${progress === 'waiting' ? 'Queued' : progress === 'active' ? 'Working' : progress.charAt(0).toUpperCase() + progress.slice(1)}$`,
+                `#101 Issue 101${progress === 'waiting' ? 'Queued' : progress === 'active' ? 'Working' : progress.charAt(0).toUpperCase() + progress.slice(1)}$`,
             ),
         );
         expect(countShown(count())).toBe(progress === 'done' ? '2/3 slices done' : '1/3 slices done');

@@ -4,19 +4,11 @@ import { CheckIcon, CircleIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { DetailFact, MainSection, SectionHeader } from './ItemDetails';
+import { MetaLine, Moment } from './TextParts';
 import { workHoldReason } from './work-hold-reason';
 
 function RecordedAt({ evidence }: { evidence: ReleaseEvidence }) {
-    const date = new Date(evidence.at);
-    const when = Number.isNaN(date.getTime())
-        ? evidence.at
-        : date.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-    return (
-        <time dateTime={evidence.at} title={evidence.at}>
-            {when}
-        </time>
-    );
+    return <Moment at={evidence.at} />;
 }
 
 /** Keep receipts short; pointer and keyboard users can inspect or copy the exact evidence. */
@@ -89,19 +81,21 @@ export function ReleaseProgress({
                                     {step.what}
                                 </Text>
                                 {!!step.shipsWith?.length && (
-                                    <Text variant="caption" breaks>
-                                        Ships with: {step.shipsWith.map(name).join(' + ')}
-                                    </Text>
+                                    <DetailFact presentation="record" label="Ships with">
+                                        <Text as="span" variant="caption" breaks>
+                                            {step.shipsWith.map(name).join(' + ')}
+                                        </Text>
+                                    </DetailFact>
                                 )}
                                 <Text variant="caption" tone="muted" breaks>
-                                    {step.who} · {step.done ? 'Done' : 'Pending'}
-                                    {step.done && (
-                                        <>
-                                            {' '}
-                                            · <RecordedAt evidence={step.done} />
-                                            {step.done.by !== step.who && ` · recorded by ${step.done.by}`}
-                                        </>
-                                    )}
+                                    <MetaLine
+                                        parts={[
+                                            step.who,
+                                            step.done ? 'Done' : 'Pending',
+                                            step.done && <RecordedAt key="at" evidence={step.done} />,
+                                            step.done && step.done.by !== step.who && `recorded by ${step.done.by}`,
+                                        ]}
+                                    />
                                 </Text>
                                 {step.done && <Evidence evidence={step.done} />}
                             </div>
@@ -112,13 +106,15 @@ export function ReleaseProgress({
             <div className="grid min-w-0 gap-1" data-outcome-check>
                 <DetailFact label="Outcome check">
                     <Text as="span" breaks>
-                        {outcome.what} · {outcome.result}
+                        <MetaLine parts={[outcome.what, outcome.result]} />
                     </Text>
                 </DetailFact>
                 {outcome.evidence && (
                     <>
                         <Text variant="caption" tone="muted">
-                            {outcome.evidence.by} · <RecordedAt evidence={outcome.evidence} />
+                            <MetaLine
+                                parts={[outcome.evidence.by, <RecordedAt key="at" evidence={outcome.evidence} />]}
+                            />
                         </Text>
                         <Evidence evidence={outcome.evidence} />
                     </>

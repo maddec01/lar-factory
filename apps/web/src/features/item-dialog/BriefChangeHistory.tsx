@@ -3,7 +3,7 @@ import { Alert, Button, Stack, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
-import { buttonKind, DetailFact, FactList } from '@/ui/board';
+import { buttonKind, DetailFact, FactList, MetaLine, Moment } from '@/ui/board';
 
 export function BriefChangeHistory({
     itemId,
@@ -33,7 +33,11 @@ export function BriefChangeHistory({
                 {requests.map((request) => (
                     <DetailFact
                         key={request.requestId}
-                        label={`Changes requested by ${request.by} · ${new Date(request.at).toLocaleString()}`}
+                        label={
+                            <MetaLine
+                                parts={[`Changes requested by ${request.by}`, <Moment key="at" at={request.at} />]}
+                            />
+                        }
                     >
                         <Text>{request.note}</Text>
                         <Text variant="caption" tone="muted">

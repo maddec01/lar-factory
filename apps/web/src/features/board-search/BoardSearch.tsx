@@ -6,7 +6,6 @@
 import { boardApp } from '@lar-factory/shared';
 import {
     Button,
-    EmptyState,
     CommandPalette,
     CommandPaletteGroup,
     CommandPaletteOption,
@@ -24,7 +23,7 @@ import { useItemStates } from '@/features/items';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { buttonKind } from '@/ui/board';
+import { buttonKind, NoMatches } from '@/ui/board';
 
 /** The step the Update pill would run now; none while it does nothing, as when another step is under way. */
 function useUpdateStep() {
@@ -103,21 +102,13 @@ function Dialog({
             onClose={onClose}
             listLabel="Search results"
             empty={
-                <EmptyState
+                <NoMatches
                     size="inline"
-                    title="Nothing matches"
-                    actions={
-                        <Button
-                            variant="secondary"
-                            onClick={() => {
-                                setQuery('');
-                                setWidened(false);
-                                setAllSettings(false);
-                            }}
-                        >
-                            Clear search
-                        </Button>
-                    }
+                    onClear={() => {
+                        setQuery('');
+                        setWidened(false);
+                        setAllSettings(false);
+                    }}
                 />
             }
             busy={reading}

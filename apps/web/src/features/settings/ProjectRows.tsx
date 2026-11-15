@@ -7,7 +7,7 @@ import { custom, type Group, type Row, type SettingsData } from './SettingsModel
 import { useSettingsStore } from './SettingsStore';
 import { stoppedAt, useWizardStore } from '@/features/onboarding';
 import { ProjectIcon } from '@/features/repositories';
-import { buttonKind, SettingsRowOpen } from '@/ui/board';
+import { buttonKind, MetaLine, SettingsRowOpen } from '@/ui/board';
 
 const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current sprint' } as const;
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
@@ -26,9 +26,9 @@ export function repositoryGroup(data: SettingsData): Group {
         title: shownRepo(r.repo),
         icon: <ProjectIcon repo={r.repo} size="md" />,
         description: (
-            <>
-                {itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
-            </>
+            <MetaLine
+                parts={[itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub', sourceName(itemSource(r), r.team)]}
+            />
         ),
         // The whole row opens the project's page.
         control: custom(() =>

@@ -12,6 +12,9 @@ interface ArchiveState {
     load: () => Promise<void>;
 }
 
+/** A reason as a sentence: its first letter in capitals. */
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 /** Counts reads, so only the latest one's answer shows. */
 let reads = 0;
 
@@ -30,8 +33,7 @@ export const useArchiveStore = create<ArchiveState>()((set) => ({
 
             if (read === reads) set({ items, problem: null });
         } catch (err) {
-            if (read === reads)
-                set({ problem: `Can’t read Archive: ${err instanceof Error ? err.message : String(err)}.` });
+            if (read === reads) set({ problem: `${sentence(err instanceof Error ? err.message : String(err))}.` });
         }
     },
 }));

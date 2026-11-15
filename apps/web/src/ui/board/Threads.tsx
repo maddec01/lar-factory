@@ -1,7 +1,9 @@
 // A piece of work's earlier T3 threads, in the item dialog.
 
-import { linkRecipe } from '@lar-works/design-system/primitives';
+import { Link } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
+
+import { MetaDot } from './TextParts';
 
 /** The earlier threads, one EarlierThread each, in small muted text. */
 export function EarlierThreadList({
@@ -12,7 +14,10 @@ export function EarlierThreadList({
 }) {
     // A property of the item as the sidebar lists them: "Threads" in the label column, each thread beside it.
     return (
-        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 text-xs" data-earlier-threads>
+        <div
+            className="grid grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 text-xs"
+            data-earlier-threads
+        >
             <span className="text-fg-muted leading-7">Threads</span>
             <ul className="m-0 grid list-none p-0">{children}</ul>
         </div>
@@ -39,9 +44,11 @@ export function EarlierThread({
     return (
         <li className="text-fg-muted flex min-h-7 min-w-0 items-center gap-1.5" title={title}>
             {href ? (
-                <a href={href} data-thread-name className={`truncate ${linkRecipe.accent}`}>
-                    {name}
-                </a>
+                <span className="min-w-0 truncate">
+                    <Link href={href} variant="caption" data-thread-name>
+                        {name}
+                    </Link>
+                </span>
             ) : (
                 <span data-thread-name className="truncate">
                     {name}
@@ -49,7 +56,7 @@ export function EarlierThread({
             )}
             {state && (
                 <span data-thread-state className="shrink-0">
-                    · {state}
+                    <MetaDot /> {state}
                 </span>
             )}
         </li>

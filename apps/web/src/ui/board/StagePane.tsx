@@ -38,7 +38,7 @@ export function StagePane({
     count: number;
     /** What sits at the header's end, such as a BuildLimit. */
     right?: ReactNode;
-    /** What the lane says with no rows, a StagePaneEmpty: given, the lane collapses to its header line. */
+    /** What the lane says with no rows, a HeaderEmpty: given, the lane collapses to its header line. */
     empty?: ReactNode;
     /** The stage's StageList. */
     children?: ReactNode;
@@ -78,28 +78,6 @@ export function StageList({
     children: ReactNode;
 }) {
     return <ol className="m-0 grid list-none gap-0.5 p-0">{children}</ol>;
-}
-
-/** What a collapsed lane's header line says: that it's loading, that nothing is in it, or that the filters hide every
- *  row, muted at its end. A `quiet` one (nothing in it, which its count of 0 already says) and, on a phone, every one
- *  says it to screen readers only, so the line keeps the room for the lane's name. */
-export function StagePaneEmpty({
-    quiet = false,
-    children,
-}: {
-    /** Says it to screen readers only. */
-    quiet?: boolean;
-    /** What the lane says, such as "Nothing here". */
-    children: ReactNode;
-}) {
-    return (
-        <p
-            data-pane-empty
-            className={`text-fg-muted m-0 min-w-0 truncate text-xs ${quiet ? 'sr-only' : 'max-sm:sr-only'}`}
-        >
-            {children}
-        </p>
-    );
 }
 
 /** Builds at work against the build limit, in a section's header: one bar per build the `limit` allows, more when

@@ -472,7 +472,7 @@ test.each([
         expect(text(card(original.id))).toContain('Answer in T3');
 
         if (patch.checkProgress && 'prWideChecks' in patch.checkProgress)
-            expect(text(card(original.id))).toContain('PR-wide statuses: 0 passed · 1 running · 0 failed · 1 total');
+            expect(text(card(original.id))).toContain('PR-wide statuses0 passed · 1 running · 0 failed · 1 total');
 
         expect(dialog()).toBeNull();
     },

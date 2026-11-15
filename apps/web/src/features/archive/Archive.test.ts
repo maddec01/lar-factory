@@ -148,13 +148,14 @@ test('each row is one line in its section: the title truncates, its project, the
     const sectionOf = (el: Element) => text(el.closest('section')?.querySelector('h2, h3'));
 
     expect(aside.querySelector('[data-archive-title]')!.getAttribute('title')).toBe('#41 Put away');
-    expect(text(aside.querySelector('[data-archive-line]')), 'its section already says Set aside').toBe(
-        '#41 Put awaylar-server',
-    );
-    // Where each ticket is saved leads the line, as it did before: on a board that mixes trackers, GitHub's mark too.
-    expect(done.querySelector('[data-archive-line] [role="img"]')?.getAttribute('aria-label')).toBe(
-        'GitHub issue. Saved on GitHub.',
-    );
+    expect(text(aside.querySelector('[data-archive-title]'))).toBe('#41 Put away');
+    expect(text(aside.querySelector('[data-repo-cell]'))).toContain('lar-server');
+    expect(aside.querySelector('[data-archive-state]'), 'its section already says Set aside').toBeNull();
+    // Its kind and where each ticket is saved lead the line, as a List row's do: on a board that mixes trackers,
+    // GitHub's mark too.
+    expect(
+        [...done.querySelectorAll('[data-archive-line] [role="img"]')].map((mark) => mark.getAttribute('aria-label')),
+    ).toContain('GitHub issue. Saved on GitHub.');
     expect(sectionOf(aside)).toBe('Set aside');
     expect(sectionOf(done)).toBe('Finished');
     expect(aside.querySelector('[data-archive-state]')).toBeNull();

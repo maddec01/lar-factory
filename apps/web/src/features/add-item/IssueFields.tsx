@@ -8,7 +8,7 @@ import {
     type TicketOptions,
 } from '@lar-factory/shared';
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
-import { Alert, Button, Checkbox, InlineLink, Loading, OptionSelect, Stack, Text } from '@lar-works/design-system';
+import { Checkbox, Loading, OptionSelect, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import type { DraftValues } from './AddItemStore';
@@ -17,7 +17,7 @@ import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { readTicketOptions } from '@/services/tickets/tickets.service';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
-import { CreateIssueChoice, DraftTicketPart, PanelField } from '@/ui/board';
+import { CreateIssueChoice, DraftTicketPart, LoadFailed, PanelField, RetryAction } from '@/ui/board';
 
 /** An optional ticket field, for a form to read; a value no longer among its choices starts at None. */
 function OptionField({
@@ -62,7 +62,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
                 if (current) setRead(options);
             })
             .catch(() => {
-                if (current) setError('Couldn’t read issue options. You can still submit the title and description.');
+                if (current) setError('Couldn’t load issue options.');
             });
 
         return () => {
@@ -72,28 +72,18 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
 
     if (error)
         return (
-            <Alert
-                size="sm"
-                tone="warning"
-                title="Couldn’t read issue options"
-                description="You can still submit the title and description."
-                action={
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                            setError('');
-                            setRead(null);
-                            setAttempt((n) => n + 1);
-                        }}
-                    >
-                        Try again
-                    </Button>
-                }
+            <LoadFailed
+                what="issue options"
+                reason="You can still submit the title and description."
+                onRetry={() => {
+                    setError('');
+                    setRead(null);
+                    setAttempt((n) => n + 1);
+                }}
             />
         );
 
-    if (!read) return <Loading presentation="status" label="Reading issue options… You can submit while they load." />;
+    if (!read) return <Loading presentation="status" label="Loading issue options… You can submit while they load." />;
 
     const setup = repo.setup;
     const access = setup?.access ?? {};
@@ -193,12 +183,12 @@ export function CreateIssueBox({
                         {!sample && (
                             <>
                                 {' '}
-                                <InlineLink
-                                    disabled={sample || disabled || running !== null}
-                                    onClick={() => void useEditStore.getState().recheck(repo.repo)}
-                                >
-                                    Recheck access
-                                </InlineLink>
+                                <RetryAction
+                                    access
+                                    inline
+                                    disabled={disabled || running !== null}
+                                    onRetry={() => void useEditStore.getState().recheck(repo.repo)}
+                                />
                             </>
                         )}
                     </Text>

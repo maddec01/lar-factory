@@ -47,7 +47,7 @@ test('a failed checks read retries, clears its error while pending and keeps its
     expect(text(section())).not.toContain('Checks temporarily unavailable');
     expect(text(section())).toContain('Loading checks');
     await settle(() => resolve(new Response(JSON.stringify({ checks: { runs: [], reuses: [] } }))));
-    expect(text(section())).toContain('No checks are recorded');
+    expect(text(section())).toContain('No checks yet.');
     await settle(() => {
         section().dispatchEvent(new Event('toggle'));
     });

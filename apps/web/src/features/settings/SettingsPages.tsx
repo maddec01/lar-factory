@@ -1,6 +1,5 @@
 import { writeAccessProblem, shownRepo } from '@lar-factory/shared';
 // Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
-import { Button, EmptyState } from '@lar-works/design-system';
 import { Archive, FolderGit2, Plug, Sparkles } from '@lar-works/design-system/icons';
 
 import { ChannelChoice, UpdateAction, UpdateStatus, UpdatesNote } from './AppRows';
@@ -9,13 +8,14 @@ import { FactorySettingsSection } from './FactorySettings';
 import { generalGroups } from './GeneralSettings';
 import { repositoryGroup } from './ProjectRows';
 import { RunChecks } from './RunChecks';
+import { emptyGroup } from './SettingsEmpty';
 import { custom, type Page, type PagesInput, type Row } from './SettingsModel';
 import { bundledGroup, targetGroup } from './SkillRows';
 import { DIAGNOSED, azSkipped, ghSkipped, stateOf, toolDescription } from './ToolRows';
 import { useEditStore } from '@/features/repositories';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
 import { ToolState } from '@/shared/settings/SettingControls';
-import { conceptIcons } from '@/ui/board';
+import { conceptIcons, RetryAction } from '@/ui/board';
 
 export { settingsData } from './SettingsModel';
 export type { Group, Page, PagesInput, SettingsData } from './SettingsModel';
@@ -122,15 +122,12 @@ export function pages(input: PagesInput): Page[] {
                             title: shownRepo(repo.repo),
                             description: problem ?? 'Ticket metadata can be edited.',
                             control: custom(() => (
-                                <Button
-                                    variant="secondary"
-                                    disabled={!!unavailable}
-                                    title={unavailable ?? undefined}
-                                    aria-description={unavailable ?? undefined}
-                                    onClick={() => void useEditStore.getState().recheck(repo.repo)}
-                                >
-                                    Recheck access
-                                </Button>
+                                <RetryAction
+                                    access
+                                    size="md"
+                                    unavailable={unavailable}
+                                    onRetry={() => void useEditStore.getState().recheck(repo.repo)}
+                                />
                             )),
                         };
                     }),
@@ -158,26 +155,12 @@ export function pages(input: PagesInput): Page[] {
             groups: input.app
                 ? [{ title: '', rows: updateRows(input), note: <UpdatesNote /> }]
                 : [
-                      {
-                          title: '',
-                          rows: [
-                              {
-                                  id: 'updates-in-app',
-                                  title: 'Updates',
-                                  control: {
-                                      type: 'row',
-                                      render: () => (
-                                          <EmptyState
-                                              size="compact"
-                                              icon={<conceptIcons.updates />}
-                                              title="Updates are in the Mac app"
-                                              description="Open Lar Factory on your Mac to check for updates."
-                                          />
-                                      ),
-                                  },
-                              },
-                          ],
-                      },
+                      emptyGroup({
+                          id: 'updates-in-app',
+                          icon: <conceptIcons.updates />,
+                          title: 'Updates are in the Mac app',
+                          description: 'Open Lar Factory on your Mac to check for updates.',
+                      }),
                   ],
         },
         {

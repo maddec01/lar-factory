@@ -185,7 +185,7 @@ test('removing a chip or clearing moves focus to the Kind menu, which always sta
     seed(LIST_KEY, ['bug'], ['gone']);
     // The filters show once List holds something to filter.
     await mountPage(withItems([item('L1', { status: 'List', kind: 'feature' })]));
-    await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
+    await settle(() => $<HTMLButtonElement>('.title-bar button[data-list-button]')!.click());
     await removeChip('gone');
     expect(document.activeElement).toBe(kindMenu());
     (document.activeElement as HTMLElement).blur();
@@ -209,7 +209,7 @@ test('List and the board keep separate filters, and filters write nothing to the
         withItems([listed('L1', 'feature'), listed('L2', 'bug'), item('Q1', { number: 1, kind: 'feature' })]),
     );
     expect(queueRows()).toEqual([]);
-    await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
+    await settle(() => $<HTMLButtonElement>('.title-bar button[data-list-button]')!.click());
 
     const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item);
 
@@ -230,7 +230,7 @@ test('the list counts follow the filters, and its Labels filter holds the chosen
             item('L2', { status: 'List', kind: 'feature', repo: other, labels: ['Docs', 'infra'] }),
         ]),
     );
-    await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
+    await settle(() => $<HTMLButtonElement>('.title-bar button[data-list-button]')!.click());
     await open('labels');
     expect(choices(), 'All projects lists the union, without case').toEqual(['docs', 'infra']);
     await choose('docs');

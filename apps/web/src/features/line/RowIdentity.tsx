@@ -63,6 +63,17 @@ export const RowKindMark = memo(function RowKindMark({
 
 /** Where the ticket is saved, as its bare muted icon, then the repository. GitHub is where tickets live unless a row
  *  says otherwise, so a GitHub ticket's row shows its repository alone; Azure and local work keep their mark. */
+/** A concept part's source and project after its title: its tracker's mark always, since a concept's parts mix GitHub
+ *  issues and parts saved only on this Mac, and its project, the concept's own (`home`) quietly. */
+export const PartSource = memo(function PartSource({ item, home }: { item: Item; home: boolean }) {
+    return (
+        <RowIdentity>
+            <SourceIcon item={item} bare always />
+            <RepoCell item={item} home={home} />
+        </RowIdentity>
+    );
+});
+
 export const RowSource = memo(function RowSource({ item }: { item: Item }) {
     const github = item.number > 0 && !(item.repo && onAzure(item.repo));
 

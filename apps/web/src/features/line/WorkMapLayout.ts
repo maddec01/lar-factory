@@ -171,12 +171,22 @@ export function layout(
         bands.push({ lane: PREREQUISITES, top: 0, height: top });
     }
 
-    lanes.forEach((lane) => {
+    // The end-to-end check sits in the first lane's first row, in the last column, inside a lane rather than across
+    // the rule between two; its rail's label takes the lane's lead room as a card's would.
+    let checkY = TOP;
+
+    lanes.forEach((lane, index) => {
         const here = current.filter((p) => laneOf(p) === lane);
         const inCol = (c: number) => here.filter((p) => depth.get(keyOf(p))! + offset === c);
         const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
         const first = Array.from({ length: cols }, (_, c) => inCol(c)[0]).filter(Boolean);
-        const lead = first.some((p) => labelledFrom.has(keyOf(p!))) ? TOP + EDGE_LABEL_ROOM : TOP;
+        const checkHere = check && index === 0;
+        const lead =
+            first.some((p) => labelledFrom.has(keyOf(p!))) || (checkHere && labelledFrom.has(CHECK))
+                ? TOP + EDGE_LABEL_ROOM
+                : TOP;
+
+        if (checkHere) checkY = top + lead;
 
         for (let c = 0; c < cols; c++) {
             inCol(c).forEach((p, r) =>
@@ -196,7 +206,7 @@ export function layout(
         top += height;
     });
 
-    const lanesEnd = check ? Math.max(top, TOP + PAD + nodeH) : top;
+    const lanesEnd = check ? Math.max(top, checkY + PAD + nodeH) : top;
 
     if (check)
         placed.push({
@@ -204,7 +214,7 @@ export function layout(
             part: null,
             col: cols - 1,
             x: LABEL_W + (cols - 1) * colW + GUTTER,
-            y: lanesEnd / 2 - nodeH / 2,
+            y: checkY,
         });
 
     // Arrows into the group carry their label just above it, in the column after their card; two in one column stack.
@@ -232,7 +242,10 @@ export function layout(
     const groupLines = Math.max(0, ...intoGroup.values());
     const groupY = lanesEnd + GROUP_PAD + groupLines * EDGE_LABEL_ROOM;
     const history = parts.length > current.length;
-    const fullWidth = Math.max(LABEL_W + cols * colW, width);
+    const drawn = LABEL_W + cols * colW;
+    // Wider than the frame, the map scrolls by whole columns to its end, so the last stop shows whole cards from the
+    // lane names on, never a sliver of one under them.
+    const fullWidth = drawn > width ? width + Math.ceil((drawn - width) / colW) * colW : Math.max(drawn, width);
 
     return {
         placed,
@@ -248,30 +261,51 @@ export function layout(
         colW,
         width: fullWidth,
         groupY,
+        /** The history group's line, which every rail starts or ends on. */
+        busY: groupY + GROUP_H / 2,
         height: groupY - GROUP_PAD + (history ? GROUP_H + GROUP_PAD * 2 : 0),
     };
 }
 
-/** An arrow's line between two placed nodes, or a history rail: from its label ("2 completed prerequisites") down the
- *  gutter before the card it leads to, so it stops at the card it serves rather than running down the map like a column
- *  rule, or from a card's end down the gutter after it into the group, so none passes behind a node. */
+/** How far a rail into a card runs in the gutter before it, and a rail out of one in the gutter after it: apart, so two
+ *  never run on one line. */
+const RAIL_IN = 8;
+const RAIL_OUT = 8;
+
+/** The history group's line: from the lane names' edge, under the group's toggle, to the last rail, so every rail
+ *  rises from it or ends on it, never in empty space; none when no rail joins the group. */
+export function busLine(m: ReturnType<typeof layout>, rails: { from?: Placed | undefined; to?: Placed | undefined }[]) {
+    const xs = rails.flatMap(({ from, to }) =>
+        to && !from ? [to.x - RAIL_IN] : from && !to ? [from.x + m.nodeW + RAIL_OUT] : [],
+    );
+
+    if (!xs.length) return null;
+
+    const end = Math.max(...xs);
+
+    return `M${LABEL_W} ${m.busY} L${end - 8} ${m.busY}`;
+}
+
+/** An arrow's line between two placed nodes, or a history rail: up from the group's line (busLine) in the gutter
+ *  before the card it leads to, turning into the card's middle, or from a card's end down the gutter after it onto the
+ *  group's line, turning along it, so every rail joins the group and none passes behind a node. */
 export function edgeLine(m: ReturnType<typeof layout>, from: Placed | undefined, to: Placed | undefined) {
     const h = m.nodeH;
+    const bus = m.busY;
 
     if (!from && to) {
         const y = to.y + h / 2,
-            gx = to.x - GUTTER,
-            label = to.y - EDGE_LABEL_ROOM + 2 + EDGE_LABEL_H / 2;
+            gx = to.x - RAIL_IN;
 
-        return `M${gx} ${label} L${gx} ${y - 8} Q${gx} ${y} ${gx + 8} ${y} L${to.x - 2} ${y}`;
+        return `M${gx - 8} ${bus} Q${gx} ${bus} ${gx} ${bus - 8} L${gx} ${y + 6} Q${gx} ${y} ${gx + 6} ${y} L${to.x - 2} ${y}`;
     }
 
     if (from && !to) {
         const y = from.y + h / 2,
             x = from.x + m.nodeW,
-            gx = x + 10;
+            gx = x + RAIL_OUT;
 
-        return `M${x} ${y} L${gx - 8} ${y} Q${gx} ${y} ${gx} ${y + 8} L${gx} ${m.groupY - 2}`;
+        return `M${x} ${y} L${gx - 6} ${y} Q${gx} ${y} ${gx} ${y + 6} L${gx} ${bus - 8} Q${gx} ${bus} ${gx - 8} ${bus}`;
     }
 
     if (!from || !to) return null;

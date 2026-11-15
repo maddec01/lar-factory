@@ -7,10 +7,11 @@ import {
     SettingsGroup,
     SettingsRow,
     Stack,
-    Text,
     Textarea,
 } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
+
+import { buttonKind } from './ButtonKinds';
 
 export function FactorySettingsLayout({
     children,
@@ -28,19 +29,6 @@ export function FactorySettingsLayout({
                 {children}
             </Stack>
         </fieldset>
-    );
-}
-
-export function FactorySettingsNotice({ children, retry }: { children: ReactNode; retry?: () => void }) {
-    return (
-        <Stack space="related">
-            <Text>{children}</Text>
-            {retry && (
-                <Button variant="secondary" onClick={retry}>
-                    Try again
-                </Button>
-            )}
-        </Stack>
     );
 }
 
@@ -139,7 +127,7 @@ export function FactoryAction({
     disabled?: boolean;
 }) {
     return (
-        <Button variant="secondary" disabled={disabled} onClick={onClick}>
+        <Button {...buttonKind('other', { size: 'md' })} disabled={disabled} onClick={onClick}>
             {children}
         </Button>
     );

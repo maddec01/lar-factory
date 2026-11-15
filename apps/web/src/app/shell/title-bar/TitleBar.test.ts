@@ -30,7 +30,7 @@ const isAmber = () => health() === 'stale';
 test('Add item opens the Add item flow, and ⌘N does too', async () => {
     await mountPage();
 
-    const add = titleBar().querySelector<HTMLButtonElement>('.add-item')!;
+    const add = titleBar().querySelector<HTMLButtonElement>('[data-add-item]')!;
 
     expect([text(add), add.getAttribute('aria-keyshortcuts')]).toEqual(['Add item', 'Meta+N']);
     await settle(() => add.click());
@@ -39,7 +39,7 @@ test('Add item opens the Add item flow, and ⌘N does too', async () => {
 
 test('the list modal’s Scope board scopes the title bar too', async () => {
     await mountPage();
-    await settle(() => $<HTMLButtonElement>('.title-bar .list-button')!.click());
+    await settle(() => $<HTMLButtonElement>('.title-bar [data-list-button]')!.click());
     await settle(() =>
         $$<HTMLButtonElement>('[data-list-modal] nav button')
             .find((b) => b.querySelector('.name')?.textContent === 'lar-apple')!
@@ -77,10 +77,10 @@ test('while some repositories still read, it shows Loading projects behind a gre
     });
 
     await mountPage(reading(['maddec01/lar-server', 'maddec01/lar-apple']));
-    expect(text(refreshed())).toBe('Loading projects');
+    expect(text(refreshed())).toBe('Loading projects…');
     expect(health()).toBe('waiting');
     await push(reading(['maddec01/lar-apple']));
-    expect(text(refreshed())).toBe('Loading projects');
+    expect(text(refreshed())).toBe('Loading projects…');
     await push(fresh());
     expect(refreshed(), 'once every read lands the board is live and the light goes').toBeNull();
 });

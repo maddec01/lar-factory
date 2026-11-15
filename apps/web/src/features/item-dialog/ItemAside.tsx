@@ -3,7 +3,6 @@
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { plural } from '@lar-factory/shared';
-import { Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { isGroupParent } from './group-parent';
@@ -102,8 +101,11 @@ export function ItemAside({
                 />
             )}
             {relations && showsPullRequests(item, isGroupParent(item, data.items)) && (
-                <DetailsSection heading="Pull requests">
-                    {item.linkedPrs.length ? (
+                <DetailsSection
+                    heading="Pull requests"
+                    empty={item.linkedPrs.length ? undefined : 'No pull request yet.'}
+                >
+                    {item.linkedPrs.length > 0 && (
                         <PrList
                             item={item}
                             checks={
@@ -112,10 +114,6 @@ export function ItemAside({
                                 )
                             }
                         />
-                    ) : (
-                        <Text variant="caption" tone="muted">
-                            No pull request yet
-                        </Text>
                     )}
                 </DetailsSection>
             )}

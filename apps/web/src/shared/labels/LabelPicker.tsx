@@ -38,7 +38,7 @@ export function LabelPicker({
             {...props}
             filterLabel={filter}
             placeholder={create && !create.refused ? `Filter or type a new ${create.noun}` : filter}
-            noMatchLabel="No match."
+            noMatchLabel="Nothing matches."
             lockedNote="set by kind"
             {...(create && { create: { ...create, createLabel: (name: string) => `Create "${name}"` } })}
         />

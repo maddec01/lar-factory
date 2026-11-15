@@ -15,23 +15,22 @@ import {
     retiredPartLabel,
 } from '@lar-factory/shared';
 import { statusStateColors } from '@lar-works/design-system';
-import type { ReactNode } from 'react';
 
 import { ActivityLine } from './ActivityLine';
-import type { Part, PartKind } from './DossierParts';
-import { DECISION_KINDS, isDone, openWaits, partActivity, partLabel, threadsOf } from './DossierParts';
+import type { Part } from './DossierParts';
+import { DECISION_KINDS, isDone, openWaits, partActivity, threadsOf } from './DossierParts';
 import { ACTIVITY_WORD, GATE_WORDS, partDetail, RUNS } from './MapCardFacts';
-import { PartStart } from './PartStart';
+import { PartAction } from './PartAction';
 import { partState } from './PartState';
+import { PartTitle } from './PartTitle';
+import { RowKindMark } from './RowIdentity';
 import { lastSeen } from './StageStatus';
 import { useActivityState } from './useActivityState';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     CardActions,
-    HumanWaitAction,
     AzureFields,
     ItemStatusGlyph,
-    ItemTitle,
     OpenThread,
     SliceBar,
     StatusGlyph,
@@ -49,20 +48,15 @@ import {
     HistoryRow as DesignHistoryRow,
     MapCheckNode,
     MapPartNode,
-    PartKindLabel as DesignPartKindLabel,
     PullRequestRef,
     StageTrack,
     CardChecks,
     RepoIdentity as DesignRepoIdentity,
 } from '@/ui/board';
 
-/** A part's method or kind, in the one place and style every map surface shows it. */
-function PartKindLabel({ kind }: { kind: PartKind }) {
-    return <DesignPartKindLabel kind={kind}>{partLabel(kind)}</DesignPartKindLabel>;
-}
-
-/** A repository's identity, its project icon and name together, as a lane's label and a history row name it. */
-export function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) {
+/** A repository's identity on the map, its project icon and name together, as a lane's label and a history row name it;
+ *  its tooltip names the repository in full. */
+export function MapRepo({ repo, data }: { repo: string; data: BoardData }) {
     return (
         <DesignRepoIdentity
             data-part-repo
@@ -122,14 +116,6 @@ export function PartNode({
     const activityState = useActivityState(item);
     // Blocked or waiting on other work, its step and track go quiet so the foot's "Blocked by #139" is its state.
     const quiet = !complete && !asks && (held || attention === 'waits');
-    let action: ReactNode = null;
-
-    if (complete) action = null;
-    else if (asks) action = <HumanWaitAction item={item} data={data} quiet />;
-    else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} />;
-
-    // Each card has one labelled thread action. Only a current question asks for an answer.
-    const opensThread = threadsOf(item).length > 0 && !action;
     const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
     // A thread at work says the presenter's word (Working, Quiet or its phase), as its row and dialog do.
     const word =
@@ -199,22 +185,22 @@ export function PartNode({
             source={<SourceIcon item={item} corner />}
             head={
                 <>
-                    <PartKindLabel kind={part.kind} />
+                    {/* Its kind in words, by the mark its parts-list row shows. */}
+                    <RowKindMark item={item} labelled />
                     <AzureFields azure={item.azure} />
                 </>
             }
-            // A card's action reads as a desk card's: named, outlined, never the rows' icon-only form.
+            // A card's action is named, never the rows' icon-only form, and tinted like every row action (CardActions).
             action={
                 <CardActions>
-                    {action ?? (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} />)}
+                    <PartAction part={part} data={data} />
                 </CardActions>
             }
-            name={<ItemTitle item={item} />}
+            // Its number leads its title, "#139" or "Part 15", as its parts-list row and every blocker name it.
+            name={<PartTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
-            // A ticket's #number leads its title; a part without one says its part number under it.
-            reference={!item.number && item.partOrder ? `Part ${item.partOrder}` : ''}
-            repository={otherProject && <RepoIdentity repo={repoKey(item)} data={data} />}
+            repository={otherProject && <MapRepo repo={repoKey(item)} data={data} />}
             recordState={recordState}
             activity={!complete && activityState && <ActivityLine item={item} />}
             waitReason={record.waits.join(' · ')}
@@ -226,21 +212,23 @@ export function PartNode({
 /** A finished part as one row of the expanded history group: its kind, title, what it followed, PR and thread when it has them. */
 export function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
     const { item } = part;
+    const picked = useItemDialogStore((state) => state.itemId === item.id);
 
     return (
         <DesignHistoryRow
             id={item.id}
+            picked={picked}
             glyph={<StatusGlyph status="Done" size="sm" />}
-            kind={<PartKindLabel kind={part.kind} />}
+            kind={<RowKindMark item={item} labelled />}
             name={itemName(item)}
             onOpen={() => useItemDialogStore.getState().open(item.id)}
-            title={<ItemTitle item={item} />}
+            title={<PartTitle item={item} />}
             after={after.length > 0 ? `after ${after.map((u) => ref(u.item)).join(', ')}` : undefined}
             afterTitle={`after ${after.map((u) => itemName(u.item)).join(', ')}`}
             side={
                 <>
                     {retiredPartLabel(item)}
-                    {repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
+                    {repoKey(item) !== home && <MapRepo repo={repoKey(item)} data={data} />}
                     {item.linkedPrs.map((pr) => (
                         <PullRequestRef key={pr.number} label={prLabel(pr)} />
                     ))}

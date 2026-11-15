@@ -3,8 +3,9 @@ import { createContext, useContext, type ComponentProps, type ReactNode } from '
 
 const MAP_ACTION = createContext(false);
 
-/** Fixed-height map cards keep prerequisite labels compact; parts and dialogs wrap the complete name. */
-export function MapStartAction({ children }: { children: ReactNode }) {
+/** Where a prerequisite's Start after keeps to one line, shortening its name, with the whole of it in its tooltip:
+ *  a fixed-height map card, and a row's action slot, which must not grow its row; dialogs wrap the complete name. */
+export function OneLineAction({ children }: { children: ReactNode }) {
     return <MAP_ACTION.Provider value>{children}</MAP_ACTION.Provider>;
 }
 

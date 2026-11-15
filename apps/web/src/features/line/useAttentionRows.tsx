@@ -1,7 +1,7 @@
 // What keeps a dossier's work moving, as the labelled rows its Attention lists.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { humanWait, itemFog, itemName, needsAnswer, ref } from '@lar-factory/shared';
+import { humanWait, itemFog, itemName, needsAnswer, ref, repoKey } from '@lar-factory/shared';
 
 import { PartLink, Refs } from './DossierEntries';
 import type { FindRef } from './DossierHelpers';
@@ -10,8 +10,9 @@ import type { Part } from './DossierParts';
 import { DECISION_KINDS, isDone, openWaits, partLabel } from './DossierParts';
 import { startable } from './PartAvailability';
 import { PartStart } from './PartStart';
+import { useItemDialogStore } from '@/features/item-dialog';
 import { dependenciesOf, HumanWaitAction, shownStatus, useActivityUnavailable } from '@/features/items';
-import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle, RefButton } from '@/ui/board';
+import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle } from '@/ui/board';
 
 /** The attention rows with entries: parts in Needs you, parts in Verify or Ready to merge, open decisions, blocked
  *  slices, parts waiting on others, parts ready to start, Dependencies, met or not, and the map's fog; with `only`,
@@ -24,6 +25,7 @@ export function useAttentionRows(
     only: readonly string[] | undefined,
 ) {
     const unavailable = useActivityUnavailable();
+    const picked = useItemDialogStore((state) => state.itemId);
     const unfinished = parts.filter((p) => !isDone(p.item));
     const ahead = only ? [] : unfinished;
     const holds = unfinished.flatMap((part) => dependenciesOf(part.item).map((hold) => ({ part, hold })));
@@ -40,6 +42,7 @@ export function useAttentionRows(
                     ? [
                           <Entry
                               key={parent.id}
+                              picked={picked === parent.id}
                               main={<EntryButton onOpen={() => open(parent)}>{itemName(parent)}</EntryButton>}
                               side={
                                   <>
@@ -59,7 +62,8 @@ export function useAttentionRows(
                     .map((p) => (
                         <Entry
                             key={p.item.id}
-                            main={<PartLink part={p} />}
+                            picked={picked === p.item.id}
+                            main={<PartLink part={p} home={repoKey(parent)} />}
                             side={
                                 <>
                                     {humanWait(p.item, unavailable, data.items)?.label}{' '}
@@ -83,7 +87,8 @@ export function useAttentionRows(
                 .map((p) => (
                     <Entry
                         key={p.item.id}
-                        main={<PartLink part={p} />}
+                        picked={picked === p.item.id}
+                        main={<PartLink part={p} home={repoKey(parent)} />}
                         side={
                             <>
                                 {humanWait(p.item, unavailable, data.items)?.label}{' '}
@@ -102,7 +107,8 @@ export function useAttentionRows(
                 .map((p) => (
                     <Entry
                         key={p.item.id}
-                        main={<PartLink part={p} />}
+                        picked={picked === p.item.id}
+                        main={<PartLink part={p} home={repoKey(parent)} />}
                         side={`${partLabel(p.kind)} · ${shownStatus(p.item, unavailable).word}`}
                     />
                 )),
@@ -125,9 +131,11 @@ export function useAttentionRows(
                     side={
                         <>
                             slice of{' '}
-                            <RefButton title={part.item.title} onOpen={() => open(part.item)}>
-                                {ref(part.item)}
-                            </RefButton>{' '}
+                            <ItemTitle
+                                reference={ref(part.item)}
+                                name={part.item.title}
+                                onOpen={() => open(part.item)}
+                            />{' '}
                             · waits on a re-slice
                         </>
                     }
@@ -140,7 +148,14 @@ export function useAttentionRows(
             tone: 'waiting' as const,
             entries: ahead
                 .filter((p) => openWaits(p).length && !needsAnswer(p.item))
-                .map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={waitsOn(p)} />),
+                .map((p) => (
+                    <Entry
+                        key={p.item.id}
+                        picked={picked === p.item.id}
+                        main={<PartLink part={p} home={repoKey(parent)} />}
+                        side={waitsOn(p)}
+                    />
+                )),
         },
         {
             key: 'ready',
@@ -149,7 +164,12 @@ export function useAttentionRows(
             entries: ahead
                 .filter(startable)
                 .map((p) => (
-                    <Entry key={p.item.id} main={<PartLink part={p} />} side={<PartStart part={p} data={data} />} />
+                    <Entry
+                        key={p.item.id}
+                        picked={picked === p.item.id}
+                        main={<PartLink part={p} home={repoKey(parent)} />}
+                        side={<PartStart part={p} data={data} />}
+                    />
                 )),
         },
         {
@@ -170,9 +190,11 @@ export function useAttentionRows(
                     side={
                         <>
                             {hold.met ? 'met' : 'not met'} · holds{' '}
-                            <RefButton title={part.item.title} onOpen={() => open(part.item)}>
-                                {ref(part.item)}
-                            </RefButton>
+                            <ItemTitle
+                                reference={ref(part.item)}
+                                name={part.item.title}
+                                onOpen={() => open(part.item)}
+                            />
                         </>
                     }
                 />

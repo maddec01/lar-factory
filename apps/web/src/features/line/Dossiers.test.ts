@@ -131,7 +131,7 @@ test('a grouped child reaches the desk with parent context when Projects shows i
     expect(step('I_sample13')).not.toBeNull();
     expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('in #200 lar cloud: sign-in and direct connections');
     // A part that waits on you offers its thread, as the desk's row does; its row opens its details.
-    expect(step('I_sample13').querySelector('[data-part-action] [data-open-thread]')).not.toBeNull();
+    expect(step('I_sample13').querySelector('.row-side [data-open-thread]')).not.toBeNull();
     expect(step('I_sample13').querySelector('[data-row-open]')).not.toBeNull();
 });
 
@@ -382,8 +382,9 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
 
     const part = text(step('I_sample13'));
 
+    // As a lane row says it: what the thread does now in place of a state word, never the stale Ready to merge.
     expect([
-        part.includes('Working'),
+        part.includes('Read a.ts'),
         part.includes('Ready to merge'),
         nameOf(step('I_sample13').querySelector('[data-open-thread]')!),
     ]).toEqual([true, false, 'Open thread']);
@@ -461,7 +462,7 @@ test('a part’s row and the header agree on what can start: a Queued decision c
     expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
 });
 
-test('a dossier opens on its parts list, and the browser remembers a switch to the Work map for that dossier alone', async () => {
+test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
     vi.stubGlobal(
         'ResizeObserver',
         class {
@@ -472,22 +473,22 @@ test('a dossier opens on its parts list, and the browser remembers a switch to t
     for (const id of [C200, C180]) localStorage.removeItem(VIEW_KEY + id);
     await mountOpen();
     expect([
-        button(dossier(), 'Parts list').getAttribute('aria-pressed'),
-        dossier().querySelector('[data-parts-list]') !== null,
-    ]).toEqual(['true', true]);
-    await press(button(dossier(), 'Work map'));
-    expect([
-        dossier().querySelector('[data-parts-list]'),
+        button(dossier(), 'Work map').getAttribute('aria-pressed'),
         dossier().querySelector('[data-work-map]') !== null,
+    ]).toEqual(['true', true]);
+    await press(button(dossier(), 'Parts list'));
+    expect([
+        dossier().querySelector('[data-work-map]'),
+        dossier().querySelector('[data-parts-list]') !== null,
         localStorage.getItem(VIEW_KEY + C200),
-    ]).toEqual([null, true, 'map']);
+    ]).toEqual([null, true, 'list']);
     vi.resetModules();
     await mountOpen();
-    expect(button(dossier(), 'Work map').getAttribute('aria-pressed'), 'it stays on the Work map').toBe('true');
+    expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
     await openInstead(C180);
     expect(
-        button(dossier(C180), 'Parts list').getAttribute('aria-pressed'),
-        'the other dossier stays on its parts list',
+        button(dossier(C180), 'Work map').getAttribute('aria-pressed'),
+        'the other dossier stays on its Work map',
     ).toBe('true');
 });
 
@@ -592,7 +593,7 @@ test("every parts-list row names its project, the concept's own quietly, so no r
 
     await mountOpen({ ...sample, items: [c200, own, other] });
 
-    const project = (id: string) => step(id).querySelector<HTMLElement>('[data-part-meta] [data-repo-cell]');
+    const project = (id: string) => step(id).querySelector<HTMLElement>('[data-repo-cell]');
 
     expect(project(own.id), "the concept's own project").not.toBeNull();
     expect(project(own.id)!.hasAttribute('data-repo-home'), 'named quietly').toBe(true);
@@ -699,6 +700,16 @@ test('a part waiting on settled decisions in the group keeps a quiet rail from t
         true,
     );
 
+    // The rail rises from the group's own line, so it never starts in empty space.
+    const startY = (d: string | null | undefined) => d?.match(/^M\S+ (\S+)/)?.[1];
+    const bus = map.querySelector('path[data-map-bus]')?.getAttribute('d');
+
+    expect(bus, 'the group has a line').toBeTruthy();
+    expect(
+        startY(map.querySelector('path[data-edge="history W_next"]')?.getAttribute('d')),
+        'from the group line',
+    ).toBe(startY(bus));
+
     const label = () => map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
     const tooltip = (id: string) => map.querySelector(`[data-map-part="${id}"] [data-title]`)!.getAttribute('title');
 
@@ -709,7 +720,7 @@ test('a part waiting on settled decisions in the group keeps a quiet rail from t
     ]);
     expect(tooltip('W_next')).toContain('After 2 completed prerequisites: Part W_s0, Part W_s1');
 
-    // The rail runs from its label down to the card it serves, not up from the group past the lanes in between.
+    // The rail rises from the group's line to the card it serves and stops there, so it starts and ends on something.
     const rail = map.querySelector('path[data-edge="history W_next"]')!.getAttribute('d')!;
     const ys = rail
         .match(/-?\d+(?:\.\d+)?/g)!
@@ -718,8 +729,8 @@ test('a part waiting on settled decisions in the group keeps a quiet rail from t
     const card = map.querySelector<HTMLElement>('[data-map-part="W_next"]')!;
     const centre = Number.parseFloat(card.parentElement!.style.top) + Number.parseFloat(card.style.height) / 2;
 
-    expect(ys[0], 'starts level with its label').toBe(Number.parseFloat(label().style.top) + 8);
-    expect(Math.max(...ys), 'stops at the card').toBe(centre);
+    expect(String(ys[0]), 'starts on the group line').toBe(startY(bus));
+    expect(Math.min(...ys), 'stops at the card').toBe(centre);
     await press(map.querySelector('[data-map-history]')!);
     expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the rail').not.toBeNull();
     await receive(
@@ -886,8 +897,7 @@ test('decision map and attention actions use answer wording only for a current q
     await press(button(dossier(), 'Parts list'));
 
     // In the parts list, the part's own action opens its thread; nothing repeats it above the list.
-    const attentionAction = () =>
-        dossier().querySelector('[data-part="W_question"] [data-part-action] [data-open-thread]')!;
+    const attentionAction = () => dossier().querySelector('[data-part="W_question"] .row-side [data-open-thread]')!;
 
     expect(nameOf(attentionAction())).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
@@ -1024,7 +1034,7 @@ test('a group names its out-of-date checklist and ships-with release steps in ma
     expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
         '1 brief to re-check after changed answers',
     );
-    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Ships with:');
+    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Ships with');
     expect(text(dossier().querySelector('[data-release-steps]'))).toContain(members[0]!.title);
     await press(dossier().querySelector('[data-reconciliation] summary')!);
     expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(members[0]!.title);

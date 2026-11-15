@@ -7,11 +7,13 @@ import type { MouseEvent } from 'react';
 import { statsOf } from './StageStatus';
 import { useItemDialogStore } from '@/features/item-dialog';
 
-/** A click on a second line beside its controls opens the item, as its first line's button does; letting go of a drag that selected text doesn't. */
-export const opensItem = (item: Item) => (e: MouseEvent<HTMLElement>) => {
+/** A click on a second line beside its controls opens the item, as its first line's button does, or calls `onOpen` in
+ *  its place; letting go of a drag that selected text doesn't. */
+export const opensItem = (item: Item, onOpen?: () => void) => (e: MouseEvent<HTMLElement>) => {
     if ((e.target as Element).closest('button, a') || !window.getSelection()?.isCollapsed) return;
 
-    useItemDialogStore.getState().open(item.id);
+    if (onOpen) onOpen();
+    else useItemDialogStore.getState().open(item.id);
 };
 
 /** The agent figures: a Dossier's total (parent plus parts), else the item's own; null when there are none. A total with no figures to show is empty and incomplete. */

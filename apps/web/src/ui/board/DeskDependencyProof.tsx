@@ -1,4 +1,4 @@
-/** The external proof Pedro must accept, beside the waiting build's title. */
+/** The external proof you must accept, beside the waiting build's title. */
 export function DeskDependencyProof({ proofs }: { proofs: { dependencyId: string; owner: string; need: string }[] }) {
     return (
         <div className="grid gap-1 text-xs">

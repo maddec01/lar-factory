@@ -122,7 +122,8 @@ test('retired parts appear in map history, Show done and details with their surv
     await settle(() => useItemDialogStore.getState().close());
     await press([...group().querySelectorAll('button')].find((el) => el.getAttribute('aria-label') === 'Parts list')!);
     expect(group().querySelector('[data-part="b4"]')).toBeNull();
-    await press([...group().querySelectorAll('button')].find((el) => text(el).startsWith('Show '))!);
+    // The fold of the done parts, not a part's own "Show slices" toggle.
+    await press([...group().querySelectorAll('button')].find((el) => /^Show \d+ (done|set aside)/.test(text(el)))!);
     expect(text(group().querySelector('[data-part="b4"]'))).toContain('Merged into b05');
     expect(text(group().querySelector('[data-part="b6"]'))).toContain('Set aside');
 });
@@ -149,7 +150,7 @@ test('a decision made in another project names that project under its title, its
     expect(text(card.querySelector('[data-col="side"] [data-start]'))).toBe('Decide');
 });
 
-test('every map card keeps its head indicators, and a part with no ticket says its part number under its title', async () => {
+test('every map card keeps its head indicators, and its number leads its title as its row’s does, ticket or not', async () => {
     await mount([part(3, { status: 'Ready' }), part(5, { number: 0, partOrder: 5, title: 'Ticketless build' })]);
 
     const card = (id: string) => group().querySelector(`[data-map-part="${id}"]`)!;
@@ -159,14 +160,13 @@ test('every map card keeps its head indicators, and a part with no ticket says i
     expect(text(head('b3'))).toContain('Build');
     expect(text(head('b3'))).toContain('Ready to build');
     expect(head('b3').querySelector('[role="img"][aria-label^="Step "]')).not.toBeNull();
-    // A ticket's #3 leads its title; a ticketless part says its part number under it.
+    // A ticket's #3 leads its title; a ticketless part's part number leads its own, once.
     expect(text(card('b3').querySelector('[data-title]'))).toBe('#3 Build 3');
-    expect(card('b3').querySelector('[data-map-reference]')).toBeNull();
-    expect(text(card('b5').querySelector('[data-title]'))).toBe('Ticketless build');
-    expect(text(card('b5').querySelector('[data-map-reference]'))).toBe('Part 5');
+    expect(text(card('b5').querySelector('[data-title]'))).toBe('Part 5 Ticketless build');
+    expect(text(card('b5')).match(/Part 5/g)).toHaveLength(1);
 });
 
-test('a linked part held by a ticketless prerequisite names it in full: Start after on its map card, its wait in the list', async () => {
+test('a linked part held by a ticketless prerequisite names it in full: Start after on its map card and its list row, its wait in the list', async () => {
     const title = 'Produce the compatible greeting contract and accepted immutable manifest';
     const build = part(2, {
         status: 'Ready',
@@ -181,9 +181,12 @@ test('a linked part held by a ticketless prerequisite names it in full: Start af
     expect(text(control)).toBe('Start when unblocked');
     expect(control.getAttribute('title')).toContain(title);
 
-    // The parts list offers no start for a part other work holds; its row says what it waits on.
+    // The parts list offers the same Start after as the card, so switching views never changes what a part offers; its
+    // row says what it waits on.
     await press([...group().querySelectorAll('button')].find((el) => el.getAttribute('aria-label') === 'Parts list')!);
-    expect(group().querySelector('[data-part-action] [data-start-after]')).toBeNull();
+    expect(text(group().querySelector('[data-part="b2"] [data-col="side"] [data-start-after]'))).toBe(
+        'Start when unblocked',
+    );
     expect(text(group().querySelector('[data-part="b2"]'))).toContain('Blocked by 1 part');
 });
 
@@ -205,7 +208,7 @@ test('a retired prerequisite in history stays unresolved on the map', async () =
     expect(text(group().querySelector('[data-map-part="b8"] [data-map-facts]'))).toContain('Blocked by #4');
 });
 
-test('a card says its queue and gate facts quietly under its title, beside its part number', async () => {
+test('a card says its queue and gate facts quietly under its title, which its part number leads', async () => {
     await mount([
         part(5, { number: 0, partOrder: 5, title: 'Ticketless build', status: 'List', passingBrief: false }),
         part(6, { status: 'Ready', passingBrief: true }),
@@ -213,9 +216,8 @@ test('a card says its queue and gate facts quietly under its title, beside its p
 
     const facts = (id: string) => text(group().querySelector(`[data-map-part="${id}"] [data-map-record-state]`));
 
-    expect(text(group().querySelector('[data-map-part="b5"] [data-map-sub]'))).toBe(
-        'Part 5·Not queued · Brief not approved',
-    );
+    expect(text(group().querySelector('[data-map-part="b5"] [data-title]'))).toBe('Part 5 Ticketless build');
+    expect(text(group().querySelector('[data-map-part="b5"] [data-map-sub]'))).toBe('Not queued · Brief not approved');
     expect(facts('b6')).toBe('Brief approved');
 });
 

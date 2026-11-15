@@ -122,7 +122,12 @@ test('a lost response survives a page reload with its request ID and options, th
     expect(posts().at(-1)!.options).toEqual(first.options);
     expect($('[data-create-ticket]')).toBeNull();
     expect(text($('[data-item-dialog] header'))).toContain('#17 Fix export');
-    expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
+    // Saved on GitHub, the item's Project links to its issue in place of the local-work mark.
+    expect($('[data-item-summary] [role="img"]')).toBeNull();
+
+    const link = $<HTMLAnchorElement>('[data-item-summary] [data-ticket-link]')!;
+
+    expect([link.title, link.href]).toEqual(['Open in GitHub', converted.url]);
 });
 
 test('an uncertain create keeps its preview and blocks another create across closing details', async () => {

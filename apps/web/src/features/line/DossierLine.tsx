@@ -4,8 +4,9 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { deskParentName, itemActivityStill, itemName } from '@lar-factory/shared';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { Figures, RowSecondLine } from './Columns';
-import { DossierActivity, DossierState } from './DossierActivity';
+import { ActivityLine } from './ActivityLine';
+import { Figures } from './Columns';
+import { DossierState, useDossierActivity } from './DossierActivity';
 import { open, usePicked } from './DossierHelpers';
 import type { Part } from './DossierParts';
 import { isDone, threadsOf } from './DossierParts';
@@ -16,8 +17,10 @@ import { figuresOf } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
 import { stageOf } from './StageStatus';
 import {
+    Age,
     ConceptBuild,
     AzureFields,
+    hasFigures,
     ItemTitle,
     shownStatus,
     useShownStatus,
@@ -39,26 +42,29 @@ import {
     DossierTitleCell,
     DossierTools,
     PartsBar as DesignPartsBar,
+    QueueAge,
     RowCells,
     RowCount,
     RowFirst,
+    RowMeta,
+    RowMetaEnd,
+    RowProgress,
     RowSide,
-    RowStateCell,
 } from '@/ui/board';
 
 /** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
-function PartsBar({ m }: { m: Moving }) {
+export function PartsBar({ m }: { m: Moving }) {
     const order = [...m.parts].sort(
         (a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status),
     );
-    const unread = m.count - m.parts.length;
     const unavailable = useActivityUnavailable();
     const disconnected = useBoardStore((state) => !!state.clientError);
 
     return (
         <DesignPartsBar
             title={`${m.done}/${m.count} parts done`}
-            unread={unread}
+            done={m.done}
+            total={m.count}
             parts={order.map((p) => {
                 const { word, glyph } = shownStatus(p.item, unavailable);
 
@@ -118,6 +124,8 @@ export function DossierLine({
     const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
     const chips = chipsOf(parent, m);
     const n = nextOf(m, parent);
+    // The parent's own thread at work says what it does where its next step would be, as a lane row's does.
+    const acts = useDossierActivity(parent);
     const repos = otherRepos(parent, m, data);
     const partOf = deskParentName(parent, data.items);
     const hasParent = !!(parent.parentId || parent.parent);
@@ -125,6 +133,8 @@ export function DossierLine({
     const parentContext = hasParent
         ? `Part of ${partOf ?? 'a parent outside the board'}${parentOutside ? ' · Parent is outside the board' : ''}`
         : undefined;
+
+    const figures = figuresOf(parent, data, true);
 
     return (
         <Line
@@ -137,7 +147,6 @@ export function DossierLine({
             <RowFirst>
                 <RowCells>
                     {lead}
-                    <RowSource item={parent} />
                     <DossierTitleCell>
                         <RowKindMark item={parent} />
                         <DossierTitle name={parent.title} onOpen={() => open(parent)}>
@@ -149,16 +158,41 @@ export function DossierLine({
                         <DossierNote>{note}</DossierNote>
                         <DossierRepos>{repos}</DossierRepos>
                     </DossierTitleCell>
-                    {/* Every chip keeps its meaning visible. */}
-                    <RowStateCell clips={false}>
-                        <DossierStates>
-                            <DossierState item={parent} />
-                            <Chips chips={chips} />
-                            {/* Its cost reads on the first line, where a lane row's does. */}
-                            <Figures s={figuresOf(parent, data, true)} item={parent} total />
-                        </DossierStates>
-                    </RowStateCell>
+                    <RowSource item={parent} />
                 </RowCells>
+                <RowMeta>
+                    {acts ? (
+                        <ActivityLine item={parent} />
+                    ) : parentContext ? (
+                        <DossierParentContext>{parentContext}</DossierParentContext>
+                    ) : (
+                        n.tone !== 'none' && <Next n={n} parent={parent} />
+                    )}
+                    {(m.count > 0 || !hasParent || parent.kind === 'concept') && (
+                        <RowProgress
+                            bar={m.count > 0 && <PartsBar m={m} />}
+                            count={
+                                <RowCount title={m.count ? `${m.done}/${m.count} parts done` : undefined}>
+                                    {m.count ? `${m.done}/${m.count} parts done` : 'No parts yet'}
+                                </RowCount>
+                            }
+                        />
+                    )}
+                    <RowMetaEnd>
+                        <DossierStates>
+                            {!acts && <DossierState item={parent} />}
+                            {/* What waits on you is already the row's next step; other chips are in its tooltip. */}
+                            {n.tone !== 'you' && <Chips chips={chips.slice(0, 1)} />}
+                            <Figures s={figures} item={parent} total />
+                            {/* With nothing else at its end, a row says how long since it moved, as a lane row does. */}
+                            {!(figures && hasFigures(figures)) && (
+                                <QueueAge>
+                                    <Age at={parent.updatedAt} />
+                                </QueueAge>
+                            )}
+                        </DossierStates>
+                    </RowMetaEnd>
+                </RowMeta>
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
                 <RowSide passEmpty>
                     {tools && <DossierTools>{tools}</DossierTools>}
@@ -169,23 +203,6 @@ export function DossierLine({
                     )}
                 </RowSide>
             </RowFirst>
-            <RowSecondLine
-                bar={m.count > 0 && <PartsBar m={m} />}
-                count={
-                    (m.count > 0 || !hasParent || parent.kind === 'concept') && (
-                        <RowCount title={m.count ? `${m.done}/${m.count} parts done` : undefined}>
-                            {m.count ? `${m.done}/${m.count} parts done` : 'No parts yet'}
-                        </RowCount>
-                    )
-                }
-            >
-                {parentContext ? (
-                    <DossierParentContext>{parentContext}</DossierParentContext>
-                ) : (
-                    <Next n={n} parent={parent} />
-                )}
-            </RowSecondLine>
-            <DossierActivity item={parent} />
         </Line>
     );
 }

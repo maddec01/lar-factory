@@ -5,7 +5,7 @@
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
-import { onAzure } from '@lar-factory/shared';
+import { onAzure, shortAgo } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
 import { Inline, Person } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
@@ -97,9 +97,17 @@ export function ItemMeta({
                 label="Created"
                 show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />}
             />
-            <Fact label="Updated">
-                <When iso={item.updatedAt} now={now} />
-            </Fact>
+            {/* Updated says something only once it is later than Created. */}
+            {!(
+                read.state === 'loaded' &&
+                read.details.createdAt &&
+                (Date.parse(item.updatedAt) <= Date.parse(read.details.createdAt) ||
+                    shortAgo(item.updatedAt, now) === shortAgo(read.details.createdAt, now))
+            ) && (
+                <Fact label="Updated">
+                    <When iso={item.updatedAt} now={now} />
+                </Fact>
+            )}
             {item.kind === 'concept' && item.status !== 'Done' && !item.releasePlan && item.refinement && (
                 <Fact label="Refinement">
                     <ConceptState state={item.refinement} />

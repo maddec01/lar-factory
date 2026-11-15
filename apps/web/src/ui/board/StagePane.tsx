@@ -48,7 +48,7 @@ export function StagePane({
 
     return (
         <section data-stage={id} data-empty={collapsed || undefined} aria-labelledby={headingId} className="min-w-0">
-            <header className="flex min-h-9 items-center px-3 py-1">
+            <header className="flex min-h-9 items-center py-1 pr-3 pl-4">
                 <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <SectionTitle id={headingId} level="h3" title={title} icon={glyph} count={count} />
                     {(right || collapsed) && (
@@ -99,11 +99,14 @@ export function StagePaneEmpty({
 /** Builds at work against the build limit, in a section's header: one bar per build the `limit` allows, more when
  *  they're over it, separated after the limit as in the title bar, then the count in words. */
 export function BuildLimit({
+    over = 0,
     building,
     limit,
     title,
     children,
 }: {
+    /** How many builds hold slots past the limit: said after the count, in the warning tone. */
+    over?: number;
     /** How many builds are at work. */
     building: number;
     /** How many builds the limit allows; none shows the count alone. */
@@ -120,7 +123,10 @@ export function BuildLimit({
         >
             {limit !== undefined ? (
                 <LimitBars used={building} limit={limit}>
-                    {children}
+                    <span>
+                        {children}
+                        {over > 0 && <span className="text-warning-fg"> · {over} over the limit</span>}
+                    </span>
                 </LimitBars>
             ) : (
                 children

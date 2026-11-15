@@ -127,8 +127,10 @@ interface ListItemRowProps {
     title: string;
     /** The repository's icon, when the list mixes repositories, and the meta line's text: its name and age. */
     repoIcon?: ReactNode;
-    /** The item's facts on one line. */
+    /** The item's facts on one line, such as its project. */
     meta: string;
+    /** How long ago it changed, at the row's end. */
+    age?: string;
     /** The item's kind, labels and sync state: at the row's end from `sm` up, after the meta line on a phone. */
     chips?: ReactNode;
     /** More under the meta line, such as a work item's fields. */
@@ -145,6 +147,7 @@ export function ListItemRow({
     title,
     repoIcon,
     meta,
+    age,
     chips,
     details,
 }: ListItemRowProps) {
@@ -154,22 +157,22 @@ export function ListItemRow({
             onClick={onOpen}
             data-item={item}
             title={name}
-            className="hover:bg-fill-hover focus-ring-inset grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 rounded-md px-2 py-2 text-left sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+            className="list-row hover:bg-fill-hover focus-ring-inset -mx-3 grid min-h-10 w-[calc(100%+1.5rem)] min-w-0 grid-cols-[auto_minmax(0,max-content)_minmax(0,auto)_minmax(0,1fr)] items-center gap-x-3 rounded-lg px-3 py-1.5 text-left"
         >
-            <span className="row-span-2">{source}</span>
-            <span className="text-fg block truncate text-sm font-medium">
-                {reference ? <span className="text-fg-muted font-normal">{reference} </span> : null}
+            <span className="text-fg-muted flex items-center gap-2">{source}</span>
+            <span className="text-fg block truncate text-sm">
+                {reference ? <span className="text-fg-muted">{reference} </span> : null}
                 {title}
             </span>
-            <span className="text-fg-muted col-start-2 flex min-w-0 items-center gap-1 text-xs">
+            {/* Its project and age follow the title, as a board row's project does. */}
+            <span className="text-fg-soft flex min-w-0 items-center gap-1.5 text-xs">
                 {repoIcon}
-                <span className="min-w-0 truncate tabular-nums">{meta}</span>
+                <span className="min-w-0 truncate">{meta}</span>
             </span>
-            {chips && (
-                <span className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 self-center sm:col-start-3 sm:row-span-2 sm:row-start-1 sm:justify-end">
-                    {chips}
-                </span>
-            )}
+            <span className="text-fg-muted flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs">
+                {chips}
+                {age && <span className="shrink-0 tabular-nums">{age}</span>}
+            </span>
             {details && <span className="col-span-full col-start-2 min-w-0">{details}</span>}
         </button>
     );

@@ -179,17 +179,17 @@ export function prReadiness(
     if (item.status !== 'Ready to merge' && item.status !== 'Verify') return null;
 
     const pr = item.linkedPrs[0];
-    // The wait has one name everywhere: verifying the build at Verify, which reviewing the PR does; before a ready build's
-    // PR can merge, reviewing it, the same words as its button.
+    // The wait has one name everywhere, its button's too: verifying the build at Verify, which happens in its PR; before a
+    // ready build's PR can merge, reviewing it.
     const review = item.status === 'Verify' ? 'Verify build' : 'Review PR';
 
     // Until the PR's evidence is read it is still your turn to review it, so it waits on you rather than reads as idle.
-    if (!pr || pr.pipelineUnread) return { word: review, action: 'Review PR', state: 'waiting' };
+    if (!pr || pr.pipelineUnread) return { word: review, action: review, state: 'waiting' };
 
     if (pr.state === 'merged') return { word: 'Merged', action: 'Review PR', state: 'ready' };
 
     if (pr.checkProgress && pr.checkProgress.state !== 'current')
-        return { word: review, action: 'Review PR', state: 'waiting' };
+        return { word: review, action: review, state: 'waiting' };
 
     if (pr.checks?.failed) return { word: 'Checks failed', action: 'Review failed checks', state: 'failed' };
 
@@ -198,7 +198,7 @@ export function prReadiness(
     if (pr.state !== 'open' || pr.isDraft || pr.mergeState === 'blocked' || pr.mergeState === 'conflicts')
         return {
             word: pr.mergeState === 'conflicts' ? 'Resolve conflicts' : review,
-            action: 'Review PR',
+            action: review,
             state: 'waiting',
         };
 

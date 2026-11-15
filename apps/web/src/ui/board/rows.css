@@ -27,7 +27,7 @@
     display: grid;
     flex: 1;
     min-width: 0;
-    grid-template-columns: var(--row-glyph) minmax(0, 1fr) var(--row-source) var(--row-state);
+    grid-template-columns: var(--row-glyph) minmax(0, max-content) minmax(0, auto) minmax(0, 1fr);
     grid-template-rows: minmax(var(--row-line), auto);
     column-gap: var(--row-gap);
     align-items: center;
@@ -40,7 +40,7 @@
 .row-cols > [data-title-cell] {
     grid-area: 1 / 2;
 }
-/* The source and project start one column, so their marks line up down the board. */
+/* The project follows its title, so a row reads as one phrase: what the work is and where it lives. */
 .row-cols > [data-row-identity] {
     grid-area: 1 / 3;
 }
@@ -125,8 +125,7 @@
 /* An unfolded slice's state sits in its row's state column, so slices and their parent read down one column. */
 .row-slices [data-slice-state] {
     width: var(--row-state);
-    /* Less the slice row's own padding, as the slices already sit inside the row's right inset. */
-    margin-right: calc(var(--row-side) + var(--row-gap) - --spacing(2));
+    margin-right: 0;
     text-align: right;
 }
 
@@ -138,127 +137,6 @@
         --row-source: 7rem;
         --row-state: 9.5rem;
         --row-side: 8rem;
-    }
-}
-
-/* Under 660px of row (a phone) the title takes the row's width, up to two lines; its project and state run under it,
-   the state giving up its tracker fields' room before its word, then the action on the title's edge. The second line
-   wraps: its text, the bar and count, the PR and figures. */
-@container (width < 41.25rem) {
-    .row-first {
-        display: block;
-        position: relative;
-    }
-    .row-cols {
-        position: relative;
-        width: 100%;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        column-gap: --spacing(2);
-        row-gap: --spacing(1);
-        padding-left: calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
-    }
-    .row-cols > :first-child {
-        position: absolute;
-        top: 0;
-        left: var(--row-inset);
-        display: grid;
-        place-items: center;
-        width: var(--row-glyph);
-        height: var(--row-line);
-    }
-    .row-cols > [data-title-cell] {
-        order: -1;
-        flex: 1 0 100%;
-        min-height: var(--row-line);
-        padding-right: calc(var(--row-side-width, var(--row-side)) + var(--row-gap));
-        flex-wrap: nowrap;
-        align-items: flex-start;
-    }
-    /* The kind's mark stays beside the title's first line. */
-    .row-cols > [data-title-cell] > [data-kind-mark] {
-        margin-top: --spacing(1.5);
-    }
-    .row-cols > [data-title-cell] > [data-title] {
-        display: -webkit-box;
-        padding-block: --spacing(1);
-        overflow: hidden;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-height: --spacing(5);
-        white-space: normal;
-        overflow-wrap: anywhere;
-    }
-    /* A long repository name gives up its room first, ending in an ellipsis, rather than pushing the line wider. */
-    .row-cols > [data-row-identity] {
-        flex: 0 1 auto;
-        min-width: 0;
-        max-width: 100%;
-    }
-    .row-cols > [data-col='state'] {
-        flex: 0 1 auto;
-        min-width: 0;
-        max-width: 100%;
-    }
-    .row-cols > [data-col='state']:not(:has(> :not(:empty))) {
-        display: none;
-    }
-    /* The action sits under the title and its facts, on the title's edge, so the title keeps the row's width. */
-    .row-side {
-        width: auto;
-        max-width: 100%;
-        margin-top: --spacing(1);
-        padding-left: calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
-        justify-content: flex-start;
-    }
-    .row-side > * {
-        justify-content: flex-start;
-    }
-    .row-cols > [data-title-cell] {
-        padding-right: 0;
-    }
-    .row-side:empty {
-        display: none;
-    }
-    /* A held action includes a sentence, so it needs flow space below the row's metadata. */
-    .row-first:has([data-start-hold]) > .row-side {
-        position: static;
-        width: auto;
-        max-width: 100%;
-        margin-top: --spacing(2);
-        padding-left: calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
-    }
-    .row-first:has([data-start-hold]) > .row-cols > [data-title-cell] {
-        padding-right: 0;
-    }
-    .row-second {
-        display: flex;
-        flex-wrap: wrap;
-        row-gap: --spacing(1);
-    }
-    .row-second > :empty {
-        display: none;
-    }
-    .row-second > [data-col='progress'] {
-        flex: 0 0 var(--row-source);
-    }
-    .row-second > [data-col='pr'] {
-        flex: 1 1 auto;
-        order: 1;
-    }
-    .row-second > [data-col='next'] {
-        flex: 1 1 12rem;
-        order: 2;
-    }
-    .row-second > [data-col='figures'] {
-        flex: 0 0 auto;
-        order: 3;
-        margin-left: auto;
-    }
-    .row-slices [data-slice-state] {
-        width: auto;
-        margin-right: 0;
     }
 }
 
@@ -322,12 +200,13 @@ li[data-item]:has([data-row-open]:focus-visible) {
 li[data-item] [data-row-open]:focus-visible {
     outline: none;
 }
-
-/* On a phone a row with no action keeps no room for one. */
-@container (width < 41.25rem) {
-    .row-side:not(:has(button, a)) {
-        display: none;
-    }
+/* A desk card draws the ring on its own surface, so the card's fill never covers it. */
+li.desk-row:has([data-row-open]:focus-visible) {
+    outline: none;
+}
+.desk-tile:has([data-row-open]:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
 }
 
 /* A row's title reads at the body's weight, as a list of work does; the needs-you state is what stands out. */
@@ -335,59 +214,195 @@ li[data-item] [data-row-open]:focus-visible {
     font-weight: 400;
 }
 
-/* Where a pointer can hover, a lane's row actions (open a thread, Shape, Build) wait until their row is hovered or
-   focused, every row alike, so a lane reads as a list of work; anything that waits on you is on Your desk. A phone-width row shows its actions, which have no hover to wait for. */
-@media (hover: hover) {
-    @container (width >= 41.25rem) {
-        :is([data-stage='queue'], [data-stage='shaping'], [data-stage='ready'], [data-stage='build'])
-            li[data-item]:not([data-attention])
-            .row-side {
-            opacity: 0;
-            transition: opacity var(--motion-duration-fast) var(--ease-standard);
-        }
-        :is([data-stage='queue'], [data-stage='shaping'], [data-stage='ready'], [data-stage='build'])
-            li[data-item]:is(:hover, :focus-within, :has([aria-expanded='true']))
-            .row-side {
-            opacity: 1;
-        }
-    }
-}
-
 /* On a row, in the item dialog and in a counter's list the project's icon is a quiet mark beside its name, without its
    colour; List and Settings keep its colour, where telling projects apart is the point. */
-:is(.row-cols, [data-dossier], [data-item-dialog], [data-counter-list]) [data-project-icon] {
+:is(.row-cols, .desk-tile, .list-row, [data-dossier], [data-item-dialog], [data-counter-list]) [data-project-icon] {
     filter: grayscale(1);
     opacity: 0.75;
 }
 
-/* Where a pointer can hover, a lane row ends flush with the board: its actions take no column at rest and, on hover or
-   focus, stand where its state was, so states and costs line up on the lanes' right edge. Your desk keeps its column. */
+/* A lane row's facts sit together at its end, on fixed tracks so every lane's columns line up and nothing moves on
+   hover: what its thread does (or what holds it) ends where the progress track starts; the progress track (bar and
+   count) has one width whether or not the row has slices; the end track holds the cost and state, and on hover or focus
+   the row's action stands over it, never wider than it. */
+.row-meta {
+    display: grid;
+    flex: 0 1 auto;
+    grid-template-columns: 20rem 10rem 8.5rem;
+    column-gap: --spacing(4);
+    align-items: center;
+    min-width: 0;
+    max-width: 62%;
+    font-size: var(--text-xs);
+    line-height: --spacing(4);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+}
+.row-meta > * {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+.row-meta > [data-col='progress'] {
+    grid-column: 2;
+    justify-self: start;
+    overflow: visible;
+}
+.row-meta > [data-col='progress'] {
+    white-space: nowrap;
+    color: var(--color-fg-soft);
+}
+.row-meta > .row-meta-end {
+    grid-column: 3;
+    justify-self: stretch;
+}
+/* Under 1280px of row the activity gives its room to the title first. */
+@container (width < 80rem) {
+    .row-meta {
+        grid-template-columns: 13rem 9.5rem 8rem;
+    }
+    .row-meta:not(:has(> [data-col='progress'])):has(> :not(.row-meta-end)) {
+        grid-template-columns: minmax(0, max-content) 8rem;
+    }
+    .row-meta:not(:has(> [data-col='progress'])) > :not(.row-meta-end) {
+        max-width: 22.5rem;
+    }
+    .row-meta:not(:has(> [data-col='progress'])):has(> :not(.row-meta-end)) > .row-meta-end {
+        grid-column: 2;
+    }
+}
+
+/* With no progress to show, a long state, such as "Blocked · starts after #31", takes the progress track's room too. */
+.row-meta:not(:has(> [data-col='progress'])) > .row-meta-end {
+    grid-column: 2 / 4;
+}
+.row-meta [data-col='bar'] {
+    display: block;
+    flex: none;
+    width: 3.5rem;
+}
+.row-meta [data-col='bar'] > * {
+    width: 100%;
+}
+.row-meta-end {
+    color: var(--color-fg-muted);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: --spacing(3);
+    white-space: nowrap;
+}
+[data-stage] li[data-item] .row-first {
+    position: relative;
+    align-items: center;
+}
+.row-meta [data-activity] {
+    flex-wrap: nowrap;
+}
+.row-meta > :has([data-activity]) {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+/* A List row whose item has no recognised kind and no source mark keeps no slot for them, so its number starts on the
+   pane's edge. */
+.list-row:not(:has(> :first-child :is(svg, [role='img']))) {
+    grid-template-columns: minmax(0, max-content) minmax(0, auto) minmax(0, 1fr);
+}
+.list-row:not(:has(> :first-child :is(svg, [role='img']))) > :first-child {
+    display: none;
+}
+
+/* A row with nothing at work and no progress keeps only its end track, so its title has the room. */
+.row-meta:not(:has(> :not(.row-meta-end))) {
+    grid-template-columns: minmax(8.5rem, max-content);
+}
+.row-meta:not(:has(> :not(.row-meta-end))) > .row-meta-end {
+    grid-column: 1;
+}
+
+/* In a row's end, a held reason reads a step above its age or cost. */
+.row-meta-end [data-state]:not(.queue-age) {
+    color: var(--color-fg-soft);
+}
+
+/* A row's action takes no room at rest, so every row's facts end on the row's edge. On hover or focus it stands at that
+   same edge in place of the row's cost and state, which fade out under it: the end track is at least as wide as the
+   action, so the action never covers the activity or progress, and it is always in the same place. A phone keeps the
+   action under the title (Pane's narrow rules). */
+.row-first,
+[data-part] > div {
+    --row-action: 8rem;
+}
+[data-stage] li[data-item] .row-first,
+[data-dossier] .row-first {
+    position: relative;
+    align-items: center;
+}
+@container (width >= 41.25rem) {
+    :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side {
+        position: absolute;
+        inset-block: 0;
+        right: var(--row-inset);
+        width: auto;
+        max-width: var(--row-action);
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+    [data-part] [data-part-action] {
+        position: absolute;
+        inset-block: 0;
+        right: 0;
+        max-width: var(--row-action);
+    }
+    [data-part] [data-part-action]:empty {
+        display: none;
+    }
+}
 @media (hover: hover) {
     @container (width >= 41.25rem) {
-        /* Its state column takes the desk's action room too, so the project column lines up with Your desk's. */
-        [data-stage] li[data-item] .row-first {
-            position: relative;
-            --row-state-wide: calc(var(--row-state) + var(--row-side) + var(--row-gap));
-            column-gap: 0;
+        :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side,
+        [data-part] [data-part-action],
+        .row-meta-end,
+        .row-cols > [data-col='state'],
+        [data-part] :is([data-part-usage], [data-part-meta]) {
+            transition: opacity var(--motion-duration-fast) var(--ease-standard);
         }
-        [data-stage] li[data-item] .row-cols {
-            grid-template-columns: var(--row-glyph) minmax(0, 1fr) var(--row-source) var(--row-state-wide);
+        :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side,
+        [data-part] [data-part-action] {
+            opacity: 0;
         }
-        [data-stage] li[data-item] .row-side {
-            --row-side: auto;
+        :is([data-stage] li[data-item], [data-dossier] .row-first):is(
+                :hover,
+                :focus-within,
+                :has([aria-haspopup][aria-expanded='true'])
+            )
+            .row-side,
+        [data-dossier] .row-first:has([data-dossier-tools]) > .row-side,
+        [data-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])) [data-part-action] {
+            opacity: 1;
         }
-        [data-stage] li[data-item] .row-side {
-            position: absolute;
-            top: 0;
-            right: var(--row-inset);
-            width: auto;
-            justify-content: flex-end;
-        }
-        [data-stage]
-            li[data-item]:is(:hover, :focus-within, :has([aria-expanded='true'])):has(.row-side :is(button, a))
-            .row-cols
-            > [data-col='state'] {
-            visibility: hidden;
+        :is([data-stage] li[data-item], [data-dossier] .row-first):is(
+                :hover,
+                :focus-within,
+                :has([aria-haspopup][aria-expanded='true'])
+            ):has(.row-side > :not(:empty))
+            :is(.row-meta-end, .row-cols > [data-col='state']),
+        [data-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])):has(
+                [data-part-action] > :not(:empty)
+            )
+            :is([data-part-usage], [data-part-meta]) {
+            opacity: 0;
         }
     }
+}
+
+/* Whatever opens an item on click (a row, a card, a part, a fold) shows the pointer; buttons keep their own cursor. */
+:is(.row-cols, .row-meta, .desk-tile, .list-row, [data-part] [data-row-open], [data-dossier-open]) {
+    cursor: pointer;
 }

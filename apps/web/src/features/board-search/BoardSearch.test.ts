@@ -311,7 +311,7 @@ const WIDE: BoardData = withItems([
     item('K1', { number: 1, title: 'Match kept', kind: 'bug' }),
     item('H1', { number: 2, title: 'Match hidden', kind: 'feature' }),
 ]);
-const tickets = () => groups().find(([label]) => label === 'Tickets')?.[1];
+const tickets = () => groups().find(([label]) => label === 'Items')?.[1];
 
 test('choosing a ticket closes the dialog and opens its item dialog, which returns the focus to the field', async () => {
     await mountPage(WIDE);
@@ -320,7 +320,7 @@ test('choosing a ticket closes the dialog and opens its item dialog, which retur
 
     await openDialog();
     await type('#2');
-    await choose('Match hidden');
+    await choose('#2 Match hidden');
     expect(dialog()).toBeNull();
     expect(itemDialog().itemId).toBe('H1');
     await returnFocus();
@@ -335,12 +335,12 @@ test('tokens narrow tickets only, and Search all tickets lists the rest until th
     await mountPage(WIDE);
     await openDialog();
     await type('match');
-    expect(tickets()).toEqual(['Match kept', 'Search all tickets']);
+    expect(tickets()).toEqual(['#1 Match kept', 'Search all tickets']);
     expect(groups().find(([label]) => label === 'Settings')?.[1]).toContain('Open items full-size with List');
     await settle(() => option('Search all tickets').click());
-    expect(tickets()).toEqual(['Match kept', 'Match hidden']);
+    expect(tickets()).toEqual(['#1 Match kept', '#2 Match hidden']);
     expect(saved()).toEqual({ kinds: ['bug'], labels: [] });
     expect(removes()).toEqual(['Remove Bug']);
     await type('match ');
-    expect(tickets(), 'any change to the query narrows them again').toEqual(['Match kept', 'Search all tickets']);
+    expect(tickets(), 'any change to the query narrows them again').toEqual(['#1 Match kept', 'Search all tickets']);
 });

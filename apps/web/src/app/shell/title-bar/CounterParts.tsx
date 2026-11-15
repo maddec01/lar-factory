@@ -46,6 +46,16 @@ export function List({
                         )
                     }
                     title={<ItemTitle item={item} />}
+                    // Beside its wait at the row's end, the project goes under the title.
+                    sub={
+                        trailing &&
+                        asks && (
+                            <CounterAge
+                                icon={<ProjectIcon repo={repoKey(item)} size="sm" />}
+                                name={itemRepoNames(item, repos)}
+                            />
+                        )
+                    }
                     trailing={
                         trailing?.(item) ?? (
                             <CounterAge

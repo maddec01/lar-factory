@@ -10,10 +10,12 @@ export function EarlierThreadList({
     /** The threads, one EarlierThread each. */
     children: ReactNode;
 }) {
+    // A property of the item as the sidebar lists them: "Threads" in the label column, each thread beside it.
     return (
-        <ul className="text-fg-muted m-0 grid list-none gap-1 p-0 text-xs" data-earlier-threads>
-            {children}
-        </ul>
+        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 text-xs" data-earlier-threads>
+            <span className="text-fg-muted leading-7">Threads</span>
+            <ul className="m-0 grid list-none p-0">{children}</ul>
+        </div>
     );
 }
 
@@ -32,10 +34,10 @@ export function EarlierThread({
     /** The thread's page; the name is plain text without one. */
     href?: string | undefined;
     /** The thread's state. */
-    state: ReactNode;
+    state?: ReactNode;
 }) {
     return (
-        <li className="flex min-w-0 items-center gap-1.5" title={title}>
+        <li className="text-fg-muted flex min-h-7 min-w-0 items-center gap-1.5" title={title}>
             {href ? (
                 <a href={href} data-thread-name className={`truncate ${linkRecipe.accent}`}>
                     {name}
@@ -44,10 +46,12 @@ export function EarlierThread({
                 <span data-thread-name className="truncate">
                     {name}
                 </span>
-            )}{' '}
-            <span data-thread-state className="shrink-0">
-                · {state}
-            </span>
+            )}
+            {state && (
+                <span data-thread-state className="shrink-0">
+                    · {state}
+                </span>
+            )}
         </li>
     );
 }

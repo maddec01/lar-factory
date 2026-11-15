@@ -37,21 +37,23 @@ const build = (running = true): Item => ({
 const board = (items: Item[]): BoardData => fresh({ ...sample, items });
 const row = () => $('[data-stage="build"] [data-item="tidy-build"]')!;
 
-test('a mounted Build row keeps long activity available in a title and lets its metadata wrap beside a PR', async () => {
+test('a mounted Build row keeps long activity available in a title and lets it wrap among the row’s facts', async () => {
     await mountPage(board([build()]));
 
     const activity = row().querySelector<HTMLElement>('[data-activity]')!;
 
     expect(activity.title).toContain('Approver running with a long activity description');
     expect(activity.classList.contains('flex-wrap')).toBe(true);
-    expect(text(row().querySelector('[data-col="pr"]'))).toContain('PR #34');
+    // The row is one line: its activity reads among its facts at the row's end, with no second line under it.
+    expect(row().querySelector('[data-row-meta]')!.contains(activity)).toBe(true);
+    expect(row().querySelector('[data-progress]')).toBeNull();
 });
 
 test('an ended owner turn in an unfinished build shows quiet elapsed activity, then clears it on a live push', async () => {
     await mountPage(board([build(false)]));
     expect(text(row().querySelector('[data-activity="quiet"]'))).toBe('No action for 12m');
-    // A row with activity holds its cost in its state's place; the sentence under the title says it is quiet.
-    expect(text(row().querySelector('[data-col="state"]'))).toBe('$46.90');
+    // A row with activity ends with its cost alone; its activity sentence says it is quiet.
+    expect(text(row().querySelector('[data-meta-end]'))).toBe('$46.90');
     expect(text($('.desk'))).toContain('Nothing waits on you.');
 
     const { useItemDialogStore } = await import('@/features/item-dialog');
@@ -64,7 +66,7 @@ test('an ended owner turn in an unfinished build shows quiet elapsed activity, t
 
     await settle(() => useBoardStore.getState().receive(board([build()])));
     expect(row().querySelector('[data-activity="quiet"]')).toBeNull();
-    expect(text(row().querySelector('[data-col="state"]'))).toBe('$46.90');
+    expect(text(row().querySelector('[data-meta-end]'))).toBe('$46.90');
     expect(text(row())).toContain('Approver running');
     expect(text($('[data-item-summary]'))).toContain('Implementing');
 });

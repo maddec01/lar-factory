@@ -2,6 +2,7 @@
 
 import type { BoardData } from '@lar-factory/shared';
 import {
+    needsAnswer,
     UNREADABLE,
     retiredPartLabel,
     blockerGroups,
@@ -22,7 +23,6 @@ import { PartStart } from './PartStart';
 import { figuresOf, opensItem } from './RowDetails';
 import { YOURS, lastSeen } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
-import { PartKindLabel } from './WorkMapParts';
 import {
     conceptBuildWait,
     AzureFields,
@@ -45,6 +45,7 @@ import {
     RowCount,
     ShowDoneToggle,
     ThreadLine as DesignThreadLine,
+    WaitWord,
 } from '@/ui/board';
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
@@ -122,6 +123,10 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
     const still = useActivityStill(item);
     // The one presenter's word, the same a row and the dialog say for this part.
     const word = shown.word;
+    // A part whose word already counts its parts shows that one count, not its slices too.
+    const partsCounted = word.endsWith(' parts done');
+    // A part that waits on you says so in amber, as its desk card does.
+    const asksYou = !isDone(item) && (needsAnswer(item) || item.status === 'Needs you');
     const slices = item.slices.length;
     // Its state already names what it waits on, so the thread line says only what a thread does.
     const hasThreadLine = !!activity || !!shownThread(part, shown.working);
@@ -135,17 +140,21 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
             name={<PartName part={part} />}
             meta={
                 <>
-                    <PartKindLabel kind={part.kind} />
                     {repoKey(item) !== home && <RepoCell item={item} />}
-                    <span>
-                        {retiredPartLabel(item) ?? (isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word))}
-                    </span>
+                    {asksYou ? (
+                        <WaitWord>{word}</WaitWord>
+                    ) : (
+                        <span>
+                            {retiredPartLabel(item) ??
+                                (isDone(item) ? 'Complete' : (conceptBuildWait(item, data) ?? word))}
+                        </span>
+                    )}
                     <AzureFields azure={item.azure} />
                 </>
             }
             action={<Action part={part} data={data} />}
             second={
-                (slices > 0 ||
+                ((slices > 0 && !partsCounted) ||
                     item.linkedPrs.length > 0 ||
                     s ||
                     usageLoading(item, data) ||
@@ -161,11 +170,12 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
                                 usageUnreadable(item) && UNREADABLE
                             )
                         }
-                        bar={slices > 0 && <SliceBar item={item} still={still} />}
+                        bar={slices > 0 && !partsCounted && <SliceBar item={item} still={still} />}
                         count={
-                            slices > 0 && (
+                            slices > 0 &&
+                            !partsCounted && (
                                 <RowCount>
-                                    {item.slices.filter((x) => x.progress === 'done').length}/{slices} slices
+                                    {item.slices.filter((x) => x.progress === 'done').length}/{slices} slices done
                                 </RowCount>
                             )
                         }

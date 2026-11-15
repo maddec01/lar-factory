@@ -2,8 +2,6 @@
 
 import { groupState, type Item } from '@lar-factory/shared';
 
-import { ActivityLine } from './ActivityLine';
-import { RowSecondLine } from './Columns';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { useActivityFeedback, useShownStatus } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -19,26 +17,24 @@ export function DossierState({ item }: { item: Item }) {
         groupState(item, data) || shown.word === stage || shown.running ? shown.word : `${stage} · ${shown.word}`;
 
     // The second line's count says how many parts are done, so the state would say it twice.
-    if (text.endsWith(' parts done')) return null;
+    if (/^\d+\/\d+ parts done$/.test(text)) return null;
 
     return <RowState title={text}>{text}</RowState>;
 }
 
-export function DossierActivity({ item }: { item: Item }) {
+/** Whether a grouped item's own thread is at work to report, so its row says what it does in place of its next step. */
+export function useDossierActivity(item: Item): boolean {
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const activity = useActivityState(item);
     const still = useActivityStill(item);
     const working = !still && (feedback.running || shown.running);
 
-    if (shown.running && item.kind === 'concept') return null;
+    // A running status that is its parts', not a thread of its own (a concept's, or a parent with no threads), leaves
+    // the row its group state and next step: there is no activity of its own to show.
+    const ownThreads = Array.isArray(item.threads) && item.threads.length > 0;
 
-    if ((!activity || activity === 'unavailable') && !working && !item.slices.length) return null;
+    if (shown.running && (item.kind === 'concept' || !ownThreads)) return false;
 
-    // The row's parts track is its one bar: the parent's own work reads as its sentence alone.
-    return (
-        <RowSecondLine>
-            <ActivityLine item={item} />
-        </RowSecondLine>
-    );
+    return Boolean((activity && activity !== 'unavailable') || working);
 }

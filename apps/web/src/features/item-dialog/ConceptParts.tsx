@@ -2,9 +2,9 @@
 // each with its status, usage under it and Open thread beside it, and what its refinement and delivery still need, in
 // words. Parts off the board aren't listed; the count above says how many and why.
 
-import { UNREADABLE, itemTotal, plural, retiredPartLabel, shapingOwner } from '@lar-factory/shared';
+import { UNREADABLE, itemTotal, needsAnswer, plural, retiredPartLabel, shapingOwner } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Disclosure } from '@lar-works/design-system';
+import { Text } from '@lar-works/design-system';
 
 import {
     conceptBuildWait,
@@ -18,9 +18,26 @@ import {
     SourceIcon,
     ItemStatusGlyph,
 } from '@/features/items';
-import { isDone, partsOf, unreadParts, unreadPartsText } from '@/features/line';
+import {
+    ConceptOpenQuestions,
+    ConceptPartsBar,
+    isDone,
+    partsOf,
+    RowKindMark,
+    unreadParts,
+    unreadPartsText,
+} from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DetailFact, PartName, PartRow, PartsList, MainSection, SectionHeader, workHoldReason } from '@/ui/board';
+import {
+    DetailFact,
+    PartName,
+    PartRow,
+    PartsList,
+    MainSection,
+    SectionHeader,
+    WaitWord,
+    workHoldReason,
+} from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn['’]t (?:settled|Done)[.]$`);
@@ -102,7 +119,18 @@ export function ConceptWork({ item }: { item: Item }) {
     );
 }
 
-function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData; openPart: (itemId: string) => void }) {
+function ConceptPartRow({
+    item,
+    data,
+    openPart,
+    parentRepo,
+}: {
+    item: Item;
+    data: BoardData;
+    openPart: (itemId: string) => void;
+    /** The concept's own repository, which a part in the same one doesn't repeat. */
+    parentRepo: string | undefined;
+}) {
     const shown = useShownStatus(item);
     const complete = isDone(item);
     const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length || shapingOwner(item, data.items));
@@ -116,7 +144,12 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
             onOpen={() => openPart(item.id)}
             name={
                 <PartName
-                    source={<SourceIcon item={item} />}
+                    source={
+                        <>
+                            <RowKindMark item={item} />
+                            <SourceIcon item={item} />
+                        </>
+                    }
                     glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />}
                 >
                     <ItemTitle item={item} />
@@ -124,8 +157,12 @@ function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData;
             }
             meta={
                 <>
-                    <RepoCell item={item} />
-                    {retiredPartLabel(item) ?? (complete ? 'Done' : (conceptBuildWait(item, data) ?? shown.word))}
+                    {item.repo !== parentRepo && <RepoCell item={item} />}
+                    {!complete && (needsAnswer(item) || item.status === 'Needs you') ? (
+                        <WaitWord>{shown.word}</WaitWord>
+                    ) : (
+                        (retiredPartLabel(item) ?? (complete ? 'Done' : (conceptBuildWait(item, data) ?? shown.word)))
+                    )}
                 </>
             }
             usage={usage}
@@ -147,7 +184,20 @@ export function ConceptParts({
     const missing = unreadParts(item, parts);
 
     return (
-        <MainSection data-concept-parts header={<SectionHeader heading="Parts" />}>
+        <MainSection
+            data-concept-parts
+            header={
+                <SectionHeader
+                    // A group with no parts yet says "Parts" over its "No parts planned yet", never "0/0 parts done".
+                    heading={
+                        item.subIssues.total
+                            ? `${item.subIssues.completed}/${item.subIssues.total} parts done`
+                            : 'Parts'
+                    }
+                    bar={<ConceptPartsBar parent={item} parts={parts} />}
+                />
+            }
+        >
             {item.completion && (
                 <DetailFact label="Delivery">
                     <ConceptState
@@ -160,7 +210,6 @@ export function ConceptParts({
                     />
                 </DetailFact>
             )}
-            {missing > 0 && <DetailFact label="Parts outside the board">{unreadPartsText(missing)}</DetailFact>}
             {!parts.length && (
                 <DetailFact label="Parts">
                     {item.subIssues.total ? 'Parts are outside the board.' : 'No parts planned yet.'}
@@ -172,19 +221,25 @@ export function ConceptParts({
                 </DetailFact>
             )}
             {parts.length > 0 && (
-                // Open while a part waits on you, so the work the notice names is in reach.
-                <Disclosure
-                    label={`${plural(parts.length, 'part')} and their holds`}
-                    presentation="section"
-                    defaultOpen={parts.some((part) => part.item.needsYou || part.item.status === 'Needs you')}
-                >
-                    <PartsList>
-                        {parts.map((part) => (
-                            <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
-                        ))}
-                    </PartsList>
-                </Disclosure>
+                <PartsList>
+                    {parts.map((part) => (
+                        <ConceptPartRow
+                            key={part.item.id}
+                            item={part.item}
+                            data={data}
+                            openPart={openPart}
+                            parentRepo={item.repo}
+                        />
+                    ))}
+                </PartsList>
             )}
+            {/* Once, muted, after the parts the board shows. */}
+            {missing > 0 && (
+                <Text variant="caption" tone="muted">
+                    {unreadPartsText(missing)}
+                </Text>
+            )}
+            <ConceptOpenQuestions parent={item} parts={parts} data={data} />
         </MainSection>
     );
 }

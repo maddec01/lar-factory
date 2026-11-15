@@ -24,13 +24,13 @@ export {
 } from './ItemParts';
 export { KIND_BADGES } from './KindBadges';
 export { useShownLabels } from './useShownLabels';
-export { NeedsYou } from './NeedsYou';
+export { NeedsYou, useNoticeTakesAction } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
 export { VerifyBuild } from './VerifyBuild';
 export { PrAction } from './PrLink';
 export { PrList } from './PrList';
-export { RowActions } from './RowActions';
+export { CardActions, RowActions } from './RowActions';
 export { SliceBar, SliceList } from './SliceParts';
 export { SourceIcon } from './SourceIcon';
 export { StartAfterError, StartOrAfter } from './StartAfter';
@@ -42,7 +42,7 @@ export { useItemStates } from './ItemState';
 export type { ItemState } from './ItemState';
 export { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from './StatusGlyph';
 export { useStatusActivity } from './useStatusActivity';
-export { workflowSteps } from './WorkflowSteps';
+export { workflowSteps, stepName } from './WorkflowSteps';
 
 export { ConceptBuild } from './ConceptBuild';
 
@@ -50,3 +50,5 @@ export { HumanWaitAction } from './HumanWaitAction';
 export { ResumeRelease } from './ResumeRelease';
 
 export { conceptBuildWait } from './ConceptBuildProgress';
+export { SLOT_WAIT } from './ItemState';
+export { checksCount, checksWord, prChecks } from './PrChecks';

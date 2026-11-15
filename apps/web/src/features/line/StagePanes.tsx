@@ -1,14 +1,12 @@
 // The Shaping, Ready to build and Build sections. Ready to build's header holds the Auto-build switch, and Build's counts the
-// factory's builds at work against the build limit. An item on Your desk stays in its lane too, quiet there and after
-// the lane's own work, so each lane shows everything at its stage and leads with what is moving.
-
-import { deskItems } from '@lar-factory/shared';
+// factory's builds at work against the build limit. An item on Your desk stays in its lane too, in its place there with
+// a softer light, so each lane shows everything at its stage and nothing jumps as work starts or stops waiting on you.
 
 import { AutoBuildSwitch } from './AutoBuildSwitch';
 import { Pane, PaneEmpty } from './Pane';
 import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
-import { useActivityUnavailable, useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
+import { useBuilds, useStatusActivity, BUILD_LIMIT_NOTE } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { BuildLimit as DesignBuildLimit, ReadyBuildControls, StageList } from '@/ui/board';
 
@@ -16,13 +14,12 @@ type Shows = (row: Row) => boolean;
 
 function Rows({ rows }: { rows: Row[] }) {
     const data = useBoardStore((state) => state.data);
-    const desk = new Set(deskItems(data, useActivityUnavailable()).map((item) => item.id));
-    // The lane's own work first, in its order, then what waits on Your desk, in its order.
-    const ordered = [...rows.filter((row) => !desk.has(row.item.id)), ...rows.filter((row) => desk.has(row.item.id))];
 
+    // Every row in its lane's own order, those on Your desk too, never folded or moved: a row that starts or stops
+    // waiting on you changes its light, not its place, so the lane doesn't jump.
     return (
         <StageList>
-            {ordered.map((row) => (
+            {rows.map((row) => (
                 <StageRow key={row.item.id} row={row} data={data} />
             ))}
         </StageList>
@@ -86,11 +83,14 @@ function BuildLimit() {
 
     return (
         <DesignBuildLimit
+            over={builds.limit === undefined ? 0 : Math.max(0, builds.items.length - builds.limit)}
             building={builds.items.length}
             limit={builds.limit}
             title={`${builds.text}. ${BUILD_LIMIT_NOTE} All builds count toward this limit. At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.`}
         >
-            {builds.occupancy}
+            {builds.limit !== undefined && builds.items.length > builds.limit
+                ? `${builds.items.length} building`
+                : builds.occupancy}
         </DesignBuildLimit>
     );
 }

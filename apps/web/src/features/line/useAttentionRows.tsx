@@ -187,12 +187,11 @@ export function useAttentionRows(
                     key={fog.text}
                     main={
                         <AttentionMark mark="fog">
-                            <Refs
-                                text={fog.routed ? fog.question : `${fog.question} · no part answers this yet`}
-                                find={find}
-                            />
+                            <Refs text={fog.question} find={find} />
                         </AttentionMark>
                     }
+                    // Where a part's state would read: no part answers it yet (the number in it is the part that asked).
+                    side={fog.routed ? undefined : 'Unanswered'}
                 />
             )),
         },

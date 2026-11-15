@@ -1,8 +1,9 @@
 // The title bar's five counters: need you, shaping, building against the automatic build limit, shipped and spend, always for
-// the whole factory. Each opens a popover of every item behind its number; picking one opens the item dialog.
+// the whole factory. Each opens a popover of every item behind its number; picking one opens the item dialog. Need you's
+// brings Your desk into view instead while the desk shows cards.
 
 import type { ItemThread } from '@lar-factory/shared';
-import { expect, test } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 
 import { $, $$, fresh, moved, mountPage, push, sample, settle, text, textBesideIcon } from '@/test/PageTest';
 
@@ -48,13 +49,26 @@ const firstRead = {
     waiting: ['owner/pending'],
 };
 
+/** Filters that hide every desk card, so need you's press opens its list rather than bringing Your desk into view. */
+const hideDesk = () =>
+    localStorage.setItem('lar-board:filters:board', JSON.stringify({ kinds: [], labels: ['no such label'] }));
+
 async function openCounter(label: string): Promise<HTMLElement> {
     await settle(() => counter(label).click());
 
     return popup()!;
 }
 
+test('need you brings Your desk into view rather than listing the cards it already shows', async () => {
+    await mountPage();
+    await settle(() => counter('need you').click());
+    expect(popup()).toBeNull();
+    await settle(() => vi.advanceTimersByTime(0));
+    expect($('section.desk')!.dataset.flash, 'its cards glow once').toBe('');
+});
+
 test('the counts are the whole factory’s with a repository scoped', async () => {
+    hideDesk();
     await mountPage();
 
     const before = counters().map(value);
@@ -68,7 +82,7 @@ test('the counts are the whole factory’s with a repository scoped', async () =
     const { useScopeStore } = await import('@/features/filters/ScopeStore');
 
     await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-    expect($('[data-search-field]')!.getAttribute('aria-description')).toBe('filtered by lar-apple');
+    expect($('[data-search-field]')!.getAttribute('aria-description')).toBe('filtered by lar-apple, no such label');
     expect(counters().map(value)).toEqual(before);
     await openCounter('need you');
     expect(rows()).toEqual(items);
@@ -143,6 +157,7 @@ test('an item waiting on you during shaping counts in both need you and shaping'
         updated: '2026-10-21T09:00:00.000Z',
     };
 
+    hideDesk();
     await mountPage(
         moved('I_sample05', 'Needs you', {
             ...sample,
@@ -296,19 +311,15 @@ test('unavailable usage takes precedence over loading', async () => {
     expect(foot(await openCounter('spend'))).toBe('Partial figures. Some usage is unavailable.');
 });
 
-test('current PR evidence groups failed checks and excludes checks-only waiting from Needs you', async () => {
+test('current PR evidence says failed checks at the row’s end and excludes checks-only waiting from Needs you', async () => {
+    hideDesk();
     await mountPage();
 
     const pop = await openCounter('need you');
-    const groups = [...pop.querySelectorAll('h3')].map((heading) => ({
-        heading: text(heading),
-        body: text(heading.parentElement),
-    }));
 
-    expect(groups.find((group) => group.heading.startsWith('Checks failed'))?.body).toContain('#142');
+    expect(rows().find((row) => row.startsWith('#142'))).toMatch(/Checks failed$/);
     expect(text(pop)).not.toContain('#149');
-    expect(groups.some((group) => group.heading.startsWith('Checks running'))).toBe(false);
-    expect(groups.find((group) => group.heading.startsWith('Ready to merge'))?.body ?? '').not.toContain('#142');
+    expect(rows().some((row) => row.endsWith('Checks running'))).toBe(false);
 });
 
 test('spend keeps a visible placeholder while no usage is known', async () => {

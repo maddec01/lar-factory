@@ -98,7 +98,16 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
 }
 
 /** The status's action, with Open thread on the latest thread beside it unless the action already opens that thread. */
-export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
+export function StatusActions({
+    item,
+    data,
+    besideOnly = false,
+}: {
+    item: Item;
+    data: BoardData;
+    /** Only the latest thread's Open thread, when the dialog's notice carries the status's own action. */
+    besideOnly?: boolean;
+}) {
     const shown = useShownStatus(item);
 
     const action = statusAction(item, data, shown);
@@ -114,17 +123,19 @@ export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
     return (
         <>
             {item.kind !== 'concept' && beside && <OpenThread item={item} data={data} />}
-            {opensThread
-                ? item.kind !== 'concept' && (
-                      <OpenThread
-                          item={item}
-                          data={data}
-                          threadId={action.opens}
-                          label={action.label}
-                          primary={needsAnswer(item) || Boolean(action.primary)}
-                      />
-                  )
-                : action.control}
+            {besideOnly
+                ? null
+                : opensThread
+                  ? item.kind !== 'concept' && (
+                        <OpenThread
+                            item={item}
+                            data={data}
+                            threadId={action.opens}
+                            label={action.label}
+                            primary={needsAnswer(item) || Boolean(action.primary)}
+                        />
+                    )
+                  : action.control}
         </>
     );
 }

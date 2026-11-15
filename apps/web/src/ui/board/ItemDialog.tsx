@@ -10,34 +10,53 @@ import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
 
 /**
- * The summary under the dialog's header, a row each: `line` (the item's source, repository, status and age), its
- * `parent`, its `kind` and its ticket `actions`.
+ * The item's properties at the top of the dialog's sidebar, a label beside each value: its status, where its ticket
+ * lives, its kind and its parent, then its ticket `actions`.
  */
 export function ItemSummary({
-    line,
-    parent,
+    status,
+    project,
     kind,
+    parent,
     actions,
     ...data
 }: {
-    /** The item's source, repository, status and age. */
-    line: ReactNode;
+    /** The item's status glyph and word, and what blocks it. */
+    status: ReactNode;
+    /** Where its ticket is saved and its repository. */
+    project: ReactNode;
+    /** The item's kind, or the control that changes it. */
+    kind: ReactNode;
     /** The item's parent, a SummaryParent. */
     parent?: ReactNode;
-    /** The item's kind, a badge. */
-    kind: ReactNode;
     /** The ticket's actions. */
     actions: ReactNode;
 } & DataAttributes) {
     return (
-        // Under the dialog's 52px header and its hairline, 16px in, as the body's own top inset.
-        <div {...data} className="text-fg-muted @container grid shrink-0 gap-1 px-5 pt-4 text-xs sm:px-6">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                {line}
-                {kind}
-            </div>
-            {parent}
-            <div className="flex flex-wrap items-start gap-2">{actions}</div>
+        <div {...data} className="grid min-w-0 gap-1">
+            <AsideProp label="Status">{status}</AsideProp>
+            <AsideProp label="Project">{project}</AsideProp>
+            <AsideProp label="Kind">{kind}</AsideProp>
+            {parent && <AsideProp label="Part of">{parent}</AsideProp>}
+            <div className="flex flex-wrap items-start gap-2 empty:hidden">{actions}</div>
+        </div>
+    );
+}
+
+/** One property in the dialog's sidebar: its muted label in a fixed column, its value beside it. */
+function AsideProp({
+    label,
+    children,
+}: {
+    /** What the property is, such as "Status". */
+    label: string;
+    /** Its value. */
+    children: ReactNode;
+}) {
+    return (
+        <div className="grid min-h-6 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-3 text-xs">
+            <span className="text-fg-muted">{label}</span>
+            <span className="text-fg flex min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">{children}</span>
         </div>
     );
 }
@@ -85,7 +104,7 @@ export function SummaryParent({
 } & DataAttributes) {
     return (
         <p {...data} className="m-0 min-w-0 wrap-anywhere">
-            {prefix}{' '}
+            <span className="sr-only">{prefix} </span>
             {href ? (
                 <a href={href} target="_blank" rel="noopener" className={linkRecipe.accent}>
                     {name}
@@ -155,18 +174,40 @@ export function ItemDialogColumns({
     /** The main column and the ItemDialogAside. */
     children: ReactNode;
 }) {
-    const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@split:grid-rows-[auto_1fr]' : '';
+    const rows = fill ? 'min-h-0 flex-1' : '';
 
     return (
         <div
-            className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@split:grid-cols-[minmax(0,1fr)_20rem]' : ''} ${rows}`}
+            className={`grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-5 ${aside ? '@split:grid-cols-[minmax(0,1fr)_18rem]' : ''} ${rows}`}
         >
             {children}
         </div>
     );
 }
 
-/** The sidebar beside the main column, ruled off from it once there is room. */
+/** The dialog's main column: what waits on you, where the work stands, what its agents do, then the record, description
+ *  and comments, one under another; filling, its open editor takes the height the rest leave. */
+export function ItemMainColumn({
+    fill,
+    children,
+}: {
+    /** Its open editor takes the height the rest leave. */
+    fill: boolean;
+    /** The main column's sections. */
+    children: ReactNode;
+}) {
+    return (
+        <div
+            className={`@split:col-start-1 @split:row-start-1 min-w-0 gap-5 ${fill ? 'flex min-h-0 flex-col' : 'grid grid-cols-[minmax(0,1fr)] content-start'}`}
+            data-item-main
+        >
+            {children}
+        </div>
+    );
+}
+
+/** The sidebar beside the main column, once there is room: a softly filled card with a hairline edge, so it reads as its own
+ *  panel on any screen, its groups (properties, figures, people and dates, threads) split by full-width dividers. */
 export function ItemDialogAside({
     children,
 }: {
@@ -175,11 +216,47 @@ export function ItemDialogAside({
 }) {
     return (
         <aside
-            className="@split:border-line @split:col-start-2 @split:row-span-2 @split:row-start-1 @split:border-l @split:pl-6 grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4"
+            className="@split:col-start-2 @split:row-start-1 bg-fill-muted border-line divide-line grid min-w-0 grid-cols-[minmax(0,1fr)] content-start divide-y self-start rounded-xl border shadow-(--shadow-raised) [&>*]:px-4 [&>*]:py-3"
             data-item-aside
         >
             {children}
         </aside>
+    );
+}
+
+/** The item's agent figures in the sidebar, time, tokens and cost, under its properties; nothing when there are none. */
+export function AsideFigures({
+    children,
+}: {
+    /** The figures and any note on them. */
+    children: ReactNode;
+}) {
+    return <div className="grid min-w-0 gap-1 empty:hidden [&_[data-agent-work]]:leading-5">{children}</div>;
+}
+
+/** The item's agent figures as sidebar properties, one labelled row each, with any `note` (such as that they are the last
+ *  known) muted under them; `title` gives them in full. */
+export function FigureRows({
+    rows,
+    title,
+    note,
+}: {
+    /** The figures, each its label and value. */
+    rows: { label: string; value: string }[];
+    /** The figures in full, as their tooltip. */
+    title: string;
+    /** A word on the figures, such as "Last known". */
+    note?: string | undefined;
+}) {
+    return (
+        <div className="grid min-w-0 gap-1 tabular-nums" title={title} data-agent-work>
+            {rows.map((row) => (
+                <AsideProp key={row.label} label={row.label}>
+                    {row.value}
+                </AsideProp>
+            ))}
+            {note && <span className="text-fg-muted text-xs">{note}</span>}
+        </div>
     );
 }
 

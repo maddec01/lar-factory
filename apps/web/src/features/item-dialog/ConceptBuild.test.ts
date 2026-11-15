@@ -201,7 +201,7 @@ test.each(['running', 'paused'] as const)(
         // Build's header carries the shared occupancy; Ready keeps only what starts builds.
         const controls = $('[data-stage="build"] [data-stage-controls]')!;
 
-        expect(text(controls)).toContain('3 building · limit 4');
+        expect(text(controls)).toContain('3 of 4 build slots');
         expect(text($('[data-ready-build-controls]'))).not.toContain('building');
         expect(controls.querySelector('[title]')?.getAttribute('title') ?? '').not.toContain('exceed');
 

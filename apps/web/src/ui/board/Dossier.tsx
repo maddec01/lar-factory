@@ -102,7 +102,7 @@ export function DossierLine({
             data-item={item}
             data-attention={attention || undefined}
             title={title}
-            className={`hover:bg-fill-hover cursor-pointer rounded-lg py-2 ${pickedRow(picked)}`}
+            className={`hover:bg-fill-hover cursor-pointer rounded-lg py-1.5 ${pickedRow(picked)}`}
         >
             {children}
         </div>
@@ -117,7 +117,7 @@ export function DossierTitleCell({
     children: ReactNode;
 }) {
     return (
-        <span className="flex min-w-0 flex-wrap items-center gap-1.5" data-line="1" data-title-cell>
+        <span className="flex min-w-0 flex-wrap items-center gap-2" data-line="1" data-title-cell>
             {children}
         </span>
     );
@@ -145,7 +145,7 @@ export function DossierTitle({
             }}
             title={name}
             data-title
-            className={`text-fg min-w-0 flex-1 rounded-xs text-left text-sm leading-5 wrap-anywhere hover:underline ${ROW_OPENS}`}
+            className={`text-fg min-w-0 flex-1 truncate rounded-xs text-left text-sm leading-7 hover:underline ${ROW_OPENS}`}
         >
             {children}
         </button>
@@ -221,10 +221,10 @@ export function DossierChips({
                 {first.icon}
                 {first.words}
             </span>
-            {/* The rest are in the line's tooltip, so the row keeps to one summary. */}
+            {/* The rest follow in words, so no count goes unexplained. */}
             {more.length > 0 && (
-                <span className="text-fg-muted text-xs whitespace-nowrap" title={more.join(' · ')} data-chips-more>
-                    +{more.length} more
+                <span className="text-fg-muted text-xs whitespace-nowrap" data-chips-more>
+                    · {more.join(' · ')}
                 </span>
             )}
         </span>
@@ -265,6 +265,7 @@ export function DossierNext({
     return (
         <span className="min-w-0" data-next>
             <span className="flex min-w-0 items-center gap-2">
+                {yours && !unseen && <span aria-hidden="true" className="bg-warning size-2 shrink-0 rounded-full" />}
                 {word && (
                     <span
                         className={`shrink-0 font-medium ${yours ? 'text-warning-fg' : 'text-fg-muted'} ${unseen ? 'sr-only' : ''}`}
@@ -293,34 +294,40 @@ export interface PartSegment {
 export function PartsBar({
     title,
     parts,
-    unread,
+    done,
+    total,
 }: {
     /** What the bar shows, as its tooltip and its name for screen readers. */
     title: string;
-    /** Every part, each a segment in its colour. */
+    /** The parts the board reads, each a segment in its colour; done ones are counted by `done`. */
     parts: PartSegment[];
-    /** How many parts the board doesn't read, each an outlined segment. */
-    unread: number;
+    /** How many parts are done, those off the board included. */
+    done: number;
+    /** How many parts there are, those off the board included. */
+    total: number;
 }) {
+    // Done parts lead in the done colour, then the open parts the board reads in theirs, then what's left on the track.
+    // Past eight parts the bar is one fill of the done share, as segments that small read as dots.
+    const open = parts.filter((p) => p.color !== 'var(--color-board-done)');
+    const segments =
+        total > 8
+            ? [{ label: title, color: 'var(--color-board-done)', value: total ? done / total : 0 }]
+            : [
+                  ...Array.from({ length: done }, () => ({ label: 'Done', color: 'var(--color-board-done)' })),
+                  ...open
+                      .slice(0, Math.max(0, total - done))
+                      .map((p) => ({ label: p.title, color: p.color, pulse: p.pulse })),
+                  ...Array.from({ length: Math.max(0, total - done - open.length) }, () => ({ label: 'To do' })),
+              ];
+
     return (
         <div className="min-w-0" title={title} data-part-bar>
-            <SegmentedProgress
-                label={title}
-                size="sm"
-                segments={[
-                    ...parts.map((p) => ({ label: p.title, color: p.color, pulse: p.pulse })),
-                    ...Array.from({ length: Math.max(0, unread) }, () => ({
-                        label: 'Not read by the board',
-                        color: 'var(--color-line-strong)',
-                        waiting: true,
-                    })),
-                ]}
-            />
+            <SegmentedProgress label={title} size="sm" segments={segments} />
         </div>
     );
 }
 
-/** What an expanded dossier holds, in a rounded panel under its line; its parts are rows, as a lane's. */
+/** What an expanded dossier holds, indented under its line as a row's slices are; its parts are rows, as a lane's. */
 export function DossierBody({
     children,
 }: {
@@ -328,7 +335,10 @@ export function DossierBody({
     children: ReactNode;
 }) {
     return (
-        <div className="grid gap-3 rounded-xl border p-3" data-dossier-body>
+        <div
+            className="ml-9 grid gap-3 pt-1 pb-2 [&>:not(:has(ol,ul))]:pr-3 [&>:not(:has(ol,ul))]:pl-5"
+            data-dossier-body
+        >
             {children}
         </div>
     );

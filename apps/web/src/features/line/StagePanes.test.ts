@@ -27,8 +27,8 @@ import { conceptIcons } from '@/ui/board';
 
 const PANES = ['shaping', 'ready', 'build'];
 const SHAPING = [130];
-// Build's own work first, furthest along first, then what waits on Your desk, in its order.
-const BUILD = [149, 150, 30, 31, 34, 147, 142, 141];
+// Build in its own order, items on Your desk too, in their places.
+const BUILD = [31, 149, 34, 147, 142, 141, 150, 30];
 const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
 const row = (id: string) =>
     $(`:is([data-stage="shaping"], [data-stage="ready"], [data-stage="build"]) li[data-item="${id}"]`)!;
@@ -41,7 +41,13 @@ const heading = (id: string) => [
     text($(`#${id}`)),
     text($(`#${id}`)!.parentElement!.querySelector('[data-slot="count"]')),
 ];
-const state = (id: string) => row(id).querySelector<HTMLElement>('[data-col=state] [data-state]')!;
+/** A row's facts on its one line: what holds it or its thread does, its progress, then its end. */
+const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-row-meta]')!;
+/** What holds a row or its first blocked or active slice, among its facts. */
+const next = (id: string) => text(meta(id).querySelector(':scope > :is([data-blocked], [data-note])'));
+/** A row's end: its cost, then its state or age. */
+const end = (id: string) => row(id).querySelector<HTMLElement>('[data-meta-end]')!;
+const state = (id: string) => end(id).querySelector<HTMLElement>('[data-state]')!;
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) =>
@@ -154,7 +160,8 @@ test('Build’s header counts the factory’s builds against the automatic build
 
     const header = $('[data-stage="build"] header .build-limit')!;
 
-    expect(text(header), 'In progress and Review count').toBe('+38 building · limit 2 · 6 over the limit');
+    // The bars show the limit, so the words say how far past it the builds are.
+    expect(text(header), 'In progress and Review count').toBe('+38 building · 6 over the limit');
     // Build's header carries the occupancy; Ready's controls keep only what starts builds.
     expect(text($('[data-ready-build-controls]'))).toBe('Auto-build');
     expect(header.getAttribute('title')).toContain(
@@ -166,7 +173,7 @@ test('Build’s header counts the factory’s builds against the automatic build
     expect(iconConcept(row('I_sample15').querySelector('[data-glyph]')!, conceptIcons)).toBe('stopped');
     await receive(withItem('I_sample09', { status: 'In progress' }, limited));
     expect(text($('[data-stage="build"] .build-limit')), 'a concept in progress is no build at work').toBe(
-        '+38 building · limit 2 · 6 over the limit',
+        '+38 building · 6 over the limit',
     );
     await receive({
         ...limited,
@@ -174,10 +181,10 @@ test('Build’s header counts the factory’s builds against the automatic build
             ['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Done' as const } : i,
         ),
     });
-    expect(text($('[data-stage="build"] .build-limit'))).toBe('+27 building · limit 2 · 5 over the limit');
+    expect(text($('[data-stage="build"] .build-limit'))).toBe('+27 building · 5 over the limit');
     await receive({ ...limited, buildLimit: { limit: 4, automatic: 2 } });
     expect([text($('[data-stage="build"] .build-limit')), $$('[data-stage="build"] .build-limit .bar').length]).toEqual(
-        ['+38 building · limit 4 · 4 over the limit', 5],
+        ['+38 building · 4 over the limit', 5],
     );
     await receive({ ...sample, buildLimit: undefined });
     expect(
@@ -215,14 +222,14 @@ test('the note names the blocked-by issues still open', async () => {
             loose,
         ),
     );
-    expect(text(col('I_sample13', 'next'))).toContain('Blocked by #202 until it completes');
+    expect(next('I_sample13')).toContain('Blocked by #202 until it completes');
     await settle(async () =>
         (await import('@/services/board/board.hooks')).useBoardStore
             .getState()
             .receive(withItem('I_sample13', { blockers: [] }, loose)),
     );
     expect(row('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('Blocked by');
-    expect(side('I_sample13').querySelector('[data-open-thread]')!.getAttribute('aria-label')).toBe('Open thread');
+    expect(text(side('I_sample13').querySelector('[data-open-thread]'))).toBe('Open thread');
 });
 
 test('a Dependency holds the badge until it is marked met, whatever its ticket shows, and the badge names it', async () => {
@@ -253,7 +260,7 @@ test('a Dependency holds the badge until it is marked met, whatever its ticket s
 
     await mountPage(withItem('I_sample13', { blockers: [dependency(false)] }, loose));
 
-    const note = col('I_sample13', 'next').querySelector<HTMLElement>('[data-blocked]')!;
+    const note = meta('I_sample13').querySelector<HTMLElement>('[data-blocked]')!;
 
     expect([text(note), note.title]).toEqual([
         'Blocked by the Dependency on server team until you mark it met',
@@ -267,7 +274,7 @@ test('a Dependency holds the badge until it is marked met, whatever its ticket s
     expect(row('I_sample13').textContent).not.toContain('Blocked by');
 });
 
-test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
+test('a blocked Ready row offers no Build and says what it starts after; its dialog’s Start after arms the start on the picked model, then reads Starts after until pressed again', async () => {
     const blocked = {
         ...withItem('I_sample13', { status: 'Ready' }, loose),
         capture: { session: 's1', enabled: true },
@@ -276,11 +283,16 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
 
     holdPosts(blocked);
     await mountPage(blocked);
+    expect(
+        side('I_sample13').querySelector('[data-start], [data-start-after]'),
+        'a held build starts on its own; its row has nothing to press',
+    ).toBeNull();
+    expect(text(meta('I_sample13').querySelector('[data-blocked]'))).toBe('Blocked · starts after #202');
+    await press(opener('I_sample13'));
 
-    const after = () => side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+    const after = () => dialog()!.querySelector<HTMLButtonElement>('[data-start-after]')!;
 
     await pressMenu(after());
-    expect(dialog(), 'the menu opens without the dialog').toBeNull();
     await press(entries()[1]!);
     expect(posted()).toEqual([
         ['/api/arm', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }],
@@ -491,11 +503,11 @@ const slices = (id = 'I_59') => {
     return {
         segments: [...bar.children].map((li) => li.getAttribute('data-state')),
         count: countShown(count(id)),
-        next: text(col(id, 'next')),
+        next: next(id),
     };
 };
 const count = (id = 'I_59') => row(id).querySelector<HTMLButtonElement>('button[data-col="count"]')!;
-/** A slice count's visible text, after the words that name its toggle for screen readers: "1/3 slices". */
+/** A slice count's visible text, after the words that name its toggle for screen readers: "1/3 slices done". */
 const countShown = (el: Element | null) => text(el).replace(/^(Show|Hide) slices: /, '');
 /** What a slice count's toggle does, as its name starts: "Show slices". */
 const countAction = (el: Element) => /^(Show|Hide) slices(?=:)/.exec(text(el))?.[0] ?? null;
@@ -519,11 +531,11 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
     expect(slices()).toEqual({
         // A slice blocked by another reads grey, as amber is kept for what waits on you.
         segments: ['ready', 'active', 'off', 'off', 'off'],
-        count: '1/5 slices',
-        next: 'blocked Issue 67 +2 more',
+        count: '1/5 slices done',
+        next: 'blocked Issue 67 +2',
     });
 
-    const sliceNote = col('I_59', 'next').querySelector('[data-note]')!;
+    const sliceNote = meta('I_59').querySelector('[data-note]')!;
 
     expect(sliceNote.firstElementChild!.className, 'blocked reads in its colour').toContain('text-warning-fg');
     expect(sliceNote.getAttribute('title'), 'the rest are named on hover').toBe(
@@ -557,7 +569,7 @@ test('a build’s count leaves out slices closed as not planned, and names none 
     await mountPage(boardOf([raw]));
     expect(slices()).toEqual({
         segments: ['ready', 'off', 'off'],
-        count: '1/3 slices',
+        count: '1/3 slices done',
         next: '',
     });
 });
@@ -591,21 +603,25 @@ test('the count unfolds the slice list under the row and folds it again, without
     expect(list('I_sample13')).toBeNull();
 });
 
-test('the status tooltip follows the latest real thread across shaping and build stages', async () => {
+test('the status tooltip follows the latest real thread across shaping and build stages, wherever the row shows a state', async () => {
     const id = 'I_sample14';
 
     await mountPage(withItem(id, { status: 'Shaping', threads: [] }));
 
-    const activity = () => state(id).title;
+    /** The state's tooltip, or null where the row says no state, as its lane's heading already names it. */
+    const activity = () => state(id)?.title ?? null;
     const { useBoardStore } = await import('@/services/board/board.hooks');
 
     for (const status of ['Shaping', 'In progress', 'Review'] as const) {
+        // Shaping and Build name their stage, so a row with nothing more to say there shows no state.
+        const named = status !== 'Review';
+
         await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [] })));
-        expect(activity(), `${status}: no thread`).toBe('Not started');
+        expect(activity(), `${status}: no thread`).toBe(named ? null : 'Not started');
         for (const [state, expected] of [
             ['running', 'Thread running'],
             ['stopped', 'Run stopped'],
-            ['done', 'Run finished'],
+            ['done', named ? null : 'Run finished'],
             ['needs you', 'Thread needs you'],
         ] as const) {
             await settle(() =>
@@ -707,7 +723,7 @@ test('live slice transitions update the bar, expanded list and count without a r
                 `#101Issue 101${progress === 'waiting' ? 'Queued' : progress === 'active' ? 'Working' : progress.charAt(0).toUpperCase() + progress.slice(1)}$`,
             ),
         );
-        expect(countShown(count())).toBe(progress === 'done' ? '2/3 slices' : '1/3 slices');
+        expect(countShown(count())).toBe(progress === 'done' ? '2/3 slices done' : '1/3 slices done');
 
         const segment = col('I_59', 'bar').querySelectorAll('ol > li')[1]!;
 
@@ -716,7 +732,7 @@ test('live slice transitions update the bar, expanded list and count without a r
         if (progress === 'unknown') {
             expect(segment.getAttribute('data-state')).toBe('off');
             expect(text(list())).toContain('?');
-            expect(text(col('I_59', 'next'))).toBe('');
+            expect(next('I_59')).toBe('');
         }
     }
 });
@@ -766,13 +782,17 @@ test.each(['Verify', 'Ready to merge'] as const)(
 
         const open = side('I_sample13').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
 
-        expect([open.getAttribute('aria-label'), open.getAttribute('href')]).toEqual([
+        expect([text(open), open.getAttribute('href')]).toEqual([
             'Open thread',
             't3code://threads/sample-environment/build',
         ]);
+
+        // Verify waits on you to verify the build; Ready to merge on a review of its PR.
+        const wait = status === 'Verify' ? 'Verify build' : 'Review PR';
+
         await receive(at(threads('done'), { slices: [] }));
-        expect(text(desk())).toContain('Review PR');
-        expect(text(desk()!.querySelector('[data-col="side"]'))).toContain('Review PR');
+        expect(text(desk())).toContain(wait);
+        expect(text(desk()!.querySelector('[data-col="side"]'))).toContain(wait);
         expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
         expect(posted()).toEqual([]);
         await receive(at(running));
@@ -780,8 +800,7 @@ test.each(['Verify', 'Ready to merge'] as const)(
         await settle(async () =>
             (await import('@/services/board/board.hooks')).useBoardStore.getState().fail('HTTP 502'),
         );
-        // Disconnected, the row offers no Review PR button; Verify's status names the step instead.
-        expect(text(desk())).toContain(status === 'Verify' ? 'Verify build' : 'Review PR');
+        expect(text(desk())).toContain(wait);
         expect(posted()).toEqual([]);
     },
 );
@@ -816,16 +835,16 @@ describe('the activity line', () => {
 
     test('five minutes with no action reads Quiet, unless a tool still runs', async () => {
         await mountPage(at({ activity: acting('Read a.ts', 295) }));
-        // While its sentence says what the thread does, the state's place holds the row's cost.
+        // While its sentence says what the thread does, the row's end holds only its cost.
         expect(line()!.dataset.activity).toBe('working');
-        expect(text(state('I_sample13'))).toBe('$1.85');
+        expect(text(end('I_sample13'))).toBe('$1.85');
         await settle(() => vi.advanceTimersByTime(5_000));
         expect(line()!.dataset.activity).toBe('quiet');
         expect(lineText(), 'with no second age').toBe('No action for 5m');
         expect(line()!.querySelector('[data-action]')!.className).toContain('text-fg');
         expect(line()!.querySelector('[data-action]')!.className).not.toContain('text-warning-fg');
         expect(line()!.querySelector('[data-mark]')!.className).toContain('border-warning-fg');
-        expect(text(state('I_sample13'))).toBe('$1.85');
+        expect(text(end('I_sample13'))).toBe('$1.85');
         expect(moving(), 'a quiet thread is still at work').not.toBeNull();
         await settle(async () =>
             (await store()).receive(at({ activity: acting('pnpm test', 1800, { toolRunning: true }) })),
@@ -871,7 +890,7 @@ describe('the activity line', () => {
         const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
 
         await mountPage(at());
-        expect(text(state('I_sample13'))).toBe('$1.85');
+        expect(text(end('I_sample13'))).toBe('$1.85');
         expect(moving()).not.toBeNull();
         // The system time alone moves, as the page's poll would bring the sample back.
         vi.setSystemTime(NOW + ACTIVITY_STALE_MS - 1_000);
@@ -891,7 +910,7 @@ describe('the activity line', () => {
             ),
         );
         expect(line()!.dataset.activity).toBe('working');
-        expect(text(state('I_sample13'))).toBe('$1.85');
+        expect(text(end('I_sample13'))).toBe('$1.85');
     });
 });
 
@@ -900,11 +919,11 @@ test('Build and its row animate for current execution, stop together, and shapin
     const idle = { ...fresh(), items: sample.items.map((item) => ({ ...item, slices: [], threads: [] })) };
     const data = withItem('I_sample14', { slices: [], threads: [build] }, idle);
     const buildGlyph = () => $('[data-stage="build"] header svg')!;
-    const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
+    const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg');
 
     await mountPage(data);
     expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
-    expect(rowGlyph().closest('.lar-status-spin')).not.toBeNull();
+    expect(rowGlyph()!.closest('.lar-status-spin')).not.toBeNull();
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
     const stopped = withItem(
@@ -915,7 +934,7 @@ test('Build and its row animate for current execution, stop together, and shapin
 
     await settle(() => useBoardStore.getState().receive(stopped));
     expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
-    expect(rowGlyph().classList.contains('lucide-circle')).toBe(true);
+    expect(rowGlyph(), 'a stopped row leaves its stage’s glyph to the heading').toBeNull();
     await settle(() =>
         useBoardStore
             .getState()

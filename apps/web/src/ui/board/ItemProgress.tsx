@@ -2,6 +2,7 @@
 // piece of work's slices as chips under their count.
 
 import { SegmentedProgress } from '@lar-works/design-system';
+import { ChevronRightIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
@@ -23,35 +24,24 @@ export function ItemProgressPanel({
 
 /** A count's line over its bar, such as "Slices · 2/3 done": `label` in the text colour, then `children`. */
 export function ProgressCount({
-    label,
     children,
 }: {
-    /** The count's name, such as "Slices", in the text colour. */
-    label: string;
-    /** The count, such as "2/3 done". */
+    /** The count in the row's words, such as "2/3 slices done". */
     children: ReactNode;
 }) {
-    return (
-        <p className="text-fg-muted m-0 text-xs">
-            <span className="text-fg font-medium">{label}</span> · {children}
-        </p>
-    );
+    return <p className="text-fg m-0 text-sm font-medium">{children}</p>;
 }
 
 /**
- * Where the work stands in its workflow, on one line: the current step's name, then a short track of the workflow's
- * steps (the design system's segmented track: past stages done, upcoming ones bare, the current one in `color`, filled
- * to `value`, such as its slices done, or outlined while it `waiting`s); its `ordinal`, such as "Stage 4 of 7", on hover.
+ * Where the work stands in its workflow, on one line: every step named in order, the past a step brighter than what's
+ * to come and the current one on a soft fill, each label on the same column whichever is current; its `ordinal`, such
+ * as "Stage 4 of 7", on hover.
  */
 export function WorkflowSteps({
     steps,
     at,
     name,
     ordinal,
-    color,
-    value,
-    pulse = false,
-    waiting = false,
 }: {
     /** The workflow's active steps, each with its label (for assistive technology) and title (its name under it). */
     steps: readonly { title: string; label: string }[];
@@ -61,36 +51,70 @@ export function WorkflowSteps({
     name: string;
     /** Explicit stage position, such as "Stage 5 of 8", read with the track's name; the names under it show it. */
     ordinal?: string;
-    /** The current step's colour, a board role colour. */
-    color: string;
-    /** How much of the current step is done, from 0 to 1, such as its slices; all of it by default. */
-    value?: number | undefined;
-    /** The current step's work runs: its fill breathes. */
-    pulse?: boolean;
-    /** The current step hasn't begun, so nothing of it is drawn as done. */
-    waiting?: boolean;
 }) {
     return (
-        <div className="flex min-w-0 items-center gap-3" title={ordinal} data-steps>
-            {/* The stage in words, then where it sits in the workflow on a short track: one line, not a band. */}
-            <span className="text-fg shrink-0 text-sm font-medium" data-step-names>
-                {steps[at]?.title ?? name}
-            </span>
-            <span className="w-28 shrink-0">
-                <SegmentedProgress
-                    label={ordinal ? `${ordinal}: ${name}` : name}
-                    size="sm"
-                    current={at}
-                    segments={steps.map((step, i) =>
-                        i < at
-                            ? { label: step.label, state: 'ready' as const, color: 'var(--color-board-past)' }
-                            : i === at
-                              ? { label: step.label, color, value, pulse, waiting }
-                              : { label: step.label },
+        <ol
+            className="m-0 flex min-w-0 list-none flex-wrap items-center gap-x-1 gap-y-1 p-0 text-xs"
+            title={ordinal}
+            data-steps
+        >
+            <span className="sr-only">{ordinal ? `${ordinal}: ${name}` : name}</span>
+            {/* Every step named in order, the past quiet, the current one marked in its colour, what's to come faint. */}
+            {steps.map((step, i) => (
+                // A plain first step's label starts on the gutter; a current one's fill does, as no fill crosses it.
+                <li
+                    key={step.title}
+                    className={`flex items-center gap-1 ${i === 0 && at !== 0 ? '-ml-2' : ''}`}
+                    aria-label={step.label}
+                >
+                    {i > 0 && <ChevronRightIcon aria-hidden="true" className="text-fg-muted size-3" />}
+                    {i === at ? (
+                        // The sidebar's status says its state, so the step names where the work is, without a second light.
+                        <span className="bg-fill-muted text-fg rounded-md px-2 py-0.5 font-medium" data-step-names>
+                            {step.title}
+                        </span>
+                    ) : (
+                        <span className={`px-2 py-0.5 ${i < at ? 'text-fg-soft' : 'text-fg-muted'}`}>{step.title}</span>
                     )}
-                />
+                </li>
+            ))}
+        </ol>
+    );
+}
+
+/** Where the work stands in its workflow, in miniature: one short segment per step, the past filled quietly, the current
+ *  one in `color`, what's to come on the track; `label` names it for screen readers and as its tooltip. */
+export function StageTrack({
+    steps,
+    at,
+    color,
+    label,
+    step,
+}: {
+    /** The current step's name, quiet after the track, so it reads at a glance. */
+    step?: string | undefined;
+    /** How many steps the workflow has. */
+    steps: number;
+    /** The current step's index. */
+    at: number;
+    /** The current step's colour. */
+    color: string;
+    /** Where it stands in words, such as "Step 5 of 7: Build". */
+    label: string;
+}) {
+    return (
+        <span className="text-fg-muted inline-flex items-center gap-2 text-xs" title={label}>
+            {step && <span aria-hidden="true">{step}</span>}
+            <span role="img" aria-label={label} className="inline-flex items-center gap-0.5" data-stage-track>
+                {Array.from({ length: steps }, (_, i) => (
+                    <span
+                        key={i}
+                        className={`h-1 w-2 rounded-full ${i < at ? 'bg-fg-muted opacity-60' : i === at ? '' : 'bg-track'}`}
+                        style={i === at ? { background: color } : undefined}
+                    />
+                ))}
             </span>
-        </div>
+        </span>
     );
 }
 
@@ -115,7 +139,7 @@ export function PartsProgress({
 }) {
     return (
         <div className="grid gap-1.5" data-parts-progress>
-            <ProgressCount label={label}>
+            <ProgressCount>
                 {children}
                 {note && <span data-parts-note> · {note}</span>}
             </ProgressCount>

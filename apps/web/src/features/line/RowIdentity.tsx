@@ -1,35 +1,30 @@
 // What names an item wherever it shows: where its ticket is saved and its repository, and its kind, as a quiet mark on
 // stage rows, desk cards and dock rows and as a badge in its dialog.
 
-import { isBuild } from '@lar-factory/shared';
+import { isBuild, onAzure } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Badge } from '@lar-works/design-system';
 import { memo } from 'react';
 
 import { partKind, partLabel } from './DossierParts';
-import { PartKindLabel } from './WorkMapParts';
-import { KIND_BADGES, KindBadge, RepoCell, SourceIcon } from '@/features/items';
+import { KIND_BADGES, RepoCell, SourceIcon } from '@/features/items';
 import { conceptIcons, KindMark, PartKindIcon, RowIdentity } from '@/ui/board';
 
-/** A row's kind: Linked work for a group parent, otherwise its kind badge, decision method or Build; no recognised kind has none. */
+/** An item's kind in its dialog: its icon and name as a plain value, as its project reads; nothing for no recognised kind. */
 export const RowKind = memo(function RowKind({ item }: { item: Item }) {
-    if (item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
-        return <Badge tone="neutral">Linked work</Badge>;
-
-    if (KIND_BADGES[item.kind]) return <KindBadge kind={item.kind} />;
-
-    return item.kind === 'decision' || item.kind === 'build' || isBuild(item) ? (
-        <Badge>
-            <PartKindLabel kind={partKind(item)} />
-        </Badge>
-    ) : null;
+    return <RowKindMark item={item} labelled="fact" />;
 });
 
 /** A row's kind as its muted icon before the title, named on hover; its empty room for an item with no recognised kind. */
-export const RowKindMark = memo(function RowKindMark({ item }: { item: Item }) {
+export const RowKindMark = memo(function RowKindMark({
+    item,
+    labelled = false,
+}: {
+    item: Item;
+    labelled?: boolean | 'fact';
+}) {
     if (item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
         return (
-            <KindMark name="Linked work">
+            <KindMark name="Linked work" labelled={labelled}>
                 <conceptIcons.linkedWork aria-hidden="true" />
             </KindMark>
         );
@@ -39,27 +34,31 @@ export const RowKindMark = memo(function RowKindMark({ item }: { item: Item }) {
     // A decision or a build has no kind badge of its own: its method's or Build's icon marks it.
     if (!kind)
         return item.kind === 'decision' || item.kind === 'build' || isBuild(item) ? (
-            <KindMark name={partLabel(partKind(item))}>
+            <KindMark name={partLabel(partKind(item))} labelled={labelled}>
                 <PartKindIcon kind={partKind(item)} />
             </KindMark>
         ) : (
+            // A ticket with no kind keeps the slot, quiet, rather than a mark that would read as a checkbox.
             <KindMark />
         );
 
     const Icon = kind.icon;
 
     return (
-        <KindMark name={kind.name}>
+        <KindMark name={kind.name} labelled={labelled}>
             <Icon aria-hidden="true" />
         </KindMark>
     );
 });
 
-/** Where the ticket is saved, as its bare muted icon, then the repository. */
+/** Where the ticket is saved, as its bare muted icon, then the repository. GitHub is where tickets live unless a row
+ *  says otherwise, so a GitHub ticket's row shows its repository alone; Azure and local work keep their mark. */
 export const RowSource = memo(function RowSource({ item }: { item: Item }) {
+    const github = item.number > 0 && !(item.repo && onAzure(item.repo));
+
     return (
         <RowIdentity>
-            <SourceIcon item={item} bare always />
+            {!github && <SourceIcon item={item} bare always />}
             <RepoCell item={item} />
         </RowIdentity>
     );

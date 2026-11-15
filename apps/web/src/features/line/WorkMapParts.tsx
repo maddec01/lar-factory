@@ -14,6 +14,7 @@ import {
     repoName,
     retiredPartLabel,
 } from '@lar-factory/shared';
+import { statusStateColors } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import type { Part, PartActivity, PartKind } from './DossierParts';
@@ -23,18 +24,23 @@ import { lastSeen } from './StageStatus';
 import { NODE_H } from './WorkMapLayout';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
+    CardActions,
     conceptBuildWait,
     HumanWaitAction,
     AzureFields,
     ItemStatusGlyph,
     ItemTitle,
     OpenThread,
-    RowActions,
     SliceBar,
     SourceIcon,
     StatusGlyph,
     useActivityUnavailable,
     useShownStatus,
+    STATUS_COLOR,
+    workflowSteps,
+    stepName,
+    checksWord,
+    prChecks,
 } from '@/features/items';
 import { ProjectIcon } from '@/features/repositories';
 import {
@@ -43,11 +49,13 @@ import {
     MapPartNode,
     PartKindLabel as DesignPartKindLabel,
     PullRequestRef,
+    StageTrack,
+    CardChecks,
     RepoIdentity as DesignRepoIdentity,
 } from '@/ui/board';
 
 /** A part's method or kind, in the one place and style every map surface shows it. */
-export function PartKindLabel({ kind }: { kind: PartKind }) {
+function PartKindLabel({ kind }: { kind: PartKind }) {
     return <DesignPartKindLabel kind={kind}>{partLabel(kind)}</DesignPartKindLabel>;
 }
 
@@ -104,6 +112,9 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     const open = openWaits(part);
     const complete = isDone(item);
     const shown = useShownStatus(item);
+    const steps = workflowSteps(item);
+    const at = steps.findIndex((step) => step === shown.progressStage);
+    const checks = prChecks(item);
     const unavailable = useActivityUnavailable();
     const activity = partActivity(part, shown.working, unavailable);
     const wait = humanWait(item, unavailable, data.items);
@@ -112,7 +123,7 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
     let action: ReactNode = null;
 
     if (complete) action = null;
-    else if (asks) action = <HumanWaitAction item={item} data={data} />;
+    else if (asks) action = <HumanWaitAction item={item} data={data} quiet />;
     else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} />;
 
     // Each card has one labelled thread action. Only a current question asks for an answer.
@@ -146,7 +157,8 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
               ...(word && word !== status && !heldBySlice ? [`${word}${seen}`] : []),
               ...detail,
           ];
-    const state = facts.join(' · ');
+    // The head's checks already say how the pipeline stands, so a fact about the checks would say it twice.
+    const state = facts.filter((fact) => !(checks && fact.startsWith('Checks '))).join(' · ');
 
     return (
         <MapPartNode
@@ -154,6 +166,32 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
             width={width}
             height={NODE_H}
             attention={attention}
+            track={
+                checks ? (
+                    // In review the PR's checks are what move, as on a desk card: its step, the PR's mark and its checks.
+                    <CardChecks checks={checks} step={at >= 0 ? stepName(steps[at]!) : ''} word={checksWord(checks)} />
+                ) : (
+                    at >= 0 && (
+                        <StageTrack
+                            steps={steps.length}
+                            at={at}
+                            color={
+                                shown.progressState ? statusStateColors[shown.progressState] : STATUS_COLOR[item.status]
+                            }
+                            label={`Step ${at + 1} of ${steps.length}: ${steps[at]}`}
+                            step={stepName(steps[at]!)}
+                        />
+                    )
+                )
+            }
+            // Its leading bar: green once done, the accent while its thread works; what it needs takes precedence.
+            tone={
+                complete
+                    ? 'done'
+                    : shown.running || activity.kind === 'working' || status === 'Working'
+                      ? 'active'
+                      : undefined
+            }
             picked={isPicked}
             openLabel={`Open ${ref(item)}`}
             title={`${itemName(item)} · ${state}`}
@@ -169,17 +207,18 @@ export function PartNode({ part, data, width, home }: { part: Part; data: BoardD
                 DECISION_KINDS.includes(part.kind) &&
                 repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />
             }
+            // A card's action reads as a desk card's: named, outlined, never the rows' icon-only form.
             action={
-                <RowActions>
+                <CardActions>
                     {action ?? (opensThread && <OpenThread item={item} data={data} threadId={activity.thread?.id} />)}
-                </RowActions>
+                </CardActions>
             }
             name={<ItemTitle item={item} />}
             glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} size="sm" />}
             facts={state}
             recordState={recordState}
             waitReason={record.waits.join(' · ')}
-            slices={item.slices.length > 0 && <SliceBar item={item} />}
+            slices={!checks && item.slices.length > 0 && <SliceBar item={item} />}
         />
     );
 }

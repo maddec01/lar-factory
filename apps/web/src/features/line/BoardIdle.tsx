@@ -19,8 +19,8 @@ export function BoardIdle() {
                 title="Nothing in progress"
                 description={
                     listed
-                        ? 'Queue an item from List, or add a new one, to start shaping it.'
-                        : 'Add an item to start shaping it.'
+                        ? 'Queue an item from List, or add one to List and queue it for shaping.'
+                        : 'Add work to List, then queue it for shaping.'
                 }
                 actions={
                     <>

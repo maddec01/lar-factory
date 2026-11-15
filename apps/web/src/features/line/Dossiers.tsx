@@ -58,11 +58,6 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                     {NO_DELIVERY}
                 </Text>
             )}
-            {missing > 0 && (
-                <Text variant="caption" tone="muted" data-unread-parts>
-                    {unreadPartsText(missing)}.
-                </Text>
-            )}
             <StructureSync item={unsynced} />
             <GroupUpkeep
                 report={parent.reconciliation}
@@ -80,6 +75,12 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                 <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
             ) : (
                 <PartsList parts={parts} data={data} home={repoKey(parent)} />
+            )}
+            {/* After the parts, as the item dialog says it. */}
+            {missing > 0 && (
+                <Text variant="caption" tone="muted" data-unread-parts>
+                    {unreadPartsText(missing)}
+                </Text>
             )}
             <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
         </Body>

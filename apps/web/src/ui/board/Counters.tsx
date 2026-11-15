@@ -1,5 +1,5 @@
-import { Popover, StatusPopoverContent, StatusPopoverSection, ToolbarCounter } from '@lar-works/design-system';
-import type { ReactNode } from 'react';
+import { Popover, StatusPopoverContent, ToolbarCounter } from '@lar-works/design-system';
+import { type ReactNode, useState } from 'react';
 
 interface BoardCounterProps {
     /** The status's glyph, in its own colour. */
@@ -27,6 +27,9 @@ interface BoardCounterProps {
     foot?: ReactNode;
     /** The popover's list, which scrolls. */
     children: ReactNode;
+    /** Called as the reader presses the counter; returning true keeps its popover shut, as the press did something
+     *  better, such as bringing Your desk into view. */
+    onActivate?: () => boolean;
 }
 
 /** One title-bar counter: the design system's ToolbarCounter (a glyph, a tabular figure and an optional build track,
@@ -45,9 +48,14 @@ export function BoardCounter({
     detail,
     foot,
     children,
+    onActivate,
 }: BoardCounterProps) {
+    const [open, setOpen] = useState(false);
+
     return (
         <ToolbarCounter
+            open={open}
+            onOpenChange={(next) => setOpen(next && onActivate?.() ? false : next)}
             icon={icon}
             label={label}
             value={value}
@@ -62,36 +70,6 @@ export function BoardCounter({
                 </div>
             </StatusPopoverContent>
         </ToolbarCounter>
-    );
-}
-
-/** A panel's list split by status, each part under its name and count. */
-export function CounterGroups({
-    children,
-}: {
-    /** The groups, one CounterGroup each. */
-    children: ReactNode;
-}) {
-    return <div className="grid">{children}</div>;
-}
-
-/** One part of a panel's list, under the status popover's group heading: its status's name and count. */
-export function CounterGroup({
-    title,
-    count,
-    children,
-}: {
-    /** The group's status name. */
-    title: string;
-    /** How many items the group holds. */
-    count: number;
-    /** The group's CounterItems. */
-    children: ReactNode;
-}) {
-    return (
-        <StatusPopoverSection title={title} count={count}>
-            {children}
-        </StatusPopoverSection>
     );
 }
 
@@ -131,10 +109,12 @@ interface CounterItemProps {
     trailing: ReactNode;
     /** Called as the reader picks the item, closing the panel. */
     onOpen: () => void;
+    /** A quiet line under the title, such as its project. */
+    sub?: ReactNode;
 }
 
 /** One item in a panel, as a menu's row; picking it closes the panel and opens the item. */
-export function CounterItem({ item, label, leading, title, trailing, onOpen }: CounterItemProps) {
+export function CounterItem({ item, label, leading, title, trailing, onOpen, sub }: CounterItemProps) {
     return (
         <li>
             <Popover.Close asChild aria-label={undefined} aria-description={label}>
@@ -142,11 +122,14 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen }: C
                     type="button"
                     onClick={onOpen}
                     data-item={item}
-                    className="text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-7 w-full cursor-default grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none max-lg:min-h-11 pointer-coarse:min-h-11"
+                    className="text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-8 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-md px-2 py-1 text-left text-sm outline-none"
                 >
-                    <span className="row-span-2 flex items-center gap-2 self-start pt-0.5">{leading}</span>
-                    {/* The title takes the row's width, its project and age quiet on a line under it. */}
-                    <span className="min-w-0 truncate">{title}</span>
+                    <span className="flex items-center gap-2">{leading}</span>
+                    {/* One line: the title takes the room, its project and age quiet at the end. */}
+                    <span className="grid min-w-0">
+                        <span className={sub ? 'truncate' : 'line-clamp-2'}>{title}</span>
+                        {sub && <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs">{sub}</span>}
+                    </span>
                     <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
                         {trailing}
                     </span>
@@ -180,6 +163,16 @@ export function CounterAge({
             {age && <span className="whitespace-nowrap">{name ? `· ${age}` : age}</span>}
         </>
     );
+}
+
+/** What a need-you row waits for, such as "Verify build", at its end in amber. */
+export function CounterReason({
+    children,
+}: {
+    /** The wait in words. */
+    children: ReactNode;
+}) {
+    return <span className="text-warning-fg font-medium whitespace-nowrap">{children}</span>;
 }
 
 /** A row's figure, such as its spend. */
@@ -277,7 +270,9 @@ export function LimitBars({
                 {Array.from({ length: within }, (_, n) => bar(n, n < used))}
                 {past > 0 && (
                     <span className="ml-1 inline-flex gap-0.75">
-                        {Array.from({ length: past }, (_, n) => bar(limit + n, true))}
+                        {Array.from({ length: past }, (_, n) => (
+                            <span key={limit + n} className="bar bg-warning h-1.5 w-3 rounded-full" />
+                        ))}
                     </span>
                 )}
                 {more > 0 && (

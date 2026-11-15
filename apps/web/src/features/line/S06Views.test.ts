@@ -123,7 +123,7 @@ test('retired parts appear in map history, Show done and details with their surv
     expect(text(group().querySelector('[data-part="b6"]'))).toContain('Set aside');
 });
 
-test('a decision card gives its long project name its own bounded line beside a reachable Decide', async () => {
+test('a decision card names its project in its head, bounded with its full name on hover, beside a reachable Decide', async () => {
     const decision = part(4, {
         kind: 'decision',
         decisionMethod: 'grill',
@@ -137,8 +137,13 @@ test('a decision card gives its long project name its own bounded line beside a 
     const card = group().querySelector('[data-map-part="b4"]')!;
     const repo = card.querySelector('[data-part-repo]')!;
 
-    expect(card.querySelector('[data-map-head]')!.contains(repo)).toBe(false);
-    expect(text(card.querySelector('[data-start]'))).toBe('Decide');
+    // A map card reads as a desk card: its head names kind and project, and its foot holds its action.
+    expect(card.querySelector('[data-map-head]')!.contains(repo)).toBe(true);
+    expect([repo.getAttribute('title'), repo.lastElementChild!.classList.contains('truncate')]).toEqual([
+        'maddec01/lar-apple',
+        true,
+    ]);
+    expect(text(card.querySelector('[data-col="side"] [data-start]'))).toBe('Decide');
 });
 
 test('a linked part held by a ticketless prerequisite names it in full: Start after on its map card, its wait in the list', async () => {

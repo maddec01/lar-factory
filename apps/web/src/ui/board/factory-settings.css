@@ -16,7 +16,15 @@
 
 .factory-reviewer-row {
     padding: --spacing(3) --spacing(4);
-    border-radius: var(--radius-lg);
+}
+/* The group draws the outer corners; inside it the rows meet on straight dividers, as other settings groups' do. */
+.factory-reviewer-row:first-child {
+    border-start-start-radius: inherit;
+    border-start-end-radius: inherit;
+}
+.factory-reviewer-row:last-child {
+    border-end-start-radius: inherit;
+    border-end-end-radius: inherit;
 }
 
 .factory-reviewer-row:hover {
@@ -61,8 +69,14 @@
 
 .factory-model-table th,
 .factory-model-table td {
-    padding: --spacing(3);
+    padding: --spacing(3) --spacing(2);
     font-weight: normal;
+}
+.factory-model-table :is(th, td):first-child {
+    padding-left: --spacing(4);
+}
+.factory-model-table :is(th, td):last-child {
+    padding-right: --spacing(4);
 }
 
 .factory-model-table th {

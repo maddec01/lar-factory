@@ -11,7 +11,8 @@ import {
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
-import { useState } from 'react';
+import { ArrowRightIcon } from '@lar-works/design-system/icons';
+import { type ReactNode, useState } from 'react';
 
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
@@ -19,6 +20,7 @@ import { askAbandon } from './CardActions';
 import { NeedsYouDialog } from './NeedsYouDialog';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { useItemDialogStore } from '@/features/item-dialog';
+import { useBoardStore } from '@/services/board/board.hooks';
 import { buttonKind, NeedsYouNotice, NeedsYouResult } from '@/ui/board';
 
 const LABELS: Record<NeedsYouOffer, string> = {
@@ -34,13 +36,36 @@ const LABELS: Record<NeedsYouOffer, string> = {
 
 /** What a build's PR wait asks you to do, in words the notice says; any other wait says its own word. */
 const REVIEW_ASKS: Record<string, string> = {
-    'Verify build': 'Check the build in its pull request.',
+    'Verify build': 'Verify the build in its pull request.',
+    'Review PR': 'Review the pull request before it can merge.',
     'Merge PR': 'Review the pull request and merge it.',
     'Resolve conflicts': 'Resolve the pull request’s conflicts with the main branch.',
     'Checks failed': 'A check failed on the pull request: look at it before going on.',
 };
 
-export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
+/** Whether the dialog's notice carries its main action: a pull request or a question that waits on you, with no cleanup
+ *  to report, so the dialog's footer leaves that action to the notice. */
+export function useNoticeTakesAction(item: Item): boolean {
+    const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
+    const items = useBoardStore((state) => state.data.items);
+    const action = deskWait(item, useActivityUnavailable(), items).action;
+
+    if (cleanupResult || item.needsYou) return false;
+
+    // An action that only opens this item (approving a brief, recording an outcome, a required verification) is done
+    // in the dialog's own sections, so the notice leaves it to them and the footer keeps its status actions.
+    if (action?.kind === 'details' || (item.status === 'Verify' && item.verification?.required)) return false;
+
+    if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
+        return false;
+
+    const review = needsAnswer(item) ? null : prReadiness(item);
+
+    return needsAnswer(item) || Boolean(review && (review.state === 'waiting' || review.state === 'failed'));
+}
+
+/** `primary` is the dialog's main action, which a question's or a pull request's notice carries beside its words. */
+export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData; primary?: ReactNode }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
     const unavailable = useActivityUnavailable();
 
@@ -53,17 +78,21 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
 
         if (parts.length && !cleanupResult) {
             const [first] = parts;
-            const what = `${deskWait(first!, unavailable, data.items).label} · ${itemName(first!)}`;
+            const wait = deskWait(first!, unavailable, data.items).label;
+            const what =
+                wait === 'Question'
+                    ? `${itemName(first!)} has a question`
+                    : `${itemName(first!)} waits on you: ${wait.toLowerCase()}`;
 
             return (
                 <NeedsYouNotice
-                    reason={
-                        parts.length === 1
-                            ? `A part waits on you: ${what}.`
-                            : `${parts.length} parts wait on you, first ${what}.`
-                    }
+                    reason={parts.length === 1 ? `${what}.` : `${parts.length} parts wait on you. First, ${what}.`}
                     actions={
-                        <Button {...buttonKind('next')} onClick={() => useItemDialogStore.getState().open(first!.id)}>
+                        <Button
+                            {...buttonKind('open')}
+                            leftIcon={<ArrowRightIcon />}
+                            onClick={() => useItemDialogStore.getState().open(first!.id)}
+                        >
                             Open {first!.number ? `#${first!.number}` : 'part'}
                         </Button>
                     }
@@ -75,10 +104,10 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
         const review = needsAnswer(item) ? null : prReadiness(item);
 
         if (review && (review.state === 'waiting' || review.state === 'failed') && !cleanupResult)
-            return <NeedsYouNotice reason={REVIEW_ASKS[review.word] ?? `${review.word}.`} />;
+            return <NeedsYouNotice reason={REVIEW_ASKS[review.word] ?? `${review.word}.`} actions={primary} />;
 
         return needsAnswer(item) ? (
-            <NeedsYouNotice reason={questionWaitReason(item)}>
+            <NeedsYouNotice reason={questionWaitReason(item)} actions={primary}>
                 {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
             </NeedsYouNotice>
         ) : cleanupResult ? (

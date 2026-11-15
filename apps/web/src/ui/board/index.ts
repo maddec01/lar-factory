@@ -1,4 +1,5 @@
 // The board's UI layer: its compositions of the design system's components, its icon glossary and its kind badge.
+export { WaitWord } from './Attention';
 export {
     AddItemButton,
     CreateIssueChoice,
@@ -23,14 +24,13 @@ export {
     QuietGlyph,
     CounterEmpty,
     CounterFigure,
-    CounterGroup,
-    CounterGroups,
+    CounterReason,
     CounterItem,
     CounterList,
     CounterPartial,
 } from './Counters';
 export { noteBoardPlaces } from './BoardLife';
-export { DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
+export { bringDeskIntoView, DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote } from './List';
 export { LoadingScreen } from './LoadingScreen';
@@ -103,12 +103,14 @@ export {
     RowIdentity,
     RowOpen,
     RowSecondLine,
+    RowMeta,
+    RowProgress,
+    RowMetaEnd,
     RowSide,
     RowSliceNote,
     RowSliceToggle,
     RowSlices,
     RowState,
-    RowStateCell,
     RowTitle,
     RowTitleCell,
     StageRowItem,
@@ -141,6 +143,9 @@ export {
     ItemDialogBody,
     ItemDialogColumns,
     ItemSummary,
+    AsideFigures,
+    FigureRows,
+    ItemMainColumn,
     SummaryBlocked,
     SummaryPanel,
     SummaryParent,
@@ -180,6 +185,7 @@ export {
     PartsProgress,
     ProgressActivity,
     ProgressCount,
+    StageTrack,
     SliceChips,
     WorkflowSteps,
 } from './ItemProgress';
@@ -242,3 +248,5 @@ export { OutcomeForm, OutcomeFix } from './OutcomeForm';
 export { BriefDependencyStatus } from './BriefDependencyStatus';
 
 export { DeskDependencyProof } from './DeskDependencyProof';
+export { TrackerLink } from './TrackerLink';
+export { CardChecks, ChecksBar } from './Checks';

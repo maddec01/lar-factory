@@ -48,7 +48,7 @@ test('a compact Done card opens the full choice in details and creates only chec
     expect(text(card())).toContain(item.title);
     expect(card().querySelector('input[type=checkbox]')).toBeNull();
     expect(text(card())).not.toContain('Full description');
-    expect(card().querySelectorAll('.row-side button')).toHaveLength(1);
+    expect(card().querySelectorAll('[data-col="side"] button')).toHaveLength(1);
     await openChoice();
     expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
     for (let i = 1; i <= 6; i++) expect(text(details())).toContain(`Full description ${i}.`);

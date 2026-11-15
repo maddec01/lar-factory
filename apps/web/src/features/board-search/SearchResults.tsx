@@ -8,6 +8,7 @@ import {
     deskWait,
     inRepo,
     isRecentlyDone,
+    placementOf,
     readingScope,
     ref,
     repoKey,
@@ -15,7 +16,6 @@ import {
     shownRepo,
 } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { StatusIndicator } from '@lar-works/design-system';
 import { Archive, Inbox, ListX, Search, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
 import type { LucideIcon } from '@lar-works/design-system/icons';
 
@@ -169,15 +169,41 @@ export function settingsOptions(
 
 const ticketValue = (item: Item) => `ticket:${item.id}`;
 
-/** `yours`: the item is on Your desk, so it leads with the waiting light rather than its kind. */
+/** The board's lanes by name, as their headings read. */
+const LANES: Record<string, string> = {
+    queue: 'Queue',
+    shaping: 'Shaping',
+    ready: 'Ready to build',
+    build: 'Build',
+    dock: 'Concepts',
+};
+
+/** The lane a desk item sits in on the board, as its desk card names it. */
+const laneOf = (item: Item, data: BoardData): string => {
+    const lane = placementOf(item, {
+        starts: data.startProgress?.[item.id],
+        unavailable: false,
+        all: data.items,
+    }).sections.find((section) => section !== 'desk');
+
+    return (lane && LANES[lane]) ?? item.status;
+};
+
+/** A ticket as a board row reads: its kind, then its number and title; at its end its project and what it waits for
+ *  when it is on Your desk (`yours`), else its status. */
 function ticketOption(item: Item, data: BoardData, leave: SearchHandlers['leave'], yours: boolean): SearchOption {
     return {
         value: ticketValue(item),
-        name: item.title,
-        ...(item.number ? { hint: ref(item) } : {}),
-        // An item on Your desk says what it waits for, in the desk's words; any other its status.
-        meta: `${repoName(repoKey(item), data.repos)} · ${yours ? deskWait(item, false, data.items).label : item.status}`,
-        icon: yours ? <StatusIndicator state="waiting" /> : <KindIcon choice={kindFilterOf(item)} />,
+        name: item.number ? `${ref(item)} ${item.title}` : item.title,
+        // An item on Your desk says its stage, then what it waits for in the desk's words; any other its status.
+        meta: [
+            repoName(repoKey(item), data.repos),
+            yours ? laneOf(item, data) : item.status,
+            yours && deskWait(item, false, data.items).label,
+        ]
+            .filter((word, i, words) => word && words.indexOf(word) === i)
+            .join(' · '),
+        icon: <KindIcon choice={kindFilterOf(item)} />,
         select: () => leave(() => useItemDialogStore.getState().open(item.id)),
     };
 }
@@ -238,10 +264,7 @@ export function searchResults(
     const tickets = typed ? ticketOptions(input, handlers) : [];
 
     return {
-        groups: [
-            ...matchingGroups(options, query),
-            ...(tickets.length ? [{ label: 'Tickets', options: tickets }] : []),
-        ],
+        groups: [...matchingGroups(options, query), ...(tickets.length ? [{ label: 'Items', options: tickets }] : [])],
         reading: typed && readingScope(data, widened ? undefined : (scope ?? undefined)),
     };
 }

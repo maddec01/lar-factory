@@ -1,4 +1,4 @@
-// Your desk: Needs you, Verify and Ready to merge items and open questions as cards in one sideways row, each opening the item dialog
+// Your desk: Needs you, Verify and Ready to merge items and open questions as a grid of cards, each opening the item dialog
 // and carrying the buttons for its next action, narrowed by the board's Scope, Kind and Labels; and the line's heading below it.
 
 import type { BoardData, Item } from '@lar-factory/shared';
@@ -10,25 +10,33 @@ const cards = () => $$('.desk-row');
 const card = (id: string) => $(`.desk-row[data-item="${id}"]`)!;
 /** Opens a card as a click anywhere on it does: on its row's open button. */
 const open = (id: string) => card(id).querySelector<HTMLButtonElement>('[data-row-open]')!.click();
-/** The card's next-step line, under its title. */
-const nextLine = (id: string) => text(card(id).querySelector('[data-desk-more] > :first-child'));
+/** The card's next-step line, under its title, past its question and what it belongs to. */
+const nextLine = (id: string) =>
+    text(card(id).querySelector('[data-desk-more] > :not([data-question], [data-part-of])'));
+/** The PR checks a card's head shows in place of its workflow track, in a word: "1 failed", "3/5" or "passed". */
+const checksWord = (id: string) => text(card(id).querySelector('[data-card-head] [data-checks-word]'));
+/** The head's checks track, as a screen reader names it. */
+const checksTrack = (id: string) =>
+    card(id).querySelector('[data-card-head] [data-checks-track]')?.getAttribute('aria-label');
 const dialog = () => $('[data-item-dialog]');
 const withItem = (id: string, change: Partial<Item>): BoardData => ({
     ...sample,
     items: sample.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
 });
 
-test.each([
-    ['an issue whose PR is blocked', 'I_sample27', 'Checks failed'],
-    ['an issue whose PR has no checks and conflicts', 'I_sample28', 'Resolve conflicts'],
-])(
-    'a Verify card for %s says its merge state, then its checks leaving out zero counts other than passed',
-    async (_what, id, line) => {
-        await mountPage();
-        expect(nextLine(id)).toBe(line);
-        expect(text(card(id))).toContain(line);
-    },
-);
+test('a Verify card for an issue whose PR has no checks and conflicts says its merge state', async () => {
+    await mountPage();
+    expect(nextLine('I_sample28')).toBe('Resolve conflicts');
+    expect(checksWord('I_sample28'), 'no checks to draw').toBe('');
+});
+
+test('a Verify card whose PR checks were read shows them in its head in place of the next-step line', async () => {
+    await mountPage();
+    expect(checksWord('I_sample27')).toBe('1 failed');
+    expect(checksTrack('I_sample27')).toMatch(/1 failed/);
+    expect(text(card('I_sample27').querySelector('[data-card-head]'))).toContain('Verify');
+    expect(nextLine('I_sample27')).toBe('');
+});
 
 test('a Verify card reads the PR Open PR opens, its first linked one', async () => {
     const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
@@ -38,7 +46,7 @@ test('a Verify card reads the PR Open PR opens, its first linked one', async () 
             linkedPrs: [...linkedPrs('I_sample16'), { ...linkedPrs('I_sample27')[0]!, number: 99 }],
         }),
     );
-    expect(nextLine('I_sample16')).toBe('Checks passed');
+    expect(checksWord('I_sample16')).toBe('passed');
     expect(text(card('I_sample16'))).toContain('Verify');
 });
 
@@ -101,10 +109,9 @@ describe('narrowed by Scope, Kind and Labels', () => {
 /** Opens a grouped part through the item dialog, where its answer action remains available. */
 const openPart = async () =>
     settle(async () => (await import('@/features/item-dialog')).useItemDialogStore.getState().open('I_sample12'));
+/** The dialog's last thread action, which answers a question: in the notice that says so, or else the footer's. */
 const answerAction = () =>
-    dialog()!.querySelector<HTMLAnchorElement | HTMLButtonElement>(
-        '[data-slot="modal-footer"] [data-open-thread]:last-child',
-    )!;
+    [...dialog()!.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>('[data-open-thread]')].at(-1)!;
 
 const questionBoard = (child: Partial<Item> = {}, concept: Partial<Item> = {}): BoardData => ({
     ...sample,
@@ -248,15 +255,16 @@ test('shaping questions target the older question and leave the desk on a board 
         't3code://threads/sample-environment/question',
     );
     await settle(() => open('I_sample12'));
+
+    // The notice answers the question; the newer thread stays in reach elsewhere in the dialog.
+    const links = [...dialog()!.querySelectorAll('a[href^="t3code:"]')].map((a) => [text(a), a.getAttribute('href')]);
+
+    expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in T3');
+    expect(links).toContainEqual(['Answer in T3', 't3code://threads/sample-environment/question']);
     expect(
-        [...dialog()!.querySelectorAll('[data-slot="modal-footer"] [data-open-thread]')].map((a) => [
-            text(a),
-            a.getAttribute('href'),
-        ]),
-    ).toEqual([
-        ['Open thread', 't3code://threads/sample-environment/newer'],
-        ['Answer in T3', 't3code://threads/sample-environment/question'],
-    ]);
+        links.map(([, href]) => href),
+        'the newer thread stays in reach',
+    ).toContain('t3code://threads/sample-environment/newer');
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
 
@@ -389,9 +397,11 @@ test('review progress identifies the delivery PR, updates without a dialog and m
     });
 
     await mountPage(data);
-    expect(text(card(original.id))).toContain('PR #881');
-    expect(text(card(original.id))).toContain('2 passed · 1 running · 1 failed · 4 total');
-    expect(text(card(original.id))).toContain('Checks failed');
+    // The head's checks track takes the counts block's place.
+    expect(checksWord(original.id)).toBe('1 failed');
+    expect(checksTrack(original.id)).toBe('2 of 4 checks passed · 1 failed · 1 running');
+    expect(text(card(original.id))).not.toContain('PR #881');
+    expect(text(card(original.id))).toContain('Review failed checks');
     expect(dialog()).toBeNull();
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
@@ -408,11 +418,14 @@ test('review progress identifies the delivery PR, updates without a dialog and m
             }),
         ),
     );
-    expect(text(card(original.id))).toContain('4 passed · 0 running · 0 failed · 4 total');
+    expect(checksWord(original.id)).toBe('passed');
+    expect(checksTrack(original.id)).toBe('4 of 4 checks passed');
     await settle(() => useBoardStore.getState().fail('offline'));
-    expect(text(card(original.id))).toContain('Stale check observation');
+    // Disconnected, the track that would look current gives way to the counts in words with their stale warning.
+    expect(checksWord(original.id)).toBe('');
     expect(text(card(original.id))).toContain('4 passed');
     expect(dialog()).toBeNull();
+    expect(text(card(original.id))).toContain('Stale check observation');
 });
 
 test.each([
@@ -458,6 +471,8 @@ test('a provider disconnect marks retained progress stale while its readiness bl
     const data = { ...sample, itemSourceProblems: [{ repo: 'maddec01/lar-apple', problem: 'Provider unavailable' }] };
 
     await mountPage(data);
+    // A project the board can't read leaves its checks as last seen: counts in words with their warning, not a track.
+    expect(checksWord('I_sample27')).toBe('');
+    expect(text(card('I_sample27'))).toContain('Review failed checks');
     expect(text(card('I_sample27'))).toContain('Stale check observation.');
-    expect(text(card('I_sample27'))).toContain('Checks failed');
 });

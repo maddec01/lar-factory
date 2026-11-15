@@ -19,8 +19,14 @@ const MARK: Record<ActivityState, string> = {
     unavailable: 'rounded-full border-[1.5px] border-board-idle',
 };
 
+/** A path in the line's words as its file's name, such as "bitmap.ts"; the line's tooltip keeps the path. */
+const short = (words: ReactNode) =>
+    typeof words === 'string' ? words.replace(/(?:[\w.@-]+\/)+([\w.@-]+)/g, '$1') : words;
+
 /** The line's words for its state, which `data-action` marks. */
-function Words({ state, children }: { state: ActivityState; children: ReactNode }) {
+function Words({ state, children: words }: { state: ActivityState; children: ReactNode }) {
+    const children = short(words);
+
     switch (state) {
         case 'working':
             return (

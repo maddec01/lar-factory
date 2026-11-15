@@ -126,7 +126,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                         }
                         add={
                             <Button
-                                {...buttonKind('main', { size: 'md' })}
+                                {...buttonKind('other', { size: 'md' })}
                                 leftIcon={<SquarePen />}
                                 data-add-item
                                 onClick={() => useAddItemStore.getState().setOpen(true)}

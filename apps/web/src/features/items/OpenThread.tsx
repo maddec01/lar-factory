@@ -15,7 +15,7 @@ import {
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { useOnRow } from './RowContext';
+import { useOnRowItself } from './RowContext';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { EarlierThread, EarlierThreadList, useButtonKind } from '@/ui/board';
 
@@ -104,8 +104,8 @@ export function OpenThread({
             : ['Answer in T3', 'Approve brief'].includes(label) && !question
               ? 'Open thread'
               : label;
-    const onRow = useOnRow();
-    const iconOnly = part || given || (onRow && actionLabel === 'Open thread');
+    const onRow = useOnRowItself();
+    const iconOnly = part || given;
     const tooltip = (part || onRow) && iconOnly;
     // Concept parts use the board's quiet control recipe, named by their label.
     const named = iconOnly ? { 'aria-label': actionLabel, iconOnly: true } : {};
@@ -153,15 +153,18 @@ export function OpenThread({
  * links. A thread T3 or the board deleted isn't on the item.
  */
 export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) {
+    // The thread at work now is Open thread's, so the list keeps to the earlier ones.
+    const current = ownerThread(item);
     const earlier = Array.isArray(item.threads)
         ? ownerThreads(item).filter(
               (thread, index) =>
-                  thread.archived ||
-                  (index === 0 && thread.purpose === 'build') ||
-                  (index > 0 &&
-                      (thread.purpose === 'shape' ||
-                          (item.kind === 'decision' &&
-                              !(needsAnswer(item) && thread.id === openQuestionThread(item)?.id)))),
+                  !(thread.state === 'running' && thread.id === current?.id) &&
+                  (thread.archived ||
+                      (index === 0 && thread.purpose === 'build') ||
+                      (index > 0 &&
+                          (thread.purpose === 'shape' ||
+                              (item.kind === 'decision' &&
+                                  !(needsAnswer(item) && thread.id === openQuestionThread(item)?.id))))),
           )
         : [];
 
@@ -172,22 +175,15 @@ export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) 
             {earlier.map((thread) => (
                 <EarlierThread
                     key={thread.id}
-                    name={`T3 · ${thread.title}`}
+                    name={thread.title}
                     title={thread.title}
                     href={
                         !thread.archived && data.t3EnvironmentId
                             ? threadLink(data.t3EnvironmentId, thread.id)
                             : undefined
                     }
-                    state={
-                        thread.archived
-                            ? 'archived'
-                            : thread.purpose === 'build'
-                              ? 'build'
-                              : thread.purpose === 'shape'
-                                ? 'shaping'
-                                : 'earlier'
-                    }
+                    // The thread's title names its purpose, so the row says only what isn't there.
+                    state={thread.archived ? 'archived' : undefined}
                 />
             ))}
         </EarlierThreadList>

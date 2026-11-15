@@ -65,7 +65,7 @@ test('a failed read shows its error in the modal and the board data stays visibl
         'Couldn’t load the detailsItem details aren’t available yet.Try again',
     );
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-    expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
+    expect(text(inDialog('[data-slices] p'))).toBe('1/3 slices done');
     expect(inDialog('[aria-busy="true"]')).toBeNull();
 });
 

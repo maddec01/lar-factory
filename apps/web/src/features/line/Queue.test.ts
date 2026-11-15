@@ -151,10 +151,7 @@ test('while an item has a running or needs-you thread, its row has Open thread i
 
     const open = row('I_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
 
-    expect([open.getAttribute('aria-label'), open.getAttribute('href')]).toEqual([
-        'Open thread',
-        expect.stringContaining('t1'),
-    ]);
+    expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', expect.stringContaining('t1')]);
     expect(row('I_sample06').querySelector('[data-open-thread]')).not.toBeNull();
 });
 

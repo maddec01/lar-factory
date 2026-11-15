@@ -167,6 +167,7 @@ export function AddItemForm() {
                                 }}
                                 options={KIND_CHOICES}
                                 aria-describedby={kindMissing ? 'item-kind-error' : undefined}
+                                invalid={kindMissing}
                             />
                             {kindMissing && (
                                 <Text variant="caption" tone="danger" id="item-kind-error">

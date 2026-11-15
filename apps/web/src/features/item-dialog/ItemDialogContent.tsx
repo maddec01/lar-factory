@@ -1,9 +1,9 @@
 // The item dialog's content: its summary and progress, then the work record and ticket description with the sidebar,
 // followed by access, metadata, earlier threads and comments. Actions stay in its footer.
 
-import { itemName, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
+import { itemName, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ButtonLink, Modal, Stack } from '@lar-works/design-system';
+import { Modal } from '@lar-works/design-system';
 
 import { canStopShaping } from './can-stop-shaping';
 import { CompleteReleaseStep } from './CompleteReleaseStep';
@@ -29,8 +29,9 @@ import {
     AgentWork,
     AgentWorkNote,
     EarlierThreads,
-    ICON,
     NeedsYou,
+    HumanWaitAction,
+    useNoticeTakesAction,
     VerifyBuild,
     StartAfterError,
     StartMessage,
@@ -40,11 +41,11 @@ import type { ItemDetailsRead } from '@/services/items/items.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 import {
     ReleaseProgress,
-    buttonKind,
     DialogActions,
     ItemDialogBody,
+    AsideFigures,
     ItemDialogColumns,
-    MainColumnSlot,
+    ItemMainColumn,
     WarningNote,
 } from '@/ui/board';
 
@@ -89,106 +90,128 @@ export function ItemDialogContent({
     // The open editor in an expanded dialog takes the height the rest leaves.
     const fill = expanded && edit.editing;
     const moves = useMovesItem(item, data);
+    // A question's or pull request's notice carries the main action beside its words, so the footer doesn't repeat it.
+    const noticeActs = useNoticeTakesAction(item) && !item.setAside;
 
     return (
         <Modal.Content
             title={`${itemName(item)}`}
             presentation="workspace"
-            fitsContent={read.state !== 'loading' && !edit.editing}
+            fitsContent={read.state !== 'loading' && !fill}
             data-item-dialog
             expanded={expanded}
             focusFirstField={false}
             headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
-            headerDetails={
-                <>
-                    <AgentWork item={item} label={item.kind === 'concept' ? 'Direct work' : undefined} />
-                    {(!group || item.usageState === 'loading' || item.usageState === 'failed') && (
-                        <AgentWorkNote item={item} />
-                    )}
-                </>
-            }
         >
-            <ItemSummary item={item} />
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
                 <ItemDialogBody fill={fill} data-item-body>
-                    {/* What waits on you leads the body, before where the work stands. */}
-                    {!item.setAside && <NeedsYou item={item} data={data} />}
-                    {!group && !item.setAside && <ItemProgress item={item} />}
-                    {/* What its agents do now, right after where the work stands, before the ticket's own facts. */}
-                    <ItemAgents item={item} />
-                    {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
-                    {item.shapingCleanupProblem && (
-                        <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
-                    )}
-                    {!item.setAside && (
-                        <>
-                            <VerifyBuild item={item} />
-                            <RetroFollowups item={item} />
-                        </>
-                    )}
-                    {group && record && (record.body?.trim() || record.answer?.trim()) && (
-                        <RecordText
-                            item={item}
-                            record={record}
-                            refresh={refresh}
-                            spec={read.state === 'loaded' && Boolean(read.details.spec)}
-                        />
-                    )}
-                    {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && <ConceptBuild item={item} />}
-                    {group && <ConceptParts item={item} data={data} openPart={openPart} />}
-                    <ReleaseProgress
-                        outcomeControls={
-                            !item.setAside && (
-                                <RecordOutcome
-                                    key={`outcome-${item.id}-${item.revision}`}
+                    <ItemDialogColumns aside fill={fill}>
+                        <ItemMainColumn fill={fill}>
+                            {/* What waits on you leads the body, before where the work stands. */}
+                            {!item.setAside && (
+                                <NeedsYou
                                     item={item}
-                                    items={data.items}
+                                    data={data}
+                                    // The same action, in the same kind, as the item's desk card shows.
+                                    primary={noticeActs && <HumanWaitAction item={item} data={data} quiet />}
                                 />
-                            )
-                        }
-                        plan={item.releasePlan}
-                        remaining={item.completion?.reasons}
-                        name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
-                    />
-                    {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
-                    <ItemDialogColumns aside={aside} fill={fill}>
-                        {record && !group && (
-                            <RecordText
+                            )}
+                            {!group && !item.setAside && <ItemProgress item={item} />}
+                            {/* What its agents do now, right after where the work stands, before the ticket's own facts. */}
+                            <ItemAgents item={item} />
+                            {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
+                            {item.shapingCleanupProblem && (
+                                <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
+                            )}
+                            {!item.setAside && (
+                                <>
+                                    <VerifyBuild item={item} />
+                                    <RetroFollowups item={item} />
+                                </>
+                            )}
+                            {group && record && (record.body?.trim() || record.answer?.trim()) && (
+                                <RecordText
+                                    item={item}
+                                    record={record}
+                                    refresh={refresh}
+                                    spec={read.state === 'loaded' && Boolean(read.details.spec)}
+                                />
+                            )}
+                            {item.kind === 'concept' && item.status !== 'Done' && !buildsDone && (
+                                <ConceptBuild item={item} />
+                            )}
+                            {group && <ConceptParts item={item} data={data} openPart={openPart} />}
+                            <ReleaseProgress
+                                outcomeControls={
+                                    !item.setAside && (
+                                        <RecordOutcome
+                                            key={`outcome-${item.id}-${item.revision}`}
+                                            item={item}
+                                            items={data.items}
+                                        />
+                                    )
+                                }
+                                plan={item.releasePlan}
+                                remaining={item.completion?.reasons}
+                                name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
+                            />
+                            {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
+                            {record && !group && (
+                                <RecordText
+                                    item={item}
+                                    record={record}
+                                    refresh={refresh}
+                                    spec={read.state === 'loaded' && Boolean(read.details.spec)}
+                                />
+                            )}
+                            {ticket && (
+                                <ItemDescription
+                                    itemId={item.id}
+                                    refresh={refresh}
+                                    read={read}
+                                    edit={edit}
+                                    editable={editable}
+                                    fill={fill}
+                                    ticketContext={Boolean(record)}
+                                />
+                            )}
+                            {ticket && (
+                                <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} />
+                            )}
+                            <ActionError item={item} />
+                            <StartMessage
                                 item={item}
-                                record={record}
-                                refresh={refresh}
-                                spec={read.state === 'loaded' && Boolean(read.details.spec)}
+                                kind={item.status === 'Ready' || item.status === 'In progress' ? 'build' : 'refine'}
                             />
-                        )}
-                        {ticket && (
-                            <ItemDescription
-                                itemId={item.id}
-                                refresh={refresh}
-                                read={read}
-                                edit={edit}
-                                editable={editable}
-                                fill={fill}
-                                ticketContext={Boolean(record)}
-                            />
-                        )}
-                        {aside && <ItemAside item={item} data={data} now={now} read={read} refresh={refresh} />}
-                        <MainColumnSlot>
-                            <Stack>
-                                <ItemMeta item={item} read={read} refresh={refresh} now={now} />
-                                <EarlierThreads item={item} data={data} />
-                            </Stack>
-                        </MainColumnSlot>
-                        {ticket && (
-                            <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} />
-                        )}
+                            <StartAfterError item={item} data={data} />
+                        </ItemMainColumn>
+                        <ItemAside
+                            item={item}
+                            data={data}
+                            now={now}
+                            read={read}
+                            refresh={refresh}
+                            relations={aside}
+                            lead={
+                                <>
+                                    <ItemSummary item={item} />
+                                    <AsideFigures>
+                                        <AgentWork
+                                            rows
+                                            item={item}
+                                            label={item.kind === 'concept' ? 'Direct work' : undefined}
+                                        />
+                                        {(!group || item.usageState === 'loading' || item.usageState === 'failed') && (
+                                            <AgentWorkNote item={item} />
+                                        )}
+                                    </AsideFigures>
+                                    <ItemMeta item={item} read={read} refresh={refresh} now={now} />
+                                    <EarlierThreads item={item} data={data} />
+                                </>
+                            }
+                        />
                     </ItemDialogColumns>
-                    <ActionError item={item} />
-                    <StartMessage
-                        item={item}
-                        kind={item.status === 'Ready' || item.status === 'In progress' ? 'build' : 'refine'}
-                    />
-                    <StartAfterError item={item} data={data} />
                 </ItemDialogBody>
             </Modal.Body>
             <Modal.Footer
@@ -201,20 +224,9 @@ export function ItemDialogContent({
                     )
                 }
             >
+                {/* The notice carries the status's action; the footer still reaches the latest thread when it is another. */}
                 <DialogActions>
-                    {item.url && (
-                        <ButtonLink
-                            look="app"
-                            {...buttonKind('other', { size: 'md' })}
-                            icon={item.repo && onAzure(item.repo) ? ICON.azure : ICON.github}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener"
-                        >
-                            {item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
-                        </ButtonLink>
-                    )}
-                    <StatusActions item={item} data={data} />
+                    <StatusActions item={item} data={data} besideOnly={noticeActs} />
                 </DialogActions>
             </Modal.Footer>
         </Modal.Content>

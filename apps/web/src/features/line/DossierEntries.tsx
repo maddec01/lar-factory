@@ -5,6 +5,7 @@ import { itemName } from '@lar-factory/shared';
 import { open } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import type { Part } from './DossierParts';
+import { RowKindMark } from './RowIdentity';
 import { ItemTitle, SourceIcon, ItemStatusGlyph } from '@/features/items';
 import { PartLink as DesignPartLink, PartName as DesignPartName, RefButton } from '@/ui/board';
 
@@ -30,7 +31,15 @@ export function Refs({ text, find }: { text: string; find: FindRef }) {
 /** A part's source, status and title, up to two lines. */
 export function PartName({ part }: { part: Part }) {
     return (
-        <DesignPartName source={<SourceIcon item={part.item} />} glyph={<ItemStatusGlyph item={part.item} />}>
+        <DesignPartName
+            source={
+                <>
+                    <RowKindMark item={part.item} />
+                    <SourceIcon item={part.item} />
+                </>
+            }
+            glyph={<ItemStatusGlyph item={part.item} />}
+        >
             <ItemTitle item={part.item} />
         </DesignPartName>
     );

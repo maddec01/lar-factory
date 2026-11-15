@@ -38,6 +38,8 @@ const press = (el: Element) =>
         (el as HTMLElement).click();
         vi.advanceTimersByTime(0);
     });
+/** A control's accessible name: its label, or its text when it shows its words. */
+const nameOf = (el: Element) => el.getAttribute('aria-label') ?? text(el);
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialogTitle = () => text($('[data-item-dialog] [data-slot="modal-header"] h2'));
 /** The button named `label`, by its text or, for an icon button, its accessible name. */
@@ -275,13 +277,12 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
     const words = (id = C200) => header(id).getAttribute('title');
 
     await mountPage(withItem(C200, refined));
-    expect(chips(), 'a part in Needs you over open decisions and Refined').toEqual(['1 needs you']);
+    // A part in Needs you is the row's next step, so no chip repeats it, nor the decisions and Refined below it.
+    expect(text(next()), 'a part in Needs you over open decisions and Refined').toContain('#202 Sign-in screen');
+    expect(chips()).toEqual([]);
     expect(header().querySelector('[data-refined]')).toBeNull();
-    // The rest are counted on the row and named on hover, so the row keeps to one summary.
-    expect([text(more()), more()!.getAttribute('title')]).toEqual([
-        '+4 more',
-        '2 decisions · Refined · no delivery planned · 2 questions to route',
-    ]);
+    // The rest are named on hover, so the row keeps to one summary.
+    expect(more()).toBeNull();
     expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 questions to route');
 
     const title = next().querySelector('[title]')!;
@@ -290,8 +291,9 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
         [title.getAttribute('title'), title.className.split(' ').includes('truncate')],
         'the next step cuts off, with its full text in its tooltip',
     ).toEqual(['#202 Sign-in screen', true]);
-    await receive(withItem('I_sample12', { status: 'Verify', threads: [] }, withItem(C200, refined)));
+    await receive(withItem('I_sample12', { status: 'In progress', threads: [] }, withItem(C200, refined)));
     expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
+    expect(more(), 'one chip; the others are in the tooltip').toBeNull();
     await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
     expect(chips(), 'Refined over fog').toEqual(['Refined']);
     expect(words()).toContain('Refined · no delivery planned · 1 question to route');
@@ -328,7 +330,7 @@ test('a settled decision counts as done in its part bar, whatever its Status say
             li.querySelector<HTMLElement>('span')?.style.background === 'var(--color-board-done)',
         ]),
     ).toEqual([
-        [expect.stringContaining('Complete'), true],
+        ['Done', true],
         [expect.stringContaining('Working'), false],
     ]);
 });
@@ -382,7 +384,7 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
     expect([
         part.includes('Working'),
         part.includes('Ready to merge'),
-        step('I_sample13').querySelector('[data-open-thread]')!.getAttribute('aria-label'),
+        nameOf(step('I_sample13').querySelector('[data-open-thread]')!),
     ]).toEqual([true, false, 'Open thread']);
     await receive(
         withItem(
@@ -798,8 +800,7 @@ test('a finished part with work still running stays with current work', async ()
 });
 
 /** The dossier's total, which reads on its first line beside its state. */
-const dossierTotal = () =>
-    header().querySelector('[data-col="state"] [data-partial]')!.closest<HTMLElement>('[title]')!;
+const dossierTotal = () => header().querySelector('[data-meta-end] [data-partial]')!.closest<HTMLElement>('[title]')!;
 
 test('a Dossier total marks a sum with a failed part partial with a + after its cost, and says why', async () => {
     const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
@@ -834,23 +835,23 @@ test('decision map and attention actions use answer wording only for a current q
     const map = await mapOpen(data);
     const action = () => map.querySelector('[data-map-part="W_question"] [data-open-thread]')!;
 
-    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    expect(nameOf(action())).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you' }]));
-    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    expect(nameOf(action())).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
     expect([text(action()), action().getAttribute('href')]).toEqual([
         'Answer in T3',
         't3code://threads/sample-environment/question-thread',
     ]);
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'done')] }]));
-    expect(action().getAttribute('aria-label')).toBe('Open thread');
+    expect(nameOf(action())).toBe('Open thread');
     await press(button(dossier(), 'Parts list'));
 
     // In the parts list, the part's own action opens its thread; nothing repeats it above the list.
     const attentionAction = () =>
         dossier().querySelector('[data-part="W_question"] [data-part-action] [data-open-thread]')!;
 
-    expect(attentionAction().getAttribute('aria-label')).toBe('Open thread');
+    expect(nameOf(attentionAction())).toBe('Open thread');
     await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
     // The list's part opens the thread that asks, as an icon; the Work map card above says Answer in T3.
     expect(attentionAction().getAttribute('href')).toBe('t3code://threads/sample-environment/question-thread');
@@ -867,7 +868,8 @@ test('queued empty concepts and parts with off-board parents stay in the dock an
     expect($(`[data-stage]:not([data-stage="dock"]) li[data-item="${concept.id}"]`)).toBeNull();
     expect($(`section.desk [data-item="${part.id}"]`)).not.toBeNull();
     expect(text(header(concept.id))).toContain('No parts yet');
-    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
+    // Its thread's wait reads where its parent would, on the row's one line.
+    expect(text(header(part.id))).toContain('Needs you');
     expect(text(header(part.id))).not.toContain('0/0 parts');
     expect(text(header(part.id))).not.toContain('Linked work');
     expect(opener(part.id)).toBeNull();
@@ -875,17 +877,20 @@ test('queued empty concepts and parts with off-board parents stay in the dock an
     expect(dialogTitle()).toContain('Faster library sync');
 });
 
-test('a working off-board part keeps its stage, newest action and progress in the dock', async () => {
+test('a working off-board part keeps its newest action in the dock, and its stage and parent once it stops', async () => {
     const part = fresh().items.find((item) => item.number === 22)!;
 
     await mountPage({ ...fresh(), items: [part] });
-    expect(text(header(part.id))).toContain('Working');
+    // While its thread works, the row's one line says what it does, in place of its parent and stage.
     expect(text(header(part.id))).toContain('Edit ContinueWatchingRow.swift');
-    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
     expect(header(part.id).querySelector('[data-activity="working"]')).not.toBeNull();
     expect(text(header(part.id))).not.toContain('0/0 parts');
     expect(text(header(part.id))).not.toContain('Nothing waits on you');
     expect($('[data-stage="shaping"] [data-item]')).toBeNull();
+    await receive({ ...fresh(), items: [{ ...part, threads: [] }] });
+    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
+    expect(text(header(part.id))).toContain('Shaping');
+    expect(header(part.id).querySelector('[data-activity="working"]')).toBeNull();
 });
 
 test('an explicitly linked empty parent keeps its own activity and says No parts yet', async () => {
@@ -895,7 +900,6 @@ test('an explicitly linked empty parent keeps its own activity and says No parts
     await mountPage({ ...fresh(), items: [parent] });
     expect(header(parent.id).querySelector('[data-kind-mark]')?.getAttribute('aria-label')).toBe('Linked work');
     expect(text(header(parent.id))).toContain('No parts yet');
-    expect(text(header(parent.id))).toContain('Working');
     expect(text(header(parent.id))).toContain('Edit ContinueWatchingRow.swift');
     expect(header(parent.id).querySelector('[data-activity="working"]')).not.toBeNull();
     await receive({ ...fresh(), items: [{ ...parent, flow: 'single' }] });
@@ -972,7 +976,8 @@ test('a group names its out-of-date checklist and ships-with release steps in ma
     });
 
     await mountOpen(data);
-    expect(chips()).toContain('Out of date: 1 item');
+    // The row keeps to one chip; every chip is named in its tooltip.
+    expect(header().getAttribute('title')).toContain('Out of date: 1 item');
     expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
         '1 brief to re-check: answers or sibling contracts changed',
     );
@@ -997,7 +1002,8 @@ test('unrouted Fog is reported for reconciliation instead of counted as an open 
     expect(header().getAttribute('title')).not.toContain('open question');
     expect(header().getAttribute('title')).toContain('1 question to route');
     await press(opener());
-    expect(text(body())).toContain('no part answers this yet');
+    expect(text(body())).toContain('Unanswered');
+    expect(text(body())).not.toContain('no part answers this yet');
     expect(text(body())).toContain('Fixture files and presentation remain unspecified.');
 });
 

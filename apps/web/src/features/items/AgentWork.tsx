@@ -7,6 +7,7 @@ import { useItemState } from './ItemState';
 import { hasFigures, usageUnreadable } from './UsageFigures';
 import { useLastKnown } from './useLastKnown';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { FigureRows } from '@/ui/board';
 
 /** Why a total isn't the whole sum. */
 export const INCOMPLETE_TOTAL = 'Some agent usage is not available yet.';
@@ -24,6 +25,7 @@ export function AgentWork({
     label,
     only,
     inline = false,
+    rows = false,
 }: {
     item: Item;
     stats?: ItemStats | 'unavailable';
@@ -31,6 +33,8 @@ export function AgentWork({
     only?: 'narrow' | 'wide';
     /** Inside a line of text or a button, where a paragraph can't go. */
     inline?: boolean;
+    /** One labelled row per figure, as the dialog's sidebar lists properties. */
+    rows?: boolean;
 }) {
     const lastKnown = useLastKnown(item);
     const { running } = useItemState(item);
@@ -47,6 +51,24 @@ export function AgentWork({
     if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' elapsed']);
 
     const shown = figures.filter(([name]) => name !== 'Wall time' || running);
+
+    const title = [figures.map(([k, v]) => `${k} ${v}`).join(' · '), old, s.incomplete && INCOMPLETE_TOTAL]
+        .filter(Boolean)
+        .join('. ');
+
+    if (rows)
+        return (
+            <FigureRows
+                title={title}
+                rows={shown.map(([name, v]) => ({
+                    label: name === 'Wall time' ? 'Since start' : name,
+                    value: `${v}${name === 'Cost' && s.incomplete ? '+' : ''}`,
+                }))}
+                note={
+                    [label, old && 'Last known', s.incomplete && 'Incomplete'].filter(Boolean).join(' · ') || undefined
+                }
+            />
+        );
 
     return (
         <Text

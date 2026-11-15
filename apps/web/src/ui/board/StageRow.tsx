@@ -150,7 +150,7 @@ export function RowIdentity({
     children: ReactNode;
 }) {
     return (
-        <span data-row-identity className="text-fg-muted flex min-w-0 items-center gap-1.5">
+        <span data-row-identity className="text-fg-soft flex min-w-0 items-center gap-1.5">
             {children}
         </span>
     );
@@ -182,27 +182,6 @@ export function RowTitle({
 }) {
     return (
         <span className="text-fg min-w-0 truncate text-sm leading-7" title={name} data-title>
-            {children}
-        </span>
-    );
-}
-
-/** The state cell, which `clips` what overflows it unless what it holds keeps its own width. What follows the state,
- *  such as a kind marker, wraps under it rather than being cut off. */
-export function RowStateCell({
-    clips = true,
-    children,
-}: {
-    /** Clips what overflows the cell. */
-    clips?: boolean;
-    /** The state and what follows it. */
-    children: ReactNode;
-}) {
-    return (
-        <span
-            className={`flex min-w-0 items-center gap-x-1.5 leading-4${clips ? ' overflow-hidden' : ''}`}
-            data-col="state"
-        >
             {children}
         </span>
     );
@@ -271,6 +250,57 @@ export function RowSide({
     );
 }
 
+/** A row's facts at its end, on its one line: what its thread does or what holds it, its slices, its pull request, then
+ *  its RowMetaEnd. A click on it beside its controls goes to `onClick`, as the row's button does. */
+export function RowMeta({
+    onClick,
+    children,
+}: {
+    /** Called with a click on the facts beside their controls. */
+    onClick?: ((event: MouseEvent<HTMLElement>) => void) | undefined;
+    /** The facts, in reading order. */
+    children: ReactNode;
+}) {
+    return (
+        <div data-row-meta onClick={onClick} className="row-meta">
+            {children}
+        </div>
+    );
+}
+
+/** A row's progress among its facts: its `bar`, then its `count`. */
+export function RowProgress({
+    bar,
+    count,
+}: {
+    /** The bar, such as a SliceBar; none shows the count alone. */
+    bar?: ReactNode;
+    /** The count, a RowCount or RowSliceToggle. */
+    count: ReactNode;
+}) {
+    return (
+        <span data-col="progress" className="flex items-center gap-2">
+            {bar && <span data-col="bar">{bar}</span>}
+            {count}
+        </span>
+    );
+}
+
+/** The last of a row's facts, its cost and state, flush with the row's end; a hovered row's action stands in their
+ *  place. */
+export function RowMetaEnd({
+    children,
+}: {
+    /** The cost, then the state. */
+    children: ReactNode;
+}) {
+    return (
+        <span data-meta-end className="row-meta-end">
+            {children}
+        </span>
+    );
+}
+
 /** A row's second line: `bar` and `count` on the left, `children` in its text slot, then its pull requests and
  *  figures. A click on it beside its controls goes to `onClick`. */
 export function RowSecondLine({
@@ -324,8 +354,10 @@ export function RowCount({
     children: ReactNode;
 }) {
     return (
-        <span data-col="count" className="tabular-nums" title={title}>
+        <span data-col="count" className="flex items-center gap-1 tabular-nums" title={title}>
             {children}
+            {/* The slice toggle's chevron room, so a parts count lines up with a slices count. */}
+            <span aria-hidden="true" className="size-3" />
         </span>
     );
 }
@@ -368,7 +400,7 @@ export function RowBlocked({
     children: string;
 }) {
     return (
-        <StateWord state="waiting" title={children} data-blocked>
+        <StateWord state="off" title={children} data-blocked>
             {children}
         </StateWord>
     );
@@ -425,7 +457,7 @@ export function RowSlices({
     children: ReactNode;
 }) {
     return (
-        <div className="row-slices pt-1 pr-3 pl-10" data-slices>
+        <div className="row-slices pt-1 pr-3 pl-17" data-slices>
             {children}
         </div>
     );

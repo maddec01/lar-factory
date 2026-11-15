@@ -1,5 +1,5 @@
 import { Button } from '@lar-works/design-system';
-import { Pencil } from '@lar-works/design-system/icons';
+import { Plus } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { buttonKind } from './ButtonKinds';
@@ -112,13 +112,17 @@ export function MainSection({
     );
 }
 
-/** An empty description's one quiet control, where the section would otherwise be a heading over nothing. */
+/** An empty description as its section's header alone: the heading, "None yet." and Add. */
 export function AddDescription({ onAdd }: { onAdd: () => void }) {
     return (
+        // The section's own header, as a written description's, so an empty one still reads as a section: its heading,
+        // a muted "None yet." and Add where Edit would be, in Edit's button.
         <div data-description>
-            <Button {...buttonKind('control')} leftIcon={<Pencil />} onClick={onAdd}>
-                Add description
-            </Button>
+            <SectionHeader heading="Description" empty="None yet.">
+                <Button {...buttonKind('other')} leftIcon={<Plus />} onClick={onAdd}>
+                    Add
+                </Button>
+            </SectionHeader>
         </div>
     );
 }
@@ -127,11 +131,14 @@ export function AddDescription({ onAdd }: { onAdd: () => void }) {
  *  end. An empty section is that one line, so "No description." or "No comments." never takes a block of its own. */
 export function SectionHeader({
     heading,
+    bar,
     empty,
     children,
 }: {
     /** The section's sentence-case heading. */
     heading: ReactNode;
+    /** A progress bar beside the heading, such as a concept's parts, as the slices' count carries theirs. */
+    bar?: ReactNode;
     /** What the section says when it has nothing to show, such as "No comments.", muted beside its heading. */
     empty?: ReactNode;
     /** The section's actions, at the header's end. */
@@ -141,6 +148,11 @@ export function SectionHeader({
         <div className="flex h-7 items-center justify-between gap-2">
             <span className="flex min-w-0 items-baseline gap-3">
                 <DetailsHeading presentation="label">{heading}</DetailsHeading>
+                {bar && (
+                    <span aria-hidden className="w-28 shrink-0 self-center">
+                        {bar}
+                    </span>
+                )}
                 {empty && <span className="text-fg-muted min-w-0 truncate text-sm">{empty}</span>}
             </span>
             {children && <span className="flex min-w-0 items-center gap-3">{children}</span>}

@@ -129,6 +129,5 @@ export function questionWaitReason(item: Item): string {
 
     return thread?.pendingRequest?.kind === 'brief-approval'
         ? 'Review the brief below, then approve it or request changes in T3.'
-        : thread?.questionSummary ||
-              'This work is waiting for your answer or decision. Open the thread in T3 to continue.';
+        : thread?.questionSummary || 'Its thread is waiting for your answer or decision.';
 }

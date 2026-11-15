@@ -26,16 +26,22 @@ export function KindBadge({ hue, ...props }: KindBadgeProps) {
  *  `name` it keeps the mark's room, empty, so titles start on one edge whether or not their item has a kind. */
 export function KindMark({
     name,
+    labelled = false,
     children,
 }: {
+    /** Shows the kind's name after its icon, as a card's head does; `fact` names it in the text colour at its sidebar's
+     *  size, as a value beside its label, as Project's is. */
+    labelled?: boolean | 'fact';
     /** The kind's name, such as "Bug"; none for an item with no recognised kind. */
     name?: string;
     /** The kind's icon. */
     children?: ReactNode;
 }) {
+    if (!name && labelled === 'fact') return null;
+
     if (!name) return <span aria-hidden="true" className="inline-block size-4 shrink-0" data-kind-mark />;
 
-    return (
+    const mark = (
         <span
             role="img"
             aria-label={name}
@@ -45,5 +51,18 @@ export function KindMark({
         >
             {children}
         </span>
+    );
+
+    return labelled ? (
+        <span
+            className={`inline-flex shrink-0 items-center gap-1.5 ${labelled === 'fact' ? 'text-fg text-xs' : 'text-fg-muted text-xs'}`}
+        >
+            {mark}
+            <span aria-hidden="true" data-kind-name>
+                {name}
+            </span>
+        </span>
+    ) : (
+        mark
     );
 }

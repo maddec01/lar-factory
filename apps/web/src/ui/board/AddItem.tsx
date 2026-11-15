@@ -124,7 +124,7 @@ export function DraftFields({
                     <aside
                         ref={detailsFadeRef}
                         aria-label={detailsLabel}
-                        className={`border-line bg-surface-page/60 @max-pane:overflow-visible @max-pane:border-t @max-pane:border-l-0 grid grid-cols-[minmax(0,1fr)] content-start gap-5 overflow-y-auto border-l px-6 py-4 ${scrollFadeClassName}`}
+                        className={`bg-surface-sunken @max-pane:overflow-visible my-4 mr-6 grid grid-cols-[minmax(0,1fr)] content-start gap-5 self-start overflow-y-auto rounded-xl p-4 ${scrollFadeClassName}`}
                     >
                         {details}
                     </aside>
@@ -191,7 +191,7 @@ export function DraftTicketPart({
     /** The ticket's own fields, or what a draft without one keeps. */
     children: ReactNode;
 }) {
-    return <div className="border-line grid gap-3 border-t pt-4">{children}</div>;
+    return <div className="grid gap-3 pt-1">{children}</div>;
 }
 
 /** Create issue in the footer: its `checkbox`, then the `reason` it can't be ticked, kept to a readable width, and any

@@ -37,11 +37,11 @@ export function SliceBar({
             <SegmentedProgress
                 label={`Slices, ${done} of ${slices.length} done`}
                 size={size}
-                // Done slices read as the track's past, so the active slice's accent and a blocked one's amber stand out.
+                // Done slices fill in the success colour and the active one in the accent, over the grey of what's to come and
+                // what's held, as the slice's own row and its grey state say; amber stays for what waits on you.
                 segments={slices.map((s, i) => ({
                     label: named[i]!,
                     state: sliceProgressState[s.progress],
-                    ...(s.progress === 'done' && { color: 'var(--color-fg-muted)' }),
                     pulse: s.progress === 'active' && !still,
                 }))}
             />
@@ -114,7 +114,7 @@ export function SliceRow({
     label?: string | undefined;
 }) {
     return (
-        <li className="hover:bg-fill-hover flex items-start gap-2 rounded-md px-2 py-1 text-sm">
+        <li className="hover:bg-fill-hover -mx-2 flex items-start gap-2 rounded-md px-2 py-1 text-sm">
             <span className="mt-0.5">
                 <SliceMark progress={progress} still={still} />
             </span>

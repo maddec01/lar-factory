@@ -5,15 +5,13 @@
 // second track of its own for the slices. A chip for each slice follows, so what the bar shows is also readable; each opens its ticket, so the sidebar doesn't list them again. A
 // concept has no step of its own to show: it shows its parts done, and why the count holds parts its list doesn't.
 
-import type { Item, Status } from '@lar-factory/shared';
-import { statusStateColors } from '@lar-works/design-system';
+import type { Item } from '@lar-factory/shared';
 
 import {
     ActivityFeedback,
     useActivityFeedback,
     useShownStatus,
     SliceBar,
-    STATUS_COLOR,
     workflowSteps,
     SliceList,
 } from '@/features/items';
@@ -28,16 +26,12 @@ import {
     WorkflowSteps,
 } from '@/ui/board';
 
-/** A stage the item waits to begin: its turn in the Queue, or a build not started. */
-const WAITING: readonly Status[] = ['Queued', 'Ready'];
-
 export function ItemProgress({ item }: { item: Item }) {
     const feedback = useActivityFeedback(item);
     const shown = useShownStatus(item);
     const items = useBoardStore((state) => state.data.items);
     const steps = workflowSteps(item);
     const at = steps.findIndex((stage) => stage === shown.progressStage);
-    const split = item.slices.length > 0;
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const concept = item.kind === 'concept';
     const parts = concept && item.subIssues.total > 0;
@@ -55,7 +49,7 @@ export function ItemProgress({ item }: { item: Item }) {
                     total={item.subIssues.total}
                     note={missing > 0 ? unreadPartsText(missing) : undefined}
                 >
-                    {item.subIssues.completed}/{item.subIssues.total} done
+                    {item.subIssues.completed}/{item.subIssues.total} parts done
                 </PartsProgress>
             )}
             {at >= 0 && !concept && (
@@ -67,18 +61,6 @@ export function ItemProgress({ item }: { item: Item }) {
                     at={at}
                     name={shown.progressStage}
                     ordinal={`Stage ${at + 1} of ${steps.length}`}
-                    // The presenter keeps the bar’s section and evidence aligned with the header.
-                    color={
-                        shown.progressState
-                            ? statusStateColors[shown.progressState]
-                            : shown.glyphState
-                              ? statusStateColors[shown.glyphState]
-                              : STATUS_COLOR[item.status]
-                    }
-                    // An item with slices fills its current step by the slices done.
-                    value={split ? Math.max(done, 0.5) / item.slices.length : undefined}
-                    pulse={feedback.running}
-                    waiting={WAITING.includes(item.status) && !shown.execution}
                 />
             )}
             {at >= 0 && !item.slices.length && feedback.running && (
@@ -89,11 +71,11 @@ export function ItemProgress({ item }: { item: Item }) {
             {item.slices.length > 0 && (
                 <SliceChips
                     count={
-                        <ProgressCount label="Slices">
-                            {done}/{item.slices.length} done
+                        <ProgressCount>
+                            {done}/{item.slices.length} slices done
                         </ProgressCount>
                     }
-                    bar={at < 0 || concept ? <SliceBar item={item} thick /> : undefined}
+                    bar={<SliceBar item={item} thick={at < 0 || concept} />}
                 >
                     {/* The slices as the board's own slice list, a row each, not chips. */}
                     <SliceList item={item} />

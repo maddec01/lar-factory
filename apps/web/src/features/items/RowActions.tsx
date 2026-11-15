@@ -7,3 +7,9 @@ import { ON_ROW } from './RowContext';
 export const RowActions = ({ children }: { children: ReactNode }) => (
     <ON_ROW.Provider value>{children}</ON_ROW.Provider>
 );
+
+/** A card's actions, on Your desk or a work-map card, inside a row list or not: named and outlined, never the rows'
+ *  icon-only form. */
+export const CardActions = ({ children }: { children: ReactNode }) => (
+    <ON_ROW.Provider value="card">{children}</ON_ROW.Provider>
+);

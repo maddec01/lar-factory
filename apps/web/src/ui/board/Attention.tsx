@@ -20,12 +20,8 @@ export function BoardAttentionList({
     rows: { key: string; label: string; tone: AttentionTone; entries: ReactNode[] }[];
 }) {
     return (
-        // The labels' column is 7.5rem, or as wide as the longest label so none wraps ("To verify or merge" needs more).
-        // On a phone each label sits on top of its entries, which take the full width.
-        <dl
-            className="m-0 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(7.5rem,max-content)_minmax(0,1fr)] sm:gap-y-2"
-            data-attention
-        >
+        // Each label sits over its entries, which take the full width and start on the parts' column.
+        <dl className="m-0 grid grid-cols-1 gap-y-1" data-attention>
             {rows.map((r) => (
                 <div key={r.key} className="contents" data-attention-row={r.key}>
                     <dt className="text-fg-soft flex items-center gap-1.5 self-start pt-2 text-xs font-medium whitespace-nowrap">
@@ -66,7 +62,8 @@ export function AttentionEntry({
     side?: ReactNode;
 }) {
     return (
-        <div className="hover:bg-fill-hover flex min-h-9 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-2 py-1.5">
+        // Its text on the column's edges, its hover fill reaching past them, as a row's does.
+        <div className="hover:bg-fill-hover -mx-2 flex min-h-7 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-2 py-1">
             <span className="min-w-0 flex-1 basis-64">{main}</span>
             {side && <span className="text-fg-muted ml-auto max-w-full min-w-0 text-xs wrap-anywhere">{side}</span>}
         </div>
@@ -136,7 +133,11 @@ export function AttentionMark({
     children: ReactNode;
 } & DataAttributes) {
     return (
-        <span {...data} className={`flex ${clamp ? 'min-w-0 ' : ''}items-start gap-1.5 text-sm`}>
+        // An open question reads a step quieter than the parts above it, but above the notes and states beside it.
+        <span
+            {...data}
+            className={`flex ${clamp ? 'min-w-0 ' : ''}items-start gap-1.5 text-sm ${mark === 'fog' ? 'text-fg-soft' : ''}`}
+        >
             {MARKS[mark]}
             <span className={clamp ? 'line-clamp-2' : undefined}>{children}</span>
         </span>
@@ -157,10 +158,10 @@ export function PartName({
     children: ReactNode;
 }) {
     return (
-        <span className="flex min-w-0 items-start gap-1.5 text-sm">
-            <span className="mt-0.5 inline-flex shrink-0">{glyph}</span>
+        <span className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="inline-flex shrink-0">{glyph}</span>
             {source}
-            <span className="line-clamp-2 min-w-0 flex-1" data-part-title>
+            <span className="min-w-0 flex-1 truncate" data-part-title>
                 {children}
             </span>
         </span>
@@ -190,4 +191,14 @@ export function PartLink({
             {children}
         </button>
     );
+}
+
+/** A part's state when it waits on you, in amber, as its desk card and its parent's row say it. */
+export function WaitWord({
+    children,
+}: {
+    /** The wait in words, such as "Question". */
+    children: ReactNode;
+}) {
+    return <span className="text-warning-fg font-medium">{children}</span>;
 }

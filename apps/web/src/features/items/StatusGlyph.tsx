@@ -38,6 +38,7 @@ export function ItemStatusGlyph({
         <StatusGlyph
             status={shown.working ? item.status : shown.glyph}
             state={shown.glyphState}
+            held={shown.blocked}
             running={shown.running}
             size={size}
         />

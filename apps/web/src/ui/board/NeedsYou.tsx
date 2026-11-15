@@ -21,14 +21,18 @@ export function NeedsYouNotice({
 }) {
     return (
         <div className="grid gap-2" data-needs-you-reason>
-            <div className="attention-flat flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md py-2 pr-2 pl-4">
+            {/* The board's card in its waiting tone, as Your desk's cards and the work map's wear it. */}
+            <div
+                className="board-card flex flex-wrap items-center gap-x-3 gap-y-2 py-2 pr-2 pl-4"
+                data-card-tone="waiting"
+            >
                 <p className="m-0 flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm">
                     {/* The amber bar says it waits on you; the words say so to assistive technology. */}
                     <span className="sr-only">Needs you:</span>
                     <span className="min-w-0 wrap-anywhere">{reason}</span>
                 </p>
                 {Children.toArray(actions).length ? (
-                    <span className="ml-auto flex flex-wrap gap-1.5">{actions}</span>
+                    <span className="wait-actions ml-auto flex flex-wrap gap-1.5">{actions}</span>
                 ) : null}
             </div>
             {children}

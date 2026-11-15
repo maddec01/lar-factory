@@ -86,7 +86,9 @@ test('re-gating stays in Build, retains the approved Spec, and requires a second
     expect(text(dialog.querySelector('[data-description]'))).toContain('Approved D1 Spec.');
     expect(text(dialog.querySelector('[data-description]'))).not.toContain('Complete proposed D2');
 
-    const button = (label: string) => [...dialog.querySelectorAll('button')].find((node) => text(node) === label)!;
+    /** The work record's button, where the brief is displayed and approved. */
+    const button = (label: string) =>
+        [...dialog.querySelectorAll<HTMLButtonElement>('[data-record] button')].find((node) => text(node) === label)!;
 
     await settle(() => button('Approve brief').click());
     expect(text(dialog)).toContain('Complete proposed D2 brief.');
@@ -108,6 +110,21 @@ test('re-gating stays in Build, retains the approved Spec, and requires a second
     ]);
     expect(text(dialog)).toContain('Display it again.');
     expect(button('Approve brief')).toBeDefined();
+});
+
+test('the dialog notice leaves Approve brief to the work record, so it shows no button that does nothing', async () => {
+    await mountPage(board);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
+
+    // An action that only opens this item belongs to the dialog's own sections (the work record's Approve brief,
+    // covered above); in the notice it would reopen the open dialog.
+    const notice = $('[data-item-dialog] [data-needs-you-reason]');
+    const idle = [...(notice?.querySelectorAll('button') ?? [])].filter((node) => text(node) === 'Approve brief');
+
+    expect(idle).toHaveLength(0);
 });
 
 test('successful approval reloads the open dialog so the new Spec replaces the outdated copy', async () => {
@@ -160,7 +177,9 @@ test('successful approval reloads the open dialog so the new Spec replaces the o
     await settle(() => useItemDialogStore.getState().open(item.id));
 
     const button = (label: string) =>
-        [...$('[data-item-dialog]')!.querySelectorAll('button')].find((node) => text(node) === label)!;
+        [...$('[data-item-dialog] [data-record]')!.querySelectorAll<HTMLButtonElement>('button')].find(
+            (node) => text(node) === label,
+        )!;
 
     await settle(() => button('Approve brief').click());
     await settle(() => button('Approve displayed brief').click());

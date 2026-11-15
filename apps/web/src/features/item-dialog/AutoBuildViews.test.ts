@@ -94,8 +94,13 @@ test('row, group details and expanded build header share Auto-build delivery sta
     expect(text($('[data-item-summary]'))).toContain('2 builds running · 1 waiting');
     expect(text($('[data-concept-build-run]'))).not.toContain('Not started');
     await settle(() => useItemDialogStore.getState().open(parts[0]!.id));
-    expect(text($('[data-earlier-threads]'))).toContain('Current build owner');
-    expect(text($('[data-earlier-threads]'))).not.toContain('Stale shaping owner');
+    // The running build thread is the footer's Open thread, not an earlier thread, and the stale owner isn't listed.
+    expect($('[data-earlier-threads]')).toBeNull();
+    expect(
+        $<HTMLAnchorElement>(
+            '[data-item-dialog] [data-slot="modal-footer"] [data-open-thread="build-0"]',
+        )!.getAttribute('href'),
+    ).toBe('t3code://threads/sample-environment/current-build');
     expect(
         $$('[data-open-thread="build-0"]').every((link) => link.getAttribute('href')?.endsWith('/current-build')),
     ).toBe(true);

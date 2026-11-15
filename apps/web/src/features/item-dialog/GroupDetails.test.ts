@@ -154,7 +154,7 @@ test('the header counts running builds and then waits for Outcome after release'
     expect(groupStatus()).toContain('Waiting on Outcome check');
 });
 
-test('a large group keeps part holds folded and batch review before delivery details', async () => {
+test('a large group lists its parts directly, keeps part holds folded and batch review before delivery details', async () => {
     const data = group('concept', false);
     const root: Item = { ...data.items[0]!, status: 'Shaping' };
     const parts = Array.from({ length: 20 }, (_, index): Item => ({
@@ -193,14 +193,11 @@ test('a large group keeps part holds folded and batch review before delivery det
 
     const dialog = $('[data-item-dialog]')!;
     const section = dialog.querySelector('[data-concept-parts]')!;
-    const disclosure = section.querySelector('details')!;
     const review = dialog.querySelector('[data-record]')!;
 
-    expect(disclosure, 'per-part holds have a counted disclosure').not.toBeNull();
-    expect(text(disclosure.querySelector('summary'))).toBe('20 parts and their holds');
-    // Parts that wait on you open the list, so what asks for you shows without a click.
-    expect(disclosure.open).toBe(true);
-    expect(disclosure.querySelectorAll('[data-row-open]')).toHaveLength(20);
+    // Every part shows without a click, under the parts count; nothing folds them away.
+    expect(section.querySelector('details'), 'the parts aren’t behind a disclosure').toBeNull();
+    expect(section.querySelectorAll('[data-row-open]')).toHaveLength(20);
 
     const holds = dialog.querySelector<HTMLDetailsElement>('[data-concept-build-run] details')!;
 
@@ -214,9 +211,6 @@ test('a large group keeps part holds folded and batch review before delivery det
             Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect([...review.querySelectorAll('button')].some((button) => text(button) === 'Approve briefs')).toBe(true);
-    await settle(() => disclosure.querySelector('summary')!.click());
-    expect(disclosure.open).toBe(false);
-    await settle(() => disclosure.querySelector('summary')!.click());
-    await settle(() => disclosure.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
+    await settle(() => section.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });

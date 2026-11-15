@@ -2,15 +2,17 @@ import type { WorkMapPrerequisite } from '@lar-factory/shared';
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
+import { BoardCard } from './BoardCard';
 import { MapStartAction } from './StartAfterButton';
 
 /** Room for a wrapping action header, a project line, two title lines, status and slices; edges share this height. */
 export const MAP_NODE_HEIGHT = 156;
 
-const NODE_ATTENTION = {
-    default: 'border-line',
-    asks: 'attention attention-warning',
-    waits: 'border-dashed border-line-strong',
+/** Each need's tone on the board's card (items.css), as a desk card wears it. */
+const NODE_TONE = {
+    default: undefined,
+    asks: 'waiting',
+    waits: 'held',
 } as const;
 
 /**
@@ -24,6 +26,7 @@ export function MapPartNode({
     width,
     height,
     attention = 'default',
+    tone,
     picked,
     openLabel,
     title,
@@ -38,6 +41,7 @@ export function MapPartNode({
     slices,
     recordState,
     waitReason,
+    track,
 }: {
     /** The part's item, named as `data-item`. */
     id: string;
@@ -46,7 +50,9 @@ export function MapPartNode({
     /** The card's height in pixels. */
     height: number;
     /** What the part needs: `asks` an answer from you, `waits` on other work, or `default` neither. */
-    attention?: keyof typeof NODE_ATTENTION;
+    attention?: keyof typeof NODE_TONE;
+    /** Its leading bar when it needs nothing: `done`, or `active` while its thread works. */
+    tone?: 'done' | 'active' | undefined;
     /** The item the dialog shows now. */
     picked: boolean;
     /** The card button's accessible name. */
@@ -75,54 +81,50 @@ export function MapPartNode({
     waitReason: string;
     /** Its slices, a SliceBar. */
     slices?: ReactNode;
+    /** Where it stands in its workflow, a StageTrack, at its head's end as on a desk card's foot. */
+    track?: ReactNode;
 }) {
+    // The board's one card, as Your desk composes it: the same head, title, foot and action in the same places.
     return (
-        <div
+        <BoardCard
             style={{ width, height }}
             data-map-part={id}
-            className={`relative flex flex-col gap-1 overflow-hidden rounded-xl border px-2.5 py-2 text-left ${picked ? `current-edge ${attention === 'asks' ? NODE_ATTENTION.asks : ''}` : attention === 'asks' ? `bg-surface-card ${NODE_ATTENTION.asks}` : `surface-card ${NODE_ATTENTION[attention]}`}`}
-        >
-            <button
-                type="button"
-                aria-label={openLabel}
-                title={[title, recordState, waitReason].filter(Boolean).join(' · ')}
-                onClick={onOpen}
-                className="focus-ring-inset hover:bg-fill-hover absolute inset-0 rounded-[inherit]"
-            />
-            {source}
-            <span
-                className="text-fg-muted pointer-events-none relative flex min-h-6 min-w-0 shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 pr-7 text-xs"
-                data-map-head
-            >
-                {head}
-                {action && (
-                    <span className="pointer-events-auto ml-auto flex max-w-full min-w-0 justify-end">
-                        <MapStartAction>{action}</MapStartAction>
+            tone={NODE_TONE[attention] ?? tone}
+            picked={picked}
+            onOpen={onOpen}
+            openLabel={openLabel}
+            tooltip={[title, recordState, waitReason].filter(Boolean).join(' · ')}
+            head={
+                <>
+                    {source}
+                    <span className="flex min-w-0 items-center gap-x-2" data-map-head>
+                        {head}
+                        {repository}
                     </span>
-                )}
-            </span>
-            {repository && (
-                <span className="text-fg-muted pointer-events-none relative min-w-0 shrink-0 truncate text-xs">
-                    {repository}
-                </span>
-            )}
-            <span className="pointer-events-none relative line-clamp-2 shrink-0 text-sm leading-5 font-medium wrap-anywhere">
-                {name}
-            </span>
-            <span className="pointer-events-none relative mt-auto flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
-                {glyph}
-                <span className="min-w-0 flex-1 truncate" data-map-facts>
-                    {facts}
-                </span>
-            </span>
-            <span
-                className="text-fg-muted pointer-events-none relative min-w-0 shrink-0 truncate text-xs"
-                data-map-record-state
-            >
-                {recordState}
-            </span>
-            {slices && <span className="pointer-events-none relative shrink-0">{slices}</span>}
-        </div>
+                </>
+            }
+            track={track}
+            name={name}
+            sub={
+                <>
+                    {recordState && (
+                        <span className="min-w-0 truncate" data-map-record-state>
+                            {recordState}
+                        </span>
+                    )}
+                </>
+            }
+            state={
+                <>
+                    {attention !== 'asks' && glyph}
+                    <span className={`min-w-0 truncate ${attention === 'asks' ? '' : 'text-fg'}`} data-map-facts>
+                        {facts}
+                    </span>
+                </>
+            }
+            action={action && <MapStartAction>{action}</MapStartAction>}
+            bottom={slices && <span className="shrink-0">{slices}</span>}
+        />
     );
 }
 
@@ -156,13 +158,14 @@ export function MapCheckNode({
         <div
             style={{ width, height }}
             data-map-check
-            className="border-line-strong flex flex-col gap-1 rounded-xl border border-dashed px-2.5 py-2"
+            className="board-card flex flex-col gap-1 px-3 py-2.5"
+            data-card-tone="held"
         >
             <span className="text-fg-muted flex items-center gap-1.5 text-xs">
                 <FlaskConicalIcon className="size-3.5" />
                 {label}
             </span>
-            <span className="line-clamp-2 text-sm leading-5 font-medium">{title}</span>
+            <span className="line-clamp-2 text-sm leading-5">{title}</span>
             <span className="mt-auto flex min-w-0 items-center gap-1.5 text-xs">
                 {glyph}
                 <span className="min-w-0 truncate" title={stepsTitle}>
@@ -193,14 +196,15 @@ export function MapPrerequisiteNode({ prerequisite, width }: { prerequisite: Wor
         <div
             data-map-prerequisite={id}
             data-prerequisite-kind={kind}
-            className="border-line-strong bg-surface-card flex flex-col gap-2 rounded-xl border border-dashed px-2.5 py-2 text-sm"
+            className="board-card flex flex-col gap-2 px-3 py-2.5 text-sm"
+            data-card-tone="held"
             style={{ width, height: MAP_NODE_HEIGHT }}
             title={`${title} · ${state}`}
         >
             <span className="text-fg-muted text-xs">
                 {kind === 'dependency' ? 'Dependency' : 'Work outside this group'}
             </span>
-            <span className="line-clamp-3 font-medium wrap-anywhere">{title}</span>
+            <span className="line-clamp-3 wrap-anywhere">{title}</span>
             <span className="text-fg-muted mt-auto text-xs">{state}</span>
         </div>
     );

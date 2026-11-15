@@ -73,10 +73,10 @@ test('tickets match on title and reference, never on repository, status or kind'
         item('A', { title: 'Plain', number: 7, repo: 'maddec01/lar-server', status: 'Verify', kind: 'bug' }),
     ];
 
-    expect(inGroup('Tickets', 'lar-server', items)).toBeUndefined();
-    expect(inGroup('Tickets', 'verify', items)).toBeUndefined();
-    expect(inGroup('Tickets', 'bug', items)).toBeUndefined();
-    expect(inGroup('Tickets', '#7', items)).toEqual(['Plain']);
+    expect(inGroup('Items', 'lar-server', items)).toBeUndefined();
+    expect(inGroup('Items', 'verify', items)).toBeUndefined();
+    expect(inGroup('Items', 'bug', items)).toBeUndefined();
+    expect(inGroup('Items', '#7', items)).toEqual(['#7 Plain']);
 });
 
 test('tickets span every status in board order, with Done limited to its 7-day window', () => {
@@ -87,7 +87,7 @@ test('tickets span every status in board order, with Done limited to its 7-day w
         item('L', { title: 'match list', status: 'List', updatedAt: ago(1) }),
     ];
 
-    expect(inGroup('Tickets', 'match', items)).toEqual(['match list', 'match verify', 'match done new']);
+    expect(inGroup('Items', 'match', items)).toEqual(['#129 match list', '#129 match verify', '#129 match done new']);
 });
 
 const FILTERED = [
@@ -100,22 +100,22 @@ const NARROWED = { scope: 'maddec01/lar-server', filters: { kinds: ['bug' as con
 test('Scope, Kind and Labels narrow tickets only, and a last row offers what they hide', () => {
     const { groups } = results('e', FILTERED, NARROWED);
 
-    expect(groups.at(-1)!.options.map(({ name }) => name)).toEqual(['match kept', 'Search all tickets']);
+    expect(groups.at(-1)!.options.map(({ name }) => name)).toEqual(['#129 match kept', 'Search all tickets']);
     expect(groups.at(-1)!.options.at(-1)!.hint).toBe('2 more');
     expect(groups.find(({ label }) => label === 'Settings')?.options.length).toBeGreaterThan(0);
     expect(inGroup('Actions', 'e', FILTERED, NARROWED)).toContain('Settings');
 });
 
 test('the last row shows even when tokens hide every match, and not when they hide none', () => {
-    expect(inGroup('Tickets', 'other repo', FILTERED, NARROWED)).toEqual(['Search all tickets']);
-    expect(inGroup('Tickets', 'kept', FILTERED, NARROWED)).toEqual(['match kept']);
+    expect(inGroup('Items', 'other repo', FILTERED, NARROWED)).toEqual(['Search all tickets']);
+    expect(inGroup('Items', 'kept', FILTERED, NARROWED)).toEqual(['#129 match kept']);
 });
 
 test('once widened, the hidden tickets follow the kept ones, the row goes, and choosing it named the first of them', () => {
-    expect(inGroup('Tickets', 'match', FILTERED, { ...NARROWED, widened: true })).toEqual([
-        'match kept',
-        'match other repo',
-        'match feature',
+    expect(inGroup('Items', 'match', FILTERED, { ...NARROWED, widened: true })).toEqual([
+        '#129 match kept',
+        '#129 match other repo',
+        '#129 match feature',
     ]);
 
     const row = results('match', FILTERED, NARROWED).groups.at(-1)!.options.at(-1)!;

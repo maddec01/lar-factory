@@ -3,17 +3,17 @@
 // kind as its row names it when the dialog's Kind control doesn't, and attaching or creating its ticket. The meta area
 // says when it was updated.
 
-import { blockedText, staleGateReason, itemName, openBlockers, retiredPartLabel } from '@lar-factory/shared';
+import { blockedText, staleGateReason, itemName, onAzure, openBlockers, retiredPartLabel } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
 import { CreateTicket } from './CreateTicket';
 import { isGroupParent } from './group-parent';
 import { ItemKindControl } from './ItemKindControl';
-import { ItemKind, ItemStatusGlyph, RepoCell, SourceIcon, StructureSync, useShownStatus } from '@/features/items';
+import { ICON, ItemKind, ItemStatusGlyph, RepoCell, SourceIcon, StructureSync, useShownStatus } from '@/features/items';
 import { RowKind } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ItemSummary as Summary, SummaryBlocked, SummaryParent, SummaryStatus } from '@/ui/board';
+import { ItemSummary as Summary, SummaryBlocked, SummaryParent, SummaryStatus, TrackerLink } from '@/ui/board';
 
 export function ItemSummary({ item }: { item: Item }) {
     const group = isGroupParent(
@@ -25,17 +25,30 @@ export function ItemSummary({ item }: { item: Item }) {
     return (
         <Summary
             data-item-summary
-            line={
+            status={
                 <>
-                    <SourceIcon item={item} bare always />
-                    <RepoCell item={item} />
-                    <ItemStatusGlyph item={item} />{' '}
+                    <ItemStatusGlyph item={item} />
                     <SummaryStatus title={item.setAside ? `Last status: ${shown.recorded}` : shown.recorded}>
-                        {retiredPartLabel(item) ?? shown.word}
+                        {retiredPartLabel(item) ??
+                            // A parts count is Progress's, so Status says the stage it stands at.
+                            (/^\d+\/\d+ parts done$/.test(shown.word) ? item.status : shown.word)}
                     </SummaryStatus>
                     {!item.setAside && item.staleGate && <SummaryBlocked>{staleGateReason(item)}</SummaryBlocked>}
                     {!item.setAside && openBlockers(item).length > 0 && !shown.blocked && (
                         <SummaryBlocked>{blockedText(item)}</SummaryBlocked>
+                    )}
+                </>
+            }
+            project={
+                <>
+                    {(!item.number || (item.repo && onAzure(item.repo))) && <SourceIcon item={item} bare always />}
+                    <RepoCell item={item} />
+                    {item.url && (
+                        <TrackerLink
+                            href={item.url}
+                            icon={item.repo && onAzure(item.repo) ? ICON.azure : ICON.github}
+                            name={item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
+                        />
                     )}
                 </>
             }

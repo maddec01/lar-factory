@@ -49,7 +49,7 @@ export function BoardContent({
     /** Everything under the title bar. */
     children: ReactNode;
 }) {
-    return <div className="px-gutter-app flex flex-1 flex-col gap-3 pt-3 pb-4 *:shrink-0">{children}</div>;
+    return <div className="px-gutter-app flex w-full flex-1 flex-col gap-6 pt-6 pb-10 *:shrink-0">{children}</div>;
 }
 
 /** A line that stands in for content the board is still reading, centred in its area. */

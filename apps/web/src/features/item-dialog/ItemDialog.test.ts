@@ -1,6 +1,7 @@
-// The item dialog: opened through its store, it shows an item's repository, status and agent work figures in its header,
-// a meta area of labels under the title, a progress bar with the slices as an overview, then sub-tickets and pull
-// requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
+// The item dialog: opened through its store, it leads its main column with what waits on you (a pull request's or a
+// question's notice carries its action), then progress, the work and the ticket; its sidebar lists the item's status,
+// project with its ticket link, kind and agent work figures, then sub-tickets and pull requests; and its footer carries
+// the action the item's status asks for when the notice doesn't.
 
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -55,12 +56,35 @@ const footerControls = () =>
     );
 
 test.each([
-    ['Verify', 'Review PR', 'I_sample16'],
+    ['Verify', 'Verify build', 'I_sample16'],
     ['Ready to merge', 'Open PR', 'I_sample17'],
-])('a %s item with no linked pull request has %s disabled, its title saying why', async (_status, label, itemId) => {
-    await mountPage({ ...sample, items: sample.items.map((i) => (i.id === itemId ? { ...i, linkedPrs: [] } : i)) });
-    await openItem(itemId);
-    expect(footerControls().at(-1)).toBe(`${label} (disabled: No pull request is linked to this item yet)`);
+])(
+    'a %s item with no linked pull request has its notice’s %s disabled, its title saying why',
+    async (_status, label, itemId) => {
+        await mountPage({ ...sample, items: sample.items.map((i) => (i.id === itemId ? { ...i, linkedPrs: [] } : i)) });
+        await openItem(itemId);
+
+        const link = [...inDialog('[data-needs-you-reason]')!.querySelectorAll<HTMLButtonElement>('button, a')].find(
+            (el) => text(el) === label,
+        )!;
+
+        expect([link.disabled, link.title]).toEqual([true, 'No pull request is linked to this item yet']);
+        expect(footerControls(), 'the notice carries the action, so the footer doesn’t repeat it').toEqual([]);
+    },
+);
+
+test('the ticket opens from the sidebar’s Project, not from a footer button', async () => {
+    await mountPage();
+    await openItem('I_sample10');
+
+    const link = inDialog<HTMLAnchorElement>('[data-item-summary] [data-ticket-link]')!;
+
+    expect([link.title, link.href, link.target]).toEqual([
+        'Open in GitHub',
+        sample.items.find((i) => i.id === 'I_sample10')!.url,
+        '_blank',
+    ]);
+    expect(footerControls()).not.toContain('GitHub');
 });
 
 /** The sample with `itemId`'s threads replaced. */
@@ -91,7 +115,7 @@ test.each([
 ])('Open thread is disabled when %s, and its title says so', async (_case, data, reason) => {
     await mountPage(data);
     await openItem('I_sample10');
-    expect(footerControls()).toEqual(['GitHub', `Open thread (disabled: ${reason})`]);
+    expect(footerControls()).toEqual([`Open thread (disabled: ${reason})`]);
 });
 
 test.each([['running'], ['needs you']] as const)(
@@ -99,8 +123,14 @@ test.each([['running'], ['needs you']] as const)(
     async (state) => {
         await mountPage(withThreads('I_sample05', [thread('live', state)]));
         await openItem('I_sample05');
-        expect(footerControls()).toEqual(['GitHub', state === 'needs you' ? 'Answer in T3' : 'Open thread']);
-        expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
+
+        // A thread that needs you puts its answer in the notice, so the footer is left empty.
+        const action = state === 'needs you' ? inDialog('[data-needs-you-reason] [data-open-thread]')! : statusAction();
+
+        expect(footerControls()).toEqual(state === 'needs you' ? [] : ['Open thread']);
+        expect(text(action)).toBe(state === 'needs you' ? 'Answer in T3' : 'Open thread');
+        expect(action.getAttribute('href')).toBe('t3code://threads/sample-environment/live');
+        expect(inDialog('[data-start], [data-back-to-list], [data-abandon]')).toBeNull();
     },
 );
 
@@ -116,7 +146,7 @@ test('Queue in the dialog shows it in flight, then shows the item Queued, says s
     expect(posted()).toEqual([['/api/queue', { itemId: 'I_sample01' }]]);
 
     await answer({ error: null, board: moved('I_sample01', 'Queued') });
-    expect(text(inDialog('[data-item-summary]'))).toContain(' Queued');
+    expect(text(inDialog('[data-item-summary] > div'))).toBe('StatusQueued');
     expect(toast()).toBeNull();
     expect(document.activeElement).toBe(button('start', 'I_sample01'));
 });
@@ -192,7 +222,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     holdPosts(readyBuild);
     await mountPage(readyBuild);
     await openItem('I_sample13');
-    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Build']);
+    expect(footerControls()).toEqual(['Open thread', 'Build']);
     await pressMenu(button('start', 'I_sample13'));
     await settle(() => vi.advanceTimersByTime(20));
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
@@ -656,7 +686,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
     );
-    expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start after Dependency on server team']);
+    expect(footerControls()).toEqual(['Open thread', 'Start after Dependency on server team']);
     expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe(
         'Pick a model to start it once you mark the Dependency on server team met',
     );
@@ -876,14 +906,15 @@ test('while T3 can’t be read, known figures stay and say they are last known',
     await openItem(CONCEPT);
 
     const meta = text(inDialog('[data-meta]'));
+    const figures = inDialog('aside [data-agent-work]')!;
 
-    expect(text(inDialog('header'))).toContain('Direct work: Agent time 1m · 1K tokens · $1.00');
+    expect([...figures.children].map(text), 'the sidebar lists its own figures, then says they are last known').toEqual(
+        ['Agent time1m', 'Tokens1K', 'Cost$1.00', 'Direct work · Last known'],
+    );
     expect(meta).toContain('With partsAgent time 2m · 2K tokens · $3.00');
     expect(meta).toContain('last known');
     expect(meta).not.toContain('Agent work unavailable.');
-    expect(inDialog('[data-agent-work]')!.title).toMatch(
-        /Last known figures from 3 Nov, \d\d:\d\d: T3 Code’s usage can’t be read now\./,
-    );
+    expect(figures.title).toMatch(/Last known figures from 3 Nov, \d\d:\d\d: T3 Code’s usage can’t be read now\./);
 });
 
 const withoutFigures = (usageState: 'failed' | 'loading') => {
@@ -908,7 +939,7 @@ test('an item whose threads T3 hasn’t answered for yet says usage is loading, 
         items: data.items.map((item) => (item.id === CONCEPT ? { ...item, threads: 'unavailable' as const } : item)),
     });
     await openItem(CONCEPT);
-    expect(text(inDialog('header'))).toContain('Loading agent work…');
+    expect(text(inDialog('aside [data-agent-work-note]'))).toBe('Loading agent work…');
     expect(text(inDialog('[data-meta]'))).not.toContain('No T3 thread');
 });
 

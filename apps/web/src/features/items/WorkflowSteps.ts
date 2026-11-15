@@ -8,3 +8,7 @@ const DECISION_STEPS = ['Queue', 'Working', 'Outcome'] as const;
 
 export const workflowSteps = (item: Item): readonly string[] =>
     isDecisionWork(item) ? DECISION_STEPS : WORKFLOW_STEPS;
+
+/** A step's name on a card's mini track: a decision's "Working" step reads "Deciding", so a step is never mistaken for
+ *  the state beside it. */
+export const stepName = (step: string): string => (step === 'Working' ? 'Deciding' : step);

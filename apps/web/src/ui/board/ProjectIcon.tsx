@@ -183,7 +183,10 @@ export function ProjectIcon({
             className={`${shared} ${icon?.kind === 'lucide' || icon?.kind === 'favicon' ? '' : 'border'} ${own ? `${HUES[own]} categorical-fill` : 'bg-fill-muted text-fg-muted border-line'}`}
             aria-hidden="true"
         >
-            {firstGraphemes(name, 1).toUpperCase()}
+            {/* The initial stands in until the icon has drawn, then hides, so no letter ghosts through its outline. */}
+            <span className="[[data-project-icon]:has(svg,img)>&]:invisible">
+                {firstGraphemes(name, 1).toUpperCase()}
+            </span>
             {icon?.kind === 'favicon' && <Favicon key={icon.src} src={icon.src} />}
             {icon?.kind === 'lucide' && (
                 // The colour is the wrapper's and the icon draws in currentColor, so a container that recolours every

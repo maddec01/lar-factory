@@ -365,7 +365,7 @@ test('an unrecorded List PR leaves the build count at zero and the Ready row wit
 
     // A quiet board leaves the building count out of the title bar rather than counting zero.
     expect($$('[data-slot="toolbar-counter"]').some((node) => text(node).startsWith('building:'))).toBe(false);
-    expect(text(document.body)).toContain('0 building · limit 1');
+    expect(text(document.body)).toContain('0 of 1 build slots');
     expect(text(card())).not.toContain('Starting now will go over the limit.');
     expect(text(document.body)).not.toContain('Waiting for a build slot');
     expect(start(ready.id).disabled).toBe(false);

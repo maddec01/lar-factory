@@ -27,8 +27,15 @@ const board = (item: Item): BoardData => ({
     repos: [{ repo: item.repo, role: '', labels: [] }],
 });
 
-test.each<[Item['status'], string, number, string, string]>([
-    ['List', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
+/** The source mark's name in `el`, among its other icons such as the kind mark. */
+const sourceIn = (el: Element | null) =>
+    [...(el?.querySelectorAll('[role="img"]') ?? [])]
+        .map((icon) => icon.getAttribute('aria-label'))
+        .find((label) => label?.includes('Saved'));
+
+// On a board that saves only to GitHub, a GitHub ticket's mark would say the same everywhere, so the local mark goes.
+test.each<[Item['status'], string, number, string, string | undefined]>([
+    ['List', 'example/product', 17, 'https://github.com/example/product/issues/17', undefined],
     [
         'List',
         'example/project/product',
@@ -36,7 +43,7 @@ test.each<[Item['status'], string, number, string, string]>([
         'https://dev.azure.com/example/project/_workitems/edit/23',
         'Azure DevOps work item. Saved in Azure DevOps.',
     ],
-    ['Verify', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
+    ['Verify', 'example/product', 17, 'https://github.com/example/product/issues/17', undefined],
     [
         'Verify',
         'example/project/product',
@@ -53,11 +60,11 @@ test.each<[Item['status'], string, number, string, string]>([
 
     const row = $<HTMLElement>(status === 'List' ? '[data-list-modal] button[data-item]' : '.desk-row')!;
 
-    expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
+    expect(sourceIn(row)).toBe('Saved only on this machine.');
     // A desk row opens from its open button, which spans the row up to its actions.
     await settle(() => (row.querySelector<HTMLButtonElement>('[data-row-open]') ?? row).click());
-    expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
+    expect(sourceIn($('[data-item-summary]'))).toBe('Saved only on this machine.');
     await push(board({ ...item, number, url }));
-    expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(label);
-    expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe(label);
+    expect(sourceIn(row)).toBe(label);
+    expect(sourceIn($('[data-item-summary]'))).toBe(label);
 });

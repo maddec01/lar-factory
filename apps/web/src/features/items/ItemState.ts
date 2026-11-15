@@ -48,6 +48,9 @@ const EXECUTION_WORD: Record<Exclude<Execution, 'starting'>, string> = {
     unavailable: 'Activity unavailable',
 };
 
+/** What a Ready item says while every build slot is taken. */
+export const SLOT_WAIT = 'Waiting for a build slot';
+
 /** A merged pull request's word while the recorded stage hasn't caught up with it. */
 const MERGED = 'PR merged';
 
@@ -215,7 +218,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         !buildsAtWork({ items: [item] }).length &&
         inputs.capacityFull;
     const word =
-        (slotWait ? 'Waiting for a build slot' : undefined) ??
+        (slotWait ? SLOT_WAIT : undefined) ??
         (item.briefReviewing && !wait ? buildActivity(item, stale).label : undefined) ??
         group?.word ??
         wait ??

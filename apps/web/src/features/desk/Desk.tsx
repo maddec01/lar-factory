@@ -24,17 +24,23 @@ import {
     placementOf,
 } from '@lar-factory/shared';
 import type { BoardData, Item, Checks } from '@lar-factory/shared';
-import { Loading } from '@lar-works/design-system';
+import { Loading, statusStateColors } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
+    Age,
     HumanWaitAction,
     AzureFields,
     ItemTitle,
     useActivityUnavailable,
     ItemStatusGlyph,
     useShownStatus,
+    STATUS_COLOR,
+    workflowSteps,
+    stepName,
+    prChecks,
+    checksWord,
 } from '@/features/items';
 import { RowKindMark, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -47,6 +53,8 @@ import {
     DeskHint,
     DeskSection,
     noteBoardPlaces,
+    StageTrack,
+    CardChecks,
 } from '@/ui/board';
 
 /**
@@ -154,6 +162,21 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const requestOwner = openQuestionThread(item) ?? openQuestionThread(questionOwnerParent(item, data.items) ?? item);
     const approval = requestOwner?.pendingRequest?.kind === 'tool-approval' ? requestOwner : undefined;
     const picked = useItemDialogStore((state) => state.itemId === item.id);
+    const steps = workflowSteps(item);
+    const at = steps.findIndex((step) => step === shown.progressStage);
+    // The lane it sits in, then its step when that says more, such as "Build · Verify".
+    const step =
+        at >= 0
+            ? [lane && LANES[lane], stepName(steps[at]!)]
+                  .filter((word, i, words) => word && words.indexOf(word) === i)
+                  .join(' · ')
+            : '';
+    // A disconnected board or a project it can't read leaves the checks as last seen, so the card keeps the counts in
+    // words with their stale warning rather than a track that looks current.
+    const stale = useBoardStore(
+        (state) => !!state.clientError || !!state.data.itemSourceProblems?.some((p) => p.repo === item.repo),
+    );
+    const checks = stale ? null : prChecks(item);
 
     return (
         <Card
@@ -161,8 +184,29 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
             picked={picked}
             onOpen={() => useItemDialogStore.getState().open(item.id)}
             source={<RowSource item={item} />}
-            kind={<RowKindMark item={item} />}
+            kind={<RowKindMark item={item} labelled />}
             stage={lane && LANES[lane]}
+            step={at >= 0 ? steps[at] : undefined}
+            question={requestOwner?.questionSummary}
+            track={
+                checks ? (
+                    // In review the PR's checks are what move, so they take the mini track's place: its step, then the PR's mark
+                    // and its checks in a word.
+                    <CardChecks checks={checks} step={at >= 0 ? stepName(steps[at]!) : ''} word={checksWord(checks)} />
+                ) : (
+                    at >= 0 && (
+                        <StageTrack
+                            steps={steps.length}
+                            at={at}
+                            color={
+                                shown.progressState ? statusStateColors[shown.progressState] : STATUS_COLOR[item.status]
+                            }
+                            label={`Step ${at + 1} of ${steps.length}: ${steps[at]}`}
+                            step={step}
+                        />
+                    )
+                )
+            }
             title={<ItemTitle item={item} />}
             name={itemName(item)}
             parentName={deskParentName(item, data.items)}
@@ -182,25 +226,21 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
                         )}
                         <DeskDependencyProof proofs={dependencyProofs(item)} />
                         <AzureFields azure={item.azure} />
-                        <Progress item={item} data={data} />
+                        {/* The head's track says the checks; the counts in words stay for a PR it can't draw. */}
+                        {!checks && <Progress item={item} data={data} />}
                     </>
                 )
             }
             statusIcon={<ItemStatusGlyph item={item} />}
-            // A wait its button already names says nothing more, so the row keeps to its lane.
-            status={
-                followups
-                    ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}`
-                    : wait.action?.label === wait.label
-                      ? ''
-                      : wait.label
-            }
+            // The wait in the same words everywhere it shows: the card's foot, the dialog's Status and search.
+            status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
             statusState={
                 followups || batch.length || dependencyProofs(item).length || wait.label === 'Outcome check'
                     ? 'waiting'
                     : (shown.state ?? boardStatusState[shown.glyph])
             }
-            next={<NextStep item={item} waitLabel={wait.label} />}
+            age={<Age at={item.updatedAt} />}
+            next={!checks && <NextStep item={item} waitLabel={wait.label} />}
             actions={<HumanWaitAction item={item} data={data} quiet />}
         />
     );

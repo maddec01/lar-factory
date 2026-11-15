@@ -97,7 +97,7 @@ function Dialog({
             listLabel="Search results"
             empty={
                 <EmptyState
-                    size="compact"
+                    size="inline"
                     title="Nothing matches"
                     actions={
                         <Button

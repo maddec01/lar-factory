@@ -19,13 +19,13 @@ import { StatusGlyph, useBuilds, useItemStates } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     BoardCounter as Counter,
+    bringDeskIntoView,
     CounterDash,
+    CounterReason,
     CounterWords,
     QuietGlyph,
     CounterEmpty as Empty,
     CounterFigure,
-    CounterGroup,
-    CounterGroups,
 } from '@/ui/board';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? (item.stats.costUsd ?? 0) : 0);
@@ -63,7 +63,7 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
     const asks = (item: Item) => {
         const { word } = states(item);
 
-        return word === 'Needs you' ? 'Questions' : word;
+        return word === 'Needs you' ? 'Question' : word;
     };
     // Nothing has been read yet, so a zero would be a claim.
     const unknown = (n: number) => reading && !n;
@@ -86,7 +86,9 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                             <CounterWords always={narrow}>need you</CounterWords>
                         </>
                     }
-                    title="Needs you"
+                    title="Your desk"
+                    // A press brings Your desk into view rather than listing the cards it already shows.
+                    onActivate={bringDeskIntoView}
                     // Amber only while something waits on you.
                     icon={<StatusIndicator state={s.needsYou.length ? 'waiting' : 'off'} />}
                     count={countFor(s.needsYou.length)}
@@ -98,17 +100,13 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                     )}
                 >
                     {s.needsYou.length ? (
-                        <CounterGroups>
-                            {[...new Set(s.needsYou.map(asks))].map((status) => {
-                                const items = s.needsYou.filter((i) => asks(i) === status);
-
-                                return (
-                                    <CounterGroup key={status} title={status} count={items.length}>
-                                        <List items={items} now={now} asks />
-                                    </CounterGroup>
-                                );
-                            })}
-                        </CounterGroups>
+                        // One flat list, each row saying what it waits for at its end.
+                        <List
+                            items={s.needsYou}
+                            now={now}
+                            asks
+                            trailing={(item) => <CounterReason>{asks(item)}</CounterReason>}
+                        />
                     ) : (
                         empty('Nothing waits on you.')
                     )}

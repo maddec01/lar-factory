@@ -138,32 +138,33 @@ export function PartRow({
     foot?: ReactNode;
 }) {
     return (
-        <li data-part={id} className={`hover:bg-fill-hover @container rounded-lg px-3 py-2 ${pickedRow(picked)}`}>
-            <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+        <li data-part={id} className={`hover:bg-fill-hover @container rounded-lg px-3 py-0.5 ${pickedRow(picked)}`}>
+            {/* One line, as a lane row: the part's name with its kind and state quiet after it, its figures at the end,
+                and its action over them on hover or focus. */}
+            <div className="relative flex min-h-6 items-center gap-x-3">
                 <button
                     type="button"
                     data-row-open
                     onClick={onOpen}
                     title={title}
-                    className={`grid min-w-48 flex-1 basis-48 gap-y-1 rounded-xs text-left ${ROW_OPENS}`}
+                    className={`flex min-w-0 flex-1 items-center gap-x-3 rounded-xs text-left ${ROW_OPENS}`}
                 >
-                    {name}
+                    <span className="flex min-w-0 flex-1">{name}</span>
+                    {/* Always its slot, so every part's state ends on one edge. */}
                     <span
-                        className="text-fg-muted flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-xs"
+                        className="text-fg-soft ml-auto w-16 shrink-0 text-right text-xs tabular-nums"
+                        data-part-usage
+                    >
+                        {usage}
+                    </span>
+                    <span
+                        className="text-fg-soft flex min-w-0 shrink-0 items-center justify-end gap-x-2 text-xs whitespace-nowrap"
                         data-part-meta
                     >
                         {meta}
                     </span>
-                    {usage && (
-                        <span className="text-fg-muted min-w-0 pl-5 text-xs tabular-nums" data-part-usage>
-                            {usage}
-                        </span>
-                    )}
                 </button>
-                <span
-                    data-part-action
-                    className="text-fg-muted ml-auto flex min-h-7 max-w-full min-w-0 flex-wrap items-center justify-end gap-2 text-xs"
-                >
+                <span data-part-action className="text-fg-muted flex items-center justify-end gap-2 text-xs">
                     {action}
                 </span>
             </div>

@@ -9,6 +9,7 @@ import {
     CircleDashedIcon,
     CircleDotIcon,
     CircleIcon,
+    CirclePauseIcon,
     Clock3Icon,
     EyeIcon,
     GitMergeIcon,
@@ -82,8 +83,11 @@ export function StatusGlyph({
     status,
     state,
     running = false,
+    held = false,
     size = 'md',
 }: {
+    /** Held by other work: the paused glyph in place of its stage's. */
+    held?: boolean;
     /** The board status the glyph stands for. */
     status: BoardStatus;
     /** The work's state when it isn't its status's: `waiting` for blocked work, `off` for stopped work (the Stopped
@@ -112,7 +116,16 @@ export function StatusGlyph({
                 state={shownState}
                 size={size === 'sm' ? 'sm' : 'md'}
                 // A running build's mark is the design system's spinner.
-                glyph={halt ? <StoppedIcon strokeWidth={2.25} /> : motion === 'spin' ? undefined : glyphs[status]}
+                glyph={
+                    halt ? (
+                        <StoppedIcon strokeWidth={2.25} />
+                    ) : motion === 'spin' ? undefined : held ? (
+                        // Held by other work: the paused glyph, so it never reads as its stage's next step.
+                        <CirclePauseIcon strokeWidth={2.25} />
+                    ) : (
+                        glyphs[status]
+                    )
+                }
                 motion={motion}
             />
         );

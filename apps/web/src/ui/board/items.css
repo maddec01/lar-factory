@@ -34,9 +34,62 @@
     position: relative;
 }
 
-/* A desk row's next step and details sit under its title, on the title's edge. */
-.desk-more {
-    padding: --spacing(1) --spacing(3) 0 calc(--spacing(3) + 1.5rem + --spacing(3));
+/* Your desk's cards: four across, each an even amber tint with a hairline of its tone and the cards' 12px radius, so
+   what waits on you is the board's one warm surface. A hovered card warms a little. */
+.desk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: --spacing(3);
+}
+@media (width >= 80rem) {
+    .desk-grid {
+        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    }
+}
+.desk-grid > li {
+    display: flex;
+}
+.desk-tile {
+    container-type: inline-size;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: --spacing(1.5);
+    min-width: 0;
+    padding: --spacing(2.5) calc(--spacing(4) - 1px);
+    cursor: pointer;
+}
+
+/* The board's one card, on Your desk and in a concept's work map alike: the cards' 12px radius, a hairline, and a
+   thicker bar down its leading edge in the colour of what it needs (amber waits on you, the accent works, green is
+   done); a card that waits on you takes an even amber tint too, and one held by other work a dashed edge. */
+.board-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-card);
+    /* The bar is drawn inside the edge, as the design system's attention recipe draws it, so it follows the radius. */
+    box-shadow: inset 3px 0 0 0 var(--board-card-bar, transparent);
+    transition: background-color var(--motion-duration-fast) var(--ease-standard);
+}
+.board-card[data-card-tone='waiting'] {
+    --board-card-bar: var(--color-warning);
+    border-color: color-mix(in srgb, var(--color-warning) 12%, transparent);
+    background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface-card));
+}
+.board-card[data-card-tone='waiting']:hover {
+    background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-card));
+}
+.board-card[data-card-tone='active'] {
+    --board-card-bar: var(--color-board-active);
+}
+.board-card[data-card-tone='done'] {
+    --board-card-bar: var(--color-board-done);
+}
+.board-card[data-card-tone='held'] {
+    border-style: dashed;
+    border-color: var(--color-line-strong);
 }
 
 /* The confirmation includes the full provider URL and source revision. */
@@ -98,36 +151,9 @@ body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='ope
     animation-play-state: paused;
 }
 
-/* A desk row's actions can be a next step, a second destination and Open thread, on one line: the next step pins to the
-   row's end, where every row's does, and the others sit before it. */
-.desk-row .row-side {
-    flex-direction: row-reverse;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-}
-
-/* On a narrower row a desk row's title keeps the line; what it belongs to shows in its dialog. */
-@container (width < 64rem) {
-    .desk-row [data-title-cell] > [data-part-of] {
-        display: none;
-    }
-}
-
 /* A desk row offers its one next step; its other destinations (Open PR, Open thread) are in its dialog, so the action
    column never grows over the row's state. */
-.desk-row .row-side > :not(:first-child) {
-    display: none;
-}
-
-/* On a phone a desk row's actions start at the title's edge, as a lane row's do. */
-@container (width < 41.25rem) {
-    .desk-row .row-side {
-        flex-direction: row;
-    }
-}
-
-/* A desk of more than five shows its first five and Show all, so the board under it stays in reach. */
-.desk ol[data-collapsed] > li:nth-child(n + 6) {
+.wait-actions > :not(:first-child) {
     display: none;
 }
 
@@ -146,10 +172,92 @@ aside[data-item-aside]:empty {
     }
 }
 
-/* What waits on you, as Your desk's panel and the dialog's notice draw it: the attention recipe's bar down its leading
-   edge over an even tint of the same tone, the same in both schemes, rather than the recipe's fading wash, which bands
-   on a wide light panel. */
-.attention-flat {
-    background: color-mix(in srgb, var(--color-warning) 7%, transparent);
-    box-shadow: inset 3px 0 0 0 var(--color-warning);
+/* In the dialog's sidebar the ticket's facts read as properties, as its status, project and kind above them do: a muted
+   label in a fixed column beside each value, one under another. */
+[data-item-aside] [data-meta-facts] {
+    display: grid;
+    gap: --spacing(1);
+}
+[data-item-aside] [data-meta-facts] > div {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    align-items: start;
+    column-gap: --spacing(3);
+    font-size: var(--text-xs);
+}
+[data-item-aside] [data-meta-facts] > div > :first-child {
+    line-height: --spacing(6);
+}
+[data-item-aside] [data-meta-facts] > div > :last-child {
+    min-height: --spacing(6);
+}
+
+/* Need you's counter, pressed while Your desk shows, makes its cards glow once: their own amber tint deepens and
+   fades back, with no ring added and their content untouched. */
+@keyframes desk-flash {
+    from {
+        background-color: color-mix(in srgb, var(--color-warning) 22%, var(--color-surface-card));
+    }
+}
+.desk[data-flash] .desk-tile {
+    animation: desk-flash 1.2s var(--ease-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+    .desk[data-flash] .desk-tile {
+        animation-duration: 0.01ms;
+    }
+}
+
+/* On a narrow card the kind keeps its icon (named on hover) so the project stays readable. */
+@container (width < 21rem) {
+    [data-card-head] [data-kind-name] {
+        display: none;
+    }
+}
+
+/* In the item dialog a part's hover fill reaches past the column, so its content sits on the column's edges. */
+[data-item-dialog] [data-parts-list] {
+    margin-inline: calc(-1 * --spacing(3));
+}
+
+/* A dialog footer with nothing to do takes no band: the ticket's link lives beside its project in the sidebar. */
+[data-slot='modal-footer']:not(:has(button, a)) {
+    display: none;
+}
+
+/* The dialog's Kind reads as a value like the facts beside it (12px, regular, a 14px icon, on their 24px line); it shows
+   it can change, its chevron, only on hover, focus or while open. */
+[data-item-aside] [data-kind-control] [data-slot='trigger'] {
+    height: --spacing(6);
+    font-size: var(--text-xs);
+    font-weight: 400;
+}
+[data-item-aside] [data-kind-control] [data-slot='trigger'] > span:first-child > span {
+    gap: --spacing(1.5);
+}
+[data-item-aside] [data-kind-control] [data-slot='trigger'] > span:first-child [aria-hidden] {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+[data-item-aside] [data-kind-control] [data-slot='trigger'] > span:last-child {
+    opacity: 0;
+    transition: opacity var(--motion-duration-fast) var(--ease-standard);
+}
+[data-item-aside]
+    [data-kind-control]
+    [data-slot='trigger']:is(:hover, :focus-visible, [data-state='open'])
+    > span:last-child {
+    opacity: 1;
+}
+
+/* The Project row keeps its ticket link on its line: the project name gives up room first and truncates, so the link
+   never drops under it on a narrow sidebar. */
+[data-item-aside] :has(> [data-ticket-link]) {
+    flex-wrap: nowrap;
+}
+[data-item-aside] :has(> [data-ticket-link]) > [data-repo-cell] {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }

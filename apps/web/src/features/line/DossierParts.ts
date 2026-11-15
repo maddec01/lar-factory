@@ -15,7 +15,7 @@ import {
     plural,
     projectWorkMap,
 } from '@lar-factory/shared';
-import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
+import type { Blocker, Item, ItemThread, Status } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
 
@@ -35,14 +35,6 @@ export interface DossierItems {
     parent: Item;
     parts: Part[];
 }
-
-/** A thread's state, drawn with the glyph of the status it reads as. */
-export const THREAD_GLYPH: Record<ThreadState, Status> = {
-    running: 'In progress',
-    'needs you': 'Needs you',
-    stopped: 'Needs you',
-    done: 'Done',
-};
 
 /** Whether the thread, a descendant or a background task of it is at work, even after the thread's own turn ended. T3 can't vouch for a last-seen state. */
 export const threadAtWork = (thread: ItemThread): boolean =>

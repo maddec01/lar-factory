@@ -1,14 +1,23 @@
 // The title bar's update control and release notes, ported from T3 Code's SidebarUpdatePill and
 // DesktopUpdateStatusIcon. Copyright (c) 2026 T3 Tools Inc. MIT License.
 
-import { Popover, ToolbarStatusItem, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import {
+    Button,
+    Popover,
+    PopoverHeader,
+    ToolbarStatusItem,
+    Tooltip,
+    TooltipPopup,
+    TooltipTrigger,
+} from '@lar-works/design-system';
 import { RotateCcwIcon } from '@lar-works/design-system/icons';
-import { ButtonBase as Button, ScrollFadeRegion } from '@lar-works/design-system/primitives';
+import { ScrollFadeRegion } from '@lar-works/design-system/primitives';
 import { type ReactNode, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { buttonKind } from './ButtonKinds';
 import { conceptIcons } from './ConceptIcons';
+import { GroupTitle } from './TextParts';
 
 const RADIUS = 7;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -76,26 +85,27 @@ export function UpdatePill({
                         <Button
                             ref={trigger}
                             {...buttonKind('control')}
+                            iconOnly
                             aria-label={label}
-                            className="update-button w-7 px-0"
-                        >
-                            {status === 'downloading' ? (
-                                <DownloadRing percent={percent} />
-                            ) : (
-                                <ToolbarStatusItem
-                                    icon={ready ? <RotateCcwIcon /> : <conceptIcons.updates />}
-                                    state={ready ? 'ready' : 'waiting'}
-                                />
-                            )}
-                        </Button>
+                            data-update-button
+                            leftIcon={
+                                status === 'downloading' ? (
+                                    <DownloadRing percent={percent} />
+                                ) : (
+                                    <ToolbarStatusItem
+                                        icon={ready ? <RotateCcwIcon /> : <conceptIcons.updates />}
+                                        state={ready ? 'ready' : 'waiting'}
+                                    />
+                                )
+                            }
+                        />
                     </TooltipTrigger>
                 </Popover.Trigger>
                 <TooltipPopup side="bottom">{label}</TooltipPopup>
             </Tooltip>
-            <Popover.Content side="bottom" align="end" width="md">
-                <div className="grid min-w-0 gap-3 text-left">
-                    <p className="update-heading text-fg m-0 text-sm font-medium break-words">{heading}</p>
-                    <p className="text-fg-muted m-0 text-xs break-words">{detail}</p>
+            <Popover.Content side="bottom" align="end" width="md" layout="fill" presentation="flush">
+                <PopoverHeader title={heading} detail={detail} />
+                <div className="grid min-w-0 gap-3 p-4 text-left">
                     {notes ? (
                         <ScrollFadeRegion className="max-h-[min(28rem,calc(100dvh-14rem))]">{notes}</ScrollFadeRegion>
                     ) : null}
@@ -103,7 +113,7 @@ export function UpdatePill({
                         <span className="justify-self-start">
                             <Button
                                 {...buttonKind('main')}
-                                className="update-next"
+                                data-update-next
                                 disabled={disabled}
                                 onClick={() => {
                                     if (ready) {
@@ -150,7 +160,7 @@ export function ReleaseNotes({
                     className="not-first:border-line not-first:mt-3 not-first:border-t not-first:pt-3"
                     key={note.version}
                 >
-                    <h3 className="text-fg m-0 text-xs leading-4 font-semibold">{note.title}</h3>
+                    <GroupTitle as="h3">{note.title}</GroupTitle>
                     <ul className="text-fg-muted m-0 mt-2 space-y-1.5 pl-4 text-xs leading-5">
                         {note.items.map((item, i) => (
                             <li className="list-disc break-words" key={i}>

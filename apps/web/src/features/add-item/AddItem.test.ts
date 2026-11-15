@@ -30,7 +30,7 @@ const withFactory: BoardData = {
         { repo: 'maddec01/lar-empty', role: 'Empty', labels: [] },
     ],
 };
-const addButton = () => $<HTMLButtonElement>('.add-item')!;
+const addButton = () => $<HTMLButtonElement>('[data-add-item]')!;
 const dialog = () => $('#add-item-dialog');
 const field = <T extends HTMLElement = HTMLInputElement>(id: string) => $<T>(`#${id}`)!;
 const submit = () => field<HTMLButtonElement>('item-submit');
@@ -148,7 +148,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
     expect(toast.textContent).toBe('Added Playback stalls to the List. View item Queue');
     expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added Playback stalls');
-    expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List21');
+    expect(text($('.title-bar [data-list-button]')), 'the board shows the new data').toBe('List21');
 });
 
 test('a refused submission keeps the draft for editing', async () => {
@@ -179,7 +179,7 @@ test('with no repository onboarded the title bar offers no Add item, but it stay
     const hint = () => $('#item-repo-hint');
 
     await mountPage(empty);
-    expect($('.add-item'), 'there is nowhere to add to yet').toBeNull();
+    expect($('[data-add-item]'), 'there is nowhere to add to yet').toBeNull();
     for (const data of [
         { ...empty, error: 'gh: HTTP 502' },
         { ...empty, fetchedAt: null },
@@ -279,10 +279,11 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
     await searchFor('seek');
     expect(text($('#pick-ticket'))).not.toContain('Find an open ticket');
     expect(calls('/api/tickets')).toEqual([['/api/tickets?repo=maddec01%2Flar-apple&q=seek', null]]);
-    expect($$('[data-ticket]').map(text)).toEqual(['#8Seek stalls', '#9Seek is slowAlready added']);
+    expect($$('[data-ticket]').map(text)).toEqual(['#8 Seek stalls', '#9 Seek is slowAlready added']);
     respond({ tickets: [], error: null });
     await searchFor('nothing');
-    expect(text(field('pick-result'))).toBe('Nothing matches');
+    expect(text(field('pick-result'))).toBe('');
+    expect(text($('#pick-ticket'))).toContain('Nothing matches');
 });
 
 test('picking a new ticket closes the dialog and announces it, and one on the board already opens its item', async () => {
@@ -547,7 +548,7 @@ test('a typed label is created on submit, is kept with the draft, and can be unt
     expect(search().placeholder).toBe('Filter or type a new label');
     await enter(search(), 'needs-design');
     expect(
-        $$('[data-label-picker] p').some((p) => text(p) === 'No match.'),
+        $$('[data-label-picker] p').some((p) => text(p) === 'Nothing matches.'),
         'the create button says what to do',
     ).toBe(false);
     await settle(() => createButton()!.click());

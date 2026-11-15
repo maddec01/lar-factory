@@ -1,14 +1,10 @@
 // The entries of a dossier's rows: text whose references open their items, and a part's name and link.
 
-import { itemName } from '@lar-factory/shared';
-
 import { open } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import type { Part } from './DossierParts';
-import { PartTitle } from './PartTitle';
-import { RowKindMark } from './RowIdentity';
-import { SourceIcon, ItemStatusGlyph } from '@/features/items';
-import { PartLink as DesignPartLink, PartName as DesignPartName, RefButton } from '@/ui/board';
+import { PartIdentity } from './PartIdentity';
+import { ItemTitle, PartLink as DesignPartLink } from '@/ui/board';
 
 /** Text with its `#n` and `owner/repo#n` references as buttons that open the item. */
 export function Refs({ text, find }: { text: string; find: FindRef }) {
@@ -19,38 +15,15 @@ export function Refs({ text, find }: { text: string; find: FindRef }) {
             const ref = /^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/.exec(bit);
             const item = ref ? find(ref[1], Number(ref[2])) : undefined;
 
-            return item ? (
-                <RefButton key={n} title={item.title} onOpen={() => open(item)}>
-                    {bit}
-                </RefButton>
-            ) : (
-                bit
-            );
+            return item ? <ItemTitle key={n} reference={bit} name={item.title} onOpen={() => open(item)} /> : bit;
         });
 }
 
-/** A part's source, status and title, up to two lines. */
-export function PartName({ part }: { part: Part }) {
+/** A part as a link to its item dialog, named as its parts-list row names it; `home` is the concept's own repository. */
+export function PartLink({ part, home }: { part: Part; home: string }) {
     return (
-        <DesignPartName
-            source={
-                <>
-                    <RowKindMark item={part.item} />
-                    <SourceIcon item={part.item} />
-                </>
-            }
-            glyph={<ItemStatusGlyph item={part.item} />}
-        >
-            <PartTitle item={part.item} />
-        </DesignPartName>
-    );
-}
-
-/** A part as a link to its item dialog. */
-export function PartLink({ part }: { part: Part }) {
-    return (
-        <DesignPartLink title={itemName(part.item)} onOpen={() => open(part.item)}>
-            <PartName part={part} />
+        <DesignPartLink onOpen={() => open(part.item)}>
+            <PartIdentity item={part.item} home={home} />
         </DesignPartLink>
     );
 }

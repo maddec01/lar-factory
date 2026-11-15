@@ -2,6 +2,8 @@ import { Popover, PopoverHeader, ToolbarCounter } from '@lar-works/design-system
 import { scrollFadeClassName, useScrollFade } from '@lar-works/design-system/primitives';
 import { type ReactNode, useRef, useState } from 'react';
 
+import { OverflowCount } from './OverflowCount';
+import { COMPACT_ROW, pickedRow } from './RowStyles';
 import { tooltipWhenCut } from './TooltipWhenCut';
 
 interface BoardCounterProps {
@@ -129,20 +131,6 @@ function CounterPopover({
     );
 }
 
-/** What a panel says when its list is empty, or what is still loading. */
-export function CounterEmpty({
-    children,
-}: {
-    /** What the panel says, such as "Nothing running". */
-    children: ReactNode;
-}) {
-    return (
-        <p className="text-fg-muted m-0 flex min-h-20 items-center justify-center px-2 py-4 text-center text-xs">
-            {children}
-        </p>
-    );
-}
-
 export function CounterList({
     children,
 }: {
@@ -155,6 +143,8 @@ export function CounterList({
 interface CounterItemProps {
     /** The item's id, as `data-item`. */
     item: string;
+    /** The item the dialog shows now. */
+    picked?: boolean;
     /** Extra context for the row, whose accessible name includes all of its visible text. */
     label: string;
     /** The item's status glyph and source icon. */
@@ -170,7 +160,7 @@ interface CounterItemProps {
 }
 
 /** One item in a panel, as a menu's row; picking it closes the panel and opens the item. */
-export function CounterItem({ item, label, leading, title, trailing, onOpen, sub }: CounterItemProps) {
+export function CounterItem({ item, picked = false, label, leading, title, trailing, onOpen, sub }: CounterItemProps) {
     // The title in full on hover, only while its two lines cut it off.
     const whenCut = tooltipWhenCut(label, (row) => row.querySelector('[data-counter-title]'));
 
@@ -182,7 +172,7 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen, sub
                     onClick={onOpen}
                     onPointerEnter={whenCut}
                     data-item={item}
-                    className={`text-fg hover:bg-fill-hover focus-visible:bg-fill-hover grid min-h-8 w-full cursor-pointer ${trailing ? 'grid-cols-[auto_minmax(0,1fr)_auto]' : 'grid-cols-[auto_minmax(0,1fr)]'} items-start gap-x-2.5 rounded-md px-2 py-1 text-left text-sm outline-none`}
+                    className={`${COMPACT_ROW} ${pickedRow(picked)} text-fg focus-visible:bg-fill-hover grid min-h-8 w-full cursor-pointer ${trailing ? 'grid-cols-[auto_minmax(0,1fr)_auto]' : 'grid-cols-[auto_minmax(0,1fr)]'} items-start gap-x-2.5 text-left text-sm outline-none`}
                 >
                     {/* The marks and the figure sit on the title's first line, however many lines it takes. */}
                     <span className="flex h-5 items-center gap-2">{leading}</span>
@@ -206,41 +196,27 @@ export function CounterItem({ item, label, leading, title, trailing, onOpen, sub
     );
 }
 
-/** A row's repository, its icon and name, then its age after a dot, each on the line's one gap. */
+/** A row's project, then its age after a dot, each on the line's one gap. */
 export function CounterAge({
-    icon,
-    name,
+    project,
     age,
 }: {
-    /** The repository's icon. */
-    icon: ReactNode;
-    /** The repository's name, giving way first, in full on hover. */
-    name?: string | undefined;
-    /** The item's age, such as "3h ago"; none where the row's end already says what matters. */
-    age?: string | undefined;
+    /** The project, a RepoCell, giving way first. */
+    project: ReactNode;
+    /** The item's age, an Age; none where the row's end already says what matters. */
+    age?: ReactNode;
 }) {
     return (
         <>
-            {icon}
-            {name && (
-                <span className="min-w-0 truncate" title={name}>
-                    {name}
-                </span>
+            {project}
+            {age && (
+                <>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap">{age}</span>
+                </>
             )}
-            {age && name && <span aria-hidden="true">·</span>}
-            {age && <span className="whitespace-nowrap">{age}</span>}
         </>
     );
-}
-
-/** What a need-you row waits for, such as "Verify build", at its end in amber. */
-export function CounterReason({
-    children,
-}: {
-    /** The wait in words. */
-    children: ReactNode;
-}) {
-    return <span className="text-warning-fg font-medium whitespace-nowrap">{children}</span>;
 }
 
 /** A row's figure, such as its spend. */
@@ -330,18 +306,18 @@ export function LimitBars({
 
     return (
         <span className="inline-flex items-center gap-2">
-            <span aria-hidden className="inline-flex items-center gap-0.75">
+            <span aria-hidden className="inline-flex items-center gap-1">
                 {Array.from({ length: within }, (_, n) => bar(n, n < used))}
                 {past > 0 && (
-                    <span className="ml-1 inline-flex gap-0.75">
+                    <span className="ml-1 inline-flex gap-1">
                         {Array.from({ length: past }, (_, n) => (
                             <span key={limit + n} className="bar bg-warning h-1.5 w-3 rounded-full" />
                         ))}
                     </span>
                 )}
                 {more > 0 && (
-                    <span className="text-fg-muted ml-1 text-xs font-medium tabular-nums" data-bars-more>
-                        +{more}
+                    <span className="ml-1 flex">
+                        <OverflowCount n={more} />
                     </span>
                 )}
             </span>

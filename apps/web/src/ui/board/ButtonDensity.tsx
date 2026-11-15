@@ -5,7 +5,7 @@
 
 import type { ReactNode } from 'react';
 
-import { DensityContext } from './ButtonDensityContext';
+import { DensityContext, TintContext } from './ButtonDensityContext';
 import type { ButtonDensity } from './ButtonKinds';
 
 /** Sets the density of the button kinds inside it: `md` in a dialog's footer or a form, `sm` (the default) elsewhere. */
@@ -19,4 +19,11 @@ export function ButtonDensityProvider({
     children: ReactNode;
 }) {
     return <DensityContext.Provider value={density}>{children}</DensityContext.Provider>;
+}
+
+/** The board's action surfaces: a row's or a map card's actions, which show on hover, and the title bar's Add item. Every
+ *  button inside that asks for its kind with useButtonKind takes the brand tint (the `tinted` recipe), whatever its kind,
+ *  so these actions read the same everywhere; App controls stay quiet and destructive ones keep their danger recipe. */
+export function TintedActions({ children }: { children: ReactNode }) {
+    return <TintContext.Provider value>{children}</TintContext.Provider>;
 }

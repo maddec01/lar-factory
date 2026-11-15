@@ -16,7 +16,7 @@ import {
     SidebarPane,
     SortMenu,
 } from '@lar-works/design-system';
-import { Inbox, SquarePen } from '@lar-works/design-system/icons';
+import { Inbox } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 
 import { listRowLabels } from './ListRowFacts';
@@ -34,11 +34,12 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 import { dialogPreference, useExpand } from '@/shared/dialogs/useExpand';
 import {
+    AddItemButton,
     buttonKind,
     ListButton as TitleBarListButton,
     ListGroupItem as GroupItem,
     ListHeader,
-    ListNote,
+    NoMatches,
     ListResults,
     ListRowGrid,
 } from '@/ui/board';
@@ -134,14 +135,13 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             />
                         }
                         add={
-                            <Button
-                                {...buttonKind('other', { size: 'md' })}
-                                leftIcon={<SquarePen />}
-                                data-add-item
-                                onClick={() => useAddItemStore.getState().setOpen(true)}
-                            >
-                                Add item
-                            </Button>
+                            // The title bar's own Add item, so the two read as one control wherever they show.
+                            <AddItemButton
+                                label="Add item"
+                                title="Add item (⌘N)"
+                                keyShortcuts="Meta+N"
+                                onOpen={() => useAddItemStore.getState().setOpen(true)}
+                            />
                         }
                         scope={
                             picked && (
@@ -178,7 +178,6 @@ function ListModal({ onClose }: { onClose: () => void }) {
                                     <ItemRow
                                         key={item.id}
                                         item={item}
-                                        now={now}
                                         showRepo={!picked && mixed}
                                         labelColumn={labelColumn}
                                         onOpen={() => useItemDialogStore.getState().open(item.id, true)}
@@ -188,27 +187,16 @@ function ListModal({ onClose }: { onClose: () => void }) {
                         )}
                         {!items.length &&
                             (q || filtering(filters) ? (
-                                <EmptyState
-                                    size="compact"
-                                    title="Nothing matches"
+                                <NoMatches
                                     description="Try another search or clear it to see all items."
-                                    actions={
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() => {
-                                                setQuery('');
-                                                setFilters({ kinds: [], labels: [] });
-                                                searchField.current?.focus();
-                                            }}
-                                        >
-                                            Clear search
-                                        </Button>
-                                    }
+                                    onClear={() => {
+                                        setQuery('');
+                                        setFilters({ kinds: [], labels: [] });
+                                        searchField.current?.focus();
+                                    }}
                                 />
                             ) : reading ? (
-                                <ListNote>
-                                    <Loading presentation="inline" label="Loading projects…" />
-                                </ListNote>
+                                <Loading presentation="status" label="Loading projects…" />
                             ) : (
                                 <EmptyState
                                     size="compact"
@@ -217,9 +205,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                                 />
                             ))}
                         {items.length > 0 && reading && (
-                            <ListNote reading>
-                                <Loading presentation="inline" label="Loading more Projects…" />
-                            </ListNote>
+                            <Loading presentation="status" label="Loading more projects…" />
                         )}
                     </ListResults>
                 </Modal.Body>

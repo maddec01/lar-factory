@@ -4,6 +4,7 @@ import { BanIcon } from '@lar-works/design-system/icons';
 import { useRecheckStore } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
+import { buttonKind } from '@/ui/board';
 
 /** Diagnostics can run checks without needing an existing failure notice. */
 export function RunChecks() {
@@ -13,8 +14,7 @@ export function RunChecks() {
     return (
         <>
             <Button
-                variant="secondary"
-                size="sm"
+                {...buttonKind('other')}
                 busy={checking}
                 disabled={!!reason}
                 leftIcon={reason ? <BanIcon /> : undefined}

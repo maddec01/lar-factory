@@ -20,6 +20,7 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import {
     AddFolderLine,
+    LoadFailed,
     buttonKind,
     ChoiceDetails,
     ProjectLine as Line,
@@ -41,19 +42,7 @@ export function ProjectStep({ run }: { run: Run }) {
         );
 
     if (projects.state === 'failed')
-        return (
-            <Alert
-                tone="danger"
-                title="Couldn’t load projects"
-                action={
-                    <Button {...buttonKind('other')} onClick={() => void loadProjects()}>
-                        Try again
-                    </Button>
-                }
-            >
-                {projects.error}
-            </Alert>
-        );
+        return <LoadFailed what="projects" reason={projects.error} onRetry={() => void loadProjects()} />;
 
     const rows = projects.projects.map((project) => ({ project, reason: unpickable(project, run, { onboarding }) }));
     const added = rows.filter(({ project, reason }) => reason && project.onBoard);

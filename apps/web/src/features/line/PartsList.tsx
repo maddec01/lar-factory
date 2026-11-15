@@ -1,219 +1,69 @@
-// An expanded dossier's parts list: each part with what it asks next, its stage track, figures, thread and slices.
+// An expanded concept's parts list, on the board and in its dialog: each part a lane row (PartRow), in the same box as
+// its Work map, the done ones folded into a count.
 
-import type { BoardData } from '@lar-factory/shared';
-import {
-    needsAnswer,
-    UNREADABLE,
-    blockerGroups,
-    canRetryBuild,
-    currentBuildThread,
-    itemName,
-    repoKey,
-} from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { useState } from 'react';
 
-import { ActivityLine } from './ActivityLine';
-import { Figures, RowSecondLine } from './Columns';
-import { PartName } from './DossierEntries';
-import { open, usePicked, waitsOn } from './DossierHelpers';
 import type { Part } from './DossierParts';
-import { THREAD_GLYPH, isDone, openWaits, shownThread, threadsOf } from './DossierParts';
-import { PartStart } from './PartStart';
-import { partState } from './PartState';
-import { figuresOf, opensItem } from './RowDetails';
-import { YOURS, lastSeen } from './StageStatus';
-import { useActivityState, useActivityStill } from './useActivityState';
-import {
-    AzureFields,
-    OpenThread,
-    RepoCell,
-    SliceBar,
-    StartAfterError,
-    StartBuild,
-    StartMessage,
-    StatusGlyph,
-    usageLoading,
-    usageUnreadable,
-    useShownStatus,
-    useStatusActivity,
-} from '@/features/items';
-import {
-    PartRow as DesignPartRow,
-    PartsList as DesignPartsList,
-    PartWaits,
-    RowCount,
-    ShowDoneToggle,
-    ThreadLine as DesignThreadLine,
-    WaitWord,
-} from '@/ui/board';
+import { isDone } from './DossierParts';
+import { PartRow } from './PartRow';
+import { RowActions } from '@/features/items';
+import { PartsFrame, ShowDoneToggle, StageList } from '@/ui/board';
 
-/** A part's thread, its title and state; before it has one, what its start waits on. */
-function ThreadLine({ part }: { part: Part }) {
-    const thread = shownThread(part, useShownStatus(part.item).working);
-    const running = useStatusActivity();
-
-    if (!thread) {
-        const { work, dependencies } = blockerGroups(part.item, openWaits(part));
-        const waits = [
-            ...(work ? [work.names] : []),
-            ...(dependencies ? [`you to mark ${dependencies.names} met`] : []),
-        ];
-
-        return waits.length ? <span>Waiting on {waits.join(' and ')}</span> : null;
-    }
-
-    return (
-        <DesignThreadLine
-            title={thread.title}
-            glyph={
-                <StatusGlyph
-                    status={thread.state === 'running' ? part.item.status : THREAD_GLYPH[thread.state]}
-                    running={!thread.observedAt && running(part.item)}
-                    size="sm"
-                />
-            }
-            name={`T3 · ${thread.title}`}
-            state={`${thread.archived ? 'archived' : thread.state}${lastSeen(thread)}`}
-        />
-    );
-}
-
-/** The one thing a part asks next: its thread when it waits on you, or its Start unless other work holds it. Otherwise
- *  its thread, when it has one, or while its status says one works on it, and what it waits on beside that. */
-function Action({ part, data }: { part: Part; data: BoardData }) {
-    const { status } = part.item;
-    const { working } = useShownStatus(part.item);
-    const done = isDone(part.item);
-
-    if (!done && working)
-        return <OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} />;
-
-    // A part that waits on you opens its thread, as the desk's row does; its row opens its details.
-    if (!done && YOURS.includes(status)) return <OpenThread item={part.item} data={data} />;
-
-    // A part held by other work says so in its state and offers no start, as a lane's blocked row.
-    if (!done && (status === 'Ready' || status === 'Queued'))
-        return openWaits(part).length ? null : <PartStart part={part} data={data} />;
-
-    const waiting = !done && openWaits(part).length > 0;
-
-    if (!done && !waiting && canRetryBuild(part.item)) return <StartBuild item={part.item} data={data} />;
-
-    const thread =
-        threadsOf(part.item).length > 0 || (!done && !waiting && ['Shaping', 'In progress', 'Review'].includes(status));
-
-    return (
-        <>
-            {waiting && <PartWaits>{waitsOn(part)}</PartWaits>}
-            {thread && <OpenThread item={part.item} data={data} />}
-        </>
-    );
-}
-
-/** One part of the parts list: one button opens its details from its title, stage track, status and Azure fields; what
- *  it asks next sits beside that button, then a second line of its slice bar and count, thread, PR and agent figures, and
- *  its start's message or error under that. `home` is the dossier's own repository, which a part in it names quietly. */
-function PartRow({ part, data, home }: { part: Part; data: BoardData; home: string }) {
-    const { item } = part;
-    const isPicked = usePicked(item);
-    const shown = useShownStatus(item);
-    const s = figuresOf(item, data);
-    const activity = useActivityState(item);
-    const still = useActivityStill(item);
-    // The one presenter's word, the same a row and the dialog say for this part.
-    const word = shown.word;
-    // A part whose word already counts its parts shows that one count, not its slices too.
-    const partsCounted = word.endsWith(' parts done');
-    // A part that waits on you says so in amber, as its desk card does.
-    const asksYou = !isDone(item) && (needsAnswer(item) || item.status === 'Needs you');
-    const slices = item.slices.length;
-    // Its state already names what it waits on, so the thread line says only what a thread does.
-    const hasThreadLine = !!activity || !!shownThread(part, shown.working);
-
-    return (
-        <DesignPartRow
-            id={item.id}
-            picked={isPicked}
-            title={itemName(item)}
-            onOpen={() => open(item)}
-            name={<PartName part={part} />}
-            meta={
-                <>
-                    {/* Every part names its project, the concept's own quietly, so no row reads with a gap. */}
-                    <RepoCell item={item} home={repoKey(item) === home} />
-                    {asksYou ? <WaitWord>{word}</WaitWord> : <span>{partState(item, data, word)}</span>}
-                    <AzureFields azure={item.azure} />
-                </>
-            }
-            action={<Action part={part} data={data} />}
-            second={
-                ((slices > 0 && !partsCounted) ||
-                    item.linkedPrs.length > 0 ||
-                    s ||
-                    usageLoading(item, data) ||
-                    usageUnreadable(item) ||
-                    hasThreadLine) && (
-                    <RowSecondLine
-                        onClick={opensItem(item)}
-                        prs={item.linkedPrs}
-                        figures={
-                            s || usageLoading(item, data) ? (
-                                <Figures s={s} item={item} />
-                            ) : (
-                                usageUnreadable(item) && UNREADABLE
-                            )
-                        }
-                        bar={slices > 0 && !partsCounted && <SliceBar item={item} still={still} />}
-                        count={
-                            slices > 0 &&
-                            !partsCounted && (
-                                <RowCount>
-                                    {item.slices.filter((x) => x.progress === 'done').length}/{slices} slices done
-                                </RowCount>
-                            )
-                        }
-                    >
-                        {activity ? <ActivityLine item={item} /> : hasThreadLine && <ThreadLine part={part} />}
-                    </RowSecondLine>
-                )
-            }
-            foot={
-                !isDone(item) &&
-                ['Ready', 'Queued', 'In progress'].includes(item.status) && (
-                    <>
-                        <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />
-                        <StartAfterError item={item} data={data} />
-                    </>
-                )
-            }
-        />
-    );
-}
-
-/** The parts list: one row per open part in two columns where there's room, the done ones folded into a count. */
-export function PartsList({ parts, data, home }: { parts: Part[]; data: BoardData; home: string }) {
+/** The parts list: one row per part, the done ones folded into a count. `openFirst` lists the open parts before the done
+ *  ones it unfolds, as the concept's dialog does; `onOpen` opens a part in place of the item dialog's own open, and
+ *  `full` gives each part every agent figure. */
+export function PartsList({
+    parts,
+    data,
+    home,
+    openFirst = false,
+    onOpen,
+    full = false,
+}: {
+    parts: Part[];
+    data: BoardData;
+    /** The concept's own repository, which a part in it names quietly. */
+    home: string | undefined;
+    openFirst?: boolean;
+    onOpen?: ((item: Item) => void) | undefined;
+    full?: boolean;
+}) {
     const [showDone, setShowDone] = useState(false);
-    const shown = parts.filter((p) => showDone || !isDone(p.item));
-    const done = parts.filter((p) => isDone(p.item)).length;
-    const retired = parts.filter((p) => isDone(p.item) && p.item.setAside).length;
+    const open = parts.filter((p) => !isDone(p.item));
+    const finished = parts.filter((p) => isDone(p.item));
+    const shown = !showDone ? open : openFirst ? [...open, ...finished] : parts;
+    const retired = finished.filter((p) => p.item.setAside).length;
     // The fold says what it holds, so its count adds up with the row's "parts done": done parts, then retired ones.
-    const history = [done - retired && `${done - retired} done`, retired && `${retired} set aside`]
+    const history = [
+        finished.length - retired && `${finished.length - retired} done`,
+        retired && `${retired} set aside`,
+    ]
         .filter(Boolean)
         .join(' and ');
 
     return (
-        <DesignPartsList
-            showDone={
-                done > 0 && (
-                    <ShowDoneToggle open={showDone} onToggle={() => setShowDone(!showDone)}>
-                        {`${showDone ? 'Hide' : 'Show'} ${history}`}
-                    </ShowDoneToggle>
-                )
-            }
-        >
-            {shown.map((p) => (
-                <PartRow key={p.item.id} part={p} data={data} home={home} />
-            ))}
-        </DesignPartsList>
+        <PartsFrame>
+            {/* Its actions read as every row's do, in the concept's dialog too. */}
+            <RowActions>
+                <StageList>
+                    {shown.map((p) => (
+                        <PartRow
+                            key={p.item.id}
+                            part={p}
+                            data={data}
+                            home={home}
+                            onOpen={onOpen && (() => onOpen(p.item))}
+                            full={full}
+                        />
+                    ))}
+                </StageList>
+            </RowActions>
+            {finished.length > 0 && (
+                <ShowDoneToggle open={showDone} onToggle={() => setShowDone(!showDone)}>
+                    {`${showDone ? 'Hide' : 'Show'} ${history}`}
+                </ShowDoneToggle>
+            )}
+        </PartsFrame>
     );
 }

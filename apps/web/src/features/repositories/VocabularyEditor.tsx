@@ -1,30 +1,21 @@
 import { trackerCapabilities, type VocabularyTerm } from '@lar-factory/shared';
 import type { VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
-import { Alert, Button, Inline, InlineLink, LabelChip, OptionSelect, Text } from '@lar-works/design-system';
+import { Alert, Button, Inline, LabelChip, Loading, OptionSelect, Text } from '@lar-works/design-system';
 
 import { AccessReason } from './AccessList';
 import { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyAccess, VocabularyKind } from './VocabularyKinds';
 import { VocabularyLabelPopover } from './VocabularyLabelPopover';
-import { buttonKind, VocabularyMore, VocabularyRow, VocabularySuggestion } from '@/ui/board';
+import { buttonKind, LoadFailed, OverflowCount, RetryAction, VocabularyRow, VocabularySuggestion } from '@/ui/board';
 
 export function VocabularyRead({ repo, error, retry }: { repo: string; error: string | null; retry: () => void }) {
     return error ? (
-        <Alert
-            tone="danger"
-            title="Couldn’t read vocabulary"
-            action={
-                <Button {...buttonKind('other')} onClick={retry}>
-                    Try again
-                </Button>
-            }
-        >
-            {error}
-        </Alert>
+        <LoadFailed what="vocabulary" reason={error} onRetry={retry} />
     ) : (
-        <Text tone="muted" role="status">
-            Reading existing {trackerCapabilities(repo).heading.toLowerCase()} and types…
-        </Text>
+        <Loading
+            presentation="status"
+            label={`Loading existing ${trackerCapabilities(repo).heading.toLowerCase()} and types…`}
+        />
     );
 }
 
@@ -103,16 +94,16 @@ export function VocabularyFields({
                         />
                     ))}
                     {chosen.length > 2 && (
-                        <VocabularyMore
+                        <OverflowCount
+                            n={chosen.length - 2}
+                            names={chosen.slice(2)}
                             label={`${chosen.length - 2} more ${title} ${plural}`}
-                            onClick={() => close(true)}
-                        >
-                            {`+${chosen.length - 2}`}
-                        </VocabularyMore>
+                            onOpen={() => close(true)}
+                        />
                     )}
                     {!chosen.length && !suggested && (
                         <Text variant="caption" tone="muted">
-                            None
+                            {`No ${plural} yet.`}
                         </Text>
                     )}
                     {suggested && (
@@ -166,7 +157,7 @@ export function VocabularyFields({
             )}
             {error && (
                 <Alert size="sm" tone="danger">
-                    {error} <InlineLink onClick={retryCommit}>Try again</InlineLink>
+                    {error} <RetryAction inline onRetry={retryCommit} />
                 </Alert>
             )}
         </VocabularyRow>

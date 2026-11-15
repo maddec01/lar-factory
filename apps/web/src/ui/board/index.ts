@@ -16,6 +16,7 @@ export { scrollBoardToTop } from './BoardScroll';
 export { BoardContent, BoardShell, ReadingLine } from './BoardShell';
 export { BoardTitleBar, type RefreshHealth, RefreshIndicator } from './BoardTitleBar';
 export { buttonKind } from './ButtonKinds';
+export { TintedActions } from './ButtonDensity';
 export { useButtonKind } from './useButtonKind';
 export {
     BoardCounter,
@@ -23,9 +24,7 @@ export {
     CounterDash,
     CounterWords,
     QuietGlyph,
-    CounterEmpty,
     CounterFigure,
-    CounterReason,
     CounterItem,
     CounterList,
     CounterPartial,
@@ -33,22 +32,17 @@ export {
 export { noteBoardPlaces } from './BoardLife';
 export { bringDeskIntoView, DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
-export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListNote, ListResults, ListRowGrid } from './List';
+export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListResults, ListRowGrid } from './List';
 export { LoadingScreen } from './LoadingScreen';
+export { RetryAction } from './RetryAction';
+export { LabelPickerPopover } from './LabelPickerPopover';
+export { OverflowCount } from './OverflowCount';
+export { QuietLabel } from './QuietLabel';
 export { ReleaseNotes, UpdatePill } from './UpdatePill';
 export { BoardWarning, BoardWarnings, ToolMissing } from './Warnings';
 export { ActivityLine, AgentAge, AgentList, AgentRow, WorkingAgents } from './ActivityLine';
 export { ActivityTrack } from './ActivityTrack';
-export {
-    AttentionEntry,
-    BoardAttentionList,
-    AttentionMark,
-    AttentionNone,
-    EntryButton,
-    PartLink,
-    PartName,
-    RefButton,
-} from './Attention';
+export { AttentionEntry, BoardAttentionList, AttentionMark, EntryButton, PartLink } from './Attention';
 export { LossList } from './Cleanup';
 export { DependencyItem, DependencyList } from './Dependencies';
 export {
@@ -69,10 +63,9 @@ export {
     PartsBar,
     PlanningNote,
 } from './Dossier';
-export { ItemFields, ItemTitle, RepoIdentity, TitleLink } from './ItemParts';
+export { ItemFields, ItemTitle, RepoIdentity } from './ItemParts';
 export { NeedsYouNotice, NeedsYouResult } from './NeedsYou';
-export { PartKindIcon, PartKindLabel, PartRow, PartsList, PartWaits, ShowDoneToggle, ThreadLine } from './PartsList';
-export { PartColumnsRow } from './PartColumns';
+export { PartKindIcon, PartsFrame, ShowDoneToggle } from './PartsList';
 export {
     ChecksState,
     PullRequestList,
@@ -84,15 +77,7 @@ export {
 } from './PullRequests';
 export { SliceBar, SliceList, SliceRow } from './Slices';
 export { SourceIcon } from './SourceIcon';
-export {
-    BuildLimit,
-    ReadyBuildControls,
-    HeaderSwitch,
-    StageList,
-    StagePane,
-    StagePaneEmpty,
-    StageSections,
-} from './StagePane';
+export { BuildLimit, ReadyBuildControls, HeaderSwitch, StageList, StagePane, StageSections } from './StagePane';
 export {
     QueueAge,
     QueuePlace,
@@ -104,7 +89,6 @@ export {
     RowGlyph,
     RowIdentity,
     RowOpen,
-    RowSecondLine,
     RowMeta,
     RowProgress,
     RowMetaEnd,
@@ -119,7 +103,7 @@ export {
     UsageFigures,
 } from './StageRow';
 export { ActionError, StartGroup, StartHold, StartLine, StartNote, StartTag } from './StartControls';
-export { boardColor, boardStatusState, statusColor } from './StatusColors';
+export { boardColor, statusColor } from './StatusColors';
 export { StatusGlyph, StatusGlyphSlot } from './StatusGlyph';
 export { EarlierThread, EarlierThreadList } from './Threads';
 export {
@@ -164,7 +148,6 @@ export {
     DetailFact,
     DetailsLoading,
     DetailsSection,
-    DetailsUnavailable,
     EditActions,
     EditorSlot,
     FactList,
@@ -172,7 +155,6 @@ export {
     HeaderStatus,
     InlineList,
     KindQuestion,
-    LabelEditorPanel,
     MainSection,
     MetaArea,
     OutgoingTicket,
@@ -183,7 +165,6 @@ export {
     TicketLink,
     TicketLinkList,
     TicketLinkPlaceholders,
-    TrackerTag,
     WaitsOnList,
 } from './ItemDetails';
 export {
@@ -198,7 +179,7 @@ export {
 export { ProjectIcon, type ProjectIconSize, type ProjectIconSource } from './ProjectIcon';
 export { OpenSettingsButton, SettingsRowOpen } from './Settings';
 export { CreateLabelForm, TrackerLabelEditor, TrackerLabelList, TrackerLabelRow } from './TrackerLabels';
-export { VocabularyMore, VocabularyRow, VocabularySuggestion } from './Vocabulary';
+export { VocabularyRow, VocabularySuggestion } from './Vocabulary';
 export {
     AddFolderLine,
     ChoiceDetails,
@@ -217,7 +198,6 @@ export { KindBadge, KindMark } from './KindBadge';
 export { DossierParentContext, DossierStates } from './DossierContext';
 export {
     FactorySettingsLayout,
-    FactorySettingsNotice,
     FactorySettingsGroup,
     FactoryChoice,
     FactoryText,
@@ -256,3 +236,5 @@ export { BriefDependencyStatus } from './BriefDependencyStatus';
 export { DeskDependencyProof } from './DeskDependencyProof';
 export { TrackerLink } from './TrackerLink';
 export { CardChecks, ChecksBar } from './Checks';
+export { HeaderEmpty, LoadFailed, NoMatches } from './States';
+export { MetaLine, Moment } from './TextParts';

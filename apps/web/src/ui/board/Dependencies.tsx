@@ -1,6 +1,6 @@
 // The Dependencies holding a build, in the item dialog.
 
-import { Alert } from '@lar-works/design-system';
+import { Alert, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 /** The Dependencies, one DependencyItem each. */
@@ -45,12 +45,12 @@ export function DependencyItem({
                 {owner}
             </span>
             <span>{need}</span>
-            <span className="text-fg-muted text-xs" data-dependency-read>
+            <Text as="span" variant="caption" tone="muted" data-dependency-read>
                 {read}
-            </span>
-            <span className="text-fg-muted text-xs" data-dependency-evidence>
+            </Text>
+            <Text as="div" variant="caption" tone="muted" data-dependency-evidence>
                 {evidence}
-            </span>
+            </Text>
             {notice && (
                 <div data-dependency-notice>
                     <Alert size="sm" tone="warning" message={notice} />

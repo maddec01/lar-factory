@@ -1,17 +1,4 @@
-/* An item's parts (ItemParts.tsx, StartControls.tsx): the title link, the Start control's group and its message line. */
-
-.title {
-    font-weight: 500;
-    text-decoration: none;
-}
-.title:hover {
-    text-decoration: underline;
-}
-.ref {
-    color: var(--color-fg-muted);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-}
+/* An item's parts (StartControls.tsx): the Start control's group and its message line. */
 
 /* The Start control's group, and the line under it with Start's message or error. */
 .start {
@@ -218,16 +205,12 @@ aside[data-item-aside]:empty {
     }
 }
 
-/* On a narrow card the kind keeps its icon (named on hover) so the project stays readable. */
+/* On a narrow desk card the kind keeps its icon (named on hover) so the project stays readable; a Work map card names
+   no project in its head, so its kind keeps its words. */
 @container (width < 21rem) {
-    [data-card-head] [data-kind-name] {
+    .desk-row [data-card-head] [data-kind-name] {
         display: none;
     }
-}
-
-/* In the item dialog a part's hover fill reaches past the column, so its content sits on the column's edges. */
-[data-item-dialog] [data-parts-list] {
-    margin-inline: calc(-1 * --spacing(3));
 }
 
 /* An item opened from the List takes its place: the List stays open under the item's backdrop, hidden, so a shorter
@@ -375,6 +358,6 @@ aside[data-item-aside]:empty {
 
 /* A part in the concept's own project names it too, quieter than a project of its own, so every parts-list row has its
    project and none reads with a gap. */
-[data-part-meta] > [data-repo-cell][data-repo-home] {
+[data-row-identity] > [data-repo-cell][data-repo-home] {
     color: var(--color-fg-muted);
 }

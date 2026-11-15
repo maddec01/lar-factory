@@ -1,11 +1,12 @@
 // A dossier in Lar Factory's board's dock (Concepts and linked work): its one line, on the stage rows' columns, which
 // expands in place to its body, and what the line holds: its toggle, title, chips, what's next and the bar of its parts.
 
-import { SegmentedProgress, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
-import { ChevronRightIcon } from '@lar-works/design-system/icons';
+import { Button, SegmentedProgress, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { pickedRow, ROW_OPENS } from './RowStyles';
+import { buttonKind } from './ButtonKinds';
+import { FoldChevron } from './FoldToggle';
+import { pickedRow, ROW_BOX, ROW_OPENS } from './RowStyles';
 
 const stop = (event: MouseEvent) => event.stopPropagation();
 
@@ -57,19 +58,21 @@ export function DossierToggle({
     onToggle: () => void;
 }) {
     return (
-        <button
-            type="button"
-            data-dossier-open
-            aria-expanded={open}
-            aria-label={label}
-            onClick={(event) => {
-                stop(event);
-                onToggle();
-            }}
-            className={`text-fg-muted hover:bg-fill-hover hover:text-fg grid size-6 shrink-0 place-items-center rounded-md ${ROW_OPENS}`}
-        >
-            <ChevronRightIcon className={`size-4 ${open ? 'rotate-90' : ''}`} />
-        </button>
+        // The 28px App control centred on the rows' 24px glyph column, which keeps a KindBadge's [data-kind] hidden.
+        <span className="grid w-6 place-items-center">
+            <Button
+                {...buttonKind('control')}
+                iconOnly
+                leftIcon={<FoldChevron open={open} />}
+                data-dossier-open
+                aria-expanded={open}
+                aria-label={label}
+                onClick={(event) => {
+                    stop(event);
+                    onToggle();
+                }}
+            />
+        </span>
     );
 }
 
@@ -102,7 +105,7 @@ export function DossierLine({
             data-item={item}
             data-attention={attention || undefined}
             title={title}
-            className={`hover:bg-fill-hover cursor-pointer rounded-lg py-1.5 ${pickedRow(picked)}`}
+            className={`${ROW_BOX} cursor-pointer py-1.5 ${pickedRow(picked)}`}
         >
             {children}
         </div>
@@ -145,7 +148,7 @@ export function DossierTitle({
             }}
             title={name}
             data-title
-            className={`text-fg min-w-0 flex-1 truncate rounded-xs text-left text-sm leading-7 hover:underline ${ROW_OPENS}`}
+            className={`text-fg min-w-0 flex-1 truncate rounded-xs text-left text-sm leading-7 ${ROW_OPENS}`}
         >
             {children}
         </button>

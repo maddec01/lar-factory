@@ -34,7 +34,7 @@ export function VocabularyRow({
 } & DataAttributes) {
     return (
         <div {...data} className="grid min-w-0 gap-2 px-4 py-3.5">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-x-3 gap-y-2 sm:grid-cols-[5.5rem_8.5rem_minmax(0,1fr)]">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-x-3 gap-y-2 sm:grid-cols-[var(--fact-label)_8.5rem_minmax(0,1fr)]">
                 <span className="text-sm leading-5 font-medium">{title}</span>
                 {type}
                 <div
@@ -48,31 +48,6 @@ export function VocabularyRow({
             </div>
             {children}
         </div>
-    );
-}
-
-/** The chip that stands for the labels past the first few, which opens the chooser (`label` names it). */
-export function VocabularyMore({
-    label,
-    onClick,
-    children,
-}: {
-    /** The chip's accessible name, which opens the chooser. */
-    label: string;
-    /** Called as the reader opens the chooser. */
-    onClick: () => void;
-    /** How many more labels, such as "+3". */
-    children: string;
-}) {
-    return (
-        <button
-            type="button"
-            className="bg-surface-sunken cursor-pointer rounded-full px-2 text-xs"
-            aria-label={label}
-            onClick={onClick}
-        >
-            {children}
-        </button>
     );
 }
 

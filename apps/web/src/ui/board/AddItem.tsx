@@ -1,28 +1,35 @@
 // Lar Factory's Add item: the title bar's button that opens it, the New work pane's fields beside their details panel,
 // the panel's labelled fields and ticket part, the Create issue choice, and the Find a ticket pane with its search.
 
-import { FormResult, TitleBarLabel, Tooltip, TooltipPopup, TooltipTrigger, tabbable } from '@lar-works/design-system';
-import { ChevronDownIcon, SquarePenIcon } from '@lar-works/design-system/icons';
 import {
-    ButtonBase as Button,
-    FormFieldsetBase,
-    InputBase,
-    scrollFadeClassName,
-    useScrollFade,
-} from '@lar-works/design-system/primitives';
+    Button,
+    FormResult,
+    Input,
+    Text,
+    TitleBarLabel,
+    Tooltip,
+    TooltipPopup,
+    TooltipTrigger,
+    tabbable,
+} from '@lar-works/design-system';
+import { ChevronDownIcon, SquarePenIcon } from '@lar-works/design-system/icons';
+import { ButtonBase, FormFieldsetBase, scrollFadeClassName, useScrollFade } from '@lar-works/design-system/primitives';
 import { type ComponentProps, forwardRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 
+import { TintedActions } from './ButtonDensity';
 import { buttonKind } from './ButtonKinds';
 import { DetailsHeading } from './ItemDetailSections';
+import { ItemTitle } from './ItemParts';
+import { PICK_ROW } from './RowStyles';
+import { useButtonKind } from './useButtonKind';
 
-/** The title bar's Add item button, a Main action named by its `label`, which folds away, for screen readers only, on a
- *  title bar under 72rem; `title` gives it whole with its shortcut in a glass tooltip, which `keyShortcuts` names.
- *  Before the first project it `waits`, an Other, so adding a project is the board's one Main action. */
+/** The title bar's Add item button, a Main action in the brand tint, named by its `label`, which folds away, for screen
+ *  readers only, on a title bar under 72rem; `title` gives it whole with its shortcut in a glass tooltip, which
+ *  `keyShortcuts` names. */
 export function AddItemButton({
     label,
     title,
     keyShortcuts,
-    waits = false,
     onOpen,
 }: {
     /** The button's text, such as "Add item". */
@@ -31,26 +38,49 @@ export function AddItemButton({
     title: string;
     /** The shortcut, for `aria-keyshortcuts`. */
     keyShortcuts?: string;
-    /** An outline, not the fill: the title bar's Add item, which a page's own next step (an empty board's) outranks. */
-    waits?: boolean;
     /** Called as the reader opens the add-item dialog. */
     onOpen: () => void;
 }) {
-    return (
+    const tooltip = (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button
-                    {...buttonKind(waits ? 'other' : 'main')}
-                    className="add-item"
-                    leftIcon={<SquarePenIcon />}
-                    aria-keyshortcuts={keyShortcuts}
-                    onClick={onOpen}
-                >
-                    <TitleBarLabel>{label}</TitleBarLabel>
-                </Button>
+                <AddItemTrigger keyShortcuts={keyShortcuts} onOpen={onOpen}>
+                    {label}
+                </AddItemTrigger>
             </TooltipTrigger>
             <TooltipPopup side="bottom">{title}</TooltipPopup>
         </Tooltip>
+    );
+
+    // A board action, tinted in the brand colour like the rows' hover actions; a page's own filled next step (an empty
+    // board's) still outranks it.
+    return <TintedActions>{tooltip}</TintedActions>;
+}
+
+/** Add item's button, taking the tooltip trigger's props and ref. */
+function AddItemTrigger({
+    keyShortcuts,
+    onOpen,
+    children,
+    ...props
+}: {
+    keyShortcuts: string | undefined;
+    onOpen: () => void;
+    children: string;
+}) {
+    const kindOf = useButtonKind();
+
+    return (
+        <Button
+            {...props}
+            {...kindOf('main')}
+            data-add-item
+            leftIcon={<SquarePenIcon />}
+            aria-keyshortcuts={keyShortcuts}
+            onClick={onOpen}
+        >
+            <TitleBarLabel>{children}</TitleBarLabel>
+        </Button>
     );
 }
 
@@ -68,7 +98,9 @@ export function AddItemModes({
     return (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 sm:px-6" data-add-item-modes>
             {children}
-            <span className="text-fg-muted min-w-0 text-sm">{description}</span>
+            <Text as="span" variant="caption" tone="muted">
+                {description}
+            </Text>
         </div>
     );
 }
@@ -137,21 +169,23 @@ export function DraftFields({
 /** A details panel's picker that opens a popover, such as Add label: as wide and as tall as the selects above and below
  *  it, its words at the start and its chevron at the end, as theirs are. A Popover's trigger (`asChild`) passes its
  *  props through. */
-export const PanelPicker = forwardRef<HTMLButtonElement, Omit<ComponentProps<typeof Button>, 'className'>>(
-    function PanelPicker({ children, ...props }, ref) {
-        return (
-            <Button
-                ref={ref}
-                {...buttonKind('other', { size: 'md' })}
-                {...props}
-                rightIcon={<ChevronDownIcon />}
-                className="w-full justify-between font-normal"
-            >
-                {children}
-            </Button>
-        );
-    },
-);
+export const PanelPicker = forwardRef<HTMLButtonElement, ComponentProps<typeof Button>>(function PanelPicker(
+    { children, ...props },
+    ref,
+) {
+    // A select's trigger in a button's recipe: the design system's Button has no field presentation yet.
+    return (
+        <ButtonBase
+            ref={ref}
+            {...buttonKind('other', { size: 'md' })}
+            {...props}
+            rightIcon={<ChevronDownIcon />}
+            className="w-full justify-between font-normal"
+        >
+            {children}
+        </ButtonBase>
+    );
+});
 
 /**
  * A field of a details panel under its sentence-case `heading`, which labels the field `htmlFor` names; without
@@ -331,21 +365,22 @@ export function TicketSearch({
     return (
         <div className="grid gap-2" data-ticket-picker>
             <div className="flex gap-2">
-                <InputBase
-                    id={`${id}-query`}
-                    type="search"
-                    value={query}
-                    onChange={(event) => onQueryChange(event.currentTarget.value)}
-                    onKeyDown={onKey}
-                    disabled={disabled}
-                    autoComplete="off"
-                    aria-label={fieldLabel}
-                    placeholder={placeholder}
-                    className="min-w-0 flex-1"
-                />
+                <div className="min-w-0 flex-1">
+                    <Input
+                        presentation="field"
+                        id={`${id}-query`}
+                        type="search"
+                        value={query}
+                        onChange={(event) => onQueryChange(event.currentTarget.value)}
+                        onKeyDown={onKey}
+                        disabled={disabled}
+                        autoComplete="off"
+                        aria-label={fieldLabel}
+                        placeholder={placeholder}
+                    />
+                </div>
                 <Button
-                    {...buttonKind('other')}
-                    size="md"
+                    {...buttonKind('other', { size: 'md' })}
                     id={`${id}-search`}
                     disabled={disabled || searchDisabled}
                     onClick={onSearch}
@@ -363,10 +398,11 @@ export function TicketSearch({
                                 data-ticket={ticket.number}
                                 disabled={busy}
                                 onClick={() => onPick(ticket.number)}
-                                className="hover:bg-fill-hover focus-ring flex w-full min-w-0 items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-60"
+                                className={`${PICK_ROW} disabled:opacity-60`}
                             >
-                                <span className="text-fg-muted shrink-0 tabular-nums">#{ticket.number}</span>
-                                <span className="min-w-0 flex-1 truncate">{ticket.title}</span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    <ItemTitle reference={`#${ticket.number}`} title={ticket.title} />
+                                </span>
                                 {ticket.note && <span className="text-fg-muted shrink-0 text-xs">{ticket.note}</span>}
                             </button>
                         </li>

@@ -33,9 +33,10 @@ const sourceIn = (el: Element | null) =>
         .map((icon) => icon.getAttribute('aria-label'))
         .find((label) => label?.includes('Saved'));
 
-// On a board that saves only to GitHub, a GitHub ticket's mark would say the same everywhere, so the local mark goes.
+// On a board that saves only to GitHub, a GitHub ticket's mark would say the same everywhere, so the local mark goes;
+// the List names every row's tracker, so a GitHub row's mark never reads as missing beside Azure DevOps rows.
 test.each<[Item['status'], string, number, string, string | undefined]>([
-    ['List', 'example/product', 17, 'https://github.com/example/product/issues/17', undefined],
+    ['List', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
     [
         'List',
         'example/project/product',
@@ -56,7 +57,7 @@ test.each<[Item['status'], string, number, string, string | undefined]>([
 
     await mountPage(board(item));
 
-    if (status === 'List') await settle(() => $<HTMLButtonElement>('.list-button')!.click());
+    if (status === 'List') await settle(() => $<HTMLButtonElement>('[data-list-button]')!.click());
 
     const row = $<HTMLElement>(status === 'List' ? '[data-list-modal] button[data-item]' : '.desk-row')!;
 
@@ -69,6 +70,6 @@ test.each<[Item['status'], string, number, string, string | undefined]>([
     // The dialog shows one tracker mark: the ticket's link, which names where it is saved.
     expect(sourceIn($('[data-item-summary]'))).toBeUndefined();
     expect($('[data-item-summary] [data-ticket-link]')?.getAttribute('title')).toBe(
-        `Open in ${label ? 'Azure DevOps' : 'GitHub'}`,
+        `Open in ${url.includes('dev.azure.com') ? 'Azure DevOps' : 'GitHub'}`,
     );
 });

@@ -2,14 +2,14 @@
 
 import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
-import { Alert, Button, OptionSelect, Text } from '@lar-works/design-system';
+import { Alert, OptionSelect, Text } from '@lar-works/design-system';
 import { useEffect, useRef, type ReactNode } from 'react';
 
 import { OPEN_ITEM_DIALOG } from './ItemDialogStore';
 import { useKindChangeStore } from './KindChangeStore';
 import { KIND_BADGES } from '@/features/items';
 import { SAMPLE_READ_ONLY } from '@/services/board/board.service';
-import { buttonKind, ChangeFailed } from '@/ui/board';
+import { ChangeFailed, RetryAction } from '@/ui/board';
 
 // Each kind's icon and name without its hue: the dialog marks kind without colour, as the board does.
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
@@ -83,13 +83,7 @@ export function ItemKindFeedback({ item }: { item: Item }) {
                     action={
                         // A sample board refuses every write, so trying again would only refuse again.
                         change.error !== SAMPLE_READ_ONLY && (
-                            <Button
-                                {...buttonKind('other')}
-                                loading={change.saving}
-                                onClick={() => void start(item.id, change.kind)}
-                            >
-                                Try again
-                            </Button>
+                            <RetryAction busy={change.saving} onRetry={() => void start(item.id, change.kind)} />
                         )
                     }
                 />

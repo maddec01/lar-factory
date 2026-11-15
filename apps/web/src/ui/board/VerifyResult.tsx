@@ -14,6 +14,7 @@ import {
 import { useId, useState } from 'react';
 
 import { buttonKind } from './ButtonKinds';
+import { LoadFailed } from './States';
 
 interface Props {
     head?: string;
@@ -36,9 +37,9 @@ export function VerifyResult({ head, testSteps, loading, pending, error, note, o
         <Stack space="tight" data-verification>
             <Disclosure label="Test steps" presentation="section" defaultOpen>
                 {loading ? (
-                    <Loading presentation="inline" label="Reading PR Test steps…" />
+                    <Loading presentation="status" label="Loading the PR’s Test steps…" />
                 ) : error && !head ? (
-                    <Text tone="muted">Test steps could not be read. Re-read PR head to try again.</Text>
+                    <LoadFailed what="Test steps" onRetry={onRefresh} />
                 ) : testSteps ? (
                     <RichText text={testSteps} format="markdown" />
                 ) : (

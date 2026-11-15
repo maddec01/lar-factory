@@ -1,8 +1,10 @@
-import { Button, Checkbox, Popover } from '@lar-works/design-system';
+import { Button, Checkbox } from '@lar-works/design-system';
 import { ChevronDownIcon } from '@lar-works/design-system/icons';
 import { forwardRef, type ReactNode } from 'react';
 
 import { buttonKind } from './ButtonKinds';
+import { LabelPickerPopover } from './LabelPickerPopover';
+import { MENU_ROW } from './RowStyles';
 
 interface FilterBarProps {
     /** The filter menus, the active chips and Clear. */
@@ -32,28 +34,27 @@ interface FilterMenuProps {
 /** A filter's button, its name and how many choices are on, opening its checklist. */
 export function FilterMenu({ which, name, picked, children }: FilterMenuProps) {
     return (
-        <Popover>
-            <Popover.Trigger asChild>
+        <LabelPickerPopover
+            trigger={
                 <Button {...buttonKind('other')} data-filter={which} rightIcon={<ChevronDownIcon />}>
                     {name}
                     {picked > 0 && ` · ${picked}`}
                 </Button>
-            </Popover.Trigger>
-            <Popover.Content side="bottom" align="start">
-                {children}
-            </Popover.Content>
-        </Popover>
+            }
+        >
+            {children}
+        </LabelPickerPopover>
     );
 }
 
-/** A filter menu's checklist. */
+/** A filter menu's checklist, its rows a hair apart. */
 export function FilterChoices({
     children,
 }: {
     /** The choices, one FilterChoice each. */
     children: ReactNode;
 }) {
-    return <div className="grid w-52 gap-0.5">{children}</div>;
+    return <div className="grid gap-0.5">{children}</div>;
 }
 
 /** One choice in a filter's checklist: its checkbox, then what it is, such as a badge. */
@@ -70,10 +71,7 @@ export function FilterChoice({
     children: ReactNode;
 }) {
     return (
-        <label
-            data-filter-choice
-            className="hover:bg-fill-hover flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs"
-        >
+        <label data-filter-choice className={MENU_ROW}>
             <Checkbox checked={checked} onChange={onToggle} />
             {children}
         </label>

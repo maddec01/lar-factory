@@ -10,7 +10,7 @@
 
 import { boardSections, formatUsd, plural, readingScope, usageFailed, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
-import { Loading, StatusIndicator } from '@lar-works/design-system';
+import { EmptyState, Loading, StatusIndicator } from '@lar-works/design-system';
 import { CircleDollarSign } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
@@ -22,11 +22,10 @@ import {
     BoardCounter as Counter,
     bringDeskIntoView,
     CounterDash,
-    CounterReason,
     CounterWords,
     QuietGlyph,
-    CounterEmpty as Empty,
     CounterFigure,
+    WaitWord,
 } from '@/ui/board';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? (item.stats.costUsd ?? 0) : 0);
@@ -72,10 +71,13 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
     const countOf = (n: number) => (unknown(n) ? <CounterDash /> : n);
     const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading projects' : hint);
     const countFor = (n: number) => (unknown(n) ? undefined : n);
-    const empty = (none: string) => (
-        <Empty>{reading ? <Loading presentation="inline" label="Loading projects…" /> : none}</Empty>
-    );
-    const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
+    const empty = (none: string) =>
+        reading ? (
+            <Loading presentation="status" label="Loading projects…" />
+        ) : (
+            <EmptyState size="inline" title={none} />
+        );
+    const listOf = (items: Item[], none: string) => (items.length ? <List items={items} /> : empty(none));
 
     return (
         <>
@@ -103,12 +105,7 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                 >
                     {s.needsYou.length ? (
                         // One flat list, each row saying what it waits for at its end.
-                        <List
-                            items={s.needsYou}
-                            now={now}
-                            asks
-                            trailing={(item) => <CounterReason>{asks(item)}</CounterReason>}
-                        />
+                        <List items={s.needsYou} asks trailing={(item) => <WaitWord>{asks(item)}</WaitWord>} />
                     ) : (
                         empty('Nothing waits on you.')
                     )}
@@ -157,7 +154,7 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                             foot={
                                 reading
                                     ? undefined
-                                    : 'All builds count toward this limit. At capacity, Pedro can start an item over the limit; automatic starts wait for a slot.'
+                                    : 'All builds count toward this limit. At capacity, you can start an item over the limit; automatic starts wait for a slot.'
                             }
                         >
                             {listOf(building, 'Nothing building right now.')}
@@ -211,19 +208,19 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                             {costs.length ? (
                                 <List
                                     items={costs.map((c) => c.item)}
-                                    now={now}
                                     trailing={(i) => <CounterFigure>{formatUsd(costOf(i))}</CounterFigure>}
                                 />
+                            ) : usageStillLoading && !unavailable ? (
+                                <Loading presentation="status" label="Loading usage…" />
                             ) : (
-                                <Empty>
-                                    {unavailable ? (
-                                        'Usage is unavailable, so nothing is priced.'
-                                    ) : usageStillLoading ? (
-                                        <Loading presentation="inline" label="Loading usage…" />
-                                    ) : (
-                                        'No priced agent work yet.'
-                                    )}
-                                </Empty>
+                                <EmptyState
+                                    size="inline"
+                                    title={
+                                        unavailable
+                                            ? 'Usage is unavailable, so nothing is priced.'
+                                            : 'No priced agent work yet.'
+                                    }
+                                />
                             )}
                         </Counter>
                     )}

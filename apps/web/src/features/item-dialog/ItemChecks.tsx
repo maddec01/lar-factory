@@ -1,9 +1,9 @@
 import type { ItemChecks } from '@lar-factory/shared';
-import { EmptyState, Disclosure, Stack, Text, PageError, Loading } from '@lar-works/design-system';
+import { EmptyState, Disclosure, Stack, Text, Loading } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 
 import { readItemChecks } from '@/services/items/items.service';
-import { CheckRun } from '@/ui/board';
+import { CheckRun, LoadFailed, MetaLine } from '@/ui/board';
 
 /** One read per mounted section; collapsing and board refreshes keep its result. */
 export function ItemChecksSection({ itemId }: { itemId: string }) {
@@ -22,7 +22,7 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
             setRecord(await readItemChecks(itemId));
         } catch (error) {
             requested.current = false;
-            setError(error instanceof Error ? error.message : 'Couldn’t read checks.');
+            setError(error instanceof Error ? error.message : 'Couldn’t load checks.');
         }
     }
 
@@ -37,27 +37,25 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
         >
             <Stack space="group">
                 {error ? (
-                    <Stack role="alert">
-                        <PageError
-                            size="inline"
-                            title="Couldn’t load checks"
-                            description={error}
-                            primaryAction={{ label: 'Try again', onAction: () => void read() }}
-                        />
-                    </Stack>
+                    <LoadFailed what="checks" reason={error} onRetry={() => void read()} />
                 ) : !record ? (
                     <Loading presentation="status" label="Loading checks…" />
                 ) : (
                     <>
-                        {record.runs.length === 0 && <EmptyState size="inline" title="No checks are recorded." />}
+                        {record.runs.length === 0 && <EmptyState size="inline" title="No checks yet." />}
                         {record.runs.map((run) => (
                             <CheckRun
                                 key={run.checkId}
                                 command={run.command.map((arg) => JSON.stringify(arg)).join(' ')}
                             >
                                 <Text variant="inherit">
-                                    {run.folder} · {run.outcome} · Run by {run.role}
-                                    {run.reason ? `: ${run.reason}` : ''}
+                                    <MetaLine
+                                        parts={[
+                                            run.folder,
+                                            run.outcome,
+                                            `Run by ${run.role}${run.reason ? `: ${run.reason}` : ''}`,
+                                        ]}
+                                    />
                                 </Text>
                                 {run.outcome === 'passed' && !run.eligible && (
                                     <Text variant="inherit">

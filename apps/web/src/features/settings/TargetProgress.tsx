@@ -5,7 +5,7 @@ import { Alert, Button, Inline, Progress, SettingsDetails, Text } from '@lar-wor
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { buttonKind } from '@/ui/board';
+import { ActionError, buttonKind, MetaLine, RetryAction } from '@/ui/board';
 
 /** Desktop commands operate across active targets, including recovery after a first install failed. */
 export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boolean }) {
@@ -24,15 +24,14 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
             </Text>
             <Inline as="span" wrap>
                 {failed && (
-                    <Button
-                        {...buttonKind('other', { size: 'md' })}
+                    <RetryAction
+                        size="md"
                         data-retry-install
-                        aria-label="Retry installation in all active targets"
-                        disabled={busy}
-                        onClick={() => void retry()}
-                    >
-                        {retrying ? 'Retrying…' : 'Try again'}
-                    </Button>
+                        label="Retry installation in all active targets"
+                        busy={retrying}
+                        disabled={busy && !retrying}
+                        onRetry={() => void retry()}
+                    />
                 )}
                 {drift && (
                     <Button
@@ -46,7 +45,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                     </Button>
                 )}
             </Inline>
-            {(error || retryError) && <Alert size="sm" tone="danger" message={error || retryError} />}
+            {(error || retryError) && <ActionError>{error || retryError}</ActionError>}
         </SettingsDetails>
     );
 }
@@ -112,7 +111,7 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
     return (
         <SettingsDetails breaks>
             <Text variant="inherit" role={showProgress ? 'status' : undefined}>
-                {target.release ? `Version ${target.release}` : 'No release installed'} · {status}
+                <MetaLine parts={[target.release ? `Version ${target.release}` : 'No release installed', status]} />
             </Text>
             {showProgress && target.operation && target.operation !== 'check' && (
                 <Progress

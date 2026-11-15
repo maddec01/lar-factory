@@ -1,9 +1,10 @@
 import type { WorkMapPrerequisite } from '@lar-factory/shared';
+import { Text } from '@lar-works/design-system';
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { BoardCard } from './BoardCard';
-import { MapStartAction } from './StartAfterButton';
+import { OneLineAction } from './StartAfterButton';
 
 /** A map card's height before its cards are measured: its head (kind, step and track), a three-line title and its
  *  foot, with the card's 8px padding and hairline. The map then makes every card as tall as its tallest needs
@@ -43,10 +44,10 @@ const NODE_TONE = {
 
 /**
  * A part on the map, `width` by `height`: a card that opens it (`openLabel` names the button, `title` says it all),
- * with a head line of its `kind`'s icon (named on hover), its `reference` ("#139" or "Part 15", in the one place on
- * every card) and its fields, then where it stands (`track`, no stage word, so the head never says a state the foot
- * contradicts), its title alone on up to three lines, and a foot with its `glyph` and `facts`, which its `action` takes
- * the place of on hover or focus (items.css), and its `slices` along the bottom. Under the title, quiet, its reference,
+ * with a head line of its kind in words and its fields, then where it stands (`track`, no stage word, so the head never
+ * says a state the foot contradicts), its title led by its number ("#139" or "Part 15", as every row names it) on up to
+ * three lines, and a foot with its `glyph` and `facts`, which its `action` takes
+ * the place of on hover or focus (items.css), and its `slices` along the bottom. Under the title, quiet,
  * another project's identity and its queue and gate facts share one line, and while its thread works, what it does now
  * takes a line of its own (`activity`). Its lane names its project. It `asks`
  * (an answer from you) or `waits` (on other work) in its border (the attention recipe, as a desk card), and takes the
@@ -71,7 +72,6 @@ export function MapPartNode({
     glyph,
     facts,
     slices,
-    reference,
     repository,
     activity,
     recordState,
@@ -100,7 +100,7 @@ export function MapPartNode({
     onOpen: () => void;
     /** Where its ticket is saved, in the corner. */
     source: ReactNode;
-    /** The card's head line: its kind in words and its fields; its reference follows. */
+    /** The card's head line: its kind in words and its fields. */
     head: ReactNode;
     /** What it asks next. */
     action?: ReactNode;
@@ -110,12 +110,10 @@ export function MapPartNode({
     glyph: ReactNode;
     /** Its facts on one line. */
     facts: string;
-    /** Which part it is, its ticket's "#139" or "Part 15", after its kind. */
-    reference: string;
-    /** Another project's identity, for a decision made in a project other than its lane's, beside its reference. */
+    /** Another project's identity, for a decision made in a project other than its lane's. */
     repository?: ReactNode;
-    /** Queue and gate facts from the current work record ("Not queued", "Brief not approved"), quiet beside its
-     *  reference and in its tooltip. */
+    /** Queue and gate facts from the current work record ("Not queued", "Brief not approved"), quiet beside
+     *  its other facts and in its tooltip. */
     recordState: string;
     /** What its thread is doing now, an ActivityLine, on a quiet line of its own while its thread is at work. */
     activity?: ReactNode;
@@ -156,20 +154,12 @@ export function MapPartNode({
             name={name}
             sub={
                 <>
-                    {(reference || repository || recordState) && (
+                    {(repository || recordState) && (
                         <span className="flex min-w-0 items-center gap-1.5" data-map-sub>
-                            {reference && (
-                                <span className="shrink-0" data-map-reference>
-                                    {reference}
-                                </span>
-                            )}
                             {repository && (
-                                <span className="flex min-w-0 shrink items-center gap-1.5">
-                                    {reference && <span aria-hidden="true">·</span>}
-                                    {repository}
-                                </span>
+                                <span className="flex min-w-0 shrink items-center gap-1.5">{repository}</span>
                             )}
-                            {recordState && (reference || repository) && <span aria-hidden="true">·</span>}
+                            {recordState && repository && <span aria-hidden="true">·</span>}
                             {recordState && (
                                 <span className="min-w-0 truncate" title={recordState} data-map-record-state>
                                     {recordState}
@@ -192,7 +182,7 @@ export function MapPartNode({
                     </span>
                 </>
             }
-            action={action && <MapStartAction>{action}</MapStartAction>}
+            action={action && <OneLineAction>{action}</OneLineAction>}
             bottom={
                 slices && (
                     <span className="shrink-0" data-map-slices>
@@ -287,9 +277,9 @@ export function MapPrerequisiteNode({
             data-map-card
             title={`${title} · ${state}`}
         >
-            <span className="text-fg-muted text-xs">
+            <Text as="span" variant="caption" tone="muted">
                 {kind === 'dependency' ? 'Dependency' : 'Work outside this group'}
-            </span>
+            </Text>
             <span className="line-clamp-3 wrap-anywhere">{title}</span>
             <span className="text-fg-muted mt-auto text-xs">{state}</span>
         </div>

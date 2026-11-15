@@ -3,13 +3,13 @@
 // the item dialog attaches one to captured work.
 
 import { repoName, type TicketMatch } from '@lar-factory/shared';
-import { Button, EmptyState } from '@lar-works/design-system';
+import { EmptyState, Loading } from '@lar-works/design-system';
 import { SearchIcon } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
 import { useBoardStore } from '@/services/board/board.hooks';
 import { searchTickets } from '@/services/tickets/tickets.service';
-import { TicketSearch } from '@/ui/board';
+import { NoMatches, TicketSearch } from '@/ui/board';
 
 type Phase = 'idle' | 'searching' | 'found' | 'picking';
 
@@ -39,7 +39,7 @@ export function TicketPicker({
         if (busy || disabled) return;
 
         setPhase('searching');
-        setMessage('Searching…');
+        setMessage('');
 
         const found = await searchTickets(repo, query);
 
@@ -50,7 +50,7 @@ export function TicketPicker({
             setMessage(found);
         } else {
             setTickets(found);
-            setMessage(found.length ? '' : 'Nothing matches');
+            setMessage('');
         }
     };
     const pick = async (number: number) => {
@@ -99,17 +99,16 @@ export function TicketPicker({
                     description={`Search ${repoName(repo, repos)}’s tickets by title or #number.`}
                 />
             )}
-            {message === 'Nothing matches' && (
-                <Button
-                    variant="secondary"
-                    onClick={() => {
+            {phase === 'searching' && <Loading presentation="status" label="Searching…" />}
+            {phase === 'found' && !tickets.length && !message && (
+                <NoMatches
+                    size="inline"
+                    description="Try other words from the title, or a ticket’s #number."
+                    onClear={() => {
                         setQuery('');
-                        setMessage('');
                         setPhase('idle');
                     }}
-                >
-                    Clear search
-                </Button>
+                />
             )}
         </>
     );

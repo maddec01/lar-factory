@@ -171,7 +171,7 @@ export function StartControl({
             <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
                 <DropdownMenu.Trigger asChild>
                     <Button
-                        {...kindOf(onRow ? 'open' : 'main')}
+                        {...kindOf(onRow ? 'start' : 'main')}
                         busy={pending}
                         leftIcon={!retry && ICON.play}
                         rightIcon={!pending && <ChevronDownIcon />}

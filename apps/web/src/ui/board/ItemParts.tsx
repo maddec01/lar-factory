@@ -7,61 +7,54 @@ import type { DataAttributes } from './DataAttributes';
 import { tooltipWhenCut } from './TooltipWhenCut';
 
 /** A title with its ticket's reference (`#12`) before it, muted, the way the board lists every item; captured work has
- *  no reference. */
+ *  no reference, and a reference alone (such as `#12` in a sentence) has no title. With `href` it links to the ticket in
+ *  a new tab, with `onOpen` it is a button that opens the item; either underlines on hover, as a link in text does,
+ *  while a row that opens on click shows its hover fill instead. */
 export function ItemTitle({
     reference,
     title,
+    name,
+    href,
+    onOpen,
 }: {
     /** The ticket's reference, such as `#12`; captured work has none. */
     reference?: string | undefined;
-    /** The item's title. */
-    title: string;
-}) {
-    return (
-        <>
-            {reference ? (
-                <>
-                    <span className="text-fg-muted font-normal tabular-nums">{reference}</span>{' '}
-                </>
-            ) : null}
-            {title}
-        </>
-    );
-}
-
-/** A title with its reference as a link to its ticket in a new tab, or as text when it has no page, as a sentence names
- *  it. */
-export function TitleLink({
-    reference,
-    title,
-    href,
-}: {
-    /** The ticket's reference, such as `#12`. */
-    reference?: string | undefined;
-    /** The item's title. */
-    title: string;
-    /** The ticket's page, opened in a new tab; the reference is text without one. */
+    /** The item's title; none for a reference alone. */
+    title?: string | undefined;
+    /** Names the item in full, as a link's or button's tooltip. */
+    name?: string | undefined;
+    /** The ticket's page, opened in a new tab. */
     href?: string | undefined;
+    /** Called as the reader opens the item. */
+    onOpen?: (() => void) | undefined;
 }) {
     const text = (
         <>
-            {reference ? (
-                <>
-                    <span className="ref">{reference}</span>{' '}
-                </>
-            ) : null}
+            {reference ? <span className="text-fg-muted font-normal tabular-nums">{reference}</span> : null}
+            {reference && title ? ' ' : null}
             {title}
         </>
     );
 
-    return href ? (
-        <a className="title" href={href} target="_blank" rel="noopener">
-            {text}
-        </a>
-    ) : (
-        <span className="title">{text}</span>
-    );
+    if (href)
+        return (
+            <a href={href} target="_blank" rel="noopener" title={name} className={OPENS}>
+                {text}
+            </a>
+        );
+
+    if (onOpen)
+        return (
+            <button type="button" onClick={onOpen} title={name} className={`text-left ${OPENS}`}>
+                {text}
+            </button>
+        );
+
+    return text;
 }
+
+/** A title that opens its item: the link's hover underline and the design system's focus ring. */
+const OPENS = 'focus-ring rounded-xs hover:underline';
 
 const identities = {
     row: 'flex min-w-0 items-center gap-1',

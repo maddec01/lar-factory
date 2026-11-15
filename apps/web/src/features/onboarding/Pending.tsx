@@ -1,9 +1,9 @@
 // What an onboarding step shows while what it needs is still loading.
 
-import { Alert, Button, Loading } from '@lar-works/design-system';
+import { Alert, Loading } from '@lar-works/design-system';
 
 import { useWizardStore } from './WizardStore';
-import { buttonKind } from '@/ui/board';
+import { RetryAction } from '@/ui/board';
 
 export function Pending({ children }: { children: string }) {
     return <Loading presentation="status" label={children} />;
@@ -18,13 +18,7 @@ export function DetectionPending() {
             aria-live={detection.code === 'sample-mode' ? 'polite' : 'assertive'}
             tone={detection.code === 'sample-mode' ? 'info' : 'danger'}
             title={detection.code === 'sample-mode' ? 'Sample mode' : 'Couldn’t check the repository'}
-            action={
-                detection.code !== 'sample-mode' && (
-                    <Button {...buttonKind('other')} onClick={() => void detect()}>
-                        Try again
-                    </Button>
-                )
-            }
+            action={detection.code !== 'sample-mode' && <RetryAction onRetry={() => void detect()} />}
         >
             {detection.error}
         </Alert>

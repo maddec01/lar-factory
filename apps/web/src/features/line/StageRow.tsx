@@ -1,4 +1,4 @@
-import { placementOf, shortAgo } from '@lar-factory/shared';
+import { placementOf } from '@lar-factory/shared';
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
@@ -43,7 +43,6 @@ import {
     checksCount,
     prChecks,
 } from '@/features/items';
-import { useBoardStore } from '@/services/board/board.hooks';
 import {
     QueueAge,
     QueuePlace,
@@ -243,7 +242,12 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         ) : (
                             // A Queue row's age is the item's own, since it was added; its last change is often only
                             // a sync's, the same for every row. The board keeps no time it was queued.
-                            <AddedAge item={item} />
+                            <QueueAge>
+                                <Age
+                                    at={item.createdAt ?? item.updatedAt}
+                                    says={item.createdAt ? 'Added' : 'Changed'}
+                                />
+                            </QueueAge>
                         )}
                         <AzureFields azure={item.azure} />
                     </RowMetaEnd>
@@ -269,13 +273,4 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             )}
         </StageRowItem>
     );
-}
-
-/** A Queue row's age, since the item was added, which its tooltip says in words ("Added 3d ago"); an item with no
- *  time it was added counts from its last change. */
-function AddedAge({ item }: { item: Item }) {
-    const now = useBoardStore((state) => state.now);
-    const ago = shortAgo(item.createdAt ?? item.updatedAt, now);
-
-    return <QueueAge title={item.createdAt ? `Added ${ago}` : `Changed ${ago}`}>{ago}</QueueAge>;
 }

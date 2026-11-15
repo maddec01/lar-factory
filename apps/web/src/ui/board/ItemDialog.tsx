@@ -1,13 +1,18 @@
 // The frame of Lar Factory's item dialog: the summary under its title, the body's column with the main column and the
 // sidebar beside it, its notes, and the footer's groups of actions.
 
-import { Alert } from '@lar-works/design-system';
+import { Alert, Link, Text } from '@lar-works/design-system';
 import { linkRecipe } from '@lar-works/design-system/primitives';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { ButtonDensityProvider } from './ButtonDensity';
 import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
+import { GroupTitle } from './TextParts';
+
+/** Draws a row's first quiet button back by the design system Button's own 11px inline padding, so its word starts on
+ *  the values' column rather than its edge. */
+const FIRST_BUTTON_ON_COLUMN = '[&>[data-slot=button]:first-child]:-ml-2.75';
 
 /**
  * The item's properties at the top of the dialog's sidebar, a label beside each value, each on one line: its status,
@@ -45,14 +50,16 @@ export function ItemSummary({
             {/* A property row of its own, label and buttons on the columns above; an opened panel takes the full width.
                 It shows only while it holds a button or a panel. */}
             <div
-                className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 pt-1 text-xs has-[section]:grid-cols-[minmax(0,1fr)] [&:has(section)>[data-label]]:hidden [&:not(:has(button,section))]:hidden"
+                className="grid min-w-0 grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 pt-1 text-xs has-[section]:grid-cols-[minmax(0,1fr)] [&:has(section)>[data-label]]:hidden [&:not(:has(button,section))]:hidden"
                 data-ticket-actions
             >
                 <span className="text-fg-muted leading-7" data-label>
                     Ticket
                 </span>
                 {/* Quiet buttons, the first one's word on the values' column, as the properties above read. */}
-                <span className="flex min-w-0 flex-wrap items-center gap-1 [&>[data-slot=button]:first-child]:-ml-2.75 [&>section]:basis-full">
+                <span
+                    className={`flex min-w-0 flex-wrap items-center gap-1 ${FIRST_BUTTON_ON_COLUMN} [&>section]:basis-full`}
+                >
                     {actions}
                 </span>
             </div>
@@ -72,7 +79,7 @@ function AsideProp({
     children: ReactNode;
 }) {
     return (
-        <div className="grid min-h-6 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3 text-xs">
+        <div className="grid min-h-6 grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 text-xs">
             <span className="text-fg-muted leading-6">{label}</span>
             <span className="text-fg flex min-h-6 min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">
                 {children}
@@ -140,15 +147,16 @@ export function SummaryParent({
                 <button
                     type="button"
                     onClick={onOpen}
+                    // A button in the link's look: the design system's Link has no button form in the accent tone yet.
                     className={`focus-ring text-left ${linkRecipe.accent}`}
                     data-parent-open
                 >
                     {name}
                 </button>
             ) : href ? (
-                <a href={href} target="_blank" rel="noopener" className={linkRecipe.accent}>
+                <Link href={href} variant="caption" external showExternalIcon={false}>
                     {name}
-                </a>
+                </Link>
             ) : (
                 <span>{name}</span>
             )}
@@ -168,7 +176,7 @@ export function SummaryPanel({
 }) {
     return (
         <section aria-label={label} className="grid gap-1.5 pt-1">
-            <span className="text-fg text-xs font-medium">{label}</span>
+            <GroupTitle>{label}</GroupTitle>
             {children}
         </section>
     );
@@ -331,17 +339,17 @@ export function FigureRows({
 } & DataAttributes) {
     return (
         <div className="grid min-w-0 gap-1 tabular-nums" title={title || undefined} data-agent-work {...data}>
-            {heading && (
-                <span className="text-fg-muted text-xs leading-6 font-medium" data-figures-heading>
-                    {heading}
-                </span>
-            )}
+            {heading && <GroupTitle>{heading}</GroupTitle>}
             {rows.map((row) => (
                 <AsideProp key={row.label} label={row.label}>
                     {row.value}
                 </AsideProp>
             ))}
-            {note && <span className="text-fg-muted text-xs">{note}</span>}
+            {note && (
+                <Text as="span" variant="caption" tone="muted">
+                    {note}
+                </Text>
+            )}
         </div>
     );
 }

@@ -34,7 +34,6 @@ import {
     AzureFields,
     ItemTitle,
     useActivityUnavailable,
-    ItemStatusGlyph,
     useShownStatus,
     STATUS_COLOR,
     workflowSteps,
@@ -46,12 +45,12 @@ import { RowKindMark, RowSource } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     ApprovalWait,
-    boardStatusState,
     DeskCard as Card,
     DeskPrProgress,
     DeskDependencyProof,
     DeskHint,
     DeskSection,
+    HeaderEmpty,
     noteBoardPlaces,
     StageTrack,
     CardChecks,
@@ -116,15 +115,19 @@ function Progress({ item, data }: { item: Item; data: BoardData }) {
         <DeskPrProgress
             label={`PR #${pr.number}`}
             summary={
-                unread
-                    ? stale || unavailable
-                        ? 'Checks unavailable. Not yet observed.'
-                        : 'Loading checks…'
-                    : unavailable
-                      ? 'Check evidence unavailable.'
-                      : pr.checks
-                        ? counts(pr.checks)
-                        : 'No checks yet'
+                unread ? (
+                    stale || unavailable ? (
+                        'Checks unavailable. Not yet observed.'
+                    ) : (
+                        <Loading presentation="inline" label="Loading checks…" />
+                    )
+                ) : unavailable ? (
+                    'Check evidence unavailable.'
+                ) : pr.checks ? (
+                    counts(pr.checks)
+                ) : (
+                    'No checks yet.'
+                )
             }
             note={
                 [
@@ -231,14 +234,8 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
                     </>
                 )
             }
-            statusIcon={<ItemStatusGlyph item={item} />}
             // The wait in the same words everywhere it shows: the card's foot, the dialog's Status and search.
             status={followups ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}` : wait.label}
-            statusState={
-                followups || batch.length || dependencyProofs(item).length || wait.label === 'Outcome check'
-                    ? 'waiting'
-                    : (shown.state ?? boardStatusState[shown.glyph])
-            }
             age={<Age at={item.updatedAt} />}
             next={!checks && <NextStep item={item} waitLabel={wait.label} />}
             actions={<HumanWaitAction item={item} data={data} quiet />}
@@ -266,15 +263,17 @@ export function Desk({ items: inScope }: { items: Item[] }) {
             count={items.length}
             loading={items.length === 0 && readingScope(data, scope ?? undefined)}
             empty={
-                clientError ? (
-                    'Nothing waited on you at the last read.'
-                ) : readingScope(data, scope ?? undefined) ? (
-                    <Loading presentation="inline" label="Loading projects…" />
-                ) : deskItems(data, unavailable).length ? (
-                    'Nothing on your desk matches the filters.'
-                ) : (
-                    'Nothing waits on you.'
-                )
+                <HeaderEmpty>
+                    {clientError ? (
+                        'Nothing waited on you at the last read.'
+                    ) : readingScope(data, scope ?? undefined) ? (
+                        <Loading presentation="inline" label="Loading projects…" />
+                    ) : deskItems(data, unavailable).length ? (
+                        'Nothing on your desk matches the filters.'
+                    ) : (
+                        'Nothing waits on you.'
+                    )}
+                </HeaderEmpty>
             }
         >
             {items.map((i) => (

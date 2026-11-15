@@ -74,16 +74,6 @@ export function SpecSync({
     );
 }
 
-/** A popover's panel for picking labels: 18rem wide, its picker over its status. */
-export function LabelEditorPanel({
-    children,
-}: {
-    /** The label picker and its status. */
-    children: ReactNode;
-}) {
-    return <div className="grid w-72 gap-2">{children}</div>;
-}
-
 /** A kind change that failed: each of its `lines`, then the `action` that retries it, announced. */
 export function ChangeFailed({
     lines,

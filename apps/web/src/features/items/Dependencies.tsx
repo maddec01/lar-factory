@@ -9,7 +9,7 @@ import { writeState } from './ActionAvailability';
 import { useItemAction } from './ActionStore';
 import { markDependencyMet } from './CardActions';
 import { dependenciesOf } from './ItemDependencies';
-import { buttonKind, DependencyItem, DependencyList } from '@/ui/board';
+import { buttonKind, DependencyItem, DependencyList, DetailFact } from '@/ui/board';
 
 /**
  * What the latest read of its ticket or a PR showed, and when, beside the last read that answered after one that
@@ -57,7 +57,15 @@ export function Dependencies({ item, data, now }: { item: Item; data: BoardData;
                     owner={`Dependency on ${d.owner} · ${d.met ? `met, marked by ${d.met.by} ${shortAgo(d.met.at, now)}` : 'not met'}`}
                     need={d.need}
                     read={<ReadLine d={d} now={now} />}
-                    evidence={d.evidence ? `Evidence: ${d.evidence}` : 'No evidence agreed yet'}
+                    evidence={
+                        d.evidence ? (
+                            <DetailFact presentation="record" label="Evidence">
+                                {d.evidence}
+                            </DetailFact>
+                        ) : (
+                            'No evidence agreed yet.'
+                        )
+                    }
                     notice={dependencyNotice(d)}
                     action={
                         <Button

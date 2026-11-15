@@ -2,13 +2,11 @@
 
 import { typedLabelsProblem, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { Button, Inline, LabelPicker, Popover, Stack } from '@lar-works/design-system';
+import { Button, Inline, LabelPicker } from '@lar-works/design-system';
 
 import type { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyKind } from './VocabularyKinds';
-import { buttonKind } from '@/ui/board';
-
-const labelPopoverPosition = { collisionPadding: 16 };
+import { buttonKind, LabelPickerPopover } from '@/ui/board';
 
 export function VocabularyLabelPopover({
     name,
@@ -28,50 +26,52 @@ export function VocabularyLabelPopover({
     fields: ReturnType<typeof useVocabularyFields>;
 }) {
     return (
-        <Popover open={open} onOpenChange={close}>
-            <Popover.Trigger asChild>
+        <LabelPickerPopover
+            open={open}
+            onOpenChange={close}
+            align="end"
+            trigger={
                 <Button {...buttonKind('control')} disabled={disabled} aria-label={`Choose ${title} ${plural}`}>
                     {chosen.length ? 'Edit' : `Add ${noun}`}
                 </Button>
-            </Popover.Trigger>
-            <Popover.Content align="end" width="md" {...labelPopoverPosition}>
-                <Stack space="related">
-                    <LabelPicker
-                        data-label-picker={name}
-                        choices={offered.map((label) => ({
-                            name: label,
-                            description: gone(label) ? 'Unavailable' : undefined,
-                        }))}
-                        picked={chosen}
-                        onToggle={choose}
-                        filterLabel={`Search ${plural} for ${title}`}
-                        placeholder={`Filter or type a new ${noun}`}
-                        noMatchLabel={`No matching ${plural}.`}
-                        locked={labelsProblem ? offered.filter((label) => !chosen.includes(label)) : []}
-                        busy={disabled}
-                        create={{
-                            refused: labelsProblem ?? access.newLabels,
-                            problem: (label) => typedLabelsProblem(repo, [label]),
-                            note: onCommit ? '' : `New ${plural} are created when you add the project.`,
-                            createLabel: (label) =>
-                                onCommit ? `Create "${label}"` : `Create "${label}" when you add the project`,
-                            onCreate: (label) => update(value, [...newLabels, label], !!onCommit),
-                        }}
-                    />
-                    <Inline>
-                        <Button
-                            {...buttonKind('other')}
-                            disabled={disabled}
-                            onClick={() => update(emptyVocabularyTerm(), [])}
-                        >
-                            None
-                        </Button>
-                        <Button {...buttonKind('other')} onClick={() => close(false)}>
-                            Done
-                        </Button>
-                    </Inline>
-                </Stack>
-            </Popover.Content>
-        </Popover>
+            }
+            footer={
+                <Inline>
+                    <Button
+                        {...buttonKind('other')}
+                        disabled={disabled}
+                        onClick={() => update(emptyVocabularyTerm(), [])}
+                    >
+                        None
+                    </Button>
+                    <Button {...buttonKind('other')} onClick={() => close(false)}>
+                        Done
+                    </Button>
+                </Inline>
+            }
+        >
+            <LabelPicker
+                data-label-picker={name}
+                choices={offered.map((label) => ({
+                    name: label,
+                    description: gone(label) ? 'Unavailable' : undefined,
+                }))}
+                picked={chosen}
+                onToggle={choose}
+                filterLabel={`Search ${plural} for ${title}`}
+                placeholder={`Filter or type a new ${noun}`}
+                noMatchLabel="Nothing matches."
+                locked={labelsProblem ? offered.filter((label) => !chosen.includes(label)) : []}
+                busy={disabled}
+                create={{
+                    refused: labelsProblem ?? access.newLabels,
+                    problem: (label) => typedLabelsProblem(repo, [label]),
+                    note: onCommit ? '' : `New ${plural} are created when you add the project.`,
+                    createLabel: (label) =>
+                        onCommit ? `Create "${label}"` : `Create "${label}" when you add the project`,
+                    onCreate: (label) => update(value, [...newLabels, label], !!onCommit),
+                }}
+            />
+        </LabelPickerPopover>
     );
 }

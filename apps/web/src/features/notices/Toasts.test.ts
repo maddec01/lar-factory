@@ -44,7 +44,7 @@ test('a poll that started before the page’s own write doesn’t bring back old
     await settle(() => useItemDialogStore.getState().open('I_sample01'));
     await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="I_sample01"]')!.click());
 
-    const inList = () => text($('.title-bar .list-button'));
+    const inList = () => text($('.title-bar [data-list-button]'));
 
     expect(inList()).toBe('List19');
     await settle(() => answerPoll());

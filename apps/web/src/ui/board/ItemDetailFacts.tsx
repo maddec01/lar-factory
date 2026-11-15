@@ -1,3 +1,4 @@
+import { Text } from '@lar-works/design-system';
 import { CheckIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -38,7 +39,7 @@ export function DetailFact({
     ...data
 }: {
     /** The fact's label. */
-    label: string;
+    label: ReactNode;
     /** `meta` sets the label over the value in the meta area; `record` beside it in the record. */
     presentation?: 'meta' | 'record';
     /** The fact's value, or the control that edits it. */
@@ -91,20 +92,24 @@ export function FactList({
     );
 }
 
-/** A sprint's count over its children: `count` ("This sprint: 2 of 5 done") and the sprint's `name`. */
+/** A sprint's count over its children, labelled "This sprint": `count` ("2 of 5 done") and the sprint's `name`. */
 export function SprintCount({
     count,
     name,
 }: {
-    /** The sprint's count, such as "This sprint: 2 of 5 done". */
+    /** The sprint's count, such as "2 of 5 done". */
     count: string;
     /** The sprint's name. */
     name: string;
 }) {
     return (
         <div className="text-sm">
-            <p className="m-0 font-medium">{count}</p>
-            <p className="text-fg-muted m-0 text-xs">{name}</p>
+            <DetailFact presentation="record" label="This sprint">
+                <span className="font-medium">{count}</span>
+            </DetailFact>
+            <Text variant="caption" tone="muted">
+                {name}
+            </Text>
         </div>
     );
 }
@@ -156,7 +161,9 @@ export function WaitsOnList({
             )}
             {done && (
                 <div className="grid min-w-0 gap-1 pt-0.5" data-waits-on-done>
-                    <span className="text-fg-muted truncate text-xs">{done.text}</span>
+                    <Text as="span" variant="caption" tone="muted" truncate>
+                        {done.text}
+                    </Text>
                     <ul className="m-0 grid min-w-0 list-none gap-0.5 p-0">
                         {done.items.map((item) => (
                             <li
@@ -187,27 +194,6 @@ export function ChipGroup({
 } & DataAttributes) {
     return (
         <span {...data} className="contents">
-            {children}
-        </span>
-    );
-}
-
-/** A tracker's label or tag as a quiet outlined chip, as the List draws them, so a tag such as "Blocked" never reads as
- *  a board state; `title` names where it comes from, such as "Azure DevOps tag: Blocked". */
-export function TrackerTag({
-    title,
-    children,
-}: {
-    /** Where the tag comes from and its name, as its tooltip. */
-    title: string;
-    /** The tag's LabelChip. */
-    children: ReactNode;
-}) {
-    return (
-        <span
-            title={title}
-            className="[&_[data-label-chip]]:text-fg-muted inline-flex max-w-full min-w-0 [&_[data-label-chip]]:bg-transparent [&_[data-label-chip]]:font-normal [&_[data-label-chip]_*]:pointer-events-none"
-        >
             {children}
         </span>
     );

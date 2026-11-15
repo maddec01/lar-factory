@@ -7,7 +7,7 @@ import type { Toast } from './Toasts';
 import { OPEN_ITEM_DIALOG } from '@/features/item-dialog';
 
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
-const FALLBACK_FOCUS = ['.add-item', '[data-add-item]', '.open-settings', '[data-slot="modal-close"]'];
+const FALLBACK_FOCUS = ['[data-add-item]', '.open-settings', '[data-slot="modal-close"]'];
 
 const focusFirst = (selectors: string[]) => {
     // The item dialog holds focus while it's open, and its buttons share their data attributes with the board's.

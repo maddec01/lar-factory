@@ -3,7 +3,6 @@
 
 import { clock, day, plural, type RetentionState } from '@lar-factory/shared';
 import {
-    Alert,
     Button,
     FormUnit,
     Input,
@@ -21,7 +20,7 @@ import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Choice } from '@/shared/settings/SettingControls';
-import { buttonKind, SettingConfirm, SettingLastRun } from '@/ui/board';
+import { ActionError, buttonKind, LoadFailed, SettingConfirm, SettingLastRun } from '@/ui/board';
 
 /** What saving a automatic deletion asks before it saves: the work it would delete now. */
 type Due = { workId: string; title: string }[];
@@ -104,9 +103,10 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
 
     if (retention.problem)
         return (
-            <Alert size="sm" tone="danger">
-                {retention.problem} The board keeps and shows all work until the setting can be read.
-            </Alert>
+            <LoadFailed
+                what="the retention setting"
+                reason={`${retention.problem} The board keeps and shows all work until the setting can be read.`}
+            />
         );
 
     return (
@@ -195,7 +195,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                 <SettingsFooter
                     leading={
                         error ? (
-                            <Alert size="sm" tone="danger" message={error} />
+                            <ActionError>{error}</ActionError>
                         ) : (
                             <Text as="span" variant="caption" tone="muted">
                                 Unsaved changes
@@ -217,7 +217,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                     </Button>
                 </SettingsFooter>
             )}
-            {error && due && <Alert size="sm" tone="danger" message={error} />}
+            {error && due && <ActionError>{error}</ActionError>}
             {retention.lastDelete && <LastDelete lastDelete={retention.lastDelete} />}
         </Stack>
     );

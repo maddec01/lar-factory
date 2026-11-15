@@ -9,7 +9,7 @@ import {
     closesTicketOnAbandon,
     hasClosedPr,
 } from '@lar-factory/shared';
-import { Alert, Button, ConfirmDialog, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, ConfirmDialog, Loading, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { useAbandonStore } from './AbandonStore';
@@ -263,7 +263,7 @@ export function AbandonDialog() {
             {hasDetails ? (
                 <Stack space="related">
                     {item.abandonRefusal && <Text>{item.abandonRefusal}</Text>}
-                    {notice.checking && <Text role="status">Checking the branch and worktree…</Text>}
+                    {notice.checking && <Loading presentation="status" label="Checking the branch and worktree…" />}
                     {notice.uninspected && (
                         <Alert tone="warning">{ABANDON_CLEANUP.uninspected(notice.uninspected)}</Alert>
                     )}

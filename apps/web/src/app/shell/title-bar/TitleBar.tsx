@@ -72,7 +72,7 @@ function Refreshed({ data }: { data: BoardData }) {
                         'Disconnected'
                     )
                 ) : reading.length ? (
-                    'Loading projects'
+                    'Loading projects…'
                 ) : !fetchedAt ? (
                     'Not read yet'
                 ) : (

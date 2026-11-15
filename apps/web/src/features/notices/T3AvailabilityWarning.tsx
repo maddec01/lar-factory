@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Warning } from './Warning';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { buttonKind } from '@/ui/board';
+import { ActionError, buttonKind } from '@/ui/board';
 
 const titles = {
     unavailable: 'T3 Code is disconnected.',
@@ -51,7 +51,7 @@ export function T3AvailabilityWarning() {
             ) : (
                 'The board retries while T3 Code is running.'
             )}
-            {error && <span role="alert"> {error}</span>}
+            {error && <ActionError>{error}</ActionError>}
         </Warning>
     );
 }

@@ -7,23 +7,12 @@ export {
     SectionHeader,
     HeaderStatus,
     DetailsLoading,
-    DetailsUnavailable,
 } from './ItemDetailSections';
-export {
-    MetaArea,
-    DetailFact,
-    InlineList,
-    FactList,
-    SprintCount,
-    WaitsOnList,
-    ChipGroup,
-    TrackerTag,
-} from './ItemDetailFacts';
+export { MetaArea, DetailFact, InlineList, FactList, SprintCount, WaitsOnList, ChipGroup } from './ItemDetailFacts';
 export {
     EditorSlot,
     EditActions,
     SpecSync,
-    LabelEditorPanel,
     ChangeFailed,
     KindQuestion,
     OutgoingTicket,

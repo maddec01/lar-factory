@@ -1,14 +1,11 @@
 // The item rows a title bar counter's panel lists, with their status, project and age or trailing figure.
 
-import { itemRepoNames, repoKey, shortAgo } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
 import { useItemDialogStore } from '@/features/item-dialog';
-import { SourceIcon, ItemStatusGlyph } from '@/features/items';
+import { Age, ItemStatusGlyph, RepoCell, SourceIcon } from '@/features/items';
 import { PartTitle, partRef, RowKindMark } from '@/features/line';
-import { ProjectIcon } from '@/features/repositories';
-import { useBoardStore } from '@/services/board/board.hooks';
 import { CounterAge, CounterItem, CounterList } from '@/ui/board';
 
 /** Each item as a menu's row: its status glyph, then its reference and title (a ticketless concept part's "Part 15")
@@ -17,16 +14,14 @@ import { CounterAge, CounterItem, CounterList } from '@/ui/board';
  *  Your desk's do. Picking one opens the item dialog. */
 export function List({
     items,
-    now,
     trailing,
     asks = false,
 }: {
     items: Item[];
-    now: number;
     trailing?: (item: Item) => ReactNode;
     asks?: boolean;
 }) {
-    const repos = useBoardStore((state) => state.data.repos);
+    const picked = useItemDialogStore((state) => state.itemId);
 
     return (
         <CounterList>
@@ -34,6 +29,7 @@ export function List({
                 <CounterItem
                     key={item.id}
                     item={item.id}
+                    picked={picked === item.id}
                     label={[partRef(item), item.title].filter(Boolean).join(' ')}
                     onOpen={() => useItemDialogStore.getState().open(item.id)}
                     leading={
@@ -42,7 +38,7 @@ export function List({
                         ) : (
                             <>
                                 <ItemStatusGlyph item={item} />
-                                <SourceIcon item={item} bare />
+                                <SourceIcon item={item} bare always />
                             </>
                         )
                     }
@@ -50,9 +46,8 @@ export function List({
                     // The title takes the row's width; its project (and age) go under it.
                     sub={
                         <CounterAge
-                            icon={<ProjectIcon repo={repoKey(item)} size="sm" />}
-                            name={itemRepoNames(item, repos)}
-                            age={trailing || asks ? undefined : shortAgo(item.closedAt ?? item.updatedAt, now)}
+                            project={<RepoCell item={item} />}
+                            age={!trailing && !asks && <Age at={item.closedAt ?? item.updatedAt} />}
                         />
                     }
                     trailing={trailing?.(item)}

@@ -1,5 +1,5 @@
 import { onAzure, writeAccessProblem, type Item } from '@lar-factory/shared';
-import { Alert, Button, FormFieldset, Inline, Stack, Text } from '@lar-works/design-system';
+import { Button, FormFieldset, Inline, Loading, Stack, Text } from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react';
 
@@ -8,7 +8,7 @@ import { TicketOptionFields, ticketOptions } from '@/features/add-item';
 import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { readTicketPreview, type TicketPreview } from '@/services/tickets/tickets.service';
-import { AccessNotice, buttonKind, FocusPanel, OutgoingTicket } from '@/ui/board';
+import { AccessNotice, ActionError, buttonKind, FocusPanel, OutgoingTicket, RetryAction } from '@/ui/board';
 
 export function CreateTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
@@ -46,7 +46,7 @@ export function CreateTicket({ item }: { item: Item }) {
                 if (!shown.signal.aborted)
                     setRead({
                         itemId,
-                        error: 'Couldn’t read the outgoing issue text. Close and reopen Create issue to retry.',
+                        error: 'Couldn’t load the outgoing issue text. Close and reopen Create issue to try again.',
                     });
             });
 
@@ -89,22 +89,11 @@ export function CreateTicket({ item }: { item: Item }) {
             {reason && (
                 <AccessNotice
                     message={reason}
-                    action={
-                        <Button
-                            {...buttonKind('other')}
-                            onClick={() => void useEditStore.getState().recheck(item.repo)}
-                        >
-                            Recheck access
-                        </Button>
-                    }
+                    action={<RetryAction access onRetry={() => void useEditStore.getState().recheck(item.repo)} />}
                 />
             )}
-            {error && <Alert size="sm" tone="danger" message={error} />}
-            {!outgoing && !error && (
-                <Text variant="inherit" role="status">
-                    Reading outgoing issue text…
-                </Text>
-            )}
+            {error && <ActionError>{error}</ActionError>}
+            {!outgoing && !error && <Loading presentation="status" label="Loading the outgoing issue text…" />}
             {!outgoing && (
                 <Inline as="span">
                     <Button {...buttonKind('other', { size: 'md' })} onClick={() => setOpen(false)}>

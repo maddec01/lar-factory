@@ -323,7 +323,7 @@ test.each([false, true])(
                 : original(...args),
         );
         await mountPage(editing);
-        await press($<HTMLButtonElement>('.title-bar .list-button')!);
+        await press($<HTMLButtonElement>('.title-bar [data-list-button]')!);
         await press($<HTMLButtonElement>(`[data-list-modal] [data-item="${github}"]`)!);
         await press(editButton());
         await typeAtEnd(' More.');

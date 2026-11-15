@@ -1,7 +1,7 @@
 import type { Item, ItemStats } from '@lar-factory/shared';
 // An item's agent work: its usage figures as one muted line, or the line that says why there are none.
 import { duration, formatTokens, formatUsd, shapingOwner } from '@lar-factory/shared';
-import { Text } from '@lar-works/design-system';
+import { Loading, Text } from '@lar-works/design-system';
 
 import { useItemState } from './ItemState';
 import { hasFigures, usageUnreadable } from './UsageFigures';
@@ -133,11 +133,13 @@ export function AgentWorkNote({ item }: { item: Item }) {
 
     return (
         <Text variant="caption" tone="muted" data-agent-work-note>
-            {s === 'unavailable'
-                ? 'Agent work unavailable.'
-                : item.usageState === 'loading'
-                  ? 'Loading agent work…'
-                  : none}
+            {s === 'unavailable' ? (
+                'Agent work unavailable.'
+            ) : item.usageState === 'loading' ? (
+                <Loading presentation="inline" label="Loading agent work…" />
+            ) : (
+                none
+            )}
         </Text>
     );
 }

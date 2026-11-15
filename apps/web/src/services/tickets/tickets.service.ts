@@ -21,7 +21,7 @@ export async function readTicketOptions(repo: string): Promise<TicketCreationOpt
     const response = await fetch(`/api/ticket-options?repo=${encodeURIComponent(repo)}`);
     const result = (await response.json()) as { options?: TicketCreationOptions; error?: string };
 
-    if (!response.ok || !result.options) throw Error(result.error ?? 'Couldn’t read issue options.');
+    if (!response.ok || !result.options) throw Error(result.error ?? 'Couldn’t load issue options.');
 
     return result.options;
 }
@@ -38,7 +38,7 @@ export async function readTicketPreview(itemId: string): Promise<TicketPreview> 
     const response = await fetch(`/api/ticket-preview?itemId=${encodeURIComponent(itemId)}`);
     const result = (await response.json()) as { preview?: TicketPreview; error?: string };
 
-    if (!response.ok || !result.preview) throw Error(result.error ?? 'Couldn’t read the outgoing issue text.');
+    if (!response.ok || !result.preview) throw Error(result.error ?? 'Couldn’t load the outgoing issue text.');
 
     return result.preview;
 }

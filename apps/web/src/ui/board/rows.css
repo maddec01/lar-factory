@@ -140,12 +140,12 @@
     }
 }
 
-/* A concept's row has no neighbours in its pane, so what it does next takes whatever room its title leaves, instead
+/* A concept's own row (not the part rows in its parts box, which are lane rows) has no neighbours in its pane, so what it does next takes whatever room its title leaves, instead
    of a lane's fixed activity track; its progress and end keep the lanes' tracks, so they still line up. */
-[data-dossier] .row-first > .row-cols {
+[data-dossier] .row-first:not([data-parts-frame] *) > .row-cols {
     flex: 0 1 auto;
 }
-[data-dossier] .row-first > .row-meta {
+[data-dossier] .row-first:not([data-parts-frame] *) > .row-meta {
     flex: 1 1 0;
     /* A row with nothing at work keeps its tracks at the row's end, as every other row does. */
     justify-content: end;
@@ -154,14 +154,14 @@
     max-width: none;
     grid-template-columns: minmax(14rem, 1fr) 10rem 8.5rem;
 }
-[data-dossier] .row-meta > :first-child:not([data-col='progress'], .row-meta-end) {
+[data-dossier] .row-meta:not([data-parts-frame] *) > :first-child:not([data-col='progress'], .row-meta-end) {
     justify-self: end;
 }
 
 /* On compact boards a concept keeps its one line: its title gives way first, then its other projects, and what it does
    next keeps a readable name beside its parts bar, count and cost. */
 @container (width < 64rem) {
-    [data-dossier] .row-first > .row-meta {
+    [data-dossier] .row-first:not([data-parts-frame] *) > .row-meta {
         grid-template-columns: minmax(9rem, 1fr) 9rem 6rem;
     }
 }
@@ -212,11 +212,6 @@ li.desk-row:has([data-row-open]:focus-visible) {
     outline-offset: 1px;
 }
 
-/* A row's title reads at the body's weight, as a list of work does; the needs-you state is what stands out. */
-:is(.row-cols, [data-dossier]) :is(.title, .ref) {
-    font-weight: 400;
-}
-
 /* On a row, in the item dialog and in a counter's list the project's icon is a quiet mark beside its name, without its
    colour; List and Settings keep its colour, where telling projects apart is the point. On a light page a project's own
    image, often a dark tile, is the darkest thing on its line, so it fades further there, to sit under the title it marks;
@@ -241,7 +236,7 @@ li.desk-row:has([data-row-open]:focus-visible) {
 .row-meta {
     display: grid;
     flex: 0 1 auto;
-    grid-template-columns: 20rem 10rem 8.5rem;
+    grid-template-columns: var(--row-activity, 20rem) 10rem var(--row-end, 8.5rem);
     column-gap: --spacing(4);
     align-items: center;
     min-width: 0;
@@ -275,10 +270,10 @@ li.desk-row:has([data-row-open]:focus-visible) {
 /* Under 1280px of row the activity gives its room to the title first. */
 @container (width < 80rem) {
     .row-meta {
-        grid-template-columns: 13rem 9.5rem 8rem;
+        grid-template-columns: var(--row-activity, 13rem) 9.5rem var(--row-end, 8rem);
     }
     .row-meta:not(:has(> [data-col='progress'])):has(> :not(.row-meta-end)) {
-        grid-template-columns: minmax(0, max-content) 8rem;
+        grid-template-columns: minmax(0, max-content) var(--row-end, 8rem);
     }
     .row-meta:not(:has(> [data-col='progress'])) > :not(.row-meta-end) {
         max-width: 22.5rem;
@@ -320,6 +315,13 @@ li.desk-row:has([data-row-open]:focus-visible) {
     min-width: 0;
 }
 
+/* A row that says every agent figure at its end (RowMetaEnd full, a concept dialog's part) gives its end track their
+   width, and what its thread does gives way first. */
+.row-meta:has(> .row-meta-end[data-full]) {
+    --row-activity: minmax(0, 13rem);
+    --row-end: minmax(8rem, max-content);
+}
+
 /* A row with nothing at work and no progress keeps only its end track, so its title has the room. */
 .row-meta:not(:has(> :not(.row-meta-end))) {
     grid-template-columns: minmax(8.5rem, max-content);
@@ -334,20 +336,21 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 
 /* A row's action takes no room at rest, so every row's facts end on the row's edge. On hover or focus it stands at that
-   same edge in place of the row's cost and state, which fade out under it: the end track is at least as wide as the
-   action, so the action never covers the activity or progress, and it is always in the same place. A phone keeps the
-   action under the title (Pane's narrow rules). */
+   same edge in place of the row's cost and state, which fade out under it, and it is always in the same place. It is as
+   wide as its label up to 11rem: a short action covers only the end track; only a held part's or Queue row's "Start
+   after Part 15", which has no progress beside it, reaches past it, whole rather than cut. A phone keeps the action
+   under the title (Pane's narrow rules). */
 .row-first,
 [data-part] > div {
-    --row-action: 8rem;
+    --row-action: 11rem;
 }
 [data-stage] li[data-item] .row-first,
-[data-dossier] .row-first {
+:is([data-dossier], [data-parts-frame]) .row-first {
     position: relative;
     align-items: center;
 }
 @container (width >= 41.25rem) {
-    :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side {
+    :is([data-stage] li[data-item], [data-dossier], [data-parts-frame]) .row-first > .row-side {
         position: absolute;
         inset-block: 0;
         right: var(--row-inset);
@@ -358,45 +361,30 @@ li.desk-row:has([data-row-open]:focus-visible) {
         align-items: center;
         justify-content: flex-end;
     }
-    [data-part] [data-part-action] {
-        position: absolute;
-        inset-block: 0;
-        right: 0;
-        max-width: var(--row-action);
-    }
-    [data-part] [data-part-action]:empty {
-        display: none;
-    }
 }
 @media (hover: hover) {
     @container (width >= 41.25rem) {
         /* Only the action fades, and only in: the facts under it step aside at once and the action leaves at once, so
            the two never read on top of each other mid-way, however a pointer or focus moves. */
-        :is([data-stage] li[data-item], [data-dossier]) .row-first > .row-side,
-        [data-part] [data-part-action] {
+        :is([data-stage] li[data-item], [data-dossier], [data-parts-frame]) .row-first > .row-side {
             opacity: 0;
         }
-        :is([data-stage] li[data-item], [data-dossier] .row-first):is(
+        :is([data-stage] li[data-item], [data-dossier] .row-first, [data-parts-frame] .row-first):is(
                 :hover,
                 :focus-within,
                 :has([aria-haspopup][aria-expanded='true'])
             )
             .row-side,
-        [data-dossier] .row-first:has([data-dossier-tools]) > .row-side,
-        [data-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])) [data-part-action] {
+        [data-dossier] .row-first:has([data-dossier-tools]) > .row-side {
             opacity: 1;
             transition: opacity var(--motion-duration-fast) var(--ease-standard);
         }
-        :is([data-stage] li[data-item], [data-dossier] .row-first):is(
+        :is([data-stage] li[data-item], [data-dossier] .row-first, [data-parts-frame] .row-first):is(
                 :hover,
                 :focus-within,
                 :has([aria-haspopup][aria-expanded='true'])
             ):has(.row-side > :not(:empty))
-            :is(.row-meta-end, .row-cols > [data-col='state']),
-        [data-part]:is(:hover, :focus-within, :has([aria-haspopup][aria-expanded='true'])):has(
-                [data-part-action] > :not(:empty)
-            )
-            :is([data-part-usage], [data-part-meta]) {
+            :is(.row-meta-end, .row-cols > [data-col='state']) {
             opacity: 0;
         }
     }
@@ -407,35 +395,10 @@ li.desk-row:has([data-row-open]:focus-visible) {
     cursor: pointer;
 }
 
-/* A part's project and state sit on two fixed tracks at its end, so projects line up down the list however long a state
-   is; the state says the short form ("After #139"), and the part's dialog names the rest. */
-@container (width >= 41.25rem) {
-    [data-part] [data-part-meta] {
-        display: grid;
-        grid-template-columns: 8rem 8rem;
-        column-gap: --spacing(3);
-    }
-    [data-part] [data-part-meta] > [data-repo-cell] {
-        grid-column: 1;
-        justify-self: start;
-        min-width: 0;
-        max-width: 100%;
-    }
-    [data-part] [data-part-meta] > :not([data-repo-cell]) {
-        grid-column: 2;
-        grid-row: 1;
-        justify-self: end;
-        min-width: 0;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
-
 /* A lane row with progress but nothing at work keeps no empty activity track, so its title has that room; its progress
    and end stay on the same right-anchored tracks as its neighbours'. */
 .row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
-    grid-template-columns: 10rem 8.5rem;
+    grid-template-columns: 10rem var(--row-end, 8.5rem);
 }
 .row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) > [data-col='progress'] {
     grid-column: 1;
@@ -445,6 +408,22 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 @container (width < 80rem) {
     .row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
-        grid-template-columns: 9.5rem 8rem;
+        grid-template-columns: 9.5rem var(--row-end, 8rem);
     }
+}
+
+/* A concept's Parts view toggle holds two buttons and never needs to scroll. The design system's ViewToggle scrolls
+   sideways when its buttons overrun it, and here they overrun it by its 2px padding, so after a click it showed a
+   scroll bar over its second button; it shows them whole instead. */
+[data-dossier-view] [role='group']:has(> [aria-label='Work map']) {
+    overflow: visible;
+}
+
+/* A concept's parts box, its Work map or its parts list alike, reaches past the concept's indent to the lanes' own edges,
+   standing 5px outside them (its border and a 4px inset), so a part row's columns fall exactly on a lane row's and the
+   map's lane names on the rows' glyphs; both views take one box, so switching them moves nothing. */
+[data-dossier-body] > :is([data-parts-frame], [data-work-map]) {
+    margin-left: calc(-2.25rem - 0.3125rem);
+    margin-right: -0.3125rem;
+    padding: 0.25rem;
 }

@@ -8,7 +8,7 @@ import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
     await mountPage(fresh());
     expect($$('.desk-row')).toHaveLength(7);
-    expect(text($('.list-button')), 'the list counts its 20 items').toBe('List20');
+    expect(text($('[data-list-button]')), 'the list counts its 20 items').toBe('List20');
     expect(fetchMock).not.toHaveBeenCalled();
     expect($('#board-data')).not.toBeNull();
     expect($('[data-warning="client-error"]')).toBeNull();
@@ -32,7 +32,7 @@ test('an entered title round-trips through the inline board data without closing
             disconnect() {}
         },
     );
-    await settle(() => $<HTMLButtonElement>('.list-button')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-list-button]')!.click());
     expect(document.body.textContent).toContain(title);
 });
 
@@ -48,7 +48,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
             new MessageEvent('message', { data: JSON.stringify({ ...fresh(), items: sample.items.slice(0, 1) }) }),
         ),
     );
-    expect(text($('.list-button'))).toBe('List1');
+    expect(text($('[data-list-button]'))).toBe('List1');
     expect($$('.desk-row')).toHaveLength(0);
 });
 
@@ -93,7 +93,7 @@ test('the lost server’s warning closes, and the next failure after the server 
     close.focus();
     await settle(() => close.click());
     expect($('[data-warning="client-error"]')).toBeNull();
-    expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
+    expect(document.activeElement, 'focus stays on the page').toBe($('[data-add-item]'));
     await settle(() => vi.advanceTimersByTime(15_000));
     expect($('[data-warning="client-error"]'), 'it stays closed while the server stays away').toBeNull();
 
@@ -106,8 +106,8 @@ test('the lost server’s warning closes, and the next failure after the server 
 
 test('new data keeps focus', async () => {
     await mountPage(fresh());
-    $('.add-item')!.focus();
+    $('[data-add-item]')!.focus();
 
     await push({ ...fresh(), items: [...sample.items].reverse() });
-    expect(document.activeElement).toBe($('.add-item'));
+    expect(document.activeElement).toBe($('[data-add-item]'));
 });

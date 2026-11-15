@@ -61,11 +61,11 @@ test('a failed read shows its error in the modal and the board data stays visibl
         'I_sample13',
         new Response(JSON.stringify({ error: 'Item details aren’t available yet.' }), { status: 501 }),
     );
-    // One line where the loading line sat: what failed, Try again and the ticket in its tracker, the reason on its tooltip.
+    // Under the description's heading, the board's LoadFailed: what failed, why, Try again and the ticket in its tracker.
     expect(text(inDialog('[data-details-error]'))).toBe(
-        'Couldn’t load details: Item details aren’t available yet.·Try again·Open in GitHub',
+        'Couldn’t load detailsItem details aren’t available yet.Try againOpen in GitHub',
     );
-    expect(inDialog('[data-details-error] [title]')?.getAttribute('title')).toBe('Item details aren’t available yet.');
+    expect(inDialog('[data-details-error]')?.getAttribute('role')).toBe('alert');
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
     expect(text(inDialog('[data-slices] p'))).toBe('1/3 slices done');
     expect(inDialog('[aria-busy="true"]')).toBeNull();
@@ -250,7 +250,7 @@ test('build checks load once on expansion and retain the empty result on reopen'
         section.dispatchEvent(new Event('toggle'));
     });
     expect(calls()).toHaveLength(1);
-    expect(text(section)).toContain('No checks are recorded.');
+    expect(text(section)).toContain('No checks yet.');
     await settle(() => {
         section.open = false;
         section.dispatchEvent(new Event('toggle'));
@@ -289,7 +289,7 @@ test('a group of tracker sub-tickets holds their place with a placeholder line e
         expect(placeholders()).toBeNull();
         expect(inDialog('[data-details-loading]')).toBeNull();
         expect(text(inDialog('[data-details-error]'))).toBe(
-            'Couldn’t load details: It took too long to answer.·Try again·Open in GitHub',
+            'Couldn’t load detailsIt took too long to answer.Try againOpen in GitHub',
         );
     } finally {
         vi.useRealTimers();

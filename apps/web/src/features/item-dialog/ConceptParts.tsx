@@ -1,31 +1,28 @@
 // What a concept's details add about its parts: its own cost beside its total on the board, and every part on the board,
-// each with its status, its cost beside it and Open thread beside it, and what its refinement and delivery still need, in
+// each as its row on the board reads with every agent figure, and what its refinement and delivery still need, in
 // words. Parts off the board aren't listed; the count above says how many and why.
 
 import { duration, formatTokens, formatUsd, onAzure, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
-import { useState } from 'react';
 
-import { ConceptPartRow } from './ConceptPartRow';
 import { TicketLinks } from './ItemRelations';
 import { sidebarSubTickets, subTicketsInParts } from './Relations';
 import { useConceptTotal } from './useConceptTotal';
 import { useDetailsWait } from './useDetailsWait';
 import { hasFigures, INCOMPLETE_TOTAL, useLastKnown } from '@/features/items';
-import { ConceptOpenQuestions, ConceptPartsBar, isDone, partsOf, unreadParts, unreadPartsText } from '@/features/line';
+import {
+    ConceptOpenQuestions,
+    ConceptPartsBar,
+    isDone,
+    PartsList,
+    partsOf,
+    unreadParts,
+    unreadPartsText,
+} from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
-import {
-    DetailFact,
-    FigureRows,
-    PartsList,
-    MainSection,
-    ShowDoneToggle,
-    SectionHeader,
-    TicketLinkPlaceholders,
-    workHoldReason,
-} from '@/ui/board';
+import { FigureRows, MainSection, SectionHeader, TicketLinkPlaceholders, workHoldReason } from '@/ui/board';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const UNFINISHED_PART = new RegExp(`^Its (.+) (${WORK_ID}) isn['’]t (?:settled|Done)[.]$`);
@@ -127,7 +124,7 @@ export function ConceptWork({ item }: { item: Item }) {
 
     return (
         <>
-            {!own && <FigureRows heading="This concept" rows={[]} note="No agent work of its own" />}
+            {!own && <FigureRows heading="This concept" rows={[]} note="No agent work of its own." />}
             <FigureRows
                 heading="Including parts"
                 rows={rows}
@@ -136,41 +133,6 @@ export function ConceptWork({ item }: { item: Item }) {
                     .join('. ')}
                 data-concept-work
             />
-        </>
-    );
-}
-
-/** The concept's parts, what's still to do first; done and set-aside parts fold under one toggle, as on the board. */
-function OpenFirst({
-    parts,
-    data,
-    openPart,
-    parentRepo,
-}: {
-    parts: ReturnType<typeof partsOf>;
-    data: BoardData;
-    openPart: (itemId: string) => void;
-    parentRepo: string | undefined;
-}) {
-    const [showDone, setShowDone] = useState(false);
-    const open = parts.filter((part) => !isDone(part.item));
-    const done = parts.filter((part) => isDone(part.item));
-    const setAside = done.filter((part) => part.item.setAside).length;
-    const history = [done.length - setAside && `${done.length - setAside} done`, setAside && `${setAside} set aside`]
-        .filter(Boolean)
-        .join(' and ');
-    const row = (part: (typeof parts)[number]) => (
-        <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} parentRepo={parentRepo} />
-    );
-
-    return (
-        <>
-            <PartsList>{[...open, ...(showDone ? done : [])].map(row)}</PartsList>
-            {done.length > 0 && (
-                <ShowDoneToggle open={showDone} onToggle={() => setShowDone(!showDone)}>
-                    {`${showDone ? 'Hide' : 'Show'} ${history}`}
-                </ShowDoneToggle>
-            )}
         </>
     );
 }
@@ -213,6 +175,7 @@ export function ConceptParts({
                               : 'Parts'
                     }
                     bar={<ConceptPartsBar parent={item} parts={parts} />}
+                    empty={!parts.length && !tracked ? 'No parts planned yet.' : undefined}
                 />
             }
         >
@@ -245,8 +208,18 @@ export function ConceptParts({
                         )}
                 </Text>
             )}
-            {!parts.length && !tracked && <DetailFact label="Parts">No parts planned yet.</DetailFact>}
-            {parts.length > 0 && <OpenFirst parts={parts} data={data} openPart={openPart} parentRepo={item.repo} />}
+            {/* The board's own part rows, what's still to do first, done and set-aside parts folded under one toggle; each
+                says every agent figure, as the dialog has room for. */}
+            {parts.length > 0 && (
+                <PartsList
+                    parts={parts}
+                    data={data}
+                    home={item.repo}
+                    openFirst
+                    onOpen={(part) => openPart(part.id)}
+                    full
+                />
+            )}
             {subTickets.length > 0 && <TicketLinks tickets={subTickets} row />}
             {loading && waited !== 'too long' && item.subIssues.total > 0 && (
                 <TicketLinkPlaceholders

@@ -223,7 +223,7 @@ test('a large group lists its parts directly, keeps part holds folded and batch 
     expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });
 
-test('a concept’s part says its agent time, tokens and cost on its one line, in their own column', async () => {
+test('a concept’s part says its agent time, tokens and cost at its row’s end, as the board’s part row does', async () => {
     const data = group('concept', false);
     const part: Item = {
         ...data.items[1]!,
@@ -235,7 +235,7 @@ test('a concept’s part says its agent time, tokens and cost on its one line, i
 
     await show(fresh({ ...data, items: [data.items[0]!, part, data.items[2]!] }));
 
-    const usage = $(`[data-part="${part.id}"] [data-part-cost]`);
+    const end = $(`[data-item-dialog] [data-parts-frame] [data-part="${part.id}"] [data-meta-end][data-full]`);
 
-    expect(text(usage)).toBe('2h 29m · 64.8M tokens · $29.12');
+    expect(text(end)).toContain('2h 29m · 64.8M tokens · $29.12');
 });

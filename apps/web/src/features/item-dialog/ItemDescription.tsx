@@ -17,10 +17,10 @@ import {
     AddDescription,
     buttonKind,
     DetailsLoading,
-    DetailsUnavailable,
     EditActions,
     EditorSlot,
     HeaderStatus,
+    LoadFailed,
     MainSection,
     SectionHeader,
     TextSection,
@@ -37,13 +37,15 @@ function useSource(itemId: string) {
     };
 }
 
-/** The one line in place of the details that couldn't be read: try again, or open the ticket in its tracker. */
+/** The description's heading over what couldn't be read: try again, or open the ticket in its tracker. */
 function Unavailable({
     itemId,
+    heading,
     reason,
     refresh,
 }: {
     itemId: string;
+    heading: string;
     reason?: string | undefined;
     refresh: () => Promise<boolean>;
 }) {
@@ -51,16 +53,21 @@ function Unavailable({
     const [retrying, setRetrying] = useState(false);
 
     return (
-        <DetailsUnavailable
-            source={source}
-            reason={reason}
-            retrying={retrying}
-            href={url}
-            onRetry={() => {
-                setRetrying(true);
-                void refresh().finally(() => setRetrying(false));
-            }}
-        />
+        <MainSection header={<SectionHeader heading={heading} prose />}>
+            <LoadFailed
+                what={url ? 'details' : `details from ${source}`}
+                reason={reason}
+                retrying={retrying}
+                link={url ? { label: `Open in ${source}`, href: url } : undefined}
+                onRetry={() => {
+                    if (retrying) return;
+
+                    setRetrying(true);
+                    void refresh().finally(() => setRetrying(false));
+                }}
+                data-details-error
+            />
+        </MainSection>
     );
 }
 
@@ -72,7 +79,7 @@ function Loading({ itemId, heading, refresh }: { itemId: string; heading: string
     const waited = useDetailsWait(itemId);
 
     if (waited === 'too long')
-        return <Unavailable itemId={itemId} reason="It took too long to answer." refresh={refresh} />;
+        return <Unavailable itemId={itemId} heading={heading} reason="It took too long to answer." refresh={refresh} />;
 
     return (
         <DetailsLoading
@@ -160,7 +167,15 @@ export function ItemDescription({
             <Loading itemId={itemId} heading={ticketContext ? 'Ticket description' : 'Description'} refresh={refresh} />
         );
 
-    if (read.state === 'failed') return <Unavailable itemId={itemId} reason={read.error} refresh={refresh} />;
+    if (read.state === 'failed')
+        return (
+            <Unavailable
+                itemId={itemId}
+                heading={ticketContext ? 'Ticket description' : 'Description'}
+                reason={read.error}
+                refresh={refresh}
+            />
+        );
 
     const { sections } = read.details;
     const exportsRecord = Boolean(read.details.spec && read.details.record);

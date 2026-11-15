@@ -2,18 +2,10 @@
 
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
-import {
-    Button,
-    Comment as CommentCard,
-    CommentList,
-    Inline,
-    PageError,
-    RichText,
-    Stack,
-} from '@lar-works/design-system';
+import { Button, Comment as CommentCard, CommentList, Inline, RichText } from '@lar-works/design-system';
 
 import { useOlderComments, type DetailsEntry, type ItemDetailsRead } from '@/services/items/items.hooks';
-import { buttonKind, MainSection, SectionHeader } from '@/ui/board';
+import { buttonKind, LoadFailed, MainSection, SectionHeader } from '@/ui/board';
 
 function Comment({ comment, now }: { comment: ItemComment; now: number }) {
     return (
@@ -69,16 +61,7 @@ function Comments({
                     <Button {...buttonKind('other')} loading={older.loading} onClick={older.loadMore}>
                         Load older comments
                     </Button>
-                    {older.error && (
-                        <Stack role="alert">
-                            <PageError
-                                size="inline"
-                                title="Couldn’t load older comments"
-                                description={older.error}
-                                primaryAction={{ label: 'Try again', onAction: older.loadMore }}
-                            />
-                        </Stack>
-                    )}
+                    {older.error && <LoadFailed what="older comments" reason={older.error} onRetry={older.loadMore} />}
                 </Inline>
             )}
         </MainSection>

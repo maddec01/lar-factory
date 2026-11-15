@@ -1,9 +1,11 @@
 import { SectionTitle, StatusIndicator } from '@lar-works/design-system';
-import type { StatusState } from '@lar-works/design-system';
 import { Children, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
 import { BoardCard } from './BoardCard';
 import { useArrival } from './BoardLife';
+import { FoldToggle } from './FoldToggle';
+import { DetailFact } from './ItemDetailFacts';
+import { MetaDot, MetaLine } from './TextParts';
 
 interface DeskSectionProps {
     /** The section's heading, such as "Your desk". */
@@ -12,7 +14,7 @@ interface DeskSectionProps {
     count: number;
     /** The first read may still add rows; hide its provisional zero. */
     loading?: boolean;
-    /** What the section says when nothing awaits you. */
+    /** What the section says when nothing awaits you, a HeaderEmpty. */
     empty?: ReactNode;
     /** The rows, one DeskCard each. */
     children?: ReactNode;
@@ -64,14 +66,14 @@ export function DeskSection({ title, count, loading = false, empty, children }: 
                         countLoading={loading}
                     />
                     {/* An empty desk says why beside its title, quiet, so the lanes come straight after it. */}
-                    {!count && (
-                        <span className="text-fg-muted flex min-w-0 items-center truncate text-xs" data-desk-empty>
-                            {empty}
-                        </span>
-                    )}
+                    {!count && empty}
                 </div>
                 {/* A quiet header control on the rows' right gutter, as Auto-build is. */}
-                {hidden > 0 && <DeskShowMore onClick={() => setAll(true)}>Show {hidden} more</DeskShowMore>}
+                {(hidden > 0 || (all && count > columns * 2)) && (
+                    <FoldToggle open={all} onToggle={() => setAll(!all)}>
+                        {all ? 'Show fewer' : `Show ${hidden} more`}
+                    </FoldToggle>
+                )}
             </div>
             {count > 0 && (
                 <ol ref={grid} aria-label={title} className="desk-grid m-0 list-none p-0">
@@ -143,12 +145,8 @@ interface DeskCardProps {
     members?: string[];
     /** More about the item under its title, such as a work item's fields. */
     details?: ReactNode;
-    /** The status's glyph, only where there is no `statusState` (the row's amber bar marks it instead). */
-    statusIcon: ReactNode;
     /** The next step, in words. */
     status: string;
-    /** The status's state: its light's colour, beside the neutral word (the shared semantic tone contract). */
-    statusState?: StatusState;
     /** How long it has waited, such as "2d ago", after its status. */
     age?: ReactNode;
     /** Beside the status: the next step, such as a DeskHint. */
@@ -214,7 +212,11 @@ export function DeskCard({
                             </span>
                         )}
                         {next}
-                        {!!members?.length && <p className="m-0 wrap-anywhere">Briefs: {members.join(' · ')}</p>}
+                        {!!members?.length && (
+                            <p className="m-0 wrap-anywhere">
+                                Briefs: <MetaLine parts={members} />
+                            </p>
+                        )}
                         {details}
                     </>
                 }
@@ -223,7 +225,12 @@ export function DeskCard({
                 state={
                     <span title={step ?? stage} data-state>
                         {status}
-                        {age && <span className="text-fg-muted font-normal"> · {age}</span>}
+                        {age && (
+                            <span className="text-fg-muted font-normal">
+                                {' '}
+                                <MetaDot /> {age}
+                            </span>
+                        )}
                     </span>
                 }
                 action={actions}
@@ -254,7 +261,7 @@ export function DeskPrProgress({
     wide,
 }: {
     label: string;
-    summary: string;
+    summary: ReactNode;
     note?: string;
     wide?: string;
 }) {
@@ -266,21 +273,12 @@ export function DeskPrProgress({
         >
             <span className="text-fg font-medium">{label}</span>
             <span>{summary}</span>
-            {wide && <span>PR-wide statuses: {wide}</span>}
+            {wide && (
+                <DetailFact presentation="record" label="PR-wide statuses">
+                    <span>{wide}</span>
+                </DetailFact>
+            )}
             {note && <span>{note}</span>}
         </div>
-    );
-}
-
-/** Your desk's Show more: muted text that brightens on hover, its text ending on the rows' right edge. */
-function DeskShowMore({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="text-fg-muted hover:text-fg focus-ring rounded-xs text-xs transition-colors"
-        >
-            {children}
-        </button>
     );
 }

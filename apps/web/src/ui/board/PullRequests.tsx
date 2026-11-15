@@ -1,6 +1,6 @@
 // A piece of work's pull requests: a list with each one's checks and readiness, and the short reference rows show.
 
-import { StatusIndicator } from '@lar-works/design-system';
+import { StatusIndicator, Text } from '@lar-works/design-system';
 import { GitPullRequestIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -144,7 +144,11 @@ export function PullRequestReadiness({
         <>
             {/* The toggle ends the card's one line; what it shows takes the card's foot. */}
             <span className="ml-auto shrink-0">{toggle}</span>
-            {details && <div className="text-fg-muted basis-full text-xs">{details}</div>}
+            {details && (
+                <Text as="div" variant="caption" tone="muted" ownLine>
+                    {details}
+                </Text>
+            )}
         </>
     );
 }

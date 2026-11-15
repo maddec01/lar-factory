@@ -52,7 +52,7 @@ export function BoardContent({
     return <div className="px-gutter-app flex w-full flex-1 flex-col gap-6 pt-6 pb-10 *:shrink-0">{children}</div>;
 }
 
-/** A line that stands in for content the board is still reading, centred in its area. */
+/** A line that stands in for content the board is still reading, centred in its area, in the loader's own look. */
 export function ReadingLine({
     label,
 }: {
@@ -60,8 +60,8 @@ export function ReadingLine({
     label: string;
 }) {
     return (
-        <p className="text-fg-muted m-0 flex items-center justify-center gap-2 p-6 text-sm" data-reading>
+        <div className="flex justify-center p-6" data-reading>
             <Loading label={label} presentation="line" />
-        </p>
+        </div>
     );
 }

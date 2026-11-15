@@ -5,7 +5,8 @@ import { ambientMotion, SegmentedProgress, statusStateColors } from '@lar-works/
 import { CheckIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-import { type SliceProgress, sliceProgressLabel, sliceProgressState } from './StatusColors';
+import { COMPACT_ROW } from './RowStyles';
+import { MARK_STROKE, type SliceProgress, sliceProgressLabel, sliceProgressState } from './StatusColors';
 
 export type { SliceProgress };
 
@@ -62,7 +63,7 @@ function SliceMark({
 }) {
     return (
         <span
-            className={`grid size-4 shrink-0 place-items-center rounded-full border-[1.5px] ${progress === 'blocked' ? 'border-dashed' : ''}`}
+            className={`grid size-4 shrink-0 place-items-center rounded-full ${MARK_STROKE} ${progress === 'blocked' ? 'border-dashed' : ''}`}
             style={{
                 borderColor: SLICE_COLOR[progress],
                 background: progress === 'done' ? SLICE_COLOR.done : 'transparent',
@@ -90,13 +91,12 @@ export function SliceList({
     return <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">{children}</ul>;
 }
 
-/** A slice in SliceList: where its ticket is saved, its mark, number, title (muted when done) and state, in its
- *  state's word (`label`, such as "Queued" for a slice not started). */
+/** A slice in SliceList: where its ticket is saved, its mark, its number and title (an ItemTitle, muted when done) and
+ *  state, in its state's word (`label`, such as "Queued" for a slice not started). */
 export function SliceRow({
     source,
     progress,
     still = false,
-    number,
     title,
     label = sliceProgressLabel[progress],
 }: {
@@ -106,20 +106,17 @@ export function SliceRow({
     progress: SliceProgress;
     /** Keeps an active slice's mark from pulsing. */
     still?: boolean;
-    /** The slice's ticket number; a slice with none shows none. */
-    number?: number | undefined;
-    /** The slice's title. */
-    title: string;
+    /** The slice's number and title, an ItemTitle. */
+    title: ReactNode;
     /** The slice's state in words: Done, Working, Blocked, Unknown or Queued (a slice not started) unless given. */
     label?: string | undefined;
 }) {
     return (
-        <li className="hover:bg-fill-hover -mx-2 flex items-start gap-2 rounded-md px-2 py-1 text-sm">
+        <li className={`${COMPACT_ROW} -mx-2 flex items-start gap-2 text-sm`}>
             <span className="mt-0.5">
                 <SliceMark progress={progress} still={still} />
             </span>
-            {source}
-            {!!number && <span className="text-fg-muted shrink-0 tabular-nums">#{number}</span>}
+            <span className="flex h-5 shrink-0 items-center empty:hidden">{source}</span>
             <span
                 className={`min-w-0 flex-1 wrap-anywhere ${progress === 'done' ? 'text-fg-muted' : progress === 'active' ? 'font-medium' : ''}`}
             >

@@ -1,7 +1,8 @@
-import { SkeletonLoader } from '@lar-works/design-system';
+import { Link, SkeletonLoader } from '@lar-works/design-system';
 import { CircleCheckIcon, CircleDotIcon } from '@lar-works/design-system/icons';
-import { linkRecipe } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
+
+import { ItemTitle } from './ItemParts';
 
 /** Linked work items, such as sub-tickets or blockers, one TicketLink each; or attachments, one AttachmentLink each. */
 export function TicketLinkList({
@@ -62,7 +63,7 @@ export function TicketLink({
                     title={row ? `${reference} ${title}` : undefined}
                     className={`hover:underline ${row ? 'min-w-0 flex-1 truncate' : 'wrap-anywhere'}`}
                 >
-                    <span className="text-fg-muted">{reference}</span> {title}
+                    <ItemTitle reference={reference} title={title} />
                 </a>
                 {row ? <span className="max-w-[45%] shrink-0">{fields}</span> : fields}
             </span>
@@ -112,10 +113,10 @@ export function AttachmentLink({
     name: string;
 }) {
     return (
-        <li className="text-sm">
-            <a href={href} target="_blank" rel="noopener" className={`wrap-anywhere ${linkRecipe.accent}`}>
+        <li className="text-sm wrap-anywhere">
+            <Link href={href} external showExternalIcon={false}>
                 {name}
-            </a>
+            </Link>
         </li>
     );
 }

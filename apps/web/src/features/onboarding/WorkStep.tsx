@@ -1,7 +1,7 @@
 // Onboarding's work step: where the project's work comes from and how it is set up.
 
 import { writeAccessProblem, type SetupDetection } from '@lar-factory/shared';
-import { Button, Checkbox, Disclosure, Inline, Input, InsetPanel, OptionSelect, Text } from '@lar-works/design-system';
+import { Checkbox, Disclosure, Inline, Input, InsetPanel, OptionSelect, Text } from '@lar-works/design-system';
 
 import { KindMapping } from './KindMapping';
 import {
@@ -17,7 +17,7 @@ import { AccessReason, accessExplanation, IssueDefaults } from '@/features/repos
 import { useBoardStore } from '@/services/board/board.hooks';
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { Switch } from '@/shared/settings/SettingControls';
-import { buttonKind, SetupStep } from '@/ui/board';
+import { RetryAction, SetupStep } from '@/ui/board';
 
 export function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
     const { choose, detect } = useWizardStore();
@@ -134,9 +134,7 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
                 </InsetPanel>
             </Disclosure>
             <Inline as="span">
-                <Button {...buttonKind('other', { size: 'md' })} onClick={recheck}>
-                    Recheck access
-                </Button>
+                <RetryAction access size="md" onRetry={recheck} />
             </Inline>
         </SetupStep>
     );

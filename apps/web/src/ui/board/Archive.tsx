@@ -1,24 +1,26 @@
-import { Alert } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
-/** An archived row's one line: where its ticket is saved (`source`, when it says something), its reference and title, taking the room and truncating first with its tooltip giving
- *  it whole, then its project's short name on a 6rem track that lines up down the list, then where it stands, only when
- *  that says more than its section's heading (such as the day finished work closed, or the work it merged into). */
+import { ActionError } from './StartControls';
+
+/** An archived row's one line: its kind and where its ticket is saved (`source`), its reference and title (an
+ *  ItemTitle), taking the room and truncating first with its tooltip (`name`) giving it whole, then its project on a
+ *  6rem track that lines up down the list, then where it stands, only when that says more than its section's heading
+ *  (such as the day finished work closed, or the work it merged into). */
 export function ArchiveLine({
     source,
-    reference,
+    name,
     title,
     project,
     state,
 }: {
-    /** Where its ticket is saved, a SourceIcon, before its title. */
-    source?: ReactNode;
-    /** The ticket's reference, such as "#143"; none for work with no ticket. */
-    reference?: string | undefined;
-    /** The work's title. */
-    title: string;
-    /** Its project's short name. */
-    project: string;
+    /** Its kind mark and where its ticket is saved, a SourceIcon, before its title. */
+    source: ReactNode;
+    /** Its reference and title in full, as the title's tooltip. */
+    name: string;
+    /** Its reference and title, an ItemTitle. */
+    title: ReactNode;
+    /** Its project, a RepoCell. */
+    project: ReactNode;
     /** Where it stands, when its section's heading doesn't say it, such as "Oct 1"; none otherwise. */
     state?: string | undefined;
 }) {
@@ -28,19 +30,12 @@ export function ArchiveLine({
             data-archive-line
         >
             <span className="flex min-w-0 items-center gap-2">
-                {source && <span className="flex shrink-0 items-center empty:hidden">{source}</span>}
-                <span
-                    className="min-w-0 truncate"
-                    title={reference ? `${reference} ${title}` : title}
-                    data-archive-title
-                >
-                    {reference && <span className="text-fg-muted font-normal tabular-nums">{reference} </span>}
+                <span className="text-fg-muted flex shrink-0 items-center gap-2">{source}</span>
+                <span className="min-w-0 truncate" title={name} data-archive-title>
                     {title}
                 </span>
             </span>
-            <span className="text-fg-muted min-w-0 truncate text-xs font-normal" title={project}>
-                {project}
-            </span>
+            <span className="text-fg-soft flex min-w-0 text-xs font-normal">{project}</span>
             {state && (
                 <span
                     className="text-fg-muted max-w-40 min-w-0 truncate text-xs font-normal tabular-nums"
@@ -71,7 +66,7 @@ export function ActionStack({
         <span className="flex flex-col items-end gap-1">
             <span className="flex items-center justify-end gap-1">{children}</span>
             {below}
-            {error && <Alert size="sm" tone="danger" message={error} />}
+            {error && <ActionError>{error}</ActionError>}
         </span>
     );
 }

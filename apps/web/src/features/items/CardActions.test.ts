@@ -37,7 +37,7 @@ test('Queue shows pending state, then leaves Shape reachable without an overlay'
     expect(text(button('abandon', 'I_sample01')), 'Abandon isn’t relabelled').toBe('Abandon');
 
     await answer({ error: null, board: moved('I_sample01', 'Queued') });
-    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List19');
+    expect(text($('.title-bar [data-list-button]')), 'it leaves the list').toBe('List19');
     expect(toast()).toBeNull();
     expect(text(button('start', 'I_sample01'))).toBe('Shape');
 });
@@ -51,7 +51,7 @@ test('a failed Move to the List shows as a toast naming the item, which stays un
     expect(toast()!.getAttribute('role')).toBe('alert');
     expect(toast()!.dataset.toastColor, 'a failure is red').toBe('danger');
     expect(text(toast())).toMatch(/^Couldn’t move #129 .* to the List\. Couldn’t set List\. GitHub is down\.$/);
-    expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
+    expect(toast()!.querySelector('a[href]'), 'it links the item').not.toBeNull();
     expect($('[data-item-dialog] [data-action-error]'), 'the dialog shows no inline error').toBeNull();
     expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to the List');
     await settle(() => vi.advanceTimersByTime(60_000));
@@ -137,7 +137,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the c
     expect(text(button('queue', 'I_sample01')), 'Queue isn’t relabelled').toBe('Queue');
 
     await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
-    expect(text($('.title-bar .list-button')), 'it leaves the list').toBe('List19');
+    expect(text($('.title-bar [data-list-button]')), 'it leaves the list').toBe('List19');
     expect(toast()!.querySelector('a, [data-view-item]'), 'the toast gives the result').toBeNull();
     expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
@@ -309,7 +309,7 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
 test('Queue from the list closes details and returns focus to the surviving List search', async () => {
     holdPosts();
     await mountPage();
-    await press($<HTMLButtonElement>('.title-bar .list-button')!);
+    await press($<HTMLButtonElement>('.title-bar [data-list-button]')!);
     await press($<HTMLButtonElement>('[data-list-modal] [data-item="I_sample01"]')!);
     await press(button('queue', 'I_sample01'));
     await press(button('queue', 'I_sample01'));
@@ -326,7 +326,7 @@ test.each(['replace', 'reopen', 'other', 'closed', 'failure'])(
     async (outcome) => {
         holdPosts();
         await mountPage();
-        await press($<HTMLButtonElement>('.title-bar .list-button')!);
+        await press($<HTMLButtonElement>('.title-bar [data-list-button]')!);
         await press($<HTMLButtonElement>('[data-list-modal] [data-item="I_sample01"]')!);
         await press(button('queue', 'I_sample01'));
 

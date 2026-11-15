@@ -4,7 +4,7 @@ import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { DECISION_KINDS } from './DossierParts';
 import type { Part } from './DossierParts';
 import type { layout } from './WorkMapLayout';
-import { CheckNode, PartNode, RepoIdentity } from './WorkMapParts';
+import { CheckNode, PartNode, MapRepo } from './WorkMapParts';
 import { MapLaneName, MapPrerequisiteNode, MapStack, MapStackItem } from '@/ui/board';
 
 /** The same map cards in dependency order, so a phone never opens on an empty graph column. */
@@ -38,7 +38,7 @@ export function CompactWorkMap({
         DECISION_KINDS.includes(part.kind) ? (
             <MapLaneName lane="decisions">Decisions</MapLaneName>
         ) : (
-            <RepoIdentity repo={part.item.repo} data={data} />
+            <MapRepo repo={part.item.repo} data={data} />
         );
 
     return (

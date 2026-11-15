@@ -9,14 +9,7 @@ import { KIND_BADGES } from './KindBadges';
 import { type LabelledItem, useShownLabels } from './useShownLabels';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import {
-    ItemFields,
-    ItemTitle as DesignItemTitle,
-    KindBadge as HueBadge,
-    RepoIdentity,
-    TitleLink as DesignTitleLink,
-    TrackerTag,
-} from '@/ui/board';
+import { ItemFields, ItemTitle as DesignItemTitle, KindBadge as HueBadge, QuietLabel, RepoIdentity } from '@/ui/board';
 
 /** A row's or the item dialog's repository: its project icon and name, alike wherever it shows. Where the ticket is saved is SourceIcon's to say, beside it. A
  *  `home` one is the concept's own, which a part shares, quieter than a project of the part's own (items.css). */
@@ -36,7 +29,7 @@ export function RepoCell({ item, home = false }: { item: Item; home?: boolean })
 /** The item's numbered title as a link to its ticket, or as text when it has no page, as a sentence names it. */
 export function TitleLink({ item }: { item: Item }) {
     return (
-        <DesignTitleLink
+        <DesignItemTitle
             reference={item.number ? ref(item) : undefined}
             title={item.title}
             href={item.url ?? undefined}
@@ -83,9 +76,9 @@ export function LabelChips({ item }: { item: LabelledItem }) {
     return (
         <>
             {useShownLabels(item).map((label) => (
-                <TrackerTag key={label} title={`${tracker}: ${label}`}>
+                <QuietLabel key={label} title={`${tracker}: ${label}`}>
                     <LabelChip label={label} color={item.labelColors?.[label]} />
-                </TrackerTag>
+                </QuietLabel>
             ))}
         </>
     );
@@ -174,5 +167,10 @@ export function StructureSync({ item, localNote = true }: { item: Item; localNot
     );
 }
 
-/** How long ago `at` was. It alone follows the clock, so a tick renders nothing around it. */
-export const Age = ({ at }: { at: string }) => <>{useBoardStore((state) => shortAgo(at, state.now))}</>;
+/** How long ago `at` was, such as "3d ago"; with `says`, its tooltip says what happened then ("Added 3d ago"). It alone
+ *  follows the clock, so a tick renders nothing around it. */
+export function Age({ at, says }: { at: string; says?: string | undefined }) {
+    const ago = useBoardStore((state) => shortAgo(at, state.now));
+
+    return says ? <span title={`${says} ${ago}`}>{ago}</span> : <>{ago}</>;
+}

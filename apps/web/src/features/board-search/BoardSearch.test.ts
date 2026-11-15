@@ -85,8 +85,8 @@ test('off Apple platforms Ctrl K opens the dialog, ⌘K doesn’t, and the field
 
 const OTHER_DIALOGS: [string, () => Promise<void>][] = [
     ['Settings', () => settle(() => $<HTMLButtonElement>('.title-bar .open-settings')!.click())],
-    ['Add item', () => settle(() => $<HTMLButtonElement>('.title-bar .add-item')!.click())],
-    ['List', () => settle(() => $<HTMLButtonElement>('.title-bar .list-button')!.click())],
+    ['Add item', () => settle(() => $<HTMLButtonElement>('.title-bar [data-add-item]')!.click())],
+    ['List', () => settle(() => $<HTMLButtonElement>('.title-bar [data-list-button]')!.click())],
     [
         'the item dialog',
         async () => {

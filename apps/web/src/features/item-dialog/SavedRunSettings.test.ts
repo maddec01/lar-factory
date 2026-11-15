@@ -47,7 +47,8 @@ test('item details show saved model, effort and reviewer choices read-only', asy
         section.open = true;
         section.dispatchEvent(new Event('toggle'));
     });
-    expect(text(section)).toContain('codex / saved-model · Effort: high');
+    expect(text(section)).toContain('Threadcodex / saved-model');
+    expect(text(section)).toContain('Thread efforthigh');
     expect(text(section)).toContain('T3 default (not resolved)');
     expect(text(section)).toContain('Custom revision 2 · Never');
     expect(section.querySelector('input, textarea, select')).toBeNull();

@@ -3,7 +3,7 @@ import { Button, Disclosure } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
-import { VerifyResult, VerifyEvidence, buttonKind } from '@/ui/board';
+import { VerifyResult, VerifyEvidence, buttonKind, MetaLine, Moment } from '@/ui/board';
 
 interface Context {
     pr: string;
@@ -90,10 +90,17 @@ export function VerifyBuild({ item }: { item: Item }) {
         <Disclosure label="Verify results" presentation="section" defaultOpen>
             {results.map((result) => (
                 <VerifyEvidence key={result.id}>
-                    {result.result === 'pass' ? 'Passed' : 'Failed'} by {result.by} at{' '}
-                    {new Date(result.at).toLocaleString()} · Tested head {result.head.slice(0, 7)}
-                    {historyHead && result.head !== historyHead ? ` · superseded by ${historyHead.slice(0, 7)}` : ''}
-                    {result.note ? ` · ${result.note}` : ''}
+                    <MetaLine
+                        parts={[
+                            <>
+                                {result.result === 'pass' ? 'Passed' : 'Failed'} by {result.by} at{' '}
+                                <Moment at={result.at} />
+                            </>,
+                            `Tested head ${result.head.slice(0, 7)}`,
+                            historyHead && result.head !== historyHead && `superseded by ${historyHead.slice(0, 7)}`,
+                            result.note,
+                        ]}
+                    />
                 </VerifyEvidence>
             ))}
         </Disclosure>

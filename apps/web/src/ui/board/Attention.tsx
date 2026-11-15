@@ -6,8 +6,9 @@ import { BanIcon, CheckIcon, CircleHelpIcon } from '@lar-works/design-system/ico
 import type { ReactNode } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
-import { ROW_OPENS } from './RowStyles';
+import { COMPACT_ROW, pickedRow, ROW_OPENS } from './RowStyles';
 import { type AttentionTone, attentionToneState } from './StatusColors';
+import { GroupTitle } from './TextParts';
 
 export type { AttentionTone };
 
@@ -24,11 +25,13 @@ export function BoardAttentionList({
         <dl className="m-0 grid grid-cols-1 gap-y-1" data-attention>
             {rows.map((r) => (
                 <div key={r.key} className="contents" data-attention-row={r.key}>
-                    <dt className="text-fg-soft flex items-center gap-1.5 self-start pt-2 text-xs font-medium whitespace-nowrap">
-                        {r.tone !== 'fog' && <StatusIndicator size="sm" state={attentionToneState[r.tone]} />}
-                        <span>
-                            {r.label} <span className="tabular-nums">{r.entries.length}</span>
-                        </span>
+                    <dt className="self-start pt-2 whitespace-nowrap">
+                        <GroupTitle>
+                            {r.tone !== 'fog' && <StatusIndicator size="sm" state={attentionToneState[r.tone]} />}
+                            <span>
+                                {r.label} <span className="tabular-nums">{r.entries.length}</span>
+                            </span>
+                        </GroupTitle>
                     </dt>
                     <dd className="m-0 grid gap-1">{r.entries}</dd>
                 </div>
@@ -37,33 +40,24 @@ export function BoardAttentionList({
     );
 }
 
-/** What the attention list says when nothing holds the work up. */
-export function AttentionNone({
-    children,
-}: {
-    /** What the list says, such as "Nothing holds this up". */
-    children: ReactNode;
-}) {
-    return (
-        <p className="text-fg-muted m-0 text-sm" data-attention-none>
-            {children}
-        </p>
-    );
-}
-
 /** One entry of an attention row, with what it waits on or its next action at the right. */
 export function AttentionEntry({
     main,
     side,
+    picked = false,
 }: {
     /** The entry's text, such as a PartLink. */
     main: ReactNode;
+    /** The item it names is the one the dialog shows now. */
+    picked?: boolean;
     /** What it waits on or its next action, at the right. */
     side?: ReactNode;
 }) {
     return (
         // Its text on the column's edges, its hover fill reaching past them, as a row's does.
-        <div className="hover:bg-fill-hover -mx-2 flex min-h-7 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-2 py-1">
+        <div
+            className={`${COMPACT_ROW} ${pickedRow(picked)} -mx-2 flex min-h-7 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1`}
+        >
             <span className="min-w-0 flex-1 basis-64">{main}</span>
             {side && <span className="text-fg-muted ml-auto max-w-full min-w-0 text-xs wrap-anywhere">{side}</span>}
         </div>
@@ -82,31 +76,6 @@ export function EntryButton({
 }) {
     return (
         <button type="button" onClick={onOpen}>
-            {children}
-        </button>
-    );
-}
-
-/** A reference to an item, such as `#12`, as a button that opens it; `title` names it. */
-export function RefButton({
-    title,
-    onOpen,
-    children,
-}: {
-    /** Names the item in full, as the tooltip. */
-    title: string;
-    /** Called as the reader opens the item. */
-    onOpen: () => void;
-    /** The reference, such as `#12`. */
-    children: ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onOpen}
-            title={title}
-            className="text-primary-fg hover:bg-fill-hover focus-ring rounded-xs font-medium tabular-nums"
-        >
             {children}
         </button>
     );
@@ -144,49 +113,23 @@ export function AttentionMark({
     );
 }
 
-/** A part's status glyph, source and title, in that order, the title up to two lines. */
-export function PartName({
-    source,
-    glyph,
-    children,
-}: {
-    /** Where the part's ticket is saved, as a SourceIcon. */
-    source: ReactNode;
-    /** The part's status glyph. */
-    glyph: ReactNode;
-    /** The part's title. */
-    children: ReactNode;
-}) {
-    return (
-        <span className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="inline-flex shrink-0">{glyph}</span>
-            {source}
-            <span className="min-w-0 flex-1 truncate" data-part-title>
-                {children}
-            </span>
-        </span>
-    );
-}
-
-/** A part's PartName as a button that opens it; `title` names it. */
+/** A part as a button that opens it: its identity (PartIdentity, a row's glyph, title and source cells) on one line, as
+ *  its parts-list row names it; the title says it whole on hover. */
 export function PartLink({
-    title,
     onOpen,
     children,
 }: {
-    /** Names the part in full, as the tooltip. */
-    title: string;
     /** Called as the reader opens the part. */
     onOpen: () => void;
-    /** The part's PartName. */
+    /** The part's PartIdentity. */
     children: ReactNode;
 }) {
     return (
         <button
             type="button"
             onClick={onOpen}
-            title={title}
-            className={`min-w-0 rounded-xs text-left hover:underline ${ROW_OPENS}`}
+            className={`flex max-w-full min-w-0 items-center gap-3 rounded-xs text-left text-xs ${ROW_OPENS}`}
+            data-part-link
         >
             {children}
         </button>
@@ -200,5 +143,5 @@ export function WaitWord({
     /** The wait in words, such as "Question". */
     children: ReactNode;
 }) {
-    return <span className="text-warning-fg font-medium">{children}</span>;
+    return <span className="text-warning-fg font-medium whitespace-nowrap">{children}</span>;
 }

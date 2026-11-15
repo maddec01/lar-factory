@@ -5,7 +5,7 @@ import {
     type MergeConfirmation,
     type MergeMethod,
 } from '@lar-factory/shared';
-import { Alert, Button, ConfirmDialog, RadioGroup, RadioGroupItem, Stack, Text } from '@lar-works/design-system';
+import { Alert, Button, ConfirmDialog, Loading, RadioGroup, RadioGroupItem, Stack } from '@lar-works/design-system';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -144,7 +144,9 @@ export function MergePr({
                     secondaryAction={openPr}
                 >
                     <Stack space="related">
-                        {reading && <Text role="status">Reading current permissions and merge policies…</Text>}
+                        {reading && (
+                            <Loading presentation="status" label="Loading current permissions and merge policies…" />
+                        )}
                         {error && <Alert tone="danger">{error}</Alert>}
                         {confirmation && (
                             <RadioGroup

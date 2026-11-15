@@ -45,7 +45,7 @@ test('a pending Verify head read stays loading, retries and enables results with
     });
     await mountPage(board);
     await open();
-    expect(text(panel())).toContain('Reading PR Test steps');
+    expect(text(panel())).toContain('Loading the PR’s Test steps…');
     expect(text(panel())).not.toContain('No Test steps');
     expect(button('Pass').disabled).toBe(true);
 
@@ -69,7 +69,7 @@ test('a failed Verify read describes unread instructions instead of claiming the
     await mountPage(board);
     await open();
     expect(text(panel())).not.toContain('No Test steps');
-    expect(text(panel())).toContain('Test steps could not be read');
+    expect(text(panel())).toContain('Couldn’t load Test steps');
     expect(button('Pass').disabled).toBe(true);
     expect(button('Re-read PR head').disabled).toBe(false);
 });

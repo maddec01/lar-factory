@@ -29,7 +29,7 @@ test('Queue holds feedback, coordinates requests and hands focus to View item', 
         button.click();
     });
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect($('[data-toast="notice"]')?.textContent).toContain('Queueing');
+    expect($('[data-toast="notice"]')?.textContent).toContain('Queuing');
     await settle(() =>
         finish(
             new Response(

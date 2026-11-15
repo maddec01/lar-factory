@@ -109,10 +109,14 @@ export function FactoryReviewerRow({
                             </Button>
                         ) : (
                             <>
-                                <Button variant="secondary" onClick={onEdit} aria-expanded={editing}>
+                                <Button
+                                    {...buttonKind('other', { size: 'md' })}
+                                    onClick={onEdit}
+                                    aria-expanded={editing}
+                                >
                                     {editing ? 'Done editing' : 'Edit'}
                                 </Button>
-                                <Button variant="secondary" onClick={onRemove}>
+                                <Button {...buttonKind('other', { tone: 'danger', size: 'md' })} onClick={onRemove}>
                                     Delete
                                 </Button>
                             </>

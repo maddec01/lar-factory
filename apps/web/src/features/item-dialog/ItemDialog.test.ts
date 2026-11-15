@@ -683,7 +683,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
         '_blank',
     ]);
     expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(
-        'Evidence: The endpoint answers in staging',
+        'EvidenceThe endpoint answers in staging',
     );
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
@@ -842,7 +842,7 @@ test('build recovery inspects before offering branches and explains a missing wo
     const id = await recoveryItem();
 
     expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
-    expect(text(confirmation())).toContain('Checking the branch and PR...');
+    expect(text(confirmation())).toContain('Checking the branch and PR…');
     await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
     expect(text(confirmation())).toContain('The old worktree is gone.');
     expect(confirmButtons().map(text)).toEqual(['Cancel', 'Continue on old branch', 'Start on new branch']);
@@ -937,7 +937,7 @@ test('a concept with no agent work of its own says so, then lists its parts’ f
     const figures = [...inDialog('aside [data-agent-work]')!.parentElement!.querySelectorAll('[data-agent-work]')];
 
     expect(figures.map((f) => [...f.children].map(text))).toEqual([
-        ['This concept', 'No agent work of its own'],
+        ['This concept', 'No agent work of its own.'],
         ['Including parts', 'Agent time1m', 'Tokens1K', 'Cost$2.00'],
     ]);
 });
@@ -1072,7 +1072,7 @@ test('acceptance evidence retains full unbroken paths and hashes alongside the c
 
     await mountPage(withDependency(dependencyBlocker('closed', { evidence })));
     await openItem('I_sample13');
-    expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(`Evidence: ${evidence}`);
+    expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(`Evidence${evidence}`);
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toContain('once the change is delivered');
     expect(dependencyRow().querySelector('button')).not.toBeNull();
 });

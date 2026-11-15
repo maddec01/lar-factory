@@ -611,7 +611,7 @@ describe('updates', () => {
         const next = '0.2.0-nightly.20261024.42';
         const available: UpdateState = { ...nightly, status: 'available', availableVersion: next };
         const action = () => $<HTMLButtonElement>('[data-settings-body] [data-update-action]');
-        const pill = () => $('.title-bar .update-button')!;
+        const pill = () => $('.title-bar [data-update-button]')!;
 
         test('a downloaded update says so, and Restart to update asks, then installs', async () => {
             const { bridge } = stubChannel({

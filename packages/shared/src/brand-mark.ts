@@ -1,4 +1,4 @@
-// The lar mark, from lar-brand's brand/SPEC.md: an L in the ink colour and a block that is always
+// The lar mark, from lar-brand's tools/build.mjs: an L in the ink colour and a block that is always
 // BRAND_BLOCK_COLOR, on a 100-unit box. The L has flat ends, a square inner corner and a 3-unit outer corner; the
 // block is a 57.35 square with 8.03 corners. The page draws it in its header; index.html's favicon copies it.
 

@@ -63,6 +63,7 @@ export async function readAzureReadiness(
                 ...(area === 'git' ? [`repositoryId=${repositoryId}`, `pullRequestId=${pullRequestId}`] : []),
                 ...(query.length ? ['--query-parameters', ...query] : []),
                 '--api-version',
+                // Bare 7.1-preview: `az devops invoke` drops -preview from a versioned one (7.1-preview.1).
                 area === 'policy' ? '7.1-preview' : '7.1',
                 ...orgFlags(organization),
             ]),

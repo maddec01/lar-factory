@@ -1,5 +1,5 @@
 // Disposable repositories for the workflow boundary: each exists only as fake gh or az state and a temporary
-// checkout, so no test reads or writes a real repository. workflow-checks.md lists what they can't prove.
+// checkout, so no test reads or writes a real repository.
 
 import type { Checkout } from '../src/t3/repository-project.ts';
 

@@ -14,6 +14,7 @@ interface TriggerMatch {
 type Policy = Extract<ReviewerTrigger, { kind: 'policy' }>['policy'];
 
 // Version 1: fixed, case-insensitive policy signals. Text includes removed and added lines only.
+// Saved selections cite their version: change what a signal matches only under a new trigger version.
 const policies: Record<Policy, { path: RegExp; text: RegExp }> = {
     security: {
         path: /auth|session|permission|secret|credential|password|token|input|validat|upload|filesystem|[/._-]fs[/._-]|shell|\.sh$|\.bash$|\.zsh$|(^|\/)\.github\/|(^|\/)ci\/|docker|jenkins|package\.json$|lock(file)?([.-]|$)|requirements|cargo\.toml$|go\.mod$|network|http|api|webhook|socket/iu,

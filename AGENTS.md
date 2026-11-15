@@ -5,12 +5,9 @@ Terms are in `GLOSSARY.md`, decisions in `docs/adr/`.
 - `skills/**` and `.agents/skills/**` are the product: agent instructions shipped to other repositories.
   Never edit a Copy (listed in `UPSTREAM.md`) by hand; upstream changes come through `skill-sync`. To set
   aside part of a Copy, write an Override beside the step that loads it, citing its file and heading, and
-  list it in the Copy's "Overridden in" column. Copies keep their source's file names; everything else is
-  kebab-case.
+  list it in the Copy's "Overridden in" column.
 - Apps import packages, never each other. Browser code never imports `packages/work-records`.
-- `apps/web`: style only in `src/ui/board`, built from `@lar-works/design-system`; icons come from
-  `@lar-works/design-system/icons`, never `lucide-react`. Tokens, primitives and generic components change
-  in lar-web.
+- Design-system tokens, primitives and generic components change in lar-web, not here.
 - The factory never reads, writes or offers repository configuration or guidance files; settings live in
   the local app data folder. This repo is public: nothing secret, and no screenshots of real project names
   or folders (`pnpm run sample:t3` shows them).
@@ -19,8 +16,7 @@ Terms are in `GLOSSARY.md`, decisions in `docs/adr/`.
 
 ## Checks
 
-- Board: `pnpm test` in each changed package (or at the root for all), then `pnpm run typecheck`,
-  `pnpm run knip` and `pnpm run check` at the root. Copies and skill text stay unformatted.
+- Board: `pnpm test`, `pnpm run typecheck`, `pnpm run knip` and `pnpm run check`.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` (or `sample:t3`) in `apps/server` on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the app usually holds 4317). Stop it with that command
   `| xargs kill`, never `pkill`.

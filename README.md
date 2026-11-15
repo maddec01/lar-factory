@@ -14,20 +14,10 @@ what to build and merge every PR.
 ## Get started
 
 Install the Mac app from [GitHub Releases](https://github.com/maddec01/lar-factory/releases)
-and open it with [T3 Code](https://github.com/pingdotgg/t3code) running. In Settings > Projects,
-choose Add project:
-
-1. Project. Choose a T3 project for the repository you want to work with.
-2. Access. Check what your local login can read and write.
-3. Work and docs. Choose the issue source, issue defaults, domain docs and optional kind
-   mappings. GitHub uses repository issues; Azure DevOps uses a team's backlog and current sprint.
-4. Done. Review the setup and add the Project.
-
-The app uses your local `gh` or `az` login and keeps its data in
-`~/Library/Application Support/Lar Factory/` (or an absolute `LAR_FACTORY_DATA_DIR`).
-`LAR_FACTORY_AZURE_READ_ONLY=1` bars Azure writes. Repositories need no factory files.
-The app installs the `lar-shape` and `lar-build` skills and the `~/.local/bin/lar-work`
-command; `lar-work --help` lists its commands.
+and open it with [T3 Code](https://github.com/pingdotgg/t3code) running, then add a project in Settings > Projects.
+It uses your local `gh` or `az` login; repositories need no factory files. Data lives in
+`~/Library/Application Support/Lar Factory/` (or an absolute `LAR_FACTORY_DATA_DIR`);
+`LAR_FACTORY_AZURE_READ_ONLY=1` bars Azure writes.
 
 ## Develop
 

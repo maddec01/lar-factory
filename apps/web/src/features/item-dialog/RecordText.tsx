@@ -103,11 +103,22 @@ export function RecordText({
               : record.body;
     const buildPhase = item.buildPhase === undefined ? record.buildPhase : item.buildPhase;
     const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
+    // A single item's own brief waiting for approval.
+    const approvable =
+        !group &&
+        !item.setAside &&
+        record.bodyKind === 'brief' &&
+        Boolean(record.body) &&
+        !item.briefChangesRequested &&
+        !item.briefReviewing &&
+        item.passingBrief === false &&
+        item.status !== 'Done';
     // What the record holds besides its text: a Spec's record shows only these, under the Spec's own heading row.
     const extras =
         Boolean(record.briefChangeRequests) ||
         Boolean(reviewing) ||
         (!item.setAside && pendingBriefs.length > 0) ||
+        approvable ||
         Boolean(record.reviewers) ||
         Boolean(record.runSettings) ||
         Boolean(buildPhase) ||
@@ -149,14 +160,7 @@ export function RecordText({
             {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
-            {!group &&
-                !item.setAside &&
-                record.bodyKind === 'brief' &&
-                record.body &&
-                !item.briefChangesRequested &&
-                !item.briefReviewing &&
-                item.passingBrief === false &&
-                item.status !== 'Done' && <ApproveBrief itemId={item.id} onApproved={refresh} />}
+            {approvable && <ApproveBrief itemId={item.id} onApproved={refresh} />}
             {!spec && !unwritten && (
                 <div data-record-body>
                     <MarkdownDiagrams text={answer || body!} />

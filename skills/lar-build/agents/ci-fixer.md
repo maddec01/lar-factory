@@ -31,9 +31,12 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
      and match `sourceVersion`). A run cancelled because a
      newer one replaced it is normal `cancel-in-progress`, not a failure.
      Report infrastructure and change nothing.
-   - **Code**: fix it test-first where a test can catch it, as a
+   - **Code**: fix it with the run's method, as a
      `git commit --fixup <sha>` (never `--no-verify`) on the commit that caused it, then fold it in
      with `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/$base_branch`.
+     The runtime block's `Frozen build method:` line names the method:
+     `Prove it` loads `<lar-build>/prove-it.md`; `TDD`, or a block without
+     the line, loads `<lar-build>/test-first.md`. Load it only for a code fix.
 3. Follow Checks and Validation record in `project-rules.md`. Name failing tests and diagnose
    recorded failures before retries. Use focused tests for the change and rerun
    the failed check through `run-check`, even when broad. Do not repeat unrelated

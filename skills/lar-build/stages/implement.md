@@ -5,9 +5,12 @@ committed change or integrated and finished slices.
 
 ## Small build
 
-Implement in the build worktree with [Test first](../test-first.md),
+Implement in the build worktree with the run's method file,
 [Coding style](../coding-style.md), and [Design modules](../design-modules.md)
-when a module's shape changes. Commit per project rules, run focused checks,
+when a module's shape changes. Read the method from the runtime block's
+`Frozen build method:` line when you reach this step: `Prove it` loads
+[Prove it](../prove-it.md); `TDD`, or a block without the line, loads
+[Test first](../test-first.md). Load only that method's file. Commit per project rules, run focused checks,
 then continue to [Domain docs](domain-docs.md).
 
 ## Slices
@@ -22,8 +25,9 @@ Follow **Launch reporting and recovery** in
    while no planner runs, per **Implementer** in
    `<lar-build>/shared/orchestration.md`, and track it by its `taskId`. Give it
    [Implementer](../agents/implementer.md), the slice's work ID, its brief
-   (`lar-work body <slice> --body brief`), the build branch and the full slice
-   branch name. Derive the name from the slice work ID's first 8 characters `<id>` and a slug of the
+   (`lar-work body <slice> --body brief`), the build branch, the full slice
+   branch name and this thread's runtime block unchanged, including its
+   `Frozen build method:` line when present. Derive the name from the slice work ID's first 8 characters `<id>` and a slug of the
    slice title. The first attempt uses `slice/<id>-<slug>`. When
    `git branch --list 'slice/<id>-*'` finds a branch, a restart (after a
    handoff, a re-slice or a retry) uses `slice/<id>-<slug>-<k>`, where `k`

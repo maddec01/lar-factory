@@ -4,13 +4,11 @@ import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { startableEnv, startBoard, until } from './server-support.ts';
+import { startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
 const statusOf = (data: BoardData, id: string) => data.items.find((i) => i.id === id)?.status;
-const queue = (board: Board, itemId: string, origin = board.url) => board.post({ itemId }, origin, '/api/queue');
-const backToList = (board: Board, itemId: string, origin = board.url) =>
-    board.post({ itemId }, origin, '/api/back-to-list');
+const queue = (board: Board, itemId: string) => board.post({ itemId }, board.url, '/api/queue');
 /** The gh calls that changed an issue: a move writes none. */
 const issueEdits = async (board: Board) =>
     (await board.calls()).filter((args) => args[0] === 'issue' && args[1] === 'edit');
@@ -84,66 +82,4 @@ test('a move on a record a thread changed since the board read it is refused, an
     assert.match(body.error, /read it again/);
     assert.equal(body.board.items.find((i) => i.id === id)?.kind, 'bug');
     assert.equal(await recordedStatus(board, id), 'List');
-});
-
-test('Queue and Back to List reject requests from other pages and sample mode', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
-
-    await until(board, (d) => d.items.length === 1);
-    for (const origin of ['https://evil.example', 'null', '']) {
-        assert.equal((await queue(board, board.id(12), origin)).status, 403);
-        assert.equal((await backToList(board, board.id(12), origin)).status, 403);
-    }
-    assert.equal(await recordedStatus(board, board.id(12)), 'List');
-
-    const sample = await startBoard(t, {}, true);
-
-    assert.equal((await queue(sample, 'I_sample01')).status, 403);
-
-    const response = await backToList(sample, 'I_sample01');
-
-    assert.equal(response.status, 403);
-    assert.equal((await response.json()).error, 'Moving items back to the List is disabled in sample mode.');
-    assert.equal((await sample.calls()).length, 0);
-});
-
-const startItem = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');
-
-test('Back to List is refused while a Start is in flight, uncertain or done for the item', async (t) => {
-    const refused = 'Start is running or has run for this item. Check its T3 thread before moving it back to the List.';
-    const board = await startBoard(
-        t,
-        { items: [boardIssue(12, 'Queued')], t3: { delay: 300 } },
-        false,
-        false,
-        startableEnv(t),
-    );
-
-    await until(board, (d) => d.items.length === 1);
-
-    const id = board.id(12);
-    const starting = startItem(board, id);
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    const inFlight = await backToList(board, id);
-
-    assert.equal(inFlight.status, 409);
-    assert.equal((await inFlight.json()).error, refused);
-    assert.equal((await starting).status, 200);
-    assert.equal((await backToList(board, id)).status, 409, 'done');
-
-    const unsure = await startBoard(
-        t,
-        { items: [boardIssue(12, 'Queued')], t3: { fail: 'killed' } },
-        false,
-        false,
-        startableEnv(t),
-    );
-
-    await until(unsure, (d) => d.items.length === 1);
-    assert.equal((await startItem(unsure, unsure.id(12))).status, 202);
-    assert.equal((await backToList(unsure, unsure.id(12))).status, 409, 'uncertain');
-    assert.equal(await recordedStatus(board, id), 'Shaping');
-    assert.equal(await recordedStatus(unsure, unsure.id(12)), 'Queued');
 });

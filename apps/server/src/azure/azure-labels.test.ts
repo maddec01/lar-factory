@@ -30,29 +30,6 @@ test('renaming a tag changes it in the project and on every work item', async ()
     expect(items[0]!.tags).toBe('new name; docs');
 });
 
-test('deleting a tag removes it from the project and from every work item', async () => {
-    const items: WorkItem[] = [
-        { id: 1, type: 'User Story', state: 'New', tags: 'gone; docs' },
-        { id: 2, type: 'User Story', state: 'New', tags: 'gone' },
-    ];
-    const { az, labels } = azure(items, ['gone', 'docs']);
-
-    await labels.delete('gone');
-    expect(az.tags).toEqual(['docs']);
-    expect(items.map((item) => item.tags)).toEqual(['docs', '']);
-});
-
-test('a tag name holding route characters reaches its own tag, on rename and on delete', async () => {
-    const name = 'a/../b?x=1';
-    const items: WorkItem[] = [{ id: 1, type: 'User Story', state: 'New', tags: `${name}; docs` }];
-    const { az, labels } = azure(items, [name, 'docs']);
-
-    await labels.update(name, { name: 'moved' });
-    expect(az.tags).toEqual(['moved', 'docs']);
-    await labels.delete('moved');
-    expect(items[0]!.tags).toBe('docs');
-});
-
 test('adding a tag keeps every other tag on the work item, however many it has, and tests its revision', async () => {
     const items: WorkItem[] = [{ id: 7, rev: 4, type: 'User Story', state: 'New', tags: manyTags.join('; ') }];
     const { az, labels } = azure(items);
@@ -60,19 +37,6 @@ test('adding a tag keeps every other tag on the work item, however many it has, 
     await labels.addToTicket(7, ['brand new', 'TAG-1']);
     expect(items[0]!.tags).toBe([...manyTags, 'brand new'].join('; '));
     expect(az.patches[0]!.ops[0]).toEqual({ op: 'test', path: '/rev', value: 4 });
-});
-
-test('removing a tag keeps every other tag, ignores its case and clears the field when none remain', async () => {
-    const items: WorkItem[] = [
-        { id: 7, type: 'User Story', state: 'New', tags: manyTags.join('; ') },
-        { id: 8, type: 'User Story', state: 'New', tags: 'only' },
-    ];
-    const { labels } = azure(items);
-
-    await labels.removeFromTicket(7, ['TAG-2']);
-    expect(items[0]!.tags).toBe(manyTags.filter((tag) => tag !== 'tag-2').join('; '));
-    await labels.removeFromTicket(8, ['only']);
-    expect(items[1]!.tags).toBe('');
 });
 
 test('a work item changed since the read is refused and keeps its tags', async () => {

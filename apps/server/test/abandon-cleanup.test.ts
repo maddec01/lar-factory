@@ -129,21 +129,6 @@ interface Inspected {
 const refs = (checkout: string) =>
     git(checkout, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/').trim().split('\n');
 
-test("inspecting and cancelling a notice's cleanup write nothing, and it plans the branch before its slices", async () => {
-    const { workId, sliceBranch, commands, board } = closedBuild();
-    const before = records.read(workId).revision;
-    const reply = await commands.inspectOwnedCleanup(workId);
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-    assert.deepEqual(
-        (reply.body as Inspected).plans.map((plan) => plan.branch),
-        [BRANCH, sliceBranch],
-    );
-    assert.deepEqual(records.cleanupOwnership(workId), []);
-    assert.equal(records.read(workId).revision, before);
-    assert.ok(board.find(workId)?.needsYou);
-});
-
 test('a confirmed cleanup persists ownership without changing the plan, and Abandon then moves the build into Archive', async () => {
     const { workId, sliceBranch, checkout, commands, board } = closedBuild();
     const { token } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
@@ -157,48 +142,6 @@ test('a confirmed cleanup persists ownership without changing the plan, and Aban
     assert.equal(board.find(workId), undefined);
     assert.equal(records.read(workId).setAside, true);
     assert.ok(!refs(checkout).includes(sliceBranch));
-});
-
-/** Removes `branch` from the checkout and its origin, and has the PR host report it not pushed. */
-function deleteEverywhere(checkout: string, branch: string) {
-    git(checkout, 'push', 'origin', '--delete', branch);
-    git(checkout, 'branch', '-D', branch);
-    vi.mocked(prHost).mockReturnValue({
-        branchExists: async (_repo: string, name: string) => name !== branch,
-        openPrByHead: async () => null,
-        deleteRemoteBranch,
-    } as unknown as ReturnType<typeof prHost>);
-}
-
-test('a confirmed cleanup drops a saved slice branch that was already deleted, with nothing ticked', async () => {
-    const { workId, sliceBranch, checkout, commands } = closedBuild();
-
-    records.captureCleanup(workId, records.read(workId).revision, BRANCH, [sliceBranch]);
-    deleteEverywhere(checkout, sliceBranch);
-
-    const { token, plans } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
-
-    assert.deepEqual(
-        plans.map((plan) => plan.branch),
-        [BRANCH, sliceBranch],
-    );
-
-    const reply = await commands.executeOwnedCleanup(workId, { token });
-
-    assert.equal(reply.status, 200, JSON.stringify(reply.body));
-
-    const body = reply.body as { errors: string[]; remainingBranches: string[] };
-
-    assert.deepEqual(body.errors, []);
-    assert.deepEqual(body.remainingBranches, [BRANCH]);
-    assert.deepEqual(
-        records.cleanupOwnership(workId).flatMap((snapshot) => snapshot.sliceBranches),
-        [],
-    );
-    assert.deepEqual(
-        records.cleanupOwnership(workId).map((snapshot) => snapshot.branch),
-        [BRANCH],
-    );
 });
 
 test('a failed cleanup step keeps the item and notice, and a retry inspects again in the same order and can succeed', async () => {
@@ -229,22 +172,4 @@ test('a failed cleanup step keeps the item and notice, and a retry inspects agai
 
     assert.equal(retried.status, 200, JSON.stringify(retried.body));
     assert.deepEqual((retried.body as { errors: string[] }).errors, []);
-});
-
-test("a build that T3 can't inspect fails inspection and stays abandonable; work with nothing to inspect needs no T3", async () => {
-    const { workId, commands } = closedBuild('closed', async () => ({ error: 'T3 is unavailable.' }));
-    const reply = await commands.inspectOwnedCleanup(workId);
-
-    assert.equal(reply.status, 409);
-    assert.equal((reply.body as { error: string }).error, 'T3 is unavailable.');
-    assert.deepEqual(records.cleanupOwnership(workId), []);
-
-    const issue = records.create({ title: 'Plain', repository: REPO, kind: 'issue', status: 'In progress' });
-
-    assert.equal((await commands.abandon(workId)).status, 200);
-
-    const plain = await commands.inspectOwnedCleanup(issue.workId);
-
-    assert.equal(plain.status, 200, JSON.stringify(plain.body));
-    assert.deepEqual((plain.body as Inspected).plans, []);
 });

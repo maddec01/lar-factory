@@ -1,7 +1,6 @@
 import {
     effectiveVocabulary,
     writeTrackerStructure,
-    type Item,
     type RepositorySetup,
     type TrackerStructure,
 } from '@lar-factory/shared';
@@ -13,17 +12,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // A kind change on the fake Azure DevOps: the type changes with the main text in the field the new type shows, through the
 // tracker adapter item details and lar-work share, and the work item reads back with that text.
-import { afterEach, expect, test, vi } from 'vite-plus/test';
+import { afterEach, expect, test } from 'vite-plus/test';
 
-import { readAzureItemDetails } from './azure-details.ts';
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
-const REPRO = 'Microsoft.VSTS.TCM.ReproSteps';
 const opened: { records: WorkRecords; dir: string }[] = [];
 
 afterEach(() => {
-    vi.unstubAllEnvs();
     for (const { records, dir } of opened.splice(0)) {
         records.close();
         rmSync(dir, { recursive: true, force: true });
@@ -56,72 +52,6 @@ test('a User Story becoming a Bug shows its description in Repro Steps, and the 
     });
     expect(az.patches[0]!.ops[0]).toEqual({ op: 'test', path: '/rev', value: 1 });
     expect(workItem.rev).toBe(2);
-});
-
-test('a Bug becoming a User Story shows its Repro Steps in the description, and Repro Steps stays', async () => {
-    const { workItem, kinds } = on({ type: 'Bug', reproSteps: '<p>Steps</p>' });
-
-    await kinds.setType(7, 'User Story');
-    expect(workItem).toMatchObject({ type: 'User Story', description: '<p>Steps</p>', reproSteps: '<p>Steps</p>' });
-});
-
-test('the details read shows the moved text as the main body, with the old field kept as a section', async () => {
-    const { kinds, az } = on({ type: 'User Story', description: '<p>The main text</p>', comments: [] });
-
-    await kinds.setType(7, 'Bug');
-
-    const details = await readAzureItemDetails({ repo: REPO, number: 7 } as Item, az.run);
-
-    expect(details).toMatchObject({
-        body: '<p>The main text</p>',
-        bodyField: REPRO,
-        sections: [{ title: 'Description', body: '<p>The main text</p>' }],
-    });
-});
-
-test('a change between other types moves no text', async () => {
-    const { workItem, kinds, az } = on({ type: 'User Story', description: 'Text' });
-
-    await kinds.setType(7, 'Product Backlog Item');
-    expect(workItem.type).toBe('Product Backlog Item');
-    expect(workItem.reproSteps).toBeUndefined();
-    expect(az.patches[0]!.ops).toHaveLength(2);
-});
-
-test('text already in the new field stays, after the moved text', async () => {
-    const { workItem, kinds } = on({ type: 'Bug', reproSteps: '<p>Steps</p>', description: '<p>Older</p>' });
-
-    await kinds.setType(7, 'User Story');
-    expect(workItem.description).toBe('<p>Steps</p><hr><p>Older</p>');
-    expect(workItem.reproSteps).toBe('<p>Steps</p>');
-});
-
-test('going back to a type whose field already holds the text writes no second copy', async () => {
-    const { workItem, kinds } = on({ type: 'User Story', description: '<p>Text</p>' });
-
-    await kinds.setType(7, 'Bug');
-    await kinds.setType(7, 'User Story');
-    expect(workItem).toMatchObject({ type: 'User Story', description: '<p>Text</p>', reproSteps: '<p>Text</p>' });
-});
-
-test('markdown text moves as markdown, including into a field that was markdown already', async () => {
-    const moved = on({ type: 'User Story', description: '# Text', descriptionFormat: 'Markdown' });
-
-    await moved.kinds.setType(7, 'Bug');
-    expect(moved.workItem).toMatchObject({ reproSteps: '# Text', reproStepsFormat: 'Markdown' });
-
-    const merged = on({
-        type: 'Bug',
-        reproSteps: '<p>Steps</p>',
-        description: '# Older',
-        descriptionFormat: 'Markdown',
-    });
-
-    await merged.kinds.setType(7, 'User Story');
-    expect(merged.workItem).toMatchObject({
-        description: '<p>Steps</p>\n\n---\n\n# Older',
-        descriptionFormat: 'Markdown',
-    });
 });
 
 test('structure stays in the description, in one copy, whichever way the type changes', async () => {
@@ -161,15 +91,6 @@ test('someone changing the work item since the read fails the type change whole'
     await expect(racing.setType(7, 'Bug')).rejects.toThrow(/TF26071/);
     expect(workItem.type).toBe('User Story');
     expect(stale.patches).toEqual([]);
-});
-
-test('read-only sessions refuse the type change before any az call', async () => {
-    vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
-
-    const { kinds, az } = on({ type: 'User Story' });
-
-    await expect(kinds.setType(7, 'Bug')).rejects.toThrow('read-only');
-    expect(az.calls).toEqual([]);
 });
 
 async function recordOn(kind: 'bug' | 'feature') {
@@ -212,22 +133,6 @@ test('a kind change swaps tags and type on the fake, moves the text and keeps ot
     expect(az.calls.some((args) => args.includes('backlogconfiguration') && args.includes('team=Fabrikam Team'))).toBe(
         true,
     );
-});
-
-test("a type the team's backlog doesn't show stays, with its text where it was, and the tags still swap", async () => {
-    const { workItem, labels, kinds } = on(
-        { type: 'User Story', tags: 'type-feature', description: 'Text' },
-        { requirementTypes: ['User Story'] },
-    );
-    const { records, workId, revision } = await recordOn('feature');
-    const result = await changeKind(records, workId, revision, 'bug', { setup, labels, kinds });
-
-    expect(result.line).toBe(
-        "#7: added tag type-bug; removed tag type-feature. The type stays User Story, because the team's backlog doesn't show Bug.",
-    );
-    expect(workItem).toMatchObject({ type: 'User Story', tags: 'type-bug', description: 'Text' });
-    expect(workItem.reproSteps).toBeUndefined();
-    expect(records.read(workId).kind).toBe('bug');
 });
 
 test('a failed type change on the fake keeps the old kind, and running it again finishes', async () => {

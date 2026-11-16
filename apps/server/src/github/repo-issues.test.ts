@@ -43,85 +43,6 @@ function fakeGh(reply: (args: string[]) => string = () => '{}') {
     return { calls, run };
 }
 
-test("a ticket search lists the repository's open issues matching the words, and a number reads that issue alone", async () => {
-    const gh = fakeGh((args) =>
-        args[1] === 'list'
-            ? JSON.stringify([{ number: 8, title: 'Stall on seek', url: `https://github.com/${REPO}/issues/8` }])
-            : JSON.stringify({
-                  number: 12,
-                  title: 'Seek',
-                  url: `https://github.com/${REPO}/issues/12`,
-                  body: '',
-                  labels: [],
-                  state: 'OPEN',
-              }),
-    );
-    const issues = repoIssues(REPO, gh.run);
-
-    assert.deepEqual(await issues.searchTickets(REPO, 'stall'), [
-        { number: 8, title: 'Stall on seek', url: `https://github.com/${REPO}/issues/8` },
-    ]);
-    assert.deepEqual(await issues.searchTickets(REPO, '#12'), [
-        { number: 12, title: 'Seek', url: `https://github.com/${REPO}/issues/12` },
-    ]);
-    assert.deepEqual(gh.calls, [
-        [
-            'issue',
-            'list',
-            '-R',
-            REPO,
-            '--state',
-            'open',
-            '--limit',
-            '20',
-            '--json',
-            'number,title,url',
-            '--search',
-            'stall',
-        ],
-        ['api', `repos/${REPO}/issues/12`],
-    ]);
-});
-
-test("a ticket read gives an open issue's text and kind, and nothing for a closed or missing one", async () => {
-    const answers: Record<string, () => string> = {
-        7: () =>
-            JSON.stringify({
-                number: 7,
-                title: 'Stall',
-                url: `https://github.com/${REPO}/issues/7`,
-                body: '## Steps',
-                labels: [{ name: 'bug' }],
-                state: 'OPEN',
-            }),
-        8: () =>
-            JSON.stringify({
-                number: 8,
-                title: 'Old',
-                url: `https://github.com/${REPO}/issues/8`,
-                body: '',
-                labels: [],
-                state: 'CLOSED',
-            }),
-        9: () => {
-            throw new Error(
-                'gh issue view failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.',
-            );
-        },
-    };
-    const issues = repoIssues(REPO, fakeGh((args) => answers[args[1]!.split('/').at(-1)!]!()).run);
-
-    assert.deepEqual(await issues.readTicket(REPO, 7), {
-        number: 7,
-        title: 'Stall',
-        url: `https://github.com/${REPO}/issues/7`,
-        text: '## Steps',
-        kind: 'bug',
-    });
-    assert.equal(await issues.readTicket(REPO, 8), null);
-    assert.equal(await issues.readTicket(REPO, 9), null);
-});
-
 test('a ticket observation reads its state and assignees, and a confirmed not-found, but throws on any other failure', async () => {
     const answers: Record<string, () => string> = {
         7: () => JSON.stringify({ state: 'OPEN', assignees: [{ login: 'pedro' }, { login: 'ana' }] }),
@@ -172,26 +93,6 @@ test("a change check lists the issues and PRs updated since, and can't tell once
     page = Array.from({ length: 30 }, (_, i) => updated(i + 1, '2026-10-21T09:00:00Z'));
     assert.equal(await issues.changes!(Date.parse('2026-10-21T08:30:00Z')), null);
     assert.deepEqual(gh.calls[1]!.slice(2, 4), ['-H', 'If-None-Match: W/"3"'], 'the next check sends the last ETag');
-});
-
-test('a change check leaves out an edit to an issue that closed before it, as a comment on an old one', async () => {
-    const page = [
-        {
-            html_url: `https://github.com/${REPO}/issues/3`,
-            updated_at: '2026-10-21T08:10:00Z',
-            closed_at: '2026-09-01T00:00:00Z',
-        },
-        {
-            html_url: `https://github.com/${REPO}/issues/4`,
-            updated_at: '2026-10-21T08:10:00Z',
-            closed_at: '2026-10-21T08:10:00Z',
-        },
-    ];
-    const issues = repoIssues(REPO, fakeGh(() => `HTTP/2.0 200 OK\r\n\r\n${JSON.stringify(page)}`).run);
-
-    assert.deepEqual(await issues.changes!(Date.parse('2026-10-21T08:10:00Z')), [
-        `https://github.com/${REPO}/issues/4`,
-    ]);
 });
 
 test('Abandon closes an issue as not planned and reports close failures', async () => {

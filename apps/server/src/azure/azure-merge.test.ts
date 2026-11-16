@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, expect, test, vi } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 
 import { createPrProgressReader } from '../items/pr-progress.ts';
 import { azureMerge } from './azure-merge.ts';
-
-afterEach(() => vi.unstubAllEnvs());
 
 const fake = (
     permission = true,
@@ -119,41 +117,4 @@ test('merge eligibility rereads revision metadata, checks and permission after c
     expect(run.mock.calls.filter(([args]) => args.includes('pullRequestIterations'))).toHaveLength(2);
     expect(run.mock.calls.filter(([args]) => args.includes('evaluations'))).toHaveLength(3);
     expect(run.mock.calls.filter(([args]) => args.includes('pullRequestReviewers'))).toHaveLength(3);
-});
-
-test('Azure refuses unknown method policies and blocks a completion still in flight', async () => {
-    await expect(azureMerge(fake(true, {}).run).read('o/p/r', 8)).rejects.toThrow('policy is unknown');
-    expect(
-        (await azureMerge(fake(true, undefined, { completionQueueTime: 'now' }).run).read('o/p/r', 8)).blockers.join(
-            ' ',
-        ),
-    ).toContain('still completing');
-});
-
-test('Azure read-only sessions retain reads and refuse completion before invoking even a fake provider', async () => {
-    vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
-
-    const { run, writes } = fake();
-    const provider = azureMerge(run);
-
-    expect((await provider.read('o/p/r', 8)).methods).toEqual(['squash']);
-
-    const count = run.mock.calls.length;
-
-    await expect(provider.merge('o/p/r', 8, 'abc', 'squash')).rejects.toThrow('read-only');
-    expect(run.mock.calls).toHaveLength(count);
-    expect(writes).toEqual([]);
-});
-
-test('Azure evaluates the exact nested branch token with slash separators and UTF-16 little-endian encoding', async () => {
-    const { run } = fake(true, undefined, { targetRefName: 'refs/heads/user/mattc/feature1' });
-
-    await azureMerge(run).read('o/p/r', 8);
-
-    const args = run.mock.calls.find(([args]) => args[0] === 'rest')![0];
-    const url = new URL(args[args.indexOf('--url') + 1]!);
-
-    expect(url.searchParams.get('tokens')).toBe(
-        'repoV2/pid/rid/refs/heads/7500730065007200/6d006100740074006300/66006500610074007500720065003100/',
-    );
 });

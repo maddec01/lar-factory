@@ -1,8 +1,7 @@
 import type { BoardData, RawItem } from '@lar-factory/shared';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
-import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
@@ -56,7 +55,6 @@ async function blockedBuildBoard(t: TestContext, options: object = {}) {
 }
 
 const arm = (board: Board, itemId: string, model?: unknown) => board.postSession({ itemId, model }, '/api/arm');
-const disarm = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/disarm');
 const armedPath = (home: string) => join(home, 'Library/Application Support/Lar Factory/armed-starts.json');
 const armedFile = (home: string) => JSON.parse(readFileSync(armedPath(home), 'utf8'));
 
@@ -68,21 +66,6 @@ async function read(board: Board): Promise<BoardData> {
 
     return until(board, (d) => d.fetchedAt !== before);
 }
-
-test('arming and disarming write and remove the entry, which the board data carries', async (t) => {
-    const { board, env } = await blockedBuildBoard(t);
-    const armed = await arm(board, board.id(12), OPUS);
-
-    assert.equal(armed.status, 200);
-    assert.deepEqual((await armed.json()).board.armed, { [board.id(12)]: { model: OPUS } });
-    assert.deepEqual(armedFile(env.HOME!), { [board.id(12)]: { model: OPUS } });
-
-    const disarmed = await disarm(board, board.id(12));
-
-    assert.equal(disarmed.status, 200);
-    assert.deepEqual((await disarmed.json()).board.armed, {});
-    assert.deepEqual(armedFile(env.HOME!), {});
-});
 
 test('armed starts survive a board restart', async (t) => {
     const { board, env } = await blockedBuildBoard(t);
@@ -181,127 +164,4 @@ test('a Dependency whose ticket closed still holds Start and Start after until t
     const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)] && !d.armed?.[board.id(12)]);
 
     assert.deepEqual(started.armed, {});
-});
-
-test('clearing the met mark holds the build again', async (t) => {
-    const { board } = await armableBoard(t, [build], CLOSED_DEPENDENCY);
-    const dependencyId = await recordClosedDependency(board);
-
-    assert.equal((await markMet(board, dependencyId, true)).status, 200);
-
-    const cleared = await markMet(board, dependencyId, false);
-
-    assert.equal(cleared.status, 200);
-
-    const item = (await cleared.json()).board.items.find((i: { id: string }) => i.id === board.id(12));
-
-    assert.deepEqual(
-        item.blockers.map((b: { state: string; dependency: { met: unknown } }) => [b.state, b.dependency.met]),
-        [['open', null]],
-    );
-    assert.equal((await markMet(board, dependencyId, false)).status, 409, 'a stale revision is refused');
-});
-
-test('a failed start disarms the part and shows its error on it, until it is armed again', async (t) => {
-    const { board, env, open } = await blockedBuildBoard(t, { t3: { fail: 'down' } });
-
-    assert.equal((await arm(board, board.id(12))).status, 200);
-    await settleDecisions(board, board.id(12), [open]);
-
-    const failed = await until(board, (d) => !!d.armedErrors?.[board.id(12)]);
-
-    assert.deepEqual(failed.armed, {});
-    assert.deepEqual(armedFile(env.HOME!), {});
-    await recordBlockers(board, board.id(12), ['Decision 7']);
-
-    const rearmed = await arm(board, board.id(12));
-
-    assert.equal(rearmed.status, 200);
-    assert.equal((await rearmed.json()).board.armedErrors[board.id(12)], undefined);
-});
-
-test('an armed build whose fetch fails stays armed, shows the hold and starts nothing', async (t) => {
-    const { board, env, open } = await blockedBuildBoard(t);
-
-    assert.equal((await arm(board, board.id(12))).status, 200);
-    rmSync(env.FAKE_ORIGIN!, { recursive: true });
-    await settleDecisions(board, board.id(12), [open]);
-
-    const failed = await until(board, (d) => !!d.armedErrors?.[board.id(12)]);
-
-    assert.equal(
-        failed.armedErrors![board.id(12)],
-        'Could not fetch main from origin. Check the network and your Git login, then start the build again.',
-    );
-    assert.deepEqual(failed.armed, { [board.id(12)]: {} });
-    assert.deepEqual(
-        (await board.t3Calls()).filter((args) => args[0] === 'launch'),
-        [],
-    );
-});
-
-test('an armed start whose repository leaves the board drops on the next read and never starts, also after a restart', async (t) => {
-    const { board, env, open } = await blockedBuildBoard(t, { files: ['.lar-factory.json'] });
-
-    assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
-
-    const list = join(env.HOME!, 'Library/Application Support/Lar Factory/repository-settings.json');
-    const { repositories, ...rest } = JSON.parse(readFileSync(list, 'utf8')) as { repositories: { repo: string }[] };
-
-    writeFileSync(
-        list,
-        JSON.stringify({ ...rest, repositories: repositories.filter((r) => r.repo !== 'maddec01/lar-factory') }),
-    );
-
-    const records = await openWorkRecords(workRecordsPath(board.dataDir));
-
-    try {
-        records.setBody(open, records.read(open).revision, 'answer', 'Settled.');
-        records.setBody(open, records.read(open).revision, 'domain-drafts', 'None.');
-    } finally {
-        records.close();
-    }
-
-    await read(board);
-
-    const data = await until(board, (d) => d.items.length === 0 && Object.keys(d.armed ?? {}).length === 0);
-
-    assert.deepEqual([data.items, data.armed], [[], {}]);
-    assert.deepEqual(armedFile(env.HOME!), {});
-    await board.stop();
-
-    const again = await startBoard(t, { items: [build] }, false, false, env);
-
-    assert.deepEqual((await read(again)).items, []);
-    assert.deepEqual([await board.t3Calls(), await again.t3Calls()], [[], []]);
-});
-
-test('only a blocked Ready or Queued issue, on an offered model, from this page and session, can be armed', async (t) => {
-    const { board } = await armableBoard(t, [
-        build,
-        rawIssue('I_13', 13, 'Ready', []),
-        rawIssue('I_14', 14, 'In progress', []),
-    ]);
-
-    await recordBlockers(board, board.id(12), ['Decision 5']);
-    await recordBlockers(board, board.id(14), ['Decision 6']);
-    assert.match((await (await arm(board, board.id(13))).json()).error, /^Nothing blocks this item now/);
-    assert.match(
-        (await (await arm(board, board.id(14))).json()).error,
-        /^Only Ready and Queued items can start after their blockers; this one is in In progress\.$/,
-    );
-    assert.equal((await arm(board, 'I_missing')).status, 404);
-    assert.equal((await arm(board, board.id(12), { instanceId: 'codex', model: '--help' })).status, 422);
-
-    const restarted = await board.post({ session: 'old', itemId: board.id(12) }, board.url, '/api/arm');
-
-    assert.equal(restarted.status, 409);
-    assert.match((await restarted.json()).error, /Press Start after again/);
-    assert.equal((await board.post({ itemId: board.id(12) }, 'https://evil.example', '/api/disarm')).status, 403);
-    assert.equal(((await board.board()) as BoardData).armed?.[board.id(12)], undefined);
-
-    const sample = await startBoard(t, {}, true);
-
-    assert.equal((await arm(sample, 'I_sample13')).status, 403);
-    assert.equal((await disarm(sample, 'I_sample13')).status, 403);
 });

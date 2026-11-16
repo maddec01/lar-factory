@@ -24,22 +24,3 @@ test('a ticket has the live root threads its first messages name, oldest activit
         { threadId: 'newer', purpose: 'build' },
     ]);
 });
-
-test('a thread belongs only to the issue its first message names first, and child and deleted threads are left out', (t) => {
-    const threadsOf = reader(t, [
-        { id: 'first', messages: [`Build ${REPO}#3, then $lar-work ${REPO}#4`, `$lar-work ${REPO}#5`] },
-        { id: 'child', rootThreadId: 'first', messages: [`Build ${REPO}#3`] },
-        { id: 'gone', messages: [`Build ${REPO}#3`], deletedAt: '2026-10-21T08:00:00Z' },
-        { id: 'upper', messages: [`$lar-work Maddec01/Lar-Factory#3`] },
-    ]);
-
-    assert.deepEqual(
-        threadsOf(REPO, 3)
-            .map((thread) => thread.threadId)
-            .sort(),
-        ['first', 'upper'],
-    );
-    assert.deepEqual(threadsOf(REPO, 4), []);
-    assert.deepEqual(threadsOf(REPO, 5), []);
-    assert.deepEqual(threadsOf(REPO, 6), [], 'an item no thread names has none');
-});

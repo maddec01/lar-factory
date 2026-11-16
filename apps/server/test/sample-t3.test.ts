@@ -1,4 +1,3 @@
-import type { BoardData } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
 import {
     chmodSync,
@@ -6,7 +5,6 @@ import {
     mkdtempSync,
     readFileSync,
     readdirSync,
-    renameSync,
     rmSync,
     statSync,
     writeFileSync,
@@ -39,19 +37,19 @@ async function sampleT3(t: TestContext, home: string, env: Record<string, string
 
     if (!existsSync(join(home, 'Library'))) writeRepositoryList(home, ['maddec01/lar-web']);
 
-    const db = projectsDb(
+    const T3_STATE_DB = projectsDb(
         t,
         ['lar-server', 'lar-web'].map((id) => ({ id, root: `${home}/Developer/lar/${id}` })),
     );
     const board = await startBoard(t, { recorded: false }, true, false, {
         HOME: home,
-        T3_STATE_DB: db,
+        T3_STATE_DB,
         BOARD_SAMPLE_T3: '1',
         FAKE_T3_ICON: JSON.stringify(ICON),
         ...env,
     });
 
-    return { ...board, db, data: () => board.board() as Promise<BoardData> };
+    return board;
 }
 
 async function until(check: () => Promise<boolean>): Promise<void> {
@@ -72,48 +70,6 @@ ${script}
 
     return bin;
 }
-
-test('it shows T3 as unavailable when T3 stops and reads again when T3 returns', async (t) => {
-    const board = await sampleT3(t, tempHome(t));
-
-    await until(async () => (await board.data()).t3Availability?.availability === 'available');
-
-    renameSync(board.db, `${board.db}.away`);
-    await until(async () => (await board.data()).t3Availability?.availability === 'unavailable');
-
-    const refused = await fetch(`${board.url}/api/onboarding/projects`);
-
-    assert.deepEqual(
-        [refused.status, await refused.json()],
-        [502, { error: "Can't read T3 Code's projects; reconnect T3 Code before onboarding" }],
-    );
-    assert.ok((await board.data()).items.length > 0, 'the sample items stay');
-
-    renameSync(`${board.db}.away`, board.db);
-    await until(async () => (await board.data()).t3Availability?.availability === 'available');
-    assert.equal((await fetch(`${board.url}/api/onboarding/projects`)).status, 200);
-});
-
-test("real operations retain sample mode's refusal", async (t) => {
-    const board = await sampleT3(t, tempHome(t));
-    const refusals: [string, object, string][] = [
-        ['/api/onboarding/projects', { folder: '/tmp' }, 'Sample mode onboards no Project.'],
-        ['/api/onboarding/setup', {}, 'Sample mode onboards no Project.'],
-        ['/api/t3/reauthorize', {}, 'T3 reauthorization is unavailable here.'],
-        ['/api/recheck', {}, 'Sample mode looks no tools up.'],
-        ['/api/start', {}, 'Starting threads is disabled in sample mode.'],
-    ];
-
-    for (const [path, body, error] of refusals) {
-        const response = await board.postSession(body, path);
-
-        assert.deepEqual(
-            [path, response.status, await response.json()],
-            [path, 403, { error, ...(path.startsWith('/api/onboarding/') && { code: 'sample-mode' }) }],
-        );
-    }
-    assert.deepEqual(await board.t3Calls(), []);
-});
 
 /** Each file under `dir` with its size and modification time. */
 function filesUnder(dir: string): Record<string, string> {

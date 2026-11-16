@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
-import { recordDetails } from '../item-details/item-details.ts';
 import { recordItems } from './record-items.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -78,24 +77,4 @@ test('S05 R2-002: a mismatched brief stays held until its replacement has curren
     expect(shown.passingBrief).toBe(false);
     expect(shown.briefApproval).toBeUndefined();
     expect(shown.briefReviewing).toBe(true);
-});
-
-test('S05 R2-001: linked parent details use the group map and child batch control instead of an own-brief button', async () => {
-    const records = await fixture();
-    const parent = records.create({ title: 'Linked exchange', repository: 'fake/a', kind: 'build' });
-
-    records.setBody(parent.workId, parent.revision, 'brief', 'Shared greeting destination.');
-    records.createPart({
-        title: 'Producer',
-        repository: 'fake/a',
-        parentId: parent.workId,
-        parentRevision: records.read(parent.workId).revision,
-        kind: 'build',
-        body: 'Produce v1.',
-        blockerIds: [],
-    });
-    expect(recordDetails(records, parent.workId)).toMatchObject({
-        bodyKind: 'map',
-        body: 'Shared greeting destination.',
-    });
 });

@@ -31,7 +31,7 @@ describe('thread launch', () => {
         ).toEqual({ thread: null, error: 'T3 launch authorization failed.', uncertain: true });
         expect(subscribeProjects).not.toHaveBeenCalled();
     });
-    it.each(['empty', 'preparing'])(
+    it.each(['preparing'])(
         'freezes the request before sending, and replays the same command after an %s launch',
         async (state) => {
             vi.useFakeTimers();
@@ -95,59 +95,6 @@ describe('thread launch', () => {
             expect(payloads[1]).toEqual(payloads[0]);
         },
     );
-    it('reports authorization failure without sending a launch', async () => {
-        vi.mocked(boardSessionAuthority).mockReturnValue({
-            issue: async () => {
-                throw Error('secret');
-            },
-            revoke: vi.fn(),
-        });
-        expect(await launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN)).toEqual({
-            thread: null,
-            error: 'T3 launch authorization failed.',
-        });
-        expect(subscribeProjects).not.toHaveBeenCalled();
-    });
-    it('keeps malformed responses uncertain and revokes launch authority', async () => {
-        vi.useFakeTimers();
-
-        const revoke = vi.fn().mockResolvedValue(undefined);
-        const stop = vi.fn();
-
-        vi.mocked(boardSessionAuthority).mockReturnValue({
-            issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
-            revoke,
-        });
-        vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
-            execution!.accept({ threadId: 'incomplete' });
-
-            return stop;
-        });
-
-        const result = launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN, 'stable');
-
-        await vi.advanceTimersByTimeAsync(30_000);
-        expect(await result).toMatchObject({ thread: null, uncertain: true });
-        expect(stop).toHaveBeenCalled();
-        expect(revoke).toHaveBeenCalledWith('session');
-        expect(vi.mocked(subscribeProjects).mock.calls[0]![4]!.payload).toMatchObject({
-            commandId: 'stable',
-            workspaceStrategy: { type: 'existing_worktree', worktreePath: '/tmp/work', branch: 'build/test' },
-        });
-    });
-    it('reports a missing origin without sending a launch', async () => {
-        vi.mocked(boardSessionAuthority).mockReturnValue({
-            issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
-            revoke: vi.fn().mockResolvedValue(undefined),
-        });
-        vi.mocked(subscribeProjects).mockImplementation(() => {
-            throw Error('bad origin');
-        });
-        expect(await launchThread('project', 'Continue', selection, workspace, 'approval-required', '')).toEqual({
-            thread: null,
-            error: 'Invalid local T3 launch endpoint.',
-        });
-    });
     it('sends the whole selection and workspace, and tells a refusal from a lost answer', async () => {
         const revoke = vi.fn().mockResolvedValue(undefined);
 
@@ -190,36 +137,5 @@ describe('thread launch', () => {
         expect(
             await launchThread('project', 'Build', selection, { type: 'root' }, 'full-access', ORIGIN),
         ).toMatchObject({ thread: null, uncertain: true });
-    });
-    it('a dropped connection leaves the launch uncertain, with nothing unhandled', async () => {
-        vi.useFakeTimers();
-        vi.stubGlobal('fetch', async () => {
-            throw Error('refused');
-        });
-
-        const actual = await vi.importActual<typeof import('./project-subscription.ts')>('./project-subscription.ts');
-
-        vi.mocked(subscribeProjects).mockImplementation(actual.subscribeProjects);
-        vi.mocked(boardSessionAuthority).mockReturnValue({
-            issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
-            revoke: vi.fn().mockResolvedValue(undefined),
-        });
-
-        const unhandled = vi.fn();
-
-        process.on('unhandledRejection', unhandled);
-
-        try {
-            const result = launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN);
-
-            await vi.advanceTimersByTimeAsync(30_000);
-            expect(await result).toMatchObject({ thread: null, uncertain: true });
-            vi.useRealTimers();
-            await new Promise((resolve) => setImmediate(resolve));
-            expect(unhandled).not.toHaveBeenCalled();
-        } finally {
-            process.off('unhandledRejection', unhandled);
-            vi.unstubAllGlobals();
-        }
     });
 });

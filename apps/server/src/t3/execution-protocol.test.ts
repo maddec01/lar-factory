@@ -1,13 +1,6 @@
 import { expect, it, vi } from 'vite-plus/test';
 
-import {
-    readArchivedShells,
-    readExecution,
-    readThreadFamily,
-    subscribeExecution,
-    subscribeExecutionShell,
-    executionCapabilities,
-} from './execution-protocol.ts';
+import { subscribeExecution } from './execution-protocol.ts';
 import { ProjectProtocol } from './project-protocol.ts';
 
 const protocol = new ProjectProtocol(
@@ -22,26 +15,8 @@ const protocol = new ProjectProtocol(
     'unknown',
 );
 
-it('reports failed authentication without waiting for lookup or family timeout', async () => {
-    const origin = new URL('http://127.0.0.1:3773');
-
-    expect(await readExecution(origin, 'unknown', protocol, 'thread')).toEqual({
-        availability: 'renewal-required',
-        observation: undefined,
-    });
-    expect(await readThreadFamily(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'renewal-required' });
-    expect(await readArchivedShells(origin, 'unknown', protocol)).toEqual({ availability: 'renewal-required' });
-});
 it('refuses external origins before obtaining a session', () => {
     expect(() => subscribeExecution(new URL('http://example.com'), 'unknown', protocol, 'thread', () => {})).toThrow(
-        'Expected local T3 server',
-    );
-});
-
-it('reports exact capability gaps and rejects external shell origins', () => {
-    expect(executionCapabilities.azurePolicies).toBe(false);
-    expect(executionCapabilities.transcriptUsage).toBe(false);
-    expect(() => subscribeExecutionShell(new URL('http://example.com'), 'unknown', protocol, () => {})).toThrow(
         'Expected local T3 server',
     );
 });

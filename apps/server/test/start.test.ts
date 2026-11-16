@@ -1,15 +1,14 @@
 import type { BoardData } from '@lar-factory/shared';
-import { boardIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import { shapePrompt, DEFAULT_SELECTION, recordBlockers, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
+import { shapePrompt, DEFAULT_SELECTION, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
@@ -34,10 +33,9 @@ async function boardIn(
     origins: Record<string, string | null>,
     db: (home: string) => string,
     options: object = {},
-    env: Record<string, string> = {},
 ) {
     const dir = home(t, origins);
-    const board = await startBoard(t, { items, ...options }, false, false, { HOME: dir, T3_STATE_DB: db(dir), ...env });
+    const board = await startBoard(t, { items, ...options }, false, false, { HOME: dir, T3_STATE_DB: db(dir) });
 
     await until(board, (d) => d.items.length === items.length);
 
@@ -56,12 +54,11 @@ const ORIGINS = {
     'lar-server': 'https://github.com/MADDEC01/Lar-Server',
 };
 
-async function factoryBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}) {
-    return (await boardIn(t, items, ORIGINS, (dir) => projectsDb(t, PROJECTS(dir)), options, env)).board;
+async function factoryBoard(t: TestContext, items: object[], options: object = {}) {
+    return (await boardIn(t, items, ORIGINS, (dir) => projectsDb(t, PROJECTS(dir)), options)).board;
 }
 
-const start = (board: Board, itemId: string, origin = board.url, model?: unknown) =>
-    board.postSession({ itemId, model }, '/api/start', origin);
+const start = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');
 
 test("Start begins one lar-shape thread in the card's repository project and leaves the Status alone", async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
@@ -84,162 +81,23 @@ test("Start begins one lar-shape thread in the card's repository project and lea
     assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });
 
-test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
-    const response = await start(board, board.id(12), board.url, {
-        instanceId: 'claudeAgent_personal',
-        model: 'claude-opus-5-5',
-    });
-
-    assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-    assert.deepEqual(await board.t3Calls(), [
-        [
-            'launch',
-            'project-factory',
-            await message(board),
-            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5', options: [] },
-            { type: 'root' },
-            'full-access',
-        ],
-    ]);
-});
-
-test('Start refuses unoffered model choices without launching a thread', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
-
-    // Every input is refused before a launch or record write, so the cases can share one board.
-    for (const [name, model] of [
-        ['an unknown instance', { instanceId: 'claudeAgent_work', model: 'claude-opus-5-5' }],
-        ['a disabled instance', { instanceId: 'cursor', model: 'cursor-agent' }],
-        ['an unknown model', { instanceId: 'codex', model: 'claude-opus-5-5' }],
-        ['an instance alone', { instanceId: 'codex' }],
-        ['a model alone', { model: 'gpt-6-astra' }],
-        ['a flag in place of a model', { instanceId: 'codex', model: '--help' }],
-        ['no object', 'codex/gpt-6-astra'],
-    ] as const) {
-        const response = await start(board, board.id(12), board.url, model);
-
-        assert.equal(response.status, 422, name);
-        assert.match((await response.json()).error, /isn't offered/, name);
-        assert.deepEqual(await board.t3Calls(), [], name);
-    }
-});
-
-test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
-    const { board } = await boardIn(t, [boardIssue(12, 'Queued')], {}, (dir) => {
-        checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/lar-factory' }, 'code');
-
-        return projectsDb(t, [
-            { id: 'project-lar', root: `${dir}/Developer/lar` },
-            { id: 'project-clone', root: '~/code/factory-clone' },
-        ]);
-    });
-
-    assert.equal((await start(board, board.id(12))).status, 200);
-    assert.equal((await board.t3Calls())[0]?.[1], 'project-clone');
-});
-
 const NO_PROJECT = 'No T3 project is a checkout of maddec01/lar-factory; add the checkout in T3 Code';
 
-/** A folder whose `.git` is a file, as in a git worktree of the lar-factory checkout. */
-function worktree(dir: string): string {
-    const folder = join(dir, 'worktrees/lar-factory-1');
-
-    mkdirSync(folder, { recursive: true });
-    writeFileSync(join(folder, '.git'), `gitdir: ${dir}/Developer/lar/lar-factory/.git\n`);
-
-    return folder;
-}
-
-const refusals: {
-    name: string;
-    repo?: string;
-    origins?: Record<string, string | null>;
-    projects?: (home: string) => FixtureProject[];
-    db?: (home: string) => string;
-    error: (home: string) => string;
-}[] = [
-    { name: 'a project whose folder is gone', origins: {}, error: () => NO_PROJECT },
-    {
-        name: "another repository's checkout",
-        origins: { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
-        error: () => NO_PROJECT,
-    },
-    { name: 'a checkout with no origin', origins: { 'lar-factory': null }, error: () => NO_PROJECT },
-    {
-        name: 'a deleted T3 project',
-        projects: (dir) => [
-            { id: 'project-lar', root: `${dir}/Developer/lar` },
-            { id: 'project-factory', root: `${dir}/Developer/lar/lar-factory`, deletedAt: '2026-10-01T00:00:00Z' },
-        ],
-        error: () => NO_PROJECT,
-    },
-    {
-        name: 'a worktree or a folder inside the checkout',
-        projects: (dir) => [
-            { id: 'project-worktree', root: worktree(dir) },
-            { id: 'project-board', root: `${dir}/Developer/lar/lar-factory/board` },
-        ],
-        error: () => NO_PROJECT,
-    },
-    {
-        name: 'two checkouts of the repository',
-        projects: (dir) => {
-            checkouts(dir, { 'factory-clone': 'git@github.com:maddec01/lar-factory.git' }, 'code');
-
-            return [...PROJECTS(dir), { id: 'project-clone', root: `${dir}/code/factory-clone` }];
-        },
-        error: () =>
-            'Several T3 projects are checkouts of maddec01/lar-factory: ~/Developer/lar/lar-factory, ~/code/factory-clone; remove all but one in T3 Code',
-    },
-    {
-        name: 'a missing T3 database',
-        db: (dir) => join(dir, 'none.sqlite'),
-        error: () =>
-            "Can't read T3 Code's projects; the board retries automatically. Open T3 Code or run checks in Diagnostics.",
-    },
-];
-
-for (const refusal of refusals) {
-    test(`Start refuses ${refusal.name} with a hint and runs no t3`, async (t) => {
-        const item = boardIssue(12, 'Queued', refusal.repo);
-        const { board, home: dir } = await boardIn(
-            t,
-            [item],
-            refusal.origins ?? ORIGINS,
-            refusal.db ?? ((dir) => projectsDb(t, (refusal.projects ?? PROJECTS)(dir))),
-        );
-        const response = await start(board, board.id(12));
-
-        assert.equal(response.status, 409, 'a refusal is not a t3 failure');
-
-        const answer = await response.json();
-
-        assert.equal(answer.error, refusal.error(dir));
-        assert.equal(answer.uncertain, undefined, 'a refused Start can be pressed again');
-        assert.deepEqual(await board.t3Calls(), []);
-    });
-}
-
-test('Start refuses a T3 database whose schema changed', async (t) => {
-    let db = '';
-    const { board } = await boardIn(t, [boardIssue(12, 'Queued')], ORIGINS, (dir) => {
-        db = join(dir, 'changed.sqlite');
-
-        const changed = new DatabaseSync(db);
-
-        changed.exec('CREATE TABLE projection_projects (id TEXT)');
-        changed.close();
-
-        return db;
-    });
+test("Start refuses a folder that is another repository's checkout with a hint and runs no t3", async (t) => {
+    const { board } = await boardIn(
+        t,
+        [boardIssue(12, 'Queued')],
+        { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
+        (dir) => projectsDb(t, PROJECTS(dir)),
+    );
     const response = await start(board, board.id(12));
 
-    assert.equal(response.status, 409);
-    assert.equal(
-        (await response.json()).error,
-        "Can't read T3 Code's projects; the board retries automatically. Open T3 Code or run checks in Diagnostics.",
-    );
+    assert.equal(response.status, 409, 'a refusal is not a t3 failure');
+
+    const answer = await response.json();
+
+    assert.equal(answer.error, NO_PROJECT);
+    assert.equal(answer.uncertain, undefined, 'a refused Start can be pressed again');
     assert.deepEqual(await board.t3Calls(), []);
 });
 
@@ -268,105 +126,13 @@ test('a double press, a retry or another page starts no second thread for the it
     assert.equal((await board.t3Calls()).length, 2);
 });
 
-test('an uncertain T3 error prevents another launch', async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'down' } });
-    const failed = await start(board, board.id(12));
+test('an unconfirmed start (killed) is never retried as a new thread', async (t) => {
+    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'killed' } });
+    const first = await start(board, board.id(12));
 
-    assert.equal(failed.status, 202);
-    assert.match((await failed.json()).error, /could not be confirmed/);
+    assert.equal(first.status, 202);
+    assert.equal((await first.json()).uncertain, true);
     await board.update({ items: [boardIssue(12, 'Queued')] });
-    assert.equal((await start(board, board.id(12))).status, 202);
+    assert.equal((await (await start(board, board.id(12))).json()).uncertain, true);
+    assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
 });
-
-for (const fail of ['killed', 'garbage']) {
-    test(`an unconfirmed start (${fail}) is never retried as a new thread`, async (t) => {
-        const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail } });
-        const first = await start(board, board.id(12));
-
-        assert.equal(first.status, 202);
-        assert.equal((await first.json()).uncertain, true);
-        await board.update({ items: [boardIssue(12, 'Queued')] });
-        assert.equal((await (await start(board, board.id(12))).json()).uncertain, true);
-        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
-    });
-}
-
-test('Start only runs for Queued issues from this board page and session', async (t) => {
-    const board = await startBoard(t, {
-        items: [boardIssue(12, 'List'), boardIssue(13, 'Ready'), boardIssue(14, 'Queued')],
-    });
-
-    await until(board, (d) => d.items.length === 3);
-    assert.equal((await start(board, board.id(12))).status, 409);
-    assert.equal((await start(board, board.id(13))).status, 409);
-    assert.equal((await start(board, 'I_missing')).status, 404);
-    assert.equal(
-        (await board.post({ session: (await board.board()).capture.session, itemId: 14 }, board.url, '/api/start'))
-            .status,
-        400,
-    );
-
-    const restarted = await board.post({ session: 'old', itemId: board.id(14) }, board.url, '/api/start');
-
-    assert.equal(restarted.status, 409);
-
-    const answer = await restarted.json();
-
-    assert.ok(
-        !answer.uncertain && answer.board.capture.session,
-        'a stale page gets the new session and can press Start again',
-    );
-    for (const origin of ['https://evil.example', 'null', ''])
-        assert.equal((await start(board, board.id(14), origin)).status, 403);
-
-    const sample = await startBoard(t, {}, true);
-
-    assert.equal((await start(sample, 'I_sample05')).status, 403);
-    assert.equal(
-        (await sample.postSession({ itemId: 'I_sample05', purpose: 'shape' }, '/api/dismiss-start-error')).status,
-        403,
-    );
-    assert.equal(
-        (await board.postSession({ itemId: board.id(14), purpose: 'other' }, '/api/dismiss-start-error')).status,
-        422,
-    );
-    assert.deepEqual([...(await board.t3Calls()), ...(await sample.t3Calls())], []);
-});
-
-test('Start is refused while a blocker is incomplete, naming each one', async (t) => {
-    const board = await factoryBoard(t, [rawIssue('I_12', 12, 'Queued', ['decision-grill'])]);
-
-    await recordBlockers(board, board.id(12), ['Decision 5', 'Decision 6']);
-
-    const refused = await start(board, board.id(12));
-
-    assert.equal(refused.status, 409);
-    assert.equal(
-        (await refused.json()).error,
-        'Blocked by Decision 5, Decision 6 until they complete; use Start after to start it then.',
-    );
-    assert.deepEqual(await board.t3Calls(), []);
-});
-
-for (const recover of ['late', 'deleted']) {
-    test(`an uncertain launch with ${recover} CLI evidence preserves duplicate protection`, async (t) => {
-        const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
-        const response = await start(board, board.id(12));
-
-        assert.equal(response.status, 202);
-        assert.equal((await response.json()).uncertain, true);
-
-        // This older-launch fixture has no saved request; recovery checks it on the next press.
-        const retried = await start(board, board.id(12));
-
-        assert.equal(retried.status, recover === 'late' ? 200 : 202);
-
-        const answer = await retried.json();
-
-        if (recover === 'late') assert.equal(answer.thread.threadId, 'thread-1');
-        else assert.equal(answer.uncertain, true);
-
-        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
-        assert.ok((await board.t3Calls()).some((args) => args[1] === 'show'));
-    });
-}

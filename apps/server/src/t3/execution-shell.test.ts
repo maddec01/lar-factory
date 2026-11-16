@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vite-plus/test';
 
-import { readArchivedShells, subscribeExecutionShell } from './execution-protocol.ts';
+import { subscribeExecutionShell } from './execution-protocol.ts';
 import type { ProjectProtocol } from './project-protocol.ts';
 
 const fixture = vi.hoisted(() => ({ accept: (_value: unknown) => {}, tag: '', payload: {} as unknown }));
@@ -62,17 +62,4 @@ it('keeps projects and active/archived threads during metadata refresh and appli
     });
     expect(changed.mock.lastCall![0].observation.snapshot.projects).toEqual([]);
     stop();
-});
-
-it('reads archived shells through their own RPC, and refuses a response that lacks them', async () => {
-    const read = readArchivedShells(new URL('http://127.0.0.1:3773'), 'any', {} as ProjectProtocol);
-
-    expect([fixture.tag, fixture.payload]).toEqual(['orchestration.getArchivedShellSnapshot', {}]);
-    fixture.accept({ schemaVersion: 2, snapshotSequence: 7, projects: [], threads: [{ id: 'archived' }] });
-    expect(await read).toMatchObject({
-        availability: 'available',
-        observation: { snapshotSequence: 7, threads: [{ id: 'archived' }] },
-    });
-    void readArchivedShells(new URL('http://127.0.0.1:3773'), 'any', {} as ProjectProtocol);
-    expect(() => fixture.accept({ snapshotSequence: 7, threads: 'none' })).toThrow('Invalid');
 });

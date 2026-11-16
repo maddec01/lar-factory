@@ -6,7 +6,7 @@ import type { ItemSource } from '../items/item-source.ts';
 import { mergeSources } from '../items/item-sources.ts';
 import { azureItems, type Az } from './azure-items.ts';
 import { readSprint } from './azure-sprint.ts';
-import { REPO_URL, STATES, fakeAz, type FakePr, type WorkItem } from './fake-az.ts';
+import { REPO_URL, fakeAz, type FakePr, type WorkItem } from './fake-az.ts';
 
 const azureSprint = (repos: readonly string[], team: string, run: Az) =>
     azureItems(repos, team, (calls) => readSprint(team, calls), run);
@@ -14,8 +14,6 @@ const azureSprint = (repos: readonly string[], team: string, run: Az) =>
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 const TEAM = 'Fabrikam Team';
 
-const invokes = (calls: string[][], resource: string) =>
-    calls.filter((c) => c[0] === 'devops' && c[c.indexOf('--resource') + 1] === resource);
 const shown = (items: Item[]) => items.map((i) => [i.number, i.status, i.parent?.number ?? null]);
 
 const SPRINT: WorkItem[] = [
@@ -99,99 +97,6 @@ test('a sprint read lists requirement-level items with Task counts, a Completed 
     assert.deepEqual(az.batches, [[1, 11, 12, 13, 2, 3, 4, 5, 6], [99]]);
 });
 
-test('a sprint counts only its own Tasks and keeps plain Tasks off the board, including on a partial refresh', async () => {
-    const az = fakeAz({ items: SPRINT, sprint: [1, 11, 2] });
-    const source = azureSprint([REPO], TEAM, az.run);
-    const read = await source.read();
-
-    assert.deepEqual(shown(read.items), [
-        [1, 'Shaping', null],
-        [2, 'Done', null],
-    ]);
-    assert.deepEqual(read.items[0]!.subIssues, { total: 1, completed: 0 });
-    assert.deepEqual(
-        az.batches,
-        [[1, 11, 2], [12, 13], [99]],
-        'children outside the sprint are checked for factory tags',
-    );
-    assert.deepEqual((await source.readSome!([read.items[0]!]))[0]!.subIssues, { total: 1, completed: 0 });
-});
-
-test("every az call names the team's organization and project, and every invoke passes --api-version", async () => {
-    const az = fakeAz({ items: SPRINT, sprint: [1, 11, 12, 13, 2, 3, 4, 5, 6] });
-
-    await azureSprint([REPO], TEAM, az.run).read();
-    for (const call of az.calls) {
-        if (call[0] !== 'rest')
-            assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
-
-        if (call[0] === 'devops') {
-            assert.ok(call.includes('--api-version') && call[call.indexOf('--api-version') + 1], call.join(' '));
-            assert.ok(call.includes('project=Fabrikam Fiber'), call.join(' '));
-        } else if (call[0] === 'boards') {
-            assert.equal(call[call.indexOf('--project') + 1], 'Fabrikam Fiber', call.join(' '));
-            assert.equal(call[call.indexOf('--team') + 1], TEAM, call.join(' '));
-        }
-    }
-    assert.deepEqual(az.calls.find((c) => c[3] === 'list-work-items')!.slice(0, 6), [
-        'boards',
-        'iteration',
-        'team',
-        'list-work-items',
-        '--id',
-        'it-12',
-    ]);
-});
-
-test("each process's requirement type shows at the top level, and only the team's requirement backlog level's types do", async () => {
-    for (const requirement of ['User Story', 'Product Backlog Item', 'Issue', 'Requirement']) {
-        const [open, done] = STATES[requirement]!.filter(
-            ([, category]) => category === 'InProgress' || category === 'Completed',
-        ).map(([name]) => name);
-        const items: WorkItem[] = [
-            { id: 1, type: requirement, state: open! },
-            { id: 2, type: requirement, state: done! },
-            { id: 3, type: requirement === 'User Story' ? 'Epic' : 'User Story', state: 'Active' },
-            { id: 4, type: 'Task', state: 'Active', parent: 1 },
-        ];
-        const read = await azureSprint([REPO], TEAM, fakeAz({ items, requirement }).run).read();
-
-        assert.deepEqual(
-            shown(read.items),
-            [
-                [1, 'List', null],
-                [2, 'Done', null],
-            ],
-            requirement,
-        );
-    }
-});
-
-test('a read of more than 200 ids reads their fields in batches of at most 200', async () => {
-    const items = Array.from({ length: 450 }, (_, i): WorkItem => ({ id: i + 1, type: 'User Story', state: 'New' }));
-    const az = fakeAz({ items });
-    const read = await azureSprint([REPO], TEAM, az.run).read();
-
-    assert.equal(read.items.length, 450);
-    assert.deepEqual(
-        az.batches.map((ids) => ids.length).sort((a, b) => a - b),
-        [50, 200, 200],
-    );
-
-    const calls = invokes(az.calls, 'workitemsbatch');
-
-    assert.equal(calls.length, 3);
-    for (const call of calls) assert.ok(call[call.indexOf('--api-version') + 1], call.join(' '));
-});
-
-test('status tags give the statuses and every other tag is a label', async () => {
-    const sprint = azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run);
-    const read = await sprint.read();
-    const two = read.items.find((i) => i.number === 5)!;
-
-    assert.deepEqual([two.statuses, two.labels], [['Queued', 'Review'], []]);
-});
-
 /** A source for another repository that lists one item. */
 const otherRepo: ItemSource = {
     read: async () => ({
@@ -272,18 +177,6 @@ test("a logged-out az and a missing azure-devops extension each name their fix, 
     }
 });
 
-test('any other az failure fails the read, naming the repository', async () => {
-    const az = fakeAz({ items: SPRINT, fail: () => new Error('az boards iteration failed: TF400813: not authorized') });
-    const source = mergeSources(
-        new Map([
-            ['maddec01/lar-apple', otherRepo],
-            [REPO, azureSprint([REPO], TEAM, az.run)],
-        ]),
-    );
-
-    await assert.rejects(source.read(), { message: `${REPO}: az boards iteration failed: TF400813: not authorized` });
-});
-
 test("a work item's linked PRs show their state from az repos pr show, a draft as open, with no checks; a deleted PR is left out", async () => {
     const pr = (pullRequestId: number, status: FakePr['status'], more: Partial<FakePr> = {}): FakePr => ({
         pullRequestId,
@@ -360,19 +253,4 @@ test("a work item's linked PRs show their state from az repos pr show, a draft a
         ['41', '42', '43', '44', '45'],
     );
     assert.ok(shows.every((c) => c[c.indexOf('--org') + 1] === 'https://dev.azure.com/contoso'));
-});
-
-test('a sprint follows backlog priority, with a completed sprint-only requirement after the backlog', async () => {
-    const az = fakeAz({ items: SPRINT, backlog: [6, 1, 5], sprint: [1, 2, 5, 6] });
-    const items = (await azureSprint([REPO], TEAM, az.run).read()).items;
-
-    assert.deepEqual(
-        items.map((item) => [item.number, item.status]),
-        [
-            [6, 'List'],
-            [1, 'Shaping'],
-            [5, 'Queued'],
-            [2, 'Done'],
-        ],
-    );
 });

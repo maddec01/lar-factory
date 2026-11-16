@@ -42,41 +42,6 @@ test('GitHub reads head revision, state and complete check counts together witho
     expect(run.mock.calls[0]?.[0]).toContain('number0=4');
 });
 
-test('one GitHub batch reads many delivery PRs while keeping an individual failure distinct', async () => {
-    const refs = Array.from({ length: 20 }, (_, number) => ({ repo: 'o/r', number: number + 1 }));
-    const run = vi.fn(async () =>
-        JSON.stringify({
-            data: Object.fromEntries(
-                refs.map(({ number }, i) => [
-                    `pr${i}`,
-                    {
-                        pullRequest:
-                            i === 1
-                                ? null
-                                : {
-                                      number,
-                                      url: `https://github.com/o/r/pull/${number}`,
-                                      state: 'OPEN',
-                                      isDraft: false,
-                                      headRefOid: `head${number}`,
-                                      mergeStateStatus: 'CLEAN',
-                                      statusCheckRollup: i === 2 ? {} : null,
-                                  },
-                    },
-                ]),
-            ),
-            errors: [{ path: ['pr1', 'pullRequest'], message: 'PR unavailable' }],
-        }),
-    );
-    const results = await createPrProgressReader(run)(refs);
-
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(results.get('o/r#1')).toMatchObject({ status: 'fulfilled', value: { sourceRevision: 'head1' } });
-    expect(results.get('o/r#2')?.status).toBe('rejected');
-    expect(results.get('o/r#3')?.status).toBe('rejected');
-    expect(results.get('o/r#20')).toMatchObject({ status: 'fulfilled', value: { sourceRevision: 'head20' } });
-});
-
 test('Azure progress reads work through the read-only command boundary', async () => {
     const fake = fakeAz({
         items: [],

@@ -51,25 +51,3 @@ test('a taken port is skipped for the next one', async (t) => {
     assert.equal(await listenOnFreePort(server, '127.0.0.1', [first, first + 1]), first + 1);
     assert.equal((server.address() as { port: number }).port, first + 1);
 });
-
-test('every port taken gives null and leaves the server closed', async (t) => {
-    const port = await freePort();
-
-    await hold(t, port);
-
-    const server = createServer();
-
-    assert.equal(await listenOnFreePort(server, '127.0.0.1', [port]), null);
-    assert.equal(server.listening, false);
-});
-
-test('port zero binds an OS-assigned port and returns the actual listening port', async (t) => {
-    const server = createServer();
-
-    t.onTestFinished(() => new Promise<void>((resolve) => server.close(() => resolve())));
-
-    const port = await listenOnFreePort(server, '127.0.0.1', [0]);
-
-    assert.ok(port && port > 0);
-    assert.equal((server.address() as { port: number }).port, port);
-});

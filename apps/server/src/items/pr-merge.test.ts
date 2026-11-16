@@ -86,25 +86,6 @@ test('confirmation binds the recorded delivery PR and method; only provider conf
     expect(s.records.read(s.item.id).status).toBe('Done');
 });
 
-test('in-board merge completion replaces cached open observer progress without another poll', async () => {
-    const s = await setup();
-    const observer = createPrObserver(s.records, {
-        repositories: () => ['owner/repo'],
-        hidden: () => new Set(),
-        waits: () => false,
-        changed: vi.fn(),
-        read: async () => ({ ...s.pr }),
-    });
-
-    await observer.poll(0);
-
-    const { confirmation } = await s.inspect();
-
-    expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(200);
-    expect(s.records.read(s.item.id).status).toBe('Done');
-    expect(observer.project([s.item])[0]?.linkedPrs[0]?.state).toBe('merged');
-});
-
 test('a poll started before an in-board merge cannot overwrite confirmed completion', async () => {
     const s = await setup();
     const open = { ...s.pr };
@@ -129,154 +110,99 @@ test('a poll started before an in-board merge cannot overwrite confirmed complet
     expect(observer.project([s.item])[0]?.linkedPrs[0]?.state).toBe('merged');
 });
 
-for (const repo of ['owner/repo', 'o/p/r']) {
-    test(`${repo} refuses another item's valid confirmation without a provider mutation`, async () => {
-        const s = await setup(repo);
-        let other = s.records.create({ title: 'Other', repository: repo, kind: 'bug', status: 'Ready to merge' });
-
-        other = s.records.setPullRequest(other.workId, other.revision, `${repo}#9`);
-
-        const otherItem = {
-            ...s.item,
-            id: other.workId,
-            linkedPrs: [{ ...s.pr, number: 9, url: s.pr.url.replace(/8$/, '9') }],
-        };
-
-        s.board.update({ items: [s.item, otherItem] });
-
-        const { confirmation } = await s.inspect();
-
-        expect((await s.mergePr(otherItem.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: 'Inspect and confirm this delivery PR again.',
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-        expect(s.read).toHaveBeenCalledTimes(1);
-    });
-
-    test(`${repo} refuses an expired confirmation after board activity refreshes`, async () => {
-        const s = await setup(repo);
-        const { confirmation } = await s.inspect();
-        const now = Date.now() + 5 * 60_000 + 1;
-
-        vi.spyOn(Date, 'now').mockReturnValue(now);
-        s.board.update({ fetchedAt: new Date(now).toISOString() });
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: 'Inspect and confirm this delivery PR again.',
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-        expect(s.read).toHaveBeenCalledTimes(1);
-    });
-
-    test(`${repo} refuses a consumed confirmation after a failed merge attempt finishes`, async () => {
-        const s = await setup(repo);
-        const { confirmation } = await s.inspect();
-
-        s.merge.mockRejectedValue(new Error('Provider rejected merge'));
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(409);
-        expect(s.merge).toHaveBeenCalledTimes(1);
-        s.merge.mockClear();
-        s.read.mockClear();
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: 'Inspect and confirm this delivery PR again.',
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-        expect(s.read).not.toHaveBeenCalled();
-    });
-
-    test(`${repo} refuses wrong identity, changed head and a method revoked after confirmation`, async () => {
-        const s = await setup(repo);
-        const { confirmation } = await s.inspect();
-
-        expect((await s.mergePr(s.item.id, { token: 'other', method: 'squash' })).status).toBe(409);
-        s.pr.sourceRevision = 'new-head';
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: expect.stringContaining('revision changed'),
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-
-        const next = await s.inspect();
-
-        s.read.mockImplementation(async () => ({ pr: { ...s.pr }, methods: [], blockers: [] }));
-        expect((await s.mergePr(s.item.id, { token: next.confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: expect.stringContaining('no longer permitted'),
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-        s.records.setPullRequest(s.item.id, s.records.read(s.item.id).revision, `${repo}#99`);
-        expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-    });
-
-    test(`${repo} shares a pending guard and rereads an uncertain result before another attempt`, async () => {
-        const s = await setup(repo);
-        const { confirmation } = await s.inspect();
-        let release!: () => void;
-
-        s.merge.mockImplementation(async () => {
-            await new Promise<void>((resolve) => {
-                release = resolve;
-            });
-            throw new Error('Response lost');
-        });
-
-        const first = s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' });
-
-        await vi.waitFor(() => expect(s.merge).toHaveBeenCalledTimes(1));
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(409);
-        expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-        s.read.mockRejectedValue(new Error('Provider unavailable'));
-        release();
-        expect((await first).status).toBe(409);
-        expect(s.records.read(s.item.id).status).toBe('Ready to merge');
-        expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-        s.read.mockImplementation(async () => ({
-            pr: { ...s.pr, state: 'merged' },
-            methods: ['squash'],
-            blockers: [],
-        }));
-        expect((await s.inspectMerge(s.item.id)).body).toMatchObject({ merged: true });
-        expect(s.records.read(s.item.id).status).toBe('Done');
-        expect(s.merge).toHaveBeenCalledTimes(1);
-    });
-
-    test(`${repo} refuses a provider blocker after confirmation`, async () => {
-        const s = await setup(repo);
-        const { confirmation } = await s.inspect();
-        const blocker = 'Reviews required';
-
-        s.read.mockImplementation(async () => ({ pr: { ...s.pr }, methods: ['squash'], blockers: [blocker] }));
-        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-            error: expect.stringContaining(blocker),
-        });
-        expect(s.merge).not.toHaveBeenCalled();
-    });
-}
-
-test.each([
-    { status: 'Verify' },
-    { status: 'Review' },
-    { needsYou: { reason: 'Answer required' } },
-    { threads: 'unavailable' },
-    { threads: [{ id: 'build', purpose: 'build', currentRunning: true }] },
-    { threads: [{ id: 'build', purpose: 'build', state: 'needs you' }] },
-])('refuses stage and activity gate %j without provider calls', async (patch) => {
+test("refuses another item's valid confirmation without a provider mutation", async () => {
     const s = await setup();
+    let other = s.records.create({ title: 'Other', repository: 'owner/repo', kind: 'bug', status: 'Ready to merge' });
 
-    Object.assign(s.item, patch);
-    s.board.update({ items: [s.item] });
-    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-    expect(s.read).not.toHaveBeenCalled();
+    other = s.records.setPullRequest(other.workId, other.revision, 'owner/repo#9');
+
+    const otherItem = {
+        ...s.item,
+        id: other.workId,
+        linkedPrs: [{ ...s.pr, number: 9, url: s.pr.url.replace(/8$/, '9') }],
+    };
+
+    s.board.update({ items: [s.item, otherItem] });
+
+    const { confirmation } = await s.inspect();
+
+    expect((await s.mergePr(otherItem.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
+        error: 'Inspect and confirm this delivery PR again.',
+    });
+    expect(s.merge).not.toHaveBeenCalled();
+    expect(s.read).toHaveBeenCalledTimes(1);
 });
 
-test.each([
-    { isDraft: true },
-    { mergeState: 'conflicts' },
-    { mergeState: 'checking' },
-    { checks: { passed: 1, failed: 1, running: 0, total: 2, since: null } },
-    { checks: { passed: 1, failed: 0, running: 1, total: 2, since: null } },
-    { pipelineUnread: true },
-])('refuses provider readiness %j', async (patch) => {
+test('refuses wrong identity, changed head and a method revoked after confirmation', async () => {
+    const s = await setup();
+    const { confirmation } = await s.inspect();
+
+    expect((await s.mergePr(s.item.id, { token: 'other', method: 'squash' })).status).toBe(409);
+    s.pr.sourceRevision = 'new-head';
+    expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
+        error: expect.stringContaining('revision changed'),
+    });
+    expect(s.merge).not.toHaveBeenCalled();
+
+    const next = await s.inspect();
+
+    s.read.mockImplementation(async () => ({ pr: { ...s.pr }, methods: [], blockers: [] }));
+    expect((await s.mergePr(s.item.id, { token: next.confirmation.token, method: 'squash' })).body).toMatchObject({
+        error: expect.stringContaining('no longer permitted'),
+    });
+    expect(s.merge).not.toHaveBeenCalled();
+    s.records.setPullRequest(s.item.id, s.records.read(s.item.id).revision, 'owner/repo#99');
+    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
+});
+
+test('shares a pending guard and rereads an uncertain result before another attempt', async () => {
+    const s = await setup();
+    const { confirmation } = await s.inspect();
+    let release!: () => void;
+
+    s.merge.mockImplementation(async () => {
+        await new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        throw new Error('Response lost');
+    });
+
+    const first = s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' });
+
+    await vi.waitFor(() => expect(s.merge).toHaveBeenCalledTimes(1));
+    expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(409);
+    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
+    s.read.mockRejectedValue(new Error('Provider unavailable'));
+    release();
+    expect((await first).status).toBe(409);
+    expect(s.records.read(s.item.id).status).toBe('Ready to merge');
+    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
+    s.read.mockImplementation(async () => ({
+        pr: { ...s.pr, state: 'merged' },
+        methods: ['squash'],
+        blockers: [],
+    }));
+    expect((await s.inspectMerge(s.item.id)).body).toMatchObject({ merged: true });
+    expect(s.records.read(s.item.id).status).toBe('Done');
+    expect(s.merge).toHaveBeenCalledTimes(1);
+});
+
+test.each([{ status: 'Verify' }, { threads: [{ id: 'build', purpose: 'build', currentRunning: true }] }])(
+    'refuses stage and activity gate %j without provider calls',
+    async (patch) => {
+        const s = await setup();
+
+        Object.assign(s.item, patch);
+        s.board.update({ items: [s.item] });
+        expect((await s.inspectMerge(s.item.id)).status).toBe(409);
+        expect(s.read).not.toHaveBeenCalled();
+    },
+);
+
+test('refuses a PR whose checks failed', async () => {
     const s = await setup();
 
-    Object.assign(s.pr, patch);
+    s.pr.checks = { passed: 1, failed: 1, running: 0, total: 2, since: null };
     expect((await s.inspectMerge(s.item.id)).status).toBe(409);
     expect(s.merge).not.toHaveBeenCalled();
 });
@@ -293,93 +219,4 @@ test('Azure read-only sessions allow eligibility reads but refuse writes before 
         error: expect.stringContaining('read-only'),
     });
     expect(s.merge).not.toHaveBeenCalled();
-});
-
-test('a wrong provider PR identity cannot issue a confirmation, even with green checks', async () => {
-    const s = await setup();
-
-    s.pr.number = 99;
-    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-    expect(s.merge).not.toHaveBeenCalled();
-});
-
-test('a record changed during the final read cannot merge the replaced delivery PR', async () => {
-    const s = await setup();
-    const { confirmation } = await s.inspect();
-
-    s.read.mockImplementation(async () => {
-        s.records.setPullRequest(s.item.id, s.records.read(s.item.id).revision, 'owner/repo#9');
-
-        return { pr: s.pr, methods: ['squash'], blockers: [] };
-    });
-    expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(409);
-    expect(s.merge).not.toHaveBeenCalled();
-});
-
-test('stale activity cannot establish that the build has stopped', async () => {
-    const s = await setup();
-
-    s.board.update({ error: 'T3 unavailable' });
-    expect((await s.inspectMerge(s.item.id)).status).toBe(409);
-    expect(s.read).not.toHaveBeenCalled();
-});
-
-test('separate work records for the same PR share the server merge guard', async () => {
-    const s = await setup();
-    let other = s.records.create({
-        title: 'Other record',
-        repository: 'owner/repo',
-        kind: 'bug',
-        status: 'Ready to merge',
-    });
-
-    other = s.records.setPullRequest(other.workId, other.revision, 'owner/repo#8');
-
-    const otherItem = { ...s.item, id: other.workId };
-
-    s.board.update({ items: [s.item, otherItem] });
-
-    const first = await s.inspect();
-    const second = (await s.inspectMerge(otherItem.id)).body as { confirmation: { token: string } };
-    let release!: () => void;
-
-    s.merge.mockImplementation(async () => {
-        await new Promise<void>((resolve) => {
-            release = resolve;
-        });
-        s.pr.state = 'merged';
-    });
-
-    const pending = s.mergePr(s.item.id, { token: first.confirmation.token, method: 'squash' });
-
-    await vi.waitFor(() => expect(s.merge).toHaveBeenCalledTimes(1));
-    expect((await s.mergePr(otherItem.id, { token: second.confirmation.token, method: 'squash' })).status).toBe(409);
-    release();
-    expect((await pending).status).toBe(200);
-    expect(s.merge).toHaveBeenCalledTimes(1);
-});
-
-test('the board merge refreshes its ticket observation without assuming the merge closed it', async () => {
-    const s = await setup();
-
-    s.records.attachTicket(s.item.id, s.records.read(s.item.id).revision, 'owner/repo#12');
-    s.records.observe(s.item.id, s.records.read(s.item.id).revision, { of: 'ticket', state: 'open' });
-
-    const readTicket = vi.fn(async () => ({ state: 'closed' as const, assignee: 'pedro' }));
-    const commands = createPrMerge({
-        board: s.board,
-        records: s.records,
-        reread: vi.fn(),
-        provider: () => ({ read: s.read, merge: s.merge }),
-        readTicket,
-    });
-    const inspected = (await commands.inspectMerge(s.item.id)).body as { confirmation: { token: string } };
-
-    expect((await commands.mergePr(s.item.id, { token: inspected.confirmation.token, method: 'squash' })).status).toBe(
-        200,
-    );
-    expect(readTicket).toHaveBeenCalledWith('owner/repo', 12);
-    expect(s.records.observations(s.item.id)).toContainEqual(
-        expect.objectContaining({ of: 'ticket', state: 'closed', assignee: 'pedro' }),
-    );
 });

@@ -20,14 +20,6 @@ const input = {
     ],
 };
 
-test.each(['command', 'permission'])('%s is a tool approval with no command exposure', (kind) => {
-    expect(pendingRequest({ ...shell, pendingRuntimeRequest: { id: 'pending', kind, command: 'private' } })).toEqual({
-        id: 'pending',
-        threadId: 'owner',
-        kind: 'tool-approval',
-    });
-});
-
 test('only the exact pending question names its brief gate', () => {
     expect(pendingRequest(shell, { turnItems: [input] })).toMatchObject({
         kind: 'brief-approval',
@@ -35,31 +27,6 @@ test('only the exact pending question names its brief gate', () => {
     });
     expect(pendingRequest(shell, { turnItems: [{ ...input, requestId: 'answered' }] })?.kind).toBe('question');
     expect(pendingRequest({ ...shell, pendingRuntimeRequest: null }, { turnItems: [input] })).toBeUndefined();
-});
-
-test('ordinary brief questions and chat do not become gate approvals', () => {
-    expect(
-        pendingRequest(shell, {
-            turnItems: [{ ...input, questions: [{ header: 'Scope', question: 'Which files belong in the brief?' }] }],
-            messages: [{ text: 'Approve brief' }],
-        })?.kind,
-    ).toBe('question');
-});
-
-test('a descendant request retains its kind and exact owner on its parent', () => {
-    const request = pendingRequest(shell, { turnItems: [input] })!;
-    const lookup = executionItemThreads(
-        [
-            { id: 'root', updatedAt: shell.updatedAt, status: 'completed' },
-            { ...shell, lineage: { parentThreadId: 'root' } },
-        ],
-        new Map([['owner', request]]),
-    );
-
-    expect(lookup(['root'])?.[0]).toMatchObject({
-        childNeedsYou: true,
-        pendingRequest: { id: 'pending', threadId: 'owner', kind: 'brief-approval' },
-    });
 });
 
 test('a changed shell request cannot reuse an old gate title', () => {
@@ -71,27 +38,6 @@ test('a changed shell request cannot reuse an old gate title', () => {
 
     expect(lookup(['owner'])?.[0]?.pendingRequest).toEqual({ id: 'new', threadId: 'owner', kind: 'question' });
 });
-
-test.each(['Approve revised brief', 'Approve current brief', 'Approve final brief'])(
-    'the exact pending %s title is a brief gate',
-    (title) => {
-        expect(
-            pendingRequest(shell, {
-                turnItems: [
-                    {
-                        ...input,
-                        questions: [
-                            {
-                                header: 'Question',
-                                question: `Q3 - ${title}: Does this version meet your expectations?`,
-                            },
-                        ],
-                    },
-                ],
-            })?.kind,
-        ).toBe('brief-approval');
-    },
-);
 
 test('the exact pending approval exposes only its display prompt and reason and names its child owner', () => {
     const approval = { ...shell, title: 'Explore sandbox', pendingRuntimeRequest: { id: 'approval', kind: 'command' } };

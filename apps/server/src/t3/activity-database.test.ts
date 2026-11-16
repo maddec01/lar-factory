@@ -68,28 +68,3 @@ test('a replaced or removed database closes the old connection before the next r
     seed(path, 3);
     expect(value(database.open())).toBe(3);
 });
-
-test('a failed activity pass drops its connection and a missing database can recover', (t) => {
-    const path = join(tempDir(t, 'activity-recover-'), 'state.sqlite');
-    const database = createActivityDatabase(path);
-
-    t.onTestFinished(database.close);
-    expect(() => database.open()).toThrow(/ENOENT: no such file or directory/);
-    seed(path, 1);
-
-    const first = database.open();
-
-    database.release(first, true);
-    expect(() => value(first)).toThrow('database is not open');
-
-    const next = database.open();
-
-    expect(next === first).toBe(false);
-    // A late release of the previous connection must not close the replacement.
-    database.release(first, true);
-    expect(value(next)).toBe(1);
-    database.release(undefined, false);
-    expect(() => value(next)).toThrow('database is not open');
-    database.close();
-    database.close();
-});

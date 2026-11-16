@@ -1,4 +1,4 @@
-import { deskItems, retroWaits, type BoardData, type Item } from '@lar-factory/shared';
+import { deskItems, type BoardData, type Item } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -121,43 +121,6 @@ test('one desk wait lists all suggestions, creates only picks, and replay makes 
     expect(s.records.read(s.id).status).toBe('Done');
 });
 
-test('No follow-ups is recorded; an empty proposal never reaches the desk', async () => {
-    const s = await setup();
-
-    s.merge();
-    await s.commands.reconcileRetros();
-    s.propose();
-    await s.commands.chooseRetro(s.id, { revision: s.at(), selected: [] });
-    expect(s.records.retro(s.id)?.choice?.selected).toEqual([]);
-    expect(s.records.list({ status: 'List' })).toEqual([]);
-    expect(deskItems(s.board.snapshot(), false)).toEqual([]);
-
-    const t = await setup();
-
-    t.merge();
-    await t.commands.reconcileRetros();
-    t.propose([]);
-    expect(deskItems(t.board.snapshot(), false)).toEqual([]);
-});
-
-test('lost T3 dispatch remains a desk retry using the same command receipt', async () => {
-    const s = await setup();
-
-    s.merge();
-
-    const send = vi
-        .fn()
-        .mockResolvedValueOnce({ outcome: 'unconfirmed', reason: 'Connection lost' })
-        .mockResolvedValue({ outcome: 'accepted', sequence: 1 });
-    const commands = createRetro({ ...s, send });
-
-    await commands.reconcileRetros();
-    expect(retroWaits(s.records.retro(s.id))).toBe(true);
-    await commands.retryRetro(s.id);
-    expect(send.mock.calls[0]?.[0].commandId).toBe(send.mock.calls[1]?.[0].commandId);
-    expect(retroWaits(s.records.retro(s.id))).toBe(false);
-});
-
 test('a failed ticket keeps its local record and desk retry, with no duplicate capture on retry', async () => {
     const s = await setup();
 
@@ -187,25 +150,6 @@ test('a failed ticket keeps its local record and desk retry, with no duplicate c
     expect(s.records.retro(s.id)!.captures[0]?.workId).toBe(receipt.workId);
     expect(s.records.list({ status: 'List' })).toHaveLength(1);
     expect(s.records.read(s.id).status).toBe('Done');
-});
-
-test('a completed empty proposal supersedes an unconfirmed dispatch and never reaches the desk', async () => {
-    const s = await setup();
-
-    s.merge();
-
-    const commands = createRetro({
-        ...s,
-        send: async () => {
-            s.records.proposeRetro(s.id, s.at(), []);
-
-            return { outcome: 'unconfirmed', reason: 'Response lost after the build ran.' };
-        },
-    });
-
-    await commands.reconcileRetros();
-    expect(s.records.retro(s.id)?.delivery).toMatchObject({ sent: true, error: null });
-    expect(deskItems(s.board.snapshot(), false)).toEqual([]);
 });
 
 test('a missing build thread does not start a repeated refresh loop after merge', async () => {

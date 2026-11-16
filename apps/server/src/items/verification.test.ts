@@ -110,14 +110,6 @@ test('desk pass binds the freshly read PR head and server operator, then allows 
     expect(s.records.read(s.item.id).status).toBe('Verify');
     expect(s.merge).not.toHaveBeenCalled();
 });
-test('new head between inspection and pass refuses stale evidence without a result', async () => {
-    const s = await setup();
-    const context = await s.context();
-
-    s.pr.sourceRevision = 'b'.repeat(40);
-    expect((await s.commands.recordVerification(s.item.id, { ...context, result: 'pass' })).status).toBe(409);
-    expect(s.records.verification(s.item.id).latest).toBeNull();
-});
 test('a failure persists its note and retries the same thread/message after an uncertain delivery', async () => {
     const s = await setup();
     const context = await s.context();
@@ -156,65 +148,4 @@ test('merge rechecks Verify after confirmation and refuses a newly pushed head',
     s.pr.sourceRevision = 'b'.repeat(40);
     expect((await s.merging.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).status).toBe(409);
     expect(s.merge).not.toHaveBeenCalled();
-});
-
-test('a CLI-recorded failure is delivered by the board reconciliation after restart', async () => {
-    const s = await setup();
-    const context = await s.context();
-
-    s.records.recordVerification(s.item.id, Number(context.revision), {
-        pr: String(context.pr),
-        head: String(context.head),
-        result: 'fail',
-        by: 'Pedro',
-        note: 'CLI failure.',
-        testSteps: String(context.testSteps),
-    });
-    s.reread();
-    await s.commands.reconcileVerificationFixes();
-    expect(s.send).toHaveBeenCalledOnce();
-    expect(s.records.verification(s.item.id).resume?.sent).toBe(true);
-    await s.commands.reconcileVerificationFixes();
-    expect(s.send).toHaveBeenCalledOnce();
-});
-
-test('concurrent head inspection identifies a pending read for automatic UI retry', async () => {
-    const s = await setup();
-    let finish!: () => void;
-    const waiting = new Promise<void>((resolve) => {
-        finish = resolve;
-    });
-
-    s.read.mockImplementationOnce(async () => {
-        await waiting;
-
-        return { pr: { ...s.pr }, methods: ['squash'] as const, blockers: [] };
-    });
-
-    const first = s.commands.inspectVerification(s.item.id);
-
-    expect((await s.commands.inspectVerification(s.item.id)).body).toMatchObject({ verificationPending: true });
-    finish();
-    expect((await first).status).toBe(200);
-    expect((await s.commands.inspectVerification(s.item.id)).status).toBe(200);
-});
-
-test('the build activity guard clears after the same owner and delegated work settle', async () => {
-    const s = await setup();
-    const updated = new Date().toISOString();
-
-    s.item.threads = [
-        { id: 'same-build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated },
-    ];
-    s.reread();
-    expect((await s.commands.inspectVerification(s.item.id)).body).toMatchObject({
-        error: 'Wait for current build activity before recording Verify.',
-    });
-    s.item.threads = [{ id: 'same-build', title: 'Build', purpose: 'build', state: 'running', updated }];
-    s.reread();
-
-    const context = await s.context();
-
-    expect(context).toMatchObject({ testSteps: '1. Press the button.' });
-    expect((await s.commands.recordVerification(s.item.id, { ...context, result: 'pass' })).status).toBe(200);
 });

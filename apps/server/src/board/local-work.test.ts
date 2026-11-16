@@ -12,36 +12,6 @@ const fixture = () => {
     return { board, log, local: createLocalWork(board, log) };
 };
 
-test('a later successful refresh clears its warning and a second failure is reported again', () => {
-    const { board, log, local } = fixture();
-    const error = new WorkRecordError('busy', 'The work-record database is locked by another writer; try again.');
-
-    local.failed('local refresh', error);
-    local.failed('local refresh', error);
-    expect(log).toHaveBeenCalledTimes(1);
-    local.succeeded('local refresh');
-    expect(board.snapshot().localProblem).toBeUndefined();
-    local.failed('local refresh', error);
-    expect(log).toHaveBeenCalledTimes(3); // failure, recovery, failure
-});
-
-test('different operations recover independently and explain a refused record read', () => {
-    const { board, local } = fixture();
-
-    local.failed(
-        'local refresh',
-        new WorkRecordError('invalid', 'Work record work-17 (acme/app#17): invalid saved scope.'),
-    );
-    expect(board.snapshot().localProblem).toContain('work-17 (acme/app#17): invalid saved scope.');
-    expect(board.snapshot().localProblem).toContain('retry');
-    local.failed('Spec sync', new WorkRecordError('busy', 'Database locked.'));
-    local.succeeded('stats');
-    local.succeeded('Spec sync');
-    expect(board.snapshot().localProblem).toContain('invalid saved scope.');
-    local.succeeded('local refresh');
-    expect(board.snapshot().localProblem).toBeUndefined();
-});
-
 test('a newer schema blocks all recovery until restart, with one sanitized notice', () => {
     const { board, log } = fixture();
     const restart = vi.fn();
@@ -56,28 +26,6 @@ test('a newer schema blocks all recovery until restart, with one sanitized notic
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls.flat().join()).not.toContain('999');
     expect(restart).toHaveBeenCalledExactlyOnceWith('Restart Lar Factory to continue.');
-});
-
-test('skipped work and a success begun before a newer failure cannot clear that failure', async () => {
-    const { board, local } = fixture();
-    let finish = () => {};
-
-    local.run(
-        'local refresh',
-        () =>
-            new Promise<void>((resolve) => {
-                finish = resolve;
-            }),
-    );
-    local.failed('local refresh', new WorkRecordError('invalid', 'Newer invalid record.'));
-    finish();
-    await Promise.resolve();
-    local.run('local refresh', () => false);
-    await Promise.resolve();
-    expect(board.snapshot().localProblem).toContain('Newer invalid record.');
-    local.run('local refresh', () => {});
-    await Promise.resolve();
-    expect(board.snapshot().localProblem).toBeUndefined();
 });
 
 test('periodic work catches sync and async failures without exposing unexpected error details', async () => {

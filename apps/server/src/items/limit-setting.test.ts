@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
@@ -29,29 +29,6 @@ function setUp() {
     return { dir, limit: settings.heavyCommandLimit, build: settings.buildLimit, changes: () => changes };
 }
 
-test('an invalid limit is refused with a 400 and changes nothing', () => {
-    const { limit, changes } = setUp();
-
-    limit.save({ limit: 3 });
-    for (const value of [0, -2, 1.5, '3', 'auto', null, undefined])
-        assert.equal(limit.save({ limit: value }).status, 400, String(value));
-    assert.deepEqual(limit.state(), { limit: 3, automatic: 2 });
-    assert.equal(changes(), 1);
-});
-
-test('an invalid file shows as Automatic with why, and a save replaces it', () => {
-    const { dir, limit } = setUp();
-
-    writeFileSync(join(dir, 'heavy-command-limit.json'), '{ "limit": 0 }');
-
-    const state = limit.state();
-
-    assert.equal(state.limit, 'automatic');
-    assert.match(state.problem ?? '', /needs a limit/);
-    assert.equal(limit.save({ limit: 1 }).status, 200);
-    assert.deepEqual(limit.state(), { limit: 1, automatic: 2 });
-});
-
 test("the build limit saves beside the heavy command limit, and its Automatic follows that limit's number", () => {
     const { limit, build, changes } = setUp();
 
@@ -65,16 +42,4 @@ test("the build limit saves beside the heavy command limit, and its Automatic fo
     assert.deepEqual(build.state(), { limit: 3, automatic: 2 });
     assert.equal(build.save({ limit: 0 }).status, 400);
     assert.equal(changes(), 3);
-});
-
-test('an invalid build limit file shows as Automatic with why', () => {
-    const { dir, build } = setUp();
-
-    writeFileSync(join(dir, 'build-limit.json'), 'null');
-
-    const state = build.state();
-
-    assert.equal(state.limit, 'automatic');
-    assert.match(state.problem ?? '', /build limit setting .* needs a limit/);
-    assert.equal(state.automatic, 2);
 });

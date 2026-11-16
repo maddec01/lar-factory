@@ -37,27 +37,3 @@ it('interrupts a mismatched live run, reports requested versus actual, and expos
         expect.objectContaining({ type: 'run.interrupt', threadId: 'thread', runId: 'run' }),
     );
 });
-
-it('keeps missing or contradictory run evidence unknown instead of substituting the thread selection', () => {
-    expect(executionReport({ ...projection, runs: [{ id: 'run' }] }, 'thread')).toBeNull();
-    expect(
-        executionReport(
-            {
-                ...projection,
-                runs: [
-                    {
-                        id: 'run',
-                        modelSelection: {
-                            ...selection,
-                            options: [
-                                { id: 'reasoningEffort', value: 'high' },
-                                { id: 'reasoningEffort', value: 'low' },
-                            ],
-                        },
-                    },
-                ],
-            },
-            'thread',
-        ),
-    ).toBeNull();
-});

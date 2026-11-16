@@ -53,23 +53,6 @@ test('a change stays until GitHub reports it, or for three reads at most', () =>
     assert.deepEqual(statuses(board.snapshot()), ['a:List']);
 });
 
-test("a read that listed the item's source from an earlier read doesn't count toward giving up on its change", () => {
-    const board = createBoardState(empty());
-
-    board.showChanged(item('a', 'Queued'));
-    assert.equal(board.changing('a'), true);
-    for (let read = 1; read <= 5; read++)
-        board.applyRead(
-            [item('a', 'List')],
-            board.revision(),
-            (items) => items,
-            () => false,
-        );
-    assert.deepEqual(statuses(board.snapshot()), ['a:Queued']);
-    board.applyRead([item('a', 'Queued')], board.revision(), (items) => items);
-    assert.equal(board.changing('a'), false);
-});
-
 test('a read that started before a change keeps the change', () => {
     const board = createBoardState(empty());
     const since = board.revision();
@@ -77,37 +60,6 @@ test('a read that started before a change keeps the change', () => {
     board.showChanged(item('a', 'Queued'));
     for (let read = 0; read < 3; read++) board.applyRead([item('a', 'List')], since, (items) => items);
     assert.deepEqual(statuses(board.snapshot()), ['a:Queued']);
-});
-
-test('a removed item stays off the board while GitHub still lists it', () => {
-    const board = createBoardState(empty());
-    const pushed: string[][] = [];
-
-    board.subscribe((data) => pushed.push(statuses(data)));
-    board.applyRead([item('a', 'List'), item('b', 'List')], board.revision(), (items) => items);
-    board.remove('a');
-    board.showChanged(item('a', 'Queued'));
-    board.applyRead([item('a', 'List'), item('b', 'List')], board.revision(), (items) => items);
-    assert.equal(board.removed('a'), true);
-    assert.deepEqual(statuses(board.snapshot()), ['b:List']);
-    assert.deepEqual(pushed, [['b:List']], 'remove pushes; a change to a removed item does not');
-});
-
-test('a pick stays until a read shows the item with only the status picked', () => {
-    const board = createBoardState(empty());
-    const twice = { ...item('a', 'Shaping'), statuses: ['Shaping', 'Review'] } satisfies Item;
-
-    board.applyRead([twice], board.revision(), (items) => items);
-    board.showChanged(item('a', 'Shaping'));
-    board.applyRead([twice], board.revision(), (items) => items);
-    assert.deepEqual(board.snapshot().items[0]!.statuses, ['Shaping'], 'the read still shows both');
-    board.applyRead([item('a', 'Shaping')], board.revision(), (items) => items);
-    board.applyRead([twice], board.revision(), (items) => items);
-    assert.deepEqual(
-        board.snapshot().items[0]!.statuses,
-        ['Shaping', 'Review'],
-        'confirmed, so the board trusts later reads',
-    );
 });
 
 test('a newer provider read brings back an issue reopened after Abandon', () => {

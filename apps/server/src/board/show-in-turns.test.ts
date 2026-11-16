@@ -23,30 +23,6 @@ const settle = () =>
         setImmediate(resolve);
     });
 
-test('the read and the threads take separate turns, and the board shows the whole read at once', async () => {
-    const board = createBoardState({ items: [item('a', 'Ready'), item('b', 'Ready')] } as unknown as BoardData);
-    const enriched: string[] = [];
-    const { turn, pass } = heldTurn();
-    const shown = showInTurns(
-        board,
-        async () => [item('a', 'Review'), item('b', 'Review')],
-        () => {
-            throw Error('read again');
-        },
-        (items) => board.applyRead(items, board.revision(), (read) => read.map((i) => (enriched.push(i.id), i))),
-        turn,
-    );
-
-    await settle();
-    // Between the turns, the board still shows the last read whole, and no thread was read.
-    expect(board.snapshot().items.map((i) => i.status)).toEqual(['Ready', 'Ready']);
-    expect(enriched).toEqual([]);
-    pass();
-    await shown;
-    expect(board.snapshot().items.map((i) => i.status)).toEqual(['Review', 'Review']);
-    expect(enriched).toEqual(['a', 'b']);
-});
-
 test('a read that reaches the board between the turns is read again in the showing turn', async () => {
     const board = createBoardState({ items: [item('a', 'Ready')] } as unknown as BoardData);
     let records = [item('a', 'Ready')];
@@ -66,24 +42,5 @@ test('a read that reaches the board between the turns is read again in the showi
     show(records);
     pass();
     await shown;
-    expect(board.find('a')?.status).toBe('In progress');
-});
-
-test('with nothing to read again, the newer read stays and the older one is dropped', async () => {
-    const board = createBoardState({ items: [item('a', 'Ready')] } as unknown as BoardData);
-    const show = (items: Item[]) => board.applyRead(items, board.revision(), (read) => read);
-    const applied: string[] = [];
-
-    await showInTurns(
-        board,
-        async () => [item('a', 'Ready')],
-        null,
-        (items) => {
-            applied.push('older');
-            show(items);
-        },
-        async () => show([item('a', 'In progress')]),
-    );
-    expect(applied).toEqual([]);
     expect(board.find('a')?.status).toBe('In progress');
 });

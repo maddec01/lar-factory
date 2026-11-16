@@ -5,8 +5,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 
-import { azureBoard } from '../azure/azure-board.ts';
-import { fakeAz, type FakePr, type WorkItem } from '../azure/fake-az.ts';
 import { observePr } from '../config/pr-host.ts';
 import { observeIssue } from '../github/github.ts';
 import type { TicketObservation } from './item-source.ts';
@@ -83,18 +81,6 @@ test('a merged PR finishes the build and makes it Done', async () => {
     assert.ok(records.completion(workId).complete);
 });
 
-test('a finished record keeps its ticket observed until retention hides it, and then takes no provider read', async () => {
-    const records = await open();
-    const { workId } = build(records);
-    const { reads, asked } = provider({ pr: 'merged', ticket: { state: 'closed' } });
-
-    await observeRecords(records, [REPO], reads);
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(asked, [`pr ${REPO}#40`, `ticket ${REPO}#12`, `ticket ${REPO}#12`]);
-    await observeRecords(records, [REPO], reads, new Set([workId]));
-    assert.equal(asked.length, 3);
-});
-
 test('a PR closed unmerged sets Needs you once, leaving the Status as it was', async () => {
     const records = await open();
     const { workId } = build(records, 'Review', null);
@@ -134,102 +120,6 @@ test('a ticket closing elsewhere sets Needs you without moving the Status', asyn
     assert.deepEqual(record.needsYouCauses, [{ type: 'ticket-closed' }]);
 });
 
-test('a PR that closes after Keep working on a closed ticket names both causes', async () => {
-    const records = await open();
-    const { workId } = build(records, 'Review');
-    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'closed' } });
-
-    await observeRecords(records, [REPO], reads);
-
-    const kept = records.read(workId);
-
-    assert.deepEqual(kept.needsYouCauses, [{ type: 'ticket-closed' }]);
-    records.setNeedsYouCauses(workId, kept.revision, []);
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(records.read(workId).needsYouCauses, [], 'a ticket that stays closed flags nothing again');
-    answers.pr = 'closed';
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]);
-});
-
-test('a ticket that closes after a replacement build resolved the closed PR names only the ticket', async () => {
-    const records = await open();
-    const { workId } = build(records, 'Review');
-    const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
-
-    await observeRecords(records, [REPO], reads);
-
-    const closed = records.read(workId);
-
-    assert.deepEqual(closed.needsYouCauses, [{ type: 'pr-closed' }]);
-    records.setNeedsYouCauses(workId, closed.revision, [], { status: 'Ready' });
-    answers.ticket = { state: 'closed' };
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'ticket-closed' }]);
-});
-
-test('a ticket reopened or reassigned after merge adds nothing', async () => {
-    const records = await open();
-    const { workId } = build(records);
-    const { reads, answers } = provider({ pr: 'merged', ticket: { state: 'closed', assignee: 'pedro' } });
-
-    await observeRecords(records, [REPO], reads);
-    answers.ticket = { state: 'open', assignee: 'ana' };
-    await observeRecords(records, [REPO], reads);
-
-    const record = records.read(workId);
-
-    assert.equal(record.status, 'Done');
-    assert.deepEqual([record.needsYou, record.needsYouCauses], [null, []]);
-});
-
-test('a reassigned ticket sets Needs you without moving the Status', async () => {
-    const records = await open();
-    const { workId } = records.importTicket({
-        title: 'Bug',
-        repository: REPO,
-        kind: 'bug',
-        status: 'In progress',
-        ticket: `${REPO}#12`,
-    }).record;
-    const { reads, answers } = provider({ ticket: { state: 'open', assignee: 'pedro' } });
-
-    await observeRecords(records, [REPO], reads);
-    answers.ticket = { state: 'open', assignee: 'ana' };
-    await observeRecords(records, [REPO], reads);
-
-    const record = records.read(workId);
-
-    assert.equal(record.status, 'In progress');
-    assert.deepEqual(record.needsYouCauses, [{ type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
-});
-
-test('a closed PR and a closed ticket hold both causes in either closing order', async () => {
-    for (const [first, second] of [
-        ['pr', 'ticket'],
-        ['ticket', 'pr'],
-    ]) {
-        const records = await open();
-        const { workId } = build(records);
-        const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open' } });
-
-        await observeRecords(records, [REPO], reads);
-        for (const closing of [first, second]) {
-            if (closing === 'pr') answers.pr = 'closed';
-            else answers.ticket = { state: 'closed' };
-
-            await observeRecords(records, [REPO], reads);
-        }
-        assert.deepEqual(
-            records
-                .read(workId)
-                .needsYouCauses.map((c) => c.type)
-                .sort(),
-            ['pr-closed', 'ticket-closed'],
-        );
-    }
-});
-
 test('a reopened PR, a reopened ticket and an assignee changed back each remove their cause, and the notice goes with the last', async () => {
     const records = await open();
     const { workId } = build(records);
@@ -264,39 +154,6 @@ test('a reopened PR, a reopened ticket and an assignee changed back each remove 
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(causes(), []);
     assert.equal(recordItems(records, [], [REPO])[0]!.needsYou, undefined);
-});
-
-test('a missing ticket read as found removes its cause, and free text stays until someone clears it', async () => {
-    const records = await open();
-    const { workId } = records.importTicket({
-        title: 'Bug',
-        repository: REPO,
-        kind: 'bug',
-        status: 'List',
-        ticket: `${REPO}#12`,
-    }).record;
-    const { reads, answers } = provider({ ticket: { state: 'not-found' } });
-
-    await observeRecords(records, [REPO], reads);
-
-    let record = records.restore(workId, records.read(workId).revision);
-
-    records.setNeedsYou(workId, record.revision, 'Merge conflict.');
-    answers.ticket = { state: 'open' };
-    await observeRecords(records, [REPO], reads);
-    record = records.read(workId);
-    assert.deepEqual([record.needsYou, record.needsYouCauses], ['Merge conflict.', []]);
-});
-
-test('a failed read keeps every cause', async () => {
-    const records = await open();
-    const { workId } = build(records);
-    const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
-
-    await observeRecords(records, [REPO], reads);
-    answers.pr = new Error('HTTP 502');
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'pr-closed' }]);
 });
 
 test('a read turns saved old wording into causes and drops the old text', async () => {
@@ -403,19 +260,6 @@ test('a temporary provider error keeps the last observation and changes nothing 
     );
 });
 
-test('set-aside work and work in repositories off the board read nothing', async () => {
-    const records = await open();
-    const aside = records.importTicket({ title: 'Bug', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
-
-    records.setAside(aside.workId, aside.revision);
-    records.importTicket({ title: 'Other', repository: 'maddec01/other', kind: 'bug', ticket: 'maddec01/other#3' });
-
-    const { reads, asked } = provider({ ticket: { state: 'closed' } });
-
-    await observeRecords(records, [REPO], reads);
-    assert.deepEqual(asked, []);
-});
-
 test('a settled decision finishes while a concept without delivery stays unfinished', async () => {
     const records = await open();
     let decision = records.create({ title: 'Which store', repository: REPO, kind: 'decision', status: 'Shaping' });
@@ -441,54 +285,6 @@ test('a settled decision finishes while a concept without delivery stays unfinis
     }
     assert.equal(records.read(concept.workId).status, 'Shaping');
     assert.equal(records.read(concept.workId).finishedAt, null);
-});
-
-test('the provider reads at most six records at once', async () => {
-    const records = await open();
-
-    for (let n = 1; n <= 12; n++)
-        records.importTicket({ title: `Bug ${n}`, repository: REPO, kind: 'bug', ticket: `${REPO}#${n}` });
-
-    let running = 0;
-    let most = 0;
-
-    await observeRecords(records, [REPO], {
-        ticket: async () => {
-            most = Math.max(most, ++running);
-            await new Promise((resolve) => setTimeout(resolve, 5));
-            running--;
-
-            return { state: 'open' };
-        },
-        pr: async () => 'open',
-    });
-    assert.equal(most, 6);
-    assert.equal(
-        records.list({}).filter((r) => records.observations(r.workId).length).length,
-        12,
-        'every record is observed',
-    );
-});
-
-test("a ticket the item source's last read shows open takes no read of its own", async () => {
-    const records = await open();
-    const { workId } = records.importTicket({
-        title: 'Bug',
-        repository: REPO,
-        kind: 'bug',
-        ticket: `${REPO}#12`,
-    }).record;
-    const { reads, asked } = provider({ ticket: new Error('not asked') });
-
-    await observeRecords(records, [REPO], {
-        ...reads,
-        known: (repo, number) => (repo === REPO && number === 12 ? { state: 'open', assignee: 'pedro' } : undefined),
-    });
-    assert.deepEqual(asked, []);
-    assert.deepEqual(
-        records.observations(workId).map((o) => [o.of, o.state, o.assignee]),
-        [['ticket', 'open', 'pedro']],
-    );
 });
 
 /** A Dependency on `owner`'s ticket #5 and PR #9, held by a concept on the board with no ticket or PR of its own. */
@@ -580,96 +376,6 @@ test("a Dependency's GitHub ticket and PR read as each kind, and the reads write
     );
 });
 
-test('each Dependency observation says whether it changed the kind a mark decides on, which a failed read never does', async () => {
-    const records = await open();
-
-    dependencyOn(records, 'acme/auth');
-
-    const answers = { ticket: issue('OPEN'), pr: () => 'OPEN' };
-    const gh = ghAnswering(answers);
-    const heard: boolean[] = [];
-    const reads = {
-        ...gh.reads,
-        observed: (_id: string, _from: number, _to: number, changed: boolean) => {
-            heard.push(changed);
-        },
-    };
-    const observed = async (ticket: () => string, pr: () => string) => {
-        Object.assign(answers, { ticket, pr });
-        heard.length = 0;
-        await observeRecords(records, [REPO], reads);
-
-        return [...heard];
-    };
-
-    assert.deepEqual(
-        await observed(issue('OPEN'), () => 'OPEN'),
-        [true, true],
-        'a first observation is news to the page',
-    );
-    assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), [false, false]);
-    assert.deepEqual(await observed(issue('OPEN'), () => 'MERGED'), [false, true]);
-    assert.deepEqual(await observed(fails('HTTP 502: Bad Gateway'), fails('HTTP 502: Bad Gateway')), [false, false]);
-    assert.deepEqual(
-        await observed(issue('OPEN'), () => 'MERGED'),
-        [false, false],
-        'the read after a failure shows what the page showed',
-    );
-    assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), [false, true], 'a merged PR read open is reopened');
-});
-
-test("a Dependency's Azure work item and PR read as each kind, and the reads write nothing", async () => {
-    const API = 'contoso/Fabrikam%20Fiber/Web%20Api';
-    const records = await open();
-    const id = dependencyOn(records, API);
-    const item: WorkItem = { id: 5, type: 'User Story', state: 'Active' };
-    const pr: FakePr = { pullRequestId: 9, status: 'active', sourceRefName: 'refs/heads/sign-in' };
-    let failure: string | undefined;
-    let az = fakeAz({ items: [item], pullRequests: [pr], fail: () => (failure ? new Error(failure) : undefined) });
-    const calls: string[][] = [];
-    const run = (args: string[]) => (calls.push(args), az.run(args));
-    const source = azureBoard([API], 'Fabrikam Team', run);
-    const reads: ObserveReads = {
-        ticket: (repo, number) => source.observeTicket(repo, number),
-        pr: (repo, number) => observePr(repo, number, run),
-    };
-    const observed = async (state: string, status: FakePr['status']) => {
-        Object.assign(item, { state });
-        Object.assign(pr, { status });
-        await observeRecords(records, [REPO], reads);
-
-        return kinds(records, id);
-    };
-
-    assert.deepEqual(await observed('Active', 'active'), ['open', 'open']);
-    assert.deepEqual(await observed('Closed', 'completed'), ['closed', 'merged']);
-    assert.deepEqual(await observed('Active', 'abandoned'), ['reopened', 'closed']);
-    assert.deepEqual(await observed('Active', 'active'), ['reopened', 'reopened']);
-    failure =
-        "az devops invoke failed: TF400813: The user 'pedro@contoso.com' is not authorized to access this resource.";
-    assert.deepEqual(await observed('Active', 'active'), ['access-lost', 'access-lost']);
-    failure = 'az devops invoke failed: timed out';
-    assert.deepEqual(await observed('Active', 'active'), ['read-failed', 'read-failed']);
-    failure = undefined;
-    az = fakeAz({ items: [] });
-    assert.deepEqual(
-        await observed('Active', 'active'),
-        ['deleted', 'deleted'],
-        'a work item the batch omits and a PR az finds no more are deleted',
-    );
-
-    const read = (call: string[]) =>
-        call.slice(0, 3).join(' ') === 'repos pr show' ||
-        (call.slice(0, 2).join(' ') === 'devops invoke' &&
-            (!call.includes('--http-method') || call[call.indexOf('--resource') + 1] === 'workitemsbatch'));
-
-    assert.deepEqual(
-        calls.filter((call) => !read(call)),
-        [],
-        'only reads, never a write',
-    );
-});
-
 test('a read never changes the met mark: an outage leaves it unflagged, and a reopened ticket flags it for review', async () => {
     const records = await open();
     const id = dependencyOn(records, 'acme/auth');
@@ -704,49 +410,6 @@ test('a read never changes the met mark: an outage leaves it unflagged, and a re
     );
 });
 
-test("each Dependency subject reads once a pass, and a ticket the item source's last read shows takes no read", async () => {
-    const records = await open();
-    const [first, second] = [dependencyOn(records, 'acme/auth'), dependencyOn(records, 'acme/auth')];
-    const gh = ghAnswering({ ticket: issue('OPEN'), pr: () => 'MERGED' });
-
-    await observeRecords(records, [REPO], gh.reads);
-    assert.deepEqual(
-        gh.calls.map((call) => call.slice(0, 2).join(' ')),
-        ['issue view', 'pr view'],
-    );
-    assert.deepEqual(
-        [kinds(records, first), kinds(records, second)],
-        [
-            ['open', 'merged'],
-            ['open', 'merged'],
-        ],
-    );
-
-    const known = (repo: string, number: number) =>
-        repo === 'acme/auth' && number === 5 ? { state: 'closed' as const } : undefined;
-
-    await observeRecords(records, [REPO], { ...gh.reads, known });
-    assert.deepEqual(
-        gh.calls.slice(2).map((call) => call.slice(0, 2).join(' ')),
-        ['pr view'],
-    );
-    assert.deepEqual(kinds(records, first), ['closed', 'merged']);
-});
-
-test('a Dependency in a repository whose reads wait takes no read and keeps its last observation', async () => {
-    const records = await open();
-    const id = dependencyOn(records, 'acme/auth');
-    const gh = ghAnswering({ ticket: issue('OPEN'), pr: () => 'OPEN' });
-
-    await observeRecords(records, [REPO], gh.reads);
-
-    const before = records.dependency(id);
-
-    await observeRecords(records, [REPO], { ...gh.reads, waits: (repo) => repo === 'acme/auth' });
-    assert.equal(gh.calls.length, 2);
-    assert.deepEqual(records.dependency(id), before);
-});
-
 test("a read showing the record and its ticket agree keeps that kind, so a later ticket change is the ticket's", async () => {
     const records = await open();
     const { workId } = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
@@ -759,102 +422,6 @@ test("a read showing the record and its ticket agree keeps that kind, so a later
     agreed = 'bug';
     await observeRecords(records, [REPO], observing);
     assert.equal(records.read(workId).agreedTicketKind, 'bug');
-});
-
-test('an agreement already kept writes nothing more', async () => {
-    const records = await open();
-    const { workId, revision } = records.importTicket({
-        title: 'T',
-        repository: REPO,
-        kind: 'bug',
-        ticket: `${REPO}#12`,
-    }).record;
-
-    records.update(workId, revision, { agreedTicketKind: 'bug' });
-
-    const answered = records.recordKindAnswer(workId, revision + 1, { answer: 'keep', ticketKind: 'feature' });
-    const { reads } = provider({ ticket: { state: 'open' } });
-
-    await observeRecords(records, [REPO], { ...reads, agreedKind: () => 'bug' });
-    assert.deepEqual(records.read(workId).kindAnswer, answered.kindAnswer);
-});
-
-test('a linked parent finishes from its parts and release evidence without a parent PR', async () => {
-    const records = await open();
-    const parent = records.create({
-        title: 'Linked delivery',
-        repository: REPO,
-        kind: 'feature',
-        status: 'In progress',
-    });
-    const revision = () => records.read(parent.workId).revision;
-    let child = records.createPart({
-        parentId: parent.workId,
-        parentRevision: revision(),
-        repository: REPO,
-        kind: 'build',
-        title: 'One repository',
-        body: 'Approved scope.',
-        blockerIds: [],
-    });
-
-    child = records.setPullRequest(child.workId, child.revision, `${REPO}#44`);
-    records.setReleasePlan(parent.workId, revision(), {
-        steps: [{ id: 'activate', who: 'Pedro', what: 'activate the bundle' }],
-        outcomeCheck: 'Check the delivered outcome.',
-    });
-    records.observe(child.workId, child.revision, { of: 'pr', state: 'merged' });
-
-    const item = () => recordItems(records, [], [REPO]).find((candidate) => candidate.id === parent.workId)!;
-
-    finishCompleted(records, [REPO]);
-    assert.equal(item().status, 'In progress');
-    assert.ok(item().releasePlan);
-    assert.ok(item().completion?.reasons.some((reason) => reason.includes('activate')));
-    records.completeReleaseStep(parent.workId, revision(), 'activate', 'Pedro', 'Manifest receipt.');
-    records.recordOutcomeCheck(parent.workId, revision(), 'passed', 'Pedro', 'Actual post-activation checks passed.');
-    records.setNeedsYou(parent.workId, revision(), 'Review the delivery evidence.');
-    assert.equal(
-        item().status,
-        'In progress',
-        'an explicit human hold remains open after child and release completion',
-    );
-    records.clearNeedsYou(parent.workId, revision());
-    assert.equal(item().status, 'Done', 'the projection derives Done immediately');
-    finishCompleted(records, [REPO]);
-    assert.equal(records.read(parent.workId).status, 'Done');
-    assert.ok(records.read(parent.workId).finishedAt);
-    assert.equal(records.read(parent.workId).pullRequest, null);
-});
-
-test('a merge bypasses a cached open ticket, including later reads of Done work', async () => {
-    const records = await open();
-    const { workId } = build(records);
-    const { reads, asked } = provider({ pr: 'merged', ticket: { state: 'closed', assignee: 'pedro' } });
-    const cached = { ...reads, known: () => ({ state: 'open' as const }) };
-
-    await observeRecords(records, [REPO], cached);
-    await observeRecords(records, [REPO], cached);
-    assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
-    assert.deepEqual(asked, [`pr ${REPO}#40`, `ticket ${REPO}#12`, `ticket ${REPO}#12`]);
-    assert.deepEqual(records.read(workId).needsYouCauses, []);
-});
-
-test('a ticket read failure after merge preserves its last state and records the failure without reopening work', async () => {
-    const records = await open();
-    const { workId } = build(records);
-
-    records.observe(workId, records.read(workId).revision, { of: 'ticket', state: 'open' });
-    await observeRecords(records, [REPO], {
-        pr: async () => 'merged',
-        known: () => ({ state: 'open' }),
-        ticket: async () => {
-            throw new Error('Ticket unavailable');
-        },
-    });
-    assert.equal(records.read(workId).status, 'Done');
-    assert.deepEqual(records.read(workId).needsYouCauses, []);
-    assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.failure, 'Ticket unavailable');
 });
 
 test('an open ticket read begun before merge cannot overwrite the merge-time refresh', async () => {

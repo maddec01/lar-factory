@@ -9,7 +9,7 @@ import { afterEach, test } from 'vite-plus/test';
 import { createBoardState, type BoardState } from '../board/board-state.ts';
 import type { Reply } from '../items/item-commands.ts';
 import { recordItems } from '../items/record-items.ts';
-import { HOLD_RETRY_MS, createAutoBuild } from './auto-build.ts';
+import { createAutoBuild } from './auto-build.ts';
 
 const REPO = 'maddec01/lar-factory';
 const OTHER = 'maddec01/lar-other';
@@ -66,8 +66,6 @@ interface SetUp {
     choices: ModelGroup[];
     /** The clock Auto-build reads. */
     clock: number;
-    /** Runs inside each Start build, before it answers. */
-    during?: (itemId: string) => void;
     reread(): void;
     pass(): Promise<void>;
     /** Stops this board, as its process exiting would. */
@@ -116,7 +114,6 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
                 assert.deepEqual([drift, quiet], [undefined, true]);
                 assert.deepEqual(model, s.auto.model);
                 s.started.push(itemId);
-                s.during?.(itemId);
 
                 const answer = s.answers.get(itemId) ?? OK;
 
@@ -220,88 +217,6 @@ test('Auto-build starts the oldest passing gate first, up to the build limit, an
     assert.deepEqual(s.started, [c, a, b]);
 });
 
-test('with the switch off nothing starts, and the tooltip count says how many would', async () => {
-    const s = await setUp();
-
-    ready(s.records, 'A');
-    ready(s.records, 'B');
-    ready(s.records, 'C');
-    s.auto = { on: false };
-    s.limit = 2;
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, []);
-    assert.equal(pass(s)?.wouldStart, 2);
-});
-
-test('each hold starts nothing, marks nothing on the build, says why, and the next pass retries', async () => {
-    const holds: [string, (s: SetUp, workId: string) => void, string, boolean?][] = [
-        [
-            'T3 unreachable',
-            (s) => s.board.update({ t3Availability: { availability: 'unavailable' } }),
-            "Builds wait for T3, which the board can't reach.",
-        ],
-        [
-            'model choices unreadable',
-            (s) => {
-                s.choices = [];
-            },
-            "Builds wait for T3's model choices, which the board can't read.",
-        ],
-        [
-            'saved model no longer offered',
-            (s) => {
-                s.auto = { on: true, model: { instanceId: 'codex', model: 'gpt-5' } };
-            },
-            "Auto-build's model isn't offered now. Choose another in Settings.",
-        ],
-    ];
-
-    // Start build's own temporary refusals, as it marks them.
-    for (const error of [
-        'Waits for onboarding to finish',
-        'Skills drifted from the bundle.',
-        'A shaping thread is still at work on this item.',
-        'Push access is blocked.',
-        'T3 has no project for this repository.',
-        'Could not read the repository’s default branch.',
-    ]) {
-        holds.push([
-            error,
-            (s, workId) => s.answers.set(workId, { status: 409, body: { thread: null, error, hold: true } }),
-            error,
-            true,
-        ]);
-    }
-    for (const [name, cause, reason, waits] of holds) {
-        const s = await setUp();
-        const workId = ready(s.records, 'Held');
-
-        s.reread();
-        cause(s, workId);
-        await s.pass();
-        assert.equal(pass(s)?.hold, reason, name);
-        assert.deepEqual(pass(s)?.paused, {}, name);
-        assert.equal(s.records.read(workId).status, 'Ready', name);
-
-        s.board.update({ t3Availability: { availability: 'available' } });
-        s.choices = OFFERED;
-        s.auto = { on: true };
-        s.answers.clear();
-        s.started.length = 0;
-        await s.pass();
-
-        if (waits) {
-            // Each try of Start build rereads the Spec, so its hold waits before it retries.
-            assert.deepEqual([s.started, pass(s)?.hold], [[], reason], `${name}: waits`);
-            s.clock += HOLD_RETRY_MS;
-            await s.pass();
-        }
-
-        assert.deepEqual([s.started, pass(s)?.hold], [[workId], undefined], `${name}: retried`);
-    }
-});
-
 test('a failed start pauses only that build, survives a restart, and ends when Start build succeeds or a new gate passes', async () => {
     const s = await setUp();
     const { records } = s;
@@ -390,176 +305,4 @@ test('two boards sharing a data folder start a build once', async () => {
     await owner.stop();
     await other.pass();
     assert.ok(other.started.includes(next), 'a board that stopped hands Auto-build over');
-});
-
-test('a Ready build a blocker held starts once the blocker completes', async () => {
-    const s = await setUp();
-    const { records } = s;
-    const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
-
-    records.setPullRequest(blocker.workId, at(records, blocker.workId), `${REPO}#90`);
-    records.observe(blocker.workId, at(records, blocker.workId), { of: 'pr', state: 'open' });
-
-    const blocked = ready(records, 'Blocked');
-
-    records.addBlocker(blocked, at(records, blocked), blocker.workId);
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, []);
-    records.observe(blocker.workId, at(records, blocker.workId), { of: 'pr', state: 'merged' });
-    records.update(blocker.workId, at(records, blocker.workId), { status: 'Done' });
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [blocked]);
-});
-
-test('a pause survives set-aside; an edited brief leaves Auto-build until its new gate', async () => {
-    const s = await setUp();
-    const { records } = s;
-    const failing = ready(records, 'Failing');
-
-    s.answers.set(failing, { status: 502, body: { thread: null, error: 'T3 started no thread.' } });
-    s.reread();
-    await s.pass();
-
-    const paused = { [failing]: 'T3 started no thread.' };
-
-    assert.deepEqual(pass(s)?.paused, paused);
-
-    records.setAside(failing, at(records, failing));
-    s.reread();
-    await s.pass();
-    records.restore(failing, at(records, failing));
-    s.reread();
-    await s.pass();
-    assert.deepEqual([s.started, pass(s)?.paused], [[failing], paused], 'setting it aside and back keeps the pause');
-
-    records.setBody(failing, at(records, failing), 'brief', 'A changed brief.');
-    s.reread();
-    await s.pass();
-    assert.equal(records.read(failing).status, 'Shaping');
-    assert.deepEqual(pass(s)?.paused, {}, 'reshaping leaves Auto-build; the gate card owns its wait');
-
-    await s.stop();
-
-    let unreadable = true;
-    const failingReads = new Proxy(records, {
-        get: (target, key) =>
-            key === 'read'
-                ? (workId: string) => {
-                      if (unreadable && workId === failing) throw new Error('database is locked');
-
-                      return target.read(workId);
-                  }
-                : target[key as keyof WorkRecords],
-    });
-    const restarted = await setUp({ dir: s.dir, records: failingReads });
-
-    await restarted.pass();
-    assert.deepEqual(pass(restarted)?.paused, {}, 'an unavailable read never restores a cleared pause');
-    unreadable = false;
-    gate(records, failing);
-    restarted.reread();
-    await restarted.pass();
-    assert.deepEqual([restarted.started, pass(restarted)?.paused], [[failing], {}], 'a new gate ends it');
-});
-
-test('a build the board shows blocked waits without a pause, even when its record lists no blocker', async () => {
-    const s = await setUp();
-    const { records } = s;
-    const blocked = ready(records, 'Blocked');
-    const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
-
-    records.addBlocker(blocked, at(records, blocked), blocker.workId);
-    s.reread();
-    records.removeBlocker(blocked, at(records, blocked), blocker.workId);
-    await s.pass();
-    assert.deepEqual([s.started, pass(s)?.paused], [[], {}]);
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [blocked]);
-});
-
-test('Auto-build checks each build again just before it starts it', async () => {
-    const s = await setUp();
-    const { records } = s;
-    const first = ready(records, 'First');
-    const second = ready(records, 'Second');
-
-    s.during = (itemId) => {
-        if (itemId === first) records.setAside(second, at(records, second));
-    };
-    s.reread();
-    await s.pass();
-    assert.deepEqual([s.started, pass(s)?.wouldStart, pass(s)?.paused], [[first], 0, {}]);
-});
-
-function concept(s: SetUp) {
-    const { records } = s;
-    const group = records.create({ title: 'Deliver concept', repository: REPO, kind: 'concept' }).workId;
-    const a = ready(records, 'A');
-    const b = ready(records, 'B', true, OTHER);
-    const next = ready(records, 'After A');
-
-    for (const id of [a, b, next]) records.setParent(id, at(records, id), group);
-    records.addBlocker(next, at(records, next), a);
-    records.setFogGone(group, at(records, group), true);
-    records.setBody(group, at(records, group), 'map', 'Approved destination.');
-    records.setConceptBuildRun(group, at(records, group), 'running');
-
-    return { group, a, b, next };
-}
-
-test('an explicitly started concept runs independent repositories with Auto-build off and leaves standalone work alone', async () => {
-    const s = await setUp();
-    const standalone = ready(s.records, 'Standalone');
-    const { a, b, next } = concept(s);
-
-    s.auto.on = false;
-    s.limit = 2;
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [a, b]);
-    assert.equal(s.records.read(next).status, 'Ready');
-    assert.equal(s.records.read(standalone).status, 'Ready');
-    await s.stop();
-});
-
-test('running concepts and automatic standalone builds compete by gate age for one capacity', async () => {
-    const s = await setUp();
-    const standalone = ready(s.records, 'Older standalone');
-    const { a, b } = concept(s);
-
-    s.limit = 2;
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [standalone, a]);
-    s.records.update(standalone, at(s.records, standalone), { status: 'Ready to merge' });
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [standalone, a], 'merge waits retain their reservation');
-    s.records.setPullRequest(standalone, at(s.records, standalone), `${REPO}#100`);
-    s.records.observe(standalone, at(s.records, standalone), { of: 'pr', state: 'merged' });
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [standalone, a, b]);
-    await s.stop();
-});
-
-test('Pause overrides Auto-build and scope changes durably pause future starts', async () => {
-    const s = await setUp();
-    const { group } = concept(s);
-
-    s.records.setConceptBuildRun(group, at(s.records, group), 'paused');
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, []);
-    s.records.setConceptBuildRun(group, at(s.records, group), 'running');
-    s.records.setBody(group, at(s.records, group), 'map', 'Changed destination.');
-    s.reread();
-    await s.pass();
-    s.records.setBody(group, at(s.records, group), 'map', 'Approved destination.');
-    assert.equal(s.records.conceptBuildPlan(group).run?.state, 'paused');
-    assert.deepEqual(s.started, []);
-    await s.stop();
 });

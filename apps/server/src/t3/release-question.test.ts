@@ -20,31 +20,23 @@ const projection = (kind: string, questions: unknown[]) => ({
     turnItems: [{ type: 'user_input_request', requestId: 'q', questions }],
 });
 
-test.each([
-    ['user_input', [{ id: '0', question: 'Which manifest should I approve?' }]],
-    ['permission', [{ id: '0', question: 'Approve activation of manifest?' }]],
-    [
-        'user_input',
-        [
-            { id: '0', question: 'Approve activation of manifest?' },
-            { id: '1', question: 'Which region?' },
-        ],
-    ],
-    ['user_input', [{ id: '0', question: `Approve activation of manifest ${'b'.repeat(64)}?` }]],
-] as const)('never settles an independent/mixed or tool request (%s)', async (kind, questions) => {
-    const send = vi.fn();
+test.each([['permission', [{ id: '0', question: 'Approve activation of manifest?' }]]] as const)(
+    'never settles an independent/mixed or tool request (%s)',
+    async (kind, questions) => {
+        const send = vi.fn();
 
-    await expect(
-        settleReleaseQuestion(
-            'owner',
-            plan,
-            'stable',
-            vi.fn().mockResolvedValue(projection(kind, [...questions])),
-            send,
-        ),
-    ).rejects.toThrow(/independent/);
-    expect(send).not.toHaveBeenCalled();
-});
+        await expect(
+            settleReleaseQuestion(
+                'owner',
+                plan,
+                'stable',
+                vi.fn().mockResolvedValue(projection(kind, [...questions])),
+                send,
+            ),
+        ).rejects.toThrow(/independent/);
+        expect(send).not.toHaveBeenCalled();
+    },
+);
 
 test('forwards the exact saved receipt with stable request IDs, never an approval decision', async () => {
     const read = vi

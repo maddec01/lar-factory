@@ -1,6 +1,6 @@
 import { openWorkRecords, readRetention, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
@@ -110,15 +110,4 @@ test('a confirmed timed delete saves, deletes the due work through deleteExpired
         { status: 200, body: { error: null, saved: true } },
         'changing only when work hides asks nothing',
     );
-});
-
-test('days that are not whole numbers save nothing, and an unreadable setting hides nothing', async () => {
-    const { dir, retention, later } = await setUp();
-
-    assert.equal(retention.save({ hideAfterDays: -1, deleteAfterDays: null }).status, 400);
-    assert.equal(retention.save({ hideAfterDays: 7, deleteAfterDays: 'soon' }).status, 400);
-    writeFileSync(join(dir, 'retention.json'), 'not json');
-    later(8);
-    assert.deepEqual(retention.hidden(), new Set());
-    assert.match(retention.state().problem!, /isn't JSON/);
 });

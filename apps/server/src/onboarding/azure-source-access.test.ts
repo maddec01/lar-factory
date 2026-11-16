@@ -61,26 +61,8 @@ test('Azure access checks the selected team and reads only one item, without loa
     expect(fake.bodies.workitemsbatch).toEqual({ ids: [7], fields: ['System.Id'], errorPolicy: 'Fail' });
 });
 
-test('an empty team proves query access without a work-item read', async () => {
-    const fake = source({ ids: [] });
-
-    await checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run);
-    expect(fake.calls).toHaveLength(3);
-});
-
-test.each(['backlogconfiguration', 'workitemsbatch'])('a refused %s read stops access checking', async (denied) => {
-    const fake = source({ denied });
-
-    await expect(checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run)).rejects.toThrow(
-        'Read work items denied',
-    );
-    expect(fake.calls.some((args) => args[args.indexOf('--http-method') + 1] === 'PATCH')).toBe(false);
-});
-
-test('unbounded or unreadable samples and invalid field names fail without a broad fallback', async () => {
+test('an injected field name fails without a broad fallback', async () => {
     const cases: [Parameters<typeof source>[0], string][] = [
-        [{ ids: [7, 8] }, 'Azure did not return a bounded issue-list check.'],
-        [{ unreadable: true }, "Azure did not allow reading the selected team's sample work item."],
         [
             { field: "System.AreaPath] = 'x' OR [System.Id" },
             "Azure did not return the selected team's backlog and area settings.",

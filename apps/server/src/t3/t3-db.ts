@@ -246,8 +246,6 @@ export function projectDefaultSelection(db: DatabaseSync, projectId: string): un
     return typeof row?.selection === 'string' ? (JSON.parse(row.selection) as unknown) : null;
 }
 
-// A project's live threads with a title, newest first, each with its latest assistant message.
-
 // A run with work under way.
 const LIVE_RUN = `('preparing', 'starting', 'running', 'waiting')`;
 const TOOL_ITEMS = `('command_execution', 'dynamic_tool', 'file_change', 'web_search')`;

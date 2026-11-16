@@ -1,7 +1,8 @@
 import type { ThreadLaunchRequest } from '@lar-factory/shared';
 // Spawned board fixtures record a launch where the fake t3 records its calls, and answer like T3. Never reaches a real T3.
 import { executionSettingsOf } from '@lar-factory/shared/execution-target';
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, watch } from 'node:fs';
+import { dirname } from 'node:path';
 
 import type { LaunchThread } from '../src/t3/launch-thread.ts';
 
@@ -14,6 +15,20 @@ export const launchThread: LaunchThread = async (projectId, text, selection, wor
     const options = JSON.parse(readFileSync(process.env.FAKE_GH_STATE!, 'utf8')).t3 ?? {};
 
     if (options.delay) await new Promise((resolve) => setTimeout(resolve, options.delay));
+
+    // While the file options.hold names exists, a launch waits for its removal, so a test decides when it ends.
+    if (options.hold)
+        await new Promise<void>((resolve) => {
+            const watcher = watch(dirname(options.hold), () => ready());
+            const ready = () => {
+                if (existsSync(options.hold)) return;
+
+                watcher.close();
+                resolve();
+            };
+
+            ready();
+        });
 
     if (options.fail === 'refused') return { thread: null, error: 'T3 launch authorization failed.' };
 

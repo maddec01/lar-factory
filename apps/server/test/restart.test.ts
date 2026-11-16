@@ -1,6 +1,6 @@
 import type { BoardData } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
+import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test, type TestContext } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import { shapePrompt, larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
+import { shapePrompt, startBoard, until, writesRepository, type Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
@@ -93,6 +93,17 @@ test(
     },
 );
 
+/** Writes to the board's records from outside the board, as lar-work does. */
+async function writeRecords<T>(dataDir: string, write: (records: WorkRecords) => T): Promise<T> {
+    const records = await openWorkRecords(workRecordsPath(dataDir));
+
+    try {
+        return write(records);
+    } finally {
+        records.close();
+    }
+}
+
 test(
     'a lar-work write while the board is closed shows after its restart, beside the records it held',
     { timeout: 30_000 },
@@ -102,38 +113,18 @@ test(
 
         await until(before, (d) => d.fetchedAt !== null);
 
-        const kept = await larWork(
-            before.dataDir,
-            'create',
-            '--title',
-            'Kept',
-            '--repository',
-            'maddec01/lar-factory',
-            '--kind',
-            'feature',
+        const kept = await writeRecords(before.dataDir, (records) =>
+            records.create({ title: 'Kept', repository: 'maddec01/lar-factory', kind: 'feature' }),
         );
 
         await until(before, (d) => d.items.some((i) => i.id === kept.workId));
         await before.stop();
 
-        const moved = await larWork(
-            before.dataDir,
-            'update',
-            kept.workId,
-            '--revision',
-            String(kept.revision),
-            '--status',
-            'Shaping',
+        const moved = await writeRecords(before.dataDir, (records) =>
+            records.update(kept.workId, kept.revision, { status: 'Shaping' }),
         );
-        const added = await larWork(
-            before.dataDir,
-            'create',
-            '--title',
-            'Written while closed',
-            '--repository',
-            'maddec01/lar-factory',
-            '--kind',
-            'bug',
+        const added = await writeRecords(before.dataDir, (records) =>
+            records.create({ title: 'Written while closed', repository: 'maddec01/lar-factory', kind: 'bug' }),
         );
         const after = await boardOn({ items: [] });
         const shown = await until(after, (d) => d.items.length === 2);

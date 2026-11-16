@@ -98,34 +98,6 @@ describe('start', () => {
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
     );
 
-    /** The fake server's answer to its skill check, once it comes. */
-    const skillAnswer = (url: URL) =>
-        Effect.promise(async () => {
-            for (let attempt = 0; attempt < 100; attempt++) {
-                const body = await fetch(new URL('/answer', url)).then((res) => res.json());
-
-                if (body) return body;
-
-                await new Promise((resolve) => setTimeout(resolve, 20));
-            }
-
-            return null;
-        });
-
-    it.live("answers the server's skill check over its IPC channel", () =>
-        Effect.gen(function* () {
-            const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: '1' }), {
-                checkSkills: () => Promise.resolve({ refusal: 'tdd is blocked' }),
-            });
-
-            assert.deepStrictEqual(yield* skillAnswer(board.url), {
-                type: 'skills-checked',
-                id: 7,
-                refusal: 'tdd is blocked',
-            });
-        }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
     it.live('stops the server when its scope closes', () =>
         Effect.gen(function* () {
             const scope = yield* Scope.make();

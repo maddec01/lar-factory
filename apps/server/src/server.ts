@@ -86,7 +86,6 @@ import { SAMPLE_DESK_SCENARIOS } from './sample/sample-scenarios.ts';
 import { factorySettingsService } from './settings/factory-settings.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { refreshReleaseFolders, runningRelease } from './skills/release-folders.ts';
-import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import { loopTrace, nextTurn } from './startup/loop-trace.ts';
 import type { StatsSources } from './stats/item-stats.ts';
@@ -1453,7 +1452,6 @@ const commands = createItemCommands({
     },
     archive,
     offerModelChoices,
-    checkSkills: parentSkillCheck(),
 });
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.

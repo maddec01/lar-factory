@@ -186,7 +186,7 @@ test('Start after retains authorization across a capacity hold and launches once
                 throw Error('A build must use Start build.');
             },
             startBuild: async (...args) => {
-                assert.deepEqual(args.slice(3), [true, { automatic: true }]);
+                assert.deepEqual(args.slice(2), [true, { automatic: true }]);
 
                 return ++attempts === 1
                     ? { status: 409, body: { error: 'Shared build capacity is full.', hold: true } }

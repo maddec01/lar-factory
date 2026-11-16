@@ -1,4 +1,4 @@
-// Start shaping or building with the chosen model. Existing skill edits stay in place.
+// Start shaping or building with the chosen model.
 
 import { remembersChoice, startProgressOf, startRequest } from '@lar-factory/shared';
 import type { ModelChoice, StartResult } from '@lar-factory/shared';
@@ -13,7 +13,6 @@ import { postAction, receive } from '@/services/board/board.service';
 
 const PATH: Record<StartKind, string> = { refine: '/api/start', build: '/api/start-build' };
 
-/** Skill repair is a separate action in Settings. A build keeps existing skill edits. */
 export async function startItem(itemId: string, choice?: ModelChoice, kind: StartKind = 'refine'): Promise<void> {
     const starts = useStartStore.getState();
 
@@ -25,10 +24,10 @@ export async function startItem(itemId: string, choice?: ModelChoice, kind: Star
 
     starts.set(itemId, { phase: 'pending' }, kind);
 
-    const result = await postAction<StartResult>(PATH[kind], {
-        ...startRequest(useBoardStore.getState().data.capture?.session, itemId, choice),
-        ...(kind === 'build' && { drift: 'keep' }),
-    });
+    const result = await postAction<StartResult>(
+        PATH[kind],
+        startRequest(useBoardStore.getState().data.capture?.session, itemId, choice),
+    );
 
     flushSync(() => {
         receive(result);

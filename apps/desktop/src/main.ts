@@ -1,6 +1,6 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
-// checks the bundled skills at launch and before each Start build, removes the old
+// checks the bundled skills at launch, removes the old
 // launch agent, installs the lar-work launcher, answers the page's skill install calls, checks Releases for updates, drains and stops the server
 // before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
@@ -9,7 +9,6 @@
 import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import * as NodeRuntime from '@effect/platform-node/NodeRuntime';
 import * as NodeServices from '@effect/platform-node/NodeServices';
-import type { DriftChoice } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
@@ -351,7 +350,7 @@ const program = Effect.gen(function* () {
 
     // Read once: a restarted server keeps the PATH the first one got.
     const env = yield* ShellEnvironment.childEnvironment(process.env);
-    // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
+    // One set of checks for the whole run, so the launch's check and the page's operations take turns.
     const skillChecks = yield* makeSkillChecks(env);
     const installReady = skillChecks ? yield* SkillInstall.launchWhenReady(skillChecks) : () => {};
 
@@ -362,22 +361,10 @@ const program = Effect.gen(function* () {
         executablePath: process.execPath,
         env,
         secret,
-        checksSkills: skillChecks !== undefined,
     });
-    const checkSkills =
-        skillChecks &&
-        ((drift?: DriftChoice) =>
-            Effect.runPromise(
-                skillChecks.beforeBuild(drift).pipe(
-                    Effect.match({
-                        onFailure: (failed) => SkillInstall.buildAnswer(failed, drift),
-                        onSuccess: (outcome) => SkillInstall.buildAnswer(outcome, drift),
-                    }),
-                ),
-            ));
     // Quitting closes the scope, which stops the server or cancels a pending restart.
     const supervisor = yield* BoardSupervisor.makeControl(
-        BoardSupervisor.supervise(BoardServer.start(config, { checkSkills, progress: board.progress }), board.events),
+        BoardSupervisor.supervise(BoardServer.start(config, { progress: board.progress }), board.events),
     );
     const http = yield* HttpClient.HttpClient;
     const stopBoard = Effect.suspend(() => {

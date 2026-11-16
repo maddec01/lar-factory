@@ -17,7 +17,6 @@ import {
     canRetryBuild,
     earlierBuildMessage,
     earlierWorkMessage,
-    isDriftChoice,
     isLiveThread,
     isOnboarding,
     kindCanChange,
@@ -27,7 +26,6 @@ import {
 } from '@lar-factory/shared';
 import type {
     BoardData,
-    DriftChoice,
     FactoryThreadContext,
     Item,
     LabelChange,
@@ -37,7 +35,6 @@ import type {
     OperationAccess,
     PickedTicket,
     ShapingThreadCleanup,
-    SkillCheckOutcome,
     StartedThread,
     StartProgress,
     StartPurpose,
@@ -141,20 +138,13 @@ export interface ItemCommands {
      * blocks it, as lar-shape's step 5 does after Go: it fetches the default branch, refusing the start with no write when
      * that fails, moves a parent record that isn't a build to In progress and snapshots the repository's selected project
      * skills on the record. The branch starts from the fetched commit. Launch intents guard it as they guard Start.
-     * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
      */
     inspectOwnedCleanup(itemId: string): Promise<Reply>;
     executeOwnedCleanup(itemId: string, input: unknown): Promise<Reply>;
     inspectRecovery(itemId: string): Promise<Reply>;
     startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
     setConceptBuildRun(itemId: string, revision: unknown, state: unknown): Reply;
-    startBuild(
-        itemId: string,
-        model: unknown,
-        drift?: unknown,
-        quiet?: boolean,
-        source?: BuildStartSource,
-    ): Promise<Reply>;
+    startBuild(itemId: string, model: unknown, quiet?: boolean, source?: BuildStartSource): Promise<Reply>;
     /** Clears the refused or failed start the item shows for `purpose`, on every page. */
     dismissStartError(itemId: string, purpose: unknown): Reply;
     /**
@@ -227,12 +217,6 @@ export interface ItemCommandsDeps {
     archive: () => Item[];
     /** Reads the model choices T3 offers now into the board data. */
     offerModelChoices: () => ModelGroup[];
-    /**
-     * Checks the installed skills against the bundle before Start build, replacing Drift if `drift` says so: resolves
-     * with why the build can't start, or null, and the skills with Drift while it waits for a choice. Missing without a
-     * bundle, so Start build checks nothing.
-     */
-    checkSkills?: (drift?: DriftChoice) => Promise<SkillCheckOutcome>;
     /** The repository's T3 project as the onboarded repositories are now; tests stand in for it. */
     projectOf?: (repo: string) => Promise<RepositoryProject>;
     /** The provider's default branch, resolved before changing or launching the build. */
@@ -396,7 +380,6 @@ export function createItemCommands({
     showObservations = () => {},
     archive,
     offerModelChoices,
-    checkSkills,
     kindTracker,
     projectOf = currentRepositoryProject,
     baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
@@ -2004,10 +1987,6 @@ export function createItemCommands({
                                     refused: true,
                                 };
 
-                            const skills = await checkSkills?.();
-
-                            if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true };
-
                             const base = continuing ? inspection.branch : await freshBase(item.repo, project.projectId);
 
                             if (typeof base !== 'string') return base;
@@ -2092,16 +2071,13 @@ export function createItemCommands({
             }
         },
 
-        startBuild: (itemId, model, drift, quiet = false, source = { manual: true }) =>
+        startBuild: (itemId, model, quiet = false, source = { manual: true }) =>
             press('startedBuilds', itemId, quiet, () =>
                 startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
                     if (records) {
                         reread();
                         item = board.find(itemId) ?? item;
                     }
-
-                    if (drift !== undefined && !isDriftChoice(drift))
-                        return reply(422, { error: 'Choose Replace and start or Start anyway.' });
 
                     const held =
                         records && ['Ready', 'In progress'].includes(item.status) && !prClosed(item.id)
@@ -2182,18 +2158,6 @@ export function createItemCommands({
                             await refreshSpecs(records, { workId: item.id });
                             reread();
                         }
-
-                        // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
-                        const skills = await checkSkills?.(drift);
-
-                        if (skills?.refusal)
-                            return {
-                                thread: null,
-                                error: skills.refusal,
-                                refused: true,
-                                hold: true,
-                                ...(skills.drift && { drift: skills.drift }),
-                            };
 
                         const repoProject = await projectOf(repo);
 

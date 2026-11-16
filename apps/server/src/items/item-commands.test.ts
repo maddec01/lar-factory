@@ -1604,8 +1604,8 @@ test('two boards share one atomic capacity claim, and independent same-repositor
         for (const { board } of [first, second]) board.update({ buildLimit: { limit, automatic: limit } });
 
         const results = await Promise.all([
-            first.commands.startBuild(a, undefined, undefined, true, { automatic: true }),
-            second.commands.startBuild(b, undefined, undefined, true, { automatic: true }),
+            first.commands.startBuild(a, undefined, true, { automatic: true }),
+            second.commands.startBuild(b, undefined, true, { automatic: true }),
         ]);
 
         assert.equal(results.filter((result) => result.status === 200).length, limit);

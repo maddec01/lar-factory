@@ -6,13 +6,6 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import {
-    SKILL_CHECK_ENV,
-    isSkillCheckRequest,
-    type DriftChoice,
-    type SkillCheckAnswer,
-    type SkillCheckOutcome,
-} from '@lar-factory/shared';
 import { APP_RELEASE_ENV } from '@lar-factory/shared/run-settings';
 import * as Data from 'effect/Data';
 import * as Duration from 'effect/Duration';
@@ -91,14 +84,12 @@ export const locate = (appPath: string, isPackaged: boolean, version?: string): 
  * Runs `serverFile` with `executablePath` in Node mode. In the app that is the
  * Electron binary, whose Node strips the types when the server runs as source.
  * The server reads `bundleDir` and `release`, and refuses guarded writes that don't carry `secret`.
- * With `checksSkills` it asks the app to check the installed skills before each Start build.
  */
 export const makeStartConfig = (
     input: BoardLocation & {
         readonly executablePath: string;
         readonly env: Readonly<Record<string, string | undefined>>;
         readonly secret: string;
-        readonly checksSkills?: boolean;
     },
 ): StartConfig => ({
     executablePath: input.executablePath,
@@ -110,7 +101,6 @@ export const makeStartConfig = (
         BOARD_APP_SECRET: input.secret,
         ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
         ...(input.release && { [APP_RELEASE_ENV]: input.release }),
-        ...(input.checksSkills && { [SKILL_CHECK_ENV]: '1' }),
     },
 });
 
@@ -119,22 +109,18 @@ export type StartStep = 'starting' | 'healthz';
 
 /**
  * Starts the server, reads the port it reports and waits for `/healthz` to answer, calling `progress` as each step
- * begins. `checkSkills` answers each skill check the server asks for, given its Drift choice, with what it found; if
- * it rejects, the answer is that reason. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
+ * begins. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
  */
 export const start = Effect.fn('BoardServer.start')(function* (
     config: StartConfig,
     options?: {
         readonly portTimeout?: Duration.Input;
-        readonly checkSkills?: ((drift?: DriftChoice) => Promise<SkillCheckOutcome>) | undefined;
         readonly progress?: ((step: StartStep) => void) | undefined;
     },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
     options?.progress?.('starting');
 
     const child = yield* Effect.acquireRelease(spawn(config), stop);
-
-    if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
 
     const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
     const url = new URL(`http://${HOST}:${port}/`);
@@ -174,25 +160,6 @@ const spawn = (config: StartConfig) =>
                 stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
             }),
         catch: (cause) => new BoardServerError({ message: `could not start the board server: ${String(cause)}` }),
-    });
-
-const answerSkillChecks = (
-    child: NodeChildProcess.ChildProcess,
-    checkSkills: (drift?: DriftChoice) => Promise<SkillCheckOutcome>,
-) =>
-    child.on('message', (message) => {
-        if (!isSkillCheckRequest(message)) return;
-
-        // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
-        void checkSkills(message.drift)
-            .catch((cause: unknown): SkillCheckOutcome => ({
-                refusal: `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
-            }))
-            .then((outcome) => {
-                // A server that exited meanwhile has no one to read the answer.
-                if (child.connected)
-                    child.send({ type: 'skills-checked', id: message.id, ...outcome } satisfies SkillCheckAnswer);
-            });
     });
 
 const exited = (child: NodeChildProcess.ChildProcess) => child.exitCode !== null || child.signalCode !== null;

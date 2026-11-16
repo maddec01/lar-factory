@@ -19,7 +19,7 @@ export const useDismissStore = create<DismissState>()((set) => ({
 
 export const useDismissed = (key: string): boolean => useDismissStore((state) => state.dismissed.has(key));
 
-// Reconcile every board update and Drift change, even when React batches a clear and a recurrence into one paint.
+// Reconcile every board update, even when React batches a clear and a recurrence into one paint.
 // Use underlying problems before az coverage filtering, and ignore scope and screen changes.
 function reconcile(): void {
     const { dismissed } = useDismissStore.getState();

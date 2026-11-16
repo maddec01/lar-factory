@@ -156,10 +156,7 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
     expect(dialogTitle(), 'Start opens its menu, not the dialog').toBe('');
     await press(entries()[1]!);
     expect(posted()).toEqual([
-        [
-            '/api/start-build',
-            { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } },
-        ],
+        ['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }],
     ]);
 });
 

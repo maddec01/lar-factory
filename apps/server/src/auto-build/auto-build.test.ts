@@ -110,8 +110,8 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
         limit: () => s.limit,
         offerModelChoices: () => s.choices,
         commands: {
-            async startBuild(itemId, model, drift, quiet) {
-                assert.deepEqual([drift, quiet], [undefined, true]);
+            async startBuild(itemId, model, quiet) {
+                assert.equal(quiet, true);
                 assert.deepEqual(model, s.auto.model);
                 s.started.push(itemId);
 

@@ -5,8 +5,8 @@
 import type { SkillPaths, TargetSelection, TickResult, InstallSkillState, TargetProgress } from './install-skills.ts';
 import type { InstallTargetKind, UnavailableReason } from './install-targets.ts';
 
-/** What the app is doing with the skills: a check at launch, after T3 answers or before Start build, or the User's operation. */
-export type InstallOperation = 'launch' | 'discovery' | 'build' | 'retry' | 'replace' | 'tick';
+/** What the app is doing with the skills: a check at launch or after T3 answers, or the User's operation. */
+export type InstallOperation = 'launch' | 'discovery' | 'retry' | 'replace' | 'tick';
 
 /** A provider instance as T3 names it, without its settings. */
 export interface InstanceIdentity {

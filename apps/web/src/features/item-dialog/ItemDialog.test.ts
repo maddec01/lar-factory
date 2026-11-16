@@ -106,7 +106,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     await pressMenu(button('start', 'I_sample13'));
     await settle(() => vi.advanceTimersByTime(20));
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-    expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13' }]]);
+    expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
 
     const thread = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
 

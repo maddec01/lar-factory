@@ -10,7 +10,7 @@ import { syncSpecs } from './spec-sync.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
 /** Provider calls follow the atomic local commit. Durable UUIDs recover uncertain or interrupted ticket creates. */
-export async function syncPartTickets(
+async function syncPartTickets(
     id: string,
     records: WorkRecords,
     deps: Omit<Parameters<typeof createAgentTicket>[2], 'records'>,

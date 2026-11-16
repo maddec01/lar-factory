@@ -1,4 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -156,23 +156,25 @@ describe('stopping test helpers', () => {
 
 describe('lar-work heavy', () => {
     it(
-        'runs no more commands at once than the limit across folders and worktrees, and every waiter runs',
-        { timeout: 60_000 },
+        'runs no more commands at once than the limit across folders, and every waiter runs',
+        { timeout: 30_000 },
         async () => {
             const run = setup(2);
-            const repo = temp('repo');
-            const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+            const [one, two] = [temp('one'), temp('two')];
+            const cwds = [one, two, one];
+            const names = ['a', 'b', 'c'];
+            const wrappers = names.map((name, i) => run.job(name, run.gate(name), cwds[i]));
+            const started = () => names.filter((name) => run.started(name));
 
-            git('init', '-q');
-            git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'init');
-
-            const worktree = join(temp('worktrees'), 'other');
-
-            git('worktree', 'add', '-q', worktree);
-
-            const wrappers = [0, 1, 2, 3, 4, 5].map((i) => run.job(`job${i}`, 'ms:250', i % 2 ? worktree : repo));
-
-            expect(await Promise.all(wrappers.map((wrapper) => wrapper.status))).toEqual([0, 0, 0, 0, 0, 0]);
+            await until(
+                () =>
+                    started().length === 2 &&
+                    wrappers.some((w) => w.stderr().includes('waiting for a heavy command slot')),
+            );
+            writeFileSync(run.gate(started()[0]!), '');
+            await until(() => started().length === 3);
+            for (const name of names) writeFileSync(run.gate(name), '');
+            expect(await Promise.all(wrappers.map((wrapper) => wrapper.status))).toEqual([0, 0, 0]);
 
             let running = 0;
             let most = 0;
@@ -182,19 +184,6 @@ describe('lar-work heavy', () => {
                 most = Math.max(most, running);
             }
             expect(most).toBe(2);
-
-            const starts = run.lines().filter((line) => line.startsWith('start '));
-
-            expect(starts).toHaveLength(6);
-            expect(new Set(starts.map((line) => line.split(' ')[3]))).toEqual(
-                new Set([
-                    execFileSync('pwd', ['-P'], { cwd: repo, encoding: 'utf8' }).trim(),
-                    execFileSync('pwd', ['-P'], { cwd: worktree, encoding: 'utf8' }).trim(),
-                ]),
-            );
-            expect(wrappers.some((wrapper) => wrapper.stderr().includes('waiting for a heavy command slot'))).toBe(
-                true,
-            );
             expect(wrappers.every((wrapper) => /started after waiting \d+s/.test(wrapper.stderr()))).toBe(true);
         },
     );

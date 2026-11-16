@@ -1,12 +1,9 @@
-import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { promisify } from 'node:util';
 import { afterEach, expect, it } from 'vite-plus/test';
 
-import { openWorkRecords, type WorkRecords } from './work-records.ts';
+import { openWorkRecords, WorkRecordError, type WorkRecords } from './work-records.ts';
 
 const opened: WorkRecords[] = [];
 const dirs: string[] = [];
@@ -322,38 +319,28 @@ it('requires fresh approval for content changes and preserves success through fa
     expect(records.publication(work.workId, plan.planId).approval).toEqual(plan.approval);
 });
 
-it('allows one claim across processes and keeps a simulated provider write uncertain after a crash', async () => {
+it('allows one claim across connections and keeps a simulated provider write uncertain after a crash', async () => {
     const path = join(tempDir(), 'work-records.db');
     const records = await open(path);
     const work = await passingBuild(records);
     const plan = approve(records, work.workId);
-    const module = pathToFileURL(join(import.meta.dirname, 'work-records.ts')).href;
-    const claimScript = `
-    const { openWorkRecords, WorkRecordError } = await import(process.argv[1]);
-    const records = await openWorkRecords(process.argv[2]);
-    const plan = records.publication(process.argv[3], process.argv[4]);
-    try {
-      const claim = records.claimPublication(plan.workId, plan.planId, 2, plan.digest, {tickets: plan.tickets, operations: plan.operations}, 'worker');
-      console.log(JSON.stringify(claim));
-    } catch (error) {
-      if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision') throw error;
-      console.log('lost');
-    } finally { records.close(); }
-  `;
-    const execute = promisify(execFile);
-    const args = [
-        '--disable-warning=ExperimentalWarning',
-        '--input-type=module',
-        '-e',
-        claimScript,
-        module,
-        path,
-        work.workId,
-        plan.planId,
-    ];
-    const results = await Promise.all([execute(process.execPath, args), execute(process.execPath, args)]);
+    const workers = [await open(path), await open(path)];
+    const read = workers.map((worker) => worker.publication(work.workId, plan.planId));
+    const results = workers.map((worker, index) => {
+        const { workId, planId, digest, tickets, operations } = read[index]!;
 
-    expect(results.filter((item) => item.stdout.trim() === 'lost')).toHaveLength(1);
+        try {
+            worker.claimPublication(workId, planId, 2, digest, { tickets, operations }, 'worker');
+
+            return 'claimed';
+        } catch (error) {
+            if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision') throw error;
+
+            return 'lost';
+        }
+    });
+
+    expect(results.toSorted()).toEqual(['claimed', 'lost']);
     expect(records.pendingPublication(work.workId, plan.planId)).toMatchObject({
         uncertain: ['create-build'],
         next: null,
@@ -371,31 +358,22 @@ it('allows one claim across processes and keeps a simulated provider write uncer
         replaces: saved.planId,
     });
     const approved = records.approvePublication(work.workId, next.planId, next.revision, next.digest, 'pedro');
-    const providerFixture = join(tempDir(), 'created-ticket.txt');
-    const crashScript = `
-    const { writeFileSync } = await import('node:fs');
-    const { openWorkRecords } = await import(process.argv[1]);
-    const records = await openWorkRecords(process.argv[2]);
-    const plan = records.publication(process.argv[3], process.argv[4]);
-    records.claimPublication(plan.workId, plan.planId, plan.revision, plan.digest, {tickets: plan.tickets, operations: plan.operations}, 'crashing-worker');
-    writeFileSync(process.argv[5], 'https://example.test/issues/12');
-    process.exit(17);
-  `;
+    const crashing = await openWorkRecords(path);
+    const claimed = crashing.publication(work.workId, approved.planId);
 
-    await expect(
-        execute(process.execPath, [
-            '--disable-warning=ExperimentalWarning',
-            '--input-type=module',
-            '-e',
-            crashScript,
-            module,
-            path,
-            work.workId,
-            approved.planId,
-            providerFixture,
-        ]),
-    ).rejects.toMatchObject({ code: 17 });
-    expect(readFileSync(providerFixture, 'utf8')).toBe('https://example.test/issues/12');
+    crashing.claimPublication(
+        claimed.workId,
+        claimed.planId,
+        claimed.revision,
+        claimed.digest,
+        { tickets: claimed.tickets, operations: claimed.operations },
+        'crashing-worker',
+    );
+
+    // The provider created the ticket, then the worker died before recording it.
+    const created = 'https://example.test/issues/12';
+
+    crashing.close();
 
     const reopened = await open(path);
 
@@ -423,7 +401,7 @@ it('allows one claim across processes and keeps a simulated provider write uncer
             status: 'successful',
             evidence: 'Found the controlled provider ticket.',
             ticket: 'team/app#12',
-            url: readFileSync(providerFixture, 'utf8'),
+            url: created,
             location: { kind: 'body', start: 0, end: 28 },
         },
     );

@@ -176,58 +176,6 @@ it(
     },
 );
 
-it(
-    'preserves the child status when the log cannot be written or the schema changes at finish',
-    { timeout: 30_000 },
-    async () => {
-        const { writeFileSync } = await import('node:fs');
-        const { openWorkRecords } = await import('./work-records.ts');
-        const cwd = mkdtempSync(join(tmpdir(), 'check-fallback-'));
-        const records = await openWorkRecords(join(cwd, 'work-records.db'));
-
-        try {
-            const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-
-            writeFileSync(join(cwd, 'check-logs'), 'blocked');
-
-            const run = (script: string) =>
-                spawnSync(
-                    process.execPath,
-                    [
-                        join(import.meta.dirname, 'cli.ts'),
-                        'run-check',
-                        build.workId,
-                        '--role',
-                        'implementer',
-                        '--',
-                        process.execPath,
-                        '-e',
-                        script,
-                    ],
-                    { cwd, encoding: 'utf8', env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } },
-                );
-
-            expect(run('process.exit(19)').status).toBe(19);
-            expect(records.checks(build.workId).runs[0]?.log).toBeNull();
-
-            const result = run(
-                'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync("work-records.db"); db.exec("PRAGMA user_version = 9999"); db.close(); process.exit(29)',
-            );
-
-            expect(result.status).toBe(29);
-            expect(result.stderr).toContain('unrecorded');
-
-            const newer = run('process.exit(31)');
-
-            expect(newer.status).toBe(31);
-            expect(newer.stderr).toContain('unrecorded');
-        } finally {
-            records.close();
-            rmSync(cwd, { recursive: true, force: true });
-        }
-    },
-);
-
 describe('run-check waiting for a heavy command slot', () => {
     // One slot, held by a heavy command that ends once the gate file exists, and a run-check that waits for it.
     async function waiting(

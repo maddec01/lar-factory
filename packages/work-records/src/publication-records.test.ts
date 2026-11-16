@@ -324,21 +324,28 @@ it('allows one claim across connections and keeps a simulated provider write unc
     const records = await open(path);
     const work = await passingBuild(records);
     const plan = approve(records, work.workId);
-    const workers = [await open(path), await open(path)];
-    const read = workers.map((worker) => worker.publication(work.workId, plan.planId));
-    const results = workers.map((worker, index) => {
-        const { workId, planId, digest, tickets, operations } = read[index]!;
+    const workers = [await openWorkRecords(path), await openWorkRecords(path)];
+    let results: string[];
 
-        try {
-            worker.claimPublication(workId, planId, 2, digest, { tickets, operations }, 'worker');
+    try {
+        const read = workers.map((worker) => worker.publication(work.workId, plan.planId));
 
-            return 'claimed';
-        } catch (error) {
-            if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision') throw error;
+        results = workers.map((worker, index) => {
+            const { workId, planId, digest, tickets, operations } = read[index]!;
 
-            return 'lost';
-        }
-    });
+            try {
+                worker.claimPublication(workId, planId, 2, digest, { tickets, operations }, 'worker');
+
+                return 'claimed';
+            } catch (error) {
+                if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision') throw error;
+
+                return 'lost';
+            }
+        });
+    } finally {
+        for (const worker of workers) worker.close();
+    }
 
     expect(results.toSorted()).toEqual(['claimed', 'lost']);
     expect(records.pendingPublication(work.workId, plan.planId)).toMatchObject({

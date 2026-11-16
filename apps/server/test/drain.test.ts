@@ -44,9 +44,15 @@ test('a drain answers once running writes finish, and refuses new writes from th
     while (!(await board.t3Calls()).some((args) => args[0] === 'launch')) await new Promise((r) => setTimeout(r, 25));
 
     const drain = post(board, '/api/drain');
+    const settled = { drain: false, starting: false };
+
+    void drain.finally(() => (settled.drain = true)).catch(() => {});
+    void starting.finally(() => (settled.starting = true)).catch(() => {});
 
     // Once the drain is in, new writes are refused, though the Start still runs.
     while ((await post(board, '/api/recheck')).status !== 503) await new Promise((r) => setTimeout(r, 25));
+
+    assert.deepEqual(settled, { drain: false, starting: false }, 'the drain answered while the Start was held');
 
     await rm(hold);
     assert.equal((await drain).status, 200);

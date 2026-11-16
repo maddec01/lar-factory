@@ -21,20 +21,6 @@ const titleFromMessage = (message) => {
 const main = async () => {
     if (options.delay) await new Promise((r) => setTimeout(r, options.delay));
 
-    // While the file options.hold names exists, a launch waits for its removal, so a test decides when it ends.
-    if (options.hold && args[0] === 'launch')
-        await new Promise((resolve) => {
-            const ready = () => {
-                if (!fs.existsSync(options.hold)) {
-                    watcher.close();
-                    resolve();
-                }
-            };
-            const watcher = fs.watch(require('node:path').dirname(options.hold), ready);
-
-            ready();
-        });
-
     // Adding a project: T3 lists the folder as project `added`, or refuses with `addFails` as its message.
     if (args[0] === 'project' && args[1] === 'add') {
         if (options.addFails) {

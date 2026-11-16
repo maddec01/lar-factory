@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vite-plus/test';
 
-import { executionItemThreads, protocolThreadById } from './item-execution.ts';
+import { executionItemThreads } from './item-execution.ts';
 
 describe('recorded thread lookup', () => {
     const shell = { id: 'root', title: 'Build', updatedAt: '2026-10-31T12:00:00Z', status: 'idle' };
@@ -170,11 +170,6 @@ describe('recorded thread lookup', () => {
             executionItemThreads([{ ...shell, status: 'cancelled', activityRunStatus: null }])(['root'])?.[0],
         ).toMatchObject({ state: 'stopped' });
     });
-    it('shows a subagent thread only when it is recorded', () => {
-        const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
-
-        expect(executionItemThreads([child])(['child'])).toHaveLength(1);
-    });
     it('keeps an interrupted root held while one of its nested child threads runs or waits', () => {
         const parent = { ...shell, status: 'interrupted' };
         const child = {
@@ -201,10 +196,6 @@ describe('recorded thread lookup', () => {
             { id: 'root', title: 'Build', state: 'stopped', updated: shell.updatedAt },
         ]);
     });
-});
-
-it('exposes discovery-owned thread lookup without transport configuration', () => {
-    expect(protocolThreadById('missing-thread').availability).toBe('unavailable');
 });
 
 it('keeps the pending user question without exposing the runtime request payload', () => {

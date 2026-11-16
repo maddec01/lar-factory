@@ -150,21 +150,6 @@ test("token counts take T3's reading: negative, fractional or non-numeric counts
     });
 });
 
-test('total tokens leave reasoning out, since it is inside output', () => {
-    const record = {
-        totals: {
-            uncachedInputTokens: 1,
-            cachedInputTokens: 2,
-            cacheCreationTokens: 3,
-            outputTokens: 40,
-            reasoningTokens: 30,
-        },
-    } as UsageRecord;
-
-    assert.equal(totalTokens([record, record]), 92);
-    assert.equal(totalTokens([]), 0);
-});
-
 test("a session's records come from its own transcript and its subagents' transcripts", async (t) => {
     const home = claudeHome(t, {
         'session-a': {

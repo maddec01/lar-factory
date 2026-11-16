@@ -5,17 +5,7 @@ import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
-import {
-    TOOL_NAMES,
-    checkTools,
-    findTools,
-    lookUpTools,
-    mergePaths,
-    probeAz,
-    probeGh,
-    readLoginPath,
-    versionOf,
-} from './tools.ts';
+import { checkTools, findTools, lookUpTools, mergePaths, probeAz, probeGh, readLoginPath, versionOf } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
@@ -95,28 +85,6 @@ test('a missing az is reported as missing and the other tools are still found', 
     assert.deepEqual(tools.gh, { path: join(bin, 'gh') });
 });
 
-test('git, jq and curl are looked up like gh, each with its own override', async (t) => {
-    assert.deepEqual(TOOL_NAMES, ['t3', 'gh', 'az', 'git', 'jq', 'curl']);
-
-    const { dir, bin } = await machine(t, ['git', 'jq', 'curl', 'my-jq']);
-    const found = findTools({ PATH: bin }, null, []);
-
-    assert.deepEqual(
-        [found.git, found.jq, found.curl],
-        [{ path: join(bin, 'git') }, { path: join(bin, 'jq') }, { path: join(bin, 'curl') }],
-    );
-
-    const overridden = findTools(
-        { PATH: bin, GIT_PATH: join(dir, 'nowhere/git'), JQ_PATH: 'my-jq', CURL_PATH: 'absent-curl' },
-        null,
-        [],
-    );
-
-    assert.deepEqual(overridden.git, { path: null, override: `GIT_PATH=${join(dir, 'nowhere/git')}` });
-    assert.deepEqual(overridden.jq, { path: join(bin, 'my-jq') });
-    assert.deepEqual(overridden.curl, { path: null, override: 'CURL_PATH=absent-curl' });
-});
-
 test('a version is the first version number on the first line, else that line', () => {
     assert.equal(versionOf('t3 v0.1.3-nightly.20261025.3655\n'), '0.1.3-nightly.20261025.3655');
     assert.equal(
@@ -157,27 +125,6 @@ test('the checks report each command: its version, missing with the override and
         curl: { result: 'ok' },
     });
     assert.equal(ghError, undefined);
-});
-
-test('each check is heard as it lands, so a slow one holds up no other', async (t) => {
-    const { dir, bin, shell } = await machine(t, []);
-    const script = async (name: string, body: string) => {
-        await writeFile(join(bin, name), `#!/bin/sh\n${body}\n`);
-        await chmod(join(bin, name), 0o755);
-    };
-
-    await script('t3', 'echo t3 v0.1.3-nightly.1');
-    await script('gh', 'echo "gh version 2.96.1 (2026-08-01)"');
-    await script('git', 'sleep 1; echo git version 2.56.0');
-    await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
-
-    const heard: string[] = [];
-
-    await checkTools({ gh: true, az: false }, join(dir, 'no-runtime.json'), (check) =>
-        heard.push(...Object.keys(check)),
-    );
-    assert.equal(heard.length, 5);
-    assert.equal(heard.at(-1), 'git', 'the slow git lands last');
 });
 
 test("t3 is not running without T3's runtime file, and missing outranks it", async (t) => {

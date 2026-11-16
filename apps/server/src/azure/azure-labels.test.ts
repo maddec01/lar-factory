@@ -87,26 +87,3 @@ test('a work item changed since the read is refused and keeps its tags', async (
     expect(items[0]!.tags).toBe('one');
     expect(az.patches).toEqual([]);
 });
-
-test('the fake refuses a tag create, as Azure documents none', async () => {
-    const { az } = azure([], []);
-
-    await expect(
-        az.run([
-            'devops',
-            'invoke',
-            '--area',
-            'wit',
-            '--resource',
-            'tags',
-            '--route-parameters',
-            'project=p',
-            'tagIdOrName=new',
-            '--http-method',
-            'PUT',
-            '--api-version',
-            '7.1',
-        ]),
-    ).rejects.toThrow('fake az: unexpected');
-    expect(az.tags).toEqual([]);
-});

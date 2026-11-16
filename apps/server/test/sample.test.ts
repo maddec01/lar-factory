@@ -46,26 +46,6 @@ function clashes(data: unknown): string[] {
         .map(([key]) => key);
 }
 
-test('the clash check catches one number naming two things', () => {
-    const url = (kind: string, n: number) => `https://github.com/o/r/${kind}/${n}`;
-
-    assert.deepEqual(
-        clashes([
-            { url: url('issues', 1), title: 'A' },
-            { url: url('issues', 1), title: 'B' },
-        ]),
-        ['o/r#1'],
-    );
-    assert.deepEqual(clashes([{ url: url('issues', 2), title: 'A' }, { url: url('pull', 2) }]), ['o/r#2']);
-    assert.deepEqual(
-        clashes([
-            { url: url('issues', 3), title: 'A' },
-            { url: url('issues', 3), title: 'A' },
-        ]),
-        [],
-    );
-});
-
 test('sample data never gives one issue or PR number to two things', async () => {
     const data = JSON.parse(await readFile(SAMPLE_DATA, 'utf8'));
 

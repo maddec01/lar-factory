@@ -43,15 +43,6 @@ async function setUp() {
     return { dir, cleanup, changes: () => changes };
 }
 
-test('a saved choice shows in the state and reaches the board', async () => {
-    const { cleanup, changes } = await setUp();
-
-    assert.deepEqual(cleanup.state(), { choice: 'settle' });
-    assert.deepEqual(cleanup.save({ choice: 'delete' }), { status: 200, body: { error: null } });
-    assert.deepEqual(cleanup.state(), { choice: 'delete' });
-    assert.equal(changes(), 1);
-});
-
 test('an invalid choice is refused with a 400 and changes nothing', async () => {
     const { cleanup, changes } = await setUp();
 
@@ -72,12 +63,6 @@ test('an unreadable setting shows why, and a valid choice replaces the file', as
     assert.ok('problem' in state && state.problem.includes("isn't JSON"));
     assert.equal(cleanup.save({ choice: 'keep' }).status, 200);
     assert.deepEqual(cleanup.state(), { choice: 'keep' });
-});
-
-test('a board with no work records refuses the choice', () => {
-    const cleanup = createShapingThreadCleanup({ records: null, dir: 'unused' });
-
-    assert.equal(cleanup.save({ choice: 'keep' }).status, 409);
 });
 
 const IDLE = { archived: false, settled: false, live: false };

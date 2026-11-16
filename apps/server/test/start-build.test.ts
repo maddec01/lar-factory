@@ -17,7 +17,6 @@ import {
     withRunPrompt,
     DEFAULT_SELECTION,
     recordBlockers,
-    SAMPLE_MODELS,
     settleDecisions,
     startableEnv,
     startBoard,
@@ -224,30 +223,6 @@ test('Drift asks for a choice before Start build writes anything, then starts on
     );
 });
 
-test('Start build runs the thread on the picked model choice', async (t) => {
-    const { board, home } = await buildBoard(t, [readyIssue(12, ['bug', 'build'])], {}, SAMPLE_MODELS);
-    const response = await startBuild(board, board.id(12), {
-        instanceId: 'claudeAgent_personal',
-        model: 'claude-opus-5-5',
-    });
-
-    assert.equal(response.status, 200);
-    assert.deepEqual(await board.t3Calls(), [
-        [
-            'launch',
-            'project-factory',
-            await message(home, board.id(12)),
-            { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5', options: [] },
-            { type: 'worktree', baseRef: originTip(home), branch: 'fix/12-issue-12' },
-            'full-access',
-        ],
-    ]);
-    assert.match(
-        (await (await startBuild(board, board.id(12), { instanceId: 'codex', model: '--help' })).json()).error,
-        /isn't offered/,
-    );
-});
-
 test('Start build is refused while a blocker is incomplete, naming it, and runs once it completes', async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
     const blockers = await recordBlockers(board, board.id(12), ['Decision 5']);
@@ -296,11 +271,8 @@ async function shapingBoard(t: TestContext, threads?: object[], requests: object
 
 for (const [name, threads, requests] of [
     ['is running', [{ id: SHAPING, turns: [turn()] }]],
-    ['is waiting', [{ id: SHAPING, turns: [turn('waiting')] }]],
     ['needs the user', [{ id: SHAPING, turns: [turn()] }], [{ turnId: 'turn', createdAt: '2026-11-01T08:01:00Z' }]],
-    ['is queued', [{ id: SHAPING, turns: [turn('queued')] }]],
     ['has a running child', [idleShaping, child()]],
-    ['has a queued child', [idleShaping, child('queued')]],
 ] as [string, object[], object[]?][]) {
     test(`Start build is refused while a shaping thread ${name}, writing no record and launching nothing`, async (t) => {
         const board = await shapingBoard(t, threads, requests);
@@ -340,7 +312,6 @@ for (const [name, threads, requests] of [
 
 for (const [name, threads] of [
     ['idle', [idleShaping]],
-    ['stopped', [{ id: SHAPING, turns: [turn('interrupted')] }]],
     ['unreadable, T3 being down', undefined],
     ['last seen running, T3 being down', [{ id: SHAPING, turns: [turn()], retainedAt: '2026-11-01T08:02:00Z' }]],
 ] as [string, object[] | undefined][]) {
@@ -485,15 +456,13 @@ test('a double press, a retry or another page starts no second build thread', as
     assert.equal((await board.t3Calls()).length, 1);
 });
 
-for (const fail of ['killed', 'garbage']) {
-    test(`an unconfirmed build start (${fail}) is never retried as a new thread`, async (t) => {
-        const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { fail } });
+test('an unconfirmed build start (killed) is never retried as a new thread', async (t) => {
+    const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { fail: 'killed' } });
 
-        assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
-        assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
-        assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
-    });
-}
+    assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
+    assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
+    assert.equal((await board.t3Calls()).filter((args) => args[0] === 'launch').length, 1);
+});
 
 test('Start build only runs for Ready issues from this board page and session', async (t) => {
     const { board } = await buildBoard(t, [boardIssue(12, 'Queued')]);

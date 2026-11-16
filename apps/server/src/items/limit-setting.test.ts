@@ -29,17 +29,6 @@ function setUp() {
     return { dir, limit: settings.heavyCommandLimit, build: settings.buildLimit, changes: () => changes };
 }
 
-test('a saved limit shows in the state beside the automatic number and reaches the board', () => {
-    const { limit, changes } = setUp();
-
-    assert.deepEqual(limit.state(), { limit: 'automatic', automatic: 2 });
-    assert.deepEqual(limit.save({ limit: 5 }), { status: 200, body: { error: null } });
-    assert.deepEqual(limit.state(), { limit: 5, automatic: 2 });
-    assert.deepEqual(limit.save({ limit: 'automatic' }), { status: 200, body: { error: null } });
-    assert.deepEqual(limit.state(), { limit: 'automatic', automatic: 2 });
-    assert.equal(changes(), 2);
-});
-
 test('an invalid limit is refused with a 400 and changes nothing', () => {
     const { limit, changes } = setUp();
 

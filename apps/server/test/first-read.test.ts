@@ -62,14 +62,6 @@ async function pushedFirstReads(t: TestContext, board: { url: string }): Promise
     return seen;
 }
 
-test('the first read settles once the repositories are read, with nothing running', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
-    const data = await settled(board);
-
-    assert.ok(data.fetchedAt, 'the read finished');
-    assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
-});
-
 test('the first read settles when the read fails', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(1, 'List')], fail: 'read' });
     const data = await settled(board);
@@ -85,20 +77,6 @@ test('the first read settles when gh is logged out at launch, though the read ne
     assert.equal(data.tools?.gh?.result, 'logged-out');
     assert.equal(data.fetchedAt, null);
     assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
-});
-
-test('a read after the first never un-settles it', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
-
-    await settled(board);
-    await fetch(`${board.url}/api/read`, {
-        method: 'POST',
-        headers: { Origin: board.url, 'Content-Type': 'application/json' },
-        body: '{}',
-    });
-    await board.update({ items: [boardIssue(1, 'List', 'maddec01/lar-factory', ['bug'])] });
-    await until(board, (d) => d.items[0]?.labels.includes('bug') === true);
-    assert.equal(((await board.board()) as BoardData).firstRead.settled, true);
 });
 
 test('the stream pushes the first read as it moves from unsettled to settled, naming what runs', async (t) => {

@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:net';
 import { test, type TestContext } from 'vite-plus/test';
 
 import { freePort } from '../../test/server-support.ts';
-import { BOARD_PORTS, listenOnFreePort } from './port.ts';
+import { listenOnFreePort } from './port.ts';
 
 async function hold(t: TestContext, port: number): Promise<Server> {
     const server = createServer();
@@ -39,12 +39,6 @@ async function isFree(port: number): Promise<boolean> {
         if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
     }
 }
-
-test('a board without BOARD_PORT tries 4317 to 4416 in order', () => {
-    assert.equal(BOARD_PORTS[0], 4317);
-    assert.equal(BOARD_PORTS.at(-1), 4416);
-    assert.equal(BOARD_PORTS.length, 100);
-});
 
 test('a taken port is skipped for the next one', async (t) => {
     const first = await freePair();

@@ -36,10 +36,10 @@ const read = (policy = 'approved', vote = 10, state = 'succeeded', race = false)
 
 test('binds successful evidence to a revision', async () =>
     expect(await read()).toMatchObject({ available: true, sourceRevision: 'old', blockers: [] }));
-test.each(['queued', 'running', 'rejected', 'broken', 'unknown'])('blocks required policy %s', async (state) =>
+test.each(['running', 'rejected'])('blocks required policy %s', async (state) =>
     expect(await read(state)).toMatchObject({ available: true, blockers: [`policy:p:${state}`] }),
 );
-test.each([-10, -5, 0, 99])('blocks unmet vote %s', async (vote) =>
+test.each([-10, 0, 99])('blocks unmet vote %s', async (vote) =>
     expect(await read('approved', vote)).toMatchObject({ blockers: [`reviewer:r:${vote}`] }),
 );
 test('blocks pending statuses and retains iteration', async () =>

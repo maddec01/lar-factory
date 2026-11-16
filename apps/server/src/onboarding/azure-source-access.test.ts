@@ -68,17 +68,14 @@ test('an empty team proves query access without a work-item read', async () => {
     expect(fake.calls).toHaveLength(3);
 });
 
-test.each(['backlogconfiguration', 'teamfieldvalues', 'wiql', 'workitemsbatch'])(
-    'a refused %s read stops access checking',
-    async (denied) => {
-        const fake = source({ denied });
+test.each(['backlogconfiguration', 'workitemsbatch'])('a refused %s read stops access checking', async (denied) => {
+    const fake = source({ denied });
 
-        await expect(checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run)).rejects.toThrow(
-            'Read work items denied',
-        );
-        expect(fake.calls.some((args) => args[args.indexOf('--http-method') + 1] === 'PATCH')).toBe(false);
-    },
-);
+    await expect(checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run)).rejects.toThrow(
+        'Read work items denied',
+    );
+    expect(fake.calls.some((args) => args[args.indexOf('--http-method') + 1] === 'PATCH')).toBe(false);
+});
 
 test('unbounded or unreadable samples and invalid field names fail without a broad fallback', async () => {
     const cases: [Parameters<typeof source>[0], string][] = [

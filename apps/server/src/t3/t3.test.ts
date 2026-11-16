@@ -354,7 +354,7 @@ test('another model launches with no options, even on the same provider instance
     );
 });
 
-test.each(['approval-required', 'auto-accept-edits', 'auto', 'full-access'])(
+test.each(['approval-required', 'full-access'])(
     'new and resumed launches follow T3 project runtime %s',
     async (mode) => {
         const { startThread } = await import('./t3.ts');

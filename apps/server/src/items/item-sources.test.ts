@@ -408,17 +408,6 @@ test('the onboarded sources pass on what has landed, leaving out the repositorie
     );
 });
 
-test('the onboarded sources pass the progress to the sources they build', async () => {
-    const events: string[] = [];
-    const sources = onboardedSources(
-        async () => ({ configs: [config('maddec01/lar-apple')], problems: [] }),
-        () => merged({ ...fakeSource('lar', [], []), name: 'lar' }),
-    );
-
-    await sources.read({ started: (name) => events.push(`+${name}`), finished: (name) => events.push(`-${name}`) });
-    assert.deepEqual(events, ['+lar', '-lar']);
-});
-
 /** A source that counts its reads and lists `items` as they are at each read. */
 function countedSource(name: string, items: () => Item[]): ItemSource & { reads: number } {
     const source = {

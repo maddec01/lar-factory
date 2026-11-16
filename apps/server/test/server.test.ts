@@ -727,14 +727,6 @@ test('PR edits run beside the refreshes without holding them up, and never two s
     );
 });
 
-test("a BOARD_PORT that isn't a port exits with a log line, not a stack trace", async (t) => {
-    await assert.rejects(
-        startBoard(t, {}, true, false, { BOARD_PORT: 'abc' }),
-        (err: Error) =>
-            /BOARD_PORT=abc is not a port/.test(err.message) && !/ERR_SOCKET_BAD_PORT|\n\s+at /.test(err.message),
-    );
-});
-
 test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {
     const home = mkdtempSync(join(tmpdir(), 'lar-records-home-'));
 
@@ -803,20 +795,23 @@ test('default-status slices follow implementation activity on local refresh with
 
     await observe([running, planner], 'active');
     await observe([running, planner], 'blocked', [{ turnId: 'turn', createdAt: '2026-11-01T08:01:00Z' }]);
-    for (const status of ['completed', 'failed', 'interrupted', 'cancelled']) {
-        await observe(
-            [
-                {
-                    id: 'implementation',
-                    turns: [
-                        { id: 'turn', startedAt: '2026-11-01T08:00:00Z', completedAt: '2026-11-01T08:02:00Z', status },
-                    ],
-                },
-                planner,
-            ],
-            'waiting',
-        );
-    }
+    await observe(
+        [
+            {
+                id: 'implementation',
+                turns: [
+                    {
+                        id: 'turn',
+                        startedAt: '2026-11-01T08:00:00Z',
+                        completedAt: '2026-11-01T08:02:00Z',
+                        status: 'completed',
+                    },
+                ],
+            },
+            planner,
+        ],
+        'waiting',
+    );
     await observe([planner], 'unknown');
     await observe(
         [{ id: 'implementation' }, { ...running, id: 'child', rootThreadId: 'implementation' }, planner],

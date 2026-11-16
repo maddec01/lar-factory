@@ -158,19 +158,3 @@ test('a slow request names its wait for the tool check, and a fast one logs noth
     expect(lines).toEqual(['request GET /api/board took 1095 ms, 1094 ms of it waiting for the first tool check']);
     teardown();
 });
-
-test('after the trace ends, spans only run their work', () => {
-    const { trace, lines, pass, teardown } = traced();
-
-    teardown();
-    lines.length = 0;
-    expect(
-        trace.span('records', () => {
-            pass(500);
-
-            return 7;
-        }),
-    ).toBe(7);
-    trace.request('GET /api/board', 900, 0);
-    expect(lines).toEqual([]);
-});

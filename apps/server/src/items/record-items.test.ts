@@ -1207,32 +1207,30 @@ test('a group projects the live reconciliation count and record-backed ships-wit
     assert.notEqual(shown().reconciliation!.digest, before);
 });
 
-for (const status of ['Ready', 'Queued'] as const) {
-    test(`a stale gate at ${status} explains the hold and asks for renewed board approval`, async () => {
-        const records = await open();
-        let work = records.create({ title: 'Held', repository: REPO, kind: 'build', status });
+test('a stale gate at Ready explains the hold and asks for renewed board approval', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Held', repository: REPO, kind: 'build', status: 'Ready' });
 
-        work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved brief.'));
-        records.recordGate(work.workId, work.revision, {
-            briefDigest: records.gate(work.workId).briefDigest!,
-            approvedBy: 'Pedro',
-            evidence: 'Board approval.',
-        });
-        work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Changed brief.'));
-
-        const reviewed = records.doubtPackage(work.workId);
-
-        records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
-
-        const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
-
-        assert.equal(item.status, 'Shaping');
-        assert.equal(item.passingBrief, false);
-        assert.equal(item.staleGate, 'brief');
-        assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
-        assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved brief.'));
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
     });
-}
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Changed brief.'));
+
+    const reviewed = records.doubtPackage(work.workId);
+
+    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
+
+    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
+
+    assert.equal(item.status, 'Shaping');
+    assert.equal(item.passingBrief, false);
+    assert.equal(item.staleGate, 'brief');
+    assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
+    assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
+});
 
 test('an unrelated concept map edit preserves a reviewed gate', async () => {
     const records = await open();

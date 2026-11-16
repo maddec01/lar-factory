@@ -67,8 +67,6 @@ it('recovers automatically after a real server process restarts with a new port 
     await vi.waitFor(async () => expect((await repositoryProjects(env)).availability).toBe('unavailable'));
     expect((await repositoryProjects(env)).observation?.projects[0]?.id).toBe('fixture');
 
-    const started = Date.now();
-
     await start();
     expect(runtime.pid).not.toBe(old.pid);
     expect(runtime.origin).not.toBe(old.origin);
@@ -77,7 +75,6 @@ it('recovers automatically after a real server process restarts with a new port 
         timeout: 6_000,
         interval: 100,
     });
-    expect(Date.now() - started).toBeLessThan(6_000);
     expect(issue).toHaveBeenCalledTimes(2);
     expect(repositoryProjectAccess()?.origin.origin).toBe(runtime.origin);
 

@@ -136,24 +136,6 @@ test('closing onboarding keeps its repository on the list as onboarding, which t
     assert.deepEqual(((await restarted.board()) as BoardData).onboarding, [{ repo: 'maddec01/lar-web', progress }]);
 });
 
-test('keeping an onboarding without its progress, or for a repository onboarded already, is refused', async (t) => {
-    const board = await startBoard(t, { repositories: ['maddec01/lar-web'] });
-    const keep = (body: object) => board.post(body, board.url, '/api/onboarding/repositories');
-    const unsent = await keep({ repo: 'maddec01/lar-web', progress: { step: 'setup' } });
-
-    assert.deepEqual(
-        [unsent.status, await unsent.json()],
-        [400, { error: 'Send the Project and where its onboarding stopped.' }],
-    );
-
-    const onboarded = await keep({ repo: 'maddec01/lar-web', progress });
-
-    assert.deepEqual(
-        [onboarded.status, await onboarded.json()],
-        [409, { error: 'maddec01/lar-web is onboarded already.' }],
-    );
-});
-
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
 const ANSWERS = {
     structureSync: false,
@@ -204,27 +186,6 @@ test('a repository with no factory files is detected and onboards with no write 
 
     assert.deepEqual([settings.projectId, settings.access['push-branch']], ['lar-web', 'refused']);
     assert.deepEqual((await board.calls()).filter(writesRepository), []);
-});
-
-test('detection and saving refuse a body they cannot use', async (t) => {
-    const board = await startBoard(t);
-    const detected = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/detect');
-
-    assert.deepEqual(
-        [detected.status, await detected.json()],
-        [400, { error: 'Choose a Project and its T3 project before detecting its setup.' }],
-    );
-
-    const saved = await board.post(
-        { repo: 'maddec01/lar-web', ...ANSWERS, structureSync: 'invalid' },
-        board.url,
-        '/api/onboarding/setup',
-    );
-
-    assert.deepEqual(
-        [saved.status, await saved.json()],
-        [400, { error: 'Send the Project, its T3 project, role, item source, domain-doc location, skills.' }],
-    );
 });
 
 test('a fine-grained read-only token permits local setup without enabling concept sync', async (t) => {

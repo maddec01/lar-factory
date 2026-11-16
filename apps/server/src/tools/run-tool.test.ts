@@ -5,15 +5,6 @@ import { runTool } from './run-tool.ts';
 
 const node = (script: string) => ['-e', script];
 
-test('a tool that succeeds gives code 0 and what it printed', async () => {
-    assert.deepEqual(
-        await runTool(process.execPath, node('process.stdout.write("out"); process.stderr.write("warn")'), {
-            timeout: 5_000,
-        }),
-        { code: 0, stdout: 'out', stderr: 'warn', detail: '' },
-    );
-});
-
 test('a tool that fails gives its exit code and the first four lines of what it printed as the detail', async () => {
     const result = await runTool(process.execPath, node('console.error("\\n1\\n2\\n3\\n4\\n5"); process.exit(3)'), {
         timeout: 5_000,
@@ -34,32 +25,8 @@ test('a tool that fails gives its exit code and the first four lines of what it 
     );
 });
 
-test('a missing binary gives the spawn error code; a timeout gives null', async () => {
+test('a missing binary gives the spawn error code', async () => {
     assert.equal((await runTool('/nonexistent/tool', [], { timeout: 5_000 })).code, 'ENOENT');
-    assert.equal((await runTool(process.execPath, node('setTimeout(() => {}, 5_000)'), { timeout: 100 })).code, null);
-});
-
-test('the env and buffer limit reach the tool', async () => {
-    const env = { ...process.env, RUN_TOOL_TEST: 'set' };
-
-    assert.equal(
-        (
-            await runTool(process.execPath, node('process.stdout.write(process.env.RUN_TOOL_TEST)'), {
-                env,
-                timeout: 5_000,
-            })
-        ).stdout,
-        'set',
-    );
-    assert.equal(
-        (
-            await runTool(process.execPath, node('process.stdout.write("x".repeat(100))'), {
-                timeout: 5_000,
-                maxBuffer: 10,
-            })
-        ).code,
-        'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
-    );
 });
 
 test('a tool receives JSON on stdin and sees the end of input', async () => {

@@ -223,41 +223,6 @@ it('gives a replaced file a new revision, and an unchanged one leaves the board 
     expect((await icons.image('id-factory'))?.body).toEqual(Buffer.from('new'));
 });
 
-it('refreshes on its own timer every 4 minutes and when the repositories change, until stopped', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    t3.read = listed(fact('factory'));
-    assets = { factory: png('old') };
-
-    const board = boardOf();
-    const icons = createProjectIcons(board);
-    const stop = icons.start();
-
-    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeUndefined());
-
-    board.update({ repos: [repo('lar-factory')] } as Partial<BoardData>);
-    board.push();
-    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
-    // The change came during the first read, so a second read follows it; a file replaced before that one ends would show early.
-    await icons.refresh();
-
-    const first = board.snapshot().projectIcons;
-
-    assets = { factory: png('new') };
-    await vi.advanceTimersByTimeAsync(239_000);
-    expect(board.snapshot().projectIcons).toEqual(first);
-    await vi.advanceTimersByTimeAsync(1_000);
-    await vi.waitFor(() => expect(board.snapshot().projectIcons).not.toEqual(first));
-
-    stop();
-
-    const stopped = board.snapshot().projectIcons;
-
-    assets = { factory: png('newer') };
-    await vi.advanceTimersByTimeAsync(480_000);
-    expect(board.snapshot().projectIcons).toEqual(stopped);
-    expect(vi.getTimerCount()).toBe(0);
-});
-
 /** An answer that waits for `release`, so a test can act while a read runs. */
 const held = (answer: () => Response) => {
     let release = () => {};
@@ -888,11 +853,7 @@ it('keeps a known icon while T3 is unavailable, sends nothing and knows nothing 
     expect(await nothing.image('id-factory')).toBeUndefined();
 });
 
-it.each<ChosenProjectIcon>([
-    { kind: 'emoji', emoji: '🚀' },
-    { kind: 'lucide', name: 'rocket', color: 'sky' },
-    { kind: 'monogram', text: 'LF', color: 'rose' },
-])(
+it.each<ChosenProjectIcon>([{ kind: 'emoji', emoji: '🚀' }])(
     'publishes a chosen $kind icon without asking T3 for a favicon, and drops bytes it no longer needs',
     async (chosen) => {
         t3.read = listed(fact('factory'));

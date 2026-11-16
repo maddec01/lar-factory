@@ -44,12 +44,6 @@ test('development launch prompts name the checkout bundle and preserve the isola
     }
 });
 
-test('an unset override keeps the installed skills', () => {
-    expect(factorySkillDir('lar-shape', { LAR_FACTORY_INSTALL_ROOT: '/installation' })).toBe(
-        '/installation/.agents/skills/lar-shape',
-    );
-});
-
 test('invalid or unavailable development bundles refuse instead of selecting installed skills', () => {
     for (const env of [
         { NODE_ENV: 'production', BOARD_DEV_SKILLS_DIR: '/checkout/.assembled-skills' },

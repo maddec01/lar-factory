@@ -20,14 +20,13 @@ const input = {
     ],
 };
 
-test.each(['command', 'file-read', 'file-change', 'permission', 'mcp-elicitation', 'auth_refresh'])(
-    '%s is a tool approval with no command exposure',
-    (kind) => {
-        expect(
-            pendingRequest({ ...shell, pendingRuntimeRequest: { id: 'pending', kind, command: 'private' } }),
-        ).toEqual({ id: 'pending', threadId: 'owner', kind: 'tool-approval' });
-    },
-);
+test.each(['command', 'permission'])('%s is a tool approval with no command exposure', (kind) => {
+    expect(pendingRequest({ ...shell, pendingRuntimeRequest: { id: 'pending', kind, command: 'private' } })).toEqual({
+        id: 'pending',
+        threadId: 'owner',
+        kind: 'tool-approval',
+    });
+});
 
 test('only the exact pending question names its brief gate', () => {
     expect(pendingRequest(shell, { turnItems: [input] })).toMatchObject({

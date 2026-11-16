@@ -3,6 +3,7 @@
 import { parseDecisionMethod } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 
+import { reduceBlockers } from './blocker-graph.ts';
 import type { Migration } from './database.ts';
 import { migrateDecisionAnswers } from './decision-answer-migration.ts';
 import { parseBriefVerify } from './verify-requirement.ts';
@@ -459,7 +460,7 @@ export const MIGRATIONS: readonly Migration[] = [
     CREATE INDEX check_reuses_owner ON check_reuses(work_id);
   `),
     // Fence legacy structural writers without changing their journals or settings.
-    () => {},
+    reduceBlockers,
     (db) => db.exec('ALTER TABLE review_axes ADD COLUMN escalation TEXT'),
     (db) =>
         db.exec(`
@@ -638,4 +639,5 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             "ALTER TABLE dependencies ADD COLUMN proof_state TEXT NOT NULL DEFAULT 'pending' CHECK(proof_state IN ('pending','submitted','insufficient'))",
         ),
+    reduceBlockers,
 ];

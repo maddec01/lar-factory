@@ -1,8 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 let records: WorkRecords;
@@ -115,4 +117,29 @@ it('rolls back structural recovery of a redundant graph before retaining importe
     } finally {
         fresh.close();
     }
+});
+
+it('drops redundant blockers recorded before the rule so later writes succeed', async () => {
+    const { a, b, c, d, add } = await fixture();
+
+    add(a, d);
+    add(b, c);
+    records.close();
+
+    const legacy = new DatabaseSync(join(dir, 'work.db'));
+
+    legacy
+        .prepare('INSERT INTO blockers(work_id, blocker_id) VALUES (?, ?), (?, ?)')
+        .run(a.workId, c.workId, a.workId, b.workId);
+    legacy.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+    legacy.close();
+    records = await openWorkRecords(join(dir, 'work.db'));
+
+    expect(new Set(records.blockers(a.workId).map((r) => r.workId))).toEqual(new Set([b.workId, d.workId]));
+    expect(records.blockers(b.workId).map((r) => r.workId)).toEqual([c.workId]);
+
+    const lone = records.create({ title: 'Lone', repository: 'test/repo', kind: 'build' })!;
+
+    expect(records.setAside(lone.workId, lone.revision).setAside).toBeTruthy();
+    expect(() => add(d, c)).not.toThrow();
 });

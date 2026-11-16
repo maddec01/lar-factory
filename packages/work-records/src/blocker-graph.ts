@@ -4,9 +4,10 @@ import { WorkRecordError } from './database.ts';
 
 type Edge = { work_id: string; blocker_id: string };
 
-/** Validate the final graph inside the caller's transaction, including multi-edge writes. */
-export function validateBlockers(db: DatabaseSync): void {
-    const edges = db.prepare('SELECT work_id, blocker_id FROM blockers ORDER BY rowid').all() as Edge[];
+const readEdges = (db: DatabaseSync) =>
+    db.prepare('SELECT work_id, blocker_id FROM blockers ORDER BY rowid').all() as Edge[];
+
+function router(edges: readonly Edge[]) {
     const graph = new Map<string, string[]>();
 
     for (const edge of edges) {
@@ -37,6 +38,19 @@ export function validateBlockers(db: DatabaseSync): void {
 
         return null;
     };
+    const drop = (edge: Edge) => {
+        const next = graph.get(edge.work_id)!;
+
+        next.splice(next.indexOf(edge.blocker_id), 1);
+    };
+
+    return { path, drop };
+}
+
+/** Validate the final graph inside the caller's transaction, including multi-edge writes. */
+export function validateBlockers(db: DatabaseSync): void {
+    const edges = readEdges(db);
+    const { path } = router(edges);
 
     for (const edge of edges) {
         if (edge.work_id === edge.blocker_id)
@@ -56,4 +70,16 @@ export function validateBlockers(db: DatabaseSync): void {
                 `The blocker ${edge.work_id} → ${edge.blocker_id} is already implied by ${implied.join(' → ')}; remove the redundant edge.`,
             );
     }
+}
+
+export function reduceBlockers(db: DatabaseSync): void {
+    const edges = readEdges(db);
+    const { path, drop } = router(edges);
+    const remove = db.prepare('DELETE FROM blockers WHERE work_id = ? AND blocker_id = ?');
+
+    for (const edge of edges)
+        if (path(edge.work_id, edge.blocker_id, edge)) {
+            drop(edge);
+            remove.run(edge.work_id, edge.blocker_id);
+        }
 }

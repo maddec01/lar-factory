@@ -24,7 +24,7 @@ export const runT3 =
         });
 
 /** T3's runtime file: `T3_SERVER_RUNTIME`, or `server-runtime.json` in its userdata folder in `home`. */
-export const runtimePath = (env: Environment, home: string) =>
+const runtimePath = (env: Environment, home: string) =>
     env.T3_SERVER_RUNTIME || NodePath.join(home, '.t3/userdata/server-runtime.json');
 
 /** Asks the T3 that `home` runs, within discovery's own time limit, with `env` for the CLI. */

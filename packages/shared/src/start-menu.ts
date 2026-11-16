@@ -1,4 +1,4 @@
-// Start ▾'s menu on a Queued card: what picking an entry posts, and how keys move through it.
+// Start ▾'s menu on a Queued card: what picking an entry posts, and which choice it remembers.
 
 import { offers } from './model.ts';
 import type { ModelChoice, ModelGroup, StartResult } from './model.ts';
@@ -11,22 +11,6 @@ export function choiceOf(entry: { instanceId?: string; model?: string }): ModelC
 /** /api/start's body. Without a choice it sends no `model`, so T3 uses the project's default. */
 export function startRequest(session: string | undefined, itemId: string, choice?: ModelChoice): object {
     return { session, itemId, ...(choice && { model: choice }) };
-}
-
-/** The entry a key moves focus to from `index` among `count`, wrapping; null for a key the menu doesn't take. */
-export function menuMove(key: string, index: number, count: number): number | null {
-    switch (key) {
-        case 'ArrowDown':
-            return (index + 1) % count;
-        case 'ArrowUp':
-            return (index - 1 + count) % count;
-        case 'Home':
-            return 0;
-        case 'End':
-            return count - 1;
-        default:
-            return null;
-    }
 }
 
 /** Whether a start's result makes its choice the one to remember: "Started" or "May have started", not a refusal or failure. */

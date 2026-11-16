@@ -130,7 +130,7 @@ export const requiredTargets = (instances: ReadonlyArray<ProviderInstance>): Arr
 };
 
 /** A lock that makes the checks it wraps run one at a time: one that starts while another runs waits for it to finish. */
-export const oneAtATime = Semaphore.make(1).pipe(Effect.map((semaphore) => semaphore.withPermits(1)));
+const oneAtATime = Semaphore.make(1).pipe(Effect.map((semaphore) => semaphore.withPermits(1)));
 
 /** What this launch's checks know, for the board's page. It holds T3's instances, never their settings. */
 export interface CheckState {

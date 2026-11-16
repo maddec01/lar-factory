@@ -5,6 +5,8 @@
 
 import {
     kindDisagreement,
+    linkedFlow,
+    settleFlows,
     staleGateReason,
     onAzure,
     parseConceptMap,
@@ -378,12 +380,13 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             statuses: done ? [] : [derivedStatus],
             kind: record.kind === 'slice' ? 'issue' : record.kind,
             flow:
-                record.kind === 'concept' ||
-                (record.kind !== 'slice' && !!parent) ||
-                work.length > 0 ||
-                ticket?.flow === 'linked'
+                parent?.kind === 'concept' || ticket?.flow === 'linked'
                     ? 'linked'
-                    : 'single',
+                    : linkedFlow(record.kind, [
+                          record.repository,
+                          record.kind === 'slice' ? null : parent?.repository,
+                          ...work.map((part) => part.repository),
+                      ]),
             ...(record.kind === 'decision' ? { decisionMethod: record.decisionMethod ?? null } : {}),
             number: ticketNumber(record.ticket),
             title: record.title || ticket?.title || '',
@@ -486,7 +489,7 @@ export function recordItems(
 ): Item[] {
     const { shown, toItem, unpicked } = boardRecords(records, tickets, repos, unread, hidden, setups);
 
-    return [...shown.map(toItem), ...unpicked];
+    return settleFlows([...shown.map(toItem), ...unpicked]);
 }
 
 /** How many records one turn maps: each takes a dozen queries, about 0.15 ms on a 340-item board. */
@@ -517,7 +520,7 @@ function recordItemsInTurns(
             items.push(...loopTrace.span('records', () => shown.slice(at, at + RECORDS_PER_TURN).map(toItem)));
         }
 
-        return [...items, ...unpicked];
+        return settleFlows([...items, ...unpicked]);
     });
 }
 

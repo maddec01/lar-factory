@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'vite-plus/test';
+import { expect, test } from 'vite-plus/test';
 
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
 import {
@@ -454,4 +454,19 @@ test("an issue's labels carry GitHub's colours, and a label without a valid colo
     assert.deepEqual(item.labels, ['area: web', 'odd', 'plain']);
     assert.deepEqual(item.labelColors, { 'area: web': '#BFDADC' });
     assert.equal('labelColors' in normalizeItem(rawIssue('I_8', 8, '', ['web']))!, false);
+});
+
+test('sub-issues make an issue linked only when they span repositories', () => {
+    const flow = (subIssues: RawIssueRef[]) => normalizeItem(issue900([], subIssues))!.flow;
+
+    expect(flow([refIn('maddec01/lar-factory', 901, 'OPEN')])).toBe('single');
+    expect(flow([refIn('maddec01/lar-factory', 901, 'OPEN'), refIn('maddec01/lar-web', 902, 'OPEN')])).toBe('linked');
+});
+
+test('a parent in another repository makes an issue linked', () => {
+    const flow = (repo: string) =>
+        normalizeItem(rawIssue('I_x', 900, 'Queued', [], { parent: refIn(repo, 800, 'OPEN') }))!.flow;
+
+    expect(flow('maddec01/lar-factory')).toBe('single');
+    expect(flow('maddec01/lar-web')).toBe('linked');
 });

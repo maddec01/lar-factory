@@ -13,11 +13,11 @@ A workspace for understanding an outcome through questions, evidence, decisions 
 _Avoid_: delivery ticket as a synonym for concept.
 
 **Single-flow issue**:
-Work that moves through Queue, Shaping, Ready to build and Build. Its private slices stay inside its build and do not change its flow.
-_Avoid_: treating a sliced build as linked work.
+Work that moves through Queue, Shaping, Ready to build and Build. Its private slices, and sub-issues or Tasks in its own repository, do not change its flow.
+_Avoid_: treating a sliced build, or a parent with parts in one repository, as linked work.
 
 **Concepts and linked work**:
-Settled scope across several repositories uses one parent and one build per repository, with blockers by dependency. Release and activation steps stay on the parent. The board section for concepts, linked-work parents and their parts at every stage, including queued concepts with no parts. Human waits also appear on Your desk. A part whose parent is off-board remains reachable here; completed parts remain in their group's history.
+Only concepts and their parts, and work whose parent and parts span more than one repository: work that shaping turned into a concept, work that shaping split across repositories, and tracker work already linked across repositories. Settled scope across several repositories uses one parent and one build per repository, with blockers by dependency. Release and activation steps stay on the parent. The board section shows these groups at every stage, including queued concepts with no parts. Human waits also appear on Your desk. A part whose parent is off-board remains reachable here; completed parts remain in their group's history.
 _Avoid_: moving grouped parts into single-issue stages.
 
 **Refinement**:

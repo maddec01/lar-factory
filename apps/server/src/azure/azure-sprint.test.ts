@@ -64,7 +64,7 @@ test('a sprint read lists requirement-level items with Task counts, a Completed 
             revision: 0,
             kind: 'feature',
             parentId: null,
-            flow: 'linked',
+            flow: 'single',
             number: 1,
             title: 'Seek',
             url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1',

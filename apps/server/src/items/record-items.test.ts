@@ -26,6 +26,7 @@ import { legacyApprovalNotice } from '../../test/legacy-notice.ts';
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
+const OTHER_REPO = 'maddec01/lar-web';
 const opened: { records: WorkRecords; dir: string }[] = [];
 
 test('S07 repeat 6 preserves all saved runtime notices and identifies the completed held Doubt packages', async () => {
@@ -1443,12 +1444,12 @@ for (const kind of ['concept', 'feature'] as const)
         test(`${kind} batch desk projection comes from current Doubt and gates when ${asked} asked`, async () => {
             const records = await open();
             const parent = records.create({ title: 'Group', repository: REPO, kind });
-            const parts = ['One', 'Two'].map((title) =>
+            const parts = ['One', 'Two'].map((title, at) =>
                 records.createPart({
                     parentId: parent.workId,
                     parentRevision: records.read(parent.workId).revision,
                     title,
-                    repository: REPO,
+                    repository: at ? OTHER_REPO : REPO,
                     kind: 'build',
                     body: completeBrief('Build it'),
                     blockerIds: [],
@@ -1458,7 +1459,7 @@ for (const kind of ['concept', 'feature'] as const)
 
             for (const id of ids) legacyApprovalNotice(records, id, 'Approve briefs in the board');
 
-            const project = () => recordItems(records, [], [REPO]);
+            const project = () => recordItems(records, [], [REPO, OTHER_REPO]);
 
             assert.deepEqual(
                 deskItems({ items: project() }, false)
@@ -1597,4 +1598,39 @@ test('S08 F03: an idle amended brief reports a process gap instead of a running 
 
     assert.deepEqual(buildActivity(shown), { label: "Brief changed; Doubt hasn't run", running: false });
     assert.equal(shown.briefApproval, undefined);
+});
+
+test('recorded work is linked only as a concept, a concept part or a group across repositories', async () => {
+    const records = await open();
+    const group = (kind: 'concept' | 'feature', repositories: readonly string[]) => {
+        const parent = records.create({ title: `${kind} group`, repository: REPO, kind });
+        const parts = repositories.map((repository, at) =>
+            records.createPart({
+                parentId: parent.workId,
+                parentRevision: records.read(parent.workId).revision,
+                title: `Part ${at}`,
+                repository,
+                kind: 'build',
+                body: completeBrief('Build it'),
+                blockerIds: [],
+            }),
+        );
+
+        return [parent, ...parts].map((record) => record.workId);
+    };
+    const groups = {
+        concept: group('concept', [REPO]),
+        split: group('feature', [REPO, OTHER_REPO]),
+        sameRepo: group('feature', [REPO, REPO]),
+    };
+    const flow = new Map(recordItems(records, [], [REPO, OTHER_REPO]).map((item) => [item.id, item.flow]));
+
+    assert.deepEqual(
+        Object.fromEntries(Object.entries(groups).map(([name, ids]) => [name, ids.map((id) => flow.get(id))])),
+        {
+            concept: ['linked', 'linked'],
+            split: ['linked', 'linked', 'linked'],
+            sameRepo: ['single', 'single', 'single'],
+        },
+    );
 });

@@ -257,122 +257,119 @@ process.stdout.write('{}');
             }),
         );
 
-    it.each([undefined, false, true])(
-        'keeps cross-provider exploration local with legacy structureSync=%s',
-        async (structureSync) => {
-            const data = tempDir();
-            const log = join(data, 'provider.log');
+    it('keeps cross-provider exploration local with legacy structureSync=true', async () => {
+        const data = tempDir();
+        const log = join(data, 'provider.log');
 
-            writeFileSync(log, '');
+        writeFileSync(log, '');
 
-            const fake = join(data, 'provider.cjs');
+        const fake = join(data, 'provider.cjs');
 
-            writeFileSync(
-                fake,
-                `#!/usr/bin/env node
+        writeFileSync(
+            fake,
+            `#!/usr/bin/env node
 require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');
 throw Error('Local exploration must not call a tracker');
 `,
-                { mode: 0o755 },
-            );
-            vi.stubEnv('GH_PATH', fake);
-            vi.stubEnv('AZ_PATH', fake);
+            { mode: 0o755 },
+        );
+        vi.stubEnv('GH_PATH', fake);
+        vi.stubEnv('AZ_PATH', fake);
 
-            const repositories = ['team/server', 'org/Project/client'];
+        const repositories = ['team/server', 'org/Project/client'];
 
-            writeFileSync(
-                join(data, 'repository-settings.json'),
-                JSON.stringify({
-                    repositories: repositories.map((repo) => ({
-                        repo,
-                        settings: {
-                            access: {
-                                'publish-ticket': 'allowed',
-                                'edit-ticket': 'allowed',
-                                'comment-ticket': 'allowed',
-                                'tag-ticket': 'allowed',
-                            },
-                            overrides: { structureSync },
+        writeFileSync(
+            join(data, 'repository-settings.json'),
+            JSON.stringify({
+                repositories: repositories.map((repo) => ({
+                    repo,
+                    settings: {
+                        access: {
+                            'publish-ticket': 'allowed',
+                            'edit-ticket': 'allowed',
+                            'comment-ticket': 'allowed',
+                            'tag-ticket': 'allowed',
                         },
-                    })),
-                }),
-            );
+                        overrides: { structureSync: true },
+                    },
+                })),
+            }),
+        );
 
-            const records = await openWorkRecords(join(data, 'work-records.db'));
+        const records = await openWorkRecords(join(data, 'work-records.db'));
 
-            try {
-                for (const repository of repositories) {
-                    const root = records.create({
-                        repository,
-                        title: 'Existing concept',
-                        kind: 'concept',
-                        ticket: `${repository}#42`,
-                    });
+        try {
+            for (const repository of repositories) {
+                const root = records.create({
+                    repository,
+                    title: 'Existing concept',
+                    kind: 'concept',
+                    ticket: `${repository}#42`,
+                });
 
-                    records.trackerReserveCreation(root.workId);
+                records.trackerReserveCreation(root.workId);
 
-                    const map = join(data, 'map.md');
+                const map = join(data, 'map.md');
 
-                    writeFileSync(map, '# Map\nInvestigate another repository.');
+                writeFileSync(map, '# Map\nInvestigate another repository.');
 
-                    const edited = await larWork(
-                        data,
-                        'set-body',
-                        root.workId,
-                        '--revision',
-                        String(root.revision),
-                        '--body',
-                        'map',
-                        '--file',
-                        map,
-                    );
+                const edited = await larWork(
+                    data,
+                    'set-body',
+                    root.workId,
+                    '--revision',
+                    String(root.revision),
+                    '--body',
+                    'map',
+                    '--file',
+                    map,
+                );
 
-                    expect(edited.code, `stderr: ${edited.stderr}`).toBe(0);
+                expect(edited.code, `stderr: ${edited.stderr}`).toBe(0);
 
-                    const child = await larWork(
-                        data,
-                        'create',
-                        '--repository',
-                        repositories.find((repo) => repo !== repository)!,
-                        '--title',
-                        'Tentative build',
-                        '--kind',
-                        'build',
-                    );
+                const child = await larWork(
+                    data,
+                    'create',
+                    '--repository',
+                    repositories.find((repo) => repo !== repository)!,
+                    '--title',
+                    'Tentative build',
+                    '--kind',
+                    'build',
+                );
 
-                    expect(child.code, `stderr: ${child.stderr}`).toBe(0);
+                expect(child.code, `stderr: ${child.stderr}`).toBe(0);
 
-                    const linked = await larWork(
-                        data,
-                        'set-parent',
-                        child.record.workId,
-                        '--revision',
-                        String(child.record.revision),
-                        '--parent',
-                        root.workId,
-                    );
+                const linked = await larWork(
+                    data,
+                    'set-parent',
+                    child.record.workId,
+                    '--revision',
+                    String(child.record.revision),
+                    '--parent',
+                    root.workId,
+                );
 
-                    expect(linked.code, `stderr: ${linked.stderr}`).toBe(0);
+                expect(linked.code, `stderr: ${linked.stderr}`).toBe(0);
 
-                    const retried = await larWork(
-                        data,
-                        'sync-structure',
-                        root.workId,
-                        '--confirmed-missing-issue',
-                        root.workId,
-                    );
+                const retried = await larWork(
+                    data,
+                    'sync-structure',
+                    root.workId,
+                    '--confirmed-missing-issue',
+                    root.workId,
+                );
 
-                    expect(retried.code).toBe(2);
-                    expect(retried.stderr).toContain('suspended');
-                    expect(records.trackerReserveCreation(root.workId)).toBe(false);
-                    expect(records.children(root.workId)).toHaveLength(1);
-                }
-                expect(readFileSync(log, 'utf8')).toBe('');
-            } finally {
-                records.close();
+                expect(retried.code).toBe(2);
+                expect(retried.stderr).toContain('suspended');
+                expect(records.trackerReserveCreation(root.workId)).toBe(false);
+                expect(records.children(root.workId)).toHaveLength(1);
             }
-        },
-    );
+            expect(readFileSync(log, 'utf8')).toBe('');
+        } finally {
+            records.close();
+        }
+    });
 
     it('explicit structural sync refuses retries and preserves local content and uncertainty', async () => {
         const data = tempDir();

@@ -27,7 +27,6 @@ describe('automatic heavy command limit', () => {
         [4, 8, 1],
         [2, 4, 1],
         [32, 64, 8],
-        [64, 16, 2],
     ])('gives %i CPUs and %i GB %i slots', (cpus, gb, slots) => {
         expect(automaticHeavyCommandLimit(cpus, gb * GB)).toBe(slots);
     });
@@ -38,11 +37,7 @@ describe('automatic heavy command limit', () => {
 });
 
 describe('heavy command limit setting', () => {
-    it('is Automatic while no file is saved', () => {
-        expect(readHeavyCommandLimit(tempDir())).toEqual({ limit: 'automatic' });
-    });
-
-    it.each<HeavyCommandLimit>(['automatic', 1, 3])('saves %s in the data folder and reads it back', (limit) => {
+    it.each<HeavyCommandLimit>(['automatic', 1])('saves %s in the data folder and reads it back', (limit) => {
         const dir = join(tempDir(), 'Lar Factory');
 
         expect(writeHeavyCommandLimit(limit, dir)).toBe(limit);

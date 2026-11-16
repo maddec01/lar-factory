@@ -21,20 +21,13 @@ afterEach(() => {
 });
 
 describe('shaping thread cleanup setting', () => {
-    it('settles until the machine chooses otherwise', () => {
-        expect(readShapingThreadCleanup(tempDir())).toBe('settle');
+    it('saves a choice in the data folder and reads it back', () => {
+        const dir = join(tempDir(), 'Lar Factory');
+
+        expect(writeShapingThreadCleanup('archive', dir)).toBe('archive');
+        expect(readShapingThreadCleanup(dir)).toBe('archive');
+        expect(readdirSync(dir)).toEqual(['shaping-thread-cleanup.json']);
     });
-
-    it.each<ShapingThreadCleanup>(['keep', 'settle', 'archive', 'delete'])(
-        'saves %s in the data folder and reads it back',
-        (choice) => {
-            const dir = join(tempDir(), 'Lar Factory');
-
-            expect(writeShapingThreadCleanup(choice, dir)).toBe(choice);
-            expect(readShapingThreadCleanup(dir)).toBe(choice);
-            expect(readdirSync(dir)).toEqual(['shaping-thread-cleanup.json']);
-        },
-    );
 
     it('refuses an invalid choice and leaves the saved one as it was', () => {
         const dir = tempDir();

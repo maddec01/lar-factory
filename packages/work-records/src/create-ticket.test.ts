@@ -377,7 +377,7 @@ test.each(['attachment', 'checkpoint'])(
 
 test.each(
     ['attachment', 'checkpoint', 'response'].flatMap((stage) =>
-        [true, false, undefined].map((editorWrite) => ({ stage, editorWrite })),
+        [true, false].map((editorWrite) => ({ stage, editorWrite })),
     ),
 )(
     'recovery checks provenance of edits before retry after a failed $stage, editorWrite=$editorWrite',

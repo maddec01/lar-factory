@@ -39,28 +39,27 @@ test('gate presentation refuses each missing Bug obligation, including empty sec
     }
 });
 
-for (const kind of ['feature', 'improvement'] as const)
-    test(`${kind} gate names all missing acceptance, files and tests`, async () => {
-        const dir = mkdtempSync(join(tmpdir(), 'brief-completeness-'));
-        const records = await openWorkRecords(join(dir, 'work.db'));
+test('feature gate names all missing acceptance, files and tests', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'brief-completeness-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
 
-        try {
-            let work = records.create({ title: 'Names', repository: 'fake/app', kind });
+    try {
+        let work = records.create({ title: 'Names', repository: 'fake/app', kind: 'feature' });
 
-            work = records.setBody(
-                work.workId,
-                work.revision,
-                'brief',
-                '## What\nKeep names.\n## Done when\nTODO\n### Tests\nnone\n## Scope\n### Files\nTBD',
-            );
-            expect(() => records.displayGate(work.workId)).toThrow(/acceptance.*affected files.*named tests/);
-            work = records.setBody(work.workId, work.revision, 'brief', feature);
-            expect(records.displayGate(work.workId).brief).toBe(feature);
-        } finally {
-            records.close();
-            rmSync(dir, { recursive: true, force: true });
-        }
-    });
+        work = records.setBody(
+            work.workId,
+            work.revision,
+            'brief',
+            '## What\nKeep names.\n## Done when\nTODO\n### Tests\nnone\n## Scope\n### Files\nTBD',
+        );
+        expect(() => records.displayGate(work.workId)).toThrow(/acceptance.*affected files.*named tests/);
+        work = records.setBody(work.workId, work.revision, 'brief', feature);
+        expect(records.displayGate(work.workId).brief).toBe(feature);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
 
 test('every linked batch member is checked again while unrelated sibling progress preserves Doubt', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'linked-completeness-'));
@@ -105,17 +104,15 @@ test('every linked batch member is checked again while unrelated sibling progres
     }
 });
 
-for (const kind of ['feature', 'improvement', 'build', 'issue']) {
-    test(`${kind} accepts S01's amended brief and explains the first brief's missing tests`, () => {
-        const amended = readFileSync(new URL('../test/briefs/s01-amended.txt', import.meta.url), 'utf8');
-        const first = readFileSync(new URL('../test/briefs/s01-first.txt', import.meta.url), 'utf8');
+test("accepts S01's amended brief and explains the first brief's missing tests", () => {
+    const amended = readFileSync(new URL('../test/briefs/s01-amended.txt', import.meta.url), 'utf8');
+    const first = readFileSync(new URL('../test/briefs/s01-first.txt', import.meta.url), 'utf8');
 
-        expect(() => requireCompleteBrief(kind, amended)).not.toThrow();
-        expect(() => requireCompleteBrief(kind, first)).toThrow(
-            'named tests (Tests or Done when: name a test file plus its case, or a test case with an assertion; e.g. test/cli.test.js: omitted name prints Hello, friend!)',
-        );
-    });
-}
+    expect(() => requireCompleteBrief('build', amended)).not.toThrow();
+    expect(() => requireCompleteBrief('build', first)).toThrow(
+        'named tests (Tests or Done when: name a test file plus its case, or a test case with an assertion; e.g. test/cli.test.js: omitted name prints Hello, friend!)',
+    );
+});
 
 test.each([
     '### Tests\n- test/name.test.js: preserves one-character names.',

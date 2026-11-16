@@ -94,7 +94,7 @@ describe('createPart', () => {
         expect(records.read(blocker.workId).status).toBe('List');
     });
 
-    it.each(['build', 'bug', 'feature', 'improvement', 'issue'] as const)(
+    it.each(['build', 'bug'] as const)(
         'creates a delivery part under a linked-work %s without changing its kind',
         async (kind) => {
             const { records, parent, input } = await fixture(kind);

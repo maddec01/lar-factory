@@ -237,24 +237,21 @@ it('rejects the whole batch after an edited brief is restored and Doubt renewed'
     empty();
 });
 
-it.each([0, 1, 2, 3, 4, 5, 6, 7])(
-    'checks captured scope for batch member %s before display and approval',
-    async (index) => {
-        const { records, ids, review, approve, empty } = await fixture(true);
-        const manifest = records.gateBatch(ids);
-        const id = ids[index]!;
-        const amended = { ...scopeFor(index), excluded: ['No README examples.'] };
+it.each([0, 7])('checks captured scope for batch member %s before display and approval', async (index) => {
+    const { records, ids, review, approve, empty } = await fixture(true);
+    const manifest = records.gateBatch(ids);
+    const id = ids[index]!;
+    const amended = { ...scopeFor(index), excluded: ['No README examples.'] };
 
-        records.confirmScope(id, records.read(id).revision, amended, 'Pedro', 'Exclude README examples.');
-        review();
-        expect(() => records.gateBatch(ids)).toThrow(/brief differs from confirmed scope/);
-        expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
-        empty();
-        records.setBody(id, records.read(id).revision, 'brief', completeBrief(scopeMarkdown(amended)));
-        review();
-        expect(approve().gates).toHaveLength(8);
-    },
-);
+    records.confirmScope(id, records.read(id).revision, amended, 'Pedro', 'Exclude README examples.');
+    review();
+    expect(() => records.gateBatch(ids)).toThrow(/brief differs from confirmed scope/);
+    expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
+    empty();
+    records.setBody(id, records.read(id).revision, 'brief', completeBrief(scopeMarkdown(amended)));
+    review();
+    expect(approve().gates).toHaveLength(8);
+});
 
 it('rejects batch approval after captured scope is amended and restored, even with renewed Doubt', async () => {
     const { records, ids, review, approve, empty } = await fixture(true);

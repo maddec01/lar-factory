@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { runningRelease } from '../skills/release-folders.ts';
 import { readExecutionModels } from '../t3/execution-capabilities.ts';
 import { launchSelection, projectDefaults } from '../t3/model-choices.ts';
 
@@ -14,6 +15,8 @@ export interface RunLaunchDeps {
     defaults: typeof projectDefaults;
     models: () => Promise<ExecutionModel[]>;
     packaged: (skill: string) => SnapshotRunInput['packaged'];
+    /** The running app release a new run freezes, or undefined without a packaged app. */
+    release: () => string | undefined;
 }
 
 const defaults: RunLaunchDeps = {
@@ -27,6 +30,7 @@ const defaults: RunLaunchDeps = {
         // Content-address the installed instruction bundle, including local drift, rather than claiming a release version.
         return { version: `sha256:${createHash('sha256').update(JSON.stringify(reviewers)).digest('hex')}`, reviewers };
     },
+    release: () => runningRelease(),
 };
 
 /** Retry/handoff reuse the latest logical run of the same kind, even after Settings or package edits. */
@@ -47,6 +51,7 @@ export async function prepareRunLaunch(
 
     if (!snapshot) {
         const project = context.delegationModel ?? deps.defaults(projectId)?.selection ?? null;
+        const release = deps.release();
 
         snapshot = records.snapshotRun(item.id, records.read(item.id).revision, {
             runId: randomUUID(),
@@ -55,6 +60,7 @@ export async function prepareRunLaunch(
             ...(choice && { threadSelection: launchSelection(choice, project) }),
             packaged: deps.packaged(skill),
             skills: [...skills()],
+            ...(release && { release }),
         });
     }
 

@@ -28,6 +28,7 @@ const dependencies = (): RunLaunchDeps => ({
         { instanceId: 'claude', model: 'opus', options: [{ id: 'effort', values: ['low', 'high'] }] },
     ],
     packaged: () => packaged,
+    release: () => undefined,
 });
 
 async function fixture(kind: string = 'issue') {
@@ -121,3 +122,17 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
         expect(retry).toEqual(result);
         expect(changedDeps.packaged).not.toHaveBeenCalled();
     });
+
+it('freezes the running release in a new run, and none without one', async () => {
+    const launch = async (release: string | undefined) => {
+        const { records, item } = await fixture('build');
+
+        return prepareRunLaunch(records, item, true, 'project', undefined, context, '/skill', () => [], {
+            ...dependencies(),
+            release: () => release,
+        });
+    };
+
+    expect((await launch('2.0.0')).snapshot.release).toBe('2.0.0');
+    expect((await launch(undefined)).snapshot).not.toHaveProperty('release');
+});

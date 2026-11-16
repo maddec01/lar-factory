@@ -1315,6 +1315,7 @@ for (const kind of ['build'] as ('issue' | 'concept' | 'decision' | 'build')[])
                     version: 'fixture',
                     reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
                 }),
+                release: () => undefined,
             },
             startThread: start,
         });

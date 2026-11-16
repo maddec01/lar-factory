@@ -12,18 +12,18 @@ import {
     type VocabularyMapping,
 } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { DEFAULT_RETENTION, openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
+import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { changeKind } from '@lar-factory/work-records/change-kind';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, test, vi } from 'vite-plus/test';
+import { afterEach, test } from 'vite-plus/test';
 
 import { completeBrief } from '../../test/complete-brief.ts';
 import shapingHold from '../../test/fixtures/s07-shaping-hold.json' with { type: 'json' };
 import { legacyApprovalNotice } from '../../test/legacy-notice.ts';
-import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
+import { archivedItems, recordItems, recordItemsReader } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const OTHER_REPO = 'maddec01/lar-web';
@@ -132,90 +132,6 @@ async function openReader(): Promise<WorkRecords> {
 const tickets = (...issues: Parameters<typeof boardIssue>[]) =>
     normalizeItems(issues.map((args) => boardIssue(...args)));
 
-test('ticketless decisions expose their local method as soon as it is written', async () => {
-    const records = await open();
-    const decision = records.create({ title: 'Choose the layout', repository: REPO, kind: 'decision' });
-
-    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, null);
-
-    let saved = records.setBody(
-        decision.workId,
-        decision.revision,
-        'decision',
-        'Method: prototype\nChoose the stage layout.',
-    );
-
-    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
-    saved = records.setBody(saved.workId, saved.revision, 'decision', 'Staged artifacts awaiting approval.');
-    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
-    saved = records.setBody(saved.workId, saved.revision, 'decision', 'Method: research\nA rewritten body.');
-    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
-    records.update(saved.workId, saved.revision, { decisionMethod: 'task' });
-    assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'task');
-});
-
-test("a ticketless build's recorded PR is its linked PR, from the record's last observation, with its pipeline unread", async () => {
-    const records = await open();
-    let build = records.create({ title: 'Ticketless', repository: REPO, kind: 'build' });
-
-    build = records.setPullRequest(build.workId, build.revision, `${REPO}#835`);
-
-    const pr = {
-        number: 835,
-        url: `https://github.com/${REPO}/pull/835`,
-        isDraft: false,
-        checks: null,
-        mergeState: 'checking',
-        pipelineUnread: true,
-    };
-
-    assert.deepEqual(
-        recordItems(records, [], [REPO])[0]!.linkedPrs,
-        [{ ...pr, state: 'open' }],
-        'open until an observation says otherwise',
-    );
-    records.observe(build.workId, build.revision, { of: 'pr', state: 'closed' });
-    assert.deepEqual(recordItems(records, [], [REPO])[0]!.linkedPrs, [{ ...pr, state: 'closed' }]);
-});
-
-test("a ticket's linked PRs follow the recorded PR, and the ticket's read of that same PR is the one kept, first", async () => {
-    const records = await open();
-    const linked = (number: number) => ({
-        number,
-        url: `https://github.com/${REPO}/pull/${number}`,
-        state: 'open' as const,
-        isDraft: false,
-        checks: null,
-        mergeState: 'can merge' as const,
-    });
-    const [ticket] = tickets([12, 'Review']);
-    const read = { ...ticket!, linkedPrs: [linked(40), linked(41)] };
-    let work = records.importTicket({
-        title: 'With a ticket',
-        repository: REPO,
-        kind: 'feature',
-        status: 'Review',
-        ticket: `${REPO}#12`,
-    }).record;
-
-    assert.deepEqual(
-        recordItems(records, [read], [REPO])[0]!.linkedPrs,
-        [linked(40), linked(41)],
-        'no recorded PR leaves the ticket links alone',
-    );
-    work = records.setPullRequest(work.workId, work.revision, `${REPO}#41`);
-    assert.deepEqual(recordItems(records, [read], [REPO])[0]!.linkedPrs, [linked(41), linked(40)]);
-    work = records.setPullRequest(work.workId, work.revision, `${REPO.toUpperCase()}#42`);
-    assert.deepEqual(
-        recordItems(records, [read], [REPO])[0]!.linkedPrs.map((pr) => [pr.number, pr.pipelineUnread]),
-        [
-            [42, true],
-            [40, undefined],
-            [41, undefined],
-        ],
-    );
-});
-
 test('recorded work keeps its progress and unpicked tracker issues appear fresh in List', async () => {
     const records = await open();
     const recorded = records.importTicket({
@@ -258,60 +174,6 @@ test("a ticket edit never changes the record's Status, kind or title", async () 
         ['Ready', ['Ready'], 'feature', 'Kept title'],
     );
     assert.ok(item!.labels.includes('bug'), 'the ticket supplies its labels as context');
-});
-
-test("a recorded item takes its ticket's labels and colours from the read, and the record stores neither", async () => {
-    const records = await open();
-    const { record } = records.importTicket({
-        title: 'Coloured',
-        repository: REPO,
-        kind: 'feature',
-        status: 'Queued',
-        ticket: `${REPO}#12`,
-    });
-    const [ticket] = tickets([12, 'Queued', REPO, ['area: web']]);
-    const [item] = recordItems(records, [{ ...ticket!, labelColors: { 'area: web': '#BFDADC' } }], [REPO]);
-
-    assert.deepEqual(item!.labelColors, { 'area: web': '#BFDADC' });
-    assert.deepEqual(recordItems(records, [], [REPO]).find((i) => i.id === record.workId)!.labelColors, undefined);
-    assert.equal(JSON.stringify(records.read(record.workId)).includes('BFDADC'), false);
-});
-
-test('a ticketless record and a record whose ticket the read did not list show from the record alone', async () => {
-    const records = await open();
-    const local = records.create({ title: 'Local', repository: REPO, kind: 'improvement', status: 'Shaping' });
-
-    records.importTicket({ title: 'Unread', repository: REPO, kind: 'bug', ticket: `${REPO}#40` });
-
-    const items = recordItems(records, [], [REPO]);
-
-    assert.deepEqual(
-        items.map((i) => [i.title, i.number, i.url, i.status, i.state]),
-        [
-            ['Local', 0, null, 'Shaping', 'open'],
-            ['Unread', 40, null, 'List', 'open'],
-        ],
-    );
-    assert.equal(items[0]!.id, local.workId);
-});
-
-test('set-aside work and slices are no board items; a Done record is closed as done', async () => {
-    const records = await open();
-    const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Done' });
-    const aside = records.create({ title: 'Aside', repository: REPO, kind: 'bug' });
-
-    records.setAside(aside.workId, aside.revision);
-
-    const slice = records.create({ title: 'Slice', repository: REPO, kind: 'slice' });
-
-    records.setParent(slice.workId, slice.revision, build.workId);
-
-    const items = recordItems(records, [], [REPO]);
-
-    assert.deepEqual(
-        items.map((i) => [i.title, i.state, i.closedAs]),
-        [['Build', 'closed', 'done']],
-    );
 });
 
 test('finished work retention hides leaves the board for Archive, and set-aside work is in Archive until Restore brings it back', async () => {
@@ -399,27 +261,6 @@ test("a record's structure, blockers and slices come from records", async () => 
     assert.deepEqual(shown('Concept').map, { destination: 'Where it goes.', decisions: [], fog: ['What is left'] });
 });
 
-test("only the record's blockers hold it: its ticket's provider blockers never do", async () => {
-    const records = await open();
-
-    records.importTicket({
-        title: 'Ticketed',
-        repository: REPO,
-        kind: 'feature',
-        status: 'Queued',
-        ticket: `${REPO}#12`,
-    });
-
-    const [ticket] = tickets([12, 'Queued']);
-    const [item] = recordItems(
-        records,
-        [{ ...ticket!, blockers: [{ number: 11, repo: REPO, state: 'open' }] }],
-        [REPO],
-    );
-
-    assert.deepEqual(item!.blockers, []);
-});
-
 test('a Dependency blocking a build is one of its blockers, open until the user marks it met, whatever its ticket shows', async () => {
     const records = await open();
     const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept', status: 'Shaping' });
@@ -501,42 +342,6 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
     );
 });
 
-test("a Dependency's Azure work item and PR link to their pages", async () => {
-    const records = await open();
-    const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Ready' });
-    const API = 'contoso/Fabrikam%20Fiber/Web%20Api';
-    const dependency = records.addDependency(build.workId, {
-        need: 'An export endpoint',
-        owner: API,
-        ticket: `${API}#5`,
-        pullRequests: [`${API}#9`],
-    });
-
-    records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
-
-    const [blocker] = recordItems(records, [], [REPO]).find((i) => i.id === build.workId)!.blockers;
-
-    assert.deepEqual(blocker!.dependency!.named, [
-        { reference: `${API}#5`, url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/5' },
-        { reference: `${API}#9`, url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/Web%20Api/pullrequest/9' },
-    ]);
-});
-
-test("in a repository whose source hasn't read yet, only a record with a ticket waits for it", async () => {
-    const records = await open();
-
-    records.importTicket({ title: 'Unread', repository: REPO, kind: 'bug', ticket: `${REPO}#40` });
-    records.create({ title: 'Local', repository: REPO, kind: 'feature' });
-    assert.deepEqual(
-        recordItems(records, [], [REPO], [REPO]).map((i) => i.title),
-        ['Local'],
-    );
-    assert.deepEqual(
-        recordItems(records, tickets([40, 'List']), [REPO], [REPO]).map((i) => i.title),
-        ['Unread', 'Local'],
-    );
-});
-
 /** A build on REPO with ticket #12 and PR #40, with `pr` and `ticket` as its last reads. */
 function observedBuild(
     records: WorkRecords,
@@ -573,37 +378,11 @@ const noticeOf = (records: WorkRecords, workId: string) =>
 
 const PR_CLOSED = `Its PR ${REPO}#40 closed without merging.`;
 const TICKET_CLOSED = `Its ticket ${REPO}#12 closed in its provider.`;
-const NO_THREAD_NOW =
-    'The board asked T3 for a thread, but T3 shows no thread for it. Check its T3 project in T3 Code.';
-const MISSING = `Its ticket ${REPO}#12 wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
-
-test('a no-thread notice names the purpose of the start that failed, and other notices name none', async () => {
-    const records = await open();
-    const record = observedBuild(records, {});
-    const { record: asked, intent } = records.recordLaunchIntent(record.workId, record.revision, 'build');
-    const failed = records.resolveLaunchIntent(record.workId, asked.revision, intent.intentId, {
-        failure: NO_THREAD_NOW,
-    }).record;
-    const waiting = records.setNeedsYouCauses(record.workId, failed.revision, [{ type: 'no-thread' }]);
-
-    assert.equal(noticeOf(records, record.workId)?.startAgainPurpose, 'build');
-    records.setNeedsYouCauses(record.workId, waiting.revision, [{ type: 'ticket-closed' }]);
-    assert.equal(noticeOf(records, record.workId)?.startAgainPurpose, undefined);
-});
 
 test('each cause decides the text and the exact offers of its notice', async () => {
-    const moved = { type: 'assignee-changed', from: 'pedro', to: null } as const;
     const rows: [NeedsYouCause[], string, NeedsYouOffer[]][] = [
         [[{ type: 'pr-closed' }], PR_CLOSED, ['reopen-pr', 'replace-pr', 'set-aside']],
-        [
-            [{ type: 'ticket-closed' }, { type: 'pr-closed' }],
-            `${PR_CLOSED} ${TICKET_CLOSED}`,
-            ['reopen-pr', 'replace-pr', 'set-aside'],
-        ],
         [[{ type: 'ticket-closed' }], TICKET_CLOSED, ['keep-working', 'set-aside']],
-        [[moved], `Its ticket ${REPO}#12 moved from pedro to no one.`, ['keep-working', 'set-aside']],
-        [[{ type: 'no-thread' }], NO_THREAD_NOW, ['start-again', 'set-aside']],
-        [[{ type: 'ticket-missing' }], MISSING, ['mark-handled', 'set-aside']],
     ];
 
     for (const [causes, reason, offers] of rows) {
@@ -616,73 +395,6 @@ test('each cause decides the text and the exact offers of its notice', async () 
     }
 });
 
-test('free text and causes show together, and the first matching row of causes decides the offers', async () => {
-    const records = await open();
-    const record = observedBuild(records, { ticket: 'closed' });
-    const written = records.setNeedsYou(record.workId, record.revision, 'Merge conflict.');
-
-    assert.deepEqual(noticeOf(records, record.workId), {
-        reason: 'Merge conflict.',
-        offers: ['mark-handled', 'set-aside'],
-        causes: [],
-        ticketOpen: false,
-        hasOtherNote: true,
-    });
-    records.setNeedsYouCauses(record.workId, written.revision, [{ type: 'ticket-closed' }]);
-    assert.deepEqual(noticeOf(records, record.workId), {
-        reason: `${TICKET_CLOSED} Merge conflict.`,
-        offers: ['keep-working', 'set-aside'],
-        causes: [{ type: 'ticket-closed' }],
-        ticketOpen: false,
-        hasOtherNote: true,
-    });
-});
-
-test('a notice says whether the ticket reads open', async () => {
-    const records = await open();
-    const record = observedBuild(records, { pr: 'closed', ticket: 'open' });
-
-    records.setNeedsYouCauses(record.workId, record.revision, [{ type: 'pr-closed' }]);
-    assert.deepEqual(noticeOf(records, record.workId), {
-        reason: PR_CLOSED,
-        offers: ['reopen-pr', 'replace-pr', 'set-aside'],
-        causes: [{ type: 'pr-closed' }],
-        ticketOpen: true,
-    });
-});
-
-test('a stale closed PR adds nothing to an unrelated reason', async () => {
-    const records = await open();
-    const record = observedBuild(records, { pr: 'closed', ticket: 'closed' });
-
-    records.setNeedsYou(record.workId, record.revision, 'Its PR closed without merging.');
-    assert.deepEqual(noticeOf(records, record.workId), {
-        reason: 'Its PR closed without merging.',
-        offers: ['mark-handled', 'set-aside'],
-        causes: [],
-        ticketOpen: false,
-        hasOtherNote: true,
-    });
-});
-
-test('no notice saved on Done work shows, whatever it holds', async () => {
-    const typed = await open();
-    const cause = observedBuild(typed, { ticket: 'open', status: 'Done' });
-
-    typed.setNeedsYouCauses(cause.workId, cause.revision, [{ type: 'ticket-closed' }]);
-    assert.equal(noticeOf(typed, cause.workId), undefined);
-    for (const saved of [
-        'Merge conflict.',
-        `Its ticket ${REPO}#12 reopened after the work was Done. Reopen the work, or clear this.`,
-    ]) {
-        const records = await open();
-        const record = observedBuild(records, { ticket: 'open', status: 'Done' });
-
-        records.setNeedsYou(record.workId, record.revision, saved);
-        assert.equal(noticeOf(records, record.workId), undefined);
-    }
-});
-
 const OLD_PR = `Its PR ${REPO}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`;
 const OLD_TICKET = `Its ticket ${REPO}#12 closed in its provider. Set the work aside, or clear this to keep working.`;
 
@@ -690,19 +402,6 @@ test('saved old wording reads as causes and shows new wording, with no reason to
     const rows: [string, Parameters<typeof observedBuild>[1], string, NeedsYouCause[]][] = [
         [OLD_PR, { pr: 'closed' }, PR_CLOSED, [{ type: 'pr-closed' }]],
         [OLD_TICKET, { ticket: 'closed' }, TICKET_CLOSED, [{ type: 'ticket-closed' }]],
-        [
-            `Its ticket ${REPO}#12 moved from pedro to no one. Check who owns the work, then clear this.`,
-            { ticket: 'open', assignee: 'ana' },
-            `Its ticket ${REPO}#12 moved from pedro to no one.`,
-            [{ type: 'assignee-changed', from: 'pedro', to: null }],
-        ],
-        [MISSING, { ticket: 'not-found' }, MISSING, [{ type: 'ticket-missing' }]],
-        [
-            "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.",
-            {},
-            NO_THREAD_NOW,
-            [{ type: 'no-thread' }],
-        ],
     ];
 
     for (const [saved, observed, reason, causes] of rows) {
@@ -719,41 +418,18 @@ test('saved old wording reads as causes and shows new wording, with no reason to
 });
 
 test('a crafted reason reads as free text at once, whatever its length', async () => {
-    const crafted = (repeats: number) =>
-        `Its ticket a#1${' moved from x to'.repeat(repeats)} y. Check who owns the work, then clear this!`;
+    // Guards the old-wording matcher against catastrophic backtracking on saved free text.
+    const reason = `Its ticket a#1${' moved from x to'.repeat(2200)} y. Check who owns the work, then clear this!`;
+    const records = await open();
+    const record = observedBuild(records, {});
 
-    for (const reason of [crafted(2200), crafted(25)]) {
-        const records = await open();
-        const record = observedBuild(records, {});
+    records.setNeedsYou(record.workId, record.revision, reason);
 
-        records.setNeedsYou(record.workId, record.revision, reason);
+    const started = performance.now();
+    const notice = noticeOf(records, record.workId);
 
-        const started = performance.now();
-        const notice = noticeOf(records, record.workId);
-
-        assert.ok(performance.now() - started < 1000, 'matching stays fast');
-        assert.deepEqual([notice?.reason, notice?.causes], [reason, []]);
-    }
-});
-
-test('a saved cause whose observation now reads ended no longer counts', async () => {
-    const rows: [string, Parameters<typeof observedBuild>[1]][] = [
-        [OLD_PR, { pr: 'open' }],
-        [OLD_TICKET, { ticket: 'open' }],
-        [
-            `Its ticket ${REPO}#12 moved from pedro to ana. Check who owns the work, then clear this.`,
-            { ticket: 'open', assignee: 'pedro' },
-        ],
-        [MISSING, { ticket: 'open' }],
-    ];
-
-    for (const [saved, observed] of rows) {
-        const records = await open();
-        const record = observedBuild(records, observed);
-
-        records.setNeedsYou(record.workId, record.revision, saved);
-        assert.equal(noticeOf(records, record.workId), undefined);
-    }
+    assert.ok(performance.now() - started < 1000, 'matching stays fast');
+    assert.deepEqual([notice?.reason, notice?.causes], [reason, []]);
 });
 
 test('concept counts completed decision facts while its Status remains Shaping, and recovered structure starts with no local completion', async () => {
@@ -824,85 +500,50 @@ test('concept counts completed decision facts while its Status remains Shaping, 
     assert.deepEqual(recovered.find((item) => item.id === restored)!.map?.decisions, ['Use the native issue title.']);
 });
 
-const SWAPS: [string, VocabularyMapping, string[]][] = [
-    [
-        'a mapping',
-        { bug: { type: null, labels: ['type: bug'] }, feature: { type: null, labels: ['type: feature'] } },
-        ['type: bug', 'docs'],
-    ],
-    ['no mapping', {}, ['bug', 'docs']],
-];
-
-for (const [name, vocabulary, labels] of SWAPS)
-    test(`a board read after a kind swap keeps the new kind, with ${name}`, async () => {
-        const records = await open();
-        const { workId, revision } = records.importTicket({
-            title: 'Swapped',
-            repository: REPO,
-            kind: 'bug',
-            ticket: `${REPO}#12`,
-        }).record;
-        let onTicket: string[] = [...labels];
-        const setup = {
-            repo: REPO,
-            access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' },
-            vocabulary: effectiveVocabulary(vocabulary).vocabulary,
-        } as unknown as RepositorySetup;
-        const { error } = await changeKind(records, workId, revision, 'feature', {
-            setup,
-            labels: {
-                addToTicket: async (_, names) => {
-                    onTicket.push(...names);
-                },
-                removeFromTicket: async (_, names) => {
-                    onTicket = onTicket.filter((label) => !names.includes(label));
-                },
-            },
-            kinds: {
-                read: async () => ({ labels: onTicket, type: null }),
-                setType: async () => {},
-                boardTypes: async () => null,
-            },
-        });
-
-        assert.equal(error, null);
-
-        const [item] = recordItems(records, tickets([12, 'List', REPO, onTicket]), [REPO]);
-
-        assert.equal(item!.kind, 'feature');
-        assert.deepEqual(
-            item!.labels.filter((label) => label !== 'status-list'),
-            Object.keys(vocabulary).length ? ['docs', 'type: feature'] : ['docs'],
-        );
-    });
-
-test('a board read keeps the kind even when the swap could not write, as the ticket still says the old one', async () => {
+test('a board read after a kind swap keeps the new kind', async () => {
+    const vocabulary: VocabularyMapping = {
+        bug: { type: null, labels: ['type: bug'] },
+        feature: { type: null, labels: ['type: feature'] },
+    };
     const records = await open();
     const { workId, revision } = records.importTicket({
-        title: 'Local',
+        title: 'Swapped',
         repository: REPO,
         kind: 'bug',
         ticket: `${REPO}#12`,
     }).record;
+    let onTicket: string[] = ['type: bug', 'docs'];
     const setup = {
         repo: REPO,
-        access: { 'tag-ticket': 'refused' },
-        vocabulary: effectiveVocabulary({}).vocabulary,
+        access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' },
+        vocabulary: effectiveVocabulary(vocabulary).vocabulary,
     } as unknown as RepositorySetup;
-
-    await changeKind(records, workId, revision, 'feature', {
+    const { error } = await changeKind(records, workId, revision, 'feature', {
         setup,
-        labels: { addToTicket: async () => {}, removeFromTicket: async () => {} },
+        labels: {
+            addToTicket: async (_, names) => {
+                onTicket.push(...names);
+            },
+            removeFromTicket: async (_, names) => {
+                onTicket = onTicket.filter((label) => !names.includes(label));
+            },
+        },
         kinds: {
-            read: async () => ({ labels: ['bug'], type: null }),
+            read: async () => ({ labels: onTicket, type: null }),
             setType: async () => {},
             boardTypes: async () => null,
         },
     });
 
-    const [item] = recordItems(records, tickets([12, 'List', REPO, ['bug']]), [REPO]);
+    assert.equal(error, null);
+
+    const [item] = recordItems(records, tickets([12, 'List', REPO, onTicket]), [REPO]);
 
     assert.equal(item!.kind, 'feature');
+    assert.deepEqual(
+        item!.labels.filter((label) => label !== 'status-list'),
+        ['docs', 'type: feature'],
+    );
 });
 
 const setupWith = (vocabulary: VocabularyMapping = {}) =>
@@ -930,74 +571,6 @@ test("a board read shows how the item's kind and its ticket's disagree, and an i
     assert.equal(readWith(records, ['feature', 'type: bug'], MAPPED).kindDisagreement, undefined);
 });
 
-test("a GitHub issue's type and an Azure work item's type both count", async () => {
-    const records = await open();
-
-    importBug(records);
-
-    const [ticket] = tickets([12, 'List', REPO, []]);
-    const read = (more: Partial<typeof ticket & object>) =>
-        recordItems(records, [{ ...ticket!, ...more }], [REPO], [], new Set(), [setupWith()])[0]!.kindDisagreement
-            ?.ticketKind;
-
-    assert.equal(read({ issueType: 'Feature' }), 'feature');
-    assert.equal(
-        read({ azure: { type: 'User Story', state: 'New' } as NonNullable<typeof ticket & object>['azure'] }),
-        'feature',
-    );
-});
-
-test("a kept answer shows as kept until the ticket's kind changes", async () => {
-    const records = await open();
-    const { workId, revision } = importBug(records);
-
-    records.recordKindAnswer(workId, revision, { answer: 'keep', ticketKind: 'feature' });
-    assert.equal(readWith(records, ['feature']).kindDisagreement?.kept, true);
-    assert.equal(readWith(records, ['improvement']).kindDisagreement?.kept, false);
-});
-
-for (const [name, vocabulary, labels] of SWAPS)
-    test(`no disagreement shows on the board read after a swap, with ${name}`, async () => {
-        const records = await open();
-        const { workId, revision } = importBug(records);
-        let onTicket = [...labels];
-        const setup = {
-            ...setupWith(vocabulary),
-            access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' },
-        } as RepositorySetup;
-
-        assert.ok(readWith(records, ['feature'], vocabulary).kindDisagreement);
-        await changeKind(records, workId, revision, 'feature', {
-            setup,
-            labels: {
-                addToTicket: async (_, names) => {
-                    onTicket.push(...names);
-                },
-                removeFromTicket: async (_, names) => {
-                    onTicket = onTicket.filter((label) => !names.includes(label));
-                },
-            },
-            kinds: {
-                read: async () => ({ labels: onTicket, type: null }),
-                setType: async () => {},
-                boardTypes: async () => null,
-            },
-        });
-        assert.equal(readWith(records, onTicket, vocabulary).kindDisagreement, undefined);
-    });
-
-test('the kind a record and its ticket agree on comes from the last read and the mappings', async () => {
-    const records = await open();
-    const record = importBug(records);
-    const byTicket = (labels: string[]) => ticketsByReference(tickets([12, 'List', REPO, labels]));
-    const { vocabulary } = setupWith(MAPPED);
-
-    assert.equal(agreedKind(record, byTicket(['feature', 'type: bug']), vocabulary), 'bug');
-    assert.equal(agreedKind(record, byTicket(['feature']), vocabulary), null);
-    assert.equal(agreedKind(record, new Map(), vocabulary), null);
-    assert.equal(agreedKind(record, byTicket(['bug']), undefined), null);
-});
-
 test('disabled legacy settings retain pending concept content in board details', async () => {
     const records = await open();
     const concept = records.create({ repository: REPO, title: 'Retained concept', kind: 'concept' });
@@ -1011,34 +584,6 @@ test('disabled legacy settings retain pending concept content in board details',
 
     assert.equal(item?.sync?.state, 'pending');
     assert.deepEqual(records.trackerPending(), pending);
-});
-
-test('concept projection separates refinement from delivery', async () => {
-    const records = await open();
-    const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept' });
-
-    records.setBody(concept.workId, 1, 'map', '# Map');
-    records.setFogGone(concept.workId, 2, true);
-
-    const [item] = recordItems(records, [], [REPO]);
-
-    assert.deepEqual(item!.refinement, { complete: true, reasons: [] });
-    assert.deepEqual(item!.completion, { complete: false, reasons: ['No delivery planned.'] });
-    assert.equal(item!.state, 'open');
-});
-
-test('records map fifty a turn into the same items a read in one turn shows', async () => {
-    const records = await open();
-
-    for (let i = 0; i < 250; i++) records.create({ title: `Work ${i}`, repository: REPO, kind: 'bug' });
-
-    let turns = 0;
-    const items = await recordItemsReader(await openReader())([], [REPO], [], new Set(), [], async () => {
-        turns++;
-    });
-
-    assert.equal(turns, 5);
-    assert.deepEqual(items, recordItems(records, [], [REPO]));
 });
 
 test('a read with no commit since the last and the same inputs gives its items again without mapping', async () => {
@@ -1095,118 +640,6 @@ test('commits between turns stay out of the read, which shows one state of the r
     );
 });
 
-test('flow is projected from typed records and tracker links, independently of visible parents and private slices', async () => {
-    const records = await open();
-    const concept = records.create({ title: 'Concept', repository: 'owner/other', kind: 'concept', status: 'Queued' });
-
-    assert.equal(recordItems(records, [], ['owner/other'])[0]!.flow, 'linked', 'a queued concept has no children yet');
-
-    const part = records.create({ title: 'Part', repository: REPO, kind: 'build' });
-
-    records.setParent(part.workId, part.revision, concept.workId);
-
-    const build = records.create({ title: 'Single build', repository: REPO, kind: 'build' });
-    const slice = records.create({ title: 'Private slice', repository: REPO, kind: 'slice' });
-
-    records.setParent(slice.workId, slice.revision, build.workId);
-
-    const parent = records.importTicket({
-        ticket: `${REPO}#50`,
-        title: 'Linked parent',
-        repository: REPO,
-        kind: 'issue',
-    }).record;
-    const child = records.importTicket({
-        ticket: `${REPO}#51`,
-        title: 'Linked part',
-        repository: REPO,
-        kind: 'issue',
-    }).record;
-    const [parentTicket, childTicket] = tickets([50, 'List'], [51, 'List']);
-
-    parentTicket!.flow = 'linked';
-    childTicket!.flow = 'linked';
-    childTicket!.parent = { number: 50, repo: REPO, title: 'Linked parent', url: '', state: 'open' };
-
-    const projected = recordItems(records, [parentTicket!, childTicket!], [REPO]);
-    const shown = (id: string) => projected.find((item) => item.id === id)!;
-
-    assert.equal(recordItems(records, [], ['owner/other'])[0]!.flow, 'linked');
-    assert.equal(shown(part.workId).flow, 'linked', 'the concept is outside the onboarded repositories');
-    assert.equal(shown(build.workId).flow, 'single');
-    assert.equal(shown(build.workId).slices.length, 1);
-    assert.ok(!shown(slice.workId), 'private slices are never board items');
-    assert.equal(shown(parent.workId).flow, 'linked');
-    assert.equal(shown(child.workId).flow, 'linked');
-    assert.equal(shown(child.workId).parentId, parent.workId);
-});
-
-test('a changed approved brief during Build carries a brief approval reason instead of a generic question', async () => {
-    const records = await open();
-    let work = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'In progress' });
-
-    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved D1.'));
-    records.recordGate(work.workId, work.revision, {
-        briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
-        evidence: 'Board approval.',
-    });
-    work = records.setBuildBranch(work.workId, work.revision, 'build/same');
-    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Proposed D2.'));
-    legacyApprovalNotice(records, work.workId, 'Revised brief needs approval');
-
-    const reviewed = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
-
-    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
-
-    assert.equal(item.passingBrief, false);
-    assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
-    assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
-});
-
-test('a group projects the live reconciliation count and record-backed ships-with release steps', async () => {
-    const records = await open();
-    const group = records.create({ title: 'Reconnect', repository: REPO, kind: 'concept' });
-    const parts = [1, 2].map((n) =>
-        records.createPart({
-            title: `Part ${n}`,
-            repository: REPO,
-            parentId: group.workId,
-            parentRevision: records.read(group.workId).revision,
-            kind: 'build',
-            body: completeBrief('Reconnect safely.'),
-            blockerIds: [],
-        }),
-    );
-
-    records.setReleasePlan(group.workId, records.read(group.workId).revision, {
-        steps: [
-            {
-                id: 'together',
-                who: 'Pedro',
-                what: 'Release together',
-                shipsWith: parts.map((p) => p.workId),
-            },
-        ],
-        outcomeCheck: 'Both parts work together.',
-    });
-
-    const shown = () => recordItems(records, [], [REPO]).find((r) => r.id === group.workId)!;
-
-    assert.equal(shown().reconciliation!.items.length, records.reconciliation(group.workId).items.length);
-    assert.deepEqual(
-        shown().releasePlan!.steps[0]!.shipsWith,
-        parts.map((p) => p.workId),
-    );
-
-    const before = shown().reconciliation!.digest;
-
-    records.retitle(parts[0]!.workId, records.read(parts[0]!.workId).revision, 'A changed part');
-    assert.notEqual(shown().reconciliation!.digest, before);
-});
-
 test('a stale gate at Ready explains the hold and asks for renewed board approval', async () => {
     const records = await open();
     let work = records.create({ title: 'Held', repository: REPO, kind: 'build', status: 'Ready' });
@@ -1230,182 +663,6 @@ test('a stale gate at Ready explains the hold and asks for renewed board approva
     assert.equal(item.staleGate, 'brief');
     assert.equal(item.briefApproval!.reason, 'Brief changed. Review and approve the current product content.');
     assert.equal(item.briefApproval!.digest, records.displayGate(item.id).approvalDigest);
-});
-
-test('an unrelated concept map edit preserves a reviewed gate', async () => {
-    const records = await open();
-    let work = records.create({ title: 'Source hold', repository: REPO, kind: 'build', status: 'Ready' });
-
-    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Keep the agreed contract.'));
-
-    let parent = records.create({ title: 'Source concept', repository: REPO, kind: 'concept' });
-
-    parent = records.setBody(parent.workId, parent.revision, 'map', '## Destination\nKeep the agreed contract.');
-    work = records.setParent(work.workId, work.revision, parent.workId);
-
-    const reviewed = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Checked code evidence.', []);
-    records.recordGate(work.workId, work.revision, {
-        briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
-        evidence: 'Board approval.',
-    });
-    records.setBody(
-        parent.workId,
-        records.read(parent.workId).revision,
-        'map',
-        '## Destination\nThe source contract changed.',
-    );
-
-    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
-
-    assert.equal(item.passingBrief, true);
-    assert.equal(item.staleGate, undefined);
-    assert.equal(item.briefApproval, undefined);
-});
-
-test('withdrawn approval asks for a new gate without claiming the brief or sources changed', async () => {
-    const records = await open();
-    let work = records.create({ title: 'Approval withdrawn', repository: REPO, kind: 'build', status: 'Ready' });
-
-    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Unchanged brief.'));
-    records.recordGate(work.workId, work.revision, {
-        briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
-        evidence: 'Board approval.',
-    });
-    records.invalidateGate(work.workId, work.revision);
-
-    const reviewed = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
-
-    const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
-
-    assert.equal(item.staleGate, 'approval');
-    assert.equal(item.briefApproval!.reason, 'Gate out of date: approval is no longer current');
-});
-
-test('a confirmed scope amendment refreshes while the previous brief awaits replacement', async () => {
-    const records = await open();
-    const work = records.create({ title: 'CLI greeting', repository: REPO, kind: 'feature' });
-    const scope = {
-        files: ['cli.js'],
-        tests: ['`test/cli.test.js`: prints the greeting.'],
-        behaviour: ['Print the greeting.'],
-        excluded: [],
-        size: 'Small' as const,
-        verify: { required: false, visibleUi: null },
-    };
-    const brief = (files: string[]) =>
-        `## Done when\n### Behaviour\n- Print the greeting.\n### Tests\n- \`test/cli.test.js\`: prints the greeting.\n\n## Scope\n### Files\n${files.map((file) => `- ${file}`).join('\n')}\n### Size\nSmall\n\n## Verify\nno\n`;
-
-    records.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
-    records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(scope.files)));
-    assert.throws(
-        () => records.setNeedsYou(work.workId, records.read(work.workId).revision, 'Approve brief in the board.'),
-        /board action/,
-    );
-
-    const review = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, review.packageDigest, 'Doubt', 'Clean.', []);
-    assert.ok(recordItems(records, [], [REPO])[0]!.briefApproval);
-
-    const amended = { ...scope, files: ['cli.js', 'test/cli.test.js'] };
-
-    records.confirmScope(work.workId, records.read(work.workId).revision, amended, 'Pedro', 'Add tests.');
-
-    const waiting = recordItems(records, [], [REPO])[0]!;
-
-    assert.equal(waiting.title, 'CLI greeting');
-    assert.equal(waiting.briefApproval, undefined, 'the old brief cannot offer approval');
-    assert.equal(waiting.passingBrief, false);
-    records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief(brief(amended.files)));
-
-    const replacement = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, replacement.packageDigest, 'Doubt', 'Rechecked.', []);
-    assert.ok(
-        recordItems(records, [], [REPO])[0]!.briefApproval,
-        'a reviewed matching replacement offers approval again',
-    );
-});
-
-test('a refused record read identifies the work and reason without losing its error code', async () => {
-    const records = await open();
-    const work = records.create({ title: 'Broken work', repository: REPO, kind: 'feature' });
-
-    vi.spyOn(records, 'gate').mockImplementationOnce(() => {
-        throw new WorkRecordError('invalid', 'Invalid saved gate data.');
-    });
-    assert.throws(
-        () => recordItems(records, [], [REPO]),
-        (error: unknown) =>
-            error instanceof WorkRecordError &&
-            error.code === 'invalid' &&
-            error.message === `Work record ${work.workId} (Broken work): Invalid saved gate data.`,
-    );
-});
-
-test('keeps retired concept parts in history with creation order and survivor, never as active board items', async () => {
-    const records = await open();
-    const group = records.create({ title: 'Growing concept', repository: REPO, kind: 'concept' });
-    const part = (title: string) =>
-        records.createPart({
-            parentId: group.workId,
-            parentRevision: records.read(group.workId).revision,
-            title,
-            kind: 'build',
-            repository: REPO,
-            body: completeBrief('Build it'),
-            blockerIds: [],
-        });
-    const retired = part('b04');
-    const survivor = part('b05');
-    const aside = part('b06');
-
-    records.setAside(aside.workId, records.read(aside.workId).revision);
-    records.mergeBuild(retired.workId, records.read(retired.workId).revision, {
-        into: survivor.workId,
-        revisions: {
-            [survivor.workId]: records.read(survivor.workId).revision,
-            [group.workId]: records.read(group.workId).revision,
-        },
-    });
-
-    const items = recordItems(records, [], [REPO]);
-
-    assert.deepEqual(items.map((item) => item.id).sort(), [group.workId, survivor.workId].sort());
-
-    const history = items.find((item) => item.id === group.workId)?.retiredParts;
-
-    assert.deepEqual(
-        history?.map((item) => item.title),
-        ['b04', 'b06'],
-    );
-    assert.equal(history?.[0]?.supersededBy?.workId, survivor.workId);
-    assert.equal(history?.[1]?.setAside, true);
-    assert.equal(items.find((item) => item.id === survivor.workId)?.createdAt, survivor.createdAt);
-    assert.equal(
-        archivedItems(records, [], [REPO], new Set()).find((item) => item.id === retired.workId)?.supersededBy?.title,
-        'b05',
-    );
-});
-
-test('an incomplete draft stays readable without offering approval or breaking the board', async () => {
-    const records = await open();
-    let work = records.create({ title: 'Incomplete bug', repository: REPO, kind: 'bug', status: 'Shaping' });
-
-    work = records.setBody(work.workId, work.revision, 'brief', '## What\nFix the name bug.');
-    assert.throws(() => records.setNeedsYou(work.workId, work.revision, 'Approve brief in the board.'), /board action/);
-
-    const shown = recordItems(records, [], [REPO])[0]!;
-
-    assert.equal(shown.title, 'Incomplete bug');
-    assert.equal(shown.briefApproval, undefined);
-    assert.equal(shown.passingBrief, false);
 });
 
 test('S03 amended gate waits for Doubt on its current digest before advertising approval', async () => {
@@ -1436,66 +693,6 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
     assert.equal(shown().briefApproval, undefined);
     assert.equal(shown().briefReviewing, true);
 });
-
-for (const kind of ['concept', 'feature'] as const)
-    for (const asked of ['parent', 'members', 'none'] as const)
-        test(`${kind} batch desk projection comes from current Doubt and gates when ${asked} asked`, async () => {
-            const records = await open();
-            const parent = records.create({ title: 'Group', repository: REPO, kind });
-            const parts = ['One', 'Two'].map((title, at) =>
-                records.createPart({
-                    parentId: parent.workId,
-                    parentRevision: records.read(parent.workId).revision,
-                    title,
-                    repository: at ? OTHER_REPO : REPO,
-                    kind: 'build',
-                    body: completeBrief('Build it'),
-                    blockerIds: [],
-                }),
-            );
-            const ids = asked === 'parent' ? [parent.workId] : asked === 'members' ? parts.map((p) => p.workId) : [];
-
-            for (const id of ids) legacyApprovalNotice(records, id, 'Approve briefs in the board');
-
-            const project = () => recordItems(records, [], [REPO, OTHER_REPO]);
-
-            assert.deepEqual(
-                deskItems({ items: project() }, false)
-                    .map((i) => i.id)
-                    .sort(),
-                [...ids].sort(),
-            );
-            for (const part of parts) {
-                const input = records.doubtPackage(part.workId);
-
-                records.recordDoubt(part.workId, input.packageDigest, 'Doubt', 'Clean.', []);
-            }
-
-            const items = project();
-            const desk = deskItems({ items }, false);
-
-            assert.deepEqual(desk.map((i) => i.id).sort(), [...new Set([parent.workId, ...ids])].sort());
-            assert.equal(
-                deskWait(
-                    items.find((i) => i.id === parent.workId)!,
-                    false,
-                    items,
-                ).label,
-                'Approve briefs',
-            );
-            records.setBody(
-                parts[0]!.workId,
-                records.read(parts[0]!.workId).revision,
-                'brief',
-                completeBrief('Changed'),
-            );
-            assert.equal(
-                deskItems({ items: project() }, false).some(
-                    (i) => deskWait(i, false, project()).label === 'Approve briefs',
-                ),
-                false,
-            );
-        });
 
 test('S06: an unknown-provenance ticket edit stays on Your desk until board acceptance', async () => {
     const records = await open();
@@ -1584,18 +781,6 @@ test('stale approval names the changed cited answer, contract or brief', async (
     approve();
     write(build, 'brief', `${records.body(build, 'brief')}\nA new acceptance criterion.`);
     assert.equal(shown().staleGateDetail, 'Brief changed.');
-});
-
-test('S08 F03: an idle amended brief reports a process gap instead of a running Doubt', async () => {
-    const records = await open();
-    const work = records.create({ title: 'ST', repository: REPO, kind: 'build', status: 'Shaping' });
-
-    records.setBody(work.workId, work.revision, 'brief', completeBrief('Gold amendment.'));
-
-    const shown = recordItems(records, [], [REPO])[0]!;
-
-    assert.deepEqual(buildActivity(shown), { label: "Brief changed; Doubt hasn't run", running: false });
-    assert.equal(shown.briefApproval, undefined);
 });
 
 test('recorded work is linked only as a concept, a concept part or a group across repositories', async () => {

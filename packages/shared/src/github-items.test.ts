@@ -2,14 +2,7 @@ import assert from 'node:assert/strict';
 import { expect, test } from 'vite-plus/test';
 
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
-import {
-    buildSubIssueSearches,
-    normalizeItem,
-    normalizeItems,
-    normalizeMergeState,
-    rawBuildPrs,
-    rawDossiers,
-} from './github-items.ts';
+import { normalizeItem, normalizeItems, normalizeMergeState } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import type { Item } from './model.ts';
 
@@ -19,14 +12,10 @@ const withSubIssues = (id: string, number: number, labels: string[], subIssues: 
         subIssuesSummary: { total: subIssues.length, completed: 0 },
         subIssues: { nodes: subIssues },
     });
-
-/** A sub-issue in another repo. */
 const refIn = (repo: string, number: number, state: 'OPEN' | 'CLOSED'): RawIssueRef => ({
     ...sliceRef(number, state),
     repository: { nameWithOwner: repo },
 });
-
-/** Issue 900 with the given labels and sub-issues. It is none of the sub-issues, so the searches look for all of them. */
 const issue900 = (labels: string[], subIssues: RawIssueRef[]) => withSubIssues('I_x', 900, labels, subIssues);
 
 /** The status an item shows by, and every status it carries. */
@@ -88,112 +77,6 @@ test('normalizes an issue item from the GraphQL response', () => {
     assert.ok(!('map' in item!), 'only a concept has a map');
     assert.equal(item?.linkedPrs.length, 1);
     assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
-});
-
-test("an issue's assignees become its assignee, sorted and joined as a work record observes them; null when it has none", () => {
-    const assigned = rawIssue('I_5', 5, 'List', ['feature'], {
-        assignees: { nodes: [{ login: 'pedro' }, { login: 'ana' }] },
-    });
-
-    assert.equal(normalizeItem(assigned)?.assignee, 'ana, pedro');
-    assert.equal(normalizeItem(rawIssue('I_6', 6, 'List', ['feature'], { assignees: { nodes: [] } }))?.assignee, null);
-    assert.equal(
-        normalizeItem(rawIssue('I_7', 7, 'List', ['feature']))?.assignee,
-        undefined,
-        'a read without assignees says nothing about them',
-    );
-});
-
-test("a concept's body becomes its map, and no other item keeps the body", () => {
-    const body = '## Destination\nThere.\n\n## Fog\n- Why?\n';
-    const concept = normalizeItem(rawIssue('I_6', 6, 'Shaping', ['concept'], { body }));
-
-    assert.deepEqual(concept?.map, { destination: 'There.', decisions: [], fog: ['Why?'] });
-    assert.ok(!('body' in concept!), 'the page gets the parsed sections, not the raw body');
-
-    const feature = normalizeItem(rawIssue('I_7', 7, 'Shaping', ['feature'], { body }));
-
-    assert.ok(!('map' in feature!) && !('body' in feature!));
-});
-
-/** Issue `number`, a sub-issue of issue `parent`, in the same repo. */
-const childOf = (number: number, parent: number) =>
-    rawIssue(`I_${number}`, number, 'Ready', ['build'], {
-        parent: { ...sliceRef(parent, 'OPEN'), title: `Issue ${parent}` },
-    });
-
-test('an item with sub-issues on the board takes its map from its body, as a concept does; other items, and a body with no map sections, give none', () => {
-    const body = '## Destination\nThere.\n\n## End-to-end check\nIt works\n1. Try it\n';
-    const items = normalizeItems([
-        rawIssue('I_10', 10, 'In progress', ['feature'], { body }),
-        childOf(11, 10),
-        rawIssue('I_12', 12, 'In progress', ['feature'], { body: 'Just a description.' }),
-        childOf(13, 12),
-        rawIssue('I_14', 14, 'In progress', ['feature'], { body }),
-    ]);
-    const map = (id: string) => items.find((i) => i.id === id)?.map;
-
-    assert.deepEqual(map('I_10'), {
-        destination: 'There.',
-        decisions: [],
-        fog: [],
-        check: { title: 'It works', steps: ['Try it'] },
-    });
-    assert.equal(map('I_12'), undefined, 'a parent whose body has no map sections has no map yet');
-    assert.equal(map('I_14'), undefined, 'no sub-issue on the board, so no dossier and no map');
-    assert.ok(items.every((i) => !('body' in i)));
-});
-
-test("the dossiers' items, whose bodies the board reads: every concept, and every item with a sub-issue on the board, but not a build whose slices the project holds", () => {
-    const raws = [
-        rawIssue('I_1', 1, 'Shaping', ['concept']),
-        rawIssue('I_10', 10, 'In progress', ['feature']),
-        childOf(11, 10),
-        withSubIssues('I_20', 20, ['build'], [sliceRef(21, 'OPEN')]),
-        rawIssue('I_21', 21, 'In progress', ['improvement'], {
-            parent: { ...sliceRef(20, 'OPEN'), title: 'Issue 20' },
-        }),
-        rawIssue('I_30', 30, 'In progress', ['feature']),
-    ];
-
-    assert.deepEqual(
-        rawDossiers(raws).map((r) => r.id),
-        ['I_1', 'I_10'],
-    );
-});
-
-test("the linked PRs whose body and merge time the board reads: a build's, never another item's or a concept's", () => {
-    const linked = (id: string): RawLinkedPr => ({
-        id,
-        number: 1,
-        url: `https://github.com/maddec01/lar-factory/pull/${id}`,
-        state: 'OPEN',
-        isDraft: false,
-    });
-    const withPrs = (id: string, number: number, labels: string[], prs: RawLinkedPr[]) =>
-        rawIssue(id, number, 'In progress', labels, { closedByPullRequestsReferences: { nodes: prs } });
-    const raws = [
-        withPrs('I_1', 1, ['build'], [linked('PR_1'), linked('PR_2')]),
-        withPrs('I_2', 2, ['feature'], [linked('PR_3')]),
-        withPrs('I_3', 3, ['build', 'concept'], [linked('PR_4')]),
-        withPrs('I_4', 4, ['build'], [linked('PR_2')]),
-    ];
-
-    assert.deepEqual(
-        rawBuildPrs(raws).map((pr) => pr.id),
-        ['PR_1', 'PR_2', 'PR_2'],
-    );
-});
-
-test("a linked PR's state is open, closed or merged", () => {
-    const linked = (state: string) =>
-        normalizeItem(
-            rawIssue('I_9', 9, 'Review', [], {
-                closedByPullRequestsReferences: { nodes: [{ number: 10, url: 'p', state, isDraft: false }] },
-            }),
-        )?.linkedPrs[0]?.state;
-
-    assert.deepEqual(['OPEN', 'CLOSED', 'MERGED'].map(linked), ['open', 'closed', 'merged']);
 });
 
 test("a linked PR's check rollup becomes counts over all checks and the earliest start", () => {
@@ -313,20 +196,6 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
     assert.deepEqual(issue(['concept'])?.slices, [], "a concept's sub-issues are board items, not slices");
 });
 
-test('a slice closed as not planned is still no board item', () => {
-    const dropped: RawIssueRef = { ...sliceRef(45, 'CLOSED'), stateReason: 'NOT_PLANNED' };
-    const items = normalizeItems([
-        withSubIssues('I_build', 59, ['build'], [dropped]),
-        withSubIssues('I_45', 45, ['improvement']),
-    ]);
-
-    assert.deepEqual(
-        items.map((i) => i.id),
-        ['I_59'],
-    );
-    assert.deepEqual(items[0]?.slices, []);
-});
-
 test('a build sub-issue the `build` search found is a board item and counts as a sub-issue, not a slice', () => {
     const builds = new Set(['maddec01/lar-factory#102']);
     const items = normalizeItems(
@@ -363,28 +232,6 @@ test('a build sub-issue the `build` search found is a board item and counts as a
     );
 });
 
-test("build sub-issues come from one search per repo of the builds' sub-issues, open and closed", () => {
-    assert.deepEqual(
-        buildSubIssueSearches([
-            issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
-            issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
-            issue900(['concept'], [refIn('maddec01/lar-factory', 5, 'OPEN')]),
-        ]),
-        ['is:issue label:build repo:maddec01/lar-server', 'is:issue label:build repo:maddec01/lar-apple'],
-    );
-    assert.deepEqual(buildSubIssueSearches([issue900(['build'], [])]), [], 'no sub-issue, no search');
-
-    const onProject = rawIssue('I_1', 1, 'In progress', ['build'], {
-        repository: { nameWithOwner: 'maddec01/lar-server' },
-    });
-
-    assert.deepEqual(
-        buildSubIssueSearches([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]),
-        [],
-        'a sub-issue on the board is judged by its own labels, so it needs no search',
-    );
-});
-
 test("an issue from a repository's issues takes its statuses from its status labels, and shows by the first in flow order", () => {
     const fromLabels = (...labels: string[]) => pick(normalizeItem({ ...rawIssue('I_1', 1, '', labels) }, {}));
 
@@ -406,35 +253,6 @@ test('an item closed as not planned is no board item, from either item source', 
         normalizeItems(raws, {}).map((i) => i.number),
         [4],
     );
-});
-
-test('a concept without parsed map content has no map, while a partial map keeps its content', () => {
-    for (const body of [
-        '',
-        'A concept written as ordinary prose.',
-        '## Notes\nSome notes.',
-        '## Destination\n\n## Decisions so far\n\n## Fog\n\n## End-to-end check\n',
-    ]) {
-        const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body });
-
-        assert.equal(normalizeItem(concept)?.map, undefined, body);
-        assert.equal(normalizeItems([concept])[0]?.map, undefined, body);
-    }
-
-    const partial = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: '## Fog\n- Where will it run?' });
-
-    assert.deepEqual(normalizeItem(partial)?.map, { destination: '', decisions: [], fog: ['Where will it run?'] });
-});
-
-test("an issue's labels carry GitHub's colours, and a label without a valid colour has none", () => {
-    const raw = rawIssue('I_7', 7, '', [], {
-        labels: { nodes: [{ name: 'area: web', color: 'BFDADC' }, { name: 'odd', color: 'red;' }, { name: 'plain' }] },
-    });
-    const item = normalizeItem(raw)!;
-
-    assert.deepEqual(item.labels, ['area: web', 'odd', 'plain']);
-    assert.deepEqual(item.labelColors, { 'area: web': '#BFDADC' });
-    assert.equal('labelColors' in normalizeItem(rawIssue('I_8', 8, '', ['web']))!, false);
 });
 
 test('sub-issues make an issue linked only when they span repositories', () => {

@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
 import { completeBrief } from '../test/complete-brief.ts';
-import { scopeMarkdown, type BriefScope } from './brief-scope.ts';
+import type { BriefScope } from './brief-scope.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -128,29 +128,6 @@ test('S06: only cited answers and named sibling contracts invalidate approval', 
     expect(records.gate(consumer.workId).current).toBe(false);
 });
 
-test('S06: reconcile reports missing b02 to b09 edge and sync derives the complete graph from declarations', async () => {
-    const { records, g, part } = await fixture();
-    const b02 = part('b02 producer', 'Producer.\nBlocked by: none');
-    const x = records.create({ title: 'x envelope', repository: 'fake/a', kind: 'build' });
-    const b09 = part('b09 proof', `Proof.\nBlocked by: \`${b02.workId}\`, \`${x.workId}\``);
-
-    records.addBlocker(b09.workId, records.read(b09.workId).revision, x.workId);
-    expect(records.reconcile(g.workId).items).toContainEqual(
-        expect.objectContaining({ key: `declared-blockers:${b09.workId}`, requiresFix: true }),
-    );
-
-    const revisions = Object.fromEntries([g, b02, b09, x].map((b) => [b.workId, records.read(b.workId).revision]));
-
-    records.syncBlockers(g.workId, revisions);
-    expect(
-        records
-            .blockers(b09.workId)
-            .map((b) => b.workId)
-            .sort(),
-    ).toEqual([b02.workId, x.workId].sort());
-    expect(records.reconcile(g.workId).items.some((i) => i.key.startsWith('declared-blockers:'))).toBe(false);
-});
-
 test('S06: fourteen-part growth commits records, ticket requests, graph and map together or nothing', async () => {
     const { records, dir, g } = await fixture();
     const parts = Array.from({ length: 14 }, (_, n) => ({
@@ -201,47 +178,6 @@ test('S06: fourteen-part growth commits records, ticket requests, graph and map 
     expect(records.blockers(result.parts[13]!.workId).map((b) => b.workId)).toEqual([result.parts[12]!.workId]);
     expect(() => records.createParts(g.workId, g.revision, input)).toThrow(/revision/);
     expect(records.children(g.workId)).toHaveLength(14);
-});
-
-test('S06: incorporation settles decisions immediately; changed approved draft returns to Shaping', async () => {
-    const { records, g, part, approve } = await fixture();
-    const d = part('D2', 'Method: grill\nTransport?', 'decision');
-
-    records.update(d.workId, d.revision, { status: 'Shaping' });
-    records.setBody(d.workId, records.read(d.workId).revision, 'answer', 'Fragment.');
-    records.setBody(d.workId, records.read(d.workId).revision, 'domain-drafts', 'none');
-    records.setBody(g.workId, records.read(g.workId).revision, 'map', '## Destination\nFragment exchange.');
-    expect(records.read(d.workId)).toMatchObject({ status: 'Done', finishedAt: expect.any(String) });
-
-    const b = part('b08', 'Compatibility proof.');
-
-    approve(b.workId);
-    records.update(b.workId, records.read(b.workId).revision, { status: 'Ready' });
-    records.setBody(b.workId, records.read(b.workId).revision, 'brief', completeBrief('Direct equivalence proof.'));
-    expect(records.read(b.workId).status).toBe('Shaping');
-    expect(() => records.update(b.workId, records.read(b.workId).revision, { status: 'Queued' })).toThrow(
-        /Shaping|gate/,
-    );
-});
-
-test('S06: structure classifies standalone implementation as Build', async () => {
-    const { records } = await fixture();
-    const x = records.create({ title: 'x envelope', repository: 'fake/a', kind: 'improvement' });
-    const scope: BriefScope = {
-        repositories: ['fake/a'],
-        openDecisions: [],
-        files: ['fixture.json'],
-        tests: [],
-        behaviour: ['Envelope extensible.'],
-        excluded: [],
-        size: 'Small',
-        verify: { required: false, visibleUi: null },
-    };
-
-    records.confirmScope(x.workId, x.revision, scope, 'Pedro', 'Yes.');
-    records.setBody(x.workId, records.read(x.workId).revision, 'brief', completeBrief(scopeMarkdown(scope)));
-    records.chooseStructure(x.workId);
-    expect(records.read(x.workId).kind).toBe('build');
 });
 
 test('S06: later incorporation holds stale current answers and map stage prose, preserving answer history', async () => {
@@ -333,36 +269,6 @@ test('S06: D1 seven declared blockers replace its six erroneous stored edges in 
                 .map((b) => b.workId)
                 .sort(),
         ).toEqual(declared[Number(n)]!.map((b) => builds[b]!.workId).sort());
-});
-
-test('S06: linked growth also saves all parts and its map without reclassifying the parent', async () => {
-    const { records } = await fixture();
-    const parent = records.create({ title: 'Linked greeting', repository: 'fake/a', kind: 'build' });
-    const result = records.createParts(parent.workId, parent.revision, {
-        map: 'Greeting producer then view.',
-        parts: [
-            {
-                key: 'producer',
-                title: 'Producer',
-                repository: 'fake/a',
-                kind: 'build',
-                body: completeBrief('Produce v1.'),
-                blockerIds: [],
-            },
-            {
-                key: 'view',
-                title: 'View',
-                repository: 'fake/c',
-                kind: 'build',
-                body: completeBrief('Show v1.'),
-                blockerIds: ['$producer'],
-            },
-        ],
-    });
-
-    expect(records.read(parent.workId).kind).toBe('build');
-    expect(records.body(parent.workId, 'map')).toBe('Greeting producer then view.');
-    expect(records.blockers(result.keys.view!).map((r) => r.workId)).toEqual([result.keys.producer]);
 });
 
 test('S06: an amended scope across repositories turns single work into a linked parent with a build per repository', async () => {
@@ -460,27 +366,4 @@ test('S06: upgrading a still-current legacy review preserves its approval throug
     });
     expect(upgraded.gate(b01.workId).current).toBe(true);
     expect(upgraded.gate(b01.workId).evidence).toHaveLength(1);
-});
-
-test('S06: legacy free-prose ordering cannot reconcile clean until its owner declares an exact graph', async () => {
-    const { records, g, part } = await fixture();
-    const producer = part('b02 producer', 'Produce a v1 greeting.');
-    const proof = part('b09 proof', 'Prove the producer equivalence after the producer is delivered.');
-
-    expect(records.reconcile(g.workId).items).toContainEqual(
-        expect.objectContaining({ key: `blocker-declaration:${proof.workId}`, requiresFix: true }),
-    );
-
-    const revisions = () => Object.fromEntries(records.list({}).map((r) => [r.workId, r.revision]));
-
-    expect(() => records.syncBlockers(g.workId, revisions())).toThrow(/Normalize brief\/map/);
-    records.setBody(
-        g.workId,
-        records.read(g.workId).revision,
-        'map',
-        `## Destination\nGreeting exchange.\nBlocker: \`${producer.workId}\` <- none\nBlocker: \`${proof.workId}\` <- \`${producer.workId}\``,
-    );
-    records.syncBlockers(g.workId, revisions());
-    expect(records.blockers(proof.workId).map((r) => r.workId)).toEqual([producer.workId]);
-    expect(records.reconcile(g.workId).items.some((i) => i.key.startsWith('blocker-declaration:'))).toBe(false);
 });

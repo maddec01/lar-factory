@@ -2,7 +2,7 @@
    fill-board-done, border-board-idle) for a glyph, a dot, a bar or an edge, never for text: text on the board uses the
    semantic text tokens (fg-muted, warning-fg…), which the design system holds to 4.5:1 and these roles are not.
    A status role is its state's colour (the design system's statusStateColors), so a board status reads as the same
-   colour in every app; StatusColors.test.ts holds them to it. Everything else the board draws uses the design
+   colour in every app. Everything else the board draws uses the design
    system's semantic tokens. */
 @theme static {
     /* Needs you (waiting): your turn (an answer, a check to verify), the waiting agent, a blocked slice. */

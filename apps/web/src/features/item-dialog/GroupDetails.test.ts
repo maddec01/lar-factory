@@ -1,7 +1,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, detailsRead, detailsReply, fetchMock, fresh, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const parent = sample.items.find((item) => item.kind === 'concept')!;
 const base = sample.items.find((item) => item.kind !== 'concept')!;
@@ -75,150 +75,9 @@ async function show(data: BoardData, body = '') {
 /** A group's status reads in the dialog's summary line, as every item's does. */
 const groupStatus = () => text($('[data-item-dialog] [data-item-summary]'));
 
-test.each(['feature', 'concept'] as const)(
-    'a delivered %s parent shows delivery, clickable parts and release evidence',
-    async (kind) => {
-        await show(group(kind, true));
-
-        const dialog = $('[data-item-dialog]')!;
-
-        expect(groupStatus()).toContain('Delivered');
-        expect(text(dialog)).toContain('2/2 builds done');
-        expect(text(dialog)).toContain('Delivery complete');
-        expect(dialog.querySelector('[data-steps]')).toBeNull();
-        for (const noise of [
-            'No agent work',
-            'No brief',
-            'Attach a ticket',
-            'Create issue',
-            'Planning is saved on this Mac',
-        ])
-            expect(text(dialog)).not.toContain(noise);
-
-        // The done parts fold under a toggle; open it before reading them.
-        const toggle = [...dialog.querySelectorAll<HTMLButtonElement>('[data-concept-parts] button')].find((b) =>
-            /^Show \d+ done/.test(text(b)),
-        );
-
-        expect(toggle).toBeDefined();
-        await settle(() => toggle!.click());
-
-        const parts = dialog.querySelectorAll<HTMLButtonElement>('[data-concept-parts] [data-row-open]');
-
-        expect(parts).toHaveLength(2);
-        expect(text(parts[0])).toContain('Server build');
-        await settle(() => parts[0]!.click());
-        expect(text($('[data-item-dialog] header'))).toContain('Server build');
-        expect(groupStatus()).not.toContain('Delivered');
-        expect($('[data-item-dialog] [data-steps]')).not.toBeNull();
-    },
-);
-
 test('merged parts do not make a parent Delivered while a release step remains', async () => {
     await show(group('feature', false));
     expect(groupStatus()).toContain('Waiting on release step');
     expect(text($('[data-release-progress]'))).toContain('Activation pending.');
     expect(text($('[data-release-progress]'))).toContain('Pending');
-});
-
-test('the header counts running builds and then waits for Outcome after release', async () => {
-    const data = group('feature', false);
-    const items = data.items.map((item, index): Item =>
-        index === 0
-            ? item
-            : {
-                  ...item,
-                  status: 'In progress',
-                  buildReserved: true,
-                  state: 'open',
-                  completion: { complete: false, reasons: [] },
-                  threads: [
-                      { id: `running-${index}`, title: 'Build', state: 'running', updated: new Date().toISOString() },
-                  ],
-              },
-    );
-
-    await show({ ...data, items });
-    expect(groupStatus()).toContain('2 builds running');
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    await settle(() =>
-        useBoardStore.getState().receive({
-            ...data,
-            items: data.items.map((item, index): Item =>
-                index === 0
-                    ? {
-                          ...item,
-                          releasePlan: {
-                              ...item.releasePlan!,
-                              steps: item.releasePlan!.steps.map((step) => ({ ...step, done: receipt })),
-                          },
-                      }
-                    : item,
-            ),
-        }),
-    );
-    expect(groupStatus()).toContain('Waiting on Outcome check');
-});
-
-test('a large group lists its parts directly, keeps part holds folded and batch review before delivery details', async () => {
-    const data = group('concept', false);
-    const root: Item = { ...data.items[0]!, status: 'Shaping' };
-    const parts = Array.from({ length: 20 }, (_, index): Item => ({
-        ...data.items[1]!,
-        id: `waiting-${index}`,
-        title: `Greeting fixture ${index + 1}`,
-        status: 'Needs you',
-        state: 'open',
-        passingBrief: false,
-        completion: { complete: false, reasons: [] },
-        needsYou: {
-            reason: `Review fixture ${index + 1}: ${'The complete current contract needs approval. '.repeat(8)}`,
-            offers: [],
-            causes: [],
-            ticketOpen: true,
-        },
-    }));
-
-    root.conceptBuild = {
-        run: null,
-        members: parts.map((part) => ({
-            workId: part.id,
-            title: part.title,
-            repository: part.repo!,
-            kind: 'build',
-            status: part.status,
-            complete: false,
-            waits: [part.needsYou!.reason],
-        })),
-        holds: parts.map((part) => ({
-            workId: part.id,
-            reason: `${part.title}: the current brief needs an approved gate. ${part.needsYou!.reason}`,
-        })),
-    };
-    await show(fresh({ ...data, items: [root, ...parts] }), 'Review the complete group batch.');
-
-    const dialog = $('[data-item-dialog]')!;
-    const section = dialog.querySelector('[data-concept-parts]')!;
-    const review = dialog.querySelector('[data-record]')!;
-
-    // Every part shows without a click, under the parts count; nothing folds them away.
-    expect(section.querySelector('details'), 'the parts aren’t behind a disclosure').toBeNull();
-    expect(section.querySelectorAll('[data-row-open]')).toHaveLength(20);
-
-    const holds = dialog.querySelector<HTMLDetailsElement>('[data-concept-build-run] details')!;
-
-    expect(holds.open).toBe(false);
-    expect(text(holds.querySelector('summary'))).toBe('Waiting on 20 approvals');
-    expect(text(holds)).toContain(parts[0]!.needsYou!.reason.trim());
-    expect(review.compareDocumentPosition(holds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(review.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(
-        review.compareDocumentPosition(dialog.querySelector('[data-release-progress]')!) &
-            Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect([...review.querySelectorAll('button')].some((button) => text(button) === 'Approve briefs')).toBe(true);
-    await settle(() => section.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
-    expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });

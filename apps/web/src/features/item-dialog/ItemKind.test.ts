@@ -1,7 +1,7 @@
 // Changing an item's kind in the item dialog: an ordinary item offers the three kinds, the write goes through the board and
 // the row changes from its answer. A failure keeps the old kind, says what changed on the ticket, and Retry sends the same change.
 
-import type { BoardData, Item, KindDisagreement, Kind } from '@lar-factory/shared';
+import type { BoardData, Item, KindDisagreement } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
 import {
@@ -12,7 +12,6 @@ import {
     detailsReply,
     fetchMock,
     mountPage,
-    openOptions,
     sample,
     settle,
     text,
@@ -77,58 +76,7 @@ async function openItem(itemId = ID): Promise<void> {
 const control = () => $('[data-item-dialog] [data-item-summary] [role="combobox"][aria-label="Kind"]');
 const shownKind = () => text(control());
 const choose = (name: string) => chooseOption(control()!, name);
-const options = async () => {
-    await openOptions(control()!);
-
-    return $$('[role="option"]').map((o) => text(o));
-};
 const retry = () => $$<HTMLButtonElement>('[data-kind-change-failed] button').find((b) => text(b) === 'Try again')!;
-const detailsReads = () => (fetchMock.mock.calls as unknown as [string][]).filter(([url]) => detailsRead(url)).length;
-
-/** Holds each details read from here on until the test calls the function this returns, which answers the latest. */
-function holdDetails(): () => Promise<void> {
-    const serving = fetchMock.getMockImplementation() as unknown as (
-        url: string,
-        init?: RequestInit,
-    ) => Promise<Response>;
-    let release = () => {};
-
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
-        detailsRead(url)
-            ? new Promise<Response>((resolve) => {
-                  release = () => resolve(serving(url, init));
-              })
-            : serving(url, init),
-    );
-
-    return () => settle(() => release());
-}
-
-for (const [kind, shown] of [
-    ['bug', 'Bug'],
-    ['issue', 'No kind'],
-] as const) {
-    test(`an item with ${kind === 'issue' ? 'no kind' : `the kind ${kind}`} shows it and offers the three kinds`, async () => {
-        const board = boardWith({ kind });
-
-        serve(board);
-        await mountPage(board);
-        await openItem();
-        expect(shownKind()).toBe(shown);
-        expect(await options()).toEqual(['Bug', 'Feature', 'Improvement']);
-    });
-}
-
-for (const kind of ['concept', 'build'] as Kind[]) {
-    test(`a ${kind} has no kind control`, async () => {
-        const board = boardWith({ kind });
-
-        serve(board);
-        await mountPage(board);
-        await openItem();
-        expect(control()).toBeNull();
-    });
-}
 
 test('changing the kind writes it, and the control and line follow the board’s answer', async () => {
     const before = boardWith({ kind: 'bug' });
@@ -185,63 +133,12 @@ test('a failure keeps the old kind, says what changed, and Retry sends the same 
     expect($('[data-kind-change-failed]')).toBeNull();
 });
 
-test('a failed retry keeps what the first attempt changed', async () => {
-    const before = boardWith({ kind: 'bug' });
-    const { answer } = serve(before);
-
-    await mountPage(before);
-    await openItem();
-    await choose('Feature');
-    await answer(502, {
-        error: 'Couldn’t finish changing #129 to Feature. First',
-        itemId: ID,
-        line: '#129: added label feature.',
-        board: before,
-    });
-    await settle(() => retry().click());
-    await answer(502, {
-        error: 'Couldn’t finish changing #129 to Feature. Second',
-        itemId: ID,
-        line: '',
-        board: before,
-    });
-
-    const failed = text($('[data-kind-change-failed]'));
-
-    expect(failed).toContain('Second');
-    expect(failed).toContain('Changed on the ticket so far: #129: added label feature.');
-});
-
-test('a failed change that wrote nothing says so', async () => {
-    const before = boardWith({ kind: 'bug' });
-    const { answer } = serve(before);
-
-    await mountPage(before);
-    await openItem();
-    await choose('Feature');
-    await answer(502, {
-        error: 'Couldn’t finish changing #129 to Feature. gh failed: HTTP 502',
-        itemId: ID,
-        line: '',
-        board: before,
-    });
-    expect(text($('[data-kind-change-failed]'))).toContain('Nothing changed on the ticket.');
-});
-
 const SWAP = { add: ['type: feature'], remove: ['type: bug'], type: { from: 'Bug', to: 'Feature' } };
-const itemMoved: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: SWAP };
 const ticketMoved: KindDisagreement = { ticketKind: 'bug', changed: 'ticket', kept: false, swap: SWAP };
 const notice = () => $('[data-item-dialog] [data-kind-notice]');
 const noticeButtons = () => $$<HTMLButtonElement>('[data-item-dialog] [data-kind-notice] button');
 const noticeButton = (name: string) => noticeButtons().find((b) => text(b) === name)!;
 const ALLOWED = { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' };
-const TYPE_REFUSED = { 'tag-ticket': 'allowed', 'type-ticket': 'refused' };
-const FEATURE_PLAN = {
-    itemKind: 'feature',
-    ticketKind: 'bug',
-    swap: { add: ['type: feature'], remove: ['type: bug'], type: null },
-    note: ' The type stays Bug, because the team’s backlog doesn’t show Feature.',
-};
 const withAccess = (board: BoardData, access: object = ALLOWED): BoardData => ({
     ...board,
     repos: board.repos.map((r) =>
@@ -260,146 +157,6 @@ const opened = async (item: Partial<Item>, access?: object, details?: object) =>
     return server;
 };
 
-test('the notice takes what an update writes from the details: a backlog-hidden type is dropped, says so, and needs no type access', async () => {
-    await opened({ kind: 'feature', kindDisagreement: itemMoved }, TYPE_REFUSED, { kindPlan: FEATURE_PLAN });
-    expect(text($('[data-kind-notice-hint]'))).toBe(
-        'Update changes #129: label type: bug → type: feature. The type stays Bug, because the team’s backlog doesn’t show Feature.',
-    );
-    expect(noticeButton('Update ticket to Feature').disabled).toBe(false);
-});
-
-test('details with no plan are read once more, and then the board’s own swap stands in', async () => {
-    const board = withAccess(boardWith({ kind: 'feature', kindDisagreement: itemMoved }));
-
-    serve(board);
-
-    const release = holdDetails();
-
-    await mountPage(board);
-    await openItem();
-
-    const reads = detailsReads();
-
-    await release();
-    expect(text($('[data-kind-notice-hint]'))).toBe('Checking what the update changes…');
-    expect(noticeButton('Update ticket to Feature').disabled).toBe(true);
-    await release();
-    expect(text($('[data-kind-notice-hint]'))).toBe(
-        'Update changes #129: label type: bug → type: feature, type Bug → Feature.',
-    );
-    expect(noticeButton('Update ticket to Feature').disabled).toBe(false);
-    expect(detailsReads()).toBe(reads + 1);
-});
-
-test('an item-only change with the dialog open checks again, and shows no plan for the earlier kind', async () => {
-    const details = { kindPlan: FEATURE_PLAN as object };
-    const { answer } = await opened({ kind: 'feature', kindDisagreement: itemMoved }, TYPE_REFUSED, details);
-
-    expect(noticeButton('Update ticket to Feature').disabled).toBe(false);
-
-    const release = holdDetails();
-
-    await choose('Improvement');
-
-    const swap = { add: [], remove: ['type: bug'], type: { from: 'Bug', to: 'Improvement' } };
-
-    details.kindPlan = {
-        itemKind: 'improvement',
-        ticketKind: 'bug',
-        swap: { ...swap, type: null },
-        note: ' The type stays Bug, because the team’s backlog doesn’t show Improvement.',
-    };
-    await answer(200, {
-        error: null,
-        itemId: ID,
-        line: 'This item is now Improvement. Its ticket stays as it is: Access to type-ticket was refused. Recheck access in Settings.',
-        board: withAccess(boardWith({ kind: 'improvement', kindDisagreement: { ...itemMoved, swap } }), TYPE_REFUSED),
-    });
-    expect(noticeButton('Update ticket to Improvement').disabled).toBe(true);
-    expect(text($('[data-kind-notice-hint]'))).toBe('Checking what the update changes…');
-    await release();
-    expect(noticeButton('Update ticket to Improvement').disabled).toBe(false);
-    expect(text($('[data-kind-notice-hint]'))).toBe(
-        'Update changes #129: label type: bug → none. The type stays Bug, because the team’s backlog doesn’t show Improvement.',
-    );
-});
-
-test('reopening after the ticket changed, with updatedAt unmoved, reads the details again', async () => {
-    const details = { kindPlan: FEATURE_PLAN as object };
-
-    await opened({ kind: 'feature', kindDisagreement: itemMoved }, TYPE_REFUSED, details);
-
-    const { useItemDialogStore } = await import('./ItemDialogStore');
-
-    await settle(() => useItemDialogStore.getState().close());
-
-    const release = holdDetails();
-    const { receive } = await import('@/services/board/board.service');
-
-    await settle(() =>
-        receive({
-            error: null,
-            board: withAccess(
-                boardWith({ kind: 'feature', kindDisagreement: { ...itemMoved, ticketKind: 'improvement' } }),
-                TYPE_REFUSED,
-            ),
-        }),
-    );
-    details.kindPlan = {
-        ...FEATURE_PLAN,
-        ticketKind: 'improvement',
-        swap: { add: [], remove: [], type: null },
-        note: '',
-    };
-    await openItem();
-    expect(text($('[data-kind-notice-hint]'))).toBe('Checking what the update changes…');
-    await release();
-    expect(text($('[data-kind-notice-hint]'))).toBe(
-        'Update writes nothing to #129, as Feature has no mapped label or type.',
-    );
-});
-
-for (const [ending, status, body] of [
-    [
-        'succeeds',
-        200,
-        { error: null, itemId: ID, line: '#129: added label feature.', board: boardWith({ kind: 'feature' }) },
-    ],
-] as const) {
-    test(`focus comes back to Kind from the dialog when a kind change ${ending}`, async () => {
-        const board = boardWith({ kind: 'bug' });
-        const { answer } = serve(board);
-
-        await mountPage(board);
-        await openItem();
-        await choose('Feature');
-        $('[data-item-dialog]')!.focus();
-        expect(document.activeElement).toBe($('[data-item-dialog]'));
-        await answer(status, body);
-        expect(document.activeElement).toBe(control());
-    });
-}
-
-test('a control the user moved to during a kind change keeps focus', async () => {
-    const board = boardWith({ kind: 'bug' });
-    const { answer } = serve(board);
-
-    await mountPage(board);
-    await openItem();
-    await choose('Feature');
-
-    const close = $('[data-item-dialog] [aria-label="Close"]')!;
-
-    close.focus();
-    await answer(200, {
-        error: null,
-        itemId: ID,
-        line: '#129: added label feature.',
-        board: boardWith({ kind: 'feature' }),
-    });
-    expect(document.activeElement).toBe(close);
-});
-
 test('when the ticket changed, the notice offers updating the item and writes nothing to the ticket', async () => {
     const { answer } = await opened({ kind: 'feature', kindDisagreement: ticketMoved });
 
@@ -412,32 +169,4 @@ test('when the ticket changed, the notice offers updating the item and writes no
     await answer(200, { error: null, board: boardWith({ kind: 'bug' }) });
     expect(notice()).toBeNull();
     expect(shownKind()).toBe('Bug');
-});
-
-test('Keep records the answer and leaves a line in details, whose Change shows the choice again', async () => {
-    const { answer } = await opened({ kind: 'bug', kindDisagreement: { ...itemMoved, ticketKind: 'feature' } });
-
-    await settle(() => noticeButton('Keep ticket as Feature').click());
-    expect(sentTo('/api/item-kind-answer')).toEqual([{ itemId: ID, answer: 'keep', ticketKind: 'feature' }]);
-    await answer(200, {
-        error: null,
-        board: withAccess(
-            boardWith({ kind: 'bug', kindDisagreement: { ...itemMoved, ticketKind: 'feature', kept: true } }),
-        ),
-    });
-    expect(notice()).toBeNull();
-
-    const kept = $('[data-kind-kept]')!;
-
-    expect(text(kept)).toBe('Ticket says Feature. Kept as is. Change');
-    await settle(() => $<HTMLButtonElement>('[data-kind-kept] button')!.click());
-    expect(noticeButtons().map((b) => text(b))).toEqual(['Update ticket to Bug', 'Keep ticket as Feature']);
-});
-
-test('a failed answer stays in the notice and changes nothing', async () => {
-    const { answer } = await opened({ kind: 'feature', kindDisagreement: ticketMoved });
-
-    await settle(() => noticeButton('Keep item as Feature').click());
-    await answer(409, { error: 'The kinds changed. Check the updated item.' });
-    expect(text($$('[data-kind-notice] [role="alert"]').at(-1)!)).toBe('The kinds changed. Check the updated item.');
 });

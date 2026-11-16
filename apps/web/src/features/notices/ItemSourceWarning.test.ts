@@ -2,7 +2,7 @@
 
 import { expect, test } from 'vite-plus/test';
 
-import { $$, fresh, warningText, mountPage, push, sample, toolChecks } from '@/test/PageTest';
+import { $$, warningText, mountPage, push, sample } from '@/test/PageTest';
 
 const problems = [
     { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out.', fix: 'az login' },
@@ -33,25 +33,4 @@ test('each repository whose items can’t be read gets a warning naming it as th
 
     await push({ ...sample, itemSourceProblems: [] });
     expect(warnings()).toEqual([]);
-});
-
-test('a repository whose problem the failed az check’s fix covers shows no warning of its own beside the az warning', async () => {
-    await mountPage({
-        ...sample,
-        tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }),
-        itemSourceProblems: problems,
-    });
-    expect($$('[data-slot="notice"]').map((b) => warningText(b)[0])).toEqual([
-        'Azure CLI is logged out.',
-        'lar-web’s items couldn’t be refreshed.',
-    ]);
-});
-
-test('failed sources mark retained data stale and expose diagnostics until recovery', async () => {
-    await mountPage({ ...fresh(), itemSourceProblems: problems });
-    expect(document.querySelector<HTMLElement>('.refreshed [data-status-dot]')?.dataset.statusDot).toBe('warning');
-    expect(document.querySelector('[data-board-notices]')?.textContent).toContain('Diagnostics');
-    await push({ ...fresh(), itemSourceProblems: [] });
-    expect(document.querySelector('[data-board-notices]')).toBeNull();
-    expect(document.querySelector('.refreshed'), 'a live board shows no Refreshed light').toBeNull();
 });

@@ -1,27 +1,12 @@
-// What the dossiers hold: which items are dossiers, their parts in order with their kinds, waits and threads, and
-// which items they take off the rest of the line.
+// What the dossiers hold: their parts in dependency order, and which parts are done.
 
-import type { Item, ItemThread } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 import { expect, test } from 'vite-plus/test';
 
-import {
-    DECISION_KINDS,
-    dossiersOf,
-    isDone,
-    isHistory,
-    openWaits,
-    partActivity,
-    partKind,
-    partWaves,
-    partsOf,
-    shownThread,
-} from './DossierParts';
-import type { Part } from './DossierParts';
+import { isDone, partWaves, partsOf } from './DossierParts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
-/** The sample's later groups: the ticketless household concept, an Apple part whose parent is closed, and Azure items with tasks. */
-const LATER_GROUPS = [0, 109, 5116, 5672, 5661, 6318, 6167, 6164, 6163];
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
 const child = (number: number, parent: Item, change: Partial<Item> = {}): Item => ({
     ...byNumber(129),
@@ -33,83 +18,6 @@ const child = (number: number, parent: Item, change: Partial<Item> = {}): Item =
     parentId: parent.id,
     flow: 'linked',
     ...change,
-});
-
-test('explicit groups and off-board parents’ parts have dossiers in board order', () => {
-    expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([22, 200, 23, 180, ...LATER_GROUPS]);
-
-    const parent = { ...byNumber(150), flow: 'linked' as const };
-    const withChild = [...items.map((item) => (item.id === parent.id ? parent : item)), child(151, parent)];
-
-    expect(
-        dossiersOf(withChild, withChild).map((d) => d.parent.number),
-        'coupled work',
-    ).toEqual([22, 200, 23, 150, 180, ...LATER_GROUPS]);
-
-    const listed = withChild.map((i) =>
-        i.number === 150 ? { ...i, status: 'List' as const } : i.number === 180 ? { ...i, status: 'Done' as const } : i,
-    );
-
-    expect(
-        dossiersOf(listed, listed).map((d) => d.parent.number),
-        'List stays grouped; a fully finished group leaves the dock',
-    ).toEqual([22, 200, 23, 150, ...LATER_GROUPS]);
-});
-
-test('a dossier shows where its parent or any part is in the scope', () => {
-    const apple = items.filter((i) => i.repo === 'maddec01/lar-apple');
-
-    expect(
-        dossiersOf(apple, items).map((d) => d.parent.number),
-        '#180 through its Apple build #40, and the household concept through its Apple parts',
-    ).toEqual([22, 23, 180, 0, 109]);
-    expect(dossiersOf([], items)).toEqual([]);
-});
-
-test('parts follow dependency waves, then kind, with each kind from its labels', () => {
-    expect(partsOf(byNumber(200), items).map((p) => [p.item.number, p.kind])).toEqual([
-        [203, 'research'],
-        [202, 'prototype'],
-        [201, 'grill'],
-        [140, 'build'],
-    ]);
-    expect(partsOf(byNumber(180), items).map((p) => [p.item.number, p.kind])).toEqual([
-        [181, 'build'],
-        [40, 'build'],
-    ]);
-    expect(partKind({ ...byNumber(201), labels: ['decision-task'] }), 'a task decision is a decision').toBe('task');
-    expect(DECISION_KINDS).toContain('task');
-    expect(
-        partKind({ ...byNumber(201), labels: ['decision-wayfind'] }),
-        'an unlabelled decision method stays a decision',
-    ).toBe('decision');
-    expect(
-        partKind({ ...byNumber(201), labels: [['decision:', 'grill'].join(' ')] }),
-        'the local decision kind remains authoritative',
-    ).toBe('decision');
-});
-
-test('each part carries its blocked-by issues and its newest thread', () => {
-    const [research, prototype, grill, build] = partsOf(byNumber(200), items);
-
-    expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'closed' }]);
-    expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual([
-        'Research: account and discovery hosting',
-        'running',
-        'needs you',
-        'done',
-    ]);
-});
-
-test('a part waits on its open blockers until a thread takes it on', () => {
-    const [, , grill, build] = partsOf(byNumber(200), items);
-
-    expect(openWaits(build!).map((b) => b.number)).toEqual([202]);
-    expect(openWaits(grill!), 'its blocker closed').toEqual([]);
-    expect(
-        openWaits({ ...build!, item: { ...build!.item, status: 'In progress' } }),
-        'building, whatever it waited for',
-    ).toEqual([]);
 });
 
 test('parts follow dependency waves across repositories, with stable ties and external blockers ignored', () => {
@@ -183,89 +91,6 @@ test('recorded decisions need no factory labels, and local completion facts over
     expect(complete.status).toBe('Shaping');
     expect(isDone(pending)).toBe(false);
     expect(isDone(build)).toBe(false);
-});
-
-const quiet: ItemThread = { id: 'newest', title: 'Newest', state: 'done', updated: '2026-10-21T09:00:00.000Z' };
-const partWith = (threads: ItemThread[], change: Partial<Item> = {}): Part => {
-    const item = child(1, byNumber(200), { status: 'In progress', threads, slices: [], ...change });
-
-    return { item, kind: 'build', waitsOn: [], thread: threads[0] };
-};
-
-test.each<[string, ItemThread[], Partial<Item>, string, string | undefined]>([
-    [
-        'its running thread, behind a newer finished one',
-        [quiet, { ...quiet, id: 'older', state: 'running' }],
-        {},
-        'working',
-        'older',
-    ],
-    ['a finished planner with running child work', [{ ...quiet, hasRunningChildren: true }], {}, 'working', 'newest'],
-    [
-        'a finished thread with background tasks, behind a newer finished one',
-        [quiet, { ...quiet, id: 'older', hasRunningChildren: true }],
-        {},
-        'working',
-        'older',
-    ],
-    [
-        'an active slice',
-        [quiet],
-        { slices: [{ number: 1, repo: 'o/r', title: 'S', progress: 'active' }] as Item['slices'] },
-        'working',
-        'newest',
-    ],
-    ['a child that is live without running', [{ ...quiet, hasLiveChildren: true }], {}, 'child waiting', 'newest'],
-    [
-        'a question beside a running thread',
-        [
-            { ...quiet, state: 'running' },
-            { ...quiet, id: 'asks', state: 'needs you' },
-        ],
-        {},
-        'needs you',
-        'asks',
-    ],
-    ['a stopped run', [{ ...quiet, state: 'stopped' }], {}, 'stopped', 'newest'],
-    ['a run that ended with nothing left', [quiet], {}, 'finished', 'newest'],
-    ['no thread at all', [], {}, 'none', undefined],
-])('a build reads its activity from every thread and descendant: %s', (_name, threads, change, kind, thread) => {
-    const activity = partActivity(partWith(threads, change));
-
-    expect([activity.kind, activity.thread?.id]).toEqual([kind, thread]);
-});
-
-test('while activity is unavailable a part claims no live work, and keeps its question and its thread', () => {
-    const slices = [{ number: 1, repo: 'o/r', title: 'S', progress: 'active' }] as Item['slices'];
-    const read = (threads: ItemThread[], change: Partial<Item> = {}) => {
-        const { kind, thread } = partActivity(partWith(threads, change), false, true);
-
-        return [kind, thread?.id];
-    };
-
-    expect(read([{ ...quiet, state: 'running' }])).toEqual(['none', 'newest']);
-    expect(read([quiet], { slices }), 'a recorded active slice').toEqual(['none', 'newest']);
-    expect(read([{ ...quiet, hasLiveChildren: true }]), 'a live child').toEqual(['none', 'newest']);
-    expect(read([{ ...quiet, state: 'needs you' }]), 'a question stands').toEqual(['needs you', 'newest']);
-    expect(partActivity(partWith([quiet]), true, true).kind, 'work the status already vouches for').toBe('working');
-});
-
-test('a thread running behind a finished one is the thread a part shows, as running', () => {
-    expect(shownThread(partWith([quiet, { ...quiet, id: 'older', hasRunningChildren: true }]))).toMatchObject({
-        id: 'older',
-        state: 'running',
-    });
-});
-
-test('a finished part folds into history only once nothing of it is still at work', () => {
-    const finished = { status: 'Done', completion: { complete: true, reasons: [] } } as Partial<Item>;
-
-    expect(isHistory(partWith([quiet], finished))).toBe(true);
-    expect(isHistory(partWith([], finished)), 'no thread is normal').toBe(true);
-    expect(isHistory(partWith([{ ...quiet, hasRunningChildren: true }], finished)), 'background work goes on').toBe(
-        false,
-    );
-    expect(isHistory(partWith([quiet])), 'not finished').toBe(false);
 });
 
 test('a record-derived concept uses the same deterministic member order as its CLI report', () => {

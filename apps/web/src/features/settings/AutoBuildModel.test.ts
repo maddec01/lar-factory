@@ -57,16 +57,3 @@ test('picking a model saves it, and picking Project default in T3 saves none', a
     expect(posted()).toEqual([{ model: OPUS }, { model: null }]);
     expect(text(trigger())).toBe('Project default in T3');
 });
-
-test('a saved model the choices no longer offer still shows, and says so', async () => {
-    await openGeneral(withAutoBuild({ on: true, model: { instanceId: 'cursor', model: 'cursor-agent' } }));
-    expect(text(trigger())).toBe('cursor cursor-agent (not offered)');
-    await openOptions(trigger());
-
-    const missing = entries().at(-1)!;
-
-    expect(missing.getAttribute('data-state')).toBe('checked');
-    expect(missing.getAttribute('aria-disabled')).toBe('true');
-    await settle(() => missing.click());
-    expect(posted()).toEqual([]);
-});

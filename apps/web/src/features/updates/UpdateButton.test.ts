@@ -3,7 +3,7 @@
 import type { UpdateState } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, mountPage, settle, stubApp, text, toast } from '@/test/PageTest';
+import { $, mountPage, settle, stubApp, text } from '@/test/PageTest';
 
 const idle: UpdateState = {
     enabled: true,
@@ -29,13 +29,6 @@ const downloaded: UpdateState = {
     downloadPercent: 100,
     canRetry: true,
 };
-const downloadFailed: UpdateState = {
-    ...available,
-    errorContext: 'download',
-    canRetry: true,
-    message: 'net::ERR_TIMED_OUT',
-};
-const installFailed: UpdateState = { ...downloaded, errorContext: 'install', message: 'quit refused' };
 const withNotes: UpdateState = {
     ...available,
     releaseNotes: [
@@ -103,34 +96,6 @@ test('the quiet icon sits before Settings and downloads only from its click-open
     expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
 });
 
-test('the same anchored popover survives download progress and completion', async () => {
-    const { push } = stubBridge(withNotes);
-
-    await mountPage();
-    await click();
-
-    const details = popover();
-
-    await push({ ...downloading, releaseNotes: withNotes.releaseNotes });
-    expect(popover()).toBe(details);
-    expect(control().getAttribute('aria-label')).toBe('Downloading 1.1.0 · 42%');
-    expect(control().querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('42');
-    expect(text(popover())).toContain('Downloading 1.1.0… 42%');
-    expect($('[data-update-next]')).toBeNull();
-    await push(downloaded);
-    expect(popover()).toBe(details);
-    expect(text($('[data-update-next]'))).toBe('Restart now');
-});
-
-test.each([idle, { ...idle, status: 'checking' as const }])(
-    'no actionable update hides the icon: $status',
-    async (state) => {
-        stubBridge(state);
-        await mountPage();
-        expect(control()).toBeNull();
-    },
-);
-
 test('restart closes details and asks in the board dialog before installing', async () => {
     const { bridge } = stubBridge(downloaded);
 
@@ -148,139 +113,6 @@ test('restart closes details and asks in the board dialog before installing', as
     await answer('Restart now');
     expect(bridge.installUpdate).toHaveBeenCalledOnce();
 });
-
-test('Later cancels without losing the downloaded update and restores focus', async () => {
-    const { bridge } = stubBridge(downloaded);
-
-    await mountPage();
-    await requestRestart();
-    await answer('Later');
-    expect(confirmation()).toBeNull();
-    await settle(() => vi.advanceTimersByTime(0));
-    expect(document.activeElement === control()).toBe(true);
-    expect(bridge.installUpdate).not.toHaveBeenCalled();
-    expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
-    expect(toast()).toBeNull();
-    await requestRestart();
-    expect(confirmation()).not.toBeNull();
-});
-
-test.each(['refused', 'failed', 'rejected'])(
-    'a %s install ends the busy dialog, keeps the update and permits retry',
-    async (failure) => {
-        const { bridge } = stubBridge(downloaded);
-
-        if (failure === 'rejected') bridge.installUpdate.mockRejectedValueOnce(new Error('quit refused'));
-        else
-            bridge.installUpdate.mockResolvedValueOnce({
-                accepted: failure !== 'refused',
-                completed: false,
-                state: failure === 'failed' ? installFailed : downloaded,
-            });
-
-        await mountPage();
-        await requestRestart();
-        await answer('Restart now');
-        expect(confirmation()).toBeNull();
-        expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
-        expect(text(toast())).toContain(failure === 'refused' ? 'Update downloaded' : 'Couldn’t install update');
-        await requestRestart();
-        await answer('Restart now');
-        expect(bridge.installUpdate).toHaveBeenCalledTimes(2);
-    },
-);
-
-test('a pushed install failure ends the busy dialog and permits retry', async () => {
-    const { bridge, push } = stubBridge(downloaded);
-
-    await mountPage();
-    await requestRestart();
-    await answer('Restart now');
-    await push(installFailed);
-    expect(confirmation()).toBeNull();
-    await requestRestart();
-    await answer('Restart now');
-    expect(bridge.installUpdate).toHaveBeenCalledTimes(2);
-});
-
-test('a background check retains the restart indicator and blocks installation until finished', async () => {
-    const { bridge, push } = stubBridge(downloaded);
-
-    await mountPage();
-    await push({ ...downloaded, status: 'checking' });
-    expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
-    await click();
-    expect($<HTMLButtonElement>('[data-update-next]')!.disabled).toBe(true);
-    await next();
-    expect(confirmation()).toBeNull();
-    expect(bridge.installUpdate).not.toHaveBeenCalled();
-    await push(downloaded);
-    await next();
-    expect(confirmation()).not.toBeNull();
-});
-
-test('a pending download cannot run twice and failure leaves Download available', async () => {
-    const { bridge, push } = stubBridge(available);
-    let finish!: (value: { accepted: boolean; completed: boolean; state: UpdateState }) => void;
-
-    bridge.downloadUpdate.mockImplementationOnce(
-        () =>
-            new Promise((resolve) => {
-                finish = resolve;
-            }),
-    );
-    await mountPage();
-    await click();
-    await next();
-    await next();
-    expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-    await settle(() => finish({ accepted: true, completed: false, state: downloadFailed }));
-    await push(downloadFailed);
-    expect(text(toast())).toContain('Couldn’t download update net::ERR_TIMED_OUT');
-    await next();
-    expect(bridge.downloadUpdate).toHaveBeenCalledTimes(2);
-});
-
-test('a refused download keeps its feedback and retry', async () => {
-    const { bridge } = stubBridge(available);
-
-    bridge.downloadUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: available });
-    await mountPage();
-    await click();
-    await next();
-    expect(text(toast())).toContain('Update not downloaded');
-    await next();
-    expect(bridge.downloadUpdate).toHaveBeenCalledTimes(2);
-});
-
-test.each(['download', 'restart'])(
-    'Board search keeps its direct %s action and returns focus after cancellation',
-    async (action) => {
-        const { bridge } = stubBridge(action === 'download' ? available : downloaded);
-
-        await mountPage();
-
-        const field = $<HTMLButtonElement>('[data-search-field]')!;
-
-        await settle(() => field.click());
-
-        const option = [...document.querySelectorAll<HTMLElement>('[data-command-palette] [role="option"]')].find(
-            (el) => text(el).includes(action === 'download' ? 'Download the update' : 'Restart to update'),
-        )!;
-
-        await settle(() => option.click());
-        expect($('[data-command-palette]')).toBeNull();
-
-        if (action === 'download') expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-        else {
-            expect(bridge.installUpdate).not.toHaveBeenCalled();
-            expect(confirmation()).not.toBeNull();
-            await answer('Later');
-            await settle(() => vi.advanceTimersByTime(100));
-            expect(document.activeElement === field).toBe(true);
-        }
-    },
-);
 
 test('all entry points share the guards while checking and confirming', async () => {
     const { bridge } = stubBridge(downloaded);

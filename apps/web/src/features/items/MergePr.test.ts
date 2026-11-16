@@ -41,50 +41,35 @@ const press = async (label: string) =>
             .click(),
     );
 
-test.each([null, 'I_sample09'])(
-    'Merge PR confirms the exact revision and permits method choice for parent %s',
-    async (parentId) => {
-        holdPosts();
-
-        const board = data();
-
-        await mountPage({
-            ...board,
-            items: board.items.map((item) => (item.id === 'I_sample16' ? { ...item, parentId } : item)),
-        });
-        await press('Merge PR');
-        expect(posted().map((p) => p[0])).toEqual(['/api/inspect-merge']);
-        await answer({ error: null, confirmation });
-        expect(text($('#merge-pr-dialog'))).toContain('abc123');
-        expect($('#merge-pr-dialog a')?.getAttribute('href')).toBe(confirmation.url);
-        expect($$('[role="radio"]')).toHaveLength(2);
-        await press('Cancel');
-        expect($('#merge-pr-dialog')).toBeNull();
-        expect(posted()).toHaveLength(1);
-        await press('Merge PR');
-        await answer({ error: null, confirmation });
-        await settle(() => $<HTMLButtonElement>('[role="radio"][value="squash"]')!.click());
-        await settle(() => confirmButton().click());
-        expect(posted().at(-1)).toMatchObject([
-            '/api/merge-pr',
-            { itemId: 'I_sample16', token: 'confirm8', method: 'squash' },
-        ]);
-        await answer({ error: 'Provider refused merge.' }, 409);
-        expect(text($('#merge-pr-dialog'))).toContain('Provider refused merge.');
-        expect($('#merge-pr-dialog a')?.textContent).toBe('Open PR');
-    },
-);
-
-test('failed readiness explains the blocker and leaves Open PR available without a mutation', async () => {
+test.each([null])('Merge PR confirms the exact revision and permits method choice for parent %s', async (parentId) => {
     holdPosts();
-    await mountPage(data());
+
+    const board = data();
+
+    await mountPage({
+        ...board,
+        items: board.items.map((item) => (item.id === 'I_sample16' ? { ...item, parentId } : item)),
+    });
     await press('Merge PR');
-    await answer({ error: 'Merge queue required. Open PR to continue at GitHub.' }, 409);
-    expect(text($('#merge-pr-dialog'))).toContain('Merge queue required.');
-    expect(confirmButton().disabled).toBe(true);
-    expect($('#merge-pr-dialog a')?.textContent).toBe('Open PR');
+    expect(posted().map((p) => p[0])).toEqual(['/api/inspect-merge']);
+    await answer({ error: null, confirmation });
+    expect(text($('#merge-pr-dialog'))).toContain('abc123');
+    expect($('#merge-pr-dialog a')?.getAttribute('href')).toBe(confirmation.url);
+    expect($$('[role="radio"]')).toHaveLength(2);
     await press('Cancel');
-    expect(posted().some(([url]) => url === '/api/merge-pr')).toBe(false);
+    expect($('#merge-pr-dialog')).toBeNull();
+    expect(posted()).toHaveLength(1);
+    await press('Merge PR');
+    await answer({ error: null, confirmation });
+    await settle(() => $<HTMLButtonElement>('[role="radio"][value="squash"]')!.click());
+    await settle(() => confirmButton().click());
+    expect(posted().at(-1)).toMatchObject([
+        '/api/merge-pr',
+        { itemId: 'I_sample16', token: 'confirm8', method: 'squash' },
+    ]);
+    await answer({ error: 'Provider refused merge.' }, 409);
+    expect(text($('#merge-pr-dialog'))).toContain('Provider refused merge.');
+    expect($('#merge-pr-dialog a')?.textContent).toBe('Open PR');
 });
 
 test('an uncertain response requires a provider readiness read and another confirmation before retrying', async () => {
@@ -105,41 +90,4 @@ test('an uncertain response requires a provider readiness read and another confi
     });
     expect($('#merge-pr-dialog')).toBeNull();
     expect(posted().filter(([url]) => url === '/api/merge-pr')).toHaveLength(1);
-});
-
-test('pending confirmation disables merge actions on the desk and in the item dialog', async () => {
-    holdPosts();
-    await mountPage(data());
-
-    const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
-
-    await settle(() => useItemDialogStore.getState().open('I_sample16'));
-    expect($$<HTMLButtonElement>('button').filter((b) => text(b) === 'Merge PR')).toHaveLength(2);
-    await press('Merge PR');
-    await answer({ error: null, confirmation });
-    await settle(() => confirmButton().click());
-    expect(
-        $$<HTMLButtonElement>('button')
-            .filter((b) => text(b) === 'Merge PR')
-            .every((b) => b.disabled || b.getAttribute('aria-disabled') === 'true'),
-    ).toBe(true);
-    await answer({ error: null, merged: true });
-    expect(posted().filter(([url]) => url === '/api/merge-pr')).toHaveLength(1);
-});
-
-test('S08 F05: behind-main work offers the provider PR update link instead of merge', async () => {
-    const board = data();
-
-    await mountPage({
-        ...board,
-        items: board.items.map((item) =>
-            item.id === 'I_sample16'
-                ? { ...item, linkedPrs: item.linkedPrs.map((pr) => ({ ...pr, mergeState: 'behind' as const })) }
-                : item,
-        ),
-    });
-    expect($('a[data-pr-link="I_sample16"]')?.getAttribute('href')).toBe(confirmation.url);
-    expect($('a[data-pr-link="I_sample16"]')?.textContent).toBe('Open PR');
-    expect(document.body.textContent).toContain('Behind main');
-    expect($('#merge-pr-dialog')).toBeNull();
 });

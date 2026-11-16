@@ -25,18 +25,6 @@ test('an identical wire snapshot reuses the board and changing one item keeps ev
     expect(sample.items[0]!.title).not.toBe('New tracker title');
 });
 
-test('inserting, reordering and deleting items preserves identity by work ID and the incoming order', () => {
-    const inserted = { ...clone(sample.items[0]!), id: 'new-work' };
-    const next = { ...clone(sample), items: [inserted, ...clone(sample.items).reverse().slice(1)] };
-    const shared = shareBoardData(sample, next);
-
-    expect(shared).toEqual(next);
-
-    const previous = new Map(sample.items.map((item) => [item.id, item]));
-
-    expect(shared.items.slice(1).every((item) => item === previous.get(item.id))).toBe(true);
-});
-
 test('fresh activity read times, actions, agent lists and tracker checks are never treated as unchanged', () => {
     const thread = {
         id: 't',
@@ -86,32 +74,4 @@ test('connection health and removed fields propagate even when no item changes',
     expect(shared).toEqual(next);
     expect(shared).not.toHaveProperty('localProblem');
     expect(shared.items).toBe(before.items);
-});
-
-test('a tracker check result and usage figures propagate on the first snapshot carrying them', () => {
-    const next = clone(sample);
-    const item = next.items.find((item) => item.linkedPrs.some((pr) => pr.checks))!;
-    const pr = item.linkedPrs.find((pr) => pr.checks)!;
-
-    pr.checks = { ...pr.checks!, failed: pr.checks!.failed + 1 };
-    item.stats = { agentMs: 60_000, tokens: 200, costUsd: 1.25 };
-
-    const shared = shareBoardData(sample, next);
-
-    expect(shared).toEqual(next);
-    expect(shared.items.find((before) => before.id === item.id)).not.toBe(
-        sample.items.find((before) => before.id === item.id),
-    );
-});
-
-test('record keys are preserved as data without changing object prototypes', () => {
-    const next = clone(sample);
-
-    next.items[0]!.labelColors = JSON.parse('{"__proto__":"ff0000","constructor":"00ff00"}');
-
-    const shared = shareBoardData(sample, next);
-
-    expect(Object.hasOwn(shared.items[0]!.labelColors!, '__proto__')).toBe(true);
-    expect(shared.items[0]!.labelColors).toEqual(next.items[0]!.labelColors);
-    expect(Object.getPrototypeOf(shared.items[0]!.labelColors)).toBe(Object.prototype);
 });

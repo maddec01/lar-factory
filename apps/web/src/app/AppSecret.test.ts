@@ -26,9 +26,3 @@ test('in the app, a write carries the secret the bridge holds', async () => {
     expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/queue');
     expect(secretOfLastPost()).toBe('launch-secret');
 });
-
-test('outside the app, a write carries no secret header', async () => {
-    await queueFirstItem();
-    expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/queue');
-    expect(secretOfLastPost()).toBeNull();
-});

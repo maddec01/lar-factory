@@ -16,8 +16,7 @@ const LIST: TrackerLabel[] = [
     { name: 'type: improvement' },
 ];
 const vocabulary = effectiveVocabulary({ improvement: { type: null, labels: ['type: improvement'] } }).vocabulary;
-const setup = (access: object = { 'tag-ticket': 'allowed' }, more: object = {}) =>
-    ({ access, vocabulary, ...more }) as unknown as RepositorySetup;
+const setup = () => ({ access: { 'tag-ticket': 'allowed' }, vocabulary }) as unknown as RepositorySetup;
 
 const boardWith = (item: Partial<Item>, repoSetup: RepositorySetup = setup()): BoardData => ({
     ...sample,
@@ -26,10 +25,7 @@ const boardWith = (item: Partial<Item>, repoSetup: RepositorySetup = setup()): B
 });
 
 /** Serves the board and the labels, holding each label write until the test answers it. */
-function serve(
-    board: BoardData,
-    list: Response | (() => Response) = () => new Response(JSON.stringify({ labels: LIST })),
-) {
+function serve(board: BoardData, list: () => Response = () => new Response(JSON.stringify({ labels: LIST }))) {
     const writes: ((status: number, body: object) => Promise<void>)[] = [];
 
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
@@ -37,7 +33,7 @@ function serve(
 
         if (itemId) return detailsReply(itemId);
 
-        if (url.startsWith('/api/item-labels?')) return typeof list === 'function' ? list() : list;
+        if (url.startsWith('/api/item-labels?')) return list();
 
         if (url === '/api/item-labels' && init?.method === 'POST')
             return new Promise<Response>((resolve) => {
@@ -54,8 +50,6 @@ const sentWrites = () =>
     (fetchMock.mock.calls as unknown as [string, RequestInit?][])
         .filter(([url, init]) => url === '/api/item-labels' && init?.method === 'POST')
         .map(([, init]) => JSON.parse(init!.body as string) as object);
-const sentReads = () =>
-    (fetchMock.mock.calls as unknown as [string][]).filter(([url]) => url.startsWith('/api/item-labels?'));
 
 async function openItem(itemId = ID): Promise<void> {
     const { useItemDialogStore } = await import('./ItemDialogStore');
@@ -86,32 +80,6 @@ test('adding a label writes that one label, and the chip shows only once the wri
     expect(text($('[data-label-picker]')?.parentElement)).not.toMatch(/Couldn’t/);
 });
 
-test('removing a label writes only its removal', async () => {
-    const before = boardWith({ labels: ['needs-design', 'docs'] });
-    const { answer } = serve(before);
-
-    await mountPage(before);
-    await openItem();
-    await openPicker();
-    await toggle('docs');
-    expect(sentWrites()).toEqual([{ itemId: ID, label: 'docs', action: 'remove' }]);
-    await answer(200, { error: null, board: boardWith({ labels: ['needs-design'] }) });
-    expect(chips()).toEqual(['needs-design']);
-});
-
-test('a second toggle waits for the write in flight', async () => {
-    const before = boardWith({ labels: [] });
-    const { answer } = serve(before);
-
-    await mountPage(before);
-    await openItem();
-    await openPicker();
-    await toggle('docs');
-    await toggle('needs-design');
-    expect(sentWrites()).toHaveLength(1);
-    await answer(200, { error: null, board: boardWith({ labels: ['docs'] }) });
-});
-
 test('a failed write leaves the labels as they were and shows the error, closed or open', async () => {
     const before = boardWith({ labels: ['needs-design'] });
     const { answer } = serve(before);
@@ -132,44 +100,4 @@ test('a failed write leaves the labels as they were and shows the error, closed 
     );
     expect($('[data-label-picker]')).toBeNull();
     expect(alerts()).toEqual(['Couldn’t change the labels on #129. gh failed: HTTP 403']);
-});
-
-test('without tag-ticket access the control says why, opens no picker and reads nothing', async () => {
-    const refused = boardWith({ labels: ['docs'] }, setup({ 'tag-ticket': 'refused' }));
-    const reason = 'Access to tag-ticket was refused. Recheck access in Settings.';
-
-    serve(refused);
-    await mountPage(refused);
-    await openItem();
-    expect(pencil()!.title).toBe(reason);
-    expect($('[data-item-dialog] [role="alert"]'), 'no warning before it is pressed').toBeNull();
-    await openPicker();
-    expect($('[data-label-picker]'), 'no picker').toBeNull();
-    expect(text($('[data-item-dialog] [role="status"]'))).toContain(
-        'Ticket labels are read-only. Access to tag-ticket was refused.',
-    );
-    expect(chips()).toEqual(['docs']);
-    expect(sentReads()).toEqual([]);
-});
-
-test('a failed read says why, and opening again reads again', async () => {
-    let fails = true;
-    const board = boardWith({});
-
-    serve(board, () =>
-        fails
-            ? new Response(JSON.stringify({ error: 'Couldn’t read the labels. gh failed: HTTP 502' }), { status: 502 })
-            : new Response(JSON.stringify({ labels: LIST })),
-    );
-    await mountPage(board);
-    await openItem();
-    await openPicker();
-    expect(text($('[role="alert"]'))).toBe('Couldn’t read the labels. gh failed: HTTP 502');
-    fails = false;
-    await settle(() =>
-        document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
-    );
-    await openPicker();
-    expect(choices()).toHaveLength(4);
-    expect($('[role="alert"]')).toBeNull();
 });

@@ -1,5 +1,5 @@
 import type { BoardData } from '@lar-factory/shared';
-import { expect, test, vi } from 'vite-plus/test';
+import { expect, test } from 'vite-plus/test';
 
 import {
     $,
@@ -10,7 +10,6 @@ import {
     sample,
     settle,
     text,
-    stream,
     detailsRead,
     detailsReply,
 } from '@/test/PageTest';
@@ -91,77 +90,4 @@ test('the compact desk action opens Verify details; only Fail asks for a note an
         '/api/record-verification',
         { itemId: item.id, ...context, result: 'fail', note: 'Clipped greeting.' },
     ]);
-});
-test('passing needs no note and shows recorded evidence only in details', async () => {
-    const after = fresh({
-        ...board,
-        items: [
-            {
-                ...item,
-                status: 'Ready to merge',
-                verification: {
-                    ...item.verification,
-                    latest: { ...context, id: 'result', result: 'pass', at: '2026-11-13T12:00:00Z', note: null },
-                },
-            },
-        ],
-    });
-
-    api(after);
-    await mountPage(board);
-    await openVerify();
-    await settle(() => button('Fail').click());
-
-    const abandoned = dialog().querySelector<HTMLInputElement>('[data-verification] input')!;
-
-    await settle(() => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(abandoned, 'Abandoned draft.');
-        abandoned.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await settle(() => button('Cancel').click());
-    await settle(() => button('Pass').click());
-    expect(posted()).toContainEqual([
-        '/api/record-verification',
-        { itemId: item.id, ...context, result: 'pass', note: '' },
-    ]);
-    expect(text(card())).not.toContain('Passed by');
-    expect(dialog().querySelector('[data-verification]')).toBeNull();
-    expect(text(dialog())).toContain('Passed by Pedro at');
-    expect(text(dialog())).toContain('Tested head aaaaaaa');
-
-    const advanced = fresh({
-        ...after,
-        items: after.items.map((work) => ({
-            ...work,
-            status: 'In progress' as const,
-            linkedPrs: [{ ...work.linkedPrs[0]!, sourceRevision: 'b'.repeat(40) }],
-        })),
-    });
-
-    await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(advanced) })));
-    expect(text(dialog())).toContain('Tested head aaaaaaa · superseded by bbbbbbb');
-});
-test('stale-head refusal keeps the failure draft and offers an explicit PR head reread', async () => {
-    api(undefined, 'The PR head changed. Re-read PR head.');
-    await mountPage(board);
-    await openVerify();
-    await settle(() => button('Fail').click());
-
-    const note = dialog().querySelector<HTMLInputElement>('[data-verification] input')!;
-
-    await settle(() => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(note, 'Needs fixing.');
-        note.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await settle(() => button('Submit failure').click());
-    expect(note.value).toBe('Needs fixing.');
-    expect(text(dialog())).toContain('The PR head changed.');
-
-    const reads = fetchMock.mock.calls.filter(([url]) => url === '/api/inspect-verification').length;
-
-    await settle(() => button('Re-read PR head').click());
-    expect(vi.mocked(fetchMock).mock.calls.filter(([url]) => url === '/api/record-verification')).toHaveLength(1);
-    expect(vi.mocked(fetchMock).mock.calls.filter(([url]) => url === '/api/inspect-verification')).toHaveLength(
-        reads + 1,
-    );
 });

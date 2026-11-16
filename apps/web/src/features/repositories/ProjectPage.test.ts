@@ -14,6 +14,7 @@ const SETUP: RepositorySetup = {
     labels: ['area: server'],
     domainDocs: { kind: 'off' },
     skills: [],
+    buildMethod: 'tdd',
     ...effectiveVocabulary(),
     access: {
         'push-branch': 'allowed',
@@ -36,6 +37,7 @@ const SETUP: RepositorySetup = {
         labels: 'local',
         domainDocs: 'default',
         skills: 'default',
+        buildMethod: 'default',
         vocabulary: 'default',
     },
 };

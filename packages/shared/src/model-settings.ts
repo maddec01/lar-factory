@@ -1,6 +1,7 @@
 // Project settings and onboarding contracts.
 
 import { onAzure } from './domain.ts';
+import type { BuildMethod } from './run-settings.ts';
 import type { EffectiveVocabulary, VocabularyMapping, VocabularySources } from './vocabulary.ts';
 
 /** The colors T3 lets a chosen project icon use. */
@@ -61,6 +62,8 @@ export interface SharedRepositorySettings {
     domainDocs?: DomainDocLocation;
     /** The project skills the user selected as coding guidance for builds. */
     skills?: string[];
+    /** How the project's builds work; new runs freeze it. */
+    buildMethod?: BuildMethod;
     vocabulary?: VocabularyMapping;
     createIssuesFromAddItem?: boolean;
     createIssuesFromRetro?: boolean;
@@ -74,6 +77,7 @@ export const SHARED_SETTINGS = [
     'labels',
     'domainDocs',
     'skills',
+    'buildMethod',
     'vocabulary',
     'createIssuesFromAddItem',
     'createIssuesFromRetro',
@@ -130,6 +134,7 @@ export interface RepositorySetup {
     labels: string[];
     domainDocs: DomainDocLocation;
     skills: string[];
+    buildMethod: BuildMethod;
     vocabulary: EffectiveVocabulary;
     vocabularySources: VocabularySources;
     access: Record<RepositoryOperation, OperationAccess>;

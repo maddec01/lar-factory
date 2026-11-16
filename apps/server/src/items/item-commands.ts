@@ -45,6 +45,7 @@ import type {
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { executionMismatch } from '@lar-factory/shared/execution-target';
+import type { BuildMethod } from '@lar-factory/shared/run-settings';
 import {
     readShapingThreadCleanup,
     WorkRecordError,
@@ -244,6 +245,8 @@ export interface ItemCommandsDeps {
     shapingThreadCleanupChoice?: () => ShapingThreadCleanup;
     /** The project skills selected for the repository as builds start now; tests stand in for the local settings. */
     skillsOf?: (repo: string) => readonly string[];
+    /** The repository's Build method as runs start now; tests stand in for the local settings. */
+    buildMethodOf?: (repo: string) => BuildMethod;
     /** Reopens the repository's PR `number`; tests stand in for gh and az. */
     reopenPr?: (repo: string, number: number) => Promise<void>;
     /** Reads the repository's PR `number` as it is now; tests stand in for gh and az. */
@@ -339,6 +342,15 @@ async function recoverStartedThread(
     return findStartedThread(projectId, messages, known);
 }
 
+/** The Build method in the repository's local settings, or TDD. */
+function selectedBuildMethod(repo: string): BuildMethod {
+    try {
+        return readRepositorySetups().find((setup) => sameRepo(setup.repo, repo))?.buildMethod ?? 'tdd';
+    } catch {
+        return 'tdd';
+    }
+}
+
 /** The project skills selected for the repository in its local settings, or none. */
 function selectedSkills(repo: string): readonly string[] {
     try {
@@ -391,6 +403,7 @@ export function createItemCommands({
     recoverThread = recoverStartedThread,
     shapingThreadCleanupChoice = readShapingThreadCleanup,
     skillsOf = selectedSkills,
+    buildMethodOf = selectedBuildMethod,
     factoryContext = currentFactoryContext(),
     runLaunchDeps,
     verificationDeps,
@@ -1072,7 +1085,10 @@ export function createItemCommands({
                     choice,
                     factoryContext,
                     (release) => dirname(contextFor(release).buildSkill),
-                    () => records.read(item.id).skills ?? skillsOf(item.repo),
+                    () => ({
+                        skills: records.read(item.id).skills ?? skillsOf(item.repo),
+                        buildMethod: buildMethodOf(item.repo),
+                    }),
                     runLaunchDeps,
                 );
 

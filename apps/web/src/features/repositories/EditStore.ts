@@ -15,7 +15,7 @@ import { postAction, receive } from '@/services/board/board.service';
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
 export type DraftSetting = Exclude<
     SharedSetting,
-    'labels' | 'vocabulary' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'
+    'labels' | 'vocabulary' | 'buildMethod' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'
 >;
 
 /** Project fields that keep text drafts until their save succeeds. */

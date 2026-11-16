@@ -1,20 +1,45 @@
-// Your desk: the items awaiting your action, including shaping and concept questions, as a list of rows on the stage
-// rows' columns: status light, kind and title, project, then what it waits for and its age, and its action at the end,
-// with Open thread as an icon beside it. A row opens the item dialog. Scope, Kind and Labels narrow the rows. An empty desk is one small line, which while the board is
-// disconnected only speaks for the last read, during a first read that may still add items is the loader, and says so
-// when Scope, Kind and Labels hide every card.
-
-import { deskItems, readingScope } from '@lar-factory/shared';
-import type { Item } from '@lar-factory/shared';
+import {
+    deskItems,
+    deskParentName,
+    deskWait,
+    itemName,
+    openQuestionThread,
+    questionOwnerParent,
+    readingScope,
+} from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { Loading } from '@lar-works/design-system';
 
 import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
-import { useActivityUnavailable } from '@/features/items';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { HumanWaitAction, ItemTitle, useActivityUnavailable } from '@/features/items';
 import { ItemCard } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { DeskCard, DeskSection, HeaderEmpty, noteBoardPlaces } from '@/ui/board';
+import { DeskCard, DeskDrawer, type DeskLatest, noteBoardPlaces } from '@/ui/board';
 
-/** `inScope` are the items in the main area's scope. */
+function latestOf(items: Item[], data: BoardData, unavailable: boolean): DeskLatest | undefined {
+    const item = items.reduce<Item | undefined>(
+        (latest, i) => (!latest || i.updatedAt > latest.updatedAt ? i : latest),
+        undefined,
+    );
+
+    if (!item) return undefined;
+
+    const question = (openQuestionThread(item) ?? openQuestionThread(questionOwnerParent(item, data.items) ?? item))
+        ?.questionSummary;
+    const parent = deskParentName(item, data.items);
+
+    return {
+        title: <ItemTitle item={item} />,
+        name: itemName(item),
+        detail: [deskWait(item, unavailable, data.items).label, question ?? (parent && `in ${parent}`)]
+            .filter(Boolean)
+            .join(' · '),
+        action: <HumanWaitAction item={item} data={data} quiet />,
+        onOpen: () => useItemDialogStore.getState().open(item.id),
+    };
+}
+
 export function Desk({ items: inScope }: { items: Item[] }) {
     const data = useBoardStore((state) => state.data);
     const clientError = useBoardStore((state) => state.clientError);
@@ -25,34 +50,29 @@ export function Desk({ items: inScope }: { items: Item[] }) {
     const items = deskItems(data, unavailable).filter((item) => scoped.has(item.id) && shows(item));
     const scope = useShownScope();
 
-    // A card that lands on the desk pulses once, whatever the scope and filters show.
     noteBoardPlaces('desk', new Map(deskItems(data, unavailable).map((item) => [item.id, 0])), data.firstRead.settled);
 
     return (
-        <DeskSection
-            title="Your desk"
+        <DeskDrawer
             count={items.length}
-            loading={items.length === 0 && readingScope(data, scope ?? undefined)}
+            latest={latestOf(items, data, unavailable)}
             empty={
-                <HeaderEmpty>
-                    {clientError ? (
-                        'Nothing waited on you at the last read.'
-                    ) : readingScope(data, scope ?? undefined) ? (
-                        <Loading presentation="inline" label="Loading projects…" />
-                    ) : deskItems(data, unavailable).length ? (
-                        'Nothing on your desk matches the filters.'
-                    ) : (
-                        'Nothing waits on you.'
-                    )}
-                </HeaderEmpty>
+                clientError ? (
+                    'Nothing waited on you at the last read.'
+                ) : readingScope(data, scope ?? undefined) ? (
+                    <Loading presentation="inline" label="Loading projects…" />
+                ) : deskItems(data, unavailable).length ? (
+                    'Nothing on your desk matches the filters.'
+                ) : (
+                    'Nothing waits on you.'
+                )
             }
         >
             {items.map((i) => (
-                // The board's one card, the same as on a concept's work map (ItemCard).
                 <DeskCard key={i.id} item={i.id}>
                     <ItemCard item={i} data={data} />
                 </DeskCard>
             ))}
-        </DeskSection>
+        </DeskDrawer>
     );
 }

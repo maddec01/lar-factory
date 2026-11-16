@@ -1,10 +1,3 @@
-// The board's title bar, the design system's TitleBar as every Lar app's: the "Lar Factory" lockup, a link that takes
-// the board back to its top and clears the scope; then, at the end, the board search, how the board is doing (the
-// Refreshed time and the counters, one status group that folds into a "Board status" popover on a narrow bar), what
-// you can do (List, Add item, Update while there's an update) and Settings. Every control is the bar's 28px one with a
-// glass tooltip. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the lockup
-// and Settings; before the first project it holds the lockup, the Refreshed light, Update and Settings.
-
 import { clock, failedCheck, isStale, noneOnboarded, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { ToolbarStatusGroup } from '@lar-works/design-system';
@@ -21,8 +14,6 @@ import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { BoardTitleBar, type RefreshHealth, RefreshIndicator, scrollBoardToTop } from '@/ui/board';
 
-/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. Only the dot
- *  changes colour (amber when stale, red while the page has lost the board server) and only the dot pings. */
 function Refreshed({ data }: { data: BoardData }) {
     const { fetchedAt } = data;
     const clientError = useBoardStore((state) => state.clientError);
@@ -48,7 +39,6 @@ function Refreshed({ data }: { data: BoardData }) {
         };
     }, [fetchedAt]);
 
-    // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
     const reading = data.firstRead.waiting ?? [];
     const health: RefreshHealth = clientError
         ? 'disconnected'
@@ -64,7 +54,6 @@ function Refreshed({ data }: { data: BoardData }) {
     return (
         <RefreshIndicator
             health={health}
-            // While projects load the lanes say so; the bar shows nothing of it.
             hidden={health === 'waiting' && reading.length > 0}
             label={
                 health === 'disconnected' ? (
@@ -96,7 +85,6 @@ function Refreshed({ data }: { data: BoardData }) {
 export function TitleBar() {
     const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
     const data = useBoardStore((state) => state.data);
-    // Before the first project there is nothing to count, search, list or add to.
     const work = board && !noneOnboarded(data);
     const wide = useWideBar();
 
@@ -114,20 +102,15 @@ export function TitleBar() {
             status={
                 board &&
                 wide && (
-                    <>
-                        {/* Need you leads; on a narrow bar, which keeps to it, it stands among the actions. */}
-                        {work && <Counters part="need you" />}
-                        <ToolbarStatusGroup role="group" aria-label="Board status">
-                            <Refreshed data={data} />
-                            {work && <Counters part="routine" />}
-                        </ToolbarStatusGroup>
-                    </>
+                    <ToolbarStatusGroup role="group" aria-label="Board status">
+                        <Refreshed data={data} />
+                        {work && <Counters />}
+                    </ToolbarStatusGroup>
                 )
             }
             actions={
                 board && (
                     <>
-                        {work && !wide && <Counters part="need you" narrow />}
                         {work && <ListButton />}
                         {work && <AddItem />}
                         <UpdateButton />

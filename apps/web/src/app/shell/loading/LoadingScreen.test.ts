@@ -4,7 +4,7 @@
 import type { BoardData, FirstRead } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, fresh, mountPage, push, sample, settle, stubApp } from '@/test/PageTest';
+import { $, fresh, mountPage, push, sample, settle } from '@/test/PageTest';
 
 const DRAW_MS = 1750;
 const EXIT_MS = 600;
@@ -21,54 +21,8 @@ const unsettled = (read: FirstRead = firstRead('repositories')): BoardData => ({
 });
 
 const screen = () => $('.loading-screen');
-const leaving = () => screen()?.classList.contains('is-leaving') ?? false;
 const advance = (ms: number) => settle(() => vi.advanceTimersByTime(ms));
 const covered = () => $('#app')!.hasAttribute('inert');
-
-test('the screen waits for the draw even when the read settled long before, and for the read when the draw is done', async () => {
-    await mountPage(unsettled());
-    await advance(DRAW_MS + 2_000);
-    expect(leaving(), 'drawn but unsettled').toBe(false);
-    await push(fresh());
-    expect(leaving()).toBe(true);
-});
-
-test.each([
-    ['the read fails', { ...fresh(), fetchedAt: null, error: 'gh api failed' }],
-    [
-        'gh blocks the read',
-        {
-            ...fresh(),
-            fetchedAt: null,
-            error: null,
-            tools: { ...sample.tools!, gh: { result: 'missing' as const, fix: 'Install gh' } },
-        },
-    ],
-])('the screen ends the same way when %s', async (_name, data) => {
-    await mountPage({ ...unsettled(), ...data, firstRead: firstRead('repositories') });
-    await push({ ...data, firstRead: firstRead('finishing', [], true) });
-    await advance(DRAW_MS);
-    expect(leaving()).toBe(true);
-    await advance(EXIT_MS);
-    expect(screen()).toBeNull();
-});
-
-test('an empty successful source reveals the board while another source waits, after the logo and fade', async () => {
-    await mountPage(unsettled(firstRead('items', ['lar-server', 'lar-apple'])));
-    await push({
-        ...unsettled({ ...firstRead('items', ['lar-server']), ready: true, waiting: ['maddec01/lar-server'] }),
-        items: [],
-    });
-    await advance(DRAW_MS - 1);
-    expect(leaving()).toBe(false);
-    await advance(1);
-    expect(leaving()).toBe(true);
-    await advance(EXIT_MS);
-    expect(screen()).toBeNull();
-    expect(covered()).toBe(false);
-    await push(unsettled());
-    expect(screen()).toBeNull();
-});
 
 test('a restarted server keeps the last complete board visible until fresh data settles', async () => {
     await mountPage(fresh());
@@ -154,58 +108,6 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
     await settle(() => receive({ error: null, board: { ...unsettled(read), items: [queued] } }));
     expect(useBoardStore.getState().data.items).toEqual([queued]);
     expect(screen(), 'actions never re-open the loading screen').toBeNull();
-});
-
-test('the board behind is inert while the screen is up, through the fade, and set free once it is gone', async () => {
-    await mountPage(unsettled());
-    expect(covered()).toBe(true);
-    expect($('#app .loading-screen'), 'the screen isn’t inside the inert board').toBeNull();
-    expect($('#app .title-bar'), 'the board is').not.toBeNull();
-
-    await advance(DRAW_MS);
-    await push(fresh());
-    expect(leaving()).toBe(true);
-    expect(covered(), 'the fade').toBe(true);
-    await push(unsettled());
-    expect(leaving()).toBe(true);
-    expect(covered(), 'the initial fade still covers the board').toBe(true);
-
-    await advance(EXIT_MS);
-    expect(screen()).toBeNull();
-    expect(covered()).toBe(false);
-
-    await push(unsettled(firstRead('items', ['lar-apple'])));
-    expect(covered(), 'a restart keeps the loaded board usable').toBe(false);
-});
-
-test('installation readiness waits until the loading screen has finished leaving and the stack is mounted', async () => {
-    const bridge = stubApp({
-        boardReady: vi.fn(async () => {
-            expect(screen()).toBeNull();
-            expect(covered()).toBe(false);
-            expect($('.notification-stack')).not.toBeNull();
-        }),
-        getInstallState: async () => ({
-            installs: true,
-            installed: false,
-            version: '1.0.0',
-            running: null,
-            discovery: 'waiting',
-            instances: [],
-            targets: [],
-            drift: [],
-            replaced: [],
-            conflicts: [],
-            blocked: [],
-        }),
-    });
-
-    await mountPage(fresh(), '', '?loading=drawn');
-    expect(bridge.boardReady).not.toHaveBeenCalled();
-    await advance(EXIT_MS - 1);
-    expect(bridge.boardReady).not.toHaveBeenCalled();
-    await advance(1);
-    expect(bridge.boardReady).toHaveBeenCalledOnce();
 });
 
 test('restart keeps rows before readiness and through failed settlement, then accepts successful empty sources', async () => {

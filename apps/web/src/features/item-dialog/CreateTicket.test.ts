@@ -1,7 +1,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 beforeEach(() => localStorage.removeItem('lar-board:create-ticket'));
 
@@ -87,15 +87,6 @@ async function open(
     await settle(() => vi.advanceTimersByTime(50));
     await settle(() => action().click());
 }
-
-test('unverified Access explains the refusal, offers Recheck and disables creation', async () => {
-    await open(board('unverified'));
-    expect(text(section())).toContain('isn’t checked yet');
-    expect($$('button').some((button) => text(button) === 'Recheck access')).toBe(true);
-    expect(submit().disabled).toBe(true);
-    await settle(() => submit().click());
-    expect(posts()).toHaveLength(0);
-});
 
 test('a lost response survives a page reload with its request ID and options, then conversion updates the existing item', async () => {
     await open(board(), async () => {

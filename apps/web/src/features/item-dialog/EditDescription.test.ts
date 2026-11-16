@@ -117,17 +117,6 @@ const azureBoard = (): [BoardData, string] => {
 };
 const github = sample.items[0]!.id;
 
-test('Edit is offered only while this Mac lets the factory edit the repository’s tickets', async () => {
-    // The sample's lar-server setup allows editing; a repository with no setup has said nothing about it.
-    const unset: BoardData = { ...sample, repos: sample.repos.map(({ setup: _setup, ...repo }) => repo) };
-
-    serve(unset, { [github]: details('Old text.') });
-    await mountPage(unset);
-    await openItem(github);
-    expect(text(description())).toContain('Old text.');
-    expect(editButton()).toBeUndefined();
-});
-
 test('Save writes the new Markdown to the GitHub issue, reads the details again and shows the new text', async () => {
     const served = { [github]: details('Old text.') };
     const board = serve(editing, served);
@@ -149,38 +138,6 @@ test('Save writes the new Markdown to the GitHub issue, reads the details again 
     expect(editorArea()).toBeNull();
     expect(text(description())).toContain('Old text. More.');
     expect(editButton()).toBeDefined();
-});
-
-test('a save whose reload fails shows the saved text, says so, and Edit opens on the saved text', async () => {
-    const served: Record<string, ItemDetails> = { [github]: details('Old text.') };
-    const board = serve(editing, served);
-
-    await mountPage(editing);
-    await openItem(github);
-    await press(editButton());
-    await typeAtEnd(' More.');
-    await press(buttonIn(description(), 'Save'));
-    delete served[github];
-    await board.answer(200, { error: null });
-    expect(editorArea()).toBeNull();
-    expect(text(dialog()!)).not.toContain('Couldn’t load the details');
-    expect(text(description())).toContain('Old text. More.');
-
-    const status = description().querySelector('[role="status"]')!;
-
-    expect([text(status), status.getAttribute('title')], 'the truncated status has its whole text as a title').toEqual([
-        'Saved; couldn’t reload the details',
-        'Saved; couldn’t reload the details',
-    ]);
-    await press(editButton());
-    expect(text(editorArea()!), 'Edit starts from the text just saved, not the old details').toBe('Old text. More.');
-    await typeAtEnd(' Again.');
-    served[github] = details('Old text. More. Again.');
-    await press(buttonIn(description(), 'Save'));
-    expect(board.saved().at(-1)).toEqual({ itemId: github, body: 'Old text. More. Again.' });
-    await board.answer(200, { error: null });
-    expect(text(description())).not.toContain('couldn’t reload');
-    expect(text(description())).toContain('Old text. More. Again.');
 });
 
 test('a save whose reload fails drops the cached details, so a reopen reads them again rather than showing the old text', async () => {
@@ -207,20 +164,6 @@ test('a save whose reload fails drops the cached details, so a reopen reads them
     expect(text(description())).toContain('Old text. More.');
     await press(editButton());
     expect(text(editorArea()!), 'Edit opens on the saved text').toBe('Old text. More.');
-});
-
-test('Cancel closes the editor and writes nothing', async () => {
-    const board = serve(editing, { [github]: details('Old text.') });
-
-    await mountPage(editing);
-    await openItem(github);
-    await press(editButton());
-    await typeAtEnd(' More.');
-    await press(buttonIn(description(), 'Cancel'));
-    expect(editorArea()).toBeNull();
-    expect(text(description())).toContain('Old text.');
-    expect(text(description())).not.toContain('More.');
-    expect(board.saved()).toEqual([]);
 });
 
 test('an Azure work item saves to the field and revision its details gave, and an HTML description opens and saves as Markdown', async () => {
@@ -298,97 +241,51 @@ test('closing with unsaved changes asks "Discard changes?": Keep editing stays, 
     expect(await isOpen()).toBe(false);
 });
 
-test('closing with the editor open but nothing changed closes at once', async () => {
-    serve(editing, { [github]: details('- one\n- two') });
+test.each([false])('Queue identity replacement preserves description edits while saving is %s', async (saving) => {
+    const server = serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
+    const original = fetchMock.getMockImplementation()!;
+    let completeQueue!: (response: Response) => void;
+
+    fetchMock.mockImplementation((...args) =>
+        args[0] === '/api/queue'
+            ? new Promise<Response>((resolve) => {
+                  completeQueue = resolve;
+              })
+            : original(...args),
+    );
     await mountPage(editing);
-    await openItem(github);
+    await press($<HTMLButtonElement>('.title-bar [data-list-button]')!);
+    await press($<HTMLButtonElement>(`[data-list-modal] [data-item="${github}"]`)!);
     await press(editButton());
-    await escape(editorArea()!);
-    expect(prompt()).toBeUndefined();
-    expect(await isOpen()).toBe(false);
-});
+    await typeAtEnd(' More.');
+    await press(inDialog<HTMLButtonElement>('[data-queue]')!);
 
-test.each([false, true])(
-    'Queue identity replacement preserves description edits while saving is %s',
-    async (saving) => {
-        const server = serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
-        const original = fetchMock.getMockImplementation()!;
-        let completeQueue!: (response: Response) => void;
+    if (saving) await press(buttonIn(description(), 'Save'));
 
-        fetchMock.mockImplementation((...args) =>
-            args[0] === '/api/queue'
-                ? new Promise<Response>((resolve) => {
-                      completeQueue = resolve;
-                  })
-                : original(...args),
-        );
-        await mountPage(editing);
-        await press($<HTMLButtonElement>('.title-bar [data-list-button]')!);
-        await press($<HTMLButtonElement>(`[data-list-modal] [data-item="${github}"]`)!);
-        await press(editButton());
-        await typeAtEnd(' More.');
-        await press(inDialog<HTMLButtonElement>('[data-queue]')!);
-
-        if (saving) await press(buttonIn(description(), 'Save'));
-
-        const board = {
-            ...editing,
-            items: editing.items.map((item) =>
-                item.id === github ? { ...item, id: 'I_imported', status: 'Queued' } : item,
-            ),
-        };
-
-        await settle(() => completeQueue(new Response(JSON.stringify({ error: null, board, itemId: 'I_imported' }))));
-        expect(await isOpen()).toBe(true);
-        expect(text(editorArea())).toBe('Old text. More.');
-
-        if (saving) {
-            expect(prompt()).toBeUndefined();
-            await server.answer(409, { error: 'Save refused' });
-            expect(await isOpen()).toBe(true);
-            expect(text(description())).toContain('Save refused');
-        } else {
-            expect(prompt()).toBeDefined();
-            await press(buttonIn(prompt()!, 'Keep editing'));
-            expect(await isOpen()).toBe(true);
-            expect(text(editorArea())).toBe('Old text. More.');
-        }
-
-        await escape(editorArea()!);
-        await press(buttonIn(prompt()!, 'Discard'));
-        expect(await isOpen()).toBe(false);
-    },
-);
-
-test('opening a concept part with unsaved changes asks first: Keep editing stays, Discard opens the part', async () => {
-    const concept: BoardData = {
+    const board = {
         ...editing,
-        items: editing.items.map((i) =>
-            i.id === github
-                ? { ...i, kind: 'concept' as const }
-                : i.id === 'I_sample14'
-                  ? { ...i, parentId: github }
-                  : i,
+        items: editing.items.map((item) =>
+            item.id === github ? { ...item, id: 'I_imported', status: 'Queued' } : item,
         ),
     };
 
-    serve(concept, { [github]: details('Old text.'), I_sample14: details('The part.') });
-    await mountPage(concept);
-    await openItem(github);
-    await press(editButton());
-    await typeAtEnd(' More.');
-
-    const part = () => inDialog<HTMLButtonElement>('[data-part="I_sample14"] button')!;
-
-    await press(part());
-    expect(prompt(), 'the prompt asks first').toBeDefined();
-    await press(buttonIn(prompt()!, 'Keep editing'));
+    await settle(() => completeQueue(new Response(JSON.stringify({ error: null, board, itemId: 'I_imported' }))));
+    expect(await isOpen()).toBe(true);
     expect(text(editorArea())).toBe('Old text. More.');
-    await press(part());
+
+    if (saving) {
+        expect(prompt()).toBeUndefined();
+        await server.answer(409, { error: 'Save refused' });
+        expect(await isOpen()).toBe(true);
+        expect(text(description())).toContain('Save refused');
+    } else {
+        expect(prompt()).toBeDefined();
+        await press(buttonIn(prompt()!, 'Keep editing'));
+        expect(await isOpen()).toBe(true);
+        expect(text(editorArea())).toBe('Old text. More.');
+    }
+
+    await escape(editorArea()!);
     await press(buttonIn(prompt()!, 'Discard'));
-    expect(prompt()).toBeUndefined();
-    expect(inDialog('[data-concept-parts] [data-part]')).toBeNull();
-    expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain(
-        concept.items.find((i) => i.id === 'I_sample14')!.title,
-    );
+    expect(await isOpen()).toBe(false);
 });

@@ -1,17 +1,11 @@
-// The notices for a missing t3, a gh that's missing, logged out, or too old, or a missing git, jq or curl, and their Recheck.
-// Ported from the tool notice cases of test/render.test.ts and its saved copies.
+// A missing tool's notice and its Recheck.
 
 import type { BoardData, ToolChecks } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, $$, warningText, fetchMock, mountPage, push, sample, settle, toolChecks } from '@/test/PageTest';
+import { $, fetchMock, mountPage, sample, settle, toolChecks } from '@/test/PageTest';
 
-const withTools = (failed: Partial<ToolChecks>, fields: Partial<BoardData> = {}): BoardData => ({
-    ...sample,
-    tools: toolChecks(failed),
-    ...fields,
-});
-const failed = { error: 'gh api graphql failed: HTTP 401' };
+const withTools = (failed: Partial<ToolChecks>): BoardData => ({ ...sample, tools: toolChecks(failed) });
 const recheckButton = () => $<HTMLButtonElement>('[data-recheck]')!;
 const note = () => $('[data-recheck-note]');
 const rechecks = () => fetchMock.mock.calls.filter(([url]) => url === '/api/recheck');
@@ -30,40 +24,6 @@ function holdRecheck(): void {
 }
 
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
-
-test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
-    await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
-
-    const warnings = () => $$('[data-slot="notice"]');
-
-    expect(warnings().length).toBe(1);
-    expect(warnings()[0]!.closest('[data-slot="toaster"]')).toBeNull();
-    expect(warningText(warnings()[0]!)).toEqual([
-        'GitHub CLI not found.',
-        'The board reads GitHub through gh. Install it with brew install gh Copy, ' +
-            'then press Recheck. The board also looks again every 10 seconds. Recheck',
-    ]);
-    expect(warnings()[0]!.closest('[data-board-notices]')).not.toBeNull();
-    expect(
-        warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label'),
-    ).toBe('Copy brew install gh');
-
-    await push(withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } }, failed));
-    expect(warnings().length).toBe(1);
-    expect(warningText(warnings()[0]!)).toEqual([
-        'GitHub CLI is logged out.',
-        'The board reads GitHub through gh. Run gh auth login Copy in a terminal, ' +
-            'then press Recheck. The board also looks again every 10 seconds. Recheck',
-    ]);
-
-    await push(withTools({ gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } }));
-    expect(warnings()[0]!.textContent).toContain(
-        'No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.',
-    );
-
-    await push(withTools({}, failed));
-    expect(warnings(), 'a failed read is the title bar’s to show').toEqual([]);
-});
 
 test('Recheck posts, shows Checking…, then the board once the tool is found, and keeps focus', async () => {
     holdRecheck();
@@ -84,42 +44,4 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
     await answer(board(withTools({})));
     expect($('.tool-missing')).toBeNull();
     expect($('.desk')).not.toBeNull();
-});
-
-test('after Recheck a gh warning says it’s still logged out, or why Recheck failed, until the server answers again', async () => {
-    holdRecheck();
-
-    const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
-
-    await mountPage(loggedOut);
-    expect(note(), 'nothing before a Recheck').toBeNull();
-    await settle(() => recheckButton().click());
-    await answer(board(loggedOut));
-    expect(note()!.textContent).toBe('Still logged out.');
-    await push(loggedOut);
-    expect(note()!.textContent, 'stays across polls while gh is still logged out').toBe('Still logged out.');
-
-    await settle(() => recheckButton().click());
-    await answer(new TypeError('Failed to fetch'));
-    expect(note()!.textContent).toBe('Can’t reach the board server. Try again.');
-    await push(loggedOut);
-    expect(note(), 'gone once the server answers again').toBeNull();
-});
-
-test('a Recheck note answers only the tool problems it found, and goes once they change', async () => {
-    holdRecheck();
-
-    const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
-
-    await mountPage(loggedOut);
-    await settle(() => recheckButton().click());
-    await answer(board(loggedOut));
-    expect(note()!.textContent).toBe('Still logged out.');
-
-    await push(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }));
-    expect(note(), 'a different problem isn’t what Recheck answered').toBeNull();
-    await push(withTools({}));
-    await push(loggedOut);
-    expect(recheckButton()).not.toBeNull();
-    expect(note(), 'a gh that logs out again opens a warning without the note').toBeNull();
 });

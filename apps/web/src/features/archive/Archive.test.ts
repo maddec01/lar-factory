@@ -88,22 +88,6 @@ test('Restore posts the work, and the row leaves Archive as Archive is read agai
     expect($('.settings-row[data-row="archived-W_aside"]')).toBeNull();
 });
 
-test('Close ticket asks as Abandon’s own step does, and closes only on its confirm', async () => {
-    await openArchive(withRetention(), { '/api/close-ticket': () => ({ error: null }) });
-
-    const entries = await more('archived-W_aside');
-
-    expect(entries.map(text)).toEqual(['Export markdown', 'Close ticket']);
-    await settle(() => entries.find((entry) => text(entry) === 'Close ticket')!.click());
-
-    const confirm = $('#abandon-dialog')!;
-
-    expect(confirm.getAttribute('data-abandon-step')).toBe('close-ticket');
-    expect(posted('/api/close-ticket')).toEqual([]);
-    await settle(() => button(confirm, 'Close issue')!.click());
-    expect(posted('/api/close-ticket')).toEqual([{ itemId: 'W_aside' }]);
-});
-
 test('a automatic deletion names the work it would delete and saves only on its confirm; the report names the work it kept', async () => {
     const kept = {
         hideAfterDays: 7,

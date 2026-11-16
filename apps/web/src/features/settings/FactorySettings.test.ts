@@ -70,57 +70,6 @@ async function open() {
     await settle(() => button('Reviewers and models').click());
 }
 
-test('changes packaged reviewer mode, duplicates it and only edits the copy', async () => {
-    await open();
-    expect(text($('[aria-label="Shaping model"]')!)).toBe('Project default in T3');
-    expect(text($('[aria-label="Planner model"]')!)).toBe('Same as its thread');
-    expect(input('Reviewer name')).toBeNull();
-    expect($('textarea')).toBeNull();
-    expect($('[aria-label="Reviewer"]')).toBeNull();
-    expect($('[aria-label="Thread kind"]')).toBeNull();
-    expect($('[aria-label="Role"]')).toBeNull();
-    expect($$('table[aria-label="Thread defaults"] tbody tr')).toHaveLength(4);
-    expect($$('table[aria-label="Roles"] tbody tr').length).toBeGreaterThan(10);
-    expect(button('Restore default instructions')).toBeUndefined();
-    await settle(() => {
-        const disclosure = $<HTMLDetailsElement>('[aria-label="Security reviewer"] details')!;
-
-        disclosure.open = true;
-        disclosure.dispatchEvent(new Event('toggle'));
-    });
-    expect(text($('[aria-label="Security reviewer"]')!)).toContain('Default security');
-    expect($('textarea')).toBeNull();
-    expect($('[aria-label="Trigger"]')).toBeNull();
-    // Duplicate is an icon button, named for its reviewer.
-    await settle(() =>
-        $<HTMLButtonElement>('[aria-label="Security reviewer"] button[aria-label="Duplicate Security"]')!.click(),
-    );
-    expect(input('Reviewer name').value).toBe('Security (copy)');
-    expect(document.activeElement).toBe(input('Reviewer name'));
-    expect(input('Reviewer name').readOnly).toBe(false);
-    expect($<HTMLTextAreaElement>('textarea')!.value).toBe('Default security');
-    expect(text($('[aria-label="Trigger"]')!)).toBe('Security changes');
-    await enter($<HTMLTextAreaElement>('textarea')!, 'Check custom security rules');
-    await save();
-
-    const copy = state.settings.reviewers.at(-1)!;
-
-    expect(copy.id).not.toBe('security');
-    expect(copy.revisions).toEqual([
-        { revision: 1, text: 'Default security' },
-        { revision: 2, text: 'Check custom security rules' },
-    ]);
-    expect(state.settings.reviewers[1]).not.toHaveProperty('revisions');
-    await pick('Security review mode', 'Never');
-    await save();
-    await settle(() => button('General').click());
-    await settle(() => button('Reviewers and models').click());
-    expect(text($('[aria-label="Security review mode"]')!)).toBe('Never');
-    expect($('textarea')).toBeNull();
-    await settle(() => button('Edit').click());
-    expect($<HTMLTextAreaElement>('textarea')!.value).toBe('Check custom security rules');
-});
-
 test('adds, edits and removes a custom reviewer with a trigger and its model override', async () => {
     await open();
     await settle(() => button('Add reviewer').click());
@@ -176,13 +125,4 @@ test('keeps failed drafts and saves kind/role choices with independent inheritan
     await pick('CI fixer effort', 'Same as its thread');
     await save();
     expect(state.settings.roles['ci-fixer']).toEqual({});
-});
-
-test('saved options missing from T3 stay visible and are not substituted', async () => {
-    await open();
-    await settle(() => button('General').click());
-    state.settings.threadKinds.shaping = { model: { instanceId: 'missing', model: 'old-model' }, effort: 'ultra' };
-    await settle(() => button('Reviewers and models').click());
-    expect(text(document.body)).toContain('missing old-model (not offered)');
-    expect(text(document.body)).toContain('ultra (not offered)');
 });

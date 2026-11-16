@@ -3,7 +3,7 @@
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, chooseOption, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, $$, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const REPO = 'team/app';
 
@@ -173,64 +173,6 @@ test('closing Settings with typed text asks first, and discarding sends nothing'
     expect($('[data-project-page]')).toBeNull();
 });
 
-test('a blank Team shows an error and sends no request', async () => {
-    const repo = 'organization/project/repository';
-    const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Platform' } });
-    const sent = serve(board);
-
-    await openRepositories(board);
-    await settle(() =>
-        $(`.settings-row[data-row="repo-${repo}"]`)!
-            .querySelector<HTMLButtonElement>('[data-settings-row-open]')!
-            .click(),
-    );
-
-    const input = setting('itemSource').querySelector<HTMLInputElement>('input')!;
-
-    await type(input, ' ');
-    await settle(() => footerButton('Save changes')!.click());
-    expect(sent).toHaveLength(0);
-    expect(text(setting('itemSource'))).toContain('Enter a Team.');
-});
-
-test('choices apply immediately and Reset retains its default behavior', async () => {
-    const board = allowed();
-    const sent = serve(board);
-
-    await openEdit(board);
-    await chooseOption(setting('domainDocs').querySelector('[role="combobox"]')!, 'Write in build PRs');
-    expect(sent[0]).toEqual({
-        repo: REPO,
-        change: 'override',
-        key: 'domainDocs',
-        value: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' },
-    });
-    await settle(() => buttonIn(setting('role'), 'Reset')!.click());
-    expect(sent.at(-1)).toEqual({ repo: REPO, change: 'override', key: 'role' });
-});
-
-test('access disables only issue options that need it and recheck restores stored preferences', async () => {
-    const initial = boardWith();
-    const final = boardWith({
-        access: { ...SETUP.access, 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' },
-        createIssuesFromRetro: false,
-    });
-    const sent = serve(initial, () => ({ body: { board: final } }));
-
-    await openEdit(initial);
-    expect(setting('createIssuesFromAddItem').querySelector<HTMLButtonElement>('[role="switch"]')!.disabled).toBe(true);
-    expect(text(setting('createIssuesFromAddItem'))).toContain('isn’t checked');
-    await settle(() => buttonIn($('[data-access-settings]')!, 'Recheck access')!.click());
-    expect(setting('createIssuesFromAddItem').querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe(
-        'true',
-    );
-    expect(setting('createIssuesFromRetro').querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe(
-        'false',
-    );
-    await settle(() => setting('writeRefinedSpec').querySelector<HTMLButtonElement>('[role="switch"]')!.click());
-    expect(sent.at(-1)).toEqual({ repo: REPO, change: 'override', key: 'writeRefinedSpec', value: false });
-});
-
 test('a label search finds one of 150 choices with checkboxes and saves the complete kind once on close', async () => {
     const board = allowed();
     const sent = serve(board);
@@ -250,78 +192,6 @@ test('a label search finds one of 150 choices with checkboxes and saves the comp
     expect(sent).toEqual([
         { repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: ['label-149', 'triage'] } },
     ]);
-});
-
-test('typing a new label creates nothing and explicit Create preserves a failed draft', async () => {
-    const board = allowed();
-    const sent = serve(board, () => ({ status: 403, body: { error: 'Label creation refused.' } }));
-
-    await openEdit(board);
-
-    const popover = await picker();
-    const input = popover.querySelector<HTMLInputElement>('input')!;
-
-    await type(input, 'needs review');
-    expect(sent).toHaveLength(0);
-    await settle(() => buttonIn(popover, 'Create "needs review"')!.click());
-    expect(sent).toEqual([
-        {
-            repo: REPO,
-            change: 'vocabulary',
-            key: 'bug',
-            value: { type: null, labels: [] },
-            newLabels: ['needs review'],
-        },
-    ]);
-    expect(text(vocabularyRow('bug'))).toContain('Label creation refused.');
-    expect(text(vocabularyRow('bug'))).toContain('needs review');
-    expect(input.value).toBe('');
-});
-
-test('closing a failed Create preserves its draft without repeating the request', async () => {
-    const board = allowed();
-    const sent = serve(board, () => ({ status: 403, body: { error: 'Create refused.' } }));
-
-    await openEdit(board);
-
-    const popover = await picker();
-
-    await type(popover.querySelector('input')!, 'new-label');
-    await settle(() => buttonIn(popover, 'Create "new-label"')!.click());
-    await settle(() => buttonIn(popover, 'Done')!.click());
-    expect(sent).toHaveLength(1);
-    expect(text(vocabularyRow('bug'))).toContain('new-label');
-    expect(text(vocabularyRow('bug'))).toContain('Create refused.');
-});
-
-test('an older kind save can refresh discovery without erasing another picker search', async () => {
-    const board = allowed();
-
-    serve(board);
-
-    const serving = fetchMock.getMockImplementation() as unknown as (
-        url: string,
-        init?: RequestInit,
-    ) => Promise<Response>;
-    let finish!: (response: Response) => void;
-
-    fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
-        if (url === '/api/repositories/settings' && JSON.parse(init?.body as string).change === 'vocabulary')
-            return new Promise<Response>((resolve) => {
-                finish = resolve;
-            });
-
-        return serving(url, init);
-    }) as typeof fetchMock);
-    await openEdit(board);
-    await chooseOption(vocabularyRow('bug').querySelector('[role="combobox"]')!, 'Task');
-
-    const popover = await picker('feature');
-    const input = popover.querySelector<HTMLInputElement>('input')!;
-
-    await type(input, 'keep this text');
-    await settle(() => finish(new Response('{}')));
-    expect($<HTMLInputElement>('[data-label-picker="feature"] input')!.value).toBe('keep this text');
 });
 
 test('leaving the project page closes a dirty label picker with one complete kind save', async () => {

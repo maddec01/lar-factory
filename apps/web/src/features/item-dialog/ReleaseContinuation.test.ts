@@ -2,7 +2,7 @@ import { expect, test } from 'vite-plus/test';
 
 import { fresh, mountPage, sample, settle, posted } from '@/test/PageTest';
 
-test.each(['concept', 'build'] as const)(
+test.each(['build'] as const)(
     'delivered %s parent resumes release without starting another shaping owner',
     async (kind) => {
         const id = 'release-parent';

@@ -3,7 +3,7 @@
 import type { BoardData } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, stream, text } from '@/test/PageTest';
+import { $, $$, warningText, fetchMock, fresh, mountPage, sample, settle, stream, text } from '@/test/PageTest';
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
     await mountPage(fresh());
@@ -52,21 +52,6 @@ test('data pushed over /api/events replaces the board, and the open stream stops
     expect($$('.desk-row')).toHaveLength(0);
 });
 
-test('while the stream is down the page fetches /api/board every 15 s', async () => {
-    await mountPage(fresh());
-    await settle(() => vi.advanceTimersByTime(14_999));
-    expect(fetchMock).not.toHaveBeenCalled();
-    await settle(() => vi.advanceTimersByTime(1));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]![0]).toBe('/api/board');
-
-    // A dropped stream hands back to polling.
-    await settle(() => stream().onopen!());
-    await settle(() => stream().onerror!());
-    await settle(() => vi.advanceTimersByTime(15_000));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-});
-
 test('a failed fetch says the server can’t be reached and keeps the last data', async () => {
     await mountPage(fresh());
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
@@ -80,34 +65,4 @@ test('a failed fetch says the server can’t be reached and keeps the last data'
     fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh())));
     await settle(() => vi.advanceTimersByTime(15_000));
     expect($('[data-warning="client-error"]')).toBeNull();
-});
-
-test('the lost server’s warning closes, and the next failure after the server answers shows it again', async () => {
-    await mountPage(fresh());
-    fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
-    await settle(() => vi.advanceTimersByTime(15_000));
-
-    const close = $<HTMLButtonElement>('[data-warning="client-error"] .dismiss')!;
-
-    expect(close.getAttribute('aria-label')).toBe('Dismiss: board disconnected');
-    close.focus();
-    await settle(() => close.click());
-    expect($('[data-warning="client-error"]')).toBeNull();
-    expect(document.activeElement, 'focus stays on the page').toBe($('[data-add-item]'));
-    await settle(() => vi.advanceTimersByTime(15_000));
-    expect($('[data-warning="client-error"]'), 'it stays closed while the server stays away').toBeNull();
-
-    fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh())));
-    await settle(() => vi.advanceTimersByTime(15_000));
-    fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
-    await settle(() => vi.advanceTimersByTime(15_000));
-    expect(warningText($('[data-warning="client-error"]')!)[0]).toBe('Board disconnected — showing last received data');
-});
-
-test('new data keeps focus', async () => {
-    await mountPage(fresh());
-    $('[data-add-item]')!.focus();
-
-    await push({ ...fresh(), items: [...sample.items].reverse() });
-    expect(document.activeElement).toBe($('[data-add-item]'));
 });

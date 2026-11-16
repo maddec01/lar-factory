@@ -190,9 +190,6 @@ export async function chooseOption(trigger: Element, name: string): Promise<void
     await settle(() => vi.advanceTimersByTime(50));
 }
 
-/** The value a form reads for its field `name`. */
-export const formValue = (name: string) => $<HTMLInputElement>(`input[type="hidden"][name="${name}"]`)!.value;
-
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';

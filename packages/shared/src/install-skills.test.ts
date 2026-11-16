@@ -509,6 +509,24 @@ function withProfiles(home: string, ...names: string[]) {
 
 const ownLinks = { 'lar-work': '../../.agents/skills/lar-work', tdd: '../../.agents/skills/tdd' };
 
+test('a skill the engine did not install survives installs and upgrades', () => {
+    const home = temporary();
+
+    writeSkill(home, 'other', 'other');
+    installSkills(home, bundle(v1), '1.0.0');
+    writeSkill(home, 'later', 'later');
+    installSkills(home, bundle(v2), '2.0.0');
+    installSkills(
+        home,
+        bundle({ 'skills/lar-work/SKILL.md': 'v3', 'skills/lar-work/references/review.md': 'v3' }),
+        '3.0.0',
+    );
+
+    assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
+    assert.equal(read(home, 'skills/later/SKILL.md'), 'later');
+    assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'later', 'other']);
+});
+
 test('a fresh install links every skill into ~/.claude, and ticking another profile links them there', () => {
     const home = temporary();
 

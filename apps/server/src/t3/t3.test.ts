@@ -186,6 +186,26 @@ test('a choice equal to the T3 Project default launches with its options, in eac
     assert.equal(calls.length, 0, 'an explicit choice never goes through the CLI');
 });
 
+test('new and resumed launches follow T3 project runtime approval-required', async () => {
+    const { startThread } = await import('./t3.ts');
+    const { sent, launch, defaults } = launches(null, 'approval-required');
+
+    await startThread('p', 'T\nm', OPUS, { base: 'main', branch: 'build' }, t3With({}).run, defaults, launch);
+    await startThread(
+        'p',
+        'T\nm',
+        OPUS,
+        { type: 'existing_worktree', worktreePath: '/w', branch: 'build' },
+        t3With({}).run,
+        defaults,
+        launch,
+    );
+    assert.deepEqual(
+        sent.map((s) => s.runtimeMode),
+        ['approval-required', 'approval-required'],
+    );
+});
+
 test('T3 Project default sends no model through the CLI, and an existing worktree refuses it', async () => {
     const { startThread } = await import('./t3.ts');
     const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });

@@ -123,6 +123,25 @@ test('the T3 Project default follows the project override when settings are fold
     assert.deepEqual(effectiveDefaults(settings, 'other', noLegacy).selection, GLOBAL);
 });
 
+test("the runtime mode follows the project override, then the global setting, then T3's own default", () => {
+    const folded = { projectSettingsFolded: true };
+
+    assert.equal(effectiveDefaults(folded, 'p', noLegacy).runtimeMode, 'full-access');
+    assert.equal(effectiveDefaults({ ...folded, defaultRuntimeMode: 'auto' }, 'p', noLegacy).runtimeMode, 'auto');
+    assert.equal(
+        effectiveDefaults(
+            {
+                ...folded,
+                defaultRuntimeMode: 'auto',
+                projectSettingsOverrides: { p: { defaultRuntimeMode: 'approval-required' } },
+            },
+            'p',
+            noLegacy,
+        ).runtimeMode,
+        'approval-required',
+    );
+});
+
 test("a choice takes the default's options only for the same instance and model", () => {
     const choice = { instanceId: OVERRIDE.instanceId, model: OVERRIDE.model };
 

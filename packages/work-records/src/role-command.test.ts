@@ -329,19 +329,25 @@ it('finishes from a file and preserves T3 evidence', async () => {
     expect(f.records.runSettings(f.workId).roleRuns.at(-1)!.actual!.model!.model).toBe('configured');
 });
 
-it('holds and exits non-zero on a substituted executed model', async () => {
-    const f = await fixture();
-    const { clientRequestId } = JSON.parse((await f.launch()).stdout);
-    const result = await f.finish(clientRequestId, reported({ executedModel: 'substituted' }));
-    const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
+for (const [name, input] of [
+    ['executed model', reported({ executedModel: 'substituted' })],
+    ['unavailable', reported({ status: 'failed' })],
+    ['unfinished children', reported({ hasPendingChildRuns: true })],
+] as const) {
+    it(`holds and exits non-zero on ${name}`, async () => {
+        const f = await fixture();
+        const { clientRequestId } = JSON.parse((await f.launch()).stdout);
+        const result = await f.finish(clientRequestId, input);
+        const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
 
-    expect(result.status).toBe(1);
-    expect(result.stdout).toBe('');
-    expect(attempt.result).toBe('failed');
-    expect(attempt.failure).toBeTruthy();
-    expect(f.records.read(f.workId).needsYou).toBeNull();
-    expect(result.stderr).toContain(attempt.failure!);
-});
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(attempt.result).toBe('failed');
+        expect(attempt.failure).toBeTruthy();
+        expect(f.records.read(f.workId).needsYou).toBeNull();
+        expect(result.stderr).toContain(attempt.failure!);
+    });
+}
 
 it('routes the executable commands and reads a terminal T3 result from stdin', async () => {
     const f = await fixture();

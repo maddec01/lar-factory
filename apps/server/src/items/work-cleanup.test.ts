@@ -229,3 +229,40 @@ it('refuses unsafe root and symlink worktrees before invoking Git', async () => 
         await rm(root, { recursive: true, force: true });
     }
 });
+
+it('passes the inspected head through the provider and retains failed remote deletion', async () => {
+    const plan = {
+        branch: 'owned',
+        localBranches: [],
+        worktreePaths: [],
+        dirtyFiles: [],
+        unpushedCommits: [],
+        remoteBranch: 'owned',
+        remoteHead: 'a'.repeat(40),
+        localAvailable: false,
+        remoteAvailable: true,
+    };
+    const calls: unknown[][] = [];
+    const result = await executeCleanup({
+        checkout: '/repo',
+        repository: 'a/b',
+        plan,
+        expectedPlan: plan,
+        local: false,
+        remote: true,
+        confirmedLoss: false,
+        git: async () => {
+            throw Error('Git must not perform remote deletion');
+        },
+        provider: {
+            deleteRemoteBranch: async (...args) => {
+                calls.push(args);
+                throw Error('changed');
+            },
+        },
+    });
+
+    expect(calls).toEqual([['a/b', 'owned', 'a'.repeat(40)]]);
+    expect(result.errors).toEqual(['Could not delete remote branch owned']);
+    expect(result.remainingBranches).toContain('owned');
+});

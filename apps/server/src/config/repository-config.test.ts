@@ -86,6 +86,14 @@ test('finishing an onboarding leaves its entry with the repository alone, in pla
     });
 });
 
+test("saving an onboarding into a list that can't be read is refused", async (t) => {
+    const broken = await dataDir(t, { 'repository-settings.json': '{ broken' });
+
+    assert.throws(() => saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, broken), {
+        message: `${join(broken, 'repository-settings.json')} isn't valid JSON.`,
+    });
+});
+
 test('a list file naming a repository that would escape its folder is refused, naming its path', async (t) => {
     for (const shape of [{ repositories: [{ repo: 'maddec01/..' }] }, { repositories: [{ repo: '../lar-factory' }] }]) {
         const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify(shape) });

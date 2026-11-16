@@ -120,6 +120,33 @@ describe('openDatabase', () => {
         expect(readdirSync(dir).filter((f) => /\.before-v/.test(f))).toEqual([]);
     });
 
+    it('restores its copy when a failed schema update committed part of its work', async () => {
+        const dir = tempDir();
+        const path = join(dir, 'work-records.db');
+        const first = await openDatabase(path, { migrations: [NOTES] });
+
+        first.db.exec('PRAGMA wal_autocheckpoint = 0');
+        first.write(() => first.db.exec("INSERT INTO notes VALUES ('one'), ('two')"));
+
+        const escaping: Migration = (db) => {
+            db.exec('COMMIT');
+            db.exec('DELETE FROM notes');
+            throw new Error('crashed');
+        };
+
+        await expect(openDatabase(path, { migrations: [NOTES, escaping] })).rejects.toMatchObject({
+            code: 'schema-update-failed',
+        });
+
+        try {
+            expect(noteTexts(first.db)).toEqual(['one', 'two']);
+        } finally {
+            first.close();
+        }
+
+        expect(readdirSync(dir).filter((f) => /\.before-v/.test(f))).toEqual([]);
+    });
+
     it('refuses writes once another process updates the schema past what it knows', async () => {
         const path = join(tempDir(), 'work-records.db');
         const old = await openDatabase(path, { migrations: [NOTES] });

@@ -54,7 +54,7 @@ export interface LaunchInput {
 }
 
 /** One call to the install engine. */
-export interface Plan {
+interface Plan {
     readonly home: string;
     /** The folder ROOT_ENV names, which every write must stay in. */
     readonly root?: string;
@@ -82,7 +82,7 @@ const installRoot = (env: LaunchInput['env']) => env[ROOT_ENV] || undefined;
 export const installHome = (home: string, env: LaunchInput['env']) => installRoot(env) ?? home;
 
 /** What this launch installs, or undefined when it installs nothing. */
-export const plan = (input: LaunchInput): Plan | undefined => {
+const plan = (input: LaunchInput): Plan | undefined => {
     if (!input.isPackaged && !input.argv.includes(INSTALL_FLAG)) return undefined;
 
     const root = installRoot(input.env);
@@ -119,7 +119,7 @@ export const offlineTargets = (home: string): Array<OfferedTarget> => {
 };
 
 /** Every Install target of T3's instances, disabled ones too, once per path and required, so no untick turns it off. */
-export const requiredTargets = (instances: ReadonlyArray<ProviderInstance>): Array<OfferedTarget> => {
+const requiredTargets = (instances: ReadonlyArray<ProviderInstance>): Array<OfferedTarget> => {
     const byPath = new Map<string, OfferedTarget>();
 
     for (const target of instances.flatMap(({ targets }) => targets)) {
@@ -388,7 +388,7 @@ export const makeChecks = (
  * or not yet running at launch still gets its targets installed later in the run. Each check takes its turn with the
  * others, and installs only the targets new to it. A check that fails counts as an answer: the board page reports it.
  */
-export const discoverUntilAnswered = (checks: Checks, every: Duration.Input): Effect.Effect<void> => {
+const discoverUntilAnswered = (checks: Checks, every: Duration.Input): Effect.Effect<void> => {
     const ask: Effect.Effect<void> = checks.afterDiscovery.pipe(
         Effect.match({ onFailure: () => true, onSuccess: (outcome) => outcome !== undefined }),
         Effect.flatMap((answered) =>

@@ -1,7 +1,6 @@
 import { boardSessionAuthority } from './board-session.ts';
 import { keychainSessionVault } from './keychain-session.ts';
-import { ProjectProtocol, type ProjectRead, type SessionAuthority, type SessionVault } from './project-protocol.ts';
-import { subscribeProjects } from './project-subscription.ts';
+import { ProjectProtocol, type SessionAuthority, type SessionVault } from './project-protocol.ts';
 
 /** Where a board's T3 session is kept and who issues it. */
 export interface BoardSessions {
@@ -44,15 +43,4 @@ export function boardProjects(baseUrl: string, version: string, sessions?: Board
             }),
         version,
     );
-}
-
-/** Authenticated shell subscription with retained observations and explicit cleanup. */
-export function subscribeBoardProjects(
-    baseUrl: string,
-    version: string,
-    onChange: (read: ProjectRead) => void,
-): () => void {
-    const protocol = boardProjects(baseUrl, version);
-
-    return subscribeProjects(new URL(baseUrl), version, protocol, onChange);
 }

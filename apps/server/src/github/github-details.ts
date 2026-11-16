@@ -21,7 +21,7 @@ const TEXT = `body ${PEOPLE}
 /**
  * One issue's details and sub-issues by node id, in one call.
  */
-export const ITEM_DETAILS_QUERY = `query($id: ID!) {
+const ITEM_DETAILS_QUERY = `query($id: ID!) {
   node(id: $id) {
     __typename
     ... on Issue {
@@ -34,7 +34,7 @@ export const ITEM_DETAILS_QUERY = `query($id: ID!) {
 }`;
 
 /** The 10 comments before a cursor, on an issue. */
-export const OLDER_COMMENTS_QUERY = `query($id: ID!, $before: String!) {
+const OLDER_COMMENTS_QUERY = `query($id: ID!, $before: String!) {
   node(id: $id) {
     __typename
     ... on Issue { ${comments(`last: ${COMMENT_LIMIT}, before: $before`)} }

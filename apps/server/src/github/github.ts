@@ -151,7 +151,7 @@ const ISSUES_BY_ID_QUERY = `query($ids: [ID!]!) {
 }`;
 
 /** One page of a repository's open issues. */
-export const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String) {
+const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
     issues(first: ${PAGE_SIZE}, after: $after, states: [OPEN]) {
       pageInfo { hasNextPage endCursor }

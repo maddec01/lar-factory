@@ -27,7 +27,7 @@ function blockedShort(item: Item, items: readonly Item[]): string | null {
 }
 
 /** A concept's Ready builds explain what must change next; active work keeps its usual stage presenter. */
-export function conceptBuildWait(item: Item, data: BoardData): string | null {
+function conceptBuildWait(item: Item, data: BoardData): string | null {
     if (item.kind !== 'build') return null;
 
     const parent = data.items.find((candidate) => candidate.id === item.parentId);

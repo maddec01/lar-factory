@@ -16,7 +16,7 @@ export function trackerFacts(item: Pick<Item, 'azure' | 'kind'>): string {
 }
 
 /** The labels a row shows: none that only repeats its project's name. */
-export function rowLabels(labels: readonly string[], project: string): string[] {
+function rowLabels(labels: readonly string[], project: string): string[] {
     const named = project.trim().toLowerCase();
 
     return labels.filter((label) => label.trim().toLowerCase() !== named);

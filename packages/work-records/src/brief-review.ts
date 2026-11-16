@@ -22,7 +22,7 @@ const text = (value: unknown): string =>
         : invalid('Doubt identity, evidence and ordering reasons must be nonempty text.');
 
 /** Explicit ownership declarations avoid pretending to infer semantic conflicts from prose. */
-export function namedWork(brief: string): { files: string[]; contracts: string[] } {
+function namedWork(brief: string): { files: string[]; contracts: string[] } {
     const names = (label: string) =>
         [...brief.matchAll(new RegExp(`^\\s*(?:-\\s*)?${label}:\\s*(.+)$`, 'gmi'))].flatMap((match) =>
             [...match[1]!.matchAll(/`([^`]+)`/g)].map((token) => token[1]!),

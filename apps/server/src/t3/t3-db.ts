@@ -247,29 +247,6 @@ export function projectDefaultSelection(db: DatabaseSync, projectId: string): un
 }
 
 // A project's live threads with a title, newest first, each with its latest assistant message.
-const THREAD_BY_TITLE = `
-SELECT t.thread_id AS id, (
-  SELECT json_extract(m.payload_json, '$.text') FROM orchestration_v2_projection_messages m
-  WHERE m.thread_id = t.thread_id AND m.role = 'assistant' ORDER BY m.created_at DESC LIMIT 1
-) AS latest
-FROM orchestration_v2_projection_threads t
-WHERE t.project_id = ? AND t.title = ? AND t.deleted_at IS NULL
-ORDER BY t.created_at DESC LIMIT 1`;
-
-/** The project's newest live thread with this title and its latest assistant message, or null when it has none; throws like liveProjects. */
-export function threadByTitle(
-    db: string,
-    projectId: string,
-    title: string,
-): { threadId: string; latest: string | null } | null {
-    const row = readT3Db(db, (open) => open.prepare(THREAD_BY_TITLE).get(projectId, title)) as
-        | { id: unknown; latest: unknown }
-        | undefined;
-
-    if (typeof row?.id !== 'string') return null;
-
-    return { threadId: row.id, latest: typeof row.latest === 'string' ? row.latest : null };
-}
 
 // A run with work under way.
 const LIVE_RUN = `('preparing', 'starting', 'running', 'waiting')`;

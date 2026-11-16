@@ -32,7 +32,7 @@ export interface DetectReads {
 }
 
 /** The reads through gh, and for an Azure DevOps repository through `run` as az. */
-export function detectReads(run: Az = az): DetectReads {
+function detectReads(run: Az = az): DetectReads {
     return {
         checkouts: () => checkouts(process.env),
         tree: async (repo) => {

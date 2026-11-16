@@ -21,7 +21,12 @@ leave the worktree as you found it. These Overrides replace parts of that Copy:
 - **skills/code-review/SKILL.md#3. Identify the standards sources**: existing
   project instructions are optional. Infer conventions from neighboring code,
   scripts and CI when no standards docs exist; use the Copy's smell baseline.
-  Do not require or offer setup or guidance files.
+  Do not require or offer setup or guidance files. Add
+  `<lar-build>/test-first.md#which-tests-to-keep` as a standards source;
+  `<lar-build>/prove-it.md` carries the same rubric. Under Standards, report
+  each added or changed test that the rubric would not keep or that could be
+  lighter, and each guard, contract or happy path the rubric keeps that has no
+  test.
 - **4. Spawn both sub-agents in parallel**: run the Standards axis, then the
   Spec axis, yourself.
 - **5. Aggregate**: return the format below. Start each finding's problem with

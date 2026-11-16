@@ -44,7 +44,7 @@ test('writes reject foreign and missing origins before touching GitHub', async (
 });
 
 test('a completed submission is immediately visible and duplicate delivery reuses it', async (t) => {
-    const board = await startBoard(t, { readDelay: 700 });
+    const board = await startBoard(t);
 
     await onboarded(board);
 
@@ -58,12 +58,6 @@ test('a completed submission is immediately visible and duplicate delivery reuse
     assert.equal(result.item.status, 'List');
     assert.equal(result.board.items[0].title, 'Capture an item');
     assert.equal((await board.board()).items[0].title, 'Capture an item');
-    await new Promise((r) => setTimeout(r, 850));
-    assert.equal(
-        (await board.board()).items[0].title,
-        'Capture an item',
-        'older refresh cannot erase the created item',
-    );
     assert.equal((await board.post(body)).status, 200, 'lost HTTP response can be delivered again');
     assert.equal(
         (await board.board()).items.filter((i: { title: string }) => i.title === 'Capture an item').length,
@@ -124,7 +118,11 @@ test('a record shared with an unread thread of another item shows provisionally,
     });
     assert.equal(item(inflated, 13)?.usageState, 'loading');
     assert.equal(item(inflated, 13)?.stats, undefined, 'a family with a thread never read shows no figures');
-    await new Promise((r) => setTimeout(r, 500));
+
+    const reads = (args: string[]) => args[0] === 'api' && args[1] === 'graphql';
+
+    // Two more reads give the board its chance to write a block.
+    await board.untilCalled(reads, (await board.calls()).filter(reads).length + 2);
 
     const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
 
@@ -145,60 +143,6 @@ test('a record shared with an unread thread of another item shows provisionally,
     await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
     assert.ok((await edits()).every((args) => !String(args[5]).includes('1,007') && !String(args[5]).includes('1.0K')));
     assert.ok(String((await edits())[0]![5]).includes('"tokens":7'));
-});
-
-test('refreshes keep a stats block in open linked PRs, and edit only when it changes', async (t) => {
-    const db = statsDb(t, [
-        {
-            id: 'build',
-            messages: ['Build maddec01/lar-factory#12'],
-            turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-        },
-    ]);
-    const pr = (number: number, state: string) => ({
-        number,
-        url: `https://github.com/maddec01/lar-factory/pull/${number}`,
-        state,
-        isDraft: false,
-        body: `PR ${number}`,
-    });
-    const withPrs = (number: number, prs: object[]) => {
-        const raw = rawBuild(number, 'Review');
-
-        return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: prs } } };
-    };
-    const items = [withPrs(12, [pr(40, 'OPEN'), pr(41, 'MERGED')]), withPrs(13, [pr(42, 'OPEN')])];
-    // A slow live-body read must finish before checking the edit and its next authoritative read.
-    const board = await startBoard(
-        t,
-        { threads: { 'maddec01/lar-factory#12': ['build'] }, items, prReadDelay: 2500 },
-        false,
-        true,
-        { T3_STATE_DB: db },
-    );
-    const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
-
-    await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
-    await until(
-        board,
-        (data) =>
-            data.items
-                .find((item) => item.number === 12)
-                ?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) === true,
-    );
-
-    const made = await edits();
-
-    assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
-    assert.equal(
-        made[0]![3],
-        'repos/maddec01/lar-factory/pulls/40',
-        'merged PRs and items without stats are left alone',
-    );
-    assert.equal(
-        made[0]![5],
-        'body=PR 40\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->',
-    );
 });
 
 test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {

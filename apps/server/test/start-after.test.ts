@@ -67,17 +67,6 @@ async function read(board: Board): Promise<BoardData> {
     return until(board, (d) => d.fetchedAt !== before);
 }
 
-test('armed starts survive a board restart', async (t) => {
-    const { board, env } = await blockedBuildBoard(t);
-
-    assert.equal((await arm(board, board.id(12))).status, 200);
-    await board.stop();
-
-    const { board: again } = await armableBoard(t, [build], {}, env);
-
-    assert.deepEqual(((await again.board()) as BoardData).armed, { [board.id(12)]: {} });
-});
-
 test('a refresh with a blocker incomplete starts nothing; once the last completes, the board starts the build once, on its armed model', async (t) => {
     const { board, env, open } = await blockedBuildBoard(t);
 

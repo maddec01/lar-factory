@@ -1,43 +1,13 @@
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { WorkRecordError } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'vite-plus/test';
-import type { TestContext } from 'vite-plus/test';
 
 import { changeRecords, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
-/** The project item reads the board has started, one per read of GitHub. */
-async function reads(board: Board): Promise<number> {
-    return (await board.calls()).filter((args) => args.some((a) => a.includes('states: [OPEN]'))).length;
-}
-
-/** Polls `check` until it passes. The test's deadline bounds the wait, as a loaded board can take seconds to read. */
-async function waitFor(check: () => Promise<boolean>): Promise<void> {
-    while (!(await check())) await new Promise((r) => setTimeout(r, 25));
-}
-
 /** Waits for the board's first read to land and settle, so no read it asks for itself is still to come. */
 const firstRead = (board: Board) => until(board, (d) => d.fetchedAt !== null && d.firstRead.settled);
-
-/** A path the fake gh's readHold watches: while the file exists, a read of open issues waits. */
-async function holdPath(t: TestContext): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), 'lar-read-hold-'));
-
-    t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-
-    return join(dir, 'hold');
-}
-
-const askRead = (board: Board) =>
-    fetch(`${board.url}/api/read`, {
-        method: 'POST',
-        headers: { Origin: board.url, 'Content-Type': 'application/json' },
-        body: '{}',
-    });
 
 test("a dossier's map and every item's blockers reach the page; only the bodies of concepts and items with sub-issues on the board are read", async (t) => {
     const body = '## Destination\nThere.\n\n## End-to-end check\nTry it\n1. Step\n';

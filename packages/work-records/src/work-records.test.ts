@@ -141,30 +141,31 @@ describe('work records', () => {
     });
 
     it(
-        'keeps every commit from two processes writing at once, refusing only stale or locked writes',
+        'keeps both commits from two processes contesting one revision, refusing only the stale or locked one',
         { timeout: 30_000 },
         async () => {
             const path = join(tempDir(), 'work-records.db');
             const made = (await open(path)).create({ title: 'Work', repository: 'maddec01/lar', kind: 'build' });
-            // Each writer appends a line named after itself to the brief it just read, naming the revision it read. Neither
-            // starts writing until both have marked themselves ready.
+            // Each writer reads the record, waits until the other has read it too, then appends its name to the brief at
+            // the revision it read. The loser rereads and tries once more.
             const writer = `import { existsSync, writeFileSync } from 'node:fs';
       import { openWorkRecords } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, 'work-records.ts')).href)};
       const [path, workId, name, other] = process.argv.slice(1);
       const records = await openWorkRecords(path);
-      writeFileSync(path + '.' + name + '-ready', '');
-      while (!existsSync(path + '.' + other + '-ready'));
-      const outcomes = [];
-      for (let i = 0; i < 100; i++) {
+      const write = () => {
         const { revision } = records.read(workId);
         const brief = records.body(workId, 'brief') ?? '';
+        writeFileSync(path + '.' + name + '-read', '');
+        while (!existsSync(path + '.' + other + '-read'));
         try {
-          records.setBody(workId, revision, 'brief', brief + name + '-' + i + '\\n');
-          outcomes.push(name + '-' + i);
+          records.setBody(workId, revision, 'brief', brief + name + '\\n');
+          return name;
         } catch (error) {
-          outcomes.push(error.code ?? String(error));
+          return error.code ?? String(error);
         }
-      }
+      };
+      const outcomes = [write()];
+      if (outcomes[0] !== name) outcomes.push(write());
       records.close();
       process.stdout.write(JSON.stringify(outcomes));`;
             const run = (name: string, other: string) =>
@@ -178,23 +179,22 @@ describe('work records', () => {
                     name,
                     other,
                 ]);
-            const outcomes = (await Promise.all([run('board', 'thread'), run('thread', 'board')])).flatMap(
+            const [board, thread] = (await Promise.all([run('board', 'thread'), run('thread', 'board')])).map(
                 ({ stdout }) => JSON.parse(stdout) as string[],
             );
+            const [winner, loser] = board!.length === 1 ? [board!, thread!] : [thread!, board!];
 
-            const committed = outcomes.filter((outcome) => /^(board|thread)-\d+$/.test(outcome));
-
-            for (const name of ['board', 'thread'])
-                expect(committed.some((outcome) => outcome.startsWith(`${name}-`))).toBe(true);
-            for (const refused of outcomes.filter((outcome) => !committed.includes(outcome)))
-                expect(['stale-revision', 'busy']).toContain(refused);
+            expect(winner).toHaveLength(1);
+            expect(loser).toHaveLength(2);
+            expect(['stale-revision', 'busy']).toContain(loser[0]);
 
             const reader = await open(path);
 
-            expect(reader.body(made.workId, 'brief')!.split('\n').filter(Boolean).toSorted()).toEqual(
-                committed.toSorted(),
-            );
-            expect(reader.read(made.workId).revision).toBe(1 + committed.length);
+            expect(reader.body(made.workId, 'brief')!.split('\n').filter(Boolean).toSorted()).toEqual([
+                'board',
+                'thread',
+            ]);
+            expect(reader.read(made.workId).revision).toBe(3);
         },
     );
 });

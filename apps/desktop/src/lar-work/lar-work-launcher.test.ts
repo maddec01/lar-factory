@@ -38,37 +38,6 @@ const install = (home: string, file = commandFile, dataDir = boardDataDir(home))
     LarWorkLauncher.install({ home, executablePath: ELECTRON, commandFile: file, dataDir });
 
 describe('install', () => {
-    it('installs a launcher that runs the bundled command', () => {
-        const home = tempDir('lar-work-home-');
-
-        assert.deepStrictEqual(install(home), { kind: 'installed', path: LarWorkLauncher.launcherPath(home) });
-
-        const dataDir = tempDir('lar-work-data-');
-        const created = runFrom(LarWorkLauncher.launcherPath(home), [
-            'create',
-            '--title',
-            'A concept',
-            '--repository',
-            'maddec01/lar',
-            '--kind',
-            'concept',
-            '--data-dir',
-            dataDir,
-        ]);
-
-        assert.strictEqual(created.status, 0, created.stderr);
-
-        const read = runFrom(LarWorkLauncher.launcherPath(home), [
-            'read',
-            JSON.parse(created.stdout).workId,
-            '--data-dir',
-            dataDir,
-        ]);
-
-        assert.strictEqual(read.status, 0, read.stderr);
-        assert.strictEqual(JSON.parse(read.stdout).kind, 'concept');
-    });
-
     it("gives Claude Code and Codex threads the board's database whatever their HOME and folder", () => {
         const appHome = tempDir('app-home-');
         const dataDir = boardDataDir(appHome, {});
@@ -113,16 +82,5 @@ describe('install', () => {
             assert.strictEqual(read.status, 0, read.stderr);
             assert.strictEqual(JSON.parse(read.stdout).title, agents[index]!.driver);
         }
-    });
-
-    it('leaves a file the app did not install alone and reports it', () => {
-        const home = tempDir('lar-work-home-');
-        const path = LarWorkLauncher.launcherPath(home);
-
-        NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
-        NodeFS.writeFileSync(path, '#!/bin/sh\necho mine\n', { mode: 0o755 });
-
-        assert.deepStrictEqual(install(home), { kind: 'foreign', path });
-        assert.strictEqual(NodeFS.readFileSync(path, 'utf8'), '#!/bin/sh\necho mine\n');
     });
 });

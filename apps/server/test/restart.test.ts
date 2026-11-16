@@ -84,8 +84,11 @@ test(
         assert.equal(after.error, 'Restart Lar Factory to continue.');
         assert.equal((await fetch(`${board.url}/healthz`)).status, 200);
         assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
-        // Two more local ticks must not crash the process.
-        await new Promise((resolve) => setTimeout(resolve, 250));
+
+        // Two more local ticks, each pushing the board, must not crash the process.
+        let pushes = 0;
+
+        await until(board, () => ++pushes > 2);
         assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
     },
 );

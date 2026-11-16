@@ -1,6 +1,9 @@
 import type { BoardData } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 
 import { startableEnv, startBoard, until } from './server-support.ts';
@@ -23,19 +26,30 @@ const post = (
     });
 
 test('a drain answers once running writes finish, and refuses new writes from then on', async (t) => {
+    const dir = await mkdtemp(join(tmpdir(), 'lar-drain-hold-'));
+    const hold = join(dir, 'hold');
+
+    t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     const env = { ...startableEnv(t), BOARD_APP_SECRET: SECRET };
-    const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, env);
+    const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { hold } }, false, false, env);
 
     await until(board, (d) => d.items.length === 1);
+    await writeFile(hold, '');
 
     const { capture } = (await board.board()) as BoardData;
     const starting = post(board, '/api/start', { session: capture!.session, itemId: board.id(12) });
 
-    await new Promise((r) => setTimeout(r, 100));
+    // The Start is running while T3 holds its launch.
+    while (!(await board.t3Calls()).some((args) => args[0] === 'launch')) await new Promise((r) => setTimeout(r, 25));
 
-    const drain = await post(board, '/api/drain');
+    const drain = post(board, '/api/drain');
 
-    assert.equal(drain.status, 200);
+    // Once the drain is in, new writes are refused, though the Start still runs.
+    while ((await post(board, '/api/recheck')).status !== 503) await new Promise((r) => setTimeout(r, 25));
+
+    await rm(hold);
+    assert.equal((await drain).status, 200);
     assert.ok(
         ((await board.board()) as BoardData).started?.[board.id(12)],
         'the drain answered before the running Start finished',

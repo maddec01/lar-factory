@@ -70,23 +70,28 @@ for (const { kind, start, finish } of BLOCKERS) {
         const board = createBoardState({ items: recordItems(records, [], [REPO]), repos: [] } as unknown as BoardData);
         const reread = () => board.applyRead(recordItems(records, [], [REPO]), board.revision(), (items) => items);
         const started: unknown[][] = [];
-        const startAfter = createStartAfter({
-            board,
+        const deps = {
             file: join(dir, 'armed.json'),
             offerModelChoices: () => [],
             gone: () => false,
             commands: {
-                start: async (...args) => {
+                start: async (...args: unknown[]) => {
                     started.push(args);
 
                     return { status: 200, body: { error: null } };
                 },
                 startBuild: async () => ({ status: 200, body: { error: null } }),
             },
-        });
+        };
+        const startAfter = createStartAfter({ board, ...deps });
 
         assert.equal(blockedText(board.find(work.workId)!), `Blocked by The ${kind} until it completes`);
         assert.equal(startAfter.arm(work.workId, undefined).status, 200);
+
+        const restarted = createBoardState({ items: [], repos: [] } as unknown as BoardData);
+
+        createStartAfter({ board: restarted, ...deps });
+        assert.deepEqual(restarted.snapshot().armed, { [work.workId]: {} }, 'a restart keeps the armed start');
         await startAfter.startUnblocked();
         assert.deepEqual(started, []);
 

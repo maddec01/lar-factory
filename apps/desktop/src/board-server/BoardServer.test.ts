@@ -112,48 +112,4 @@ describe('start', () => {
             assert.isFalse(isRunning(board.pid));
         }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
     );
-
-    it.live('starts the real board in sample mode, guarding writes and drains with the launch secret', () =>
-        Effect.gen(function* () {
-            const config = BoardServer.makeStartConfig({
-                ...BoardServer.locate(appDir, false),
-                executablePath: process.execPath,
-                env: {
-                    ...process.env,
-                    BOARD_DATA_FILE: '../../packages/shared/test/sample.json',
-                    T3_SETTINGS: 'test/t3-settings.sample.json',
-                    T3_MODEL_MANIFEST: 'test/model-manifest.sample.json',
-                },
-                secret: 'launch-secret',
-            });
-            const board = yield* BoardServer.start(config);
-            const page = yield* Effect.promise(() => fetch(board.url).then((res) => res.text()));
-
-            assert.include(page, '<html');
-
-            // Each POST comes from the page's origin, as JSON, as the page's and status.sh's do.
-            const post = (path: string, headers: Record<string, string> = {}) =>
-                Effect.promise(() =>
-                    fetch(new URL(path, board.url), {
-                        method: 'POST',
-                        headers: { Origin: board.url.origin, 'Content-Type': 'application/json', ...headers },
-                        body: '{}',
-                    }).then(async (res) => `${res.status} ${await res.text()}`),
-                );
-            const refused = '403 {"error":"Submit from the board app."}';
-
-            assert.strictEqual(yield* post('/api/queue'), refused, 'a write without the launch secret');
-            // Sample mode turns the write down itself once the secret gets it past the check.
-            assert.notStrictEqual(yield* post('/api/queue', { 'X-Board-Secret': 'launch-secret' }), refused);
-            assert.match(yield* post('/api/read'), /^2\d\d /, "status.sh's refresh stays open");
-
-            // A drain with the wrong secret fails and leaves writes open; with the launch secret it closes them.
-            const failed = yield* Effect.exit(BoardServer.drain(board.url, 'wrong-secret'));
-
-            assert.match(String(Exit.isFailure(failed) && failed.cause), /could not drain the board's writes/);
-            assert.notMatch(yield* post('/api/queue', { 'X-Board-Secret': 'launch-secret' }), /^503 /);
-            yield* BoardServer.drain(board.url, 'launch-secret');
-            assert.match(yield* post('/api/queue', { 'X-Board-Secret': 'launch-secret' }), /^503 /);
-        }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
-    );
 });

@@ -102,10 +102,9 @@ test('over its ticks it reads T3 and nothing else, and changes no file in the ap
 
     const startupReads = readCount();
 
-    // Two local ticks, and enough of the second-long read tick.
-    await new Promise((resolve) => setTimeout(resolve, 4_500));
+    // Two local ticks, which keep reading availability, and the second-long read ticks between them.
+    await until(async () => readCount() > startupReads + 2);
 
-    assert.ok(readCount() > startupReads, 'availability keeps being read');
     assert.deepEqual(await board.calls(), [], 'no gh call');
     assert.equal(existsSync(azLog), false, 'no az call');
     assert.deepEqual(await board.t3Calls(), [], 'no t3 command');

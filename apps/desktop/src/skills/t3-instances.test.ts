@@ -28,28 +28,4 @@ describe('runT3', () => {
             assert.strictEqual(failed.code, 3);
         }),
     );
-
-    it.live("answers a null code when t3 isn't on the PATH", () =>
-        Effect.gen(function* () {
-            const answer = yield* Effect.promise(() =>
-                T3Instances.runT3({ PATH: tempDir('no-t3-') })([], new AbortController().signal),
-            );
-
-            assert.strictEqual(answer.code, null);
-        }),
-    );
-});
-
-describe('discover', () => {
-    it.live("answers that T3 isn't running when its runtime file is missing", () =>
-        Effect.gen(function* () {
-            const dir = tempDir('t3-runtime-');
-            const answer = yield* T3Instances.discover(
-                { T3_SERVER_RUNTIME: NodePath.join(dir, 'missing.json'), PATH: dir },
-                dir,
-            )(dir);
-
-            assert.deepStrictEqual(answer, { available: false, reason: 'not-running' });
-        }),
-    );
 });

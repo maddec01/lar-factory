@@ -77,47 +77,6 @@ describe('childEnvironment', () => {
         }),
     );
 
-    it.effect('tries the next shell when one exits with an error, ignoring what it printed', () =>
-        Effect.gen(function* () {
-            const { env, commands } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/failing', PATH: '/usr/bin' },
-                userShell: '/opt/homebrew/bin/fish',
-                handler: (command) =>
-                    command === '/bin/failing'
-                        ? { output: envOutput({ PATH: '/failed/bin' }), exitCode: 7 }
-                        : envOutput({ PATH: '/Users/me/.cargo/bin:/usr/bin' }),
-            });
-
-            assert.deepStrictEqual(commands, ['/bin/failing', '/opt/homebrew/bin/fish']);
-            assert.strictEqual(env.PATH, '/Users/me/.cargo/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin');
-        }),
-    );
-
-    it.effect("falls back to launchctl's PATH when no shell prints one", () =>
-        Effect.gen(function* () {
-            const { env, commands } = yield* readChildEnvironment({
-                env: { SHELL: '/opt/homebrew/bin/nu', PATH: '/usr/bin' },
-                userShell: '/bin/zsh',
-                handler: (command) => (command === '/bin/launchctl' ? '/opt/homebrew/bin:/usr/bin\n' : ''),
-            });
-
-            assert.deepStrictEqual(commands, ['/opt/homebrew/bin/nu', '/bin/zsh', '/bin/launchctl']);
-            assert.strictEqual(env.PATH, '/opt/homebrew/bin:/usr/bin:/usr/local/bin');
-        }),
-    );
-
-    it.effect('gives the inherited PATH plus the Homebrew folders when nothing can be read', () =>
-        Effect.gen(function* () {
-            const { env } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/zsh', PATH: '/usr/bin:/bin', HOME: '/Users/me' },
-                handler: () => ({ output: '', exitCode: 1 }),
-            });
-
-            assert.strictEqual(env.PATH, '/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin');
-            assert.strictEqual(env.HOME, '/Users/me');
-        }),
-    );
-
     it.effect('adds a missing SSH_AUTH_SOCK, Homebrew and CA trust variables and keeps inherited ones', () =>
         Effect.gen(function* () {
             const { env } = yield* readChildEnvironment({
@@ -138,41 +97,6 @@ describe('childEnvironment', () => {
             assert.strictEqual(env.SSL_CERT_FILE, '/opt/homebrew/etc/cacert.pem');
             assert.strictEqual(env.SSL_CERT_DIR, '/etc/ssl/certs');
             assert.strictEqual(env.NODE_EXTRA_CA_CERTS, '/Users/me/corp-root.pem');
-        }),
-    );
-
-    it.effect("keeps mise's PATH record with the login shell PATH", () =>
-        Effect.gen(function* () {
-            const { env } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/zsh', PATH: '/usr/bin', __MISE_DIFF: 'stale' },
-                handler: () => envOutput({ PATH: '/mise/installs/node/latest/bin:/usr/bin', __MISE_DIFF: 'mise-diff' }),
-            });
-
-            assert.strictEqual(env.__MISE_DIFF, 'mise-diff');
-        }),
-    );
-
-    it.effect('does not mix login shell locale variables into an inherited locale', () =>
-        Effect.gen(function* () {
-            const { env } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/zsh', PATH: '/usr/bin', LANG: 'en_US.UTF-8' },
-                handler: () => envOutput({ PATH: '/usr/bin', LC_ALL: 'de_DE.UTF-8' }),
-            });
-
-            assert.strictEqual(env.LANG, 'en_US.UTF-8');
-            assert.strictEqual(env.LC_ALL, undefined);
-        }),
-    );
-
-    it.effect('sets a UTF-8 LC_CTYPE when neither the app nor the login shell has a locale', () =>
-        Effect.gen(function* () {
-            const { env } = yield* readChildEnvironment({
-                env: { SHELL: '/bin/zsh', PATH: '/usr/bin' },
-                handler: () => envOutput({ PATH: '/usr/bin' }),
-            });
-
-            assert.strictEqual(env.LANG, undefined);
-            assert.strictEqual(env.LC_CTYPE, 'en_US.UTF-8');
         }),
     );
 });

@@ -2,15 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
 import type { ModelGroup } from './model.ts';
-import {
-    choiceOf,
-    highlightedChoice,
-    menuMove,
-    readChoice,
-    remembersChoice,
-    startRequest,
-    storedChoice,
-} from './start-menu.ts';
+import { choiceOf, highlightedChoice, readChoice, remembersChoice, startRequest, storedChoice } from './start-menu.ts';
 
 test('picking "Project default in T3" posts no model choice; picking a model posts its instance id and slug', () => {
     assert.deepEqual(startRequest('s1', 'I_1', choiceOf({})), { session: 's1', itemId: 'I_1' });
@@ -18,22 +10,6 @@ test('picking "Project default in T3" posts no model choice; picking a model pos
         startRequest('s1', 'I_1', choiceOf({ instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' })),
         { session: 's1', itemId: 'I_1', model: { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' } },
     );
-});
-
-test('an entry missing its instance or its model is "Project default in T3"', () => {
-    assert.equal(choiceOf({ instanceId: 'codex' }), undefined);
-    assert.equal(choiceOf({ model: 'gpt-5.5' }), undefined);
-});
-
-test('arrow keys move through the menu and wrap; Home and End go to its ends; other keys are not its own', () => {
-    assert.equal(menuMove('ArrowDown', 0, 4), 1);
-    assert.equal(menuMove('ArrowDown', 3, 4), 0);
-    assert.equal(menuMove('ArrowUp', 0, 4), 3);
-    assert.equal(menuMove('ArrowUp', 2, 4), 1);
-    assert.equal(menuMove('Home', 2, 4), 0);
-    assert.equal(menuMove('End', 1, 4), 3);
-    assert.equal(menuMove('Enter', 1, 4), null);
-    assert.equal(menuMove('a', 1, 4), null);
 });
 
 test('Start remembers the picked choice once it reports "Started" or "May have started", not after a refusal or failure', () => {

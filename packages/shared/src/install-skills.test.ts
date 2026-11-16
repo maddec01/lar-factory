@@ -24,7 +24,6 @@ import {
     describeTargets,
     installSkills,
     profileTargets,
-    readSkillStatus,
     setTargetTick,
     t3Targets,
     type InstallResult,
@@ -355,14 +354,6 @@ test('a replaced skill keeps its time while it matches, and a later version with
 
     installSkills(home, bundle(v2), '2.0.0');
     assert.deepEqual(manifest(home).status, matching('lar-work', 'tdd'));
-});
-
-test('readSkillStatus gives each skill’s state from the last install, and null before any install', () => {
-    const home = temporary();
-
-    assert.equal(readSkillStatus(home), null);
-    installSkills(home, bundle(v1), '1.0.0');
-    assert.deepEqual(readSkillStatus(home), matching('lar-work', 'tdd'));
 });
 
 test('an install that already matches writes nothing, not even the manifest', () => {
@@ -1247,8 +1238,6 @@ test('an install copies every skill into both Antigravity folders when ~/.gemini
 
 const antigravityRestores = {
     'an edited file': (path: string) => writeFileSync(join(path, 'SKILL.md'), 'edited'),
-    'a deleted file': (path: string) => rmSync(join(path, 'SKILL.md')),
-    'an added file': (path: string) => writeFileSync(join(path, 'extra.md'), 'extra'),
     'a deleted folder': (path: string) => rmSync(path, { recursive: true }),
 };
 

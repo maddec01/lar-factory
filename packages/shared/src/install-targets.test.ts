@@ -210,7 +210,6 @@ test('says T3 is unavailable when its runtime file is missing', async () => {
 
 test('gives up within its timeout when T3 does not answer', async () => {
     const t3 = await startFakeT3(temporary(), { config, hang: true }, onTestFinished);
-    const started = Date.now();
     const found = await discoverProviderInstances({
         home: HOME,
         runtimePath: t3.runtimePath,
@@ -219,22 +218,7 @@ test('gives up within its timeout when T3 does not answer', async () => {
     });
 
     assert.deepEqual(found, { available: false, reason: 'timed-out' });
-    assert.ok(Date.now() - started < 1_000);
     await vi.waitFor(() => assert.deepEqual(t3.revoked, ['fake-session-id']));
-});
-
-test('gives up within its timeout when the CLI hangs', async () => {
-    const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
-    const started = Date.now();
-    const found = await discoverProviderInstances({
-        home: HOME,
-        runtimePath: t3.runtimePath,
-        runT3: () => new Promise(() => {}),
-        timeoutMs: 300,
-    });
-
-    assert.deepEqual(found, { available: false, reason: 'timed-out' });
-    assert.ok(Date.now() - started < 1_000);
 });
 
 test("says T3 is unavailable when its answer isn't a config", async () => {

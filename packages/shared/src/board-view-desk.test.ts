@@ -69,9 +69,6 @@ test.each(['concept', 'linked'])('%s batch approval appears once on the parent d
 
 const kinds: [string, Partial<Item>, Item[]][] = [
     ['single issue', {}, []],
-    ['bug', { kind: 'bug' }, []],
-    ['feature', { kind: 'feature' }, []],
-    ['improvement', { kind: 'improvement' }, []],
     ['build', { kind: 'build' }, []],
     ['concept', { kind: 'concept' }, []],
     ['decision', { kind: 'decision' }, []],

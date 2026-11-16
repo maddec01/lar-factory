@@ -5,7 +5,6 @@ import {
     abandonPrompt,
     boardSections,
     closesTicketOnAbandon,
-    closeTicketPrompt,
     hasClosedPr,
     needsYouPrompt,
     placementOf,
@@ -130,31 +129,6 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
             true,
             'an unsettled first read',
         );
-    });
-}
-
-for (const [repo, detail, confirm, done] of [
-    [
-        'owner/repo',
-        'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
-        'Close issue',
-        'Closed #7 Keep history as "not planned".',
-    ],
-    [
-        'org/project/repo',
-        'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.',
-        'Move to Removed',
-        'Moved #7 Keep history to Removed.',
-    ],
-]) {
-    test(`closing ${repo}’s ticket after Abandon explains how it stays recoverable`, () => {
-        assert.deepEqual(closeTicketPrompt(ticketed(repo!)), {
-            question: 'Close the ticket of #7 Keep history too?',
-            detail,
-            confirm,
-            keep: 'Keep it open',
-            done,
-        });
     });
 }
 

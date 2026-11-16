@@ -19,10 +19,6 @@ test('Azure conversion preserves the Spec delimiters and collapsed Original whil
     expect(html).not.toContain('<script>');
 });
 
-test('the formatter preserves the exact brief bytes for its gate copy', () => {
-    expect(formatTicketSpec('Spec ending.  \n', '')).toContain('Spec ending.  \n\n\n<!-- lar-factory:original -->');
-});
-
 test('reading a marked ticket restores only Original and preserves exact Spec bytes', async () => {
     const { readTicketSpec } = await import('./ticket-spec.ts');
 

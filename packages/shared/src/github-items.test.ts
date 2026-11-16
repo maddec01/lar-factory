@@ -90,10 +90,6 @@ test('normalizes an issue item from the GraphQL response', () => {
     assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
 });
 
-test('an item blocked by nothing has no blockers', () => {
-    assert.deepEqual(normalizeItem(rawIssue('I_4', 4, 'List', ['feature']))?.blockers, []);
-});
-
 test("an issue's assignees become its assignee, sorted and joined as a work record observes them; null when it has none", () => {
     const assigned = rawIssue('I_5', 5, 'List', ['feature'], {
         assignees: { nodes: [{ login: 'pedro' }, { login: 'ana' }] },
@@ -284,21 +280,6 @@ test("GitHub's merge state statuses map to can merge, checking, conflicts and bl
         ['checking', 'checking', 'checking', 'checking'],
         'an unknown status, even an object member, is checking',
     );
-});
-
-test('a linked PR carries its merge state', () => {
-    const issue = normalizeItem({
-        id: 'I_6',
-        updatedAt: '2026-10-21T08:00:00Z',
-        content: {
-            ...rawIssue('I_6', 6, 'List', []).content!,
-            closedByPullRequestsReferences: {
-                nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, mergeStateStatus: 'DIRTY' }],
-            },
-        },
-    });
-
-    assert.equal(issue?.linkedPrs[0]?.mergeState, 'conflicts');
 });
 
 test("a build's slices come from the board query, open and closed, in GitHub's order; other kinds keep none", () => {

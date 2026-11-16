@@ -10,7 +10,7 @@ import { repositoryGroup } from './ProjectRows';
 import { RunChecks } from './RunChecks';
 import { emptyGroup } from './SettingsEmpty';
 import { custom, type Page, type PagesInput, type Row } from './SettingsModel';
-import { bundledGroup, targetGroup } from './SkillRows';
+import { bundledGroup } from './SkillRows';
 import { DIAGNOSED, azSkipped, ghSkipped, stateOf, toolDescription } from './ToolRows';
 import { useEditStore } from '@/features/repositories';
 import { sampleCapability } from '@/shared/capabilities/sampleCapability';
@@ -137,12 +137,9 @@ export function pages(input: PagesInput): Page[] {
         {
             id: 'skills',
             label: 'Skills',
-            keywords: 'Skill folders',
             icon: <Sparkles />,
-            description: input.app
-                ? 'Choose the folders where Lar Factory installs and maintains its skills: copies, or links in a Claude home.'
-                : 'The skills Lar Factory gives your agents. The Mac app chooses where they install.',
-            groups: [...(input.app ? [targetGroup(input)] : []), bundledGroup(input)],
+            description: 'The skills Lar Factory gives your agents, and who wrote them.',
+            groups: [bundledGroup(input)],
         },
         {
             id: 'updates',

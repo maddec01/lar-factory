@@ -22,7 +22,6 @@ import { useScopeStore, useShownScope } from '@/features/filters';
 import { useItemStates } from '@/features/items';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { useInstallStore } from '@/services/install/install.hooks';
 import { buttonKind, NoMatches } from '@/ui/board';
 
 /** The step the Update pill would run now; none while it does nothing, as when another step is under way. */
@@ -51,12 +50,8 @@ function Dialog({
     const data = useBoardStore((state) => state.data);
     const now = useBoardStore((state) => state.now);
     const app = !!boardApp();
-    const targets = useInstallStore((state) => state.snapshot?.targets ?? null);
     const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
-    const settingOptions = useMemo(
-        () => settingsOptions(data, { app, targets, version }, leave),
-        [data, app, targets, version, leave],
-    );
+    const settingOptions = useMemo(() => settingsOptions(data, { app, version }, leave), [data, app, version, leave]);
     const stateOf = useItemStates();
     const { groups, reading } = searchResults(
         {

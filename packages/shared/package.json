@@ -2,7 +2,7 @@
     "name": "@lar-factory/shared",
     "private": true,
     "version": "0.1.0",
-    "description": "What the board's apps share: the item and board model and rules, the desktop bridge contract, and the skill installer.",
+    "description": "What the board's apps share: the item and board model and rules, and the desktop bridge contract.",
     "type": "module",
     "exports": {
         ".": "./src/index.ts",
@@ -12,8 +12,6 @@
         "./provider-command": "./src/provider-command.ts",
         "./azure-safety": "./src/azure-safety.ts",
         "./data-dir": "./src/data-dir.ts",
-        "./install-skills": "./src/install-skills.ts",
-        "./install-targets": "./src/install-targets.ts",
         "./test/sample.json": "./test/sample.json",
         "./test/sample-details.json": "./test/sample-details.json",
         "./test/raw-items": "./test/raw-items.ts",

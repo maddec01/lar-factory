@@ -109,7 +109,7 @@ function actions({ query, filtering, update }: SearchInput, { leave, clear }: Se
 /** Each page by its label and each of its rows that holds a setting by its title, opening Settings on that page. */
 export function settingsOptions(
     data: BoardData,
-    settings: Pick<PagesInput, 'app' | 'targets' | 'version'>,
+    settings: Pick<PagesInput, 'app' | 'version'>,
     leave: SearchHandlers['leave'],
 ): SearchOption[] {
     const general = pages({ ...settings, data: settingsData(data), archive: { items: null, problem: null } }).flatMap(

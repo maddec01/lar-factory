@@ -84,7 +84,7 @@ import { createSampleBoard } from './sample/sample-board.ts';
 import { sampleFixture } from './sample/sample-fixture.ts';
 import { SAMPLE_DESK_SCENARIOS } from './sample/sample-scenarios.ts';
 import { factorySettingsService } from './settings/factory-settings.ts';
-import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
+import { loadBundledSkills } from './skills/bundled-skills.ts';
 import { refreshReleaseFolders, runningRelease } from './skills/release-folders.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import { loopTrace, nextTurn } from './startup/loop-trace.ts';
@@ -143,9 +143,6 @@ const bundled = loopTrace.span('bundled skills', loadBundledSkills);
 
 if (bundled.error) log(`no bundled skills in Settings: ${bundled.error}`);
 
-/** The bundled skills with their install state; the Sample board shows none, as it installs nothing. */
-const bundledSkills = () => (fixture ? bundled.skills : withInstallState(bundled.skills, installHome()));
-
 const board = createBoardState({
     capture,
     repos: [],
@@ -155,7 +152,7 @@ const board = createBoardState({
     items: [],
     firstRead: { step: 'repositories', running: [], settled: false },
     modelChoices: [],
-    bundledSkills: bundledSkills(),
+    bundledSkills: bundled.skills,
 });
 
 /**
@@ -1173,8 +1170,6 @@ async function refresh() {
 
         loopTrace.span('read start', () => {
             loopTrace.span('model choices', offerModelChoices);
-            // The app installs after the board server starts, so each read picks up the latest install's state.
-            board.update({ bundledSkills: loopTrace.span('skill install state', bundledSkills) });
         });
 
         const { error, fetchedAt } = board.snapshot();

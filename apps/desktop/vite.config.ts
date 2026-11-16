@@ -40,7 +40,7 @@ export default defineConfig({
             entry: ['src/main.ts'],
             clean: true,
             plugins: [compiledCss()],
-            // The skills and checklists of the commit being built, which the app installs on launch, and
+            // The skills and checklists of the commit being built, which the server copies into a release folder, and
             // UPSTREAM.md, which credits them in Settings > Skills. tsdown copies a folder into `to` under its own name,
             // so the skills land in dist-electron/bundle/skills; `clean` empties dist-electron first.
             copy: [
@@ -53,18 +53,6 @@ export default defineConfig({
                 neverBundle: electronOnly,
                 onlyBundle: false,
             },
-        },
-        {
-            // The ownership engine has its own entry so synchronous filesystem work stays off the main thread.
-            format: 'cjs',
-            outDir: 'dist-electron',
-            dts: false,
-            sourcemap: true,
-            outExtensions: () => ({ js: '.cjs' }),
-            outputOptions: { codeSplitting: false },
-            entry: { 'install-worker': 'src/skills/install-worker.ts' },
-            clean: false,
-            deps: { alwaysBundle: (id) => !id.startsWith('node:'), onlyBundle: false },
         },
         {
             // Sandboxed preloads must be self-contained, without shared runtime chunks.

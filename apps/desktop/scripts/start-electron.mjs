@@ -18,7 +18,8 @@ const childEnv = { ...process.env };
 
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
-// Arguments pass through, so `pnpm run dev --install-skills` reaches the app.
+// Arguments pass through, so `pnpm run dev --install-launcher` reaches the app, which then installs the lar-work
+// launcher in ~/.local/bin (or under LAR_FACTORY_INSTALL_ROOT) as a packaged app does on every launch.
 const child = NodeChildProcess.spawn(electronPath, ['.', ...process.argv.slice(2)], {
     stdio: 'inherit',
     cwd: appDir,

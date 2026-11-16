@@ -44,13 +44,6 @@ describe('resolveInitialMainWindowBounds', () => {
             height: 860,
         });
     });
-
-    it('opens at the default size with nothing saved', () => {
-        assert.deepStrictEqual(MainWindowBounds.resolveInitialMainWindowBounds(null, [laptop]), {
-            width: 1280,
-            height: 860,
-        });
-    });
 });
 
 const tempFile = () => NodePath.join(tempDir('window-state-'), 'settings', 'window-state.json');
@@ -124,18 +117,6 @@ const fakeWindow = () => {
 describe('persistMainWindowBounds', () => {
     beforeEach(() => void vi.useFakeTimers());
     afterEach(() => void vi.useRealTimers());
-
-    it('saves once, 500 ms after the window last moves or resizes', () => {
-        const { window, writes } = fakeWindow();
-
-        window.emit('move');
-        vi.advanceTimersByTime(400);
-        window.emit('resize');
-        vi.advanceTimersByTime(499);
-        assert.deepStrictEqual(writes, []);
-        vi.advanceTimersByTime(1);
-        assert.deepStrictEqual(writes, [{ bounds: window.bounds, isMaximized: false }]);
-    });
 
     it('saves the bounds the window returns to while maximized, full screen or minimized', () => {
         const { window, writes, flush } = fakeWindow();

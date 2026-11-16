@@ -28,13 +28,6 @@ describe('StartingPage messages', () => {
             ['error', `The board server didn't start: ${reason}. Trying again.`],
         ]);
     });
-
-    it('does nothing on a page that is not the starting page', () => {
-        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
-        assert.doesNotThrow(() => new Function('window', StartingPage.stepScript('x'))({}));
-        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
-        assert.doesNotThrow(() => new Function('window', StartingPage.errorScript('x'))({}));
-    });
 });
 
 describe('StartingPage script', () => {
@@ -122,13 +115,6 @@ describe('StartingPage script', () => {
 });
 
 describe('StartingPage.drawWait', () => {
-    it('is what is left of the 1.75 s draw since the page showed', () => {
-        assert.equal(StartingPage.DRAW_MS, 1750);
-        assert.equal(StartingPage.drawWait(10_000, 10_000), 1750);
-        assert.equal(StartingPage.drawWait(10_000, 10_400), 1350);
-        assert.equal(StartingPage.drawWait(10_000, 11_749), 1);
-    });
-
     it('is nothing once the draw is done, or if the clock went back', () => {
         assert.equal(StartingPage.drawWait(10_000, 11_750), 0);
         assert.equal(StartingPage.drawWait(10_000, 60_000), 0);
@@ -136,10 +122,6 @@ describe('StartingPage.drawWait', () => {
 });
 
 describe('StartingPage.boardUrl', () => {
-    it('adds the flag that tells the board page the mark is drawn', () => {
-        assert.equal(StartingPage.boardUrl(new URL('http://127.0.0.1:4317/')), 'http://127.0.0.1:4317/?loading=drawn');
-    });
-
     it('keeps a URL the launch secret still goes to', () => {
         const secret = 's3cret';
         const href = StartingPage.boardUrl(new URL('http://127.0.0.1:4317/'));

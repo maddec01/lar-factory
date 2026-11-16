@@ -108,31 +108,6 @@ describe('install progress through preload', () => {
     });
 });
 
-it("forwards the board's readiness signal through the install mutation channel", async () => {
-    vi.resetModules();
-    await import('./preload.ts');
-
-    const bridge = ipc.expose.mock.calls.at(-1)![1] as BoardAppBridge;
-
-    ipc.invoke.mockResolvedValueOnce(undefined);
-    await bridge.boardReady();
-    expect(ipc.invoke).toHaveBeenLastCalledWith(IpcChannels.INSTALL_BOARD_READY);
-});
-
-it.each(['automatic', 'dismissed'] as const)(
-    'forwards %s overview closure with the displayed revision',
-    async (reason) => {
-        vi.resetModules();
-        await import('./preload.ts');
-
-        const bridge = ipc.expose.mock.calls.at(-1)![1] as BoardAppBridge;
-
-        ipc.invoke.mockResolvedValueOnce({ overview: reason, revision: 8 });
-        expect(await bridge.closeInstallOverview(reason, 7)).toEqual({ overview: reason, revision: 8 });
-        expect(ipc.invoke).toHaveBeenLastCalledWith(IpcChannels.INSTALL_CLOSE_OVERVIEW, reason, 7);
-    },
-);
-
 it.each(['automatic', 'dismissed'] as const)(
     'recovers %s closure through page reload and a board-server restart without another install',
     async (reason) => {

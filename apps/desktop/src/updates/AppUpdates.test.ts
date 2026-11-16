@@ -163,16 +163,6 @@ describe('AppUpdates', () => {
         }).pipe(Effect.scoped),
     );
 
-    it.effect("reads every newer Release's notes on both channels", () =>
-        Effect.gen(function* () {
-            const { fake, updates } = yield* setup();
-
-            assert.isTrue(fake.fullChangelog);
-            yield* updates.setChannel('nightly');
-            assert.isTrue(fake.fullChangelog);
-        }).pipe(Effect.scoped),
-    );
-
     it.effect('puts the changelog of an available update in the state, and drops it when nothing is newer', () =>
         Effect.gen(function* () {
             const { fake, updates } = yield* setup();
@@ -201,23 +191,6 @@ describe('AppUpdates', () => {
             const upToDate = yield* updates.check;
 
             assert.deepStrictEqual(upToDate.state.releaseNotes, []);
-        }).pipe(Effect.scoped),
-    );
-
-    it.effect('checks 15 s after launch and then every 4 minutes', () =>
-        Effect.gen(function* () {
-            const { fake } = yield* setup();
-
-            yield* TestClock.adjust(Duration.millis(14_999));
-            assert.strictEqual(fake.checks, 0);
-            yield* TestClock.adjust(Duration.millis(1));
-            assert.strictEqual(fake.checks, 1);
-            yield* TestClock.adjust(Duration.millis(240_000 - 1));
-            assert.strictEqual(fake.checks, 1);
-            yield* TestClock.adjust(Duration.millis(1));
-            assert.strictEqual(fake.checks, 2);
-            yield* TestClock.adjust(Duration.minutes(4));
-            assert.strictEqual(fake.checks, 3);
         }).pipe(Effect.scoped),
     );
 

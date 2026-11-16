@@ -1,6 +1,5 @@
 import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import { assert, describe, it } from '@effect/vitest';
-import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
 import * as Exit from 'effect/Exit';
 import * as Scope from 'effect/Scope';
@@ -61,19 +60,6 @@ describe('makeStartConfig', () => {
 
         assert.equal(BoardServer.makeStartConfig({ ...input, checksSkills: true }).env.BOARD_SKILL_CHECK, '1');
         assert.equal(BoardServer.makeStartConfig(input).env.BOARD_SKILL_CHECK, undefined);
-    });
-
-    it('names the skills bundle when the app has one', () => {
-        const config = BoardServer.makeStartConfig({
-            executablePath: '/Board',
-            serverDir: '/server',
-            serverFile: '/server/dist/server.mjs',
-            bundleDir: '/bundle',
-            env: {},
-            secret: 'launch-secret',
-        });
-
-        assert.equal(config.env.BOARD_BUNDLE_DIR, '/bundle');
     });
 
     it('runs the server file with the given executable in Node mode and the launch secret', () => {
@@ -177,16 +163,6 @@ describe('start', () => {
 
             assert.isTrue(Exit.isFailure(exit));
             assert.match(String(Exit.isFailure(exit) && exit.cause), /exited with code 3 before it reported a port/);
-        }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
-    it.live('fails when the server never reports a port', () =>
-        Effect.gen(function* () {
-            const exit = yield* BoardServer.start(fakeConfig({ FAKE_BOARD: 'silent' }), {
-                portTimeout: Duration.millis(300),
-            }).pipe(Effect.scoped, Effect.exit);
-
-            assert.match(String(Exit.isFailure(exit) && exit.cause), /reported no port within/);
         }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
     );
 

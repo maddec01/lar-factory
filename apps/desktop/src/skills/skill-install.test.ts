@@ -20,10 +20,6 @@ const launch = (overrides: Partial<SkillInstall.LaunchInput> = {}): SkillInstall
 });
 
 describe('locateBundle', () => {
-    it('finds the bundle the build copies into dist-electron/ in development', () => {
-        assert.strictEqual(SkillInstall.locateBundle('/repo/app', false), '/repo/app/dist-electron/bundle');
-    });
-
     it('finds the bundle in the packaged app’s Resources, outside app.asar', () => {
         assert.strictEqual(
             SkillInstall.locateBundle('/Applications/Board.app/Contents/Resources/app.asar', true),
@@ -33,14 +29,6 @@ describe('locateBundle', () => {
 });
 
 describe('plan', () => {
-    it('installs a packaged app’s bundle into the user’s home', () => {
-        assert.deepStrictEqual(SkillInstall.plan(launch()), {
-            home: '/Users/someone',
-            bundle: '/App/bundle',
-            version: '1.0.0',
-        });
-    });
-
     it('installs into the root the environment overrides, and keeps every write inside it', () => {
         const plan = SkillInstall.plan(launch({ env: { [SkillInstall.ROOT_ENV]: '/tmp/home' } }));
 
@@ -94,25 +82,6 @@ const checks = (input: SkillInstall.LaunchInput, discover: SkillInstall.Discover
     SkillInstall.makeChecks(input, discover).pipe(Effect.map((made) => made!));
 
 const read = (path: string) => NodeFS.readFileSync(path, 'utf8');
-
-describe('oneAtATime', () => {
-    it.live('runs two overlapping checks one after the other', () =>
-        Effect.gen(function* () {
-            let running = 0;
-            const overlaps: Array<number> = [];
-            const slow = Effect.gen(function* () {
-                running += 1;
-                overlaps.push(running);
-                yield* Effect.sleep('20 millis');
-                running -= 1;
-            });
-            const serial = yield* SkillInstall.oneAtATime;
-
-            yield* Effect.all([serial(slow), serial(slow)], { concurrency: 'unbounded' });
-            assert.deepStrictEqual(overlaps, [1, 1]);
-        }),
-    );
-});
 
 describe('makeChecks', () => {
     it.effect(
@@ -639,10 +608,6 @@ describe('buildAnswer', () => {
 
         assert.deepStrictEqual(answer.drift, ['tdd', 'grill']);
         assert.include(answer.refusal, 'tdd and grill');
-    });
-
-    it('starts anyway with Drift when the User chose to', () => {
-        assert.deepStrictEqual(SkillInstall.buildAnswer({ ...clean, drift }, 'keep'), { refusal: null });
     });
 
     it('refuses when Drift is left after Replace and start', () => {

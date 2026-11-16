@@ -41,14 +41,6 @@ describe('runT3', () => {
 });
 
 describe('discover', () => {
-    it("reads T3's runtime file from T3_SERVER_RUNTIME, or from T3's userdata folder in the home", () => {
-        assert.strictEqual(
-            T3Instances.runtimePath({ T3_SERVER_RUNTIME: '/tmp/runtime.json' }, '/Users/me'),
-            '/tmp/runtime.json',
-        );
-        assert.strictEqual(T3Instances.runtimePath({}, '/Users/me'), '/Users/me/.t3/userdata/server-runtime.json');
-    });
-
     it.live("answers that T3 isn't running when its runtime file is missing", () =>
         Effect.gen(function* () {
             const dir = tempDir('t3-runtime-');

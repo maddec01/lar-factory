@@ -12,11 +12,13 @@ import { create } from 'zustand';
 import type { IssueSetting } from './IssueDefaults';
 import { postAction, receive } from '@/services/board/board.service';
 
+/** Settings a switch or a pick applies at once, by their values. */
+type Choices = Required<Pick<SharedRepositorySettings, IssueSetting | 'buildMethod'>>;
+
+type ChoiceSetting = keyof Choices;
+
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
-export type DraftSetting = Exclude<
-    SharedSetting,
-    'labels' | 'vocabulary' | 'buildMethod' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'
->;
+export type DraftSetting = Exclude<SharedSetting, 'labels' | 'vocabulary' | ChoiceSetting>;
 
 /** Project fields that keep text drafts until their save succeeds. */
 export interface Drafts {
@@ -98,7 +100,8 @@ interface VocabularyDraft {
     newLabels: string[];
 }
 interface EditState {
-    issueDrafts: Record<string, Partial<Record<IssueSetting, boolean>>>;
+    /** Choices shown while their save is on its way. */
+    choiceDrafts: Record<string, Partial<Choices>>;
     vocabularyDrafts: Record<string, Partial<Record<VocabularyKey, VocabularyDraft>>>;
     vocabularyErrors: Record<string, Partial<Record<VocabularyKey, string>>>;
     draftVocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm, newLabels: string[]) => void;
@@ -116,14 +119,14 @@ interface EditState {
     reset: (repo: string, key: DraftSetting) => Promise<void>;
     recheck: (repo: string) => Promise<void>;
     vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm, newLabels: string[]) => Promise<boolean>;
-    issueDefault: (repo: string, key: IssueSetting, on: boolean) => Promise<void>;
+    choose: <K extends ChoiceSetting>(repo: string, key: K, value: Choices[K]) => Promise<void>;
     /** Sends a label change to the tracker; the reason it failed, or null. */
     labels: (repo: string, change: LabelChange) => Promise<string | null>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
     const queues = new Map<string, { id: string; task: Promise<string | null> }>();
-    const choiceVersions: Record<string, Partial<Record<IssueSetting, number>>> = {};
+    const choiceVersions: Record<string, Partial<Record<ChoiceSetting, number>>> = {};
     const revisions: Record<string, Partial<Record<keyof Drafts, number>>> = {};
     const fieldError = (repo: string, field: keyof Drafts | Running, error: string | null) => {
         const errors = { ...get().fieldErrors[repo] };
@@ -195,7 +198,7 @@ export const useEditStore = create<EditState>()((set, get) => {
     }
 
     return {
-        issueDrafts: {},
+        choiceDrafts: {},
         vocabularyDrafts: {},
         vocabularyErrors: {},
         draftVocabulary: (repo, key, value, newLabels) =>
@@ -292,19 +295,19 @@ export const useEditStore = create<EditState>()((set, get) => {
 
             return !error;
         },
-        issueDefault: async (repo, key, on) => {
+        choose: async (repo, key, value) => {
             const version = (choiceVersions[repo]?.[key] ?? 0) + 1;
 
             choiceVersions[repo] = { ...choiceVersions[repo], [key]: version };
-            set({ issueDrafts: { ...get().issueDrafts, [repo]: { ...get().issueDrafts[repo], [key]: on } } });
+            set({ choiceDrafts: { ...get().choiceDrafts, [repo]: { ...get().choiceDrafts[repo], [key]: value } } });
 
-            const error = await call(repo, key, { change: 'override', key, value: on });
+            const error = await call(repo, key, { change: 'override', key, value });
 
             if (!error && choiceVersions[repo]?.[key] === version) {
-                const draft = { ...get().issueDrafts[repo] };
+                const draft = { ...get().choiceDrafts[repo] };
 
                 delete draft[key];
-                set({ issueDrafts: { ...get().issueDrafts, [repo]: draft } });
+                set({ choiceDrafts: { ...get().choiceDrafts, [repo]: draft } });
             }
         },
         labels: (repo, change) => call(repo, 'labels', change, undefined, '/api/repositories/labels'),

@@ -155,7 +155,10 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const figures = figuresOf(item, data);
     const checks = prChecks(item);
     // A row at work names what runs, so its bar says something is going on even with no slices to count.
-    const atWork = n !== undefined ? undefined : workLabel(item, activity === 'working' || activity === 'quiet');
+    // A thread paused on you (a question, an approval) keeps its bar, its light travelling in amber.
+    const waiting = activity === 'waiting';
+    const atWork =
+        n !== undefined ? undefined : workLabel(item, activity === 'working' || activity === 'quiet', waiting);
     const held = shown.blocked ? state : blocked && !shown.blocked ? blocked : '';
     // The checks' count already says how the pipeline stands, so a state about the checks would say it twice.
     // A Queue row's heading says Queued, so it says no state of its own.
@@ -240,7 +243,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         // Work at it with no slices to count still draws its bar, so a row at work always shows it.
                         atWork && (
                             <RowProgress
-                                bar={<WorkingBar label={atWork} still={still} />}
+                                bar={<WorkingBar label={atWork} still={still} waiting={waiting} />}
                                 count={<RowCount title={atWork}>{atWork}</RowCount>}
                             />
                         )

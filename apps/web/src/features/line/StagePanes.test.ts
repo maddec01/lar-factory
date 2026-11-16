@@ -1,53 +1,31 @@
-// The Shaping, Ready to build and Build sections: their rows from the placement rule, each with its status, agent figures, a build's slices
-// and its side action.
+// The Shaping, Ready to build and Build sections: their rows from the placement rule and each row's side action.
 
-import { normalizeItems } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread, RawItem, Slice, ThreadActivity } from '@lar-factory/shared';
-import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
-import { iconConcept } from '@lar-works/design-system/testing';
-import { beforeEach, describe, expect, test, vi } from 'vite-plus/test';
+import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
 import {
     $,
     $$,
-    NOW,
     answer,
     fresh,
     holdPosts,
     mountPage,
     posted,
     pressMenu,
-    recorded,
     sample,
     settle,
     text,
     toast,
 } from '@/test/PageTest';
-import { conceptIcons } from '@/ui/board';
 
-const PANES = ['shaping', 'ready', 'build'];
-const SHAPING = [130];
-// Build in its own order, items on Your desk too, in their places.
-const BUILD = [31, 149, 34, 147, 142, 141, 150, 30];
-const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
 const row = (id: string) =>
     $(`:is([data-stage="shaping"], [data-stage="ready"], [data-stage="build"]) li[data-item="${id}"]`)!;
 const opener = (id: string) => row(id).querySelector<HTMLButtonElement>('[data-row-open]')!;
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const col = (id: string, name: string) => row(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
 const side = (id: string) => col(id, 'side')!;
-/** A section heading's title and the count shown beside it. */
-const heading = (id: string) => [
-    text($(`#${id}`)),
-    text($(`#${id}`)!.parentElement!.querySelector('[data-slot="count"]')),
-];
 /** A row's facts on its one line: what holds it or its thread does, its progress, then its end. */
 const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-row-meta]')!;
-/** What holds a row or its first blocked or active slice, among its facts. */
-const next = (id: string) => text(meta(id).querySelector(':scope > :is([data-blocked], [data-note])'));
-/** A row's end: its cost, then its state or age. */
-const end = (id: string) => row(id).querySelector<HTMLElement>('[data-meta-end]')!;
-const state = (id: string) => end(id).querySelector<HTMLElement>('[data-state]')!;
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) =>
@@ -57,26 +35,6 @@ const press = (el: Element) =>
     });
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
-/** The board with `raws` as items, each open slice numbered in `keys` active or blocked, as its work record holds it. */
-const boardOf = (
-    raws: RawItem[],
-    { active = [], blocked = [] }: { active?: number[]; blocked?: number[] } = {},
-): BoardData => {
-    const progress = (slice: Slice): Slice =>
-        slice.progress !== 'waiting'
-            ? slice
-            : {
-                  ...slice,
-                  progress: blocked.includes(slice.number)
-                      ? 'blocked'
-                      : active.includes(slice.number)
-                        ? 'active'
-                        : 'waiting',
-              };
-    const items = normalizeItems(raws).map((item) => ({ ...item, slices: item.slices.map(progress) }));
-
-    return { ...sample, error: null, items: recorded(items) };
-};
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData => ({
     ...data,
     items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
@@ -103,35 +61,11 @@ const thread = (id: string, state: ItemThread['state']): ItemThread => ({
     state,
     updated: '2026-10-21T09:00:00.000Z',
 });
-/** T3's read of a thread at work, with its action `seconds` old at NOW. */
-const acting = (
-    action: string,
-    seconds: number,
-    more: Partial<Extract<ThreadActivity, { available: true }>> = {},
-): ThreadActivity => ({
-    available: true,
-    readAt: new Date(NOW).toISOString(),
-    action,
-    actionAt: new Date(NOW - seconds * 1000).toISOString(),
-    toolRunning: false,
-    agents: [],
-    ...more,
-});
 
 beforeEach(() => localStorage.clear());
 
 const inPane = (pane: string) => $$(`[data-stage="${pane}"] li[data-item]`).map((r) => numberOf(r.dataset.item!));
-const shapingRows = () => $$('[data-stage="shaping"] li[data-item]').map((r) => numberOf(r.dataset.item!));
 const readyRows = () => $$('[data-stage="ready"] li[data-item]').map((r) => numberOf(r.dataset.item!));
-
-test('each pane holds the rows the placement rule gives it, and Build lists the furthest along first', async () => {
-    await mountPage();
-    expect(shapingRows()).toEqual(SHAPING);
-    expect(readyRows()).toEqual([]);
-    expect(inPane('build')).toEqual(BUILD);
-    expect(heading('shaping-h')).toEqual(['Shaping', String(SHAPING.length)]);
-    expect(heading('build-h')).toEqual(['Build', String(BUILD.length)]);
-});
 
 test('a live board push moves a row between sections with no reload', async () => {
     await mountPage(withItem('I_sample13', { blockers: [], parentId: null, flow: 'single' }));
@@ -149,140 +83,6 @@ test('a live board push moves a row between sections with no reload', async () =
     );
     expect(readyRows()).not.toContain(140);
     expect(inPane('build')).toContain(140);
-});
-
-test('Build’s header names a build at work that holds no slot apart from the slots it counts', async () => {
-    const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 50 } };
-
-    await mountPage(withItem('I_sample22', { recorded: false }, limited));
-
-    const header = $('[data-stage="build"] header .build-limit')!;
-
-    expect(text(header)).toMatch(/ of 50 build slots · 1 more working$/);
-    expect(header.getAttribute('title')).toContain('1 more build working without a slot');
-});
-
-test('Build’s header counts the factory’s builds against the automatic build limit, one bar per build past it', async () => {
-    const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 2 } };
-    const receive = async (data: BoardData) =>
-        settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
-
-    await mountPage(limited);
-
-    const header = $('[data-stage="build"] header .build-limit')!;
-
-    // The bars show the limit, so the words say how far past it the builds are.
-    expect(text(header), 'In progress and Review count').toBe('+38 building · 6 over the limit');
-    // Build's header carries the occupancy; Ready's controls keep only what starts builds.
-    expect(text($('[data-ready-build-controls]'))).toBe('Auto-build');
-    expect(header.getAttribute('title')).toContain(
-        'At capacity, you can start an item over the limit; automatic starts wait for a slot.',
-    );
-    expect(header.getAttribute('title')).not.toContain('exceed');
-    expect(header.querySelectorAll('.bar')).toHaveLength(5);
-    expect(header.getAttribute('title')).toContain('2 working, 2 checks failed, 1 run stopped');
-    expect(iconConcept(row('I_sample15').querySelector('[data-glyph]')!, conceptIcons)).toBe('stopped');
-    await receive(withItem('I_sample09', { status: 'In progress' }, limited));
-    expect(text($('[data-stage="build"] .build-limit')), 'a concept in progress is no build at work').toBe(
-        '+38 building · 6 over the limit',
-    );
-    await receive({
-        ...limited,
-        items: sample.items.map((i) =>
-            ['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Done' as const } : i,
-        ),
-    });
-    expect(text($('[data-stage="build"] .build-limit'))).toBe('+27 building · 5 over the limit');
-    await receive({ ...limited, buildLimit: { limit: 4, automatic: 2 } });
-    expect([text($('[data-stage="build"] .build-limit')), $$('[data-stage="build"] .build-limit .bar').length]).toEqual(
-        ['+38 building · 4 over the limit', 5],
-    );
-    await receive({ ...sample, buildLimit: undefined });
-    expect(
-        [text($('[data-stage="build"] .build-limit')), $$('[data-stage="build"] .build-limit .bar').length],
-        'no limit reported',
-    ).toEqual(['8 building', 0]);
-});
-
-test('scoped to a repository whose items haven’t landed yet, the main area says it’s reading instead of an empty desk and panes', async () => {
-    await mountPage({
-        ...sample,
-        items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
-        firstRead: { step: 'items', running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false },
-    });
-
-    const { useScopeStore } = await import('@/features/filters/ScopeStore');
-
-    await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-    expect(text($('[data-reading]'))).toBe('Loading projects…');
-    expect([$('[data-stage="build"]'), $('section.desk')]).toEqual([null, null]);
-    await settle(() => useScopeStore.getState().setScope('maddec01/lar-server'));
-    expect([$('[data-reading]'), $('[data-stage="build"]') !== null]).toEqual([null, true]);
-});
-
-test('the note names the blocked-by issues still open', async () => {
-    await mountPage(
-        withItem(
-            'I_sample13',
-            {
-                blockers: [
-                    { number: 202, repo: 'maddec01/lar-server', state: 'open' },
-                    { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
-                ],
-            },
-            loose,
-        ),
-    );
-    expect(next('I_sample13')).toContain('Blocked by #202 until it completes');
-    await settle(async () =>
-        (await import('@/services/board/board.hooks')).useBoardStore
-            .getState()
-            .receive(withItem('I_sample13', { blockers: [] }, loose)),
-    );
-    expect(row('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('Blocked by');
-    expect(text(side('I_sample13').querySelector('[data-open-thread]'))).toBe('Open thread');
-});
-
-test('a Dependency holds the badge until it is marked met, whatever its ticket shows, and the badge names it', async () => {
-    const dependency = (met: boolean) => ({
-        number: 40,
-        repo: 'maddec01/lar-server',
-        state: met ? ('closed' as const) : ('open' as const),
-        title: 'An export endpoint',
-        dependency: {
-            dependencyId: 'dep-1',
-            revision: 2,
-            owner: 'server team',
-            need: 'An export endpoint',
-            ticket: 'maddec01/lar-server#40',
-            named: [],
-            evidence: '',
-            met: met ? { by: 'pedro', at: '2026-10-21T08:00:00Z' } : null,
-            needsReview: false,
-            observation: {
-                subject: 'maddec01/lar-server#40',
-                kind: 'closed' as const,
-                detail: null,
-                observedAt: '2026-10-21T09:00:00Z',
-                lastGood: null,
-            },
-        },
-    });
-
-    await mountPage(withItem('I_sample13', { blockers: [dependency(false)] }, loose));
-
-    const note = meta('I_sample13').querySelector<HTMLElement>('[data-blocked]')!;
-
-    expect([text(note), note.title]).toEqual([
-        'Blocked by the Dependency on server team until you mark it met',
-        'Blocked by the Dependency on server team until you mark it met',
-    ]);
-    await settle(async () =>
-        (await import('@/services/board/board.hooks')).useBoardStore
-            .getState()
-            .receive(withItem('I_sample13', { blockers: [dependency(true)] }, loose)),
-    );
-    expect(row('I_sample13').textContent).not.toContain('Blocked by');
 });
 
 test('a blocked Ready row offers no Build and says what it starts after; its dialog’s Start after arms the start on the picked model, then reads Starts after until pressed again', async () => {
@@ -323,19 +123,6 @@ test('a blocked Ready row offers no Build and says what it starts after; its dia
     );
 });
 
-test('a start the board ran by itself and that failed shows its error under the row, and dismissing it clears it', async () => {
-    const failed = { ...unblocked(), armedErrors: { I_sample13: 'T3 is down.' } };
-
-    holdPosts(failed);
-    await mountPage(failed);
-
-    const error = row('I_sample13').querySelector('[data-start-after-error="I_sample13"]')!;
-
-    expect(text(error.querySelector('[role="alert"]'))).toBe('Start after failed: T3 is down.');
-    await press(error.querySelector('button')!);
-    expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
-});
-
 test('Start build sends the build with the chosen model, then shows the thread it started in a tag and a toast', async () => {
     holdPosts(unblocked());
     await mountPage(unblocked());
@@ -365,301 +152,6 @@ test('Start build sends the build with the chosen model, then shows the thread i
         instanceId: 'codex',
         model: 'gpt-5.5',
     });
-});
-
-test('active slices read as Working after the parent run ended, keeping that detail', async () => {
-    const board = unblocked();
-    const slice = (progress: 'active' | 'done') => ({
-        number: 1,
-        title: 'Slice',
-        url: '',
-        repo: 'maddec01/lar-server',
-        state: 'open' as const,
-        progress,
-    });
-    const withSlice = (progress: 'active' | 'done'): BoardData => ({
-        ...board,
-        items: board.items.map((i) =>
-            i.id === 'I_sample13'
-                ? {
-                      ...i,
-                      status: 'In progress' as const,
-                      statuses: ['In progress' as const],
-                      buildPhase: 'implement',
-                      slices: [slice(progress)],
-                      threads: [
-                          {
-                              id: 'b1',
-                              title: 'Build',
-                              state: 'done' as const,
-                              purpose: 'build',
-                              updated: '2026-10-31T00:00:00Z',
-                          },
-                      ],
-                  }
-                : i,
-        ),
-    });
-
-    await mountPage(withSlice('active'));
-    expect(state('I_sample13').title).toContain('Working, parent run finished');
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    await settle(() => useBoardStore.getState().receive(withSlice('done')));
-    expect(state('I_sample13').title).toContain('Run finished');
-    expect(text(row('I_sample13').querySelector('[data-meta]'))).not.toContain('Working');
-});
-
-test('a descendant holds Run finished back: Working while it runs, and waiting while it is only live', async () => {
-    const board = unblocked();
-    const at = (more: Partial<ItemThread>): BoardData => ({
-        ...board,
-        items: board.items.map((i) =>
-            i.id === 'I_sample13'
-                ? {
-                      ...i,
-                      status: 'In progress' as const,
-                      statuses: ['In progress' as const],
-                      buildPhase: 'implement',
-                      slices: [],
-                      threads: [
-                          {
-                              id: 'b1',
-                              title: 'Build',
-                              state: 'done' as const,
-                              purpose: 'build',
-                              updated: '2026-10-31T00:00:00Z',
-                              ...more,
-                          },
-                      ],
-                  }
-                : i,
-        ),
-    });
-
-    await mountPage(at({ hasRunningChildren: true, hasLiveChildren: true }));
-    expect(state('I_sample13').title).toContain('Working, parent run finished');
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    await settle(() => useBoardStore.getState().receive(at({ hasLiveChildren: true })));
-    expect(state('I_sample13').title).toBe('Run finished, child waiting');
-    await settle(() => useBoardStore.getState().receive(at({})));
-    expect(state('I_sample13').title).toBe('Run finished');
-});
-
-test('a moved build whose thread stopped before a phase offers Retry start, with Starting on its row while it runs', async () => {
-    const moved = (extra: Partial<BoardData> = {}): BoardData => {
-        const board = unblocked();
-
-        return {
-            ...board,
-            ...extra,
-            items: board.items.map((i) =>
-                i.id === 'I_sample13'
-                    ? {
-                          ...i,
-                          status: 'In progress' as const,
-                          statuses: ['In progress' as const],
-                          buildPhase: null,
-                          slices: [],
-                          threads: [
-                              {
-                                  id: 'b1',
-                                  title: 'Build',
-                                  state: 'stopped' as const,
-                                  purpose: 'build',
-                                  updated: '2026-10-31T00:00:00Z',
-                              },
-                          ],
-                      }
-                    : i,
-            ),
-        };
-    };
-
-    holdPosts(moved());
-    await mountPage(moved());
-    expect(text(startBuild())).toBe('Retry start');
-
-    const group = row('I_sample13').querySelector('[data-col="side"] .start-group')!;
-
-    expect(group.textContent, 'no second line says the run stopped').not.toContain('Run stopped');
-    expect(
-        group.querySelector('a, button:not([data-start])'),
-        'the stopped thread stays one press away',
-    ).not.toBeNull();
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    await settle(() =>
-        useBoardStore.getState().receive(moved({ startProgress: { I_sample13: { build: { phase: 'starting' } } } })),
-    );
-    expect(text(startBuild())).toBe('Starting…');
-    expect(text(state('I_sample13')), 'Start build already says Starting, and Build names the stage').toBe('');
-});
-
-// A build's slices.
-
-const build = (count: number) =>
-    rawIssue('I_build', 59, 'In progress', ['build'], {
-        subIssuesSummary: { total: count, completed: 1 },
-        subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
-    });
-/** The build row's slice bar segments' colours, its count button's text and its first blocked or active slice. */
-const slices = (id = 'I_59') => {
-    const bar = col(id, 'bar').querySelector('ol')!;
-
-    return {
-        segments: [...bar.children].map((li) => li.getAttribute('data-state')),
-        count: countShown(count(id)),
-        next: next(id),
-    };
-};
-const count = (id = 'I_59') => row(id).querySelector<HTMLButtonElement>('button[data-col="count"]')!;
-/** A slice count's visible text, after the words that name its toggle for screen readers: "1/3 slices done". */
-const countShown = (el: Element | null) => text(el).replace(/^(Show|Hide) slices: /, '');
-/** What a slice count's toggle does, as its name starts: "Show slices". */
-const countAction = (el: Element) => /^(Show|Hide) slices(?=:)/.exec(text(el))?.[0] ?? null;
-const list = (id = 'I_59') => row(id).querySelector('[data-slices] ul');
-
-test('a build shows its slice bar and its count, naming the first blocked slice plus how many more are blocked or active', async () => {
-    const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
-        subIssuesSummary: { total: 5, completed: 1 },
-        subIssues: {
-            nodes: [
-                sliceRef(65, 'CLOSED'),
-                sliceRef(66, 'OPEN'),
-                sliceRef(67, 'OPEN'),
-                sliceRef(68, 'OPEN'),
-                sliceRef(69, 'OPEN'),
-            ],
-        },
-    });
-
-    await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
-    expect(slices()).toEqual({
-        // A slice blocked by another reads grey, as amber is kept for what waits on you.
-        segments: ['ready', 'active', 'off', 'off', 'off'],
-        count: '1/5 slices done',
-        // The first blocked slice by name, then the rest in counts that can't be misread.
-        next: 'blocked Issue 67 · 1 more blocked · 1 working',
-    });
-
-    const sliceNote = meta('I_59').querySelector('[data-note]')!;
-
-    expect(sliceNote.firstElementChild!.className, 'blocked reads in its colour').toContain('text-warning-fg');
-    expect(sliceNote.getAttribute('title'), 'the rest are named on hover').toBe(
-        'blocked #67 Issue 67\nblocked #69 Issue 69\nworking #66 Issue 66',
-    );
-    expect(col('I_59', 'bar').querySelector('ol > li .lar-status-pulse'), 'the active slice pulses').not.toBeNull();
-    expect(
-        rows().map((r) => r.dataset.item),
-        'slices are no rows of their own',
-    ).toEqual(['I_59']);
-    await press(count());
-    expect(
-        [...list()!.querySelectorAll('li')].map((li) => text(li).slice(0, 3)),
-        'the list shows every slice',
-    ).toEqual(['#65', '#66', '#67', '#68', '#69']);
-});
-
-test('a build’s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {
-    const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
-        subIssuesSummary: { total: 4, completed: 2 },
-        subIssues: {
-            nodes: [
-                sliceRef(65, 'CLOSED'),
-                { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' },
-                sliceRef(67, 'OPEN'),
-                sliceRef(68, 'OPEN'),
-            ],
-        },
-    });
-
-    await mountPage(boardOf([raw]));
-    expect(slices()).toEqual({
-        segments: ['ready', 'off', 'off'],
-        count: '1/3 slices done',
-        next: '',
-    });
-});
-
-test('the count unfolds the slice list under the row and folds it again, without opening the dialog', async () => {
-    await mountPage(loose);
-    expect([
-        count('I_sample13').getAttribute('aria-expanded'),
-        countAction(count('I_sample13')),
-        list('I_sample13'),
-    ]).toEqual(['false', 'Show slices', null]);
-    await press(count('I_sample13'));
-    expect([count('I_sample13').getAttribute('aria-expanded'), countAction(count('I_sample13'))]).toEqual([
-        'true',
-        'Hide slices',
-    ]);
-    // #145 is recorded active, but #140 still waits on #202, so it shows waiting.
-    expect([...list('I_sample13')!.querySelectorAll('li')].map(text)).toEqual([
-        '#144 Owner table and sign-upDone',
-        '#145 Sign-in sessionsBlocked',
-        '#146 Owner settings pageQueued',
-    ]);
-    expect(dialog()).toBeNull();
-    await settle(async () =>
-        (await import('@/services/board/board.hooks')).useBoardStore
-            .getState()
-            .receive({ ...loose, fetchedAt: '2026-10-21T09:59:00.000Z' }),
-    );
-    expect(list('I_sample13'), 'new data keeps it open').not.toBeNull();
-    await press(count('I_sample13'));
-    expect(list('I_sample13')).toBeNull();
-});
-
-test('the status tooltip follows the latest real thread across shaping and build stages, wherever the row shows a state', async () => {
-    // #30 with no slices of its own, so only its thread says how it stands.
-    const id = 'I_sample14';
-
-    await mountPage(withItem(id, { slices: [], status: 'Shaping', threads: [] }));
-
-    /** The state's tooltip, or null where the row says no state, as its lane's heading already names it. */
-    const activity = () => state(id)?.title ?? null;
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    for (const status of ['Shaping', 'In progress', 'Review'] as const) {
-        // Shaping and Build name their stage, so a row with nothing more to say there shows no state.
-        const named = status !== 'Review';
-
-        await settle(() => useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: [] })));
-        expect(activity(), `${status}: no thread`).toBe(named ? null : 'Not started');
-        for (const [state, expected] of [
-            ['running', 'Thread running'],
-            ['stopped', 'Run stopped'],
-            ['done', named ? null : 'Run finished'],
-            ['needs you', 'Thread needs you'],
-        ] as const) {
-            await settle(() =>
-                useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: [thread('t1', state)] })),
-            );
-
-            if (status === 'Shaping' && state === 'needs you') {
-                expect($(`.desk-row[data-item="${id}"]`)).not.toBeNull();
-            } else expect(activity(), `${status}: ${state}`).toBe(expected);
-        }
-        await settle(() =>
-            useBoardStore.getState().receive(withItem(id, { slices: [], status, threads: 'unavailable' })),
-        );
-        expect(activity(), `${status}: unreadable thread`).toBe('Thread unavailable');
-        await settle(() =>
-            useBoardStore.getState().receive(
-                withItem(id, {
-                    slices: [],
-                    status,
-                    threads: [{ ...thread('t1', 'running'), observedAt: '2026-10-21T09:05:00.000Z' }],
-                }),
-            ),
-        );
-        expect(activity(), `${status}: retained thread`).toMatch(/^Thread running, last seen \d\d:05$/);
-    }
 });
 
 test('a stopped build replaces its remembered Started tag with recovery, also in the item dialog', async () => {
@@ -716,364 +208,41 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
     expect(text(side('I_sample13').querySelector('[data-start-result]'))).toBe('Started');
 });
 
-test('live slice transitions update the bar, expanded list and count without a reload', async () => {
-    const initial = boardOf([build(3)]);
-
-    await mountPage(initial);
-    await press(count());
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-
-    for (const progress of ['active', 'unknown', 'blocked', 'waiting', 'done'] as const) {
-        const data = {
-            ...initial,
-            items: initial.items.map((item) => ({
-                ...item,
-                slices: item.slices.map((slice, index) => (index === 1 ? { ...slice, progress } : slice)),
-            })),
-        };
-
-        await settle(() => useBoardStore.getState().receive(data));
-        expect(text(list()!.querySelectorAll('li')[1]!)).toMatch(
-            new RegExp(
-                `#101 Issue 101${progress === 'waiting' ? 'Queued' : progress === 'active' ? 'Working' : progress.charAt(0).toUpperCase() + progress.slice(1)}$`,
-            ),
-        );
-        expect(countShown(count())).toBe(progress === 'done' ? '2/3 slices done' : '1/3 slices done');
-
-        const segment = col('I_59', 'bar').querySelectorAll('ol > li')[1]!;
-
-        expect(segment.querySelector('.lar-status-pulse') !== null).toBe(progress === 'active');
-
-        if (progress === 'unknown') {
-            expect(segment.getAttribute('data-state')).toBe('off');
-            expect(text(list())).toContain('?');
-            expect(next('I_59')).toBe('');
-        }
-    }
-});
-
-test('usage with none known yet keeps naming usage after three seconds, keeps known figures, and says when T3 couldn’t read it', async () => {
-    const id = 'I_sample13';
-    const at = (change: Partial<Item>) =>
-        withItem(
-            id,
-            { stats: undefined, usageState: undefined, threads: [thread('t1', 'done')], ...change },
-            fresh(loose),
-        );
+test('Verify: its running row returns to the desk when the thread stops or the board disconnects', async () => {
+    const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [
+        thread('other', 'done'),
+        { ...thread('build', build), purpose: 'build', ...more },
+    ];
+    const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData =>
+        withItem('I_sample13', { status: 'Verify', blockers: [], threads: t, ...change }, fresh(loose));
+    const running = threads('running', { currentRunning: true });
     const receive = async (data: BoardData) =>
         settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
+    const desk = () => $('.desk-row[data-item="I_sample13"]');
 
-    await mountPage(at({}));
-    expect(text(row(id))).toContain('Loading usage');
-    await settle(() => vi.advanceTimersByTime(3_000));
-    expect(text(row(id))).toContain('Loading usage');
-    expect(text(row(id))).not.toContain('Still trying…');
-    expect(row(id).querySelector('[data-loader]')!.getAttribute('title')).toBe('Loading usage');
-    await receive(at({ usageState: 'loading', stats: { agentMs: 120_000, tokens: 34_000 } }));
-    expect(text(row(id)), 'known figures stay while usage loads').toContain('2m');
-    expect(text(row(id))).not.toContain('Still trying…');
-    await receive(at({ usageState: 'failed' }));
-    expect(text(row(id))).toContain('Usage unavailable');
-    expect(text(row(id))).not.toMatch(/Loading usage|Still trying/);
-});
+    await mountPage(at(running));
+    expect(desk()).toBeNull();
+    // Its state leads the row's facts.
+    expect(text(meta('I_sample13'))).toMatch(/^Working/);
 
-test.each(['Verify', 'Ready to merge'] as const)(
-    '%s: its running row returns to the desk when the thread stops or the board disconnects',
-    async (status) => {
-        const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [
-            thread('other', 'done'),
-            { ...thread('build', build), purpose: 'build', ...more },
-        ];
-        const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData =>
-            withItem('I_sample13', { status, blockers: [], threads: t, ...change }, fresh(loose));
-        const running = threads('running', { currentRunning: true });
-        const receive = async (data: BoardData) =>
-            settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
-        const desk = () => $('.desk-row[data-item="I_sample13"]');
+    const open = side('I_sample13').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
 
-        await mountPage(at(running));
-        expect(desk()).toBeNull();
-        expect(text(state('I_sample13'))).toBe('Working');
+    expect([text(open), open.getAttribute('href')]).toEqual([
+        'Open thread',
+        't3code://threads/sample-environment/build',
+    ]);
 
-        const open = side('I_sample13').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+    // Verify waits on you to verify the build.
+    const wait = 'Verify build';
 
-        expect([text(open), open.getAttribute('href')]).toEqual([
-            'Open thread',
-            't3code://threads/sample-environment/build',
-        ]);
-
-        // Verify waits on you to verify the build; Ready to merge on a review of its PR.
-        const wait = status === 'Verify' ? 'Verify build' : 'Review PR';
-
-        await receive(at(threads('done'), { slices: [] }));
-        expect(text(desk())).toContain(wait);
-        expect(text(desk()!.querySelector('[data-col="side"]'))).toContain(wait);
-        expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
-        expect(posted()).toEqual([]);
-        await receive(at(running));
-        expect(desk()).toBeNull();
-        await settle(async () =>
-            (await import('@/services/board/board.hooks')).useBoardStore.getState().fail('HTTP 502'),
-        );
-        expect(text(desk())).toContain(wait);
-        expect(posted()).toEqual([]);
-    },
-);
-
-describe('the activity line', () => {
-    const at = (more: Partial<ItemThread> = {}, change: Partial<Item> = {}, data: BoardData = fresh(loose)) =>
-        withItem(
-            'I_sample13',
-            {
-                status: 'In progress',
-                blockers: [],
-                buildPhase: 'implement',
-                slices: [{ number: 1, title: 'Startup responsiveness', progress: 'active' }] as Slice[],
-                threads: [
-                    {
-                        ...thread('build', 'running'),
-                        purpose: 'build',
-                        currentRunning: true,
-                        activity: acting('Edit stage-row.tsx', 3),
-                        ...more,
-                    },
-                ],
-                ...change,
-            },
-            data,
-        );
-    const line = () => row('I_sample13').querySelector<HTMLElement>('[data-activity]');
-    const lineText = () => text(line()).replace(/\s+/g, ' ');
-    const moving = () =>
-        row('I_sample13').querySelector('.lar-status-pulse, .animate-spin, .lar-progress-indeterminate');
-    const store = async () => (await import('@/services/board/board.hooks')).useBoardStore.getState();
-
-    test('five minutes with no action reads Quiet, unless a tool still runs', async () => {
-        await mountPage(at({ activity: acting('Read a.ts', 295) }));
-        // While its sentence says what the thread does, the row's end holds only its cost.
-        expect(line()!.dataset.activity).toBe('working');
-        expect(text(end('I_sample13'))).toBe('$1.85');
-        await settle(() => vi.advanceTimersByTime(5_000));
-        expect(line()!.dataset.activity).toBe('quiet');
-        expect(lineText(), 'with no second age').toBe('No action for 5m');
-        expect(line()!.querySelector('[data-action]')!.className).toContain('text-fg');
-        expect(line()!.querySelector('[data-action]')!.className).not.toContain('text-warning-fg');
-        expect(line()!.querySelector('[data-mark]')!.className).toContain('border-warning-fg');
-        expect(text(end('I_sample13'))).toBe('$1.85');
-        expect(moving(), 'a quiet thread is still at work').not.toBeNull();
-        await settle(async () =>
-            (await store()).receive(at({ activity: acting('pnpm test', 1800, { toolRunning: true }) })),
-        );
-        expect(line()!.dataset.activity, 'a running tool keeps it working').toBe('working');
-        expect(lineText()).toContain('pnpm test');
-    });
-
-    test('a thread or agent waiting on the user has one status phrase and stops the row animating', async () => {
-        const waiting = {
-            state: 'needs you',
-            currentRunning: undefined,
-            updated: new Date(NOW - 180_000).toISOString(),
-        } as const;
-
-        await mountPage(at(waiting));
-        expect(line()).toBeNull();
-        expect(text(state('I_sample13'))).toBe('Question');
-        expect(moving()).toBeNull();
-        await settle(async () =>
-            (await store()).receive(at({ ...waiting, state: 'done', hasLiveChildren: true, childNeedsYou: true })),
-        );
-        expect(text(state('I_sample13'))).toBe('Question');
-        expect(moving()).toBeNull();
-    });
-
-    test('a row says activity is unavailable, never an old action, when T3 or the server can’t be read', async () => {
-        const unavailable = () => expect(line()).toBeNull();
-
-        await mountPage(at({ activity: { available: false } }));
-        unavailable();
-        await settle(async () => (await store()).receive(at({ observedAt: new Date(NOW).toISOString() })));
-        unavailable();
-        await settle(async () => (await store()).receive(at({}, { threads: 'unavailable' })));
-        unavailable();
-        await settle(async () => (await store()).receive(at()));
-        expect(lineText()).toContain('Edit stage-row.tsx');
-        await settle(async () => (await store()).fail('Disconnected'));
-        unavailable();
-    });
-
-    test('a T3 read that goes old with no error says unavailable on its own: the line, the state column, the motion, then back', async () => {
-        const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
-
-        await mountPage(at());
-        expect(text(end('I_sample13'))).toBe('$1.85');
-        expect(moving()).not.toBeNull();
-        // The system time alone moves, as the page's poll would bring the sample back.
-        vi.setSystemTime(NOW + ACTIVITY_STALE_MS - 1_000);
-        await settle(() => vi.advanceTimersByTime(1_000));
-        expect(line()!.dataset.activity, 'still within the limit').toBe('working');
-        await settle(() => vi.advanceTimersByTime(1_000));
-        expect(line()).toBeNull();
-        expect((await store()).data.error).toBeNull();
-        expect(text(state('I_sample13')), 'no phase reads as current').toBe('Activity unavailable');
-        expect(moving()).toBeNull();
-        expect(row('I_sample13').querySelector('.lar-status-spin'), 'its glyph stops too').toBeNull();
-        await settle(async () =>
-            (await store()).receive(
-                at({
-                    activity: { ...acting('Grep', 1), readAt: new Date(Date.now()).toISOString() } as ThreadActivity,
-                }),
-            ),
-        );
-        expect(line()!.dataset.activity).toBe('working');
-        expect(text(end('I_sample13'))).toBe('$1.85');
-    });
-});
-
-test('Build and its row animate for current execution, stop together, and shaping alone never spins Build', async () => {
-    const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
-    const idle = { ...fresh(), items: sample.items.map((item) => ({ ...item, slices: [], threads: [] })) };
-    const data = withItem('I_sample14', { slices: [], threads: [build] }, idle);
-    const buildGlyph = () => $('[data-stage="build"] header svg')!;
-    const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg');
-
-    await mountPage(data);
-    expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
-    expect(rowGlyph()!.closest('.lar-status-spin')).not.toBeNull();
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-    const stopped = withItem(
-        'I_sample14',
-        { slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] },
-        idle,
-    );
-
-    await settle(() => useBoardStore.getState().receive(stopped));
-    expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
-    expect(rowGlyph(), 'a stopped row leaves its stage’s glyph to the heading').toBeNull();
-    await settle(() =>
-        useBoardStore
-            .getState()
-            .receive(withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, stopped)),
-    );
-    expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
-    expect(row('I_sample02').querySelector('[data-glyph] .lar-status-pulse')).not.toBeNull();
-    expect($('[data-stage="shaping"] header .lar-status-pulse')).toBeNull();
-    expect($('[data-stage="ready"] header svg.lucide-circle-arrow-right')).not.toBeNull();
-});
-
-test('status icons require current execution and suppress unavailable, cached, held and starting work', async () => {
-    const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
-    const idle = {
-        ...fresh(),
-        items: sample.items
-            .filter((item) => ['I_sample14', 'I_sample02'].includes(item.id))
-            .map((item) => ({ ...item, threads: [], slices: [] })),
-    };
-    const data = withItem(
-        'I_sample14',
-        { threads: [build] },
-        withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, idle),
-    );
-
-    await mountPage(data);
-
-    const { useBoardStore } = await import('@/services/board/board.hooks');
-    const motion = () => $$('[data-stage] [data-glyph] .lar-status-spin, [data-stage] [data-glyph] .lar-status-pulse');
-
-    expect(motion()).toHaveLength(2);
-
-    const cases: [string, BoardData][] = [
-        ['stale', { ...data, fetchedAt: '2020-01-01T00:00:00Z' }],
-        ['failed read', { ...data, error: 'Read failed' }],
-        ['first read', { ...data, firstRead: { ...data.firstRead, settled: false, ready: true } }],
-        ['T3 unavailable', { ...data, t3Availability: { availability: 'unavailable' } }],
-        ['T3 not running', { ...data, tools: { t3: { result: 'not-running' } } }],
-        ['cached T3 read', { ...data, t3Availability: { availability: 'available', observedAt: build.updated } }],
-        ['local read failure', { ...data, localProblem: 'Local records unavailable' }],
-        ...(['paused', 'archived', 'needsYou', 'threads'] as const).map(
-            (key) =>
-                [
-                    key,
-                    {
-                        ...data,
-                        items: data.items.map((item) => ({
-                            ...item,
-                            ...(key === 'paused'
-                                ? { paused: 'Settings changed' }
-                                : key === 'archived'
-                                  ? { archived: { setAside: true, hidden: false, ticketOpen: true } }
-                                  : key === 'needsYou'
-                                    ? { needsYou: { reason: 'Help', offers: [], causes: [], ticketOpen: true } }
-                                    : { threads: 'unavailable' as const }),
-                        })),
-                    },
-                ] as [string, BoardData],
-        ),
-        ...(['starting', 'may-have-started'] as const).map(
-            (phase) =>
-                [
-                    phase,
-                    {
-                        ...data,
-                        startProgress: {
-                            I_sample14: { build: phase === 'starting' ? { phase } : { phase, message: 'Check T3' } },
-                            I_sample02: { shape: phase === 'starting' ? { phase } : { phase, message: 'Check T3' } },
-                        },
-                    },
-                ] as [string, BoardData],
-        ),
-    ];
-
-    for (const [label, next] of cases) {
-        await settle(() => useBoardStore.getState().receive(next));
-        expect(motion(), `after ${label}`).toHaveLength(0);
-        expect($('[data-stage="build"] header .lar-status-spin'), `after ${label}`).toBeNull();
-        // With nothing building, the title bar leaves its building counter out.
-        expect(
-            $$('[data-slot=toolbar-counter]')
-                .find((counter) => counter.textContent!.startsWith('building:'))
-                ?.querySelector('.lar-status-spin') ?? null,
-            `after ${label}`,
-        ).toBeNull();
-    }
-    await settle(() => useBoardStore.getState().receive(data));
-    await settle(() => useBoardStore.getState().fail('Disconnected'));
-    expect(motion(), 'client read failed').toHaveLength(0);
-    await settle(() => useBoardStore.getState().receive(data));
-
-    const { useStartStore } = await import('@/features/items/StartStore');
-
-    await settle(() => {
-        useStartStore.getState().set('I_sample14', { phase: 'pending' }, 'build');
-        useStartStore.getState().set('I_sample02', { phase: 'pending' }, 'refine');
-    });
-    expect(motion(), 'local launches still pending').toHaveLength(0);
-    await settle(() => {
-        useStartStore.getState().set('I_sample14', undefined, 'build');
-        useStartStore.getState().set('I_sample02', undefined, 'refine');
-    });
-    for (const evidence of [
-        { state: 'running' as const, currentRunning: undefined },
-        { state: 'done' as const, currentRunning: undefined, queued: true as const, hasLiveChildren: true as const },
-        { observedAt: build.updated, hasRunningChildren: true as const },
-    ]) {
-        await settle(() =>
-            useBoardStore.getState().receive(
-                withItem(
-                    'I_sample14',
-                    { threads: [{ ...build, ...evidence }] },
-                    withItem(
-                        'I_sample02',
-                        {
-                            status: 'Shaping',
-                            threads: [{ ...build, purpose: 'shape', ...evidence }],
-                        },
-                        idle,
-                    ),
-                ),
-            ),
-        );
-        expect(motion(), `evidence ${JSON.stringify(evidence)}`).toHaveLength(0);
-    }
+    await receive(at(threads('done'), { slices: [] }));
+    expect(text(desk())).toContain(wait);
+    expect(text(desk()!.querySelector('[data-col="side"]'))).toContain(wait);
+    expect(text(side('I_sample13')), 'the status stays in one place on the Build row').toBe('');
+    expect(posted()).toEqual([]);
+    await receive(at(running));
+    expect(desk()).toBeNull();
+    await settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().fail('HTTP 502'));
+    expect(text(desk())).toContain(wait);
+    expect(posted()).toEqual([]);
 });

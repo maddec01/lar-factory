@@ -1,7 +1,7 @@
 // The progress at the top of Lar Factory's item dialog: the workflow's steps as a bar, a concept's parts done, and a
 // piece of work's slices as chips under their count.
 
-import { SegmentedProgress } from '@lar-works/design-system';
+import { TickMeter } from '@lar-works/design-system';
 import { ChevronRightIcon, CirclePauseIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -115,8 +115,8 @@ function StepName({ title }: { title: string }) {
     );
 }
 
-/** Where the work stands in its workflow, in miniature: one short segment per step, the past filled quietly, the current
- *  one in `color`, what's to come on the track; `label` names it for screen readers and as its tooltip. */
+/** Where the work stands in its workflow, in miniature: one tick per step, the steps done lit as done, the current one
+ *  in `color`, what's to come bare; `label` names it for screen readers and as its tooltip. */
 export function StageTrack({
     steps,
     at,
@@ -138,14 +138,17 @@ export function StageTrack({
     return (
         <span className="text-fg-muted inline-flex items-center gap-2 text-xs" title={label}>
             {step && <span aria-hidden="true">{step}</span>}
-            <span role="img" aria-label={label} className="inline-flex items-center gap-0.5" data-stage-track>
-                {Array.from({ length: steps }, (_, i) => (
-                    <span
-                        key={i}
-                        className={`h-1 w-2 rounded-full ${i < at ? 'bg-fg-muted opacity-60' : i === at ? '' : 'bg-track'}`}
-                        style={i === at ? { background: color } : undefined}
-                    />
-                ))}
+            {/* One tick a step (the meter set to that many ticks): the steps done lit as done, the current one in its
+                colour, what's to come bare. */}
+            <span className="inline-block" style={{ width: steps * 7 - 3 }} data-stage-track>
+                <TickMeter
+                    label={label}
+                    segments={[
+                        { label: 'Done', state: 'ready', weight: at },
+                        { label: 'Current', color, weight: 1 },
+                        { label: 'To come', weight: Math.max(0, steps - at - 1) },
+                    ]}
+                />
             </span>
         </span>
     );
@@ -176,7 +179,8 @@ export function PartsProgress({
                 {children}
                 {note && <span data-parts-note> · {note}</span>}
             </ProgressCount>
-            <SegmentedProgress
+            <TickMeter
+                size="lg"
                 label={`${label}: ${completed} of ${total} done`}
                 segments={[
                     {

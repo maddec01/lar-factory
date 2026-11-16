@@ -2,15 +2,7 @@
 // with the network stubbed and the clock fixed. Copy a page test for new ones.
 
 import { pageWithData } from '@lar-factory/shared';
-import type {
-    BoardData,
-    BoardAppBridge,
-    Item,
-    ItemDetails,
-    Status,
-    ToolChecks,
-    UpdateState,
-} from '@lar-factory/shared';
+import type { BoardData, BoardAppBridge, ItemDetails, Status, ToolChecks, UpdateState } from '@lar-factory/shared';
 import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 import { act } from 'react';
@@ -19,15 +11,6 @@ import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 import template from '../../index.html?raw';
 
 export const sample = sampleJson as unknown as BoardData;
-
-/** Items read from raw issues as their work records name them: each child names its parent's ID. */
-export const recorded = (items: Item[]): Item[] =>
-    items.map((item) => ({
-        ...item,
-        parentId:
-            items.find((p) => item.parent && p.number === item.parent.number && p.repo === item.parent.repo)?.id ??
-            null,
-    }));
 
 /** The details sample mode serves, by item id. */
 const sampleDetails = sampleDetailsJson as unknown as Record<string, ItemDetails>;

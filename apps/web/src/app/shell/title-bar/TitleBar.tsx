@@ -64,6 +64,8 @@ function Refreshed({ data }: { data: BoardData }) {
     return (
         <RefreshIndicator
             health={health}
+            // While projects load the lanes say so; the bar shows nothing of it.
+            hidden={health === 'waiting' && reading.length > 0}
             label={
                 health === 'disconnected' ? (
                     fetchedAt ? (

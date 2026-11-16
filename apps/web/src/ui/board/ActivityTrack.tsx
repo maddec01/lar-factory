@@ -1,6 +1,6 @@
-// A piece of work's activity as the board reads it from T3: the design system's segmented track, swept while it runs.
+// A piece of work's activity as the board reads it from T3: the design system's tick meter, swept while it runs.
 
-import { SegmentedProgress } from '@lar-works/design-system';
+import { TickMeter } from '@lar-works/design-system';
 
 /** A thin track named by `label`, swept by a bar while `running`; still, it is the bare track. */
 export function ActivityTrack({
@@ -14,7 +14,7 @@ export function ActivityTrack({
 }) {
     return (
         <div className="activity-track min-w-0" data-activity-track={running ? 'running' : 'still'}>
-            <SegmentedProgress
+            <TickMeter
                 label={label}
                 size="sm"
                 segments={[running ? { label, state: 'active', sweep: true } : { label }]}

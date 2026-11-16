@@ -1,7 +1,7 @@
 // A pull request's pipeline: its checks as the board's segmented track, the same look as a row's slices, so a build in
 // review shows at a glance whether its checks still run, failed or all passed and the PR is ready to merge.
 
-import { SegmentedProgress, statusStateColors } from '@lar-works/design-system';
+import { TickMeter } from '@lar-works/design-system';
 import type { StatusState } from '@lar-works/design-system';
 import { GitPullRequest } from '@lar-works/design-system/icons';
 
@@ -46,7 +46,7 @@ export function ChecksBar({ checks, still = false }: { checks: CheckCounts; stil
 
     return (
         <div className="min-w-0" title={summary} data-checks-bar>
-            <SegmentedProgress
+            <TickMeter
                 label={summary}
                 size="sm"
                 segments={segmentStates(checks).map((state, i) => ({
@@ -109,19 +109,20 @@ export function CardChecks({
                 {shown}
             </span>
             {segments.length > 0 ? (
+                // One tick a check (the meter set to that many ticks); checks still loading sweep grey.
                 <span
-                    role="img"
-                    aria-label={label}
-                    className={`inline-flex items-center gap-0.5 ${stale ? 'opacity-50' : ''}`}
+                    className={`inline-block ${stale ? 'opacity-50' : ''}`}
+                    style={{ width: segments.length * 7 - 3 }}
                     data-checks-track
                 >
-                    {segments.map(({ state, pulse }, i) => (
-                        <span
-                            key={i}
-                            className={`h-1 w-2 rounded-full ${state === 'off' ? 'bg-track' : ''} ${pulse ? 'motion-safe:animate-pulse' : ''}`}
-                            style={state === 'off' ? undefined : { background: statusStateColors[state] }}
-                        />
-                    ))}
+                    <TickMeter
+                        label={label}
+                        segments={
+                            checks === 'loading'
+                                ? [{ label, color: 'var(--color-fg-muted)', sweep: true }]
+                                : segments.map(({ state, pulse }, i) => ({ label: `Check ${i + 1}`, state, pulse }))
+                        }
+                    />
                 </span>
             ) : (
                 <span className="sr-only">{label}</span>

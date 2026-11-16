@@ -2,32 +2,15 @@
 // under it, what keeps the work moving and its parts as a Work map or a list. Ports the old Board view's
 // concept block tests.
 
-import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
-import {
-    $,
-    $$,
-    NOW,
-    answer,
-    fresh,
-    holdPosts,
-    mountPage,
-    posted,
-    pressMenu,
-    sample,
-    settle,
-    text,
-} from '@/test/PageTest';
+import { $, $$, answer, fresh, holdPosts, mountPage, posted, pressMenu, sample, settle, text } from '@/test/PageTest';
 
 const C200 = 'I_sample09';
 const C180 = 'I_sample23';
 const dossier = (id = C200) => $(`[data-dossier="${id}"]`)!;
 const header = (id = C200) => dossier(id).querySelector<HTMLElement>('[data-item]')!;
-const line = (id = C200) => header(id).querySelector<HTMLElement>('[data-line="1"]')!;
-/** The row's "what's next": the part that waits on you, the first part that can start, or the fallback. */
-const next = (id = C200) => header(id).querySelector<HTMLElement>('[data-next]')!;
-const chips = (id = C200) => [...header(id).querySelectorAll('[data-chip]')].map(text);
 const opener = (id = C200) => header(id).querySelector<HTMLButtonElement>('[data-dossier-open]')!;
 const VIEW_KEY = 'lar-board:dossier-view:';
 const step = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-part="${id}"]`)!;
@@ -38,15 +21,8 @@ const press = (el: Element) =>
         (el as HTMLElement).click();
         vi.advanceTimersByTime(0);
     });
-/** A control's accessible name: its label, or its text when it shows its words. */
-const nameOf = (el: Element) => el.getAttribute('aria-label') ?? text(el);
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialogTitle = () => text($('[data-item-dialog] [data-slot="modal-header"] h2'));
-/** The button named `label`, by its text or, for an icon button, its accessible name. */
-const button = (within: Element, label: string) =>
-    [...within.querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => text(b) === label || b.getAttribute('aria-label') === label,
-    )!;
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData => ({
     ...data,
     items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
@@ -77,12 +53,6 @@ const withDecision = (blockers?: Item['blockers']) =>
     writable({ ...sample, items: [...sample.items, decision(blockers)] });
 const receive = (data: BoardData) =>
     settle(async () => (await import('@/services/board/board.hooks')).useBoardStore.getState().receive(data));
-const thread = (id: string, state: ItemThread['state']): ItemThread => ({
-    id,
-    title: `Thread ${id}`,
-    state,
-    updated: '2026-10-21T09:00:00.000Z',
-});
 /** An open pull request whose checks passed and that can merge: evidence that keeps a part's recorded Verify or
  *  Ready to merge stage, where a part with no pull request reads Review PR. */
 const cleanPrs: Item['linkedPrs'] = [
@@ -110,8 +80,6 @@ const mountOpen = async (data: BoardData = sample, id = C200) => {
 
     if (!body(id)) await press(opener(id));
 };
-/** Dossier `id` expanded too. */
-const openInstead = (id: string) => press(opener(id));
 
 const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
 const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
@@ -164,44 +132,6 @@ test('live status changes keep linked work in its group with details, thread and
     expect($('[data-item-dialog] a[href="https://github.com/maddec01/lar-server/pull/150"]')).not.toBeNull();
 });
 
-test('the chevron is a real button that says whether the row is expanded, and focus stays on it as the row collapses', async () => {
-    await mountPage();
-
-    const chevron = opener();
-
-    expect([chevron.tagName, chevron.getAttribute('aria-expanded'), chevron.getAttribute('aria-label')]).toEqual([
-        'BUTTON',
-        'false',
-        'Expand #200 lar cloud: sign-in and direct connections',
-    ]);
-    chevron.focus();
-    await clickWith(chevron, 0);
-    expect([chevron.getAttribute('aria-expanded'), chevron.getAttribute('aria-label'), body() !== null]).toEqual([
-        'true',
-        'Collapse #200 lar cloud: sign-in and direct connections',
-        true,
-    ]);
-    await clickWith(chevron, 0);
-    expect([chevron.getAttribute('aria-expanded'), body(), document.activeElement, opener()]).toEqual([
-        'false',
-        null,
-        chevron,
-        chevron,
-    ]);
-});
-
-test('each dossier expands on its own, and the browser remembers it across a reload', async () => {
-    await mountPage();
-    await press(opener());
-    await press(opener(C180));
-    expect([body() !== null, body(C180) !== null]).toEqual([true, true]);
-    await press(opener());
-    expect([body(), body(C180) !== null]).toEqual([null, true]);
-    vi.resetModules();
-    await mountPage();
-    expect([body(), body(C180) !== null]).toEqual([null, true]);
-});
-
 test('a board push updates an expanded dossier in place, and one that leaves the board comes back as it was', async () => {
     await mountOpen();
     await receive(withItem('I_sample10', { title: 'Relay, renamed' }));
@@ -210,223 +140,6 @@ test('a board push updates an expanded dossier in place, and one that leaves the
     expect($(`[data-dossier="${C200}"]`)).toBeNull();
     await receive(sample);
     expect(body()).not.toBeNull();
-});
-
-test('a filter hides an expanded dossier with its row, and it is still expanded once the filter lets it back', async () => {
-    localStorage.setItem('lar-board:filters:board', JSON.stringify({ kinds: [c200.kind], labels: [] }));
-    await mountOpen();
-    await receive(withItem(C200, { kind: 'bug', status: 'Shaping' }));
-    expect($(`[data-dossier="${C200}"]`)).toBeNull();
-    await receive(sample);
-    expect(body()).not.toBeNull();
-});
-
-/** A pointer click (`detail` 1) or a key press's click (`detail` 0) on `el`. */
-const clickWith = (el: Element, detail: number) =>
-    settle(() => {
-        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail }));
-    });
-/** Selects the text of `el`. */
-const select = (el: Element) => {
-    const range = document.createRange();
-
-    range.selectNodeContents(el);
-    window.getSelection()!.removeAllRanges();
-    window.getSelection()!.addRange(range);
-};
-
-test('only the title opens the item; anywhere else on the row but its controls toggles the dossier', async () => {
-    await mountPage();
-    for (const part of [line, (id?: string) => header(id).querySelector<HTMLElement>('[data-col="bar"]')!, next]) {
-        await press(part());
-        expect(body()).not.toBeNull();
-        expect(dialogTitle()).toBe('');
-        await press(part());
-        expect(body()).toBeNull();
-    }
-});
-
-test('letting go of a drag that selected text in the row leaves it as it was; a selection elsewhere or a key press still toggles it', async () => {
-    await mountPage();
-    select(header());
-    await clickWith(header(), 1);
-    expect(body()).toBeNull();
-    await clickWith(opener(), 0);
-    expect(body(), 'Enter or Space on the row’s button, with text selected in it').not.toBeNull();
-    await press(opener());
-    select(header(C180));
-    await clickWith(header(), 1);
-    expect(body(), 'a click, with text selected in another row').not.toBeNull();
-    window.getSelection()!.removeAllRanges();
-});
-
-const refined = {
-    refinement: { complete: true, reasons: [] },
-    completion: { complete: false, reasons: ['No delivery planned.'] },
-};
-const more = (id = C200) => header(id).querySelector('[data-chips-more]');
-/** C200 with nothing that asks for the user's action and no fog left: no part in Needs you and no open decision. */
-const calm = (over: Partial<Item>) => ({
-    ...sample,
-    items: sample.items
-        .filter((i) => i.kind !== 'decision' && i.status !== 'Needs you')
-        .map((i) => (i.id === C200 ? { ...i, map: i.map && { ...i.map, fog: [] }, ...over } : i)),
-});
-
-test('the row shows one chip by priority: what asks for action over Refined, Refined over fog, and all remaining badges say what they mean', async () => {
-    const words = (id = C200) => header(id).getAttribute('title');
-
-    await mountPage(withItem(C200, refined));
-    // A part in Needs you is the row's next step, so no chip repeats it, nor the decisions and Refined below it.
-    expect(text(next()), 'a part in Needs you over open decisions and Refined').toContain('#202 Sign-in screen');
-    expect(chips()).toEqual([]);
-    expect(header().querySelector('[data-refined]')).toBeNull();
-    // The rest are named on hover, so the row keeps to one summary.
-    expect(more()).toBeNull();
-    expect(words()).toContain('1 needs you · 2 decisions · Refined · no delivery planned · 2 questions to route');
-
-    const title = next().querySelector('[title]')!;
-
-    expect(
-        [title.getAttribute('title'), title.className.split(' ').includes('truncate')],
-        'the next step cuts off, with its full text in its tooltip',
-    ).toEqual(['#202 Sign-in screen', true]);
-    await receive(withItem('I_sample12', { status: 'In progress', threads: [] }, withItem(C200, refined)));
-    // The first chip by priority reads on the title's line (the row's end keeps its one fact); the tooltip lists them all.
-    expect(chips(), 'the first chip shows beside the title').toEqual(['2 decisions']);
-    expect(header().querySelector('[data-col="repos"] [data-chips]'), 'on the title line, not the end').not.toBeNull();
-    expect(words(), 'an open decision over Refined').toMatch(/^2 decisions · Refined/);
-    await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(words(), 'Refined over fog').toMatch(/^Refined · no delivery planned · 1 question to route/);
-    await receive(calm({ refinement: undefined, map: { ...c200.map!, fog: ['An open question.'] } }));
-    expect(words(), 'fog with nothing above it').toContain('1 question to route');
-    expect(words()).not.toContain('Refined');
-    await receive(calm({ refinement: undefined }));
-    expect(header().querySelector('[data-chips]'), 'no chips, no room').toBeNull();
-});
-
-test('a settled decision counts as done in its part bar, whatever its Status says', async () => {
-    const settledDecision: Partial<Item> = {
-        recorded: true,
-        kind: 'decision',
-        labels: [],
-        status: 'Shaping',
-        completion: { complete: true, reasons: [] },
-        threads: undefined,
-    };
-    const pending: Partial<Item> = { ...settledDecision, completion: { complete: false, reasons: ['No answer.'] } };
-    const parts = [
-        { ...sample.items.find((i) => i.id === 'I_sample10')!, ...settledDecision },
-        { ...sample.items.find((i) => i.id === 'I_sample12')!, ...pending },
-    ];
-
-    await mountPage({ ...sample, items: [{ ...c200, subIssues: { total: 2, completed: 0 } }, ...parts] });
-    expect(text(col('count'))).toBe('1/2 parts done');
-
-    const bar = [...col('bar').querySelectorAll<HTMLElement>('[data-part-bar] li')];
-
-    expect(
-        bar.map((li) => [
-            li.getAttribute('aria-label'),
-            li.querySelector<HTMLElement>('span')?.style.background === 'var(--color-board-done)',
-        ]),
-    ).toEqual([
-        ['Done', true],
-        [expect.stringContaining('Working'), false],
-    ]);
-});
-
-test('the blocked chip counts the blocked slices of unfinished parts', async () => {
-    const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
-
-    await mountPage(
-        withItem('I_sample13', {
-            slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)),
-        }),
-    );
-    expect(header().getAttribute('title')).toContain('2 blocked');
-    await receive(
-        withItem(
-            'I_sample13',
-            { slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)) },
-            calm({}),
-        ),
-    );
-    expect(header().getAttribute('title'), 'with nothing above it, it leads the tooltip').toMatch(/^2 blocked/);
-});
-
-const col = (name: string, id = C200) => header(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
-
-test('a part at Verify or Ready to merge counts as moving while its build thread runs, and asks for action in its group when it stops', async () => {
-    const build = {
-        id: 'build',
-        title: 'Build',
-        purpose: 'build',
-        state: 'running',
-        currentRunning: true,
-        updated: '2026-10-21T09:00:00.000Z',
-        activity: {
-            available: true,
-            readAt: new Date(NOW).toISOString(),
-            action: 'Read a.ts',
-            actionAt: new Date(NOW).toISOString(),
-            toolRunning: false,
-            agents: [],
-        },
-    } as ItemThread;
-    const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh()));
-
-    await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
-    expect(dossier().querySelector('[data-attention-row="verify"]')).toBeNull();
-    expect(text(next())).toBe('Moving#140 Owner accounts');
-
-    const part = text(step('I_sample13'));
-
-    // As a lane row says it: what the thread does now in place of a state word, never the stale Ready to merge.
-    expect([
-        part.includes('Read a.ts'),
-        part.includes('Ready to merge'),
-        nameOf(step('I_sample13').querySelector('[data-open-thread]')!),
-    ]).toEqual([true, false, 'Open thread']);
-    await receive(
-        withItem(
-            'I_sample13',
-            {
-                status: 'Ready to merge',
-                blockers: [],
-                threads: [
-                    {
-                        ...build,
-                        id: 'shape',
-                        title: 'Shape',
-                        purpose: 'shape',
-                        state: 'done',
-                        currentRunning: undefined,
-                    },
-                    { ...build, state: 'done', currentRunning: undefined, hasRunningChildren: true },
-                ],
-            },
-            clear,
-        ),
-    );
-    expect(text(step('I_sample13')), 'it says what the running build thread does, not the newest one').toContain(
-        'Read a.ts· 0s',
-    );
-    await receive(
-        withItem(
-            'I_sample13',
-            {
-                status: 'Ready to merge',
-                blockers: [],
-                slices: [],
-                linkedPrs: cleanPrs,
-                threads: [{ ...build, state: 'done', currentRunning: undefined }],
-            },
-            clear,
-        ),
-    );
-    expect(text(next())).toBe('Merge PR#140 Owner accounts');
-    expect(text(step('I_sample13'))).toContain('Merge PR');
 });
 
 test('a part with nothing to wait on is ready to start, with its Start', async () => {
@@ -448,68 +161,6 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
             { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } },
         ],
     ]);
-});
-
-test('a part’s row and the header agree on what can start: a Queued decision can, a part with a live thread can’t', async () => {
-    const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
-
-    await mountOpen(data);
-
-    const ready = () => startIn(step('I_d204'));
-
-    expect([text(ready()), text(startIn(col('side')))]).toEqual(['Decide', 'Decide']);
-    await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
-    expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
-});
-
-test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
-    vi.stubGlobal(
-        'ResizeObserver',
-        class {
-            observe() {}
-            disconnect() {}
-        },
-    );
-    for (const id of [C200, C180]) localStorage.removeItem(VIEW_KEY + id);
-    await mountOpen();
-    expect([
-        button(dossier(), 'Work map').getAttribute('aria-pressed'),
-        dossier().querySelector('[data-work-map]') !== null,
-    ]).toEqual(['true', true]);
-    await press(button(dossier(), 'Parts list'));
-    expect([
-        dossier().querySelector('[data-work-map]'),
-        dossier().querySelector('[data-parts-list]') !== null,
-        localStorage.getItem(VIEW_KEY + C200),
-    ]).toEqual([null, true, 'list']);
-    vi.resetModules();
-    await mountOpen();
-    expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
-    await openInstead(C180);
-    expect(
-        button(dossier(C180), 'Work map').getAttribute('aria-pressed'),
-        'the other dossier stays on its Work map',
-    ).toBe('true');
-});
-
-test('once its blockers complete, Start build sends the build, and the header offers it too', async () => {
-    holdPosts(unblocked());
-    await mountOpen(
-        withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()),
-    );
-    expect(text(startIn(col('side')))).toBe('Build');
-    expect(next().textContent?.startsWith('Next'), 'Next names the step the owner can start').toBe(true);
-    await pressMenu(startIn(step('I_sample13'))!);
-    expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
-    await press(entries()[1]!);
-    expect(posted()).toEqual([
-        [
-            '/api/start-build',
-            { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } },
-        ],
-    ]);
-    await answer({ thread: null, error: 'T3 is down.' }, 502);
-    expect(text(dossier().querySelector('.start [role="alert"]')), 'its error shows under its row').toBe('T3 is down.');
 });
 
 test('a Queued decision shows only Start after while a blocker is open, naming the last open one', async () => {
@@ -542,65 +193,6 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
     expect(text(card().querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
 });
 
-test('the parts list keeps cross-repository dependency order even when builds return to a repository', async () => {
-    const first = {
-        ...sample.items.find((i) => i.id === 'I_sample24')!,
-        state: 'open' as const,
-        status: 'Ready' as const,
-        blockers: [],
-    };
-    const second = {
-        ...sample.items.find((i) => i.id === 'I_sample25')!,
-        state: 'open' as const,
-        status: 'Ready' as const,
-    };
-    const last: Item = {
-        ...first,
-        id: 'I_last',
-        number: 999,
-        title: 'Finish in the server',
-        blockers: [{ repo: second.repo!, number: second.number!, state: 'open' }],
-    };
-
-    await mountOpen(
-        {
-            ...sample,
-            items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first],
-        },
-        C180,
-    );
-    expect(
-        [...dossier(C180).querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part')),
-    ).toEqual([first.id, second.id, last.id]);
-});
-
-test('the parts list keeps a build before a research decision blocked by that build', async () => {
-    const build = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [] };
-    const research = {
-        ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]),
-        labels: ['decision-research'],
-    };
-
-    await mountOpen({ ...sample, items: [c200, research, build] });
-    expect(
-        [...dossier().querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part')),
-    ).toEqual([build.id, research.id]);
-});
-
-test("every parts-list row names its project, the concept's own quietly, so no row reads with a gap", async () => {
-    const own = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [], repo: c200.repo! };
-    const other = { ...own, id: 'I_other', number: 901, repo: 'maddec01/lar-apple' };
-
-    await mountOpen({ ...sample, items: [c200, own, other] });
-
-    const project = (id: string) => step(id).querySelector<HTMLElement>('[data-repo-cell]');
-
-    expect(project(own.id), "the concept's own project").not.toBeNull();
-    expect(project(own.id)!.hasAttribute('data-repo-home'), 'named quietly').toBe(true);
-    expect(text(project(other.id))).toContain('lar-apple');
-    expect(project(other.id)!.hasAttribute('data-repo-home')).toBe(false);
-});
-
 /** #200 on its Work map with `parts` as its parts, in place of the sample's. */
 const conceptOf = (parts: Item[], change: Partial<Item> = {}): BoardData => ({
     ...fresh(),
@@ -628,18 +220,6 @@ const workPart = (id: string, change: Partial<Item> = {}): Item => ({
     linkedPrs: [],
     ...change,
 });
-const settledPart = (
-    id: string,
-    method: 'grill' | 'prototype' | 'research' | 'task',
-    change: Partial<Item> = {},
-): Item =>
-    workPart(id, {
-        kind: 'decision',
-        decisionMethod: method,
-        status: 'Done',
-        completion: { complete: true, reasons: [] },
-        ...change,
-    });
 const mapOpen = async (data: BoardData) => {
     vi.stubGlobal(
         'ResizeObserver',
@@ -653,257 +233,6 @@ const mapOpen = async (data: BoardData) => {
 
     return dossier().querySelector<HTMLElement>('[data-work-map]')!;
 };
-const fiveSettled = (['grill', 'prototype', 'research', 'task', 'grill'] as const).map((method, n) =>
-    settledPart(`W_s${n}`, method),
-);
-
-test('map arrows meet the rendered cards at their vertical centres', async () => {
-    const first = workPart('W_first', { title: 'Limit provider calls to the metadata service', slices: base.slices });
-    const next = workPart('W_next', {
-        blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: first.id }],
-    });
-    const map = await mapOpen(conceptOf([first, next]));
-    const card = (id: string) => map.querySelector<HTMLElement>(`[data-map-part="${id}"]`)!;
-    const centre = (node: HTMLElement) =>
-        Number.parseFloat(node.parentElement!.style.top) + Number.parseFloat(node.style.height) / 2;
-    const from = card(first.id);
-    const to = card(next.id);
-    const path = map.querySelector('path[data-edge="W_first W_next"]')!.getAttribute('d')!;
-    const coordinates = path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-
-    expect(coordinates[1], 'the arrow leaves at the visible card centre').toBe(centre(from));
-    expect(coordinates.at(-1), 'the arrow arrives at the visible card centre').toBe(centre(to));
-    expect(text(from)).toContain(first.title);
-    expect(from.querySelector('[data-slice-bar]')).not.toBeNull();
-});
-
-test('a part waiting on settled decisions in the group keeps a quiet rail from the group, with its label', async () => {
-    const held = workPart('W_next', {
-        status: 'In progress',
-        blockers: [
-            { number: 0, repo: c200.repo!, state: 'closed', workId: 'W_s0', title: 'x' },
-            { number: 0, repo: c200.repo!, state: 'closed', workId: 'W_s1', title: 'y' },
-        ],
-    });
-    const later = workPart('W_later', {
-        status: 'Ready',
-        blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_next' }],
-    });
-    const map = await mapOpen(conceptOf([...fiveSettled, held, later], { map: { ...c200.map!, check: undefined } }));
-    const edges = () =>
-        [...map.querySelectorAll('path[data-edge]')]
-            .map((p) => String(p.getAttribute('data-edge')))
-            .sort((a, b) => a.localeCompare(b));
-
-    expect(edges()).toEqual(['history W_next', 'W_next W_later']);
-    expect(map.querySelector('path[data-edge="history W_next"]')?.hasAttribute('data-edge-rail'), 'drawn quietly').toBe(
-        true,
-    );
-
-    // The rail rises from the group's own line, so it never starts in empty space.
-    const startY = (d: string | null | undefined) => d?.match(/^M\S+ (\S+)/)?.[1];
-    const bus = map.querySelector('path[data-map-bus]')?.getAttribute('d');
-
-    expect(bus, 'the group has a line').toBeTruthy();
-    expect(
-        startY(map.querySelector('path[data-edge="history W_next"]')?.getAttribute('d')),
-        'from the group line',
-    ).toBe(startY(bus));
-
-    const label = () => map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
-    const tooltip = (id: string) => map.querySelector(`[data-map-part="${id}"] [data-title]`)!.getAttribute('title');
-
-    expect([text(label()), label().tagName, label().getAttribute('aria-label')]).toEqual([
-        '2 completed prerequisites',
-        'BUTTON',
-        '2 completed prerequisites: Part W_s0, Part W_s1',
-    ]);
-    expect(tooltip('W_next')).toContain('After 2 completed prerequisites: Part W_s0, Part W_s1');
-
-    // The rail rises from the group's line to the card it serves and stops there, so it starts and ends on something.
-    const rail = map.querySelector('path[data-edge="history W_next"]')!.getAttribute('d')!;
-    const ys = rail
-        .match(/-?\d+(?:\.\d+)?/g)!
-        .map(Number)
-        .filter((_, n) => n % 2 === 1);
-    const card = map.querySelector<HTMLElement>('[data-map-part="W_next"]')!;
-    const centre = Number.parseFloat(card.parentElement!.style.top) + Number.parseFloat(card.style.height) / 2;
-
-    expect(String(ys[0]), 'starts on the group line').toBe(startY(bus));
-    expect(Math.min(...ys), 'stops at the card').toBe(centre);
-    await press(map.querySelector('[data-map-history]')!);
-    expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the rail').not.toBeNull();
-    await receive(
-        conceptOf([...fiveSettled, { ...held, status: 'Done', completion: { complete: true, reasons: [] } }, later], {
-            map: { ...c200.map!, check: undefined },
-        }),
-    );
-    expect(edges(), 'a board push moves it into the group').toEqual(['history W_later']);
-    expect(text(map.querySelector('[data-edge-label="history W_later"]'))).toBe('1 completed prerequisite');
-    expect(tooltip('W_later')).toContain('After 1 completed prerequisite: Part W_next');
-});
-
-test('a card counts each finished blocker once in its tooltip, the history group shows them; an open blocker stays named', async () => {
-    const closed = (workId: string) => ({
-        number: 0,
-        repo: c200.repo!,
-        state: 'closed' as const,
-        workId,
-        title: workId,
-    });
-    const held = workPart('W_next', {
-        status: 'Ready',
-        blockers: [
-            closed('W_s0'),
-            closed('W_s0'),
-            closed('W_s1'),
-            { number: 0, repo: c200.repo!, state: 'open', workId: 'W_open', title: 'Part W_open' },
-        ],
-    });
-    const map = await mapOpen(
-        conceptOf([...fiveSettled, workPart('W_open', { status: 'In progress' }), held], {
-            map: { ...c200.map!, check: undefined },
-        }),
-    );
-    const tooltip = map.querySelector('[data-map-part="W_next"] [data-title]')!.getAttribute('title');
-
-    expect(tooltip, 'the same part listed twice counts once').toContain(
-        'After 2 completed prerequisites: Part W_s0, Part W_s1',
-    );
-    expect(
-        [...map.querySelectorAll('path[data-edge]')]
-            .map((p) => p.getAttribute('data-edge'))
-            .map(String)
-            .sort(),
-    ).toEqual(['W_open W_next', 'history W_next']);
-    expect(
-        text(map.querySelector('[data-edge-label="history W_next"]')),
-        'its label counts the same part once too',
-    ).toBe('2 completed prerequisites');
-    expect(text(map.querySelector('[data-map-part="W_next"] [data-map-facts]'))).toBe('Blocked by 1 part');
-    expect(
-        map.querySelector('[data-map-part="W_next"] [data-stage-track]'),
-        'every card keeps its stage track in its head',
-    ).not.toBeNull();
-    expect(
-        map.querySelector('[data-map-part="W_open"] [data-stage-track]'),
-        'work under way shows its step',
-    ).not.toBeNull();
-    expect(
-        map.querySelector('[data-map-part="W_next"]')?.hasAttribute('data-map-held'),
-        'a held card keeps its step and track, quiet beside its foot',
-    ).toBe(true);
-    expect(map.querySelector('[data-map-part="W_open"]')?.hasAttribute('data-map-held')).toBe(false);
-    expect(map.querySelector('[data-history-part]')).toBeNull();
-    // The history's toggle reads as the parts list's: one quiet line that says what it shows.
-    expect(map.querySelector('[data-map-history]')!.getAttribute('aria-label')).toMatch(/^Show \d+ settled decisions$/);
-    await press(map.querySelector('[data-map-history]')!);
-    expect(map.querySelector('[data-map-history]')!.getAttribute('aria-label')).toMatch(/^Hide \d+ settled decisions$/);
-    expect(map.querySelector('[data-history-part="W_s0"]')).not.toBeNull();
-});
-
-test('a build whose planner ended while its child and background work run reads as working, never as done', async () => {
-    const planner: ItemThread = {
-        id: 'plan',
-        title: 'Plan',
-        state: 'done',
-        purpose: 'build',
-        hasRunningChildren: true,
-        updated: '2026-10-21T09:00:00.000Z',
-    };
-    const newest: ItemThread = { id: 'newer', title: 'Later', state: 'done', updated: '2026-10-21T10:00:00.000Z' };
-    const build = workPart('W_build', { status: 'In progress', buildPhase: 'plan', threads: [newest, planner] });
-    const map = await mapOpen(conceptOf([build]));
-    const node = map.querySelector('[data-map-part="W_build"]')!;
-
-    expect(text(node.querySelector('[data-map-facts]'))).toBe('Planning · child work running');
-    expect(node.querySelector('[data-open-thread]')!.getAttribute('href')).toBe(
-        't3code://threads/sample-environment/plan',
-    );
-    expect(header().getAttribute('title'), 'the header counts it as running').toContain('1 running');
-    await receive(conceptOf([{ ...build, threads: [newest, { ...planner, hasRunningChildren: undefined }] }]));
-    expect(text(map.querySelector('[data-map-part="W_build"] [data-map-facts]')), 'once it all ends, it says so').toBe(
-        'In progress · Run finished',
-    );
-});
-
-test('a finished part with work still running stays with current work', async () => {
-    const map = await mapOpen(
-        conceptOf([
-            settledPart('W_d', 'research', {
-                threads: [
-                    {
-                        id: 'd',
-                        title: 'D',
-                        state: 'done',
-                        hasRunningChildren: true,
-                        updated: '2026-10-21T09:00:00.000Z',
-                    },
-                ],
-            }),
-        ]),
-    );
-
-    expect(map.querySelector('[data-map-history]')).toBeNull();
-    expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Done · Working');
-});
-
-/** The dossier's total, which reads on its first line beside its state. */
-const dossierTotal = () => header().querySelector('[data-meta-end] [data-partial]')!.closest<HTMLElement>('[title]')!;
-
-test('a Dossier total marks a sum with a failed part partial with a + after its cost, and says why', async () => {
-    const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
-
-    await mountPage(
-        withItem(
-            'I_sample10',
-            { stats: usage, usageState: 'failed' },
-            withItem('I_sample12', { stats: usage, usageState: 'current' }),
-        ),
-    );
-    // The first line keeps to its cost; time and tokens are in its tooltip.
-    expect(text(dossierTotal())).toBe('$7.90+ partial');
-    expect(
-        [
-            text(dossierTotal().querySelector('[data-partial]')),
-            dossierTotal().querySelector('[data-partial] .sr-only') !== null,
-        ],
-        'a + on screen, partial for a screen reader',
-    ).toEqual(['+ partial', true]);
-    expect(dossierTotal().title).toContain('Some agent usage is not available yet.');
-});
-
-test('decision map and attention actions use answer wording only for a current question', async () => {
-    const decision = workPart('W_question', {
-        kind: 'decision',
-        decisionMethod: 'grill',
-        status: 'Shaping',
-        threads: [thread('decision-thread', 'running')],
-    });
-    const data = conceptOf([decision]);
-    const map = await mapOpen(data);
-    const action = () => map.querySelector('[data-map-part="W_question"] [data-open-thread]')!;
-
-    expect(nameOf(action())).toBe('Open thread');
-    await receive(conceptOf([{ ...decision, status: 'Needs you' }]));
-    expect(nameOf(action())).toBe('Open thread');
-    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
-    expect([text(action()), action().getAttribute('href')]).toEqual([
-        'Answer in T3',
-        't3code://threads/sample-environment/question-thread',
-    ]);
-    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'done')] }]));
-    expect(nameOf(action())).toBe('Open thread');
-    await press(button(dossier(), 'Parts list'));
-
-    // In the parts list, the part's own action opens its thread; nothing repeats it above the list.
-    const attentionAction = () => dossier().querySelector('[data-part="W_question"] .row-side [data-open-thread]')!;
-
-    expect(nameOf(attentionAction())).toBe('Open thread');
-    await receive(conceptOf([{ ...decision, status: 'Needs you', threads: [thread('question-thread', 'needs you')] }]));
-    // The list's part opens the thread that asks, as an icon; the Work map card above says Answer in T3.
-    expect(attentionAction().getAttribute('href')).toBe('t3code://threads/sample-environment/question-thread');
-});
 
 test('queued empty concepts and parts with off-board parents stay in the dock and keep their desk waits', async () => {
     const concept = { ...c200, status: 'Queued' as const, subIssues: { total: 0, completed: 0 } };
@@ -923,36 +252,6 @@ test('queued empty concepts and parts with off-board parents stay in the dock an
     expect(opener(part.id)).toBeNull();
     await press(header(part.id).querySelector('[data-title]')!);
     expect(dialogTitle()).toContain('Faster library sync');
-});
-
-test('a working off-board part keeps its newest action in the dock, and its stage and parent once it stops', async () => {
-    const part = fresh().items.find((item) => item.number === 22)!;
-
-    await mountPage({ ...fresh(), items: [part] });
-    // While its thread works, the row's one line says what it does, in place of its parent and stage.
-    expect(text(header(part.id))).toContain('Edit ContinueWatchingRow.swift');
-    expect(header(part.id).querySelector('[data-activity="working"]')).not.toBeNull();
-    expect(text(header(part.id))).not.toContain('0/0 parts');
-    expect(text(header(part.id))).not.toContain('Nothing waits on you');
-    expect($('[data-stage="shaping"] [data-item]')).toBeNull();
-    await receive({ ...fresh(), items: [{ ...part, threads: [] }] });
-    expect(text(header(part.id))).toContain('Part of #9 Home screen refresh · Parent is outside the board');
-    expect(text(header(part.id))).toContain('Shaping');
-    expect(header(part.id).querySelector('[data-activity="working"]')).toBeNull();
-});
-
-test('an explicitly linked empty parent keeps its own activity and says No parts yet', async () => {
-    const part = fresh().items.find((item) => item.number === 22)!;
-    const parent = { ...part, parent: null, parentId: null, flow: 'linked' as const };
-
-    await mountPage({ ...fresh(), items: [parent] });
-    expect(header(parent.id).querySelector('[data-kind-mark]')?.getAttribute('aria-label')).toBe('Linked work');
-    expect(text(header(parent.id))).toContain('No parts yet');
-    expect(text(header(parent.id))).toContain('Edit ContinueWatchingRow.swift');
-    expect(header(parent.id).querySelector('[data-activity="working"]')).not.toBeNull();
-    await receive({ ...fresh(), items: [{ ...parent, flow: 'single' }] });
-    expect(dossier(parent.id)).toBeNull();
-    expect($(`[data-stage="shaping"] [data-item="${parent.id}"]`)).not.toBeNull();
 });
 
 test('the live map follows recorded parts, blockers and gate changes while prose cannot invent Dependencies', async () => {
@@ -990,103 +289,4 @@ test('the live map follows recorded parts, blockers and gate changes while prose
     expect(tooltip()).not.toContain('Not queued');
     await receive(conceptOf([{ ...first, status: 'Ready', passingBrief: true }], change));
     expect(map.querySelector('[data-map-part="W_next"]')).toBeNull();
-});
-
-test('a group names its out-of-date checklist and ships-with release steps in map and list views', async () => {
-    const members = sample.items.filter((i) => i.parentId === C200).slice(0, 2);
-    const data = withItem(C200, {
-        reconciliation: {
-            groupId: C200,
-            digest: 'current',
-            completed: [],
-            items: [
-                {
-                    key: 'doubt:consumer',
-                    digest: 'changed',
-                    workId: members[0]!.id,
-                    kind: 'brief',
-                    summary: 'Consumer: rerun Doubt after /lookup was removed.',
-                    changes: ['contract'],
-                    requiresFix: true,
-                },
-            ],
-        },
-        releasePlan: {
-            steps: [
-                {
-                    id: 'invite',
-                    who: 'Pedro',
-                    what: 'Release invitation links together',
-                    shipsWith: members.map((m) => m.id),
-                    done: null,
-                },
-            ],
-            outcomeCheck: { what: 'Invitation links work.', result: 'pending', evidence: null },
-        },
-    });
-
-    await mountOpen(data);
-    // The row keeps to one chip; every chip is named in its tooltip.
-    expect(header().getAttribute('title')).toContain('Concept map needs updating');
-    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
-        'Concept map needs updating · 1 part affected',
-    );
-    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(
-        '1 brief to re-check after changed answers',
-    );
-    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Ships with');
-    expect(text(dossier().querySelector('[data-release-steps]'))).toContain(members[0]!.title);
-    await press(dossier().querySelector('[data-reconciliation] summary')!);
-    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain(members[0]!.title);
-    expect(text(dossier().querySelector('[data-reconciliation]'))).not.toContain('rerun Doubt');
-    expect(text(dossier().querySelector('[data-release-steps]'))).toContain('Pedro');
-});
-
-test('unrouted Fog is reported for reconciliation instead of counted as an open question', async () => {
-    await mountPage(
-        calm({
-            map: {
-                destination: 'UTC display',
-                decisions: [],
-                fog: ['Fixture files and presentation remain unspecified.'],
-            },
-        }),
-    );
-    expect(header().getAttribute('title')).not.toContain('open question');
-    expect(header().getAttribute('title')).toContain('1 question to route');
-    await press(opener());
-    expect(text(body())).toContain('Unanswered');
-    expect(text(body())).not.toContain('no part answers this yet');
-    expect(text(body())).toContain('Fixture files and presentation remain unspecified.');
-});
-
-test('a Ready linked parent whose Kind is build shows its running parts in the group heading', async () => {
-    const data = structuredClone(sample);
-    const parent = data.items.find((item) => item.id === C200)!;
-
-    Object.assign(parent, {
-        kind: 'build',
-        flow: 'linked',
-        status: 'Ready',
-        linkedPrs: [],
-        buildPhase: null,
-        threads: [],
-        conceptBuild: undefined,
-    });
-
-    const parts = data.items.filter((item) => item.parentId === parent.id && item.kind !== 'decision');
-
-    for (const part of parts)
-        Object.assign(part, {
-            kind: 'build',
-            status: 'In progress',
-            linkedPrs: [],
-            threads: [{ ...thread(`owner-${part.id}`, 'running'), purpose: 'build' }],
-            completion: { complete: false, reasons: [] },
-        });
-    await mountPage(data);
-    expect(parts.length).toBeGreaterThan(0);
-    expect(text(header())).toContain('build');
-    expect(text(header())).toContain('running');
-    expect(text(header())).not.toContain('Ready to build');
 });

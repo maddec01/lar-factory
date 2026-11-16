@@ -88,7 +88,9 @@ export function PartRow({
     const slices = item.slices.length;
     const sliceCount = item.slices.filter((x) => x.progress === 'done').length;
     // A part at work names what runs, so its bar says something is going on even with no slices to count.
-    const atWork = done || held ? undefined : workLabel(item, !!showsActivity);
+    // A thread paused on you (a question, an approval) keeps its bar, its light travelling in amber.
+    const waiting = activity === 'waiting';
+    const atWork = done || held ? undefined : workLabel(item, !!showsActivity, waiting);
 
     return (
         <StageRowItem item={item.id} picked={isPicked} attention={asksYou} part>
@@ -135,7 +137,7 @@ export function PartRow({
                     ) : (
                         atWork && (
                             <RowProgress
-                                bar={<WorkingBar label={atWork} still={still} />}
+                                bar={<WorkingBar label={atWork} still={still} waiting={waiting} />}
                                 count={<RowCount title={atWork}>{atWork}</RowCount>}
                             />
                         )

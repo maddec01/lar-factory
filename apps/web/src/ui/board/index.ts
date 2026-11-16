@@ -31,7 +31,7 @@ export {
 } from './Counters';
 export { noteBoardPlaces } from './BoardLife';
 export { bringDeskIntoView, DeskCard, DeskHint, DeskSection } from './Desk';
-export { BoardCard } from './BoardCard';
+export { BoardCard, CardActivity, CardBriefs, CardMeter, CardPartOf, CardQuestion } from './BoardCard';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListResults, ListRowGrid } from './List';
 export { LoadingScreen } from './LoadingScreen';
@@ -48,14 +48,13 @@ export { LossList } from './Cleanup';
 export { DependencyItem, DependencyList } from './Dependencies';
 export {
     DossierBody,
+    DossierChip,
     DossierChips,
     type DossierChipTone,
-    DossierFields,
     DossierLine,
     DossierList,
     DossierNext,
     DossierNote,
-    DossierRepos,
     DossierRow,
     DossierTitle,
     DossierTitleCell,
@@ -76,11 +75,10 @@ export {
     PullRequestState,
     ReadinessDetails,
 } from './PullRequests';
-export { SliceBar, SliceList, SliceRow } from './Slices';
+export { SliceBar, SliceList, SliceRow, WorkingBar } from './Slices';
 export { SourceIcon } from './SourceIcon';
 export { BuildLimit, ReadyBuildControls, HeaderSwitch, StageList, StagePane, StageSections } from './StagePane';
 export {
-    QueueAge,
     QueuePlace,
     RowBlocked,
     RowCells,
@@ -90,6 +88,7 @@ export {
     RowGlyph,
     RowIdentity,
     RowOpen,
+    RowOthers,
     RowMeta,
     RowProgress,
     RowMetaEnd,

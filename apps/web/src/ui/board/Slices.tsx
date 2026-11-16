@@ -1,7 +1,7 @@
-// A piece of work's slices: the bar every view of the board draws (the design system's segmented track), and a list
+// A piece of work's slices: the bar every view of the board draws (the design system's tick meter), and a list
 // with each slice's mark.
 
-import { ambientMotion, SegmentedProgress, statusStateColors } from '@lar-works/design-system';
+import { ambientMotion, statusStateColors, TickMeter } from '@lar-works/design-system';
 import { CheckIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -35,7 +35,7 @@ export function SliceBar({
 
     return (
         <div className="min-w-0" title={named.join('\n')} data-slice-bar>
-            <SegmentedProgress
+            <TickMeter
                 label={`Slices, ${done} of ${slices.length} done`}
                 size={size}
                 // Done slices fill in the success colour and the active one in the accent, over the grey of what's to come and
@@ -45,6 +45,29 @@ export function SliceBar({
                     state: sliceProgressState[s.progress],
                     pulse: s.progress === 'active' && !still,
                 }))}
+            />
+        </div>
+    );
+}
+
+/** Work that runs with no slices to count, so a row at work always draws a bar. As a scan of unknown size does, a light
+ *  travels along the ticks while the thread works, and the ticks stay still once it stops; `waiting`, its thread paused
+ *  on you (a question, an approval), the light travels in amber, the colour of what waits on you, and keeps travelling
+ *  however long the wait. `label` names what runs, such as "Planning". */
+export function WorkingBar({
+    label,
+    still = false,
+    waiting = false,
+}: {
+    label: string;
+    still?: boolean;
+    waiting?: boolean;
+}) {
+    return (
+        <div className="min-w-0" title={label} data-slice-bar data-waiting={waiting || undefined}>
+            <TickMeter
+                label={label}
+                segments={[{ label, state: waiting ? 'waiting' : 'active', sweep: waiting || !still }]}
             />
         </div>
     );

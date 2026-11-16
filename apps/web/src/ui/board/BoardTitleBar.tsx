@@ -64,6 +64,8 @@ interface RefreshIndicatorProps {
     detail: string;
     /** More on the health, in the tooltip. */
     secondaryDetail: string;
+    /** Shows nothing, such as while projects load, which the lanes already say. */
+    hidden?: boolean;
 }
 
 /**
@@ -71,9 +73,9 @@ interface RefreshIndicatorProps {
  * colour (amber when stale, red while the page has lost the board server) and the time since the last read, with more
  * in a glass tooltip. A tab stop, so keyboard users reach its tooltip. It names its health in `data-health`.
  */
-export function RefreshIndicator({ health, label, detail, secondaryDetail }: RefreshIndicatorProps) {
+export function RefreshIndicator({ health, label, detail, secondaryDetail, hidden = false }: RefreshIndicatorProps) {
     // A live board takes no room on the bar: only a stale or failing read shows its light and words.
-    if (health === 'live') return null;
+    if (health === 'live' || hidden) return null;
 
     return (
         <Tooltip>

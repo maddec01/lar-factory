@@ -111,6 +111,53 @@ test('re-gating stays in Build, retains the approved Spec, and requires a second
     expect(button('Approve brief')).toBeDefined();
 });
 
+test('a single item with a Spec and no build phase offers Approve brief', async () => {
+    // A current Doubt: no review running and no hold.
+    const unbuilt = { ...item, buildPhase: null, briefReviewing: undefined, briefDoubtHold: undefined };
+    const unbuiltBoard = fresh({ ...sample, items: [unbuilt] });
+
+    fetchMock.mockImplementation(async (url: string) => {
+        const id = detailsRead(url);
+
+        if (!id) return new Response(JSON.stringify(unbuiltBoard));
+
+        const reply = await detailsReply(id).json();
+
+        reply.details.body = 'Approved D1 Spec.';
+        reply.details.record = {
+            bodyKind: 'brief',
+            body: 'Complete proposed D2 brief.',
+            context: '',
+            buildPhase: null,
+            reviewRounds: [],
+        };
+        reply.details.spec = {
+            outdated: true,
+            generation: 1,
+            pending: false,
+            error: null,
+            warning: null,
+            original: 'Original.',
+            originalFormat: 'markdown',
+            held: null,
+        };
+
+        return new Response(JSON.stringify(reply));
+    });
+    await mountPage(unbuiltBoard);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(unbuilt.id));
+
+    const dialog = $('[data-item-dialog]')!;
+
+    expect(text(dialog.querySelector('[data-description]'))).toContain('Out-of-date Spec');
+    expect([...dialog.querySelectorAll('[data-record] button')].some((node) => text(node) === 'Approve brief')).toBe(
+        true,
+    );
+});
+
 test('a linked parent keeps batch digests folded and binds approval to the displayed batch', async () => {
     const parent = {
         ...item,

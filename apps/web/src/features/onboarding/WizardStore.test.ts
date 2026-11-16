@@ -79,13 +79,13 @@ test('a project changed while detection runs can’t receive its stale response'
     expect(wizard.getState().detection).toBeNull();
 });
 
-test.each(['work'] as const)('old %s progress resumes on its matching step with all answers', async (step) => {
+test('old work progress resumes on its matching step with all answers', async () => {
     const repo = 'maddec01/lar-web';
     const choices = { role: 'API', skills: ['frontend'], newLabels: { bug: ['triage'] } };
     const data = {
         ...empty,
         onboarding: [
-            { repo, progress: { step, done: ['project', 'work'], answers: { projectId: 'lar-web', choices } } },
+            { repo, progress: { step: 'work', done: ['project', 'work'], answers: { projectId: 'lar-web', choices } } },
         ],
     };
 
@@ -98,12 +98,12 @@ test.each(['work'] as const)('old %s progress resumes on its matching step with 
 
     useBoardStore.setState({ data });
     await settle(() => useWizardStore.getState().resume(repo));
-    expect(useWizardStore.getState().run).toMatchObject({ step, choices });
+    expect(useWizardStore.getState().run).toMatchObject({ step: 'work', choices });
     await settle(() => useWizardStore.getState().close());
     expect(posted('/api/onboarding/repositories')[0]).toMatchObject({
         progress: {
-            step,
-            done: { project: [], access: ['project'], work: ['project', 'access'] }[step],
+            step: 'work',
+            done: ['project', 'access'],
             answers: { choices },
         },
     });

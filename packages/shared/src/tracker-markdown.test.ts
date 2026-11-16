@@ -14,8 +14,8 @@ test('tracker Markdown becomes HTML while active HTML and unsafe links remain in
     expect(html).toContain('<!-- lar-factory:create {"identity":"request"} -->');
 });
 
-test.each(['--!>'])('malformed marker terminator %s cannot expose active HTML', (terminator) => {
-    const html = trackerMarkdownHtml(`<!-- lar-factory:spec ${terminator}<img src=x onerror=alert(1)><!-- -->`);
+test('malformed marker terminator --!> cannot expose active HTML', () => {
+    const html = trackerMarkdownHtml(`<!-- lar-factory:spec --!><img src=x onerror=alert(1)><!-- -->`);
 
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');

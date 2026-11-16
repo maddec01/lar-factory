@@ -41,14 +41,14 @@ const press = async (label: string) =>
             .click(),
     );
 
-test.each([null])('Merge PR confirms the exact revision and permits method choice for parent %s', async (parentId) => {
+test('Merge PR confirms the exact revision and permits method choice for an item with no parent', async () => {
     holdPosts();
 
     const board = data();
 
     await mountPage({
         ...board,
-        items: board.items.map((item) => (item.id === 'I_sample16' ? { ...item, parentId } : item)),
+        items: board.items.map((item) => (item.id === 'I_sample16' ? { ...item, parentId: null } : item)),
     });
     await press('Merge PR');
     expect(posted().map((p) => p[0])).toEqual(['/api/inspect-merge']);

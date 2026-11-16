@@ -2,45 +2,42 @@ import { expect, test } from 'vite-plus/test';
 
 import { $, detailsRead, detailsReply, fetchMock, fresh, mountPage, sample, settle, text } from '@/test/PageTest';
 
-test.each(['map'] as const)(
-    'the %s preserves Markdown angle-bracket placeholders in item details',
-    async (bodyKind) => {
-        const item = {
-            ...sample.items.find((work) => work.id === 'I_sample13')!,
-            kind: bodyKind === 'map' ? ('concept' as const) : ('build' as const),
-            recorded: true,
-            number: 0,
-            threads: [],
+test('the map preserves Markdown angle-bracket placeholders in item details', async () => {
+    const item = {
+        ...sample.items.find((work) => work.id === 'I_sample13')!,
+        kind: 'concept' as const,
+        recorded: true,
+        number: 0,
+        threads: [],
+    };
+    const board = fresh({ ...sample, items: [item] });
+
+    fetchMock.mockImplementation(async (url: string) => {
+        if (detailsRead(url) !== item.id) return new Response(JSON.stringify(board));
+
+        const reply = await detailsReply(item.id).json();
+
+        reply.details.record = {
+            bodyKind: 'map',
+            body: '## Destination\nSend <fragment> to <placeholder>. Keep `<code>` literal.',
+            context: '',
+            buildPhase: null,
+            reviewRounds: [],
         };
-        const board = fresh({ ...sample, items: [item] });
 
-        fetchMock.mockImplementation(async (url: string) => {
-            if (detailsRead(url) !== item.id) return new Response(JSON.stringify(board));
+        return new Response(JSON.stringify(reply));
+    });
+    await mountPage(board);
 
-            const reply = await detailsReply(item.id).json();
+    const { useItemDialogStore } = await import('./ItemDialogStore');
 
-            reply.details.record = {
-                bodyKind,
-                body: '## Destination\nSend <fragment> to <placeholder>. Keep `<code>` literal.',
-                context: '',
-                buildPhase: null,
-                reviewRounds: [],
-            };
+    await settle(() => useItemDialogStore.getState().open(item.id));
 
-            return new Response(JSON.stringify(reply));
-        });
-        await mountPage(board);
+    const body = $('[data-item-dialog] [data-record-body]');
 
-        const { useItemDialogStore } = await import('./ItemDialogStore');
-
-        await settle(() => useItemDialogStore.getState().open(item.id));
-
-        const body = $('[data-item-dialog] [data-record-body]');
-
-        expect(text(body)).toContain('Send <fragment> to <placeholder>. Keep <code> literal.');
-        expect(text(body?.querySelector('code'))).toBe('<code>');
-        expect(body?.querySelector('fragment, placeholder')).toBeNull();
-        // A concept's record is its concept map, never "Map", which names the board's view of its parts.
-        expect(text($('[data-item-dialog] [data-record]'))).toMatch(bodyKind === 'map' ? /^Concept map/ : /^Brief/);
-    },
-);
+    expect(text(body)).toContain('Send <fragment> to <placeholder>. Keep <code> literal.');
+    expect(text(body?.querySelector('code'))).toBe('<code>');
+    expect(body?.querySelector('fragment, placeholder')).toBeNull();
+    // A concept's record is its concept map, never "Map", which names the board's view of its parts.
+    expect(text($('[data-item-dialog] [data-record]'))).toMatch(/^Concept map/);
+});

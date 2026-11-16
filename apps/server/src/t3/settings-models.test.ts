@@ -4,36 +4,33 @@ import { settingsModelChoices } from './settings-models.ts';
 
 const groups = [{ instanceId: 'codex-work', name: 'Work', models: [{ slug: 'model-a', label: 'Model A' }] }];
 
-test.each(['reasoningEffort'])(
-    'reads only advertised %s options for the matching provider instance and model',
-    (id) => {
-        const config = {
-            secret: 'never send',
-            providers: [
-                {
-                    instanceId: 'codex-work',
-                    secret: 'never send',
-                    models: [
-                        {
-                            slug: 'model-a',
-                            capabilities: {
-                                optionDescriptors: [
-                                    {
-                                        id,
-                                        type: 'select',
-                                        options: [{ id: 'high', label: 'High', secret: 'never send' }, { id: false }],
-                                    },
-                                    { id: 'serviceTier', type: 'select', options: [{ id: 'fast', label: 'Fast' }] },
-                                ],
-                            },
+test('reads only advertised reasoningEffort options for the matching provider instance and model', () => {
+    const config = {
+        secret: 'never send',
+        providers: [
+            {
+                instanceId: 'codex-work',
+                secret: 'never send',
+                models: [
+                    {
+                        slug: 'model-a',
+                        capabilities: {
+                            optionDescriptors: [
+                                {
+                                    id: 'reasoningEffort',
+                                    type: 'select',
+                                    options: [{ id: 'high', label: 'High', secret: 'never send' }, { id: false }],
+                                },
+                                { id: 'serviceTier', type: 'select', options: [{ id: 'fast', label: 'Fast' }] },
+                            ],
                         },
-                    ],
-                },
-            ],
-        };
+                    },
+                ],
+            },
+        ],
+    };
 
-        expect(settingsModelChoices(groups, config)).toEqual([
-            { ...groups[0], models: [{ ...groups[0]!.models[0], efforts: [{ value: 'high', label: 'High' }] }] },
-        ]);
-    },
-);
+    expect(settingsModelChoices(groups, config)).toEqual([
+        { ...groups[0], models: [{ ...groups[0]!.models[0], efforts: [{ value: 'high', label: 'High' }] }] },
+    ]);
+});

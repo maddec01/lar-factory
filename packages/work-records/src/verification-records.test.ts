@@ -122,41 +122,38 @@ test('a reverted head does not resurrect a pass invalidated by a push', async ()
     expect(verificationPassed(s.save(), head)).toBe(true);
 });
 
-test.each([30])(
-    'schema %s upgrades after the concept migrations and marks existing Verify records as required',
-    async (version) => {
-        const dir = mkdtempSync(join(tmpdir(), 'verify-upgrade-'));
-        const path = join(dir, 'work.db');
-        // Keep the pre-Verify boundaries fixed, including schema 33 with durable decision methods.
-        const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, version) });
+test('schema 30 upgrades after the concept migrations and marks existing Verify records as required', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'verify-upgrade-'));
+    const path = join(dir, 'work.db');
+    // Keep the pre-Verify boundary fixed.
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 30) });
 
-        old.db.exec(`INSERT INTO work_records
+    old.db.exec(`INSERT INTO work_records
         (work_id, repository, kind, status, revision, created_at, updated_at, title, superseded_by)
         VALUES ('existing-verify', 'owner/repo', 'build', 'Verify', 1, '2026-11-13', '2026-11-13', 'Existing build', 'kept');
         INSERT INTO set_aside_changes(work_id, content) VALUES ('existing-verify', 'kept concept change');`);
-        old.close();
+    old.close();
 
-        const records = await openWorkRecords(path);
+    const records = await openWorkRecords(path);
 
-        opened.push({ dir, records });
-        expect(records.verification('existing-verify')).toMatchObject({ required: true, latest: null });
+    opened.push({ dir, records });
+    expect(records.verification('existing-verify')).toMatchObject({ required: true, latest: null });
 
-        const db = await openDatabase(path);
+    const db = await openDatabase(path);
 
-        try {
-            expect(db.db.prepare('SELECT superseded_by FROM work_records').get()).toEqual({ superseded_by: 'kept' });
-            expect(db.db.prepare('SELECT content FROM set_aside_changes').get()).toEqual({
-                content: 'kept concept change',
-            });
-        } finally {
-            db.close();
-        }
+    try {
+        expect(db.db.prepare('SELECT superseded_by FROM work_records').get()).toEqual({ superseded_by: 'kept' });
+        expect(db.db.prepare('SELECT content FROM set_aside_changes').get()).toEqual({
+            content: 'kept concept change',
+        });
+    } finally {
+        db.close();
+    }
 
-        const later = records.create({ title: 'Later', repository: 'owner/repo', kind: 'build', status: 'Verify' });
+    const later = records.create({ title: 'Later', repository: 'owner/repo', kind: 'build', status: 'Verify' });
 
-        expect(records.verification(later.workId).required).toBe(true);
-    },
-);
+    expect(records.verification(later.workId).required).toBe(true);
+});
 
 test('Verify history retains failures and passes through pushes, PR replacement and reopen', async () => {
     const s = await setup();
@@ -213,62 +210,37 @@ test('schema 38 preserves the pre-upgrade latest result in history', async () =>
     expect(records.verification('legacy')).toMatchObject({ latest: result, history: [result] });
 });
 
-test.each([true])(
-    'S05 F3: approved Verify %s controls the saved wait; recommendations cannot change it',
-    async (required) => {
-        const s = await setup();
-        const work = s.records.create({ title: 'Consumer', repository: 'fake/b', kind: 'build', status: 'Review' });
-        const id = work.workId;
-        const rev = () => s.records.read(id).revision;
-        const brief = completeBrief(
-            `Consume numeric v1 greeting.\n\n## Verify\n${required ? 'yes: Inspect the greeting.' : 'no'}\n`,
-        );
+test('S05 F3: an approved Verify controls the saved wait; recommendations cannot change it', async () => {
+    const s = await setup();
+    const work = s.records.create({ title: 'Consumer', repository: 'fake/b', kind: 'build', status: 'Review' });
+    const id = work.workId;
+    const rev = () => s.records.read(id).revision;
+    const brief = completeBrief('Consume numeric v1 greeting.\n\n## Verify\nyes: Inspect the greeting.\n');
 
-        s.records.setBody(id, rev(), 'brief', brief);
+    s.records.setBody(id, rev(), 'brief', brief);
 
-        const approve = () => {
-            const input = s.records.doubtPackage(id);
+    const approve = () => {
+        const input = s.records.doubtPackage(id);
 
-            s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.', []);
+        s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.', []);
 
-            const display = s.records.displayGate(id);
+        const display = s.records.displayGate(id);
 
-            s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
-        };
+        s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
+    };
 
-        approve();
+    approve();
 
-        if (!required) {
-            expect(() => s.records.update(id, rev(), { status: 'Verify' })).toThrow(/approved brief/i);
-            expect(s.records.verification(id).required).toBe(false);
-            s.records.update(id, rev(), { status: 'Ready to merge' });
-        } else {
-            expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/Verify/);
-            s.records.update(id, rev(), { status: 'Verify' });
-            expect(s.records.verification(id).required).toBe(true);
-        }
-
-        s.records.setBody(
-            id,
-            rev(),
-            'brief',
-            brief.replace(
-                required ? 'yes: Inspect the greeting.' : 'no',
-                required ? 'no' : 'yes: Inspect the greeting.',
-            ),
-        );
-        expect(s.records.verification(id).required).toBe(required);
-        expect(() => s.records.update(id, rev(), { status: required ? 'Ready to merge' : 'Verify' })).toThrow(
-            /Doubt|gate|approved/i,
-        );
-        approve();
-
-        if (required) s.records.update(id, rev(), { status: 'Ready to merge' });
-        else s.records.update(id, rev(), { status: 'Verify' });
-
-        expect(s.records.verification(id).required).toBe(!required);
-    },
-);
+    expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/Verify/);
+    s.records.update(id, rev(), { status: 'Verify' });
+    expect(s.records.verification(id).required).toBe(true);
+    s.records.setBody(id, rev(), 'brief', brief.replace('yes: Inspect the greeting.', 'no'));
+    expect(s.records.verification(id).required).toBe(true);
+    expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/Doubt|gate|approved/i);
+    approve();
+    s.records.update(id, rev(), { status: 'Ready to merge' });
+    expect(s.records.verification(id).required).toBe(false);
+});
 
 test('S05 F3: upgrade replaces legacy recommendation waits only from exact approved briefs, retaining evidence', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-decision-upgrade-'));

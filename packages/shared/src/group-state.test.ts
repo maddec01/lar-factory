@@ -37,8 +37,8 @@ function group(kind: Item['kind'] = 'concept') {
     return { parent, data: { items: [parent, ...children] } as BoardData };
 }
 
-test.each(['concept'] as const)('%s delivery derives from parts even without an explicit concept run', (kind) => {
-    const { parent, data } = group(kind);
+test('concept delivery derives from parts even without an explicit concept run', () => {
+    const { parent, data } = group();
 
     parent.status = 'Ready';
     expect(groupState(parent, data)).toMatchObject({ word: '2 builds running · 1 waiting', running: true });

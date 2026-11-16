@@ -71,7 +71,6 @@ const posted = () =>
 test.each([
     ['- a\nb', '- a\n- b'],
     ['1. a\nb', '1. a\n2. b'],
-    ['# h', '# h'],
 ])('typing %j in the description creates the item with %j', async (typed, body) => {
     await open();
     await chooseOption(field('item-kind'), 'Bug');

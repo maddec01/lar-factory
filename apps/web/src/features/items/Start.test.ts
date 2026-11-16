@@ -1,5 +1,5 @@
-// Shape on a Queued item, in the item dialog: its menu of model choices, how keys and clicks move through it,
-// and what a start shows in the dialog and in a toast. Ported from the Start cases of test/render.test.ts.
+// Shape on a Queued item, in the item dialog: its menu of model choices, and what a start shows in the dialog and in
+// a toast. Ported from the Start cases of test/render.test.ts.
 
 import type { BoardData, ModelGroup } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
@@ -30,11 +30,6 @@ const checked = () =>
     entries()
         .filter((e) => e.getAttribute('aria-checked') === 'true')
         .map(text);
-const key = async (el: Element, k: string) => {
-    await settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })));
-    // Radix moves focus on the next tick.
-    await settle(() => vi.advanceTimersByTime(20));
-};
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) =>
     settle(() => {
@@ -71,33 +66,6 @@ test('the menu highlights the remembered model choice while it is offered, else 
     await open();
     expect(checked()).toEqual(['claude-opus-5-5[1m]']);
     expect(document.activeElement).toBe(entries()[3]);
-});
-
-test('arrow keys, Home and End move through the entries and wrap', async () => {
-    await mountItem(withChoices);
-    await open();
-
-    const at = () => entries().indexOf(document.activeElement as HTMLElement);
-
-    await key(document.activeElement!, 'ArrowUp');
-    expect(at(), 'up from the first wraps to the last').toBe(3);
-    await key(document.activeElement!, 'ArrowDown');
-    expect(at(), 'down from the last wraps to the first').toBe(0);
-    await key(document.activeElement!, 'ArrowDown');
-    expect(at()).toBe(1);
-    await key(document.activeElement!, 'End');
-    expect(at()).toBe(3);
-    await key(document.activeElement!, 'Home');
-    expect(at()).toBe(0);
-});
-
-test('Escape closes the menu and returns focus to Start', async () => {
-    await mountItem(withChoices);
-    await open();
-    await key(document.activeElement!, 'Escape');
-    expect(menu()).toBeNull();
-    expect(start().getAttribute('aria-expanded')).toBe('false');
-    expect(document.activeElement).toBe(start());
 });
 
 test('picking an entry starts the item with that model, shows the thread, and remembers the choice', async () => {

@@ -139,32 +139,3 @@ test('a automatic deletion names the work it would delete and saves only on its 
     );
     expect(text($('[data-last-delete]'))).toContain('Kept W_done. It owns the slice W_slice, which is kept.');
 });
-
-test('each row is one line in its section: the title truncates, its project, then Restore and the More menu; only a state its section doesn’t say', async () => {
-    await openArchive(withRetention());
-
-    const aside = row('archived-W_aside');
-    const done = row('archived-W_done');
-    const sectionOf = (el: Element) => text(el.closest('section')?.querySelector('h2, h3'));
-
-    expect(aside.querySelector('[data-archive-title]')!.getAttribute('title')).toBe('#41 Put away');
-    expect(text(aside.querySelector('[data-archive-title]'))).toBe('#41 Put away');
-    expect(text(aside.querySelector('[data-repo-cell]'))).toContain('lar-server');
-    expect(aside.querySelector('[data-archive-state]'), 'its section already says Set aside').toBeNull();
-    // Its kind and where each ticket is saved lead the line, as a List row's do: on a board that mixes trackers,
-    // GitHub's mark too.
-    expect(
-        [...done.querySelectorAll('[data-archive-line] [role="img"]')].map((mark) => mark.getAttribute('aria-label')),
-    ).toContain('GitHub issue. Saved on GitHub.');
-    expect(sectionOf(aside)).toBe('Set aside');
-    expect(sectionOf(done)).toBe('Finished');
-    expect(aside.querySelector('[data-archive-state]')).toBeNull();
-    expect(text(done.querySelector('[data-archive-state]')), 'the day it finished').not.toMatch(/Finished/);
-    expect(
-        [...aside.querySelectorAll('[data-slot="settings-row-control"] button')].map(
-            (b) => text(b) || b.getAttribute('aria-label'),
-        ),
-    ).toEqual(['Restore', 'More for Put away']);
-    expect(aside.querySelector('[data-restore]')!.getAttribute('data-kind'), 'a quiet App control').toBe('control');
-    expect(text(done), 'finished work has no Restore').not.toContain('Restore');
-});

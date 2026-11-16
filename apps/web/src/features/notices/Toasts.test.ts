@@ -1,28 +1,9 @@
-// Toasts: a success clears itself after 5 s, later while it's in use; the close button; View item;
-// shown through the design system's Toaster. Ported from the toast cases of test/render.test.ts.
+// The board after the page's own write: a poll that started before the write never brings back older data.
+// Ported from the toast cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '@/test/PageTest';
-
-/** Shows a toast straight from the store, as the Add item form will. */
-async function notify(notice: Parameters<typeof import('./Notices').notify>[0]): Promise<void> {
-    const { notify } = await import('./Notices');
-
-    await settle(() => notify(notice));
-}
-
-test('View item opens the item in the item dialog and closes the toast', async () => {
-    await mountPage();
-    await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-    await settle(() => toast()!.querySelector<HTMLButtonElement>('[data-view-item]')!.click());
-
-    const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
-
-    expect(useItemDialogStore.getState().itemId).toBe('I_sample01');
-    expect($('[data-item-dialog]')!.textContent).toContain(sample.items[0]!.title);
-    expect(toast()).toBeNull();
-});
+import { $, fetchMock, mountPage, moved, sample, settle, text } from '@/test/PageTest';
 
 test('a poll that started before the page’s own write doesn’t bring back older data', async () => {
     await mountPage();

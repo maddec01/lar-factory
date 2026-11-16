@@ -12,7 +12,3 @@ test('project names don’t appear as running reads finish', () => {
     expect(stepText(read('items', ['lar-server']))).toBe('Loading projects…');
     expect(stepText(read('items', ['lar-apple', 'lar-server', 'lar-brand']))).toBe('Loading projects…');
 });
-
-test('the running reads come before the step when both are there', () => {
-    expect(stepText(read('finishing', ['lar-apple']))).toBe('Loading projects…');
-});

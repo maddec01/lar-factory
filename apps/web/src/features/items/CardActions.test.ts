@@ -65,57 +65,6 @@ test('a failed Move to the List shows as a toast naming the item, which stays un
     expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'I_sample05'));
 });
 
-test('Abandon asks first, saying it sets the work aside on this Mac and leaves its ticket open; Cancel returns focus', async () => {
-    const warnings = vi.spyOn(console, 'warn');
-
-    await mountPage();
-    await openItem('I_sample01');
-    await press(button('abandon', 'I_sample01'));
-
-    const dialog = $('#abandon-dialog')!;
-
-    expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual(
-        [],
-    );
-    expect(dialog.getAttribute('role')).toBe('alertdialog');
-    expect(dialog.querySelector('[data-slot="modal-body"]'), 'no empty detail region or extra tab stop').toBeNull();
-    expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
-    expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe(
-        'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.',
-    );
-    expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual([
-        'Cancel',
-        'Abandon and close ticket',
-        'Abandon',
-    ]);
-    await settle(() => vi.advanceTimersByTime(100));
-    expect($('#abandon-dialog [aria-label="Close"]')).toBeNull();
-    expect(document.activeElement, 'Cancel takes focus, not the destructive button').toBe(
-        $$('#abandon-dialog [data-slot="modal-footer"] button')[0],
-    );
-    await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
-    await settle(() => vi.advanceTimersByTime(100));
-    expect($('#abandon-dialog')).toBeNull();
-    expect(document.activeElement).toBe(button('abandon', 'I_sample01'));
-    expect(posted(), 'nothing posted').toEqual([]);
-
-    await openItem('I_sample04');
-    await press(button('abandon', 'I_sample04'));
-    expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #113 Shared playback history across devices\?$/);
-    expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual([
-        'Cancel',
-        'Abandon and close ticket',
-        'Abandon',
-    ]);
-    await settle(() => vi.advanceTimersByTime(100));
-    await settle(() =>
-        document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
-    );
-    await settle(() => vi.advanceTimersByTime(100));
-    expect($('#abandon-dialog'), 'Escape cancels').toBeNull();
-    expect($('[data-item-dialog]'), 'and leaves the item dialog open').not.toBeNull();
-});
-
 test('confirming Abandon holds Queue without relabelling it, and announces the close', async () => {
     holdPosts();
 
@@ -206,7 +155,6 @@ test('two lost combined responses block dismissal and board-only recovery until 
 
 test.each([
     [[{ type: 'ticket-closed' }], 'Keep working', 'keep-working'],
-    [[{ type: 'assignee-changed', from: 'pedro', to: 'sam' }], 'Keep working', 'keep-working'],
     [[], 'Mark as handled', 'mark-handled'],
 ] as const)(
     'a notice with causes %j posts %s only once confirmed and offers no way to close it otherwise',

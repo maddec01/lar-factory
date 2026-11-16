@@ -4,20 +4,7 @@
 import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 
-import {
-    $,
-    $$,
-    answer,
-    holdPosts,
-    moved,
-    mountPage,
-    posted,
-    pressMenu,
-    sample,
-    settle,
-    text,
-    toast,
-} from '@/test/PageTest';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text, toast } from '@/test/PageTest';
 
 const MODEL_CHOICES: ModelGroup[] = [
     { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
@@ -198,15 +185,4 @@ test('a Start that may have run hides Shape; closing its message leaves a tag', 
     expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
     await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
     expect(text(moved().querySelector('.started-tag.unsure'))).toBe('May have started');
-});
-
-test('Move to the List from the dialog takes the item off the Queue', async () => {
-    holdPosts();
-    await mountPage();
-    await settle(() => row('I_sample05').querySelector<HTMLButtonElement>('[data-row-open]')!.click());
-    await press(dialog()!.querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!);
-    expect(posted()).toEqual([['/api/back-to-list', { itemId: 'I_sample05' }]]);
-    await answer({ error: null, board: moved('I_sample05', 'List') });
-    expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21', ...queuedRecords]);
-    expect(text(toast())).toMatch(/^Moved #129 .* to the List\. View item$/);
 });

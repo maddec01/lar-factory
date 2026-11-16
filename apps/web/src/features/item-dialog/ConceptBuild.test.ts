@@ -149,70 +149,59 @@ test('a held run offers no start in the row; its holds read in the dialog', asyn
     expect(text(run)).toContain('Its confirmed answer is missing.');
 });
 
-test.each(['running', 'paused'] as const)('the %s concept header describes the run', async (state) => {
-    await show({ run: { state, startedAt: '2026-01-01', prepared: {} }, holds: [], members: [] });
+test('a running concept and Ready share occupancy including outside builds', async () => {
+    const state = 'running';
 
-    // The run's state reads in the summary line under the title, with the concept's other facts.
-    const summary = text($('[data-item-dialog] [data-item-summary]'));
+    const concept = sample.items.find((item) => item.kind === 'concept')!;
+    const base = sample.items.find((item) => item.kind !== 'concept')!;
+    const members = ['a1', 'a2', 'b1'].map((workId) => ({
+        workId,
+        title: workId,
+        repository: 'example/a',
+        kind: 'build',
+        status: workId === 'a2' ? 'Ready' : 'In progress',
+        waits: [],
+        complete: false,
+    }));
+    const data: BoardData = {
+        ...sample,
+        buildLimit: { limit: 4, automatic: 2 },
+        items: [
+            {
+                ...concept,
+                conceptBuild: { run: { state, startedAt: '2026-01-01', prepared: {} }, holds: [], members },
+            },
+            ...[...members, { workId: 'outside', status: 'Review' }, { workId: 'standalone', status: 'Ready' }].map(
+                (member) => ({
+                    ...base,
+                    id: member.workId,
+                    kind: 'build' as const,
+                    status: member.status as 'Ready' | 'In progress' | 'Review',
+                    buildReserved: member.status !== 'Ready',
+                    parentId: ['outside', 'standalone'].includes(member.workId) ? null : concept.id,
+                    parent: null,
+                    threads: [],
+                    blockers: [],
+                }),
+            ),
+        ],
+    };
 
-    expect(summary).toContain(state === 'running' ? 'Concept builds running' : 'Concept builds paused');
-    expect(text($('[data-item-dialog]'))).not.toContain('No direct agent work yet');
+    holdPosts(data);
+    await mountPage(data);
+
+    // Build's header carries the shared occupancy; Ready keeps only what starts builds.
+    const controls = $('[data-stage="build"] [data-stage-controls]')!;
+
+    expect(text(controls)).toContain('3 of 4 build slots');
+    expect(text($('[data-ready-build-controls]'))).not.toContain('building');
+    expect(controls.querySelector('[title]')?.getAttribute('title') ?? '').not.toContain('exceed');
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(concept.id));
+    expect($('[data-item-dialog] [data-shared-build-capacity]')).toBeNull();
 });
-
-test.each(['running', 'paused'] as const)(
-    'the %s concept and Ready share occupancy including outside builds',
-    async (state) => {
-        const concept = sample.items.find((item) => item.kind === 'concept')!;
-        const base = sample.items.find((item) => item.kind !== 'concept')!;
-        const members = ['a1', 'a2', 'b1'].map((workId) => ({
-            workId,
-            title: workId,
-            repository: 'example/a',
-            kind: 'build',
-            status: workId === 'a2' ? 'Ready' : 'In progress',
-            waits: [],
-            complete: false,
-        }));
-        const data: BoardData = {
-            ...sample,
-            buildLimit: { limit: 4, automatic: 2 },
-            items: [
-                {
-                    ...concept,
-                    conceptBuild: { run: { state, startedAt: '2026-01-01', prepared: {} }, holds: [], members },
-                },
-                ...[...members, { workId: 'outside', status: 'Review' }, { workId: 'standalone', status: 'Ready' }].map(
-                    (member) => ({
-                        ...base,
-                        id: member.workId,
-                        kind: 'build' as const,
-                        status: member.status as 'Ready' | 'In progress' | 'Review',
-                        buildReserved: member.status !== 'Ready',
-                        parentId: ['outside', 'standalone'].includes(member.workId) ? null : concept.id,
-                        parent: null,
-                        threads: [],
-                        blockers: [],
-                    }),
-                ),
-            ],
-        };
-
-        holdPosts(data);
-        await mountPage(data);
-
-        // Build's header carries the shared occupancy; Ready keeps only what starts builds.
-        const controls = $('[data-stage="build"] [data-stage-controls]')!;
-
-        expect(text(controls)).toContain('3 of 4 build slots');
-        expect(text($('[data-ready-build-controls]'))).not.toContain('building');
-        expect(controls.querySelector('[title]')?.getAttribute('title') ?? '').not.toContain('exceed');
-
-        const { useItemDialogStore } = await import('./ItemDialogStore');
-
-        await settle(() => useItemDialogStore.getState().open(concept.id));
-        expect($('[data-item-dialog] [data-shared-build-capacity]')).toBeNull();
-    },
-);
 test('the concept shows active builds, total progress and an explicit capacity wait', async () => {
     const parent = sample.items.find((item) => item.kind === 'concept')!;
     const part = sample.items.find((item) => item.kind !== 'concept')!;

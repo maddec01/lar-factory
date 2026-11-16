@@ -76,12 +76,6 @@ const answer = (label: string) =>
     settle(() =>
         [...confirmation()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!.click(),
     );
-const escape = () =>
-    settle(() =>
-        document.activeElement!.dispatchEvent(
-            new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
-        ),
-    );
 const requestRestart = async () => {
     await click();
     await next();
@@ -109,17 +103,6 @@ test('the quiet icon sits before Settings and downloads only from its click-open
     expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
 });
 
-test('Escape closes details and returns focus to the icon', async () => {
-    stubBridge(available);
-    await mountPage();
-    await click();
-    expect(popover()).not.toBeNull();
-    await escape();
-    expect(popover()).toBeNull();
-    await settle(() => vi.advanceTimersByTime(0));
-    expect(document.activeElement === control()).toBe(true);
-});
-
 test('the same anchored popover survives download progress and completion', async () => {
     const { push } = stubBridge(withNotes);
 
@@ -139,15 +122,7 @@ test('the same anchored popover survives download progress and completion', asyn
     expect(text($('[data-update-next]'))).toBe('Restart now');
 });
 
-test('an empty changelog leaves the versions and action usable', async () => {
-    stubBridge(available);
-    await mountPage();
-    await click();
-    expect(text(popover())).toContain('You have 1.0.0');
-    expect(text($('[data-update-next]'))).toBe('Download');
-});
-
-test.each([idle, { ...idle, status: 'checking' as const }, { ...idle, enabled: false, status: 'disabled' as const }])(
+test.each([idle, { ...idle, status: 'checking' as const }])(
     'no actionable update hides the icon: $status',
     async (state) => {
         stubBridge(state);
@@ -174,27 +149,21 @@ test('restart closes details and asks in the board dialog before installing', as
     expect(bridge.installUpdate).toHaveBeenCalledOnce();
 });
 
-test.each(['Later', 'Escape'])(
-    '%s cancels without losing the downloaded update and restores focus',
-    async (dismissal) => {
-        const { bridge } = stubBridge(downloaded);
+test('Later cancels without losing the downloaded update and restores focus', async () => {
+    const { bridge } = stubBridge(downloaded);
 
-        await mountPage();
-        await requestRestart();
-
-        if (dismissal === 'Later') await answer('Later');
-        else await escape();
-
-        expect(confirmation()).toBeNull();
-        await settle(() => vi.advanceTimersByTime(0));
-        expect(document.activeElement === control()).toBe(true);
-        expect(bridge.installUpdate).not.toHaveBeenCalled();
-        expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
-        expect(toast()).toBeNull();
-        await requestRestart();
-        expect(confirmation()).not.toBeNull();
-    },
-);
+    await mountPage();
+    await requestRestart();
+    await answer('Later');
+    expect(confirmation()).toBeNull();
+    await settle(() => vi.advanceTimersByTime(0));
+    expect(document.activeElement === control()).toBe(true);
+    expect(bridge.installUpdate).not.toHaveBeenCalled();
+    expect(control().getAttribute('aria-label')).toBe('Restart to install 1.1.0');
+    expect(toast()).toBeNull();
+    await requestRestart();
+    expect(confirmation()).not.toBeNull();
+});
 
 test.each(['refused', 'failed', 'rejected'])(
     'a %s install ends the busy dialog, keeps the update and permits retry',

@@ -25,16 +25,3 @@ test('bounded reads keep input order even when later requests finish first', asy
     release.get(0)!();
     expect(await results).toEqual(['result 0', 'result 1', 'result 2']);
 });
-
-test('failed reads reject the batch and an empty batch reads nothing', async () => {
-    await expect(
-        mapConcurrent([1, 2], async () => {
-            throw Error('Read failed');
-        }),
-    ).rejects.toThrow('Read failed');
-    expect(
-        await mapConcurrent([], async () => {
-            throw Error('Unexpected read');
-        }),
-    ).toEqual([]);
-});

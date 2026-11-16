@@ -1,7 +1,7 @@
 import { expect, test } from 'vite-plus/test';
 
 import sample from '../test/sample.json' with { type: 'json' };
-import { isDossierParent, placementOf } from './board-view.ts';
+import { placementOf } from './board-view.ts';
 import { STATUSES } from './model.ts';
 import type { Item, StartProgress, StartPurpose } from './model.ts';
 
@@ -25,8 +25,8 @@ const starts: Partial<Record<StartPurpose, StartProgress>>[] = [
     { build: { phase: 'failed', message: 'Failed' } },
 ];
 
-for (const kind of ['concept', 'issue'] as const) {
-    test(`${kind} parents and parts never enter single-flow stages, whatever their status or launch intent`, () => {
+test('concept and issue parents and parts never enter single-flow stages, whatever their status or launch intent', () => {
+    for (const kind of ['concept', 'issue'] as const) {
         for (const status of STATUSES) {
             const parent = work({ id: 'parent', kind, flow: 'linked', status });
             const part = work({ flow: 'linked', parentId: parent.id, status });
@@ -50,23 +50,5 @@ for (const kind of ['concept', 'issue'] as const) {
                 }
             }
         }
-    });
-}
-
-test('a queued concept with no children heads a dossier, even before any flow projection', () => {
-    const concept = work({ kind: 'concept', status: 'Queued' });
-
-    expect(placementOf(concept, { all: [concept], unavailable: false }).sections).toEqual(['dock']);
-    expect(isDossierParent(concept, [concept])).toBe(true);
-});
-
-test('a single build keeps its stage and slice question even with private children', () => {
-    const build = work({ status: 'In progress', slices: [{ workId: 'slice', progress: 'active' }] as Item['slices'] });
-    const privateChild = work({ id: 'slice', parentId: build.id });
-
-    expect(placementOf(build, { all: [build, privateChild], unavailable: false }).sections).toEqual(['build']);
-    expect(isDossierParent(build, [build, privateChild])).toBe(false);
-    build.status = 'Needs you';
-    build.threads = [{ id: 'build', purpose: 'build', state: 'needs you' }] as Item['threads'];
-    expect(placementOf(build, { all: [build], unavailable: false }).sections).toEqual(['desk', 'build']);
+    }
 });

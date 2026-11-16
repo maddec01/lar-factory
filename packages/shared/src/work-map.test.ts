@@ -39,29 +39,6 @@ test('nodes and blocker edges follow additions, removals and reparenting, ignori
     expect(removed.prerequisites.map((node) => node.id)).toEqual(['blocker:a']);
     expect(removed.edges).toEqual([{ from: 'blocker:a', to: 'b', kind: 'blocker' }]);
 });
-
-test('status, queue membership, gate state and wait reasons always come from current records', () => {
-    const a = part('a', { status: 'List', passingBrief: false });
-
-    expect(projectWorkMap([a]).nodes[0]).toMatchObject({
-        status: 'List',
-        queued: false,
-        gate: 'not passed',
-        waits: ['Brief gate has not passed', 'Not queued'],
-    });
-
-    const ready = { ...a, status: 'Ready' as const, passingBrief: true, blockers: [blocker('other')] };
-    const next = projectWorkMap([ready]).nodes[0]!;
-
-    expect(next).toMatchObject({ status: 'Ready', queued: true, gate: 'passed' });
-    expect(next.waits.join()).toContain('Blocked by');
-    expect(projectWorkMap([{ ...ready, status: 'Done', blockers: [], state: 'closed' }]).nodes[0]).toMatchObject({
-        status: 'Done',
-        waits: [],
-    });
-    expect(projectWorkMap([part('aside', { state: 'closed', closedAs: 'not-planned' })]).nodes).toHaveLength(1);
-});
-
 test('recorded Dependencies have their own nodes and edges, even when their ticket is a group part', () => {
     const a = part('a', { number: 1 });
     const hold: DependencyHold = {

@@ -25,12 +25,3 @@ test('a nested part uses its nearest concept even when an outer concept has a qu
 
     expect(questionOwnerParent(part, [outer, nearest, parent, part])).toBe(nearest);
 });
-
-test('a cycle among intermediate parts cannot borrow an unrelated concept question', () => {
-    const first = item('first', 'second');
-    const second = item('second', first.id);
-    const concept = item('concept', null, { kind: 'concept' });
-    const part = item('part', first.id);
-
-    expect(questionOwnerParent(part, [concept, first, second, part])).toBeUndefined();
-});

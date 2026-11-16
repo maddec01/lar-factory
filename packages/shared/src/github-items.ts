@@ -2,6 +2,7 @@
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
 import { parseConceptMap } from './concept-map.ts';
+import { linkedFlow } from './linked-flow.ts';
 import { isBuild, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice } from './model.ts';
 import { readTrackerStructure, trackerKind, trackerReference } from './tracker-structure.ts';
@@ -362,7 +363,17 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
         if (map) item.map = map;
     }
 
-    item.flow = item.kind === 'concept' || item.parent || item.subIssues.total > 0 ? 'linked' : 'single';
+    const parts = isBuild({ labels: rawLabels(raw) })
+        ? rawSubIssues(raw).filter((s) => isBuildRef(s, builds))
+        : (c.subIssues?.nodes ?? []);
+    const trackerParts = item.tracker?.parts ?? [];
+
+    item.flow = linkedFlow(item.kind, [
+        item.repo,
+        item.parent?.repo,
+        ...parts.map((part) => part.repository.nameWithOwner),
+        ...trackerParts.map((part) => part.repository ?? trackerReference(part.url)?.repository),
+    ]);
 
     return item;
 }

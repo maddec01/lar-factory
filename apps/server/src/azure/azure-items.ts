@@ -12,6 +12,7 @@ import {
     parseConceptMap,
     labelStatuses,
     isRepoTag,
+    linkedFlow,
     repoTag,
     sameRepo,
     statusLabel,
@@ -538,6 +539,12 @@ export function azureItems(
             }
 
             const kind = tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType'));
+            const own = placed.get(raw.id)!.repo;
+            const repoBeside = (other: RawWorkItem) => {
+                const where = placementOf(other);
+
+                return where && !where.untaggedFor ? where.repo : own;
+            };
 
             return {
                 id: itemId(raw.id),
@@ -554,7 +561,7 @@ export function azureItems(
                 kind,
                 ...(tracker && { tracker, ...(tracker.map && { map: parseConceptMap(tracker.map) }) }),
                 ...(sync && { sync }),
-                flow: parent || children.length > 0 || kind === 'concept' ? 'linked' : 'single',
+                flow: linkedFlow(kind, [own, parent && repoBeside(parent), ...children.map(repoBeside)]),
                 content: 'ticket',
                 number: raw.id,
                 title: field(raw, 'System.Title'),

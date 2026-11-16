@@ -1,4 +1,4 @@
-import { writeTrackerStructure, type IssueRef, type TrackerPart } from '@lar-factory/shared';
+import { linkedFlow, writeTrackerStructure, type IssueRef, type TrackerPart } from '@lar-factory/shared';
 
 import { fakeIssue, fakeRepository, type FakeIssue, type FakeRepository } from './fake-tracker-state.ts';
 
@@ -68,7 +68,7 @@ export function fakeTrackerLinks(repositories: () => Map<string, FakeRepository>
             const related = (details.related ?? []).map(get);
 
             item.parent = parent ? reference(parent) : null;
-            item.flow = item.kind === 'concept' || parent || parts.length ? 'linked' : 'single';
+            item.flow = linkedFlow(item.kind, [item.repo, parent?.item.repo, ...parts.map((part) => part.item.repo)]);
             item.subIssues = {
                 total: parts.length,
                 completed: parts.filter((child) => child.item.state === 'closed').length,

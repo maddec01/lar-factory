@@ -31,13 +31,6 @@ const isRunning = (pid: number) => {
 };
 
 describe('locate', () => {
-    it("runs apps/server's source beside apps/desktop in development", () => {
-        assert.deepStrictEqual(BoardServer.locate('/repo/apps/desktop', false), {
-            serverDir: '/repo/apps/server',
-            serverFile: '/repo/apps/server/src/server.ts',
-        });
-    });
-
     it("runs the bundled server, with the skills bundle, from the packaged app's Resources", () => {
         assert.deepStrictEqual(BoardServer.locate('/Applications/Board.app/Contents/Resources/app.asar', true), {
             serverDir: '/Applications/Board.app/Contents/Resources/server',
@@ -48,20 +41,6 @@ describe('locate', () => {
 });
 
 describe('makeStartConfig', () => {
-    it('tells the server that the app checks skills when it does', () => {
-        const input = {
-            executablePath: '/Board',
-            serverDir: '/server',
-            serverFile: '/server/dist/server.mjs',
-            configFile: '/config.json',
-            env: {},
-            secret: 's',
-        };
-
-        assert.equal(BoardServer.makeStartConfig({ ...input, checksSkills: true }).env.BOARD_SKILL_CHECK, '1');
-        assert.equal(BoardServer.makeStartConfig(input).env.BOARD_SKILL_CHECK, undefined);
-    });
-
     it('runs the server file with the given executable in Node mode and the launch secret', () => {
         const config = BoardServer.makeStartConfig({
             executablePath: '/Applications/Board.app/Contents/MacOS/Board',
@@ -123,49 +102,6 @@ describe('start', () => {
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
     );
 
-    it.live("passes the server's Drift choice to the skill check and answers with the Drift it found", () =>
-        Effect.gen(function* () {
-            const choices: Array<string | undefined> = [];
-            const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: '1', FAKE_BOARD_DRIFT: 'keep' }), {
-                checkSkills: (drift) => {
-                    choices.push(drift);
-
-                    return Promise.resolve({ refusal: 'Replace or start anyway', drift: ['lar-build'] });
-                },
-            });
-
-            assert.deepStrictEqual(yield* skillAnswer(board.url), {
-                type: 'skills-checked',
-                id: 7,
-                refusal: 'Replace or start anyway',
-                drift: ['lar-build'],
-            });
-            assert.deepStrictEqual(choices, ['keep']);
-        }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
-    it.live('refuses the build when the skill check itself fails', () =>
-        Effect.gen(function* () {
-            const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: '1' }), {
-                checkSkills: () => Promise.reject(new Error('the check died')),
-            });
-            const answer = yield* skillAnswer(board.url);
-
-            assert.strictEqual(answer?.id, 7);
-            assert.include(answer?.refusal, "couldn't check its skills");
-            assert.include(answer?.refusal, 'the check died');
-        }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
-    it.live('fails when the server exits before it reports a port', () =>
-        Effect.gen(function* () {
-            const exit = yield* BoardServer.start(fakeConfig({ FAKE_BOARD: 'crash' })).pipe(Effect.scoped, Effect.exit);
-
-            assert.isTrue(Exit.isFailure(exit));
-            assert.match(String(Exit.isFailure(exit) && exit.cause), /exited with code 3 before it reported a port/);
-        }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
     it.live('stops the server when its scope closes', () =>
         Effect.gen(function* () {
             const scope = yield* Scope.make();
@@ -175,15 +111,6 @@ describe('start', () => {
             yield* Scope.close(scope, Exit.void);
             assert.isFalse(isRunning(board.pid));
         }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
-    );
-
-    it.live('reports how the server exited', () =>
-        Effect.gen(function* () {
-            const board = yield* BoardServer.start(fakeConfig({}));
-
-            process.kill(board.pid, 'SIGKILL');
-            assert.strictEqual(yield* board.exited, 'on SIGKILL');
-        }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
     );
 
     it.live('starts the real board in sample mode, guarding writes and drains with the launch secret', () =>

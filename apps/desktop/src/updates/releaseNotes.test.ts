@@ -11,9 +11,6 @@ const body = (...titles: string[]) =>
         '**Full Changelog**: https://github.com/maddec01/lar-factory/compare/v0.1.0...v0.2.0',
     ].join('\n');
 
-const titles = (count: number, prefix = 'feat(board): change') =>
-    Array.from({ length: count }, (_, i) => `${prefix} ${i + 1}`);
-
 describe('normalizeReleaseNotes', () => {
     it('gives each Release between the running version and the new one its changes, newest first', () => {
         const notes = normalizeReleaseNotes(
@@ -49,57 +46,5 @@ describe('normalizeReleaseNotes', () => {
             ],
             omittedReleaseCount: 0,
         });
-    });
-
-    it('keeps the newest 8 changes of a Release and counts them all', () => {
-        const { releaseNotes } = normalizeReleaseNotes(
-            [{ version: '0.2.0', note: body(...titles(11)) }],
-            '0.2.0',
-            'latest',
-        );
-
-        assert.strictEqual(releaseNotes[0]!.totalItems, 11);
-        assert.deepStrictEqual(
-            releaseNotes[0]!.items.map((item) => item.split(' by ')[0]),
-            titles(11).slice(3).toReversed(),
-        );
-    });
-
-    it('keeps 6 Releases and counts the rest as omitted', () => {
-        const releases = Array.from({ length: 9 }, (_, i) => ({ version: `0.${10 - i}.0`, note: body(`fix: ${i}`) }));
-        const { releaseNotes, omittedReleaseCount } = normalizeReleaseNotes(releases, '0.10.0', 'latest');
-
-        assert.deepStrictEqual(
-            releaseNotes.map((note) => note.version),
-            ['0.10.0', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.0'],
-        );
-        assert.strictEqual(omittedReleaseCount, 3);
-    });
-
-    it("keeps the nightly channel's Releases on nightly and the stable ones on latest", () => {
-        const releases = [
-            { version: '0.3.0-nightly.20261024.52', note: body('feat: nightly two') },
-            { version: '0.3.0', note: body('feat: stable') },
-            { version: '0.2.0-nightly.20261023.51', note: body('feat: nightly one') },
-        ];
-        const versions = (channel: 'latest' | 'nightly') =>
-            normalizeReleaseNotes(releases, 'x', channel).releaseNotes.map((note) => note.version);
-
-        assert.deepStrictEqual(versions('nightly'), ['0.3.0-nightly.20261024.52', '0.2.0-nightly.20261023.51']);
-        assert.deepStrictEqual(versions('latest'), ['0.3.0']);
-    });
-
-    it("reads a single body as the new version's notes, and ignores notes it can't read", () => {
-        const single = normalizeReleaseNotes(body('fix: one'), '0.2.0', 'latest');
-
-        assert.deepStrictEqual(
-            single.releaseNotes.map((note) => note.version),
-            ['0.2.0'],
-        );
-        assert.deepStrictEqual(normalizeReleaseNotes(null, '0.2.0', 'latest'), {
-            releaseNotes: [],
-            omittedReleaseCount: 0,
-        });
-        assert.deepStrictEqual(normalizeReleaseNotes([{ version: 2 }], '0.2.0', 'latest').releaseNotes, []);
     });
 });

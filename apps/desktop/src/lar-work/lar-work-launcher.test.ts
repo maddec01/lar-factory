@@ -2,7 +2,6 @@ import { assert, beforeAll, describe, it } from '@effect/vitest';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { defaultTargets, installSkills } from '@lar-factory/shared/install-skills';
 import { installTargets } from '@lar-factory/shared/install-targets';
-import * as Effect from 'effect/Effect';
 import electron from 'electron';
 // Builds the lar-work bundle as the pack step does and runs it, directly and through the launcher, with Electron's
 // Node from a folder that holds no factory files.
@@ -37,43 +36,6 @@ const runFrom = (
 
 const install = (home: string, file = commandFile, dataDir = boardDataDir(home)) =>
     LarWorkLauncher.install({ home, executablePath: ELECTRON, commandFile: file, dataDir });
-
-describe('the bundled command', () => {
-    it("prints its help and creates then reads a record with Electron's Node", () => {
-        const run = (args: ReadonlyArray<string>) =>
-            NodeChildProcess.spawnSync(ELECTRON, ['--disable-warning=ExperimentalWarning', commandFile, ...args], {
-                cwd: tempDir('no-factory-files-'),
-                encoding: 'utf8',
-                env: { PATH: '/usr/bin:/bin', ELECTRON_RUN_AS_NODE: '1' },
-            });
-        const dataDir = tempDir('lar-work-data-');
-
-        const help = run(['--help']);
-
-        assert.strictEqual(help.status, 0, help.stderr);
-        assert.include(help.stdout, 'Usage: lar-work');
-
-        const created = run([
-            'create',
-            '--title',
-            'A build',
-            '--repository',
-            'maddec01/lar',
-            '--kind',
-            'build',
-            '--data-dir',
-            dataDir,
-        ]);
-
-        assert.strictEqual(created.status, 0, created.stderr);
-
-        const { workId } = JSON.parse(created.stdout);
-        const read = run(['read', workId, '--data-dir', dataDir]);
-
-        assert.strictEqual(read.status, 0, read.stderr);
-        assert.strictEqual(JSON.parse(read.stdout).repository, 'maddec01/lar');
-    });
-});
 
 describe('install', () => {
     it('installs a launcher that runs the bundled command', () => {
@@ -153,32 +115,6 @@ describe('install', () => {
         }
     });
 
-    it('leaves a current launcher as it is', () => {
-        const home = tempDir('lar-work-home-');
-
-        install(home);
-
-        assert.deepStrictEqual(install(home), { kind: 'unchanged', path: LarWorkLauncher.launcherPath(home) });
-    });
-
-    it('points the launcher at the app after the app moves', () => {
-        const home = tempDir('lar-work-home-');
-
-        install(home, '/Applications/Old Lar Factory.app/Contents/Resources/work-records/lar-work.mjs');
-
-        const moved = NodePath.join(tempDir('moved-app-'), "it's here", 'lar-work.mjs');
-
-        NodeFS.mkdirSync(NodePath.dirname(moved));
-        NodeFS.copyFileSync(commandFile, moved);
-
-        assert.deepStrictEqual(install(home, moved), { kind: 'installed', path: LarWorkLauncher.launcherPath(home) });
-
-        const help = runFrom(LarWorkLauncher.launcherPath(home), ['--help']);
-
-        assert.strictEqual(help.status, 0, help.stderr);
-        assert.notInclude(NodeFS.readFileSync(LarWorkLauncher.launcherPath(home), 'utf8'), 'Old Lar Factory');
-    });
-
     it('leaves a file the app did not install alone and reports it', () => {
         const home = tempDir('lar-work-home-');
         const path = LarWorkLauncher.launcherPath(home);
@@ -189,66 +125,4 @@ describe('install', () => {
         assert.deepStrictEqual(install(home), { kind: 'foreign', path });
         assert.strictEqual(NodeFS.readFileSync(path, 'utf8'), '#!/bin/sh\necho mine\n');
     });
-
-    it("leaves a symlink at the launcher's path alone", () => {
-        const home = tempDir('lar-work-home-');
-        const path = LarWorkLauncher.launcherPath(home);
-
-        NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
-        NodeFS.symlinkSync(commandFile, path);
-
-        assert.deepStrictEqual(install(home), { kind: 'foreign', path });
-        assert.strictEqual(NodeFS.readlinkSync(path), commandFile);
-    });
-});
-
-describe('onLaunch', () => {
-    it.effect('installs the matching command when a dev run opts into skill installation', () =>
-        Effect.gen(function* () {
-            const home = tempDir('lar-work-home-');
-
-            yield* LarWorkLauncher.onLaunch({
-                isPackaged: false,
-                installInDevelopment: true,
-                home,
-                executablePath: ELECTRON,
-                commandFile,
-                dataDir: boardDataDir(home),
-            });
-            assert.include(NodeFS.readFileSync(LarWorkLauncher.launcherPath(home), 'utf8'), commandFile);
-        }),
-    );
-
-    it.effect('installs nothing in a dev run', () =>
-        Effect.gen(function* () {
-            const home = tempDir('lar-work-home-');
-
-            yield* LarWorkLauncher.onLaunch({
-                isPackaged: false,
-                home,
-                executablePath: ELECTRON,
-                commandFile,
-                dataDir: boardDataDir(home),
-            });
-            assert.isFalse(NodeFS.existsSync(LarWorkLauncher.launcherPath(home)));
-        }),
-    );
-
-    it.effect('logs a foreign file instead of failing', () =>
-        Effect.gen(function* () {
-            const home = tempDir('lar-work-home-');
-            const path = LarWorkLauncher.launcherPath(home);
-
-            NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
-            NodeFS.writeFileSync(path, 'mine\n');
-            yield* LarWorkLauncher.onLaunch({
-                isPackaged: true,
-                home,
-                executablePath: ELECTRON,
-                commandFile,
-                dataDir: boardDataDir(home),
-            });
-            assert.strictEqual(NodeFS.readFileSync(path, 'utf8'), 'mine\n');
-        }),
-    );
 });

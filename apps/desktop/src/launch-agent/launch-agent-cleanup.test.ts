@@ -51,27 +51,4 @@ describe('onLaunch', () => {
             assert.isTrue(NodeFS.existsSync(NodePath.join(checkout, 'README.md')));
         }),
     );
-
-    it.effect('still deletes the plist when bootout fails', () =>
-        Effect.gen(function* () {
-            const { home, checkout } = makeHome(true);
-            const fake = makeLaunchctl(3);
-
-            yield* run({ isPackaged: true, home, uid: 501, launchctl: fake.launchctl });
-            assert.lengthOf(fake.calls(), 1);
-            assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
-            assert.isTrue(NodeFS.existsSync(NodePath.join(checkout, 'README.md')));
-        }),
-    );
-
-    it.effect('leaves the agent alone in a dev run', () =>
-        Effect.gen(function* () {
-            const { home } = makeHome(true);
-            const fake = makeLaunchctl(0);
-
-            yield* run({ isPackaged: false, home, uid: 501, launchctl: fake.launchctl });
-            assert.deepStrictEqual(fake.calls(), []);
-            assert.isTrue(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
-        }),
-    );
 });

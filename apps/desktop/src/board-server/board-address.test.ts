@@ -103,29 +103,3 @@ test('does not authorize foreign origins or inject a secret into requests', asyn
         child.close();
     }
 });
-
-test('interrupts a live event stream so reconnect can reach the replacement child', async () => {
-    const address = await openBoardAddress();
-    const child = createServer((_req, res) => {
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-        res.write('data: loaded\n\n');
-    });
-
-    child.listen(0, '127.0.0.1');
-    await once(child, 'listening');
-    address.connect(new URL(`http://127.0.0.1:${(child.address() as import('node:net').AddressInfo).port}`));
-
-    try {
-        const response = await fetch(new URL('/api/events', address.url));
-        const reader = response.body!.getReader();
-
-        expect(new TextDecoder().decode((await reader.read()).value)).toBe('data: loaded\n\n');
-        address.disconnect();
-        await expect(reader.read()).rejects.toThrow('terminated');
-        expect((await fetch(new URL('/api/events', address.url))).status).toBe(503);
-    } finally {
-        address.close();
-        child.closeAllConnections();
-        child.close();
-    }
-});

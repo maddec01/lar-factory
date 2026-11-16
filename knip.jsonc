@@ -7,7 +7,7 @@
         },
         "apps/desktop": {
             // vp pack builds main.ts and preload.ts, which knip's Vite plugin doesn't read;
-            // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs and preload pause-copy.mjs.
+            // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs.
             // Knip's Vitest plugin finds vite.config.ts and the tests.
             "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/*.mjs"],
         },

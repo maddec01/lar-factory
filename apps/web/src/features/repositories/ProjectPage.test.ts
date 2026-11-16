@@ -3,7 +3,7 @@
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, $$, chooseOption, fetchMock, mountPage, sample, settle, text } from '@/test/PageTest';
 
 const REPO = 'team/app';
 
@@ -213,4 +213,16 @@ test('leaving the project page closes a dirty label picker with one complete kin
 
     await settle(() => useSettingsStore.getState().setSection('general'));
     expect(sent).toEqual([{ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: ['triage'] } }]);
+});
+
+test('the Build method shows TDD until chosen, and a choice saves at once and shows what the board saved', async () => {
+    const saved = boardWith({ buildMethod: 'prove-it', sources: { ...SETUP.sources, buildMethod: 'local' } });
+    const sent = serve(boardWith(), () => ({ body: { board: saved, error: null } }));
+    const picker = () => setting('buildMethod').querySelector('[role="combobox"]')!;
+
+    await openEdit(boardWith());
+    expect(text(picker())).toBe('TDD');
+    await chooseOption(picker(), 'Prove it');
+    expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'buildMethod', value: 'prove-it' }]);
+    expect(text(picker()), 'from the saved board once the draft clears').toBe('Prove it');
 });

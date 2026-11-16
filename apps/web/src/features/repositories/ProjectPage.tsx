@@ -29,18 +29,19 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     const {
         drafts: allDrafts,
         fieldErrors,
-        issueDrafts,
+        choiceDrafts,
         running,
         type,
         save,
         reset,
         recheck,
-        issueDefault,
+        choose,
     } = useEditStore();
     const typed = allDrafts[repo] ?? {};
     const drafts = shownDrafts(setup, typed);
     const savedText = shownDrafts(setup, {});
     const errors = fieldErrors[repo] ?? {};
+    const choices = { ...setup, ...choiceDrafts[repo] };
     const latest = useRef(setup);
 
     useLayoutEffect(() => {
@@ -125,8 +126,8 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                     </FieldRow>
                 </InsetPanel>
                 <IssueDefaults
-                    setup={{ ...setup, ...issueDrafts[repo] }}
-                    onChange={(key, on) => void issueDefault(repo, key, on)}
+                    setup={choices}
+                    onChange={(key, on) => void choose(repo, key, on)}
                     onRecheck={recheckAccess}
                     checking={running === 'recheck'}
                     errors={errors}
@@ -187,6 +188,21 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                     {text('skills', 'Project skills')}
                     {resetButton('skills')}
                 </FieldRow>
+                <FieldRow
+                    id="buildMethod"
+                    label="Build method"
+                    help="How builds write and keep tests. New runs use it."
+                    error={errors.buildMethod}
+                >
+                    <OptionSelect
+                        label="Build method"
+                        presentation="setting"
+                        writesOnPick
+                        value={choices.buildMethod}
+                        onChange={(value) => void choose(repo, 'buildMethod', value)}
+                        options={BUILD_METHOD_OPTIONS}
+                    />
+                </FieldRow>
             </SettingsGroup>
             <SettingsGroup
                 title="Access"
@@ -206,6 +222,11 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
         </Stack>
     );
 }
+
+const BUILD_METHOD_OPTIONS: { value: RepositorySetup['buildMethod']; label: string }[] = [
+    { value: 'tdd', label: 'TDD' },
+    { value: 'prove-it', label: 'Prove it' },
+];
 
 /** The text fields a draft holds until Settings' footer saves them. */
 const TEXT_FIELDS: (keyof Drafts)[] = ['role', 'team', 'skills', 'glossary', 'adrs'];

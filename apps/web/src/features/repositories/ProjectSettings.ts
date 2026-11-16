@@ -14,6 +14,7 @@ const PROJECT_SETTINGS = [
     { id: 'glossary', label: 'Glossary path' },
     { id: 'adrs', label: 'ADR folder' },
     { id: 'skills', label: 'Project skills' },
+    { id: 'buildMethod', label: 'Build method' },
     { id: 'access', label: 'Access' },
 ];
 

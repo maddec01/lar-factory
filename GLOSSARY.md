@@ -140,6 +140,10 @@ _Avoid_: auto-start.
 The provider instance and model the board starts a thread on, or Project default in T3. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.
 
+**Release folder**:
+The copy of one app release's factory skills that the app keeps in its data folder. A run reads skills from the release folder it started with while that folder exists, and otherwise from the running release.
+_Avoid_: installed skills, skill install.
+
 **Scope**:
 The one Project the board shows, or all Projects.
 _Avoid_: project filter, project picker.

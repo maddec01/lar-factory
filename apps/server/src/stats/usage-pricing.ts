@@ -187,7 +187,7 @@ function stripVariantSuffix(key: string): string {
 /** Never billed (`<synthetic>`), or a bare family name ambiguous across generations. */
 const UNPRICEABLE_MODELS = new Set(['<synthetic>', 'synthetic', 'opus', 'sonnet', 'haiku', 'fable']);
 
-export function lookupRate(table: RateTable, model: string): ModelRate | null {
+function lookupRate(table: RateTable, model: string): ModelRate | null {
     const key = stripVariantSuffix(normalizeRateKey(model));
     const bareName = bareModelName(key);
 

@@ -65,7 +65,7 @@ const MODEL_GONE = "Auto-build's model isn't offered now. Choose another in Sett
 const ANOTHER_BOARD = 'Another board on this Mac starts the builds.';
 
 /** How long a build Start build held waits before Auto-build tries it again, as each try rereads its Spec. */
-export const HOLD_RETRY_MS = 30_000;
+const HOLD_RETRY_MS = 30_000;
 
 function readPauses(file: string): Record<string, Pause> {
     return Object.fromEntries(

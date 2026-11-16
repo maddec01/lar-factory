@@ -49,11 +49,7 @@ export interface Tools extends Record<ToolName, ToolLookup> {
 }
 
 /** The login shell PATH first, then the inherited one, then the Homebrew folders, without empty entries or duplicates. */
-export function mergePaths(
-    loginPath: string | null,
-    inherited: string | undefined,
-    fallbackDirs = FALLBACK_DIRS,
-): string {
+function mergePaths(loginPath: string | null, inherited: string | undefined, fallbackDirs = FALLBACK_DIRS): string {
     const dirs = [loginPath, inherited].flatMap((path) => path?.split(':') ?? []);
 
     return [...new Set([...dirs, ...fallbackDirs].filter(Boolean))].join(':');
@@ -183,7 +179,7 @@ function missingWithFix(name: Exclude<ToolName, 't3'>): { result: 'missing'; ove
 }
 
 /** The first version number on the first line of a `--version` output, else that line; undefined when it's empty. */
-export function versionOf(stdout: string): string | undefined {
+function versionOf(stdout: string): string | undefined {
     const line = stdout.trim().split('\n')[0]!.trim();
 
     return line.match(/\d+\.\d+[\w.+-]*/)?.[0] ?? (line || undefined);
@@ -297,7 +293,7 @@ function azVersionOf(stdout: string): string | undefined {
  * as az is slow to start. Never `az --version`, which looks up the latest az over the network on every run.
  * A signed-out az names `az login`, which comes before a missing extension.
  */
-export async function probeAz(): Promise<AzCheck> {
+async function probeAz(): Promise<AzCheck> {
     const command = toolCommand('az');
 
     if (!command) return missingWithFix('az');

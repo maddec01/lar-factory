@@ -3,7 +3,7 @@ import { isRecord } from '@lar-factory/shared';
 import type { ThreadRows, ThreadSession } from './t3-db.ts';
 
 /** How many thread projections a stats read turns into rows between two turns of the event loop. */
-export const PROJECTIONS_PER_CHUNK = 32;
+const PROJECTIONS_PER_CHUNK = 32;
 
 /** The projection fields `executionStats` reads. */
 const STATS_FIELDS = [

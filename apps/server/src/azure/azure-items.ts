@@ -55,9 +55,9 @@ export const orgFlags = (organization: string): string[] => [
 const BATCH = 200;
 
 /** How long a source keeps its team's backlog levels and each type's states, which change only when someone edits the process. */
-export const SETTINGS_TTL = 10 * 60_000;
+const SETTINGS_TTL = 10 * 60_000;
 /** The most az repos pr show calls a read runs at once. */
-export const PR_READS = 4;
+const PR_READS = 4;
 
 /** `read`'s answer, kept for SETTINGS_TTL by `now`'s clock; a failed read isn't kept, so the next call reads again. */
 function kept<T>(read: () => Promise<T>, now: () => number): () => Promise<T> {

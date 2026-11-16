@@ -46,7 +46,7 @@ export interface FakeComment {
 export const TEAM_AREA = 'Fabrikam Fiber\\Fabrikam Team';
 
 /** Each process's states with their categories, as the work item type states endpoint lists them. */
-export const STATES: Record<string, [string, string][]> = {
+const STATES: Record<string, [string, string][]> = {
     'User Story': [
         ['New', 'Proposed'],
         ['Active', 'InProgress'],

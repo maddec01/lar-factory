@@ -41,7 +41,7 @@ export const threadAtWork = (thread: ItemThread): boolean =>
     !thread.observedAt && (thread.state === 'running' || !!thread.hasRunningChildren);
 
 /** The thread a part shows: its running build thread while it is at work again, else the one at work, as running, else its newest. */
-export function shownThread(part: Part, working = false): ItemThread | undefined {
+function shownThread(part: Part, working = false): ItemThread | undefined {
     const atWork = (working ? currentBuildThread(part.item) : undefined) ?? threadsOf(part.item).find(threadAtWork);
 
     return atWork ? { ...atWork, state: 'running' } : part.thread;

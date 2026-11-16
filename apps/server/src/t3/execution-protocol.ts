@@ -119,42 +119,10 @@ function readThreadShells(
     });
 }
 
-/** Source contract orchestrationV2.ts:3650. Includes active family members. */
-export function readThreadFamily(
-    origin: URL,
-    version: string,
-    protocol: ProjectProtocol,
-    threadId: string,
-): Promise<ThreadFamilyRead> {
-    if (!threadId.trim()) throw new Error('Thread ID required');
-
-    return readThreadShells(origin, version, protocol, 'orchestration.getThreadFamily', { threadId });
-}
-
 /** Source contract orchestrationV2.ts:3572 and 4122. The shell subscription always sends `archivedThreads: []`, so only this reads them. */
 export function readArchivedShells(origin: URL, version: string, protocol: ProjectProtocol): Promise<ThreadFamilyRead> {
     return readThreadShells(origin, version, protocol, 'orchestration.getArchivedShellSnapshot', {});
 }
-
-/** Exact pinned contract, not a claim about arbitrary T3 releases.
- * SQL association, transcript mapping and usage remain unchanged for #708/#709.
- * Azure policies/reviewer readiness are absent from this protocol.
- */
-export const executionCapabilities = {
-    source: '97e35bcf23e4dcf34c2dcffadd37c08db0e01e52',
-    threadIdLookup: true,
-    threadSubscription: true,
-    activeThreadFamily: true,
-    runs: true,
-    attempts: true,
-    subagents: true,
-    providerTurns: true,
-    runtimeRequests: true,
-    messages: true,
-    azurePolicies: false,
-    azureReviewerVotes: false,
-    transcriptUsage: false,
-} as const;
 
 export interface ShellRead {
     availability: ProjectRead['availability'];

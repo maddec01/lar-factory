@@ -45,7 +45,7 @@ type DelayHistogram = Pick<
     'enable' | 'disable' | 'reset' | 'max' | 'percentile'
 >;
 
-export interface LoopTraceOptions {
+interface LoopTraceOptions {
     /** Writes one line; the board's gives it the `startup <n> ms:` prefix. */
     write?: (line: string) => void;
     now?: () => number;
@@ -93,7 +93,7 @@ const observeGc: NonNullable<LoopTraceOptions['watchGc']> = (report) => {
     return () => observer.disconnect();
 };
 
-export function createLoopTrace({
+function createLoopTrace({
     write: given,
     now = () => performance.now(),
     delay = monitorEventLoopDelay({ resolution: TICK_MS }),

@@ -40,7 +40,7 @@ export function footprintRegions(text: string): Footprint | null {
 }
 
 /** The largest regions that together hold at least `share` of the footprint. */
-export function regionsHolding({ total, regions }: Footprint, share: number): Region[] {
+function regionsHolding({ total, regions }: Footprint, share: number): Region[] {
     const held: Region[] = [];
     let sum = 0;
 
@@ -55,7 +55,7 @@ export function regionsHolding({ total, regions }: Footprint, share: number): Re
 }
 
 /** RSS's peak, low and end, in bytes, and each PID that wrote a sample. */
-export function summarize(samples: readonly MemorySample[]) {
+function summarize(samples: readonly MemorySample[]) {
     const highest = highestRss(samples);
 
     return {

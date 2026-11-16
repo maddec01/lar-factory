@@ -118,7 +118,7 @@ function actionFrom(items: ActivityItemRow[]): { action?: string; actionAt?: str
 }
 
 /** Whether an unfinished subagent record is an agent at work. A child with runs of its own goes by them, since a child task outlives the run that started it. A native subagent goes by that run, or its thread's background tasks. */
-export function agentWorking(row: ActivityAgentRow, parentHasBackground: boolean): boolean {
+function agentWorking(row: ActivityAgentRow, parentHasBackground: boolean): boolean {
     return row.childRunLive !== null ? !!row.childRunLive : row.runLive !== 0 || parentHasBackground;
 }
 
@@ -126,7 +126,7 @@ export function agentWorking(row: ActivityAgentRow, parentHasBackground: boolean
 const agentTitle = (title: string | null): string =>
     !title?.trim() ? 'Subagent' : title.includes('/') && !/\s/.test(title) ? lastSegment(title) : title;
 
-export interface ActivityRows {
+interface ActivityRows {
     items: ActivityItemRow[];
     /** Whether the thread's own run is at work. */
     runLive: boolean;
@@ -137,7 +137,7 @@ export interface ActivityRows {
 }
 
 /** The activity these rows say. */
-export function threadActivity({ items, runLive, agents, commandRunning, readAt }: ActivityRows): ThreadActivity {
+function threadActivity({ items, runLive, agents, commandRunning, readAt }: ActivityRows): ThreadActivity {
     const { toolRunning, ...own } = actionFrom(runLive ? items : []);
     let anyTool = toolRunning || commandRunning;
     const working = agents.map(({ row, items: agentItems }): ThreadAgent => {

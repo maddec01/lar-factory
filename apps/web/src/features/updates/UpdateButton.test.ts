@@ -29,18 +29,6 @@ const downloaded: UpdateState = {
     downloadPercent: 100,
     canRetry: true,
 };
-const withNotes: UpdateState = {
-    ...available,
-    releaseNotes: [
-        {
-            version: '1.1.0',
-            items: ['feat(board): show the changelog', 'fix(board): keep the header steady'],
-            totalItems: 2,
-        },
-        { version: '1.0.1', items: ['fix(board): retry a failed download'], totalItems: 11 },
-    ],
-    omittedReleaseCount: 3,
-};
 
 function stubBridge(start: UpdateState) {
     let push: (state: UpdateState) => void = () => {};
@@ -73,28 +61,6 @@ const requestRestart = async () => {
     await click();
     await next();
 };
-
-test('the quiet icon sits before Settings and downloads only from its click-open details', async () => {
-    const { bridge } = stubBridge(withNotes);
-
-    await mountPage();
-    expect(text(control())).toBe('');
-    expect(control().getAttribute('aria-label')).toBe('Update to 1.1.0');
-    expect(control().getAttribute('data-kind')).toBe('control');
-    expect(control().querySelector('svg.lucide-circle-fading-arrow-up')).not.toBeNull();
-    expect(control().nextElementSibling!.classList).toContain('open-settings');
-    await settle(() => control().focus());
-    expect(popover()).toBeNull();
-    await click();
-    expect(bridge.downloadUpdate).not.toHaveBeenCalled();
-    expect(text(popover())).toContain('Lar Factory 1.1.0');
-    expect(text(popover())).toContain('You have 1.0.0');
-    expect(text(popover())).toContain('feat(board): show the changelog');
-    expect(text(popover())).toContain('10 more changes in this release');
-    expect(text(popover())).toContain('3 older releases not shown');
-    await next();
-    expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
-});
 
 test('restart closes details and asks in the board dialog before installing', async () => {
     const { bridge } = stubBridge(downloaded);

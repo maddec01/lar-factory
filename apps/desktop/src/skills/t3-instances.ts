@@ -12,7 +12,7 @@ import type { Discover } from './skill-install.ts';
 type Environment = Readonly<Record<string, string | undefined>>;
 
 /** Runs `t3` with `env`, which names the PATH to find it on; a CLI that can't start exits with a null code. */
-export const runT3 =
+const runT3 =
     (env: Environment): T3Run =>
     (args, signal) =>
         new Promise((resolve) => {

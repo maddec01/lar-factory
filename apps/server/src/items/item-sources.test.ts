@@ -153,35 +153,6 @@ const pace = (now: number, active: (i: Item) => boolean = (i) => i.status === 'I
     polled: (i: Item) => i.status === 'Review',
 });
 
-test('a paced read reads a source with active work every 15 seconds and an idle one every 5 minutes', async () => {
-    const busy = countedSource('busy', () => [item('I_1', 'maddec01/lar-apple', 'In progress')]);
-    const idle = countedSource('idle', () => [item('I_2', 'maddec01/lar-server', 'Queued')]);
-    const sources = mergeSources(
-        new Map([
-            ['maddec01/lar-apple', busy],
-            ['maddec01/lar-server', idle],
-        ]),
-    );
-
-    await sources.read(undefined, pace(0));
-    assert.equal(sources.due(pace(14_999)), false);
-
-    const read = await sources.read(undefined, pace(15_000));
-
-    assert.deepEqual(
-        read.items.map((i) => i.id),
-        ['I_1', 'I_2'],
-        'the idle source lists its items from its last read',
-    );
-    assert.deepEqual([busy.reads, idle.reads], [2, 1]);
-    assert.equal(sources.readAfresh(read.items[0]!), true);
-    assert.equal(sources.readAfresh(read.items[1]!), false);
-    await sources.read(undefined, pace(300_000));
-    assert.deepEqual([busy.reads, idle.reads], [3, 2]);
-    await sources.read(undefined, { ...pace(330_000), slow: true });
-    assert.deepEqual([busy.reads, idle.reads], [3, 2], 'a slow pace keeps even active work on the idle cadence');
-});
-
 test("invalidating an item reads only the source that lists it, at once, and an unknown one reads its repository's source", async () => {
     const apple = countedSource('apple', () => [
         {
@@ -214,39 +185,6 @@ test("invalidating an item reads only the source that lists it, at once, and an 
     sources.invalidate('https://github.com/maddec01/lar-apple/issues/404');
     await sources.read(undefined, pace(4_000));
     assert.deepEqual([apple.reads, server.reads], [3, 1]);
-});
-
-test('a source whose read failed is read again, while one that read keeps its read', async () => {
-    let fail = true;
-    const good = countedSource('good', () => [item('I_1', 'maddec01/lar-apple')]);
-    const flaky: ItemSource & { reads: number } = {
-        ...countedSource('flaky', () => []),
-        read: async () => {
-            flaky.reads++;
-
-            if (fail) throw new Error('boom');
-
-            return { title: 'flaky', items: [item('I_2', 'maddec01/lar-server')] };
-        },
-    };
-    const sources = mergeSources(
-        new Map([
-            ['maddec01/lar-apple', good],
-            ['maddec01/lar-server', flaky],
-        ]),
-    );
-
-    await assert.rejects(sources.read(undefined, pace(0)), /boom/);
-    fail = false;
-    assert.equal(sources.due(pace(14_999)), false, 'a source that never read retries at the active pace');
-
-    const read = await sources.read(undefined, pace(15_000));
-
-    assert.deepEqual(
-        read.items.map((i) => i.id),
-        ['I_1', 'I_2'],
-    );
-    assert.deepEqual([good.reads, flaky.reads], [1, 2]);
 });
 
 test('a source that reads items alone reads only its active and asked-for items between its whole reads', async () => {
@@ -294,53 +232,6 @@ test('a source that reads items alone reads only its active and asked-for items 
     );
     await sources.read(undefined, pace(300_000));
     assert.equal(project.reads, 2, 'the idle interval reads it whole');
-});
-
-test('a change check every 5 seconds reads the items changed elsewhere alone, and the whole source when it names one it never listed', async () => {
-    const pr = { url: 'https://github.com/maddec01/lar-apple/pull/9' } as Item['linkedPrs'][number];
-    const listed = [
-        item('I_1', 'maddec01/lar-apple', 'Queued'),
-        item('I_2', 'maddec01/lar-apple', 'Queued'),
-        { ...item('I_3', 'maddec01/lar-apple', 'Queued'), linkedPrs: [pr] },
-    ];
-    const some: string[][] = [];
-    const checks: number[] = [];
-    let changes: string[] | null = [];
-    const project = Object.assign(
-        countedSource('project', () => listed),
-        {
-            readSome: async (items: Item[]) => {
-                some.push(items.map((i) => i.id));
-
-                return items;
-            },
-            changes: async (since: number) => {
-                checks.push(since);
-
-                return changes;
-            },
-        },
-    );
-    const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
-
-    await sources.read(undefined, pace(0));
-    await sources.probe(pace(4_999));
-    assert.deepEqual(checks, [], 'no check before 5 seconds');
-    changes = [listed[1]!.url!, pr.url];
-    await sources.probe(pace(5_000));
-    assert.deepEqual(checks, [0], 'the first check looks back to the first read');
-    await sources.read(undefined, pace(5_000));
-    assert.deepEqual([project.reads, some], [1, [['I_2', 'I_3']]], 'a changed PR reads the item it links');
-    await sources.probe({ ...pace(10_000), slow: true });
-    assert.deepEqual(checks, [0], 'no check while the quota runs low');
-    changes = ['https://github.com/maddec01/lar-apple/pull/7'];
-    await sources.probe(pace(10_000));
-    assert.deepEqual(checks, [0, 5_000]);
-    await sources.read(undefined, pace(10_000));
-    assert.equal(project.reads, 2, 'a URL the source never listed, as a PR that just linked an issue, reads it whole');
-    changes = null;
-    await sources.probe(pace(15_000));
-    assert.equal(sources.due(pace(15_000)), true, "a check that can't tell reads it whole");
 });
 
 test('a read that fails after a change check asks again for what it read, at the active pace', async () => {

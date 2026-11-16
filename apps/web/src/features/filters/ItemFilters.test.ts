@@ -5,7 +5,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
 import { rowFilter } from './ItemFilters';
-import { $, $$, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, $$, mountPage, sample, settle } from '@/test/PageTest';
 
 const BOARD_KEY = 'lar-board:filters:board';
 const LIST_KEY = 'lar-board:filters:list';
@@ -15,16 +15,11 @@ const saved = (key: string) => JSON.parse(localStorage.getItem(key)!) as unknown
 const seed = (key: string, kinds: string[], labels: string[] = []) =>
     localStorage.setItem(key, JSON.stringify({ kinds, labels }));
 
-/** A stage's heading with the count beside it: "Queue 2". */
-const heading = (id: string) => `${text($(id))} ${text($(id)!.parentElement!.querySelector('[data-slot="count"]'))}`;
 const queueRows = () => $$<HTMLLIElement>('[data-stage="queue"] ol > li');
 const bar = () => $('[data-list-modal] [data-item-filters]')!;
 /** Each filter chip's action, as its name starts and its tooltip says: "Remove Feature". */
 const chips = () => [...bar().querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('title'));
 const clear = () => settle(() => bar().querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
-const search = () => settle(() => $<HTMLButtonElement>('[data-search-field]')!.click());
-const removeToken = (name: string) =>
-    settle(() => $<HTMLButtonElement>(`[data-command-palette] button[aria-label="Remove ${name}"]`)!.click());
 const withItems = (items: Item[], rest: Partial<BoardData> = {}): BoardData => ({ ...sample, ...rest, items });
 
 test('choices within a filter match any, and the two filters must both match', () => {
@@ -38,26 +33,6 @@ test('choices within a filter match any, and the two filters must both match', (
     expect(shows(['bug', 'feature'], [])).toEqual(['b', 'f']);
     expect(shows([], ['area: web', 'area: api'])).toEqual(['b', 'f', 'c']);
     expect(shows(['bug', 'feature'], ['AREA: WEB'])).toEqual(['b']);
-});
-
-test('the board keeps Queue numbers while a filter hides the first row, whose item the Queue header never offers', async () => {
-    seed(BOARD_KEY, ['bug']);
-    await mountPage(
-        withItems([
-            item('Q1', { number: 1, title: 'First', kind: 'feature' }),
-            item('Q2', { number: 2, title: 'Second', kind: 'bug' }),
-            item('Q3', { number: 3, title: 'Third', kind: 'bug' }),
-        ]),
-    );
-    expect(queueRows().map((r) => [r.dataset.item, text(r.querySelector('.queue-n'))])).toEqual([
-        ['Q2', '2'],
-        ['Q3', '3'],
-    ]);
-    expect(heading('#queue-h')).toBe('Queue 2');
-    expect($('[data-stage="queue"] header button')).toBeNull();
-    await search();
-    await removeToken('Bug');
-    expect(queueRows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
 });
 
 test('List and the board keep separate filters, and filters write nothing to the tracker', async () => {

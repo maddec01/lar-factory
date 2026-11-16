@@ -20,7 +20,7 @@ interface Footprint {
 }
 
 /** The footprint's total and each region's dirty plus swapped bytes, as the total counts them, the largest first; null when the text isn't a footprint. */
-export function footprintRegions(text: string): Footprint | null {
+function footprintRegions(text: string): Footprint | null {
     let process: { footprint: number; categories: Record<string, { dirty: number; swapped: number }> } | undefined;
 
     try {
@@ -81,7 +81,7 @@ function nearest<T>(items: readonly T[], time: number, timeOf: (item: T) => numb
 const GROWTH = 1.2;
 
 /** The cause the forced GC nearest the highest RSS sample shows, or null without a forced GC. All its figures come from the sample right after that GC. */
-export function conclude(samples: readonly MemorySample[]) {
+function conclude(samples: readonly MemorySample[]) {
     const gcs = samples.filter((sample) => sample.kind === 'after-gc');
     const gc = nearest(gcs, Date.parse(highestRss(samples).time), (sample) => Date.parse(sample.time));
 

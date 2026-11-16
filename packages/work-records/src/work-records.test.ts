@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
+import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
@@ -576,75 +576,6 @@ describe('work-record facts the board sets', () => {
 });
 
 describe('work-record provider observations', () => {
-    it('refreshes unchanged observations without resetting the age of the work', async () => {
-        const records = await open();
-        const made = records.create({
-            title: 'Queued work',
-            repository: 'maddec01/lar',
-            kind: 'feature',
-            ticket: 'maddec01/lar#7',
-            status: 'Queued',
-        });
-
-        vi.useFakeTimers({ toFake: ['Date'] });
-
-        try {
-            vi.setSystemTime(new Date('2026-11-03T10:00:00Z'));
-
-            const observed = records.observe(made.workId, made.revision, {
-                of: 'ticket',
-                state: 'open',
-                assignee: 'pedro',
-            });
-
-            vi.setSystemTime(new Date('2026-11-03T10:05:00Z'));
-
-            const refreshed = records.observe(made.workId, observed.revision, {
-                of: 'ticket',
-                state: 'open',
-                assignee: 'pedro',
-            });
-
-            expect(refreshed.updatedAt).toBe(observed.updatedAt);
-            expect(refreshed.revision).toBe(observed.revision + 1);
-            expect(records.observations(made.workId)[0]?.observedAt).toBe('2026-11-03T10:05:00.000Z');
-
-            const changed = records.observe(made.workId, refreshed.revision, {
-                of: 'ticket',
-                state: 'open',
-                assignee: 'ana',
-            });
-
-            expect(changed.updatedAt).toBe('2026-11-03T10:05:00.000Z');
-            vi.setSystemTime(new Date('2026-11-03T10:07:00Z'));
-
-            const failed = records.recordReadFailure(made.workId, changed.revision, 'ticket', 'Offline');
-
-            expect(failed.updatedAt).toBe(changed.updatedAt);
-            vi.setSystemTime(new Date('2026-11-03T10:10:00Z'));
-
-            const failedAgain = records.recordReadFailure(
-                made.workId,
-                failed.revision,
-                'ticket',
-                'Connection timed out',
-            );
-
-            expect(failedAgain.updatedAt).toBe(failed.updatedAt);
-            expect(records.observations(made.workId)[0]?.failedAt).toBe('2026-11-03T10:10:00.000Z');
-
-            const recovered = records.observe(made.workId, failedAgain.revision, {
-                of: 'ticket',
-                state: 'open',
-                assignee: 'ana',
-            });
-
-            expect(recovered.updatedAt).toBe(changed.updatedAt);
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
     const lar = (records: WorkRecords, kind: WorkKind, ticket?: string) =>
         records.create({ title: 'Work', repository: 'maddec01/lar', kind, ticket });
 

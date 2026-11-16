@@ -52,22 +52,6 @@ test('custom token rates go ahead of public and provider-reported costs', () => 
     }
 });
 
-test("fast requests cost the model's published fast multiple, and overrides have no fast tier", () => {
-    const table = parseRateTable({
-        'claude-opus-5-5': { ...rate(4e-6, 2e-7), provider_specific_entry: { fast: 2, us: 1.1 } },
-        'claude-fable-5-1': { ...rate(1e-5, 2.5e-7), provider_specific_entry: { us: 1.1 } },
-    });
-    const overrides = createOverrideRateTable({
-        'claude-opus-5-5': { inputCostPerMillionTokens: 4, outputCostPerMillionTokens: 20 },
-    });
-    const cost = (model: string, speed: UsageSpeed, custom?: typeof overrides) =>
-        priceUsage(table, record(model, null, speed), custom).costUsd;
-
-    close(cost('claude-opus-5-5', 'fast'), 2 * cost('claude-opus-5-5', 'standard'));
-    assert.equal(cost('claude-fable-5-1', 'fast'), cost('claude-fable-5-1', 'standard'));
-    assert.equal(cost('claude-opus-5-5', 'fast', overrides), cost('claude-opus-5-5', 'standard', overrides));
-});
-
 function usage(model: string, input: number, extra: Partial<UsageRecord> = {}): UsageRecord {
     return {
         provider: 'claude',

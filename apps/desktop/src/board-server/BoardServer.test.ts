@@ -31,11 +31,22 @@ const isRunning = (pid: number) => {
 };
 
 describe('locate', () => {
-    it("runs the bundled server, with the skills bundle, from the packaged app's Resources", () => {
-        assert.deepStrictEqual(BoardServer.locate('/Applications/Board.app/Contents/Resources/app.asar', true), {
-            serverDir: '/Applications/Board.app/Contents/Resources/server',
-            serverFile: '/Applications/Board.app/Contents/Resources/server/dist/server.mjs',
-            bundleDir: '/Applications/Board.app/Contents/Resources/bundle',
+    it("runs the bundled server, with the skills bundle and the app's release, from the packaged app's Resources", () => {
+        assert.deepStrictEqual(
+            BoardServer.locate('/Applications/Board.app/Contents/Resources/app.asar', true, '2.0.0'),
+            {
+                serverDir: '/Applications/Board.app/Contents/Resources/server',
+                serverFile: '/Applications/Board.app/Contents/Resources/server/dist/server.mjs',
+                bundleDir: '/Applications/Board.app/Contents/Resources/bundle',
+                release: '2.0.0',
+            },
+        );
+    });
+
+    it('gives a checkout no release, whatever the app reports', () => {
+        assert.deepStrictEqual(BoardServer.locate('/repo/apps/desktop', false, '2.0.0'), {
+            serverDir: '/repo/apps/server',
+            serverFile: '/repo/apps/server/src/server.ts',
         });
     });
 });
@@ -60,6 +71,19 @@ describe('makeStartConfig', () => {
                 BOARD_APP_SECRET: 'launch-secret',
             },
         });
+    });
+
+    it("passes a packaged app's release to the server, and no release from a checkout", () => {
+        const env = (isPackaged: boolean) =>
+            BoardServer.makeStartConfig({
+                ...BoardServer.locate('/app/Resources/app.asar', isPackaged, '2.0.0'),
+                executablePath: '/app/Board',
+                env: {},
+                secret: 'launch-secret',
+            }).env;
+
+        assert.strictEqual(env(true).BOARD_APP_VERSION, '2.0.0');
+        assert.notProperty(env(false), 'BOARD_APP_VERSION');
     });
 });
 

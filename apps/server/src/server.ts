@@ -85,6 +85,7 @@ import { sampleFixture } from './sample/sample-fixture.ts';
 import { SAMPLE_DESK_SCENARIOS } from './sample/sample-scenarios.ts';
 import { factorySettingsService } from './settings/factory-settings.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
+import { refreshReleaseFolders, runningRelease } from './skills/release-folders.ts';
 import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import { loopTrace, nextTurn } from './startup/loop-trace.ts';
@@ -183,6 +184,20 @@ if (!fixture) {
         board.update({ error: settings.problem ?? recordsProblem });
     }
 }
+
+/** A packaged app's release, whose folder in the data folder runs started on it read; none without a packaged app. */
+const release = runningRelease();
+
+if (!fixture && release && process.env.BOARD_BUNDLE_DIR)
+    loopTrace.span('release folders', () =>
+        refreshReleaseFolders({
+            bundle: process.env.BOARD_BUNDLE_DIR!,
+            dataDir: boardDataDir(),
+            release,
+            records,
+            log,
+        }),
+    );
 
 /** This Mac's retention setting, which hides finished and set-aside work in Archive and runs the timed delete Settings chose. */
 // A saved change shows at once; `reread` is defined below, before any request arrives.

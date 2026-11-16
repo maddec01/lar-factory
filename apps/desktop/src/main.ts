@@ -358,7 +358,7 @@ const program = Effect.gen(function* () {
     handleInstall(board.window, board.origin, skillChecks, installReady);
 
     const config = BoardServer.makeStartConfig({
-        ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
+        ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged, Electron.app.getVersion()),
         executablePath: process.execPath,
         env,
         secret,

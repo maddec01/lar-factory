@@ -13,6 +13,7 @@ import {
     type SkillCheckAnswer,
     type SkillCheckOutcome,
 } from '@lar-factory/shared';
+import { APP_RELEASE_ENV } from '@lar-factory/shared/run-settings';
 import * as Data from 'effect/Data';
 import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
@@ -59,6 +60,8 @@ export interface BoardLocation {
     readonly serverFile: string;
     /** The packaged app's skills bundle, which the server credits in Settings; the checkout's root otherwise. */
     readonly bundleDir?: string;
+    /** The packaged app's version, which names the release folder its runs read; a checkout has none. */
+    readonly release?: string;
 }
 
 /**
@@ -66,9 +69,9 @@ export interface BoardLocation {
  * `apps/desktop` in the checkout: the server runs from `apps/server/src/server.ts`.
  * Packaged, it is `Resources/app.asar`, which has no node_modules, so the server runs
  * as one bundled file in `Resources/server/dist`, which finds the page's build in
- * `Resources/web/dist`; the skills bundle sits in `Resources/`.
+ * `Resources/web/dist`; the skills bundle sits in `Resources/`. Only a packaged app has `version` as its release.
  */
-export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
+export const locate = (appPath: string, isPackaged: boolean, version?: string): BoardLocation => {
     const serverDir = NodePath.resolve(appPath, '../server');
 
     return isPackaged
@@ -76,6 +79,7 @@ export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
               serverDir,
               serverFile: NodePath.join(serverDir, 'dist/server.mjs'),
               bundleDir: NodePath.resolve(appPath, '../bundle'),
+              ...(version && { release: version }),
           }
         : {
               serverDir,
@@ -86,7 +90,7 @@ export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
 /**
  * Runs `serverFile` with `executablePath` in Node mode. In the app that is the
  * Electron binary, whose Node strips the types when the server runs as source.
- * The server reads `bundleDir`, and refuses guarded writes that don't carry `secret`.
+ * The server reads `bundleDir` and `release`, and refuses guarded writes that don't carry `secret`.
  * With `checksSkills` it asks the app to check the installed skills before each Start build.
  */
 export const makeStartConfig = (
@@ -105,6 +109,7 @@ export const makeStartConfig = (
         ELECTRON_RUN_AS_NODE: '1',
         BOARD_APP_SECRET: input.secret,
         ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
+        ...(input.release && { [APP_RELEASE_ENV]: input.release }),
         ...(input.checksSkills && { [SKILL_CHECK_ENV]: '1' }),
     },
 });

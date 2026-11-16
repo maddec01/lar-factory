@@ -15,8 +15,9 @@ or `running` while it runs. Then:
   `unwatch_pull_request`, end the turn. The board resumes this thread for
   [Retro](retro.md) only after the delivery PR is confirmed merged and the record is **Done**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
-  subagent** with [CI fixer](../agents/ci-fixer.md), the build's work ID, repo path, PR URL and
-  the failing check (or "merge conflict"). The watch stays. If the fix or conflict resolution changed the final tree,
+  subagent** with [CI fixer](../agents/ci-fixer.md), the build's work ID, repo path, PR URL,
+  the failing check (or "merge conflict") and this thread's runtime block
+  unchanged, including its `Frozen build method:` line when present. The watch stays. If the fix or conflict resolution changed the final tree,
   obtain an updated Approver assessment of every listed check against that
   tree before handback. It records its own reuse reasons or reruns only checks
   it cannot justify, without restarting reviews or repeating unaffected checks.

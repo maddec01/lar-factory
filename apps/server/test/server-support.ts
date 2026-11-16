@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import type { TestContext } from 'vite-plus/test';
 
+import { skillEntries } from '../src/skills/skill-entries.ts';
 import { checkouts, committingEnv, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -320,14 +321,6 @@ export async function startBoard(
 
     // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
     const home = env.HOME ?? dir;
-
-    if (!fixture) {
-        const agents = join(home, '.agents/skills/lar-build/agents');
-
-        mkdirSync(agents, { recursive: true });
-        for (const role of ['code', 'security', 'ui', 'performance'])
-            writeFileSync(join(agents, `reviewer-${role}.md`), `Fixture ${role} instructions.`);
-    }
 
     const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
 
@@ -663,11 +656,11 @@ export function startableEnv(t: TestContext): Record<string, string> {
     };
 }
 
+/** The factory context a test board without an app version sends: the checkout's assembled skills. */
 export const testFactoryContext = (home: string) => ({
     dataDir: boardDataDir(home, {}),
     bin: join(home, '.local/bin'),
-    shapeSkill: join(home, '.agents/skills/lar-shape/SKILL.md'),
-    buildSkill: join(home, '.agents/skills/lar-build/SKILL.md'),
+    ...skillEntries(undefined, boardDataDir(home, {}), {}),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
 export async function withRunPrompt(dataDir: string, id: string, message: string) {

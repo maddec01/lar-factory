@@ -1,9 +1,10 @@
 // The title bar's counters: need you, which leads the bar, then in its status group after the Refreshed light shaping,
 // building, shipped and spend, in the board's order, each only while it has something to count, so a quiet board shows
-// little. They are the design system's ToolbarCounters, always for the whole factory whatever repository or filters the
-// board shows. Each shows its glyph (need you's in amber, the routine ones without colour), its number and, on a wide
-// bar, what it counts in words, muted but for need you's; Build's header shows the occupancy against the limit. Its
-// label is its accessible name and its tooltip says more. Each opens a wide status popover of every item behind the
+// little, and none until the first read has landed. They are the design system's ToolbarCounters, always for the whole
+// factory whatever repository or filters the board shows. Each is an indicator: its glyph (need you's in amber, the
+// routine ones without colour) and its number, what it counts in its tooltip and accessible name, as the board's other
+// lights are; a phone's bar keeps need you's words, where it stands alone. Its label is its accessible name and its
+// tooltip says more. Each opens a wide status popover of every item behind the
 // number in a list that scrolls; picking one opens the item dialog. The row holds its width as values load; the title
 // bar's width decides what shows: Spend goes first, then Shaping and Shipped, and under 40rem the routine ones fold
 // into the bar's status popover while need you stays beside the actions.
@@ -79,15 +80,22 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
         );
     const listOf = (items: Item[], none: string) => (items.length ? <List items={items} /> : empty(none));
 
+    // Spend shows once it has a figure: never the dash of usage still loading before a first complete total.
+    const spendShown = costs.length > 0 && !(usageStillLoading && !unavailable && settled === null);
+
+    // While the first read lands the counts are partial, so the bar shows none of them until it settles; the lanes
+    // say they are loading.
+    if (reading) return null;
+
     return (
         <>
-            {part === 'need you' && (reading || s.needsYou.length > 0) && (
+            {part === 'need you' && s.needsYou.length > 0 && (
                 <Counter
                     label="need you"
                     value={
                         <>
                             {countOf(s.needsYou.length)}
-                            <CounterWords always={narrow}>need you</CounterWords>
+                            {narrow && <CounterWords always>need you</CounterWords>}
                         </>
                     }
                     title="Your desk"
@@ -113,15 +121,10 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
             )}
             {part === 'routine' && (
                 <>
-                    {(reading || s.shaping.length > 0) && (
+                    {s.shaping.length > 0 && (
                         <Counter
                             label="shaping"
-                            value={
-                                <>
-                                    {countOf(s.shaping.length)}
-                                    <CounterWords quiet>shaping</CounterWords>
-                                </>
-                            }
+                            value={<>{countOf(s.shaping.length)}</>}
                             icon={<QuietGlyph>{glyph('Shaping')}</QuietGlyph>}
                             fold="medium"
                             title="Shaping"
@@ -137,18 +140,13 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                         </Counter>
                     )}
 
-                    {(reading || building.length > 0) && (
+                    {building.length > 0 && (
                         <Counter
                             label="building"
                             icon={<QuietGlyph>{glyph('In progress')}</QuietGlyph>}
                             title="Building"
                             count={countFor(building.length)}
-                            value={
-                                <>
-                                    {countOf(building.length)}
-                                    <CounterWords quiet>building</CounterWords>
-                                </>
-                            }
+                            value={<>{countOf(building.length)}</>}
                             hint={hintFor(building.length, builds.text)}
                             detail={limit === undefined ? undefined : `Shared limit ${limit}`}
                             foot={
@@ -161,15 +159,10 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                         </Counter>
                     )}
 
-                    {(reading || s.done.length > 0) && (
+                    {s.done.length > 0 && (
                         <Counter
                             label="shipped"
-                            value={
-                                <>
-                                    {countOf(s.done.length)}
-                                    <CounterWords quiet>shipped</CounterWords>
-                                </>
-                            }
+                            value={<>{countOf(s.done.length)}</>}
                             icon={<QuietGlyph>{glyph('Done')}</QuietGlyph>}
                             fold="medium"
                             title="Shipped"
@@ -186,7 +179,7 @@ export function Counters({ part, narrow = false }: { part: 'need you' | 'routine
                         </Counter>
                     )}
 
-                    {(reading || costs.length > 0) && (
+                    {spendShown && (
                         <Counter
                             label="spend"
                             value={spend.value}

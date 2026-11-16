@@ -28,6 +28,7 @@ import {
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     boardColor,
+    DossierChip,
     DossierChips,
     DossierLine as Line,
     DossierNext,
@@ -154,10 +155,9 @@ export function DossierLine({
                         <DossierNote>{note}</DossierNote>
                         {/* Its most important chip reads on the title's line; what waits on you is the row's next step. */}
                         {n.tone !== 'you' && (
-                            // The title keeps its room; the chip gives way first and ends in an ellipsis.
-                            <span className="flex max-w-[40%] min-w-0 shrink-[100] items-center overflow-hidden [&_*]:truncate">
+                            <DossierChip>
                                 <Chips chips={chips.slice(0, 1)} />
-                            </span>
+                            </DossierChip>
                         )}
                     </DossierTitleCell>
                 </RowCells>

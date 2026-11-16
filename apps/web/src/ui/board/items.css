@@ -416,13 +416,21 @@ aside[data-item-aside]:empty {
         )
         [data-col='state'] {
         --card-fade-end: calc(100% - var(--card-side-width, 8rem) - 0.5rem);
-        mask-image: linear-gradient(to right, black calc(var(--card-fade-end) - 2.5rem), transparent var(--card-fade-end));
+        mask-image: linear-gradient(
+            to right,
+            black calc(var(--card-fade-end) - 2.5rem),
+            transparent var(--card-fade-end)
+        );
     }
 }
 @media (hover: none) {
     .desk-tile:has([data-col='side'] > *) [data-col='state'] {
         --card-fade-end: calc(100% - var(--card-side-width, 8rem) - 0.5rem);
-        mask-image: linear-gradient(to right, black calc(var(--card-fade-end) - 2.5rem), transparent var(--card-fade-end));
+        mask-image: linear-gradient(
+            to right,
+            black calc(var(--card-fade-end) - 2.5rem),
+            transparent var(--card-fade-end)
+        );
     }
 }
 

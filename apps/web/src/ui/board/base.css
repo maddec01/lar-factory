@@ -27,21 +27,21 @@ code {
    events while disabled, which would show the row's pointer under it, so a disabled control keeps them here; a click
    on it does nothing, and a row or card ignores clicks on its buttons. */
 :is(
-        button,
-        a[href],
-        summary,
-        select,
-        [role='button'],
-        [role='link'],
-        [role='menuitem'],
-        [role='menuitemcheckbox'],
-        [role='menuitemradio'],
-        [role='option'],
-        [role='tab'],
-        [role='switch'],
-        [role='checkbox'],
-        [role='radio']
-    ):not(:disabled, [aria-disabled='true'], [aria-busy='true'], [data-disabled]) {
+    button,
+    a[href],
+    summary,
+    select,
+    [role='button'],
+    [role='link'],
+    [role='menuitem'],
+    [role='menuitemcheckbox'],
+    [role='menuitemradio'],
+    [role='option'],
+    [role='tab'],
+    [role='switch'],
+    [role='checkbox'],
+    [role='radio']
+):not(:disabled, [aria-disabled='true'], [aria-busy='true'], [data-disabled]) {
     cursor: pointer;
 }
 :is(button, [role='button'], [role='menuitem'], [role='option'], [role='tab']):is(

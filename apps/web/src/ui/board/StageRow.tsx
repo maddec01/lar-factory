@@ -197,23 +197,6 @@ export function RowState({
     );
 }
 
-/** A Queue row's state: how long it has waited. */
-export function QueueAge({
-    children,
-    title,
-}: {
-    /** How long the row has waited. */
-    children: ReactNode;
-    /** What the age counts from, on hover. */
-    title?: string;
-}) {
-    return (
-        <span className="queue-age shrink-0 tabular-nums" data-state title={title}>
-            {children}
-        </span>
-    );
-}
-
 /** The row's action slot, at its right. With `passEmpty`, clicks on its controls stay there, and a click beside them
  *  reaches the row. */
 export function RowSide({
@@ -459,6 +442,15 @@ export function UsageFigures({
                       </span>
                   )
                 : incomplete && <span className="shrink-0">{incomplete}</span>}
+        </span>
+    );
+}
+
+/** The other projects a row's work spans, such as a concept's parts', as a count after its own, named on hover. */
+export function RowOthers({ names }: { names: string[] }) {
+    return (
+        <span className="text-fg-muted shrink-0 tabular-nums" title={`Also in ${names.join(', ')}`}>
+            +{names.length}
         </span>
     );
 }

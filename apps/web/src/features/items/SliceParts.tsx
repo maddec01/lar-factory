@@ -20,11 +20,7 @@ export function SliceBar({ item, thick = false, still = false }: { item: Item; t
     );
 }
 
-/** Work that runs with no slices to count, as one segment, so a row at work always draws a bar: it pulses while the
- *  thread works and keeps still once it stops. `label` names what runs, such as "Planning". */
-export function WorkingBar({ label, still = false }: { label: string; still?: boolean }) {
-    return <DesignSliceBar slices={[{ name: label, progress: 'active' }]} still={still} size="sm" />;
-}
+export { WorkingBar } from '@/ui/board';
 
 export function SliceList({ item, still = false }: { item: Item; still?: boolean }) {
     return (

@@ -8,7 +8,7 @@ import { memo, type ReactNode } from 'react';
 
 import { partKind, partLabel } from './DossierParts';
 import { KIND_BADGES, RepoCell, SourceIcon } from '@/features/items';
-import { conceptIcons, KindMark, PartKindIcon, RowIdentity } from '@/ui/board';
+import { conceptIcons, KindMark, PartKindIcon, RowIdentity, RowOthers } from '@/ui/board';
 
 /** An item's kind in its dialog: its icon and name as a plain value, as its project reads; nothing for no recognised kind. */
 export const RowKind = memo(function RowKind({ item }: { item: Item }) {
@@ -108,11 +108,7 @@ export const RowSource = memo(function RowSource({
             {(always || !github) && <SourceIcon item={item} bare always />}
             {kind}
             {project && <RepoCell item={item} />}
-            {others.length > 0 && (
-                <span className="text-fg-muted shrink-0 tabular-nums" title={`Also in ${others.join(', ')}`}>
-                    +{others.length}
-                </span>
-            )}
+            {others.length > 0 && <RowOthers names={others} />}
         </RowIdentity>
     );
 });

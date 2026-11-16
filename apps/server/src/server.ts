@@ -1481,6 +1481,7 @@ function sampleProjectIcon(projectId: string): ProjectImage | undefined {
 
     return undefined;
 }
+
 const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
 const { server, endStreams } = createBoardServer({
     factorySettings: factorySettingsService(),

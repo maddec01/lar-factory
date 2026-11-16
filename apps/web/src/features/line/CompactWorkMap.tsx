@@ -3,8 +3,8 @@ import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 
 import { DECISION_KINDS } from './DossierParts';
 import type { Part } from './DossierParts';
-import type { layout } from './WorkMapLayout';
 import { ItemCard } from './ItemCard';
+import type { layout } from './WorkMapLayout';
 import { CheckNode, MapRepo } from './WorkMapParts';
 import { MapLaneName, MapPrerequisiteNode, MapStack, MapStackItem } from '@/ui/board';
 
@@ -14,13 +14,11 @@ export function CompactWorkMap({
     width,
     check,
     data,
-    home,
 }: {
     map: ReturnType<typeof layout>;
     width: number;
     check: EndToEndCheck | undefined;
     data: BoardData;
-    home: string;
 }) {
     // A desk card's width, as on the full map, unless the column is narrower.
     const cardWidth = Math.max(0, Math.min(map.nodeW, width - 24));
@@ -57,7 +55,13 @@ export function CompactWorkMap({
                     {node.prerequisite ? (
                         <MapPrerequisiteNode prerequisite={node.prerequisite} width={cardWidth} height={map.nodeH} />
                     ) : node.part ? (
-                        <ItemCard item={node.part.item} part={node.part} data={data} width={cardWidth} height={map.nodeH} />
+                        <ItemCard
+                            item={node.part.item}
+                            part={node.part}
+                            data={data}
+                            width={cardWidth}
+                            height={map.nodeH}
+                        />
                     ) : check ? (
                         <CheckNode check={check} width={cardWidth} height={map.nodeH} after="" />
                     ) : null}

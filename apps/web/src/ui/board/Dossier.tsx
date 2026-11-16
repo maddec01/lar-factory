@@ -1,7 +1,7 @@
 // A dossier in Lar Factory's board's dock (Concepts and linked work): its one line, on the stage rows' columns, which
 // expands in place to its body, and what the line holds: its toggle, title, chips, what's next and the bar of its parts.
 
-import { Button, SegmentedProgress, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import { Button, TickMeter, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { buttonKind } from './ButtonKinds';
@@ -160,17 +160,6 @@ export function DossierTitle({
     );
 }
 
-/** After the title: the tracker's fields, which give up their room before the title does, ending in an ellipsis. Below
- *  `lg` they may shrink to nothing, so a narrow line's title keeps its room. */
-export function DossierFields({
-    children,
-}: {
-    /** The tracker's fields, an ItemFields. */
-    children: ReactNode;
-}) {
-    return <span className="min-w-0 shrink-[1000] truncate empty:hidden lg:min-w-10">{children}</span>;
-}
-
 /** After the fields: a note, such as where its planning is saved; its clicks stay there. */
 export function DossierNote({
     children,
@@ -185,30 +174,6 @@ export function DossierNote({
             className="flex max-w-[40%] min-w-0 shrink-[100] items-center overflow-hidden pl-1 empty:hidden [&_*]:truncate"
         >
             {children}
-        </span>
-    );
-}
-
-/** The repositories its parts work in beyond its own. */
-export function DossierRepos({
-    children,
-    chip,
-}: {
-    /** The other repositories, in words. */
-    children: string;
-    /** The concept's most important chip, such as "Concept map needs updating", after them on the title's line. */
-    chip?: ReactNode;
-}) {
-    if (!children && !chip) return null;
-
-    return (
-        <span data-col="repos" className="flex min-w-0 items-center gap-3 overflow-hidden">
-            {children && (
-                <span className="text-fg-muted min-w-16 shrink-[100] truncate" title={children}>
-                    {children}
-                </span>
-            )}
-            {chip && <span className="flex min-w-0 shrink items-center overflow-hidden [&_*]:truncate">{chip}</span>}
         </span>
     );
 }
@@ -343,7 +308,7 @@ export function PartsBar({
 
     return (
         <div className="min-w-0" title={title} data-part-bar>
-            <SegmentedProgress label={title} size="sm" segments={segments} />
+            <TickMeter label={title} size="sm" segments={segments} />
         </div>
     );
 }
@@ -402,5 +367,15 @@ export function PlanningNote({
             </TooltipTrigger>
             <TooltipPopup side="bottom">{note}</TooltipPopup>
         </Tooltip>
+    );
+}
+
+/** The slot a dossier's most important chip takes on its title's line: the title keeps its room, the chip gives way
+ *  first and ends in an ellipsis. */
+export function DossierChip({ children }: { children: ReactNode }) {
+    return (
+        <span className="flex max-w-[40%] min-w-0 shrink-[100] items-center overflow-hidden [&_*]:truncate">
+            {children}
+        </span>
     );
 }

@@ -10,6 +10,7 @@ import { useId, useState } from 'react';
 import { CompactWorkMap } from './CompactWorkMap';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
 import type { Part } from './DossierParts';
+import { ItemCard } from './ItemCard';
 import { useWidth } from './useWidth';
 import {
     DECISIONS,
@@ -23,7 +24,6 @@ import {
     keyOf,
     layout,
 } from './WorkMapLayout';
-import { ItemCard } from './ItemCard';
 import { CheckNode, HistoryRow, MapRepo } from './WorkMapParts';
 import { StatusGlyph } from '@/features/items';
 import {
@@ -55,6 +55,7 @@ export function WorkMap({
     const [hover, setHover] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
+
     if (!parts.length && !check) return null;
 
     const m = layout(parts, data, width, Boolean(check), { home });
@@ -104,7 +105,7 @@ export function WorkMap({
 
     return (
         <WorkMapFrame frameRef={box} labelWidth={compact ? 0 : LABEL_W}>
-            {compact && <CompactWorkMap map={m} width={width} check={check} data={data} home={home} />}
+            {compact && <CompactWorkMap map={m} width={width} check={check} data={data} />}
             <MapCanvas
                 width={compact ? width : m.width}
                 height={compact ? (history.length ? GROUP_H + 16 : 0) : m.height}

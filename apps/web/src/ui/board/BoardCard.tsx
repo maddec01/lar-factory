@@ -8,6 +8,7 @@ import { type CSSProperties, type ReactNode, useLayoutEffect, useRef } from 'rea
 import type { DataAttributes } from './DataAttributes';
 import { fitCardLines } from './fitCardLines';
 import { ROW_OPENS } from './RowStyles';
+import { MetaLine } from './TextParts';
 
 /** What a card needs, which colours its leading bar: it waits on you, works, is done, or is held by other work. */
 export type BoardCardTone = 'waiting' | 'active' | 'done' | 'held';
@@ -29,6 +30,7 @@ export function BoardCard({
     status,
     statusTone = 'waiting',
     statusTitle,
+    statusDot,
     sub,
     age,
     action,
@@ -60,6 +62,8 @@ export function BoardCard({
     statusTone?: 'waiting' | 'plain';
     /** The status in full, as its tooltip. */
     statusTitle?: string | undefined;
+    /** A dot in the status's state colour before it, as a row's state and a server scan's lane are marked. */
+    statusDot?: string | undefined;
     /** Quiet lines under the title, such as its question or what it belongs to. */
     sub?: ReactNode;
     /** The foot's left: how long ago it last moved, such as "2d ago". */
@@ -84,11 +88,12 @@ export function BoardCard({
 
         if (!element || typeof ResizeObserver === 'undefined') return;
 
-        let width = element.offsetWidth;
+        // The width it was fitted at, so a resize that keeps it (a height change the fit itself made) fits nothing again.
+        const fitted = { width: element.offsetWidth };
         const observer = new ResizeObserver(() => {
-            if (element.offsetWidth === width) return;
+            if (element.offsetWidth === fitted.width) return;
 
-            width = element.offsetWidth;
+            fitted.width = element.offsetWidth;
             fitCardLines(element);
         });
 
@@ -153,6 +158,14 @@ export function BoardCard({
             </div>
             <div ref={foot} className="mt-auto flex min-h-7 items-center justify-between gap-3 pt-1" data-card-foot>
                 <span data-col="state" className="flex min-w-0 items-center gap-1.5 truncate text-xs">
+                    {status && statusDot && (
+                        <span
+                            className="size-2 shrink-0 rounded-full"
+                            style={{ background: statusDot }}
+                            aria-hidden="true"
+                            data-status-dot
+                        />
+                    )}
                     {status && (
                         <span
                             className={`truncate font-medium ${statusTone === 'waiting' ? 'text-warning-fg' : 'text-fg-soft'}`}
@@ -179,5 +192,50 @@ export function BoardCard({
             </div>
             {bottom}
         </div>
+    );
+}
+
+/** A card's question, under its title in the softer text, whole in its tooltip. */
+export function CardQuestion({ children }: { children: string }) {
+    return (
+        <span className="text-fg-soft" title={children} data-question>
+            {children}
+        </span>
+    );
+}
+
+/** What a card's work belongs to, such as its concept: "in #200 lar cloud…". */
+export function CardPartOf({ name }: { name: string }) {
+    return (
+        <span title={name} data-part-of>
+            in {name}
+        </span>
+    );
+}
+
+/** The briefs one group approval covers, named on a card's line. */
+export function CardBriefs({ members }: { members: string[] }) {
+    return (
+        <span>
+            Briefs: <MetaLine parts={members} />
+        </span>
+    );
+}
+
+/** What a card's thread does now, an ActivityLine, on a line of its own. */
+export function CardActivity({ children }: { children: ReactNode }) {
+    return (
+        <span className="flex min-w-0" data-map-activity>
+            {children}
+        </span>
+    );
+}
+
+/** A card's meter under its foot, such as its slices or a working bar. */
+export function CardMeter({ children }: { children: ReactNode }) {
+    return (
+        <span className="shrink-0" data-map-slices>
+            {children}
+        </span>
     );
 }

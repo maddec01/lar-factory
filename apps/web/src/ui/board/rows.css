@@ -222,7 +222,7 @@ li.desk-row:has([data-row-open]:focus-visible) {
    nothing for a track leaves it empty. */
 .row-meta {
     --row-activity: 14rem;
-    --row-progress: 10rem;
+    --row-progress: 12rem;
     --row-end: 7rem;
     display: grid;
     flex: none;
@@ -253,10 +253,12 @@ li.desk-row:has([data-row-open]:focus-visible) {
     grid-column: 3;
     justify-self: stretch;
 }
+/* Twelve ticks exactly (the design system's TickMeter: 4px ticks 7px apart, less the last gap), so a row's meter spaces its ticks evenly
+   and every row's ends at the same place. */
 .row-meta [data-col='bar'] {
     display: block;
     flex: none;
-    width: 3.5rem;
+    width: calc(12 * 7px - 3px);
 }
 .row-meta [data-col='bar'] > * {
     width: 100%;
@@ -346,12 +348,16 @@ li.desk-row:has([data-row-open]:focus-visible) {
             opacity: 1;
             transition: opacity var(--motion-duration-fast) var(--ease-standard);
         }
-        [data-stage] li[data-item]:is(:hover, :root[data-keys] :has(:focus-visible), :has([aria-haspopup][aria-expanded='true'])):has(
-                .row-side > :not(:empty)
-            )
+        [data-stage]
+            li[data-item]:is(
+                :hover,
+                :root[data-keys] :has(:focus-visible),
+                :has([aria-haspopup][aria-expanded='true'])
+            ):has(.row-side > :not(:empty))
             .row-first
             > .row-meta,
-        :is([data-dossier], [data-parts-frame]) .row-first:is(
+        :is([data-dossier], [data-parts-frame])
+            .row-first:is(
                 :hover,
                 :root[data-keys] :has(:focus-visible),
                 :has([aria-haspopup][aria-expanded='true'])
@@ -359,7 +365,9 @@ li.desk-row:has([data-row-open]:focus-visible) {
             > .row-meta {
             /* Only the facts at the row's end reach under the action, and they end where it ends, so they fade over the 3rem
                before the action starts, less a little air; the title and project, never under it, keep still. */
-            --row-fade-end: calc(100% + var(--row-inset) - --spacing(1.5) - var(--row-side-width, var(--row-action)) - 0.5rem);
+            --row-fade-end: calc(
+                100% + var(--row-inset) - --spacing(1.5) - var(--row-side-width, var(--row-action)) - 0.5rem
+            );
             mask-image: linear-gradient(
                 to right,
                 black calc(var(--row-fade-end) - 3rem),

@@ -3,7 +3,6 @@ import { Text } from '@lar-works/design-system';
 import { FlaskConicalIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-
 /** A map card's size, the same as a desk card's (items.css's --desk-card-width and --desk-card-height): 18rem by 10.5rem,
  *  whatever the screen or what the card says, so the map's cards and your desk's read as one kind of card. */
 export const MAP_NODE_WIDTH = 288;

@@ -136,6 +136,10 @@ _Avoid_: build slot, concurrency setting.
 This machine's choice to have the board start eligible Ready builds by itself, up to the build limit.
 _Avoid_: auto-start.
 
+**Build method**:
+How the agent works inside a build's steps: TDD (test first) or Prove it (build, then prove by reproduction, driving the feature and the repo's checks). Each project sets one, and a run keeps the method it started with.
+_Avoid_: testing mode, build style.
+
 **Model choice**:
 The provider instance and model the board starts a thread on, or Project default in T3. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.

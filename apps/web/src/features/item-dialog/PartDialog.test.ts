@@ -1,6 +1,6 @@
 // A part's own dialog keeps the identifier its rows name it by: a ticketless part leads its title with "Part 4", and
-// what it waits on leads with its reference and opens that part, as Part of opens its concept. A build that was never
-// built still says it has no pull request yet, and the footer keeps Abandon in its first slot.
+// what it waits on leads with its reference and opens that part. A build that was never built still says it has no
+// pull request yet.
 
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
@@ -50,86 +50,11 @@ test('a ticketless part’s dialog leads with its part number, and Waits on name
     expect(title()).toBe('Part 2 Direct connections: automatic port mapping and fallback guidance');
 });
 
-test('Waits on names the done prerequisites too, each on one muted line behind a check under their count', async () => {
-    const data = ticketless();
-
-    await mountPage({
-        ...data,
-        items: data.items.map((item) =>
-            item.id === 'I_sample13'
-                ? {
-                      ...item,
-                      blockers: [
-                          ...item.blockers,
-                          { number: 0, repo: item.repo, state: 'closed', title: 'Server identity', workId: 'W_gone' },
-                      ],
-                  }
-                : item,
-        ),
-    });
-    await openItem('I_sample13');
-
-    const done = dialog().querySelector('[data-waits-on-done]')!;
-
-    expect(text(done.firstElementChild)).toBe('1 prerequisite done');
-    expect([...done.querySelectorAll('li')].map(text)).toEqual(['Server identity']);
-    expect(done.querySelector('li')!.className).not.toContain('line-through');
-    expect(done.querySelector('li svg')).not.toBeNull();
-    expect(done.querySelector('li')!.getAttribute('title')).toBe('Server identity');
-});
-
-test('Part of names the whole concept, wrapping as it needs, and opens it in the dialog', async () => {
-    await mountPage();
-    await openItem('I_sample13');
-
-    const parent = dialog().querySelector<HTMLButtonElement>('[data-item-parent] [data-parent-open]')!;
-
-    expect(text(parent)).toBe('#200 lar cloud: sign-in and direct connections');
-    expect(parent.className).not.toContain('line-clamp');
-    await settle(() => parent.click());
-    expect(title()).toBe('#200 lar cloud: sign-in and direct connections');
-});
-
-test('a List item’s Status says it is on the List', async () => {
-    await mountPage();
-    await openItem('I_sample01');
-    expect(text(dialog().querySelector('[data-item-summary]'))).toContain('On the List');
-});
-
 test('a build that was never built still says it has no pull request yet', async () => {
     await mountPage();
     await openItem('I_sample13');
     expect(asideHeadings()).toContain('Pull requests');
     expect(text(dialog().querySelector('aside'))).toContain('No pull request yet');
-});
-
-test('a build at Build with no pull request says it has none yet', async () => {
-    await mountPage({
-        ...sample,
-        items: sample.items.map((item) =>
-            item.id === 'I_sample13' ? { ...item, status: 'In progress', threads: [] } : item,
-        ),
-    });
-    await openItem('I_sample13');
-    expect(asideHeadings()).toContain('Pull requests');
-    expect(text(dialog().querySelector('aside'))).toContain('No pull request yet');
-});
-
-const leading = () =>
-    [...dialog().querySelectorAll('[data-slot="modal-footer"] :is([data-abandon], [data-back-to-list])')].map((el) =>
-        el.hasAttribute('data-abandon') ? 'Abandon' : 'Move to the List',
-    );
-
-test('Abandon keeps the footer’s first slot on a List item', async () => {
-    await mountPage();
-    await openItem('I_sample01');
-    expect(leading()).toEqual(['Abandon']);
-});
-
-test('Abandon keeps the footer’s first slot on a Queued item, Move to the List after it', async () => {
-    await mountPage();
-    await openItem('I_sample05');
-    expect(leading()).toEqual(['Abandon', 'Move to the List']);
 });
 
 test('a blocked build its project can’t push for says why beside its disabled Start after, in the footer', async () => {

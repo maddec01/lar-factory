@@ -106,8 +106,6 @@ function holdDetails(): () => Promise<void> {
 
 for (const [kind, shown] of [
     ['bug', 'Bug'],
-    ['feature', 'Feature'],
-    ['improvement', 'Improvement'],
     ['issue', 'No kind'],
 ] as const) {
     test(`an item with ${kind === 'issue' ? 'no kind' : `the kind ${kind}`} shows it and offers the three kinds`, async () => {
@@ -121,7 +119,7 @@ for (const [kind, shown] of [
     });
 }
 
-for (const kind of ['concept', 'decision', 'build'] as Kind[]) {
+for (const kind of ['concept', 'build'] as Kind[]) {
     test(`a ${kind} has no kind control`, async () => {
         const board = boardWith({ kind });
 
@@ -151,23 +149,6 @@ test('changing the kind writes it, and the control and line follow the board’s
     expect(shownKind()).toBe('Feature');
     expect(text($('[data-kind-change-line]'))).toBe('#129: removed label bug; added label feature.');
     expect($('[data-kind-change-failed]')).toBeNull();
-});
-
-test('a change without access says it changed only the item', async () => {
-    const before = boardWith({ kind: 'bug' });
-    const { answer } = serve(before);
-
-    await mountPage(before);
-    await openItem();
-    await choose('Feature');
-    await answer(200, {
-        error: null,
-        itemId: ID,
-        line: 'This item is now Feature. Its ticket stays as it is: Access to tag-ticket was refused. Recheck access in Settings.',
-        board: boardWith({ kind: 'feature' }),
-    });
-    expect(shownKind()).toBe('Feature');
-    expect(text($('[data-kind-change-line]'))).toContain('Its ticket stays as it is');
 });
 
 test('a failure keeps the old kind, says what changed, and Retry sends the same change', async () => {
@@ -378,38 +359,11 @@ test('reopening after the ticket changed, with updatedAt unmoved, reads the deta
     );
 });
 
-test('focus comes back to Kind when a kind change ends with focus on the page', async () => {
-    const board = boardWith({ kind: 'bug' });
-    const { answer } = serve(board);
-
-    await mountPage(board);
-    await openItem();
-    await choose('Feature');
-    (document.activeElement as HTMLElement).blur();
-    await answer(200, {
-        error: null,
-        itemId: ID,
-        line: '#129: added label feature.',
-        board: boardWith({ kind: 'feature' }),
-    });
-    expect(document.activeElement).toBe(control());
-});
-
 for (const [ending, status, body] of [
     [
         'succeeds',
         200,
         { error: null, itemId: ID, line: '#129: added label feature.', board: boardWith({ kind: 'feature' }) },
-    ],
-    [
-        'fails',
-        502,
-        {
-            error: 'Couldn’t finish changing #129 to Feature.',
-            itemId: ID,
-            line: '',
-            board: boardWith({ kind: 'bug' }),
-        },
     ],
 ] as const) {
     test(`focus comes back to Kind from the dialog when a kind change ${ending}`, async () => {

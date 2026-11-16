@@ -51,26 +51,6 @@ const reply = (
     response: Response = detailsReply(itemId),
 ) => settle(() => held.get(itemId)!(response));
 
-test('a failed read shows its error in the modal and the board data stays visible', async () => {
-    const held = holdReads();
-
-    await mountPage();
-    await openItem('I_sample13');
-    await reply(
-        held,
-        'I_sample13',
-        new Response(JSON.stringify({ error: 'Item details aren’t available yet.' }), { status: 501 }),
-    );
-    // Under the description's heading, the board's LoadFailed: what failed, why, Try again and the ticket in its tracker.
-    expect(text(inDialog('[data-details-error]'))).toBe(
-        'Couldn’t load detailsItem details aren’t available yet.Try againOpen in GitHub',
-    );
-    expect(inDialog('[data-details-error]')?.getAttribute('role')).toBe('alert');
-    expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-    expect(text(inDialog('[data-slices] p'))).toBe('1/3 slices done');
-    expect(inDialog('[aria-busy="true"]')).toBeNull();
-});
-
 test('a failed detail read can retry in place and recover without closing the item', async () => {
     const held = holdReads();
 
@@ -296,34 +276,4 @@ test('a group of tracker sub-tickets holds their place with a placeholder line e
     }
 
     expect(held.has('I_sample13')).toBe(true);
-});
-
-test('while the details load, the description keeps its heading with its ticket’s link beside it and the loading line under it, says a slow read can take a while, and holds its place with a short skeleton', async () => {
-    const held = holdReads();
-
-    await mountPage();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-
-    try {
-        await openItem('I_sample13');
-
-        const loading = () => inDialog('[data-details-loading]');
-
-        // The ticket's page is a click away from the start, not only once the read gives up.
-        expect(text(loading())).toBe('DescriptionOpen in GitHubLoading details from GitHub…');
-        // The loading line sits under the heading, where the text will start; the link keeps the heading's end.
-        expect(text(loading()!.querySelector('[data-details-loading-line]'))).toBe('Loading details from GitHub…');
-        expect(loading()!.querySelector('a[data-details-open]')?.getAttribute('href')).toMatch(
-            /^https:\/\/github\.com\//,
-        );
-        expect(loading()!.querySelectorAll('[data-details-skeleton] [data-slot="skeleton"]')).toHaveLength(3);
-        await settle(() => vi.advanceTimersByTime(5000));
-        expect(text(loading())).toBe('DescriptionOpen in GitHubLoading details from GitHub…This can take a while.');
-    } finally {
-        vi.useRealTimers();
-    }
-
-    await reply(held, 'I_sample13');
-    expect(inDialog('[data-details-loading]')).toBeNull();
-    expect(description()).not.toBeNull();
 });

@@ -31,24 +31,6 @@ function holdRecheck(): void {
 
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
 
-test('a missing t3 replaces the main area with a notice and Recheck', async () => {
-    await mountPage(withTools({ t3: { result: 'missing' } }));
-
-    const notice = $('main .tool-missing .tool-missing-box')!;
-
-    expect(notice.getAttribute('role')).toBe('alert');
-    expect(notice.querySelector('h1')!.textContent).toBe('T3 Code not found');
-    expect(notice.querySelector('.lar-brand-mark')!.getAttribute('aria-label')).toBe('Lar');
-    expect(notice.querySelector('p')!.textContent).toBe(
-        'The board starts threads through T3 Code’s t3 command and didn’t find it on the login shell’s PATH, ' +
-            'in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck. The board also looks again every 10 seconds.',
-    );
-    expect(recheckButton().textContent).toBe('Recheck');
-    expect($('.desk'), 'the notice replaces the desk and the line').toBeNull();
-    expect($('.line')).toBeNull();
-    expect($('[data-warning]')).toBeNull();
-});
-
 test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
     await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
 

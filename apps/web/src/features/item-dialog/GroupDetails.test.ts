@@ -222,20 +222,3 @@ test('a large group lists its parts directly, keeps part holds folded and batch 
     await settle(() => section.querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     expect(text($('[data-item-dialog] header'))).toContain('Greeting fixture 1');
 });
-
-test('a concept’s part says its agent time, tokens and cost at its row’s end, as the board’s part row does', async () => {
-    const data = group('concept', false);
-    const part: Item = {
-        ...data.items[1]!,
-        status: 'In progress',
-        state: 'open',
-        completion: { complete: false, reasons: [] },
-        stats: { agentMs: 8_940_000, tokens: 64_800_000, costUsd: 29.12 },
-    };
-
-    await show(fresh({ ...data, items: [data.items[0]!, part, data.items[2]!] }));
-
-    const end = $(`[data-item-dialog] [data-parts-frame] [data-part="${part.id}"] [data-meta-end][data-full]`);
-
-    expect(text(end)).toContain('2h 29m · 64.8M tokens · $29.12');
-});

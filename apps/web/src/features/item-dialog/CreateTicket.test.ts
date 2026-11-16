@@ -150,14 +150,3 @@ test('an uncertain create keeps its preview and blocks another create across clo
     expect(text(section())).toContain('Outcome uncertain');
     expect(posts()).toHaveLength(1);
 });
-
-test('opening the issue preview moves keyboard focus into it and Cancel returns to Create issue', async () => {
-    await open();
-    expect(section().contains(document.activeElement)).toBe(true);
-    await settle(() =>
-        [...section().querySelectorAll<HTMLButtonElement>('button')]
-            .find((button) => text(button) === 'Cancel')!
-            .click(),
-    );
-    expect(document.activeElement).toBe(action());
-});

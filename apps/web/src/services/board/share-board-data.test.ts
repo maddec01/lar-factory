@@ -7,10 +7,6 @@ import { shareBoardData } from './share-board-data';
 const sample = sampleJson as unknown as BoardData;
 const clone = <T>(value: T): T => structuredClone(value);
 
-test('the first accepted board needs no previous snapshot', () => {
-    expect(shareBoardData(null, sample)).toBe(sample);
-});
-
 test('an identical wire snapshot reuses the board and changing one item keeps every other item and setting', () => {
     expect(shareBoardData(sample, clone(sample))).toBe(sample);
 

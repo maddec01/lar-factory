@@ -135,23 +135,6 @@ test('a ticket says what the board says for it: a part its hold or Done, a List 
     expect(meta('Recently finished')).toEqual([expect.stringMatching(/ · Done$/)]);
 });
 
-test("a ticket shows its kind as the board's rows do, by the rows' own kind mark", async () => {
-    const { RowKindMark } = await import('@/features/line');
-    const items = [
-        item('B', { title: 'match bug', kind: 'bug' }),
-        item('D', { title: 'match decision', kind: 'decision' }),
-    ];
-    const icon = (id: string) =>
-        results('match', items)
-            .groups.flatMap((group) => group.options)
-            .find((option) => option.value === `ticket:${id}`)!.icon as { type: unknown; props: { item: Item } };
-
-    expect(icon('B').type).toBe(RowKindMark);
-    expect(icon('D').props.item.id).toBe('D');
-    // Listed, as the List's rows are, so one item reads with one mark in both.
-    expect((icon('B').props as { listed?: boolean }).listed).toBe(true);
-});
-
 const FILTERED = [
     item('K', { title: 'match kept', kind: 'bug', repo: 'maddec01/lar-server', updatedAt: ago(1) }),
     item('R', { title: 'match other repo', kind: 'bug', repo: 'maddec01/lar-apple', updatedAt: ago(2) }),

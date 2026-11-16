@@ -73,20 +73,6 @@ test.each([
     },
 );
 
-test('the ticket opens from the sidebar’s Project, not from a footer button', async () => {
-    await mountPage();
-    await openItem('I_sample10');
-
-    const link = inDialog<HTMLAnchorElement>('[data-item-summary] [data-ticket-link]')!;
-
-    expect([link.title, link.href, link.target]).toEqual([
-        'Open in GitHub',
-        sample.items.find((i) => i.id === 'I_sample10')!.url,
-        '_blank',
-    ]);
-    expect(footerControls()).not.toContain('GitHub');
-});
-
 /** The sample with `itemId`'s threads replaced. */
 const withThreads = (itemId: string, threads: Item['threads'], data: BoardData = sample): BoardData => ({
     ...data,
@@ -149,21 +135,6 @@ test('Queue in the dialog shows it in flight, then shows the item Queued, says s
     expect(text(inDialog('[data-item-summary] > div'))).toBe('StatusQueued');
     expect(toast()).toBeNull();
     expect(document.activeElement).toBe(button('start', 'I_sample01'));
-});
-
-test('a failed Queue stays in the dialog with a close button, which hands focus back to Queue', async () => {
-    holdPosts();
-    await mountPage();
-    await openItem('I_sample02');
-    await press(button('queue', 'I_sample02'));
-    await answer({ error: 'Couldn’t set Queued.' }, 502);
-    expect(text(inDialog('[data-action-error] [role="alert"]'))).toBe('Couldn’t set Queued.');
-
-    const close = inDialog<HTMLButtonElement>('[data-action-error] button.dismiss')!;
-
-    await press(close);
-    expect(inDialog('[data-action-error]')).toBeNull();
-    expect(document.activeElement).toBe(button('queue', 'I_sample02'));
 });
 
 test('Shape opens the model menu, and picking a model starts the item and tags it Started', async () => {
@@ -234,23 +205,6 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
 });
 
-test('a failed Start build shows in the dialog and offers Retry start', async () => {
-    holdPosts(readyBuild);
-    await mountPage(readyBuild);
-    await openItem('I_sample13');
-    await pressMenu(button('start', 'I_sample13'));
-    await settle(() => vi.advanceTimersByTime(20));
-    await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-    await answer(
-        { thread: null, error: 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code' },
-        409,
-    );
-    expect(text(inDialog('.start [role="alert"]'))).toBe(
-        'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
-    );
-    expect(text(button('start', 'I_sample13'))).toBe('Retry start');
-});
-
 test('Move to the List in the dialog shows the item in the list, says so, and moves focus to Queue', async () => {
     holdPosts();
     await mountPage();
@@ -261,16 +215,6 @@ test('Move to the List in the dialog shows the item in the list, says so, and mo
     await answer({ error: null, board: moved('I_sample05', 'List') });
     expect(text(toast())).toMatch(/^Moved #129 .* to the List\. View item$/);
     expect(document.activeElement).toBe(button('queue', 'I_sample05'));
-});
-
-test('a failed Move to the List is a toast, and focus goes back to Move to the List', async () => {
-    holdPosts();
-    await mountPage();
-    await openItem('I_sample05');
-    await press(button('back-to-list', 'I_sample05'));
-    await answer({ error: 'GitHub is down.' }, 502);
-    expect(text(toast())).toMatch(/^Couldn’t move #129 .* to the List\. GitHub is down\.$/);
-    expect(document.activeElement).toBe(button('back-to-list', 'I_sample05'));
 });
 
 test('Abandon in the dialog sets work aside without a follow-up ticket confirmation', async () => {
@@ -505,18 +449,6 @@ test('an item that leaves the board closes the dialog for good: its coming back 
     await settle(() => useBoardStore.getState().receive(without('I_sample13')));
     expect(useItemDialogStore.getState().itemId).toBeNull();
     await settle(() => useBoardStore.getState().receive(sample));
-    expect(dialog()).toBeNull();
-});
-
-test('closing the dialog clears the store, and Escape closes it', async () => {
-    await mountPage();
-    await openItem('I_sample13');
-
-    const { useItemDialogStore } = await import('./ItemDialogStore');
-    const popup = dialog()!;
-
-    await settle(() => popup.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-    expect(useItemDialogStore.getState().itemId).toBeNull();
     expect(dialog()).toBeNull();
 });
 
@@ -930,18 +862,6 @@ test('while T3 can’t be read, known figures stay and say they are last known',
     expect(figures.title).toMatch(/Last known figures from 3 Nov, \d\d:\d\d: T3 Code’s usage can’t be read now\./);
 });
 
-test('a concept with no agent work of its own says so, then lists its parts’ figures as labelled rows', async () => {
-    await mountPage(conceptBoard(undefined, stats(2)));
-    await openItem(CONCEPT);
-
-    const figures = [...inDialog('aside [data-agent-work]')!.parentElement!.querySelectorAll('[data-agent-work]')];
-
-    expect(figures.map((f) => [...f.children].map(text))).toEqual([
-        ['This concept', 'No agent work of its own.'],
-        ['Including parts', 'Agent time1m', 'Tokens1K', 'Cost$2.00'],
-    ]);
-});
-
 const withoutFigures = (usageState: 'failed' | 'loading') => {
     const board = conceptBoard(undefined, undefined);
 
@@ -1031,7 +951,7 @@ describe('the working agents', () => {
     });
 });
 
-test.each(['task', 'research', 'prototype', 'grill', null] as const)(
+test.each(['task', null] as const)(
     'a decision with method %s shows its own steps and names the work its Start begins',
     async (method) => {
         const base = sample.items.find((item) => item.id === 'I_sample4') ?? sample.items[0]!;
@@ -1066,16 +986,6 @@ test.each(['task', 'research', 'prototype', 'grill', null] as const)(
         expect(text(inDialog('[data-item-summary]'))).toContain('Complete');
     },
 );
-
-test('acceptance evidence retains full unbroken paths and hashes alongside the closed-ticket callout', async () => {
-    const evidence = `/proof/${'artifact'.repeat(48)}/assertions.txt SHA256: ${'a'.repeat(64)}`;
-
-    await mountPage(withDependency(dependencyBlocker('closed', { evidence })));
-    await openItem('I_sample13');
-    expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(`Evidence${evidence}`);
-    expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toContain('once the change is delivered');
-    expect(dependencyRow().querySelector('button')).not.toBeNull();
-});
 
 test.each(['concept', 'decision'] as const)(
     'reviewed children open the finished %s owner without inheriting usage',

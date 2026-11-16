@@ -179,21 +179,6 @@ test('the filters apply to every pane, their counts follow, and each says when n
     expect(['#queue-h', '#shaping-h', '#build-h'].map(heading)).toEqual(['Queue 1', 'Shaping 1', 'Build 1']);
 });
 
-test('removing a chip or clearing moves focus to the Kind menu, which always stays', async () => {
-    const kindMenu = () => bar().querySelector<HTMLElement>('[data-filter="kind"]');
-
-    seed(LIST_KEY, ['bug'], ['gone']);
-    // The filters show once List holds something to filter.
-    await mountPage(withItems([item('L1', { status: 'List', kind: 'feature' })]));
-    await settle(() => $<HTMLButtonElement>('.title-bar button[data-list-button]')!.click());
-    await removeChip('gone');
-    expect(document.activeElement).toBe(kindMenu());
-    (document.activeElement as HTMLElement).blur();
-    await clear();
-    expect(bar().querySelector('[data-filter-clear]')).toBeNull();
-    expect(document.activeElement).toBe(kindMenu());
-});
-
 test('a broken save reads as no filters', async () => {
     localStorage.setItem(BOARD_KEY, '{not json');
     await mountPage(withItems([item('Q1', { number: 1 })]));

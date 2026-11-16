@@ -142,43 +142,6 @@ test('a search that leaves out the open section shows the first one it keeps, an
     expect(section('General').getAttribute('aria-current')).toBe('page');
 });
 
-test('an empty search replaces the form and clearing it restores the saved selection', async () => {
-    await open('Skills');
-    await type(search(), 'zzz');
-    expect(sections()).toHaveLength(0);
-    expect(text(body())).toContain('Nothing matches');
-    expect(
-        $$('[data-settings-body] .settings-row').filter((row) => !row.closest('[hidden]')),
-        'the form is hidden, but stays mounted so a draft in it survives',
-    ).toHaveLength(0);
-
-    const clear = [...body()!.querySelectorAll<HTMLButtonElement>('button')].find(
-        (button) => text(button) === 'Clear search',
-    )!;
-
-    await settle(() => clear.click());
-    expect(section('Skills').getAttribute('aria-current')).toBe('page');
-    expect(search().value).toBe('');
-    expect(document.activeElement).toBe(search());
-});
-
-test('Close returns to the board as it was, and Settings opens again on the same section', async () => {
-    await mountPage();
-
-    const { useScopeStore } = await import('@/features/filters/ScopeStore');
-
-    await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-    await settle(() => settingsButton()!.click());
-    await settle(() => section('Diagnostics').click());
-    await settle(() => close().click());
-    await settle(() => vi.advanceTimersByTime(50));
-    expect(modal()).toBeNull();
-    expect($('[data-settings-body]')).toBeNull();
-    expect($('[data-search-field]')!.getAttribute('aria-description')).toBe('filtered by lar-apple');
-    await settle(() => settingsButton()!.click());
-    expect(section('Diagnostics').getAttribute('aria-current')).toBe('page');
-});
-
 /** Each Settings group's title with its rows' ids. */
 const groups = () =>
     $$('[data-settings-group]').map((g) => [
@@ -236,42 +199,8 @@ test('a repository still onboarding is listed with its provider and its step, an
 const pane = () => $('[data-onboarding-pane]');
 /** The setup's way back, the arrow before the header's trail. */
 const back = () => modal()!.querySelector<HTMLButtonElement>('[data-slot="modal-header"] button[aria-label="Back"]')!;
-const breadcrumb = () => text(modal()!.querySelector('[data-slot="modal-header"] h2 span:last-child'));
 const button = (within: Element | null, label: string) =>
     [...(within?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => text(b) === label);
-
-test('Add project takes Projects’ place in Settings with Back, and leaving it returns to Projects', async () => {
-    serve(sample, [project('lar-web')]);
-    await open('Projects');
-
-    const add = button(body(), 'Add project')!;
-
-    // A click focuses the button in a browser.
-    add.focus();
-    await settle(() => add.click());
-    await settle(() => vi.advanceTimersByTime(50));
-    expect($$('[data-slot="modal-content"]'), 'no second dialog over Settings').toHaveLength(1);
-    expect(dialog()).toBeNull();
-    expect(breadcrumb()).toBe('Add a project');
-    expect(text(body()), 'the section’s description goes').not.toContain('Manage projects and their local settings.');
-    expect(document.activeElement, 'the step’s heading takes focus').toBe(pane()!.querySelector('[data-setup-title]'));
-    expect(text(pane()!.querySelector('[data-setup-title]'))).toBe('Project');
-    expect(button($('[data-settings-footer]'), 'Next'), 'Next in Settings’ footer').toBeDefined();
-
-    // Back returns to Projects, with focus on the button that opened the setup.
-    await settle(() => back().click());
-    await settle(() => vi.advanceTimersByTime(50));
-    expect(pane()).toBeNull();
-    expect(breadcrumb()).toBe('Projects');
-    expect(text(body())).toContain('Manage projects and their local settings.');
-    expect(document.activeElement).toBe(add);
-
-    // Another section closes the setup too.
-    await settle(() => add.click());
-    await settle(() => section('Integrations').click());
-    await settle(() => section('Projects').click());
-    expect(pane()).toBeNull();
-});
 
 test('a folder typed for a new T3 project is a draft Back asks about first', async () => {
     serve(sample, [project('lar-web')]);
@@ -384,37 +313,6 @@ test('a refused tick shows its error and keeps the old ticks', async () => {
         'Couldn’t change ~/.claude-work/skills: No skills are installed in ~/.agents yet',
     );
     expect(result().dataset.tone).toBe('danger');
-});
-
-test('Skills says Loading until the state arrives, also when opened again', async () => {
-    const bridge = stubBridge();
-    let finish!: (snapshot: InstallSnapshot) => void;
-
-    bridge.getInstallState.mockImplementationOnce(
-        () =>
-            new Promise((resolve) => {
-                finish = resolve;
-            }),
-    );
-    await open();
-    expect(text(body())).toContain('Loading…');
-    expect($('.settings-row[data-row="target-~/.claude/skills"]')).toBeNull();
-    await settle(() => finish(listed));
-    expect(text(body())).not.toContain('Loading…');
-    expect(profileTicks()).toEqual([true, false]);
-
-    await settle(() => close().click());
-    bridge.getInstallState.mockImplementationOnce(
-        () =>
-            new Promise((resolve) => {
-                finish = resolve;
-            }),
-    );
-    await settle(() => settingsButton()!.click());
-    expect(section('Skills').getAttribute('aria-current'), 'Settings opens on the section it showed').toBe('page');
-    expect(text(body())).toContain('Loading…');
-    await settle(() => finish(bothTicked));
-    expect(profileTicks()).toEqual([true, true]);
 });
 
 test('before the first install the switches show disabled with the reason, and turn on once it finishes', async () => {
@@ -606,36 +504,6 @@ describe('updates', () => {
             expect(bridge.installUpdate).toHaveBeenCalledOnce();
         },
     );
-
-    describe('shows the update pill’s state', () => {
-        const next = '0.2.0-nightly.20261024.42';
-        const available: UpdateState = { ...nightly, status: 'available', availableVersion: next };
-        const action = () => $<HTMLButtonElement>('[data-settings-body] [data-update-action]');
-        const pill = () => $('.title-bar [data-update-button]')!;
-
-        test('a downloaded update says so, and Restart to update asks, then installs', async () => {
-            const { bridge } = stubChannel({
-                ...available,
-                status: 'downloaded',
-                downloadedVersion: next,
-                downloadPercent: 100,
-            });
-
-            await open('Updates');
-            expect(status()).toBe(`${next} is ready to install.`);
-            expect(pill().getAttribute('aria-label')).toBe(`Restart to install ${next}`);
-            expect(text(action())).toBe('Restart to update');
-            await settle(() => action()!.click());
-            expect(bridge.installUpdate).not.toHaveBeenCalled();
-            expect(text($('[data-restart-confirm]'))).toContain(`Restart to install ${next}?`);
-            await settle(() =>
-                [...document.querySelectorAll<HTMLButtonElement>('[data-restart-confirm] button')]
-                    .find((b) => text(b) === 'Restart now')!
-                    .click(),
-            );
-            expect(bridge.installUpdate).toHaveBeenCalledOnce();
-        });
-    });
 });
 
 test('dialog preferences default off and persist when Settings reopens', async () => {

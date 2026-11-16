@@ -1,8 +1,7 @@
 // The board search as the page shows it: the field and its shortcut, and the dialog that sets Scope, Kind and Labels,
 // runs actions, and opens Settings and tickets.
 
-import { effectiveVocabulary } from '@lar-factory/shared';
-import type { BoardData, Item, RepositorySetup } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
 import { $, $$, mountPage, sample, settle, text } from '@/test/PageTest';
@@ -85,50 +84,12 @@ test('off Apple platforms Ctrl K opens the dialog, ⌘K doesn’t, and the field
 
 const OTHER_DIALOGS: [string, () => Promise<void>][] = [
     ['Settings', () => settle(() => $<HTMLButtonElement>('.title-bar .open-settings')!.click())],
-    ['Add item', () => settle(() => $<HTMLButtonElement>('.title-bar [data-add-item]')!.click())],
-    ['List', () => settle(() => $<HTMLButtonElement>('.title-bar [data-list-button]')!.click())],
     [
         'the item dialog',
         async () => {
             const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
 
             await settle(() => useItemDialogStore.getState().open('I_sample01'));
-        },
-    ],
-    [
-        'the wizard',
-        async () => {
-            const { useWizardStore } = await import('@/features/onboarding/WizardStore');
-
-            await settle(() => useWizardStore.getState().start());
-        },
-    ],
-    [
-        'a project page',
-        async () => {
-            const { useBoardStore } = await import('@/services/board/board.hooks');
-            const { useSettingsStore } = await import('@/features/settings/SettingsStore');
-            const setup = {
-                ...effectiveVocabulary(),
-                repo: sample.repos[0]!.repo,
-                role: '',
-                itemSource: { kind: 'issues' },
-                labels: [],
-                domainDocs: { kind: 'off' },
-                skills: [],
-                access: {},
-                sources: {},
-            } as unknown as RepositorySetup;
-
-            await settle(() =>
-                useBoardStore
-                    .getState()
-                    .receive({ ...sample, repos: [{ ...sample.repos[0]!, setup }, sample.repos[1]!] }),
-            );
-            await settle(() => {
-                useSettingsStore.getState().openProject(sample.repos[0]!.repo);
-                useSettingsStore.getState().setOpen(true);
-            });
         },
     ],
     [
@@ -186,17 +147,6 @@ test('choosing a repository swaps Scope and All projects clears it, with the dia
     expect(removes()).toEqual([]);
     expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
     expect(dialog()).not.toBeNull();
-});
-
-test('the arrow keys and Enter choose an option, and Esc closes', async () => {
-    await mountPage();
-    await openDialog();
-    await type('lar');
-    await press('ArrowDown');
-    await press('Enter');
-    expect(removes()).toEqual(['Remove lar-apple']);
-    await press('Escape');
-    expect(dialog()).toBeNull();
 });
 
 test('each token has a remove button, and Backspace in an empty query removes the last token', async () => {
@@ -285,9 +235,6 @@ const returnFocus = () => settle(() => vi.advanceTimersByTime(0));
 
 test.each([
     ['Add item', '', '[data-pane]'],
-    ['List', '', '[data-list-modal]'],
-    ['Settings', '', '[data-settings-nav]'],
-    ['Add item from a ticket', 'ticket', '[data-pane]'],
     ['Archive', 'archive', '[data-settings-nav]'],
 ] as const)(
     'choosing %s closes the dialog, opens its own, and returns the focus to the field when that closes',

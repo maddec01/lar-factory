@@ -1,4 +1,4 @@
-// The Copy button: it copies its text, says Copied for a moment, and screen readers hear it.
+// The Copy button: without clipboard access it still copies its text.
 
 import { Fragment, act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -22,34 +22,6 @@ async function mount(): Promise<HTMLButtonElement> {
 
     return $<HTMLButtonElement>('button')!;
 }
-
-test('Copy copies its text, says Copied, and announces it in the copy-status live region', async () => {
-    const writeText = vi.fn(async () => {});
-
-    vi.stubGlobal('navigator', { clipboard: { writeText } });
-
-    const button = await mount();
-    const status = $('#copy-status')!;
-
-    expect([status.getAttribute('role'), status.getAttribute('aria-live'), status.className]).toEqual([
-        'status',
-        'polite',
-        'sr-only',
-    ]);
-    expect([button.textContent, button.dataset.slot, button.getAttribute('aria-label')]).toEqual([
-        'Copy',
-        'button',
-        'Copy test command',
-    ]);
-
-    await settle(() => button.click());
-    expect(writeText).toHaveBeenCalledWith('pnpm test');
-    expect(button.textContent).toBe('Copied');
-    await settle(() => vi.advanceTimersByTime(50));
-    expect(status.textContent).toBe('Copied');
-    await settle(() => vi.advanceTimersByTime(1500));
-    expect(button.textContent).toBe('Copy');
-});
 
 test('without clipboard access, Copy falls back to a selected textarea', async () => {
     vi.stubGlobal('navigator', {

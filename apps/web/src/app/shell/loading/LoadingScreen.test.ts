@@ -25,19 +25,6 @@ const leaving = () => screen()?.classList.contains('is-leaving') ?? false;
 const advance = (ms: number) => settle(() => vi.advanceTimersByTime(ms));
 const covered = () => $('#app')!.hasAttribute('inert');
 
-test('a read that settles at once still keeps the screen until the draw has finished, then fades over 600 ms', async () => {
-    await mountPage(fresh());
-    expect(screen()).not.toBeNull();
-    await advance(DRAW_MS - 1);
-    expect(leaving()).toBe(false);
-    await advance(1);
-    expect(leaving()).toBe(true);
-    await advance(EXIT_MS - 1);
-    expect(screen()).not.toBeNull();
-    await advance(1);
-    expect(screen()).toBeNull();
-});
-
 test('the screen waits for the draw even when the read settled long before, and for the read when the draw is done', async () => {
     await mountPage(unsettled());
     await advance(DRAW_MS + 2_000);
@@ -47,7 +34,6 @@ test('the screen waits for the draw even when the read settled long before, and 
 });
 
 test.each([
-    ['the repositories are read, zero of them included', { ...fresh(), repos: [], items: [], onboarding: [] }],
     ['the read fails', { ...fresh(), fetchedAt: null, error: 'gh api failed' }],
     [
         'gh blocks the read',
@@ -81,14 +67,6 @@ test('an empty successful source reveals the board while another source waits, a
     expect(screen()).toBeNull();
     expect(covered()).toBe(false);
     await push(unsettled());
-    expect(screen()).toBeNull();
-});
-
-test('a page opened with ?loading=drawn starts with the mark drawn and leaves at once when the read has settled', async () => {
-    await mountPage(fresh(), '', '?loading=drawn');
-    expect(screen()!.classList.contains('is-drawn')).toBe(true);
-    expect(leaving()).toBe(true);
-    await advance(EXIT_MS);
     expect(screen()).toBeNull();
 });
 

@@ -21,9 +21,34 @@ code {
     white-space: nowrap;
 }
 
-/* The design system's Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so
-   its title shows. */
-button:disabled[title] {
+/* One cursor rule for the whole board: whatever does something on a click shows the pointer, a row, a card, a title, a
+   button, a link, a menu's entry or a tab alike, whichever component draws it; a control that can't be used now shows
+   not-allowed, and one at work keeps its progress cursor. The design system's Button, ninna-ui's, takes no pointer
+   events while disabled, which would show the row's pointer under it, so a disabled control keeps them here; a click
+   on it does nothing, and a row or card ignores clicks on its buttons. */
+:is(
+        button,
+        a[href],
+        summary,
+        select,
+        [role='button'],
+        [role='link'],
+        [role='menuitem'],
+        [role='menuitemcheckbox'],
+        [role='menuitemradio'],
+        [role='option'],
+        [role='tab'],
+        [role='switch'],
+        [role='checkbox'],
+        [role='radio']
+    ):not(:disabled, [aria-disabled='true'], [aria-busy='true'], [data-disabled]) {
+    cursor: pointer;
+}
+:is(button, [role='button'], [role='menuitem'], [role='option'], [role='tab']):is(
+        :disabled,
+        [aria-disabled='true'],
+        [data-disabled]
+    ):not([aria-busy='true']) {
     pointer-events: auto;
     cursor: not-allowed;
 }

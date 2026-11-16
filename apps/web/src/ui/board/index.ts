@@ -30,7 +30,8 @@ export {
     CounterPartial,
 } from './Counters';
 export { noteBoardPlaces } from './BoardLife';
-export { bringDeskIntoView, DeskCard, DeskHint, DeskSection, DeskPrProgress } from './Desk';
+export { bringDeskIntoView, DeskCard, DeskHint, DeskSection } from './Desk';
+export { BoardCard } from './BoardCard';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListResults, ListRowGrid } from './List';
 export { LoadingScreen } from './LoadingScreen';
@@ -109,7 +110,7 @@ export { EarlierThread, EarlierThreadList } from './Threads';
 export {
     HistoryRow,
     MAP_NODE_HEIGHT,
-    measureMapCards,
+    MAP_NODE_WIDTH,
     MapBand,
     MapCanvas,
     MapCheckNode,
@@ -119,7 +120,6 @@ export {
     MapHistoryList,
     MapLaneName,
     MapNode,
-    MapPartNode,
     MapPrerequisiteNode,
     WorkMapFrame,
 } from './WorkMap';
@@ -225,8 +225,7 @@ export { GroupUpkeep } from './GroupUpkeep';
 export { MapStack, MapStackItem } from './CompactWorkMap';
 export { workHoldReason } from './work-hold-reason';
 
-export { StartAfterButton } from './StartAfterButton';
-export { ApprovalWait } from './ApprovalWait';
+export { OneLineAction, StartAfterButton } from './StartAfterButton';
 export { BriefChanges } from './BriefChanges';
 export { BriefApprovalDetails } from './BriefApprovalDetails';
 
@@ -235,6 +234,6 @@ export { BriefDependencyStatus } from './BriefDependencyStatus';
 
 export { DeskDependencyProof } from './DeskDependencyProof';
 export { TrackerLink } from './TrackerLink';
-export { CardChecks, ChecksBar } from './Checks';
+export { CardChecks, ChecksBar, type CardCheckState } from './Checks';
 export { HeaderEmpty, LoadFailed, NoMatches } from './States';
 export { MetaLine, Moment } from './TextParts';

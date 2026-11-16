@@ -20,7 +20,7 @@ export function RepoCell({ item, home = false }: { item: Item; home?: boolean })
         <RepoIdentity
             data-repo-cell
             data-repo-home={home || undefined}
-            icon={<ProjectIcon repo={repoKey(item)} size="sm" />}
+            icon={<ProjectIcon repo={repoKey(item)} size="md" />}
             name={itemRepoNames(item, repos)}
         />
     );

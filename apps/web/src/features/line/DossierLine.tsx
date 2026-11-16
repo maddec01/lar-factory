@@ -19,9 +19,6 @@ import { stageOf } from './StageStatus';
 import {
     Age,
     ConceptBuild,
-    AzureFields,
-    hasFigures,
-    usageLoading,
     ItemTitle,
     shownStatus,
     useShownStatus,
@@ -32,18 +29,15 @@ import { useBoardStore } from '@/services/board/board.hooks';
 import {
     boardColor,
     DossierChips,
-    DossierFields,
     DossierLine as Line,
     DossierNext,
     DossierNote,
     DossierParentContext,
     DossierStates,
-    DossierRepos,
     DossierTitle,
     DossierTitleCell,
     DossierTools,
     PartsBar as DesignPartsBar,
-    QueueAge,
     RowCells,
     RowCount,
     RowFirst,
@@ -151,59 +145,52 @@ export function DossierLine({
                 <RowCells>
                     {lead}
                     <DossierTitleCell>
+                        {/* Source and project, then kind and title, as on a lane row. */}
+                        <RowSource item={parent} always others={repos} />
                         <RowKindMark item={parent} />
                         <DossierTitle name={parent.title} onOpen={() => open(parent)}>
                             <ItemTitle item={parent} />
                         </DossierTitle>
-                        <DossierFields>
-                            <AzureFields azure={parent.azure} />
-                        </DossierFields>
                         <DossierNote>{note}</DossierNote>
+                        {/* Its most important chip reads on the title's line; what waits on you is the row's next step. */}
+                        {n.tone !== 'you' && (
+                            // The title keeps its room; the chip gives way first and ends in an ellipsis.
+                            <span className="flex max-w-[40%] min-w-0 shrink-[100] items-center overflow-hidden [&_*]:truncate">
+                                <Chips chips={chips.slice(0, 1)} />
+                            </span>
+                        )}
                     </DossierTitleCell>
-                    <RowSource item={parent} />
-                    {/* The other projects follow the concept's own, as a lane row names its project after its title. */}
-                    {/* Its most important chip reads on the title's line, so the row's end keeps one fact (the
-                        cost) and nothing is folded into a tooltip alone; what waits on you is the row's next step. */}
-                    <DossierRepos chip={n.tone !== 'you' && <Chips chips={chips.slice(0, 1)} />}>{repos}</DossierRepos>
                 </RowCells>
                 <RowMeta>
+                    {/* What is going on, in one column: what its thread does, else what it belongs to, else its next
+                        step, else a held run, else its state. */}
                     {acts ? (
                         <ActivityLine item={parent} />
                     ) : parentContext ? (
                         <DossierParentContext>{parentContext}</DossierParentContext>
+                    ) : n.tone !== 'none' ? (
+                        <Next n={n} parent={parent} />
+                    ) : runHeld ? (
+                        <span title="Concept builds are held. Open the concept to see why.">Build all held</span>
                     ) : (
-                        n.tone !== 'none' && <Next n={n} parent={parent} />
+                        <DossierStates>
+                            <DossierState item={parent} />
+                        </DossierStates>
                     )}
                     {(m.count > 0 || !hasParent || parent.kind === 'concept') && (
                         <RowProgress
                             bar={m.count > 0 && <PartsBar m={m} />}
                             count={
                                 <RowCount title={m.count ? `${m.done}/${m.count} parts done` : undefined}>
-                                    {m.count ? `${m.done}/${m.count} parts done` : 'No parts yet'}
+                                    {m.count ? `${m.done}/${m.count} parts` : 'No parts yet'}
                                 </RowCount>
                             }
                         />
                     )}
-                    <RowMetaEnd>
-                        <DossierStates>
-                            {!acts && <DossierState item={parent} />}
-                            {/* A held run with nothing starting or moving says so on the collapsed row, quietly; while a
-                                part can start or moves, the row's Next says that instead. The expanded concept says why. */}
-                            {runHeld && n.tone === 'none' && (
-                                <span title="Concept builds are held. Open the concept to see why.">
-                                    Build all held
-                                </span>
-                            )}
-                            {/* The end holds the cost (or the age); the first chip reads on the title's line. */}
-                            <Figures s={figures} item={parent} total />
-                            {/* With nothing else at its end, a row says how long since it moved, as a lane row does. */}
-                            {!(figures && hasFigures(figures)) && !usageLoading(parent, data) && (
-                                <QueueAge>
-                                    <Age at={parent.updatedAt} />
-                                </QueueAge>
-                            )}
-                        </DossierStates>
-                    </RowMetaEnd>
+                    <RowMetaEnd
+                        cost={<Figures s={figures} item={parent} total />}
+                        age={<Age at={parent.updatedAt} />}
+                    />
                 </RowMeta>
                 {/* A click beside the controls toggles the row, as anywhere else on it. */}
                 <RowSide passEmpty>

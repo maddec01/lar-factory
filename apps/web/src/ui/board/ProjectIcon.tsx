@@ -1,6 +1,7 @@
-// A project's icon, in a fixed square, in the project's hue on the design system's categorical palette. An emoji or
-// monogram chosen in T3 takes the square. Otherwise it holds the tinted initial, with the favicon or lucide icon laid
-// over it once that has loaded, so the square keeps its size either way and a missing or broken one leaves the initial.
+// A project's icon, in a fixed square. An emoji or monogram chosen in T3 takes the square. Otherwise it holds T3's
+// monogram of the project's name (two characters in the name's colour, as T3 draws a project with no icon), with the
+// favicon or lucide icon laid over it once that has loaded, so the square keeps its size either way and a missing or
+// broken one leaves the monogram.
 // Decorative, as a name sits beside it. An SVG favicon only ever renders through this <img>, which runs none of its
 // scripts.
 
@@ -42,14 +43,15 @@ export type ProjectIconSource =
 /** The palette's hues in the order the repositories take them (by their place in the board's list). */
 const PLACE_HUES = Object.keys(categoricalHues) as CategoricalHue[];
 
-/** The square and its type on the board's icon scale: `sm` 14px (a chip's), `md` 16px (a row's, a list of projects'
- *  and a navigation pane's) and `lg` 20px. Its corners round in step with its size, so a small tile stays a square.
- *  Its initial or monogram is 12px (the meta size), so a small square shows one character and only `lg` two; an emoji
- *  fills about as much of its square as a lucide icon's strokes do, so a row's icons line up. */
+/** The square and its type on the board's icon scale: `sm` 14px (a chip's), `md` 16px (a row's, a card's, a list of
+ *  projects' and a navigation pane's, as T3 draws a project beside its name) and `lg` 20px. Its corners round at 25%,
+ *  as T3's do.
+ *  A monogram is T3's two-character tile, scaled to the square; an emoji fills about as much of its square as a lucide
+ *  icon's strokes do, so a row's icons line up. */
 const SIZES = {
-    sm: { square: 'size-3.5 rounded-sm text-xs', emoji: 'text-xs', graphemes: 1 },
-    md: { square: 'size-4 rounded-sm text-xs', emoji: 'text-sm', graphemes: 1 },
-    lg: { square: 'size-5 rounded-md text-xs', emoji: 'text-base', graphemes: 2 },
+    sm: { square: 'size-3.5 rounded-[25%] text-xs', emoji: 'text-xs' },
+    md: { square: 'size-4 rounded-[25%] text-xs', emoji: 'text-sm' },
+    lg: { square: 'size-5 rounded-[25%] text-xs', emoji: 'text-base' },
 };
 
 export type ProjectIconSize = keyof typeof SIZES;
@@ -87,7 +89,7 @@ const T3_HUES: Record<ProjectIconColor, CategoricalHue | null> = {
     rose: 'rose',
 };
 
-const OVERLAY = 'absolute inset-0 size-full bg-surface-raised';
+const OVERLAY = 'absolute inset-0 size-full';
 
 /** lucide's name map and its icons are lazy chunks, loaded when first shown. DynamicIcon draws nothing for a name
  *  lucide lacks or an icon that won't load, and a name map that won't load draws nothing here. */
@@ -98,39 +100,12 @@ const LucideIcon = lazy<ComponentType<ComponentProps<typeof DynamicIcon>>>(() =>
     ),
 );
 
-/** The share of clear pixels past which an image is a glyph on a clear ground rather than a tile of its own: a rounded
- *  tile's corners leave about 3% clear, lar-platform's L about 17%. */
-const CLEAR_GROUND = 0.1;
-
-/** Whether an image is drawn on a clear ground: a glyph such as lar-platform's, whose strokes run to its edges, rather
- *  than a tile of its own, read from a 32px copy of it. Unreadable reads as a tile. */
-function clearGround(image: HTMLImageElement): boolean {
-    try {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-
-        canvas.width = 32;
-        canvas.height = 32;
-
-        if (!context) return false;
-
-        context.drawImage(image, 0, 0, 32, 32);
-
-        const pixels = context.getImageData(0, 0, 32, 32).data;
-        let clear = 0;
-
-        for (let alpha = 3; alpha < pixels.length; alpha += 4) if (pixels[alpha]! < 32) clear++;
-
-        return clear / (32 * 32) > CLEAR_GROUND;
-    } catch {
-        return false;
-    }
-}
-
+/** A project's image as T3 draws it (apps/web/src/components/ProjectFavicon.tsx): the whole image scaled into the
+ *  square, with its 25% corners, on nothing of its own; hidden until it has loaded, and gone if it fails. The square
+ *  adds a hairline at its edge over it (ProjectIcon). */
 function Favicon({ src }: { src: string }) {
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState(false);
-    const [inset, setInset] = useState(false);
 
     if (failed) return null;
 
@@ -139,15 +114,9 @@ function Favicon({ src }: { src: string }) {
             src={src}
             alt=""
             hidden={!loaded}
-            onLoad={(event) => {
-                setInset(clearGround(event.currentTarget));
-                setLoaded(true);
-            }}
+            onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
-            // On the ink tile every image shares, in place of the overlay's raised surface. An image with its own
-            // tile fills the square; a glyph on a clear ground sits inset on the ink, so the square's rounded corners
-            // never cut its strokes.
-            className={`bg-board-icon-tile absolute inset-0 size-full object-contain${inset ? ' p-[15%]' : ''}${loaded ? '' : ' hidden'}`}
+            className={`absolute inset-0 size-full rounded-[25%] object-contain${loaded ? '' : ' hidden'}`}
         />
     );
 }
@@ -165,6 +134,90 @@ const firstGraphemes = (text: string, count: number) => {
 
     return shown;
 };
+
+/** T3's project colours as T3 draws them (apps/web/src/projectIconColors.ts in T3 Code), in its order, which its
+ *  name hash indexes, so a project gets the same colour here as in T3. Whole class names, as Tailwind only finds those. */
+const T3_COLORS: readonly [ProjectIconColor, string][] = [
+    ['gray', 'text-gray-600 dark:text-gray-400'],
+    ['red', 'text-red-600 dark:text-red-400'],
+    ['orange', 'text-orange-600 dark:text-orange-400'],
+    ['amber', 'text-amber-600 dark:text-amber-400'],
+    ['yellow', 'text-yellow-600 dark:text-yellow-400'],
+    ['lime', 'text-lime-600 dark:text-lime-400'],
+    ['green', 'text-green-600 dark:text-green-400'],
+    ['emerald', 'text-emerald-600 dark:text-emerald-400'],
+    ['teal', 'text-teal-600 dark:text-teal-400'],
+    ['cyan', 'text-cyan-600 dark:text-cyan-400'],
+    ['sky', 'text-sky-600 dark:text-sky-400'],
+    ['blue', 'text-blue-600 dark:text-blue-400'],
+    ['indigo', 'text-indigo-600 dark:text-indigo-400'],
+    ['violet', 'text-violet-600 dark:text-violet-400'],
+    ['purple', 'text-purple-600 dark:text-purple-400'],
+    ['fuchsia', 'text-fuchsia-600 dark:text-fuchsia-400'],
+    ['pink', 'text-pink-600 dark:text-pink-400'],
+    ['rose', 'text-rose-600 dark:text-rose-400'],
+];
+const T3_COLOR_CLASS = Object.fromEntries(T3_COLORS) as Record<ProjectIconColor, string>;
+
+const normalizedName = (name: string) => name.normalize('NFKC').trim();
+
+/** A project's two-character monogram as T3 derives it (apps/web/src/projectIdentity.ts): the first word's first
+ *  character, then the first digit after it, else the last word's first character, else the first word's last. */
+function projectMonogram(name: string): string {
+    const words = normalizedName(name).match(/[\p{L}\p{N}]+/gu) ?? [];
+    const firstWord = words[0];
+
+    if (!firstWord) return 'PR';
+
+    const glyphs = Array.from(firstWord);
+    const first = glyphs[0] ?? 'P';
+    const second =
+        glyphs.slice(1).find((glyph) => /\p{N}/u.test(glyph)) ??
+        (words.length > 1 ? Array.from(words.at(-1) ?? '')[0] : glyphs.at(-1)) ??
+        first;
+
+    return Array.from(`${first}${second}`.toUpperCase()).slice(0, 2).join('');
+}
+
+/** A project's colour as T3 derives it from its name, so it matches T3's. */
+function projectColor(name: string): ProjectIconColor {
+    const seed = normalizedName(name).toLocaleLowerCase('en-US') || 'project';
+    let index = 0;
+
+    for (const glyph of seed) index = (index * 31 + (glyph.codePointAt(0) ?? 0)) % T3_COLORS.length;
+
+    return T3_COLORS[index]?.[0] ?? 'blue';
+}
+
+const monogramSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/** T3's monogram tile (apps/web/src/components/ProjectMonogram.tsx): the text in bold monospace, stretched to one
+ *  width, in the colour on a 14% tint of it, in a square with 25% corners that fills its parent. */
+function Monogram({ text, color }: { text: string; color: ProjectIconColor }) {
+    return (
+        <svg
+            viewBox="0 0 16 16"
+            data-monogram
+            className={`absolute inset-0 size-full overflow-hidden rounded-[25%] font-mono select-none ${T3_COLOR_CLASS[color]}`}
+            style={{ backgroundColor: 'color-mix(in srgb, currentColor 14%, transparent)' }}
+        >
+            <text
+                x="8"
+                y="10.8"
+                textAnchor="middle"
+                fill="currentColor"
+                className="font-mono"
+                fontSize="8.25"
+                fontWeight="700"
+                textLength={Array.from(monogramSegmenter.segment(text)).length === 1 ? 6 : 12}
+                lengthAdjust="spacingAndGlyphs"
+                textRendering="geometricPrecision"
+            >
+                {text}
+            </text>
+        </svg>
+    );
+}
 
 /**
  * A project's icon in a square of its `size`: `icon`, or its `name`'s initial in the categorical hue of its `place` among
@@ -187,7 +240,7 @@ export function ProjectIcon({
     /** The square's size on the board's icon scale: `sm` 14px, `md` 16px (a row's, a project list's) or `lg` 20px. */
     size: ProjectIconSize;
 } & DataAttributes) {
-    const { square, emoji, graphemes: shown } = SIZES[size];
+    const { square, emoji } = SIZES[size];
     const own = place === undefined ? null : PLACE_HUES[place % PLACE_HUES.length]!;
     const hue = (color: ProjectIconColor) => T3_HUES[color] ?? own;
     const tinted = (h: CategoricalHue | null, recipe: string) => (h ? `${HUES[h]} ${recipe}` : 'text-fg-muted');
@@ -202,39 +255,29 @@ export function ProjectIcon({
 
     if (icon?.kind === 'monogram')
         return (
-            <span
-                {...data}
-                data-project-icon
-                className={`${shared} ${tinted(hue(icon.color), 'categorical-text')}`}
-                aria-hidden="true"
-            >
-                <span className="whitespace-nowrap">{firstGraphemes(icon.text, shown)}</span>
+            <span {...data} data-project-icon className={shared} aria-hidden="true">
+                <Monogram text={firstGraphemes(icon.text, 2)} color={icon.color} />
             </span>
         );
 
     return (
-        <span
-            {...data}
-            data-project-icon
-            // An image laid over the initial covers the square edge to edge, so only the initial wears the fill's edge.
-            className={`${shared} ${icon?.kind === 'lucide' || icon?.kind === 'favicon' ? '' : 'border'} ${own ? `${HUES[own]} categorical-fill` : 'bg-fill-muted text-fg-muted border-line'}`}
-            aria-hidden="true"
-        >
-            {/* The initial stands in until the icon has drawn, then hides, so no letter ghosts through its outline. */}
-            <span className="[[data-project-icon]:has(svg,img)>&]:invisible">
-                {firstGraphemes(name, 1).toUpperCase()}
+        <span {...data} data-project-icon className={shared} aria-hidden="true">
+            {/* With no icon, or until its image or icon has drawn (or if it never does), T3's monogram of the name:
+                two characters in the name's own colour, as T3 shows the same project. */}
+            <span className="absolute inset-0 [[data-project-icon]:has(img:not([hidden]),[data-lucide]_svg)>&]:invisible">
+                <Monogram text={projectMonogram(name)} color={projectColor(name)} />
             </span>
             {icon?.kind === 'favicon' && <Favicon key={icon.src} src={icon.src} />}
-            {/* Every image sits on one tile: the ink fill under it and a hairline ring over its edge, the same size and
-                shape as the other squares, so a white or clear favicon reads like the rest in either theme. */}
+            {/* A hairline at the image's own edge, so a dark tile on the dark page reads at the square's full size, as a
+                light one does, and every project's icon looks the same size. Only over a loaded image. */}
             {icon?.kind === 'favicon' && (
-                <span className="ring-line pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset [[data-project-icon]:not(:has(img:not([hidden])))>&]:hidden" />
+                <span className="ring-line pointer-events-none absolute inset-0 rounded-[25%] ring-1 ring-inset [[data-project-icon]:not(:has(img:not([hidden])))>&]:hidden" />
             )}
             {icon?.kind === 'lucide' && (
                 // The colour is the wrapper's and the icon draws in currentColor, so a container that recolours every
                 // svg in it (a palette row's icon box) can't turn it into its own colour. The wrapper draws nothing of
                 // its own, so the initial shows until the icon has loaded, the same in either theme.
-                <span className={`absolute inset-0 ${tinted(hue(icon.color), 'categorical-icon')}`}>
+                <span data-lucide className={`absolute inset-0 ${tinted(hue(icon.color), 'categorical-icon')}`}>
                     <Suspense fallback={null}>
                         <LucideIcon
                             key={icon.name}

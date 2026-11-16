@@ -12,9 +12,10 @@ export const RowActions = ({ children }: { children: ReactNode }) => (
     </ON_ROW.Provider>
 );
 
-/** A card's actions on a work-map card, inside a row list or not: named and tinted, never the rows' icon-only form. */
-export const CardActions = ({ children }: { children: ReactNode }) => (
+/** A card's actions on a work-map card, inside a row list or not: named, never the rows' icon-only form, and tinted
+ *  unless `outlined`: a card that waits on you keeps its action outlined, as every amber card on Your desk does. */
+export const CardActions = ({ children, outlined = false }: { children: ReactNode; outlined?: boolean }) => (
     <ON_ROW.Provider value="card">
-        <TintedActions>{children}</TintedActions>
+        <TintedActions tinted={!outlined}>{children}</TintedActions>
     </ON_ROW.Provider>
 );

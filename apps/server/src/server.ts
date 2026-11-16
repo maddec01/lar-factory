@@ -97,7 +97,7 @@ import {
     threadCleanupState,
 } from './t3/item-execution.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
-import { createProjectIcons } from './t3/project-icons.ts';
+import { createProjectIcons, type ProjectImage } from './t3/project-icons.ts';
 import { createProjectRefresh } from './t3/project-refresh.ts';
 import {
     reconnectRepositoryProjects,
@@ -1460,6 +1460,27 @@ const autoBuildRun = createAutoBuild({
 // Sample mode asks T3 for nothing, so its boards show toned initials, unless it reads T3.
 const refreshProjects = createProjectRefresh(board, onboarded, offerModelChoices);
 const projectIcons = fixture && !sampleT3 ? null : createProjectIcons(board);
+
+/** `BOARD_SAMPLE_ICON_DIR` gives the sample board its projects' images, as `<projectId>.svg` or `.png` in that folder,
+ *  so a sample can show real icons without reading T3. */
+function sampleProjectIcon(projectId: string): ProjectImage | undefined {
+    const dir = fixture && process.env.BOARD_SAMPLE_ICON_DIR;
+
+    if (!dir || !/^[\w-]+$/.test(projectId)) return undefined;
+
+    for (const [extension, type] of [
+        ['svg', 'image/svg+xml'],
+        ['png', 'image/png'],
+    ] as const) {
+        try {
+            return { type, body: readFileSync(join(dir, `${projectId}.${extension}`)) };
+        } catch {
+            /* No image of that type. */
+        }
+    }
+
+    return undefined;
+}
 const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
 const { server, endStreams } = createBoardServer({
     factorySettings: factorySettingsService(),
@@ -1498,7 +1519,7 @@ const { server, endStreams } = createBoardServer({
     showTicketType,
     readSoon,
     ready: () => firstGhCheck,
-    projectIcon: async (projectId) => projectIcons?.image(projectId),
+    projectIcon: async (projectId) => (await projectIcons?.image(projectId)) ?? sampleProjectIcon(projectId),
     projectChoices: choices,
     keepOnboarding: (input) => keepOnboarding(input),
     createProject: (input) => createProject(input, choices),

@@ -59,31 +59,73 @@ export function ChecksBar({ checks, still = false }: { checks: CheckCounts; stil
     );
 }
 
+/** What a card knows of its PR's checks: their counts (`stale` when the board can't vouch they are current), or that
+ *  they are still loading, that the PR has none yet, or that the board can't read them. */
+export type CardCheckState = CheckCounts | 'loading' | 'none' | 'unavailable';
+
 /** The checks as a card's mini track: its `step` (such as "Verify"), then the pull request's mark with `word` (such as
- *  "1 failed"), in the danger colour when a check failed, so the PR's state reads at a glance. */
-export function CardChecks({ checks, step, word }: { checks: CheckCounts; step?: string; word: string }) {
-    const summary = checksSummary(checks);
+ *  "1 failed"), in the danger colour when a check failed, then the checks as segments, so the PR's state reads at a
+ *  glance. Checks still loading breathe as grey segments; a PR with no checks, or checks the board can't read, shows the
+ *  mark with a quiet word and no track; `stale` counts show dimmed. `detail` adds to the tooltip, such as the PR's number
+ *  and any warning, so the card itself stays one line. */
+export function CardChecks({
+    checks,
+    step,
+    word,
+    stale = false,
+    detail,
+}: {
+    checks: CardCheckState;
+    step?: string;
+    word?: string;
+    stale?: boolean;
+    detail?: string;
+}) {
+    const counts = typeof checks === 'object' ? checks : undefined;
+    const summary = counts
+        ? checksSummary(counts)
+        : checks === 'loading'
+          ? 'Loading checks…'
+          : checks === 'none'
+            ? 'No checks yet'
+            : 'Checks unavailable';
+    const label = [detail, summary, stale && 'Stale check observation'].filter(Boolean).join(' · ');
+    const shown = word ?? (checks === 'none' ? 'no checks' : checks === 'unavailable' ? 'unknown' : undefined);
+    const segments: { state: StatusState; pulse: boolean }[] = counts
+        ? segmentStates(counts).map((state) => ({ state, pulse: state === 'active' && !stale }))
+        : checks === 'loading'
+          ? Array.from({ length: 3 }, () => ({ state: 'off' as const, pulse: true }))
+          : [];
 
     return (
-        <span className="text-fg-muted inline-flex items-center gap-2 text-xs" title={summary}>
+        <span className="text-fg-muted inline-flex items-center gap-2 text-xs" title={label} data-card-checks>
             {step && <span aria-hidden="true">{step}</span>}
             <span
                 aria-hidden="true"
-                className={`inline-flex items-center gap-1 ${checks.failed ? 'text-danger-fg' : ''}`}
+                className={`inline-flex items-center gap-1 ${counts?.failed && !stale ? 'text-danger-fg' : ''}`}
                 data-checks-word
             >
                 <GitPullRequest className="size-3.5" />
-                {word}
+                {shown}
             </span>
-            <span role="img" aria-label={summary} className="inline-flex items-center gap-0.5" data-checks-track>
-                {segmentStates(checks).map((state, i) => (
-                    <span
-                        key={i}
-                        className={`h-1 w-2 rounded-full ${state === 'off' ? 'bg-track' : ''} ${state === 'active' ? 'motion-safe:animate-pulse' : ''}`}
-                        style={state === 'off' ? undefined : { background: statusStateColors[state] }}
-                    />
-                ))}
-            </span>
+            {segments.length > 0 ? (
+                <span
+                    role="img"
+                    aria-label={label}
+                    className={`inline-flex items-center gap-0.5 ${stale ? 'opacity-50' : ''}`}
+                    data-checks-track
+                >
+                    {segments.map(({ state, pulse }, i) => (
+                        <span
+                            key={i}
+                            className={`h-1 w-2 rounded-full ${state === 'off' ? 'bg-track' : ''} ${pulse ? 'motion-safe:animate-pulse' : ''}`}
+                            style={state === 'off' ? undefined : { background: statusStateColors[state] }}
+                        />
+                    ))}
+                </span>
+            ) : (
+                <span className="sr-only">{label}</span>
+            )}
         </span>
     );
 }

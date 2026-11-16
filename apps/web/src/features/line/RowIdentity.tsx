@@ -4,7 +4,7 @@
 import { isBuild, onAzure } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { TicketIcon } from '@lar-works/design-system/icons';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 
 import { partKind, partLabel } from './DossierParts';
 import { KIND_BADGES, RepoCell, SourceIcon } from '@/features/items';
@@ -55,32 +55,64 @@ export const RowKindMark = memo(function RowKindMark({
     const Icon = kind.icon;
 
     return (
-        <KindMark name={kind.name} labelled={labelled}>
+        <KindMark name={kind.name} hue={kind.hue} labelled={labelled}>
             <Icon aria-hidden="true" />
         </KindMark>
     );
 });
 
-/** Where the ticket is saved, as its bare muted icon, then the repository. GitHub is where tickets live unless a row
- *  says otherwise, so a GitHub ticket's row shows its repository alone; Azure and local work keep their mark. */
+/** What an item is and where it lives, as one group: where its ticket is saved, its kind mark, then its project's icon
+ *  and name, the same on a lane row, a concept's part and a desk card's head. GitHub is where tickets live unless a row
+ *  says otherwise, so without `always` a GitHub ticket shows no tracker mark; `always` shows every tracker's. */
 /** A concept part's source and project after its title: its tracker's mark always, since a concept's parts mix GitHub
  *  issues and parts saved only on this Mac, and its project, the concept's own (`home`) quietly. */
-export const PartSource = memo(function PartSource({ item, home }: { item: Item; home: boolean }) {
+export const PartSource = memo(function PartSource({
+    item,
+    home,
+    kind,
+}: {
+    item: Item;
+    home: boolean;
+    /** The part's kind mark, after its source, as a lane row's is. */
+    kind?: ReactNode;
+}) {
     return (
         <RowIdentity>
             <SourceIcon item={item} bare always />
+            {kind}
             <RepoCell item={item} home={home} />
         </RowIdentity>
     );
 });
 
-export const RowSource = memo(function RowSource({ item }: { item: Item }) {
+export const RowSource = memo(function RowSource({
+    item,
+    kind,
+    always = false,
+    project = true,
+    others = [],
+}: {
+    item: Item;
+    /** The item's kind mark, after its source, so source, kind and project read as one. */
+    kind?: ReactNode;
+    always?: boolean;
+    /** Whether to name its project; a work-map card leaves it to its lane, which already names it. */
+    project?: boolean;
+    /** Other projects the work spans, such as a concept's parts', as a count after its own, named on hover. */
+    others?: string[];
+}) {
     const github = item.number > 0 && !(item.repo && onAzure(item.repo));
 
     return (
         <RowIdentity>
-            {!github && <SourceIcon item={item} bare always />}
-            <RepoCell item={item} />
+            {(always || !github) && <SourceIcon item={item} bare always />}
+            {kind}
+            {project && <RepoCell item={item} />}
+            {others.length > 0 && (
+                <span className="text-fg-muted shrink-0 tabular-nums" title={`Also in ${others.join(', ')}`}>
+                    +{others.length}
+                </span>
+            )}
         </RowIdentity>
     );
 });

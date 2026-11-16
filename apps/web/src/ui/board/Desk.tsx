@@ -1,16 +1,13 @@
-import { SectionTitle, StatusIndicator } from '@lar-works/design-system';
-import { Children, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { ScrollRowArrows, SectionTitle, StatusIndicator, useScrollRow } from '@lar-works/design-system';
+import { useScrollFade } from '@lar-works/design-system/primitives';
+import { type ReactNode, useCallback } from 'react';
 
-import { BoardCard } from './BoardCard';
 import { useArrival } from './BoardLife';
-import { FoldToggle } from './FoldToggle';
-import { DetailFact } from './ItemDetailFacts';
-import { MetaDot, MetaLine } from './TextParts';
 
 interface DeskSectionProps {
     /** The section's heading, such as "Your desk". */
     title: string;
-    /** How many rows show; with none, `empty` says why, muted beside the title. */
+    /** How many rows show; with none, `empty` says why, in the row's place. */
     count: number;
     /** The first read may still add rows; hide its provisional zero. */
     loading?: boolean;
@@ -20,65 +17,50 @@ interface DeskSectionProps {
     children?: ReactNode;
 }
 
-/** "Your desk": the items awaiting your action, as a grid of cards under a section title, the board's one loud surface:
- *  each card an even amber tint with a hairline of the same tone, so what waits on you is the first thing the eye
- *  finds. It shows two rows of cards and Show more, so the lanes under it stay in reach. An empty desk is its title
- *  line alone, saying why beside the title. Its heading is `#desk-h`. */
+/** "Your desk": the items awaiting your action, as one row of same-size cards under a section title, the board's one
+ *  loud surface: each card an even amber tint with a hairline of the same tone, so what waits on you is the first thing
+ *  the eye finds. The row scrolls sideways, fading at an edge with more cards past it, with arrows in the header, and
+ *  keeps its height whether it holds cards or not, so the lanes under it never jump. An empty desk says why in the
+ *  row's place. Its heading is `#desk-h`. */
 export function DeskSection({ title, count, loading = false, empty, children }: DeskSectionProps) {
-    const [all, setAll] = useState(false);
-    const grid = useRef<HTMLOListElement>(null);
-    const [columns, setColumns] = useState(4);
-    // Two rows of as many cards as fit across; the rest wait for Show more, so the lanes under it stay in reach.
-    // Even one more card would start a third row, which pushes the lanes' work out of view on a small window.
-    const shown = all || count <= columns * 2 ? count : columns * 2;
-    const hidden = Math.max(0, count - shown);
-    const hasCards = count > 0;
-
-    useLayoutEffect(() => {
-        const element = grid.current;
-
-        if (!element || typeof ResizeObserver === 'undefined') return;
-
-        // A grid whose columns can't be read (no layout yet) keeps the four-across default rather than one column.
-        const measure = () => {
-            const tracks = getComputedStyle(element).gridTemplateColumns;
-
-            setColumns(!tracks || tracks === 'none' ? 4 : tracks.split(' ').filter(Boolean).length);
-        };
-        const observer = new ResizeObserver(measure);
-
-        observer.observe(element);
-        measure();
-
-        return () => observer.disconnect();
-    }, [hasCards]);
+    const { setViewport, className: fade } = useScrollFade({ axis: 'horizontal', row: true });
+    const { setRow, scroll, canScrollBack, canScrollForward } = useScrollRow<HTMLOListElement>(count);
+    const setList = useCallback(
+        (element: HTMLOListElement | null) => {
+            setViewport(element);
+            setRow(element);
+        },
+        [setViewport, setRow],
+    );
 
     return (
         <section className="desk grid shrink-0 scroll-mt-16 gap-3" aria-labelledby="desk-h">
             <div className="flex min-h-9 items-center justify-between gap-3 pr-3 pl-4">
-                <div className="flex min-w-0 items-center gap-3">
-                    <SectionTitle
-                        id="desk-h"
-                        level="h2"
-                        title={title}
-                        icon={<StatusIndicator state={count ? 'waiting' : 'off'} />}
-                        count={count}
-                        countLoading={loading}
+                <SectionTitle
+                    id="desk-h"
+                    level="h2"
+                    title={title}
+                    icon={<StatusIndicator state={count ? 'waiting' : 'off'} />}
+                    count={count}
+                    countLoading={loading}
+                />
+                {(canScrollBack || canScrollForward) && (
+                    <ScrollRowArrows
+                        size="sm"
+                        onScroll={scroll}
+                        canScrollBack={canScrollBack}
+                        canScrollForward={canScrollForward}
+                        backLabel="Previous cards"
+                        forwardLabel="Next cards"
                     />
-                    {/* An empty desk says why beside its title, quiet, so the lanes come straight after it. */}
-                    {!count && empty}
-                </div>
-                {/* A quiet header control on the rows' right gutter, as Auto-build is. */}
-                {(hidden > 0 || (all && count > columns * 2)) && (
-                    <FoldToggle open={all} onToggle={() => setAll(!all)}>
-                        {all ? 'Show fewer' : `Show ${hidden} more`}
-                    </FoldToggle>
                 )}
             </div>
-            {count > 0 && (
-                <ol ref={grid} aria-label={title} className="desk-grid m-0 list-none p-0">
-                    {Children.toArray(children).slice(0, shown)}
+            {count > 0 ? (
+                <ol ref={setList} aria-label={title} className={`desk-grid m-0 list-none ${fade}`}>
+                    {children}
                 </ol>
+            ) : (
+                <div className="desk-empty">{empty}</div>
             )}
         </section>
     );
@@ -116,125 +98,24 @@ export function bringDeskIntoView(): boolean {
     return true;
 }
 
-interface DeskCardProps {
-    /** The item's id, as `data-item`. */
-    item: string;
-    /** Whether the item dialog shows this item now. */
-    picked: boolean;
-    /** Called as the reader opens the item dialog. */
-    onOpen: () => void;
-    /** Where the item comes from: its source and project, a RowSource. */
-    source: ReactNode;
-    /** The item's kind, a quiet mark before its title. */
-    kind?: ReactNode;
-    /** Where the item stands in its workflow, a StageTrack, at the head's end as on a work-map card. */
-    track?: ReactNode;
-    /** The step the track points at, such as "Verify", at the foot when nothing else is waited for. */
-    step?: string | undefined;
-    /** The question its thread asks, under the title. */
-    question?: string | undefined;
-    /** The lane the item sits in, such as "Build", which the row names before its status. */
-    stage?: string | undefined;
-    /** The item's title. */
-    title: ReactNode;
-    /** The title's full text, which names the card. */
-    name: string;
-    /** The concept or linked parent this work belongs to, supplied by the desk projection. */
-    parentName?: string;
-    /** The exact member names covered by one group approval. */
-    members?: string[];
-    /** More about the item under its title, such as a work item's fields. */
-    details?: ReactNode;
-    /** The next step, in words. */
-    status: string;
-    /** How long it has waited, such as "2d ago", after its status. */
-    age?: ReactNode;
-    /** Beside the status: the next step, such as a DeskHint. */
-    next?: ReactNode;
-    /** The row's actions, at its end: `sm` buttons, the next step tinted. */
-    actions: ReactNode;
-}
-
 /**
- * An item on your desk as a card: its kind, source and project on top, its title on up to two lines and what it belongs
- * to, then any next step and details, and at its foot its lane and what it waits for, in amber, with its one action at
- * the end. A click anywhere on it but its controls opens the item dialog; its title is the button that does, for the
- * keyboard. The card whose dialog shows takes the current ring; one that lands on the desk after the board has shown
- * slides in and flashes (BoardLife).
+ * An item on your desk: its card (ItemCard, the board's one card) as an entry in the desk's row. One that lands on the
+ * desk after the board has shown slides in and flashes (BoardLife).
  */
 export function DeskCard({
     item,
-    picked,
-    onOpen,
-    source,
-    kind,
-    stage,
-    track,
-    step,
-    question,
-    title,
-    name,
-    parentName,
-    members,
-    details,
-    status,
-    age,
-    next,
-    actions,
-}: DeskCardProps) {
+    children,
+}: {
+    /** The item's id, as `data-item`. */
+    item: string;
+    /** The item's card. */
+    children: ReactNode;
+}) {
     const arrived = useArrival('desk', item);
 
     return (
         <li data-item={item} data-arrived={arrived ? 'above' : undefined} data-attention className="desk-row">
-            <BoardCard
-                tone="waiting"
-                picked={picked}
-                onOpen={onOpen}
-                tooltip={name}
-                head={
-                    <>
-                        {kind}
-                        {source}
-                    </>
-                }
-                track={track}
-                name={title}
-                sub={
-                    <>
-                        {question && (
-                            <span className="text-fg-soft line-clamp-2" title={question} data-question>
-                                {question}
-                            </span>
-                        )}
-                        {parentName && (
-                            <span className="truncate" title={parentName} data-part-of>
-                                in {parentName}
-                            </span>
-                        )}
-                        {next}
-                        {!!members?.length && (
-                            <p className="m-0 wrap-anywhere">
-                                Briefs: <MetaLine parts={members} />
-                            </p>
-                        )}
-                        {details}
-                    </>
-                }
-                // Every card says in amber what it waits for, in the board's one word for it, and how long. The track
-                // says the lane and step.
-                state={
-                    <span title={step ?? stage} data-state>
-                        {status}
-                        {age && (
-                            <span className="text-fg-muted font-normal">
-                                {' '}
-                                <MetaDot /> {age}
-                            </span>
-                        )}
-                    </span>
-                }
-                action={actions}
-            />
+            {children}
         </li>
     );
 }
@@ -250,35 +131,5 @@ export function DeskHint({
         <span className="truncate" title={children}>
             {children}
         </span>
-    );
-}
-
-/** Revision check progress stays visible alongside questions and readiness blockers. */
-export function DeskPrProgress({
-    label,
-    summary,
-    note,
-    wide,
-}: {
-    label: string;
-    summary: ReactNode;
-    note?: string;
-    wide?: string;
-}) {
-    return (
-        <div
-            className="text-fg-muted grid gap-1 text-xs tabular-nums"
-            role="status"
-            aria-label={`${label} check progress`}
-        >
-            <span className="text-fg font-medium">{label}</span>
-            <span>{summary}</span>
-            {wide && (
-                <DetailFact presentation="record" label="PR-wide statuses">
-                    <span>{wide}</span>
-                </DetailFact>
-            )}
-            {note && <span>{note}</span>}
-        </div>
     );
 }

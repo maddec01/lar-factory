@@ -1,5 +1,5 @@
 import { Badge } from '@lar-works/design-system';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 export interface KindBadgeProps {
     /** The kind's hue on the design system's categorical palette (an oklch angle, `categoricalHues`, such as rose for
@@ -21,14 +21,18 @@ export function KindBadge({ hue, ...props }: KindBadgeProps) {
     return <Badge {...props} hue={hue} />;
 }
 
-/** What kind a thing is, as its kind's icon alone, muted, named by `name` on hover and for assistive technology: a row's
- *  quiet mark before its title, where a list of badges would shout. The dialog shows the full KindBadge. With no
- *  `name` it keeps the mark's room, empty, so titles start on one edge whether or not their item has a kind. */
+/** What kind a thing is, as its kind's icon alone, named by `name` on hover and for assistive technology: a row's mark
+ *  before its title, where a list of badges would shout. It draws in its kind's `hue`, the same colour as the dialog's
+ *  KindBadge, so a kind reads the same everywhere; a kind with no hue stays muted. With no `name` it keeps the mark's
+ *  room, empty, so titles start on one edge whether or not their item has a kind. */
 export function KindMark({
     name,
+    hue,
     labelled = false,
     children,
 }: {
+    /** The kind's hue on the categorical palette, as its KindBadge's; none draws it muted. */
+    hue?: number | undefined;
     /** Shows the kind's name after its icon, as a card's head does; `fact` names it in the text colour at its sidebar's
      *  size, as a value beside its label, as Project's is. */
     labelled?: boolean | 'fact';
@@ -46,7 +50,8 @@ export function KindMark({
             role="img"
             aria-label={name}
             title={name}
-            className="text-fg-muted inline-grid size-4 shrink-0 place-items-center [&>svg]:size-3.5"
+            className={`inline-grid size-4 shrink-0 place-items-center [&>svg]:size-3.5 ${hue === undefined ? 'text-fg-muted' : 'categorical-icon'}`}
+            style={hue === undefined ? undefined : ({ '--lar-category-hue': hue } as CSSProperties)}
             data-kind-mark
         >
             {children}

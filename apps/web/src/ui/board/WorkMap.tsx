@@ -476,7 +476,7 @@ export function MapNode({
     related: boolean;
     /** Called as the pointer enters or leaves, lighting its arrows. */
     onHover: (hovered: boolean) => void;
-    /** The node, such as a MapPartNode. */
+    /** The node, such as a part's ItemCard. */
     children: ReactNode;
 }) {
     return (
@@ -496,4 +496,4 @@ export function MapNode({
 }
 
 export { MapHistoryGroup, MapHistoryList, HistoryRow } from './WorkMapHistory';
-export { MAP_NODE_HEIGHT, MapPartNode, MapCheckNode, MapPrerequisiteNode, measureMapCards } from './WorkMapNodes';
+export { MAP_NODE_HEIGHT, MAP_NODE_WIDTH, MapCheckNode, MapPrerequisiteNode } from './WorkMapNodes';

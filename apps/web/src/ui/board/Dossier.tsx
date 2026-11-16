@@ -139,19 +139,24 @@ export function DossierTitle({
     /** The title, an ItemTitle. */
     children: ReactNode;
 }) {
+    // The title keeps the cell's room, but only its words open the item, with the pointer and an underline on hover as
+    // a link's; a click on the room after them expands the dossier, as anywhere else on its line.
     return (
-        <button
-            type="button"
-            onClick={(event) => {
-                stop(event);
-                onOpen();
-            }}
-            title={name}
-            data-title
-            className={`text-fg min-w-0 flex-1 truncate rounded-xs text-left text-sm leading-7 ${ROW_OPENS}`}
-        >
-            {children}
-        </button>
+        <span className="flex min-w-0 flex-1">
+            <button
+                type="button"
+                onClick={(event) => {
+                    stop(event);
+                    onOpen();
+                }}
+                title={name}
+                data-title
+                data-opens-title
+                className={`text-fg max-w-full min-w-0 cursor-pointer truncate rounded-xs text-left text-sm leading-7 underline-offset-2 hover:underline ${ROW_OPENS}`}
+            >
+                {children}
+            </button>
+        </span>
     );
 }
 
@@ -174,7 +179,11 @@ export function DossierNote({
     children: ReactNode;
 }) {
     return (
-        <span onClick={stop} className="flex shrink-0 items-center pl-1 empty:hidden">
+        // The title keeps its room; the note gives way first and ends in an ellipsis.
+        <span
+            onClick={stop}
+            className="flex max-w-[40%] min-w-0 shrink-[100] items-center overflow-hidden pl-1 empty:hidden [&_*]:truncate"
+        >
             {children}
         </span>
     );

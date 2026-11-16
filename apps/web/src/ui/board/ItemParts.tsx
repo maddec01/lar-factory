@@ -1,7 +1,7 @@
 // The bits every view of Lar Factory's board draws for a piece of work: its numbered title, title link, repository,
 // tracker fields, label chips and planning notes.
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useLayoutEffect, useRef } from 'react';
 
 import type { DataAttributes } from './DataAttributes';
 import { tooltipWhenCut } from './TooltipWhenCut';
@@ -61,8 +61,9 @@ const identities = {
     map: 'inline-flex min-w-0 max-w-full items-center gap-1.5',
 } as const;
 
-/** A repository's project icon and name together, the name truncating: in a row's line, or roomier on the work map,
- *  its tooltip giving the name whole only while it is cut off. */
+/** A repository's project icon and name together, the one way the board shows a project: the icon leads and the name
+ *  follows in the muted grey, fading out when it is too long for its room, its tooltip giving it whole while it is cut
+ *  off. In a row's line, or roomier on the work map. */
 export function RepoIdentity({
     icon,
     name,
@@ -80,11 +81,34 @@ export function RepoIdentity({
     presentation?: 'row' | 'map';
 } & DataAttributes) {
     const whenCut = title === undefined ? tooltipWhenCut(name) : undefined;
+    const nameRef = useRef<HTMLSpanElement>(null);
+
+    // A name too long for its room fades out at its end rather than ending in an ellipsis (rows.css), so a list of
+    // projects doesn't read as a column of dots; one that fits shows whole, with no fade.
+    useLayoutEffect(() => {
+        const element = nameRef.current;
+
+        if (!element || typeof ResizeObserver === 'undefined') return;
+
+        const measure = () => {
+            if (element.scrollWidth > element.clientWidth + 0.5) element.dataset.cut = '';
+            else delete element.dataset.cut;
+        };
+        const observer = new ResizeObserver(measure);
+
+        observer.observe(element);
+        measure();
+
+        return () => observer.disconnect();
+    }, [name]);
 
     return (
         <span {...data} title={title} onPointerEnter={whenCut} onFocus={whenCut} className={identities[presentation]}>
             {icon}
-            <span className="min-w-0 truncate">{name}</span>
+            {/* The icon is what catches the eye; the name sits a step quieter beside it, the same wherever it shows. */}
+            <span ref={nameRef} className="text-fg-muted min-w-0 overflow-hidden whitespace-nowrap" data-repo-name>
+                {name}
+            </span>
         </span>
     );
 }

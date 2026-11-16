@@ -23,7 +23,8 @@ export function ButtonDensityProvider({
 
 /** The board's action surfaces: a row's or a map card's actions, which show on hover, and the title bar's Add item. Every
  *  button inside that asks for its kind with useButtonKind takes the brand tint (the `tinted` recipe), whatever its kind,
- *  so these actions read the same everywhere; App controls stay quiet and destructive ones keep their danger recipe. */
-export function TintedActions({ children }: { children: ReactNode }) {
-    return <TintContext.Provider value>{children}</TintContext.Provider>;
+ *  so these actions read the same everywhere; App controls stay quiet and destructive ones keep their danger recipe.
+ *  `tinted={false}` sets it aside inside a tinted surface, such as a card that waits on you, which keeps its outline. */
+export function TintedActions({ children, tinted = true }: { children: ReactNode; tinted?: boolean }) {
+    return <TintContext.Provider value={tinted}>{children}</TintContext.Provider>;
 }

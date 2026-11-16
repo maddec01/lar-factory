@@ -22,16 +22,16 @@ import { RowKindMark, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
 import { YOURS, threadText } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
+import { workLabel } from './WorkLabel';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     Age,
-    AzureFields,
     ItemStatusGlyph,
     ItemTitle,
     SLOT_WAIT,
-    hasFigures,
     OpenThread,
     SliceBar,
+    WorkingBar,
     SliceList,
     StartAfterError,
     StartBuild,
@@ -41,10 +41,10 @@ import {
     useActivityUnavailable,
     useShownStatus,
     checksCount,
+    checksWord,
     prChecks,
 } from '@/features/items';
 import {
-    QueueAge,
     QueuePlace,
     RowBlocked,
     RowFirst,
@@ -63,6 +63,7 @@ import {
     RowTitleCell,
     StageRowItem,
     VerifyEvidence,
+    WaitWord,
     ChecksBar,
     RowCount,
 } from '@/ui/board';
@@ -153,9 +154,12 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
         n === undefined && activity && activity !== 'unavailable' && activity !== 'stopped' && activity !== 'waiting';
     const figures = figuresOf(item, data);
     const checks = prChecks(item);
+    // A row at work names what runs, so its bar says something is going on even with no slices to count.
+    const atWork = n !== undefined ? undefined : workLabel(item, activity === 'working' || activity === 'quiet');
     const held = shown.blocked ? state : blocked && !shown.blocked ? blocked : '';
     // The checks' count already says how the pipeline stands, so a state about the checks would say it twice.
-    const endState = shown.blocked || (prChecks(item) && state.startsWith('Checks ')) ? '' : state;
+    // A Queue row's heading says Queued, so it says no state of its own.
+    const endState = n !== undefined || shown.blocked || (prChecks(item) && state.startsWith('Checks ')) ? '' : state;
 
     // The lane's heading already shows its stage's glyph, so a row draws its own only when it says more: running work,
     // a light, a held or stopped state, or a wait on you.
@@ -172,20 +176,35 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         <QueuePlace>{n + 1}</QueuePlace>
                     )}
                     <RowTitleCell>
+                        {/* Where it lives (source and project), then what it is: its kind, number and title. */}
+                        <RowSource item={item} always />
                         <RowKindMark item={item} />
                         <RowTitle name={itemName(item)}>
                             <ItemTitle item={item} />
                         </RowTitle>
                     </RowTitleCell>
-                    <RowSource item={item} />
                 </RowOpen>
                 <RowMeta onClick={opensItem(item)}>
-                    {/* What holds a row reads where its activity would, so its action never hides it. */}
-                    {held && <RowBlocked>{held}</RowBlocked>}
+                    {/* What is going on, in one column: what its thread does now, else its state, else what holds it,
+                        else its first blocked or working slice. */}
                     {showsActivity ? (
                         <ActivityLine item={item} />
+                    ) : endState && yours ? (
+                        // What waits on you reads in the desk's amber here too, so it catches the eye on any lane.
+                        <RowState title={endState}>
+                            <WaitWord>{endState}</WaitWord>
+                        </RowState>
+                    ) : endState ? (
+                        <RowState
+                            title={[(shown.light || shown.blocked) && shown.recorded, threadText(item, shown.working)]
+                                .filter(Boolean)
+                                .join(' · ')}
+                        >
+                            {endState}
+                        </RowState>
+                    ) : held ? (
+                        <RowBlocked>{held}</RowBlocked>
                     ) : (
-                        !blocked &&
                         note[0] && (
                             <RowSliceNote
                                 title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}
@@ -198,59 +217,49 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         // In review the PR's checks are what move, so they take the slices' place.
                         <RowProgress
                             bar={<ChecksBar checks={checks} still={still} />}
-                            count={<RowCount title={checksCount(checks)}>{checksCount(checks)}</RowCount>}
+                            count={
+                                <RowCount pr title={checksCount(checks)}>
+                                    {checksWord(checks)}
+                                </RowCount>
+                            }
+                        />
+                    ) : item.slices.length > 0 ? (
+                        <RowProgress
+                            bar={<SliceBar item={item} still={still} />}
+                            count={
+                                <RowSliceToggle
+                                    open={slices}
+                                    label={slices ? 'Hide slices' : 'Show slices'}
+                                    onToggle={() => setSlices(!slices)}
+                                >
+                                    {`${done}/${item.slices.length} slices`}
+                                </RowSliceToggle>
+                            }
                         />
                     ) : (
-                        item.slices.length > 0 && (
+                        // Work at it with no slices to count still draws its bar, so a row at work always shows it.
+                        atWork && (
                             <RowProgress
-                                bar={<SliceBar item={item} still={still} />}
-                                count={
-                                    <RowSliceToggle
-                                        open={slices}
-                                        label={slices ? 'Hide slices' : 'Show slices'}
-                                        onToggle={() => setSlices(!slices)}
-                                    >
-                                        {`${done}/${item.slices.length} slices done`}
-                                    </RowSliceToggle>
-                                }
+                                bar={<WorkingBar label={atWork} still={still} />}
+                                count={<RowCount title={atWork}>{atWork}</RowCount>}
                             />
                         )
                     )}
-                    <RowMetaEnd>
-                        {n === undefined ? (
-                            <>
-                                <Figures s={figures} item={item} />
-                                {/* A row with nothing else to say at its end says how long it has waited, as Queue's do. */}
-                                {!endState && !showsActivity && !(figures && hasFigures(figures)) && (
-                                    <QueueAge>
-                                        <Age at={item.updatedAt} />
-                                    </QueueAge>
-                                )}
-                                {endState && !showsActivity && (
-                                    <RowState
-                                        title={[
-                                            (shown.light || shown.blocked) && shown.recorded,
-                                            threadText(item, shown.working),
-                                        ]
-                                            .filter(Boolean)
-                                            .join(' · ')}
-                                    >
-                                        {endState}
-                                    </RowState>
-                                )}
-                            </>
-                        ) : (
+                    <RowMetaEnd
+                        cost={n === undefined && <Figures s={figures} item={item} />}
+                        age={
                             // A Queue row's age is the item's own, since it was added; its last change is often only
                             // a sync's, the same for every row. The board keeps no time it was queued.
-                            <QueueAge>
+                            n === undefined ? (
+                                <Age at={item.updatedAt} />
+                            ) : (
                                 <Age
                                     at={item.createdAt ?? item.updatedAt}
                                     says={item.createdAt ? 'Added' : 'Changed'}
                                 />
-                            </QueueAge>
-                        )}
-                        <AzureFields azure={item.azure} />
-                    </RowMetaEnd>
+                            )
+                        }
+                    />
                 </RowMeta>
                 <RowSide>
                     <Side item={item} data={data} />

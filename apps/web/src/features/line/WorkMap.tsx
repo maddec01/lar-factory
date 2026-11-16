@@ -5,7 +5,7 @@
 
 import { itemName, ref } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
-import { useId, useLayoutEffect, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { CompactWorkMap } from './CompactWorkMap';
 import { isDone, isHistory, upstreamOf } from './DossierParts';
@@ -23,7 +23,8 @@ import {
     keyOf,
     layout,
 } from './WorkMapLayout';
-import { CheckNode, HistoryRow, PartNode, MapRepo } from './WorkMapParts';
+import { ItemCard } from './ItemCard';
+import { CheckNode, HistoryRow, MapRepo } from './WorkMapParts';
 import { StatusGlyph } from '@/features/items';
 import {
     MapBand,
@@ -35,8 +36,6 @@ import {
     MapLaneName,
     MapNode,
     MapPrerequisiteNode,
-    MAP_NODE_HEIGHT,
-    measureMapCards,
     WorkMapFrame,
 } from '@/ui/board';
 
@@ -56,20 +55,9 @@ export function WorkMap({
     const [hover, setHover] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
-    const [nodeH, setNodeH] = useState(MAP_NODE_HEIGHT);
-
-    // Every card takes the height its tallest needs, measured before the map paints, so their edges line up with no
-    // empty band in a short one; a change in what a card says measures again.
-    useLayoutEffect(() => {
-        const needed = measureMapCards(box.current);
-
-        // oxlint-disable-next-line react/set-state-in-effect -- the cards' height is read from the laid-out DOM, before paint
-        if (needed !== nodeH) setNodeH(needed);
-    }, [box, parts, check, data, width, nodeH]);
-
     if (!parts.length && !check) return null;
 
-    const m = layout(parts, data, width, Boolean(check), { home, nodeH });
+    const m = layout(parts, data, width, Boolean(check), { home });
     const compact = width > 0 && width < 600;
     const at = new Map(m.placed.map((p) => [p.key, p]));
     // The nodes an arrow joins to the hovered one, which take a stronger edge; the hovered one keeps its own hover.
@@ -215,12 +203,12 @@ export function WorkMap({
                             {p.prerequisite ? (
                                 <MapPrerequisiteNode prerequisite={p.prerequisite} width={m.nodeW} height={m.nodeH} />
                             ) : p.part ? (
-                                <PartNode
+                                <ItemCard
+                                    item={p.part.item}
                                     part={p.part}
                                     data={data}
                                     width={m.nodeW}
                                     height={m.nodeH}
-                                    home={home}
                                     history={followed.get(p.key)}
                                 />
                             ) : (

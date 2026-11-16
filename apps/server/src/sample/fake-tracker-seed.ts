@@ -1,8 +1,15 @@
 import type { BoardData, IssueRef, ItemDetails } from '@lar-factory/shared';
 
 import detailFixture from '../../../../packages/shared/test/sample-details.json' with { type: 'json' };
-import boardFixture from '../../../../packages/shared/test/sample.json' with { type: 'json' };
+import bundledBoard from '../../../../packages/shared/test/sample.json' with { type: 'json' };
+import { readFileSync } from 'node:fs';
+
 import { FAKE_OWNER, emptyDetails, newFakeIssue, type FakeRepository } from './fake-tracker-state.ts';
+
+/** `BOARD_DATA_FILE` picks the sample board's fixture; tests and the default sample use the bundled one. */
+const boardFixture = (
+    process.env.BOARD_DATA_FILE ? JSON.parse(readFileSync(process.env.BOARD_DATA_FILE, 'utf8')) : bundledBoard
+) as typeof bundledBoard;
 
 /** A fixture repository's fake key: its owner swapped, the rest kept, so an Azure DevOps `org/project/repo` stays one. */
 export const fakeRepo = (repo: string) => `${FAKE_OWNER}/${repo.split('/').slice(1).join('/')}`;

@@ -3,6 +3,7 @@
 // action beside it, and under it a second line on the same columns.
 
 import { Loading } from '@lar-works/design-system';
+import { GitPullRequest } from '@lar-works/design-system/icons';
 import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
 import { useArrival } from './BoardLife';
@@ -281,37 +282,47 @@ export function RowProgress({
     );
 }
 
-/** The last of a row's facts, its cost and state, flush with the row's end; a hovered row's action stands in their
- *  place. A `full` end says every agent figure, and its track takes their width (rows.css). */
+/** The last of a row's facts, flush with the row's end: its cost, then how long it has sat there, each on a fixed
+ *  track so they line up down every list. A `full` end says every agent figure, and its track takes their width
+ *  (rows.css). */
 export function RowMetaEnd({
     full = false,
-    children,
+    cost,
+    age,
 }: {
     /** It holds every agent figure, not the cost alone. */
     full?: boolean;
-    /** The cost, then the state. */
-    children: ReactNode;
+    /** The agent figures, a Figures. */
+    cost?: ReactNode;
+    /** How long it has sat there, an Age. */
+    age?: ReactNode;
 }) {
     return (
         <span data-meta-end data-full={full || undefined} className="row-meta-end">
-            {children}
+            <span data-cost>{cost}</span>
+            <span data-age>{age}</span>
         </span>
     );
 }
 
-/** The second line's count, such as `2/5 parts`. */
+/** The second line's count, such as `2/5 parts`; `pr` leads it with the pull request's mark, as a PR's checks count does
+ *  on a desk card. */
 export function RowCount({
     title,
+    pr = false,
     children,
 }: {
     /** The count in full, as its tooltip. */
     title?: string;
+    /** It counts a pull request's checks. */
+    pr?: boolean;
     /** The count, such as `2/5 parts`. */
     children: ReactNode;
 }) {
     return (
-        <span data-col="count" className="flex items-center gap-1 tabular-nums" title={title}>
-            {children}
+        <span data-col="count" className="flex min-w-0 items-center gap-1 tabular-nums" title={title}>
+            {pr && <GitPullRequest aria-hidden="true" className="size-3.5 shrink-0" />}
+            <span className="truncate">{children}</span>
             {/* The slice toggle's chevron room, so a parts count lines up with a slices count. */}
             <span aria-hidden="true" className="size-3" />
         </span>
@@ -349,13 +360,14 @@ export function RowBlocked({
     children: string;
 }) {
     return (
-        <StateWord state="off" title={children} data-blocked>
-            {children}
+        // A red light marks what's stuck at a glance on any list; its words stay quiet.
+        <StateWord state="failed" title={children} data-blocked>
+            <span className="text-fg-muted font-normal">{children}</span>
         </StateWord>
     );
 }
 
-const SLICE_TONE = { blocked: 'text-warning-fg', active: 'text-primary-fg' } as const;
+const SLICE_TONE = { blocked: 'text-danger-fg', active: 'text-primary-fg' } as const;
 
 /** The second line's word on the row's slices: its first blocked or active slice, `more` after it, and anything `after`
  *  that (such as that every slice is implemented); `title` lists them all. */

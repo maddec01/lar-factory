@@ -232,7 +232,9 @@ export function ListItemRow({
             <span className="text-fg-muted flex items-center gap-2">{source}</span>
             {/* With no labels of its own, the title takes the labels' empty cell too. */}
             <span className={`flex min-w-0 items-center gap-3 ${labelColumn && !labels.length ? 'col-span-2' : ''}`}>
-                <span className="text-fg min-w-0 flex-1 truncate text-sm">{title}</span>
+                <span className="text-fg min-w-0 flex-1 truncate text-sm" data-title>
+                    {title}
+                </span>
                 {note && (
                     <span className="text-fg-muted max-w-48 shrink-0 truncate text-xs" data-row-note>
                         {note}

@@ -9,7 +9,7 @@ import { PartSource, RowKindMark } from './RowIdentity';
 import { ItemStatusGlyph } from '@/features/items';
 import { RowGlyph, RowTitle, RowTitleCell } from '@/ui/board';
 
-/** A part's status glyph, kind mark, PartTitle and PartSource, in that order. `home` is the concept's own repository,
+/** A part's status glyph, its source and project (PartSource), then its kind mark and PartTitle. `home` is the concept's own repository,
  *  which a part in it names quietly. */
 export function PartIdentity({ item, home }: { item: Item; home: string | undefined }) {
     return (
@@ -18,12 +18,12 @@ export function PartIdentity({ item, home }: { item: Item; home: string | undefi
                 <ItemStatusGlyph item={item} />
             </RowGlyph>
             <RowTitleCell>
+                <PartSource item={item} home={home !== undefined && repoKey(item) === home} />
                 <RowKindMark item={item} />
                 <RowTitle name={itemName(item)}>
                     <PartTitle item={item} />
                 </RowTitle>
             </RowTitleCell>
-            <PartSource item={item} home={home !== undefined && repoKey(item) === home} />
         </>
     );
 }

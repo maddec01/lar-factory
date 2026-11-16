@@ -31,7 +31,7 @@ export { VerifyBuild } from './VerifyBuild';
 export { PrAction } from './PrLink';
 export { PrList } from './PrList';
 export { CardActions, RowActions } from './RowActions';
-export { SliceBar, SliceList } from './SliceParts';
+export { SliceBar, SliceList, WorkingBar } from './SliceParts';
 export { SourceIcon } from './SourceIcon';
 export { StartAfterError, StartOrAfter } from './StartAfter';
 export { StartBuild } from './StartBuild';

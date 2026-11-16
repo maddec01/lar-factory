@@ -11,9 +11,11 @@ import { createRoot } from 'react-dom/client';
 import { App } from '@/app/App';
 import { AppProviders } from '@/app/providers/AppProviders';
 import { startLiveData } from '@/services/board/board.service';
+import { trackKeyboardNavigation } from '@/shared/navigation/keyboardNavigation';
 import { initializeTheme } from '@/shared/preferences/Theme';
 
 initializeTheme();
+trackKeyboardNavigation();
 
 // The script holds the first paint (vite.config.ts), so render now, not in a later task: the first
 // frame then shows the board.

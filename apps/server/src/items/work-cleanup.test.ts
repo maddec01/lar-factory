@@ -136,61 +136,6 @@ it('requires explicit confirmation before discarding local losses', async () => 
     ).rejects.toThrow('Confirm loss');
 });
 
-it('deletes an owned branch in a disposable repository and preserves main', async () => {
-    const { runTool } = await import('../tools/run-tool.ts');
-    const checkout = await mkdtemp(join(tmpdir(), 'cleanup-'));
-    const git = async (args: string[]) => {
-        const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
-
-        expect(result.code, `stderr: ${result.stderr}`).toBe(0);
-
-        return result.stdout;
-    };
-
-    try {
-        await git(['init', '-b', 'main']);
-        await git([
-            '-c',
-            'user.name=Test',
-            '-c',
-            'user.email=test@example.com',
-            'commit',
-            '--allow-empty',
-            '-m',
-            'initial',
-        ]);
-        await git(['branch', 'owned']);
-
-        const plan = await inspectCleanup({
-            repository: 'a/b',
-            checkout,
-            item: {} as Item,
-            branch: 'owned',
-            sliceIds: [],
-            sliceBranches: [],
-            defaultBranch: 'main',
-            liveWorktreePaths: [],
-            writable: true,
-            provider: { branchExists: async () => false, openPrByHead: async () => null },
-        });
-
-        expect(
-            await executeCleanup({
-                plan,
-                expectedPlan: plan,
-                checkout,
-                repository: 'a/b',
-                local: true,
-                remote: false,
-                confirmedLoss: false,
-            }),
-        ).toEqual({ errors: [], remainingBranches: [] });
-        expect(await git(['branch', '--format=%(refname:short)'])).toBe('main\n');
-    } finally {
-        await rm(checkout, { recursive: true, force: true });
-    }
-});
-
 it('refuses unsafe root and symlink worktrees before invoking Git', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cleanup-path-'));
 

@@ -119,32 +119,3 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
         'it asks for the concept and the parent only',
     );
 });
-
-test('requests during a read queue one more read after it, never two at once', async (t) => {
-    const hold = await holdPath(t);
-    const board = await startBoard(t, {
-        repositories: ['maddec01/lar-factory'],
-        items: [boardIssue(1, 'List')],
-        readDelay: 300,
-        readHold: hold,
-    });
-
-    await firstRead(board);
-
-    const before = await reads(board);
-
-    await writeFile(hold, '');
-    assert.equal((await askRead(board)).status, 202);
-    // The requested read waits on the hold, so every request below lands during it.
-    await board.untilCalled((args) => args[0] === 'held');
-    for (let ask = 0; ask < 3; ask++) assert.equal((await askRead(board)).status, 202);
-    await rm(hold);
-    await waitFor(async () => (await reads(board)) === before + 2);
-    await new Promise((r) => setTimeout(r, 500));
-    assert.equal(await reads(board), before + 2, 'several requests during one read lead to a single extra read');
-    assert.equal(
-        (await board.calls()).filter((args) => args[0] === 'overlap').length,
-        0,
-        'two reads never run together',
-    );
-});

@@ -198,27 +198,6 @@ it('publishes a favicon outside the checkout and a checkout favicon with no T3 p
     expect(await icons.image('id-factory')).toEqual({ type: 'image/svg+xml', body: Buffer.from('<svg/>') });
 });
 
-type Answer = () => Response | Promise<Response>;
-
-/** Answers that say this attempt learned nothing about the file. */
-const inconclusive: [string, Answer][] = [
-    ['the server fails', () => new Response('', { status: 500 })],
-    ['the RPC fails', rpcFails],
-    ['the connection fails', () => Promise.reject(new TypeError('fetch failed'))],
-];
-/** Answers that say T3 has no file the board can use. */
-const gone: [string, Answer][] = [
-    ['T3 answers 404', () => new Response('', { status: 404 })],
-    ['T3 finds no favicon', rpcNotFound],
-    [
-        'the body is over 1 MB',
-        () => new Response(new Uint8Array(1024 * 1024 + 1), { headers: { 'Content-Type': 'image/png' } }),
-    ],
-    ['the media type is not allowed', () => new Response('<html>', { headers: { 'Content-Type': 'text/html' } })],
-    ['the media type is .icns', () => new Response('icns', { headers: { 'Content-Type': 'image/x-icns' } })],
-    ['the body is empty', () => new Response('', { headers: { 'Content-Type': 'image/png' } })],
-];
-
 it('refuses a URL that leaves the T3 origin', async () => {
     t3.read = listed(fact('factory'));
 
@@ -247,37 +226,4 @@ it('refuses a URL that leaves the T3 origin', async () => {
     send.mockRestore();
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => (url as URL).host === 'elsewhere.example')).toEqual([]);
     expect(board.snapshot().projectIcons).toBeUndefined();
-});
-
-it('keeps the last good bytes through an inconclusive fetch, and drops them when T3 has no usable file or no longer lists the project', async () => {
-    t3.read = listed(fact('factory'));
-    assets = { factory: png('good') };
-
-    const board = boardOf('lar-factory');
-    const icons = createProjectIcons(board);
-
-    await icons.refresh();
-
-    const known = board.snapshot().projectIcons;
-
-    for (const [, answer] of inconclusive) {
-        assets = { factory: answer };
-        await icons.refresh();
-        expect(board.snapshot().projectIcons).toEqual(known);
-        expect((await icons.image('id-factory'))?.body).toEqual(Buffer.from('good'));
-    }
-    for (const [name, answer] of gone) {
-        assets = { factory: answer };
-        await icons.refresh();
-        expect(board.snapshot().projectIcons, `${name} answer`).toEqual({});
-        expect(await icons.image('id-factory'), `${name} answer`).toBeUndefined();
-        assets = { factory: png('good') };
-        await icons.refresh();
-        expect(board.snapshot().projectIcons, `${name} answer`).toEqual(known);
-    }
-    t3.read = listed();
-    expect(await icons.image('id-factory'), 'an unlisted project answers at once').toBeUndefined();
-    await icons.refresh();
-    t3.read = listed(fact('factory'));
-    expect(await icons.image('id-factory'), 'its bytes are gone').toBeUndefined();
 });

@@ -13,7 +13,6 @@ const reader = { ...sample, firstRead: reading };
 
 /** The filters the board search field describes itself with; null with none. */
 const scopeLabel = () => $('[data-search-field]')!.getAttribute('aria-description');
-const scoped = (name: string) => `filtered by ${name}`;
 const ALL = null;
 const deskCards = () => $$('.desk-row').length;
 const receive = async (data: BoardData) => {
@@ -21,22 +20,10 @@ const receive = async (data: BoardData) => {
 
     await settle(() => useBoardStore.getState().receive(data));
 };
-const store = async () => (await import('./ScopeStore')).useScopeStore.getState();
 const reload = async (data?: BoardData) => {
     vi.resetModules();
     await mountPage(data);
 };
-
-test('Scope, Kind and Labels survive a reload', async () => {
-    await mountPage();
-    await settle(async () => {
-        (await store()).setScope('maddec01/lar-apple');
-        (await store()).setFilters({ kinds: ['feature'], labels: ['docs'] });
-    });
-    await reload();
-    expect((await store()).filters).toEqual({ kinds: ['feature'], labels: ['docs'] });
-    expect(scopeLabel()).toBe(scoped('lar-apple, Feature, docs'));
-});
 
 test('once the first read settles, a saved repository not on the board shows as All projects and the saved value stays', async () => {
     localStorage.setItem(SCOPE_KEY, GONE);

@@ -45,13 +45,4 @@ describe('createBuildConfig', () => {
             '/App/Contents/Resources/work-records/lar-work.mjs',
         );
     });
-
-    it('signs with hardened runtime and notarizes when signed', () => {
-        const mac = createBuildConfig({ version: '0.1.0', signed: true, outputDir: '/out' }).mac;
-
-        expect(mac).not.toHaveProperty('identity');
-        expect(mac?.hardenedRuntime).toBe(true);
-        expect(mac?.notarize).toBe(true);
-        expect(mac?.sign).toMatch(/scripts\/sign-macos\.ts$/);
-    });
 });

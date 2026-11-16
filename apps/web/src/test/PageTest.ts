@@ -2,7 +2,7 @@
 // with the network stubbed and the clock fixed. Copy a page test for new ones.
 
 import { pageWithData } from '@lar-factory/shared';
-import type { BoardData, BoardAppBridge, ItemDetails, Status, ToolChecks, UpdateState } from '@lar-factory/shared';
+import type { BoardData, BoardAppBridge, ItemDetails, Status, UpdateState } from '@lar-factory/shared';
 import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 import { act } from 'react';
@@ -41,17 +41,9 @@ const answerRead = (url: string): Response => {
     return itemId ? detailsReply(itemId) : new Response(JSON.stringify(sample));
 };
 
-/** Every command check passing, with the ones given in its place. */
-export const toolChecks = (checks: Partial<ToolChecks> = {}): ToolChecks => ({
-    gh: { result: 'ok' },
-    t3: { result: 'ok' },
-    git: { result: 'ok' },
-    jq: { result: 'ok' },
-    curl: { result: 'ok' },
-    ...checks,
-});
 /** The page's clock: twenty minutes after the sample was read. */
-export const NOW = Date.parse('2026-10-21T10:00:00Z');
+const NOW = Date.parse('2026-10-21T10:00:00Z');
+
 /** `data` read without an error at NOW, so the board trusts its thread activity. The sample itself reads as stale. */
 export const fresh = (data: BoardData = sample): BoardData => ({
     ...data,
@@ -193,14 +185,16 @@ export async function chooseOption(trigger: Element, name: string): Promise<void
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
+
 /** An element's text without its project icon's initial or monogram, which screen readers skip. */
-export const textBesideIcon = (el: Element | null | undefined) => {
+const textBesideIcon = (el: Element | null | undefined) => {
     const copy = el?.cloneNode(true) as Element | undefined;
 
     copy?.querySelectorAll('[data-project-icon]').forEach((icon) => icon.remove());
 
     return text(copy);
 };
+
 /** A warning's title and description. */
 export const warningText = (el: Element) =>
     ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="${slot}"]`)));

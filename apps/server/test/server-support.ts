@@ -15,7 +15,7 @@ import { execFile, execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createServer, type Socket } from 'node:net';
+import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,21 +52,6 @@ export const SAMPLE_MODELS = {
     T3_SETTINGS: new URL('./t3-settings.sample.json', import.meta.url).pathname,
     T3_MODEL_MANIFEST: new URL('./model-manifest.sample.json', import.meta.url).pathname,
 };
-
-export async function freePort(): Promise<number> {
-    const socket = createServer();
-
-    socket.listen(0, '127.0.0.1');
-    await once(socket, 'listening');
-
-    const address = socket.address();
-
-    if (!address || typeof address === 'string') throw new Error('No test port');
-
-    await new Promise<void>((resolve) => socket.close(() => resolve()));
-
-    return address.port;
-}
 
 /** The repositories a test board has onboarded unless its options name others. */
 const TEST_REPOSITORIES = ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory'];

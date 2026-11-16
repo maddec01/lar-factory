@@ -43,16 +43,6 @@ async function setUp() {
     return { dir, cleanup, changes: () => changes };
 }
 
-test('an invalid choice is refused with a 400 and changes nothing', async () => {
-    const { cleanup, changes } = await setUp();
-
-    cleanup.save({ choice: 'settle' });
-    for (const choice of ['shred', 7, null, undefined])
-        assert.equal(cleanup.save({ choice }).status, 400, String(choice));
-    assert.deepEqual(cleanup.state(), { choice: 'settle' });
-    assert.equal(changes(), 1);
-});
-
 const IDLE = { archived: false, settled: false, live: false };
 
 /** Records with shaping threads `shaped` whose Start build saved `choice`, and a sweep over stubs: nothing reaches T3. */

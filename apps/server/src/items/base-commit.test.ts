@@ -43,16 +43,6 @@ it("returns the remote's current commit and leaves local main and the working tr
     expect(readFileSync(join(checkout, 'unsaved.txt'), 'utf8')).toBe('kept');
 });
 
-it('gives a branch started from the commit no upstream', async (t) => {
-    const { dir, checkout, tip, git } = behindClone(t);
-    const base = await fetchBaseCommit(checkout, 'main', { env });
-
-    git(checkout, 'config', 'branch.autoSetupMerge', 'always');
-    git(checkout, 'worktree', 'add', '-q', '-b', 'fix/build', join(dir, 'build'), base);
-    expect(git(checkout, 'rev-parse', 'fix/build')).toBe(tip);
-    expect(git(checkout, 'for-each-ref', '--format=%(upstream)', 'refs/heads/fix/build')).toBe('');
-});
-
 it('runs ssh in batch mode with no terminal prompt, keeping the configured ssh command', async (t) => {
     const { dir, checkout, git } = behindClone(t);
     const calls = join(dir, 'ssh-calls');

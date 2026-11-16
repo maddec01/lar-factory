@@ -21,6 +21,8 @@ import {
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { join } from 'node:path';
 
+import { isBuildMethod } from './run-settings.ts';
+
 export { isRepo } from './repository-list.ts';
 
 import { connectedTo, isItemSource, readListFile, writeListFile } from './repository-list.ts';
@@ -82,6 +84,8 @@ function settingsProblemOf(raw: Record<string, unknown>, azure: boolean): string
 
     if ('skills' in raw && !isStrings(raw.skills)) return 'field skills must be an array of strings';
 
+    if ('buildMethod' in raw && !isBuildMethod(raw.buildMethod)) return 'field buildMethod must be "tdd" or "prove-it"';
+
     return null;
 }
 
@@ -142,6 +146,7 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
         labels: pick('labels') ?? [],
         domainDocs,
         skills: pick('skills') ?? [],
+        buildMethod: pick('buildMethod') ?? 'tdd',
         createIssuesFromAddItem: pick('createIssuesFromAddItem') ?? true,
         createIssuesFromRetro: pick('createIssuesFromRetro') ?? true,
         writeRefinedSpec: pick('writeRefinedSpec') ?? true,

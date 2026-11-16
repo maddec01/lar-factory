@@ -1,7 +1,7 @@
 import { runSettingsMessage, type FactoryThreadContext, type Item, type ModelChoice } from '@lar-factory/shared';
 import { executionTarget, type ExecutionModel } from '@lar-factory/shared/execution-target';
 import { BUILTIN_REVIEWERS } from '@lar-factory/shared/factory-settings';
-import type { SnapshotRunInput } from '@lar-factory/shared/run-settings';
+import type { BuildMethod, SnapshotRunInput } from '@lar-factory/shared/run-settings';
 import type { WorkRecords } from '@lar-factory/work-records';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -43,7 +43,8 @@ export async function prepareRunLaunch(
     context: Pick<FactoryThreadContext, 'delegationModel'>,
     /** The lar-build folder of a release, whose reviewer texts a new run freezes. */
     larBuild: (release: string | undefined) => string,
-    skills: () => readonly string[],
+    /** The project's settings a new run freezes, read only when it starts one. */
+    projectSettings: () => { skills: readonly string[]; buildMethod?: BuildMethod },
     deps: RunLaunchDeps = defaults,
 ) {
     const kind = build ? 'build' : item.kind === 'concept' || item.kind === 'decision' ? item.kind : 'shaping';
@@ -53,6 +54,7 @@ export async function prepareRunLaunch(
     if (!snapshot) {
         const project = context.delegationModel ?? deps.defaults(projectId)?.selection ?? null;
         const release = deps.release();
+        const { skills, buildMethod } = projectSettings();
 
         snapshot = records.snapshotRun(item.id, records.read(item.id).revision, {
             runId: randomUUID(),
@@ -60,8 +62,9 @@ export async function prepareRunLaunch(
             projectDefault: project,
             ...(choice && { threadSelection: launchSelection(choice, project) }),
             packaged: deps.packaged(larBuild(release)),
-            skills: [...skills()],
+            skills: [...skills],
             ...(release && { release }),
+            ...(buildMethod && { buildMethod }),
         });
     }
 

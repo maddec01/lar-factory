@@ -63,7 +63,7 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
             undefined,
             context,
             () => '/skill',
-            () => ['testing'],
+            () => ({ skills: ['testing'], buildMethod: 'prove-it' }),
             dependencies(),
         );
 
@@ -72,7 +72,8 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
             model: 'opus',
             options: [{ id: 'effort', value: 'low' }],
         });
-        expect(result.snapshot.kind).toBe(kind);
+        expect(result.snapshot).toMatchObject({ kind, skills: ['testing'], buildMethod: 'prove-it' });
+        expect(result.message).toContain('\nFrozen build method: Prove it\n');
 
         if (kind === 'build')
             expect(result.snapshot).toMatchObject({
@@ -131,7 +132,7 @@ it('freezes the running release in a new run, and none without one', async () =>
             undefined,
             context,
             () => '/skill',
-            () => [],
+            () => ({ skills: [] }),
             {
                 ...dependencies(),
                 release: () => release,

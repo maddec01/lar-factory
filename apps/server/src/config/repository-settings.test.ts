@@ -73,6 +73,21 @@ test('local settings validate values and reset to factory defaults', async (t) =
     expect(readRepositorySetups(dir)[0]?.role).toBe('');
 });
 
+test('a project saves its Build method, TDD unless set, and refuses an unknown one', async (t) => {
+    const dir = await folder(t);
+    const change = (value?: unknown) =>
+        changeRepositorySettings({ repo: 'team/app', change: 'override', key: 'buildMethod', value }, dir);
+
+    saveOnboarded('team/app', null, dir);
+    expect(readRepositorySetups(dir)[0]).toMatchObject({ buildMethod: 'tdd', sources: { buildMethod: 'default' } });
+    expect(await change('prove-it')).toMatchObject({
+        setup: { buildMethod: 'prove-it', sources: { buildMethod: 'local' } },
+    });
+    expect(await change('waterfall')).toMatchObject({ status: 400 });
+    expect(readRepositorySetups(dir)[0]?.buildMethod).toBe('prove-it');
+    expect(await change()).toMatchObject({ setup: { buildMethod: 'tdd' } });
+});
+
 test('legacy private domain docs read as off and save as on or off', async (t) => {
     const dir = await folder(t);
 

@@ -13,7 +13,6 @@ import {
     sameLabel,
     sameRepo,
     usesGh,
-    type BoardData,
     type FirstRead,
     type Item,
     type ItemSource,
@@ -82,6 +81,8 @@ import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { createSampleBoard } from './sample/sample-board.ts';
+import { sampleFixture } from './sample/sample-fixture.ts';
+import { SAMPLE_DESK_SCENARIOS } from './sample/sample-scenarios.ts';
 import { factorySettingsService } from './settings/factory-settings.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { parentSkillCheck } from './skills/skill-check.ts';
@@ -131,7 +132,7 @@ if (settings.problem) log(`using the default settings: ${settings.problem}`);
 
 const stopMemorySampler = startMemorySampler();
 const fixture = process.env.BOARD_DATA_FILE;
-const sampleData = fixture ? (JSON.parse(readFileSync(fixture, 'utf8')) as BoardData) : null;
+const sampleData = fixture ? sampleFixture() : null;
 /** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
 
@@ -1483,6 +1484,15 @@ function sampleProjectIcon(projectId: string): ProjectImage | undefined {
 }
 
 const sample = sampleData ? await createSampleBoard(board, sampleData) : null;
+
+// `pnpm run sample` puts the desk's other waits in place through the sample's own controls, as a reader would.
+if (sample && process.env.BOARD_SAMPLE_SCENARIOS)
+    for (const input of SAMPLE_DESK_SCENARIOS) {
+        const { status } = await sample.sampleControl(input);
+
+        if (status >= 400) log(`sample scenario ${String(input.action)} did not apply (${status})`);
+    }
+
 const { server, endStreams } = createBoardServer({
     factorySettings: factorySettingsService(),
     settingsModels: () =>

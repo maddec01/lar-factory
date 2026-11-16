@@ -22,3 +22,41 @@ Work vertically: one seam, one failing test, enough implementation to pass,
 then the next cycle informed by what you learned. Do not write all tests before
 all implementation, anticipate future tests or add speculative features.
 Refactoring belongs to review, outside this red/green cycle.
+
+## Which tests to keep
+
+Every test costs CI time and upkeep, so keep one only when its failure would be
+silent or costly and nothing else would catch it:
+
+- **Data:** loss or corruption, persistence, migrations, reopen and restart
+  recovery.
+- **Security guards:** auth, sessions, roles and permissions, path, origin and
+  redirect checks. Write one test per guard, not one per variant.
+- **One happy path** per feature, endpoint group or job, through the highest
+  seam that still runs fast.
+- **External contracts:** an API document, or a file or wire format another
+  system reads.
+- **Regressions** for a bug that was silent or expensive to find.
+
+Rely on types, the framework, review, and production errors and user reports
+for everything else. Don't add tests for:
+
+- validation and boundary variants, or several variants of one behaviour;
+- wording, formatting and layout;
+- what the type system or a library already guarantees;
+- mocks that restate the code;
+- timing and pacing;
+- a helper that a kept test already runs.
+
+When the slice passes, delete the cycle tests that a kept test covers.
+
+Keep each test light:
+
+- Use in-memory state or a temporary database, not real services.
+- Use a fake clock instead of sleeps, and wait on a condition, not a fixed
+  delay.
+- Use the smallest fixture that still crosses the real threshold.
+- Use a local fake, not a real process or network, when it answers the same
+  question.
+
+A test that takes more than a few seconds needs a stated reason.

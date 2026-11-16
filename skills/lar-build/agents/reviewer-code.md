@@ -31,6 +31,11 @@ leave the worktree as you found it. These Overrides replace parts of that Copy:
 Follow `project-rules.md#reviewer-checks` for validation-record reads and
 permitted broad checks.
 
+Under Standards, report each added or changed test that
+`<lar-build>/test-first.md#which-tests-to-keep` would not keep, and each one it
+would make lighter. Its Fix deletes or lightens that test. A required guard,
+contract or happy path with no test is also a finding.
+
 For declared consumption, verify the public interface accepts producer output. Return
 `consumption: [{source,input,test,evidence}]` matching each brief Consumption test;
 the builder records it with this Code result. A constant-only consumer is a finding.

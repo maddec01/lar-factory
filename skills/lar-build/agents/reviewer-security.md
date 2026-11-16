@@ -15,8 +15,9 @@ diff crosses no trust boundary.
 That Copy is written for the code's author. You report and the builder fixes,
 so leave the worktree as you found it. These Overrides replace parts of it:
 
-- **Process: Threat Model First**, step 4: an abuse case with no test is a
-  finding; its Fix names the test.
+- **Process: Threat Model First**, step 4: a guard the diff adds or changes
+  with no test is a finding, and its Fix names the test. One test per guard
+  covers its abuse cases; more variants of the same guard are not findings.
 - **skills/security-and-hardening/SKILL.md#Ask First (Requires Human Approval)**:
   report a `should` finding only when a listed change lacks authorization in
   the current session. Existing authorization needs no repeated permission prompt.

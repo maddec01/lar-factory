@@ -477,6 +477,26 @@ it('retains recovery evidence and deletes terminal journals together with their 
     expect(reopened.list({})).toEqual([]);
 });
 
+it('invalidates dispatch when a different ticket is attached outside the journal', async () => {
+    const records = await open();
+    const work = await passingBuild(records);
+    const input = proposal(records, work.workId);
+    const plan = approve(records, work.workId, input);
+
+    records.attachTicket(work.workId, work.revision, 'team/app#15');
+    expect(records.pendingPublication(work.workId, plan.planId).current).toBe(false);
+    expect(() =>
+        records.claimPublication(
+            work.workId,
+            plan.planId,
+            plan.revision,
+            plan.digest,
+            { tickets: input.tickets, operations: input.operations },
+            'board',
+        ),
+    ).toThrow(/destination|ticket/);
+});
+
 it('never recreates a completed ticket after multiple replacement plans', async () => {
     const records = await open();
     const work = await passingBuild(records);

@@ -1,6 +1,8 @@
 import { assert, describe, it } from '@effect/vitest';
 import type { UpdateChannel, UpdateState } from '@lar-factory/shared';
+import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
+import { TestClock } from 'effect/testing';
 
 import * as AppUpdates from './AppUpdates.ts';
 import type { ChannelSetting } from './channel-setting.ts';
@@ -107,6 +109,17 @@ const failure = (operation: 'check' | 'download' | 'install', message: string, c
     Effect.fail(new ElectronUpdaterError({ operation, cause: Object.assign(new Error(message), code && { code }) }));
 
 describe('AppUpdates', () => {
+    it.effect('checks 15 s after launch and then every 4 minutes', () =>
+        Effect.gen(function* () {
+            const { fake } = yield* setup();
+
+            yield* TestClock.adjust(Duration.seconds(15));
+            assert.strictEqual(fake.checks, 1);
+            yield* TestClock.adjust(Duration.minutes(4));
+            assert.strictEqual(fake.checks, 2);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect('reports a newer version as available, and one of the other channel as up to date', () =>
         Effect.gen(function* () {
             const { fake, updates } = yield* setup();

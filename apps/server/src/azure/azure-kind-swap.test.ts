@@ -54,6 +54,14 @@ test('a User Story becoming a Bug shows its description in Repro Steps, and the 
     expect(workItem.rev).toBe(2);
 });
 
+test('text already in the new field stays, after the moved text', async () => {
+    const { workItem, kinds } = on({ type: 'Bug', reproSteps: '<p>Steps</p>', description: '<p>Older</p>' });
+
+    await kinds.setType(7, 'User Story');
+    expect(workItem.description).toBe('<p>Steps</p><hr><p>Older</p>');
+    expect(workItem.reproSteps).toBe('<p>Steps</p>');
+});
+
 test('structure stays in the description, in one copy, whichever way the type changes', async () => {
     const structure: TrackerStructure = {
         version: 1,

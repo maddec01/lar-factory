@@ -25,6 +25,14 @@ describe('createBuildConfig', () => {
         ]);
     });
 
+    it("points a Stable Release at lar-factory's latest releases", () => {
+        const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
+
+        expect(config.publish).toEqual([
+            { provider: 'github', owner: 'maddec01', repo: 'lar-factory', releaseType: 'release' },
+        ]);
+    });
+
     it('ships the lar-work command built from packages/work-records outside app.asar, where its launcher runs it', () => {
         const config = createBuildConfig({ version: '0.1.0', signed: false, outputDir: '/out' });
 

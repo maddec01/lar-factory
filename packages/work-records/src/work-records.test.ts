@@ -716,6 +716,20 @@ describe('work-record completion', () => {
         records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
     };
 
+    it('keeps refinement without delivery incomplete for blockers and retention', async () => {
+        const records = await open();
+        const concept = lar(records, 'concept');
+        const dependent = lar(records, 'build');
+
+        records.addBlocker(dependent.workId, 1, concept.workId);
+        records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map');
+        records.setFogGone(concept.workId, at(records, concept.workId), true);
+        expect(records.refinement(concept.workId).complete).toBe(true);
+        expect(records.completion(concept.workId)).toEqual({ complete: false, reasons: ['No delivery planned.'] });
+        expect(records.waitingOn(dependent.workId)).toHaveLength(1);
+        expect(records.read(concept.workId).finishedAt).toBeNull();
+    });
+
     it('rechecks refinement when decisions are rewritten or restored and Fog returns', async () => {
         const records = await open();
         const concept = lar(records, 'concept');
@@ -908,6 +922,26 @@ describe('work-record retention', () => {
         });
         expect(records.children(build.workId)).toMatchObject([{ workId: open_.workId }]);
         expect(records.read(build.workId).revision).toBe(5);
+    });
+
+    it('keeps a finished record another kept record waits on, and deletes both once neither is needed', async () => {
+        const records = await open();
+        const [blocker, waiting] = [lar(records, 'build'), lar(records, 'build')];
+
+        records.addBlocker(waiting.workId, 1, blocker.workId);
+        records.recordFinished(blocker.workId, 2);
+
+        const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
+
+        expect(records.deleteExpired(setting, later(31))).toEqual({
+            deleted: [],
+            kept: [{ workId: blocker.workId, reason: `The build ${waiting.workId}, which is kept, waits on it.` }],
+        });
+        records.recordFinished(waiting.workId, 2);
+        expect(records.deleteExpired(setting, later(31)).deleted.toSorted()).toEqual(
+            [blocker.workId, waiting.workId].toSorted(),
+        );
+        expect(records.list({})).toEqual([]);
     });
 });
 
@@ -1104,6 +1138,16 @@ describe('shaping thread cleanup rows', () => {
             { threadId: 'shape-2', action: 'archive', failure: null },
         ]);
         expect(new Set(rows.map((row) => row.commandId)).size).toBe(2);
+    });
+
+    it('records a Keep as already cleaned, so a later build under another setting leaves that thread alone', async () => {
+        const { records, build, startBuild } = await started('keep');
+
+        startBuild('build-1');
+        expect(pendingIds(records)).toEqual([]);
+        records.addThread(build.workId, records.read(build.workId).revision, 'shape-3', 'shape');
+        startBuild('build-2', 'archive');
+        expect(pendingIds(records)).toEqual(['shape-3']);
     });
 
     it('touches only threads without a row, skips deleted threads and keeps a cleaned thread cleaned', async () => {

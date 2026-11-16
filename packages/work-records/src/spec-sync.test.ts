@@ -161,6 +161,17 @@ test.each([undefined])('unknown GitHub edits stay out until explicitly accepted 
     });
 });
 
+test('a setting off drops pending writes and stops tracker edits from changing the local brief', async () => {
+    const f = await fixture();
+
+    await syncSpecs(f.records, { provider: f.provider, setups: [{ ...setup, writeRefinedSpec: false }] });
+    expect(f.writes).toHaveLength(0);
+    expect(f.records.specPending()).toEqual([]);
+    f.edit({ body: 'External edit', version: '2' });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.records.body(f.record.workId, 'brief')).toBe('## What\nBuild it.');
+});
+
 test('Azure revisions sync member edits and preserve Original through a sanitizer that removes hidden markup', async () => {
     const repository = 'example/Project/widget';
     const f = await fixture(repository);
@@ -230,6 +241,38 @@ test.each(['unverified'] as const)('unverified editing access never reaches a pr
     });
     expect(f.writes).toHaveLength(0);
     expect(f.records.specState(f.record.workId).error).toMatch(/Access|access/);
+});
+
+test('a Dependency ticket is excluded from Spec writes even when a record holds the same ticket', async () => {
+    const f = await fixture();
+    const owner = f.records.create({ title: 'Other work', kind: 'build', repository: setup.repo });
+
+    f.records.addDependency(owner.workId, {
+        need: 'External contract',
+        owner: 'Other team',
+        ticket: `${setup.repo}#7`,
+    });
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.writes).toHaveLength(0);
+});
+
+test('a trusted title edit cannot smuggle a previously rejected body into the brief', async () => {
+    const f = await fixture();
+
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+    f.edit({ body: formatTicketSpec('Rejected hostile body.', 'Authored request.'), editorWrite: false, version: '3' });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+
+    const held = f.records.specState(f.record.workId);
+
+    await resolveSpecEdit(f.records, f.record.workId, held.generation, 'reject', 'local-user', {
+        setups: [setup],
+        provider: f.provider,
+    });
+    f.edit({ title: 'Trusted new title', titleEditorWrite: true, version: '4' });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+    expect(f.records.read(f.record.workId).title).toBe('Trusted new title');
+    expect(f.records.body(f.record.workId, 'brief')).toBe('## What\nBuild it.');
 });
 
 test('the session Azure read-only control overrides a saved false value even with fake verified access', async () => {
@@ -341,6 +384,35 @@ test('trusted queued ticket edits refresh starting context without approving a b
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: contextId });
     expect(frozen.context).toBe('Pedro added reconnect acceptance criteria.');
     expect(f.records.launchIntents({ workId: contextId })[0]!.buildInput).toEqual(frozen);
+});
+
+test('unknown starting edits are held, explicitly accepted as context, and a read failure retains that context', async () => {
+    const f = await fixture();
+    const r = f.records.create({
+        title: 'Starting request',
+        context: 'Captured.',
+        repository: setup.repo,
+        kind: 'build',
+        status: 'List',
+        ticket: `${setup.repo}#82`,
+    });
+
+    f.edit({ number: 82, title: 'Starting request', body: 'Untrusted request.', version: '1', editorWrite: undefined });
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: r.workId });
+    expect(f.records.initialContext(r.workId)).toBe('Captured.');
+    expect(f.records.specState(r.workId).held?.body).toBe('Untrusted request.');
+    await resolveSpecEdit(f.records, r.workId, f.records.specState(r.workId).generation, 'accept', 'Pedro', {
+        provider: f.provider,
+        setups: [setup],
+    });
+    expect(f.records.initialContext(r.workId)).toBe('Untrusted request.');
+    expect(f.records.body(r.workId, 'brief')).toBeNull();
+    expect(f.records.specState(r.workId).active).toBe(false);
+    expect(f.records.gate(r.workId).current).toBe(false);
+    f.fail(true);
+    await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: r.workId });
+    expect(f.records.initialContext(r.workId)).toBe('Untrusted request.');
+    expect(f.records.specState(r.workId).warning).toContain('Offline');
 });
 
 test('a changed brief marks the retained approved ticket Spec out of date, then re-gating replaces it and removes the marker', async () => {

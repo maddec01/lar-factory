@@ -873,6 +873,35 @@ test('after a restart, an unresolved start records the thread T3 shows for it an
     assert.deepEqual(started, [], 'the recorded running thread is the start');
 });
 
+test('Abandon is refused while a Start is in flight, uncertain or done for the item', async () => {
+    const refused = 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
+    const records = await openRecords();
+    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+    const unsure = records.create({ title: 'Unsure', repository: WEB, kind: 'feature', status: 'Queued' });
+
+    records.recordLaunchIntent(unsure.workId, unsure.revision, 'shape');
+
+    let inFlight: ReturnType<ItemCommands['abandon']> | undefined;
+    const { commands } = recordedCommands(records, {
+        during: () => {
+            inFlight ??= commands.abandon(work.workId);
+        },
+    });
+
+    assert.equal((await commands.start(work.workId, undefined)).status, 200);
+    assert.deepEqual(await inFlight!.then((r) => [r.status, (r.body as { error: string }).error]), [409, refused]);
+    assert.equal((await commands.abandon(work.workId)).status, 409, 'done');
+    assert.deepEqual(
+        await commands.abandon(unsure.workId).then((r) => [r.status, (r.body as { error: string }).error]),
+        [409, refused],
+        'uncertain',
+    );
+    assert.deepEqual(
+        records.list({}).map((r) => r.setAside),
+        [false, false],
+    );
+});
+
 const idle = (ids: string[]) =>
     ids.map((id) => ({ id, title: 't', state: 'done' as const, updated: '2026-10-31T00:00:00Z' }));
 

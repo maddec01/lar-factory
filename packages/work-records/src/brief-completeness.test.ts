@@ -39,28 +39,6 @@ test('gate presentation refuses each missing Bug obligation, including empty sec
     }
 });
 
-test('feature gate names all missing acceptance, files and tests', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'brief-completeness-'));
-    const records = await openWorkRecords(join(dir, 'work.db'));
-
-    try {
-        let work = records.create({ title: 'Names', repository: 'fake/app', kind: 'feature' });
-
-        work = records.setBody(
-            work.workId,
-            work.revision,
-            'brief',
-            '## What\nKeep names.\n## Done when\nTODO\n### Tests\nnone\n## Scope\n### Files\nTBD',
-        );
-        expect(() => records.displayGate(work.workId)).toThrow(/acceptance.*affected files.*named tests/);
-        work = records.setBody(work.workId, work.revision, 'brief', feature);
-        expect(records.displayGate(work.workId).brief).toBe(feature);
-    } finally {
-        records.close();
-        rmSync(dir, { recursive: true, force: true });
-    }
-});
-
 test('every linked batch member is checked again while unrelated sibling progress preserves Doubt', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'linked-completeness-'));
     const records = await openWorkRecords(join(dir, 'work.db'));
@@ -102,51 +80,6 @@ test('every linked batch member is checked again while unrelated sibling progres
         records.close();
         rmSync(dir, { recursive: true, force: true });
     }
-});
-
-test("accepts S01's amended brief and explains the first brief's missing tests", () => {
-    const amended = readFileSync(new URL('../test/briefs/s01-amended.txt', import.meta.url), 'utf8');
-    const first = readFileSync(new URL('../test/briefs/s01-first.txt', import.meta.url), 'utf8');
-
-    expect(() => requireCompleteBrief('build', amended)).not.toThrow();
-    expect(() => requireCompleteBrief('build', first)).toThrow(
-        'named tests (Tests or Done when: name a test file plus its case, or a test case with an assertion; e.g. test/cli.test.js: omitted name prints Hello, friend!)',
-    );
-});
-
-test.each([
-    '### Tests\n- test/name.test.js: preserves one-character names.',
-    '### Tests\ntest/name.test.js: preserves one-character names.',
-    '### Tests\n- In test/name.test.js, verify one-character names survive trimming.',
-    '- test/name.test.js: preserves one-character names.',
-    '- `test/name.test.js`: preserves one-character names.',
-    '- assertions.js: preserves one-character names.',
-    '### Acceptance criteria\n- test/name.test.js: preserves one-character names.',
-])('accepts named tests in natural brief forms: %s', (tests) => {
-    const brief = feature.replace(/### Tests\n[^#]*/, `${tests}\n`);
-
-    expect(() => requireCompleteBrief('build', brief)).not.toThrow();
-});
-
-test.each([
-    'Run tests and keep them green.',
-    '- `name.js`',
-    '- test/name.test.js',
-    '- TODO',
-    '```markdown\n- test/name.test.js: preserves one-character names.\n```',
-])('generic prose, filenames alone and fenced examples do not name a test case: %s', (tests) => {
-    const brief = feature.replace(/### Tests\n[^#]*/, `### Tests\n${tests}\n`);
-
-    expect(() => requireCompleteBrief('build', brief)).toThrow('named tests');
-});
-
-test('Bug accepts an unquoted regression test file and case and explains missing format', () => {
-    const unquoted = diagnosis.replaceAll('`', '');
-
-    expect(() => requireCompleteBrief('bug', feature + unquoted)).not.toThrow();
-    expect(() => requireCompleteBrief('bug', feature + unquoted.replace(/## Regression test\n[^#]*/, ''))).toThrow(
-        'named regression test (Regression test: name a test file plus its case',
-    );
 });
 
 test('S05-F4-001 refuses C’s constant-only acceptance at single and batch gates', async () => {

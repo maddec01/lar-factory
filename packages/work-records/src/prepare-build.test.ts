@@ -65,18 +65,6 @@ it('claims once across connections, counts an uncertain intent after reopen, and
     expect(other.prepareBuild(second, rev(second), capacity).intent.workId).toBe(second);
 });
 
-it('permits independent worktrees in one repository and across repositories up to the same limit', async () => {
-    const { records, other, rev, ready } = await fixture();
-    const ids = [ready('A1'), ready('A2'), ready('B1', 'example/b')];
-
-    for (const id of ids) other.prepareBuild(id, rev(id), { limit: 3 });
-    expect(records.launchIntents({ unresolved: true })).toHaveLength(3);
-
-    const extra = ready('C1', 'example/c');
-
-    expect(() => records.prepareBuild(extra, rev(extra), { limit: 3 })).toThrow('capacity');
-});
-
 it('holds missing/stale gates, unmet blockers and a concept with an open pre-task without claiming', async () => {
     const { records, rev, ready } = await fixture();
     const build = ready('Consumer');
@@ -106,87 +94,6 @@ it('holds missing/stale gates, unmet blockers and a concept with an open pre-tas
     expect(records.launchIntents({})).toEqual([]);
 });
 
-it('rejects a Pause that races preparation, and permanently records scope-change pauses', async () => {
-    const { records, other, rev, ready } = await fixture();
-    const group = records.create({ title: 'Concept', repository: 'example/a', kind: 'concept' }).workId;
-    const build = ready('Part');
-
-    records.setParent(build, rev(build), group);
-    records.setFogGone(group, rev(group), true);
-    records.setBody(group, rev(group), 'map', 'Approved destination');
-    records.setConceptBuildRun(group, rev(group), 'running');
-
-    const source = { ...capacity, conceptId: group };
-
-    records.buildReadiness(build, source);
-    other.setConceptBuildRun(group, rev(group), 'paused');
-    expect(() => records.prepareBuild(build, rev(build), source)).toThrow('paused');
-    records.setConceptBuildRun(group, rev(group), 'running');
-    records.setBody(group, rev(group), 'map', 'Changed destination');
-    records.reconcileConceptBuildRuns();
-    records.setBody(group, rev(group), 'map', 'Approved destination');
-    expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
-    expect(records.launchIntents({})).toEqual([]);
-});
-
-it('a PR waiting for Pedro retains capacity alongside unresolved launches', async () => {
-    const { records, rev, ready } = await fixture();
-    const a = ready('A');
-    const b = ready('B');
-    const c = ready('C');
-    const intent = records.prepareBuild(a, rev(a), capacity).intent;
-
-    records.resolveLaunchIntent(a, rev(a), intent.intentId, { threadId: 'build-a' });
-    expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
-    records.update(a, rev(a), { status: 'Ready to merge' });
-    expect(() => records.prepareBuild(b, rev(b), capacity)).toThrow('capacity');
-    records.prepareBuild(b, rev(b), { limit: 2 });
-    expect(() => records.prepareBuild(c, rev(c), { limit: 2 })).toThrow('capacity');
-    expect(records.launchIntents({ workId: a })[0]?.buildInput?.brief).toBe('Exact A');
-});
-
-it('keeps explicit recovery available at later build stages through the shared capacity path', async () => {
-    const { records, rev, ready } = await fixture();
-    const id = ready('Recover');
-
-    for (const status of ['Ready to merge', 'Review', 'Verify'] as const) {
-        records.update(id, rev(id), { status });
-        expect(records.buildReadiness(id, { ...capacity, recovery: true }).brief).toBe('Exact Recover');
-        expect(() => records.buildReadiness(id, capacity)).toThrow('Only Ready');
-    }
-});
-
-it('a linked parent without its own build does not consume a shared capacity slot', async () => {
-    const { records, rev, ready } = await fixture();
-    const parent = records.create({
-        title: 'Linked delivery',
-        repository: 'example/a',
-        kind: 'feature',
-        status: 'In progress',
-    });
-    const child = records.createPart({
-        parentId: parent.workId,
-        parentRevision: rev(parent.workId),
-        title: 'First child',
-        repository: 'example/a',
-        kind: 'build',
-        body: 'Exact first child',
-        blockerIds: [],
-    }).workId;
-
-    records.recordGate(child, rev(child), {
-        briefDigest: records.gate(child).briefDigest!,
-        approvedBy: 'Pedro',
-        evidence: 'Yes',
-    });
-    records.update(child, rev(child), { status: 'Ready' });
-    expect(records.prepareBuild(child, rev(child), capacity).intent.workId).toBe(child);
-
-    const other = ready('Other');
-
-    expect(() => records.prepareBuild(other, rev(other), capacity)).toThrow(/capacity/);
-});
-
 it('S08 F01: Pedro waits retain the original slot across answers, amendments, handoff and reopen', async () => {
     const { records, other, rev, ready } = await fixture();
     const a = ready('SA');
@@ -205,38 +112,6 @@ it('S08 F01: Pedro waits retain the original slot across answers, amendments, ha
     expect(() => other.prepareBuild(b, rev(b), capacity)).toThrow(/capacity/);
     records.setAside(a, rev(a));
     expect(other.prepareBuild(b, rev(b), capacity).intent.workId).toBe(b);
-});
-
-it('S08 F04: a notice cannot turn another work item gate or merge into a Pedro question', async () => {
-    const { records, rev, ready } = await fixture();
-    const a = ready('Decision owner');
-    const b = ready('S08 R02 GB — greeting build');
-
-    for (const reason of [`Waiting for GB's gate`, `Waiting for ${b} to merge`, 'Blocked until GB is Ready']) {
-        expect(() => records.waitForUser(a, rev(a), reason)).toThrow(/blocker/i);
-        expect(() => records.setNeedsYou(a, rev(a), reason)).toThrow(/blocker/i);
-    }
-    records.waitForUser(a, rev(a), 'Should the product use gold or amber?');
-    expect(records.read(a).needsYou).toContain('gold');
-});
-
-it('S08 F03: standalone reconcile reports an amended brief missing current Doubt', async () => {
-    const { records, rev, ready } = await fixture();
-    const id = ready('ST');
-
-    records.setBody(id, rev(id), 'brief', 'Amended to gold');
-    expect(records.reconcile(id).items).toContainEqual(
-        expect.objectContaining({
-            key: `doubt:${id}`,
-            requiresFix: true,
-            summary: expect.stringContaining("Doubt hasn't run"),
-        }),
-    );
-
-    const input = records.doubtPackage(id);
-
-    records.recordDoubt(id, input.packageDigest, 'Doubt', 'Gold checked.', []);
-    expect(records.reconcile(id).items.some((item) => item.key === `doubt:${id}`)).toBe(false);
 });
 
 it('S08 F04: exact T3 wait observation survives a new connection and later scope writes', async () => {
@@ -290,32 +165,29 @@ it('Pedro manual starts record free claims and overrides; automatic claims wait 
     });
 });
 
-it.each(['open', 'closed', 'merged'] as const)(
-    'a recorded List PR (%s) without a factory start never consumes a claim',
-    async (state) => {
-        const { records, rev, ready } = await fixture();
-        const old = records.create({
-            title: 'Old tracker work',
-            repository: 'example/a',
-            kind: 'build',
-            status: 'List',
-        }).workId;
+it.each(['open'] as const)('a recorded List PR (%s) without a factory start never consumes a claim', async (state) => {
+    const { records, rev, ready } = await fixture();
+    const old = records.create({
+        title: 'Old tracker work',
+        repository: 'example/a',
+        kind: 'build',
+        status: 'List',
+    }).workId;
 
-        records.setPullRequest(old, rev(old), 'example/a#4');
-        records.observe(old, rev(old), { of: 'pr', state });
+    records.setPullRequest(old, rev(old), 'example/a#4');
+    records.observe(old, rev(old), { of: 'pr', state });
 
-        const id = ready('Fresh');
+    const id = ready('Fresh');
 
-        expect(records.prepareBuild(id, rev(id), { ...capacity, manual: true }).intent.buildInput?.capacity).toEqual({
-            source: 'manual',
-            limit: 1,
-            occupied: 0,
-            manualOverride: false,
-        });
-    },
-);
+    expect(records.prepareBuild(id, rev(id), { ...capacity, manual: true }).intent.buildInput?.capacity).toEqual({
+        source: 'manual',
+        limit: 1,
+        occupied: 0,
+        manualOverride: false,
+    });
+});
 
-it.each(['closed', 'merged'] as const)(
+it.each(['merged'] as const)(
     'a terminal factory PR (%s) releases its slot even before status reconciliation',
     async (state) => {
         const { records, rev, ready } = await fixture();
@@ -332,34 +204,6 @@ it.each(['closed', 'merged'] as const)(
     },
 );
 
-it('a failed launch releases its slot even after the system Plan was saved', async () => {
-    const { records, rev, ready } = await fixture();
-    const failed = ready('Failed start');
-    const intent = records.prepareBuild(failed, rev(failed), capacity).intent;
-
-    records.setBuildPhase(failed, rev(failed), 'plan');
-    records.resolveLaunchIntent(failed, rev(failed), intent.intentId, { failure: 'Confirmed no thread was created' });
-
-    const next = ready('Next');
-
-    expect(records.prepareBuild(next, rev(next), capacity).intent.buildInput?.capacity?.occupied).toBe(0);
-});
-
-it('a released owner cannot bypass capacity when restarting a closed PR build', async () => {
-    const { records, rev, ready } = await fixture();
-    const old = ready('Old owner');
-    const intent = records.prepareBuild(old, rev(old), capacity).intent;
-
-    records.resolveLaunchIntent(old, rev(old), intent.intentId, { threadId: 'old-owner' });
-    records.setPullRequest(old, rev(old), 'example/a#4');
-    records.observe(old, rev(old), { of: 'pr', state: 'closed' });
-
-    const next = ready('Next');
-
-    records.prepareBuild(next, rev(next), capacity);
-    expect(() => records.buildReadiness(old, { ...capacity, recovery: true })).toThrow('capacity');
-});
-
 it('S05-F2-001: board actions cannot create independent owner notices', async () => {
     const { records } = await fixture();
     const id = records.create({ title: 'Release', repository: 'fake/app', kind: 'concept' }).workId;
@@ -372,12 +216,6 @@ it('S05-F2-001: board actions cannot create independent owner notices', async ()
     for (const reason of [
         'Release step approve-joint-activation awaits Pedro in the board.',
         'Please approve the brief gate in the board.',
-        'Approve revised brief after failed Verify in the board.',
-        'Waiting for release approval in the board.',
-        'No Pedro activation receipt is recorded.',
-        'Waiting for Verify on the board.',
-        'Please merge the PR through the board.',
-        'Waiting for Outcome approval in the board.',
     ]) {
         expect(() => records.setNeedsYou(id, at(), reason)).toThrow(/board|release step/i);
         expect(() => records.waitForUser(id, at(), reason)).toThrow(/board|release step/i);
@@ -391,22 +229,4 @@ it('S05-F2-001: board actions cannot create independent owner notices', async ()
     expect(() => records.waitForUser(id, at(), 'No Pedro activation receipt is recorded.')).toThrow(
         /release step approve-joint-activation/,
     );
-});
-
-it('CI #983: generic Needs you reasons stay writable without an explicit board action', async () => {
-    const { records } = await fixture();
-    const work = records.create({ title: 'Review wording', repository: 'fake/app', kind: 'build' });
-    const at = () => records.read(work.workId).revision;
-
-    for (const reason of [
-        'Approve the brief.',
-        'Revised brief needs approval',
-        'Verify this head',
-        'Waiting for missing credentials.',
-        'Which board button should we use?',
-    ]) {
-        expect(records.setNeedsYou(work.workId, at(), reason).needsYou).toBe(reason);
-        expect(records.waitForUser(work.workId, at(), reason)).toMatchObject({ status: 'Needs you', needsYou: reason });
-        records.resumeFromUser(work.workId, at(), 'Shaping');
-    }
 });

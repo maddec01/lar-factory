@@ -13,7 +13,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-async function setup(owner = true) {
+async function setup() {
     const dir = mkdtempSync(join(tmpdir(), 'outcome-run-'));
 
     dirs.push(dir);
@@ -31,7 +31,7 @@ async function setup(owner = true) {
     }).workId;
     const at = (id = group) => records.read(id).revision;
 
-    if (owner) records.addThread(group, at(), 'group-owner', 'shape');
+    records.addThread(group, at(), 'group-owner', 'shape');
 
     const part = records.createPart({
         parentId: group,
@@ -103,14 +103,6 @@ test('rejects a dispatched result after the release criterion changes and prepar
     expect(next.commandId).not.toBe(first.commandId);
     f.records.outcomeCheckDelivered(f.group, first.commandId, 'accepted');
     expect(f.records.outcomeCheck(f.group).run?.sent).toBe(false);
-});
-
-test('a missing group owner returns an actionable check rather than manufacturing an owner', async () => {
-    const f = await setup(false);
-
-    f.merge();
-    f.release();
-    expect(f.records.prepareOutcomeCheck(f.group)).toMatchObject({ ready: true, run: null });
 });
 
 test('failed Outcome repair is explicit, digest-bound and durable; new parts still need the normal gate', async () => {

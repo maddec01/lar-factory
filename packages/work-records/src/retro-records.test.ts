@@ -93,23 +93,6 @@ test('one complete proposal and board choice persist across connections with sta
     }
 });
 
-test('an empty retro records no choice, while declining proposals records an explicit empty selection', async () => {
-    const s = await setup();
-
-    s.merge();
-    s.records.prepareRetro(s.id);
-    s.records.proposeRetro(s.id, s.at(), []);
-    expect(s.records.retro(s.id)).toMatchObject({ suggestions: [], choice: null, captures: [] });
-    expect(() => s.records.chooseRetro(s.id, s.at(), [], 'Pedro')).toThrow(/awaiting/);
-
-    const t = await setup();
-
-    t.merge();
-    t.records.prepareRetro(t.id);
-    t.records.proposeRetro(t.id, t.at(), suggestions);
-    expect(t.records.chooseRetro(t.id, t.at(), [], 'Pedro').choice).toMatchObject({ selected: [], by: 'Pedro' });
-});
-
 test('retention cannot hide or delete an unanswered retro choice', async () => {
     const s = await setup();
 

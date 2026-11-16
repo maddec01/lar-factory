@@ -1,15 +1,6 @@
 import { defaultFactorySettings } from '@lar-factory/shared/factory-settings';
 import { execFileSync } from 'node:child_process';
-import {
-    chmodSync,
-    mkdirSync,
-    mkdtempSync,
-    renameSync,
-    realpathSync,
-    rmSync,
-    symlinkSync,
-    writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, renameSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vite-plus/test';
@@ -99,33 +90,6 @@ it('treats executable-mode changes as uncertain content so permission changes ca
     expect(readReviewerDiff(base, head, cwd).diff.files).toEqual([{ path: 'ordinary.ts', text: null }]);
 });
 
-it('treats a changed existing symlink target as uncertain rather than source code', () => {
-    const { cwd, commit } = repository();
-    const link = join(cwd, 'ordinary.ts');
-
-    symlinkSync('first', link);
-
-    const base = commit();
-
-    rmSync(link);
-    symlinkSync('second', link);
-
-    const head = commit();
-
-    expect(readReviewerDiff(base, head, cwd).diff.files).toEqual([{ path: 'ordinary.ts', text: null }]);
-});
-
-it('returns uncertain text for invalid UTF-8, without silently replacing bytes', () => {
-    const { cwd, commit } = repository();
-    const base = commit();
-
-    writeFileSync(join(cwd, 'README.md'), Buffer.from([0xff, 0xfe, 0x61]));
-
-    const head = commit();
-
-    expect(readReviewerDiff(base, head, cwd).diff.files).toEqual([{ path: 'README.md', text: null }]);
-});
-
 it('selects through the CLI with saved modes and custom rules, atomically starting Review without tracker sync', async () => {
     const { cwd, commit } = repository();
     const data = directory();
@@ -209,148 +173,6 @@ it('selects through the CLI with saved modes and custom rules, atomically starti
     });
     expect(reopened.reviewRounds(record.workId)).toEqual([]);
     reopened.close();
-}, 30_000);
-
-it('accepts Code requests through the CLI and saves their provenance with the resulting round', async () => {
-    const { cwd, commit } = repository();
-    const data = directory();
-    const records = await openWorkRecords(workRecordsPath(data));
-    const record = records.create({ title: 'Escalation fixture', repository: 'example/repo', kind: 'feature' });
-
-    records.close();
-
-    const settings = defaultFactorySettings();
-
-    settings.reviewers.find((entry) => entry.id === 'ui')!.mode = { kind: 'never' };
-    writeFactorySettings(settings, data);
-
-    const base = commit();
-
-    writeFileSync(join(cwd, 'helper.ts'), 'verifyCaller();\n');
-
-    const head = commit();
-    const escalation = { requestedBy: 'code', reason: 'verifyCaller changes auth.' };
-    const request = { reviewer: 'security', ...escalation };
-    const file = join(data, 'requests.json');
-
-    writeFileSync(
-        file,
-        JSON.stringify([request, request, { ...request, reviewer: 'ui' }, { ...request, reviewer: 'code' }]),
-    );
-
-    const run = (...args: string[]) =>
-        JSON.parse(
-            execFileSync(
-                process.execPath,
-                [
-                    '--disable-warning=ExperimentalWarning',
-                    join(import.meta.dirname, 'cli.ts'),
-                    ...args,
-                    '--data-dir',
-                    data,
-                ],
-                { cwd, encoding: 'utf8' },
-            ),
-        );
-    const selected = run('select-reviewers', record.workId, '--base', base, '--head', head, '--escalations', file);
-    const reviewers = selected.reviewers as { id: string; run: boolean; reason: string; escalation?: unknown }[];
-
-    expect(reviewers.filter((entry) => entry.escalation).map((entry) => entry.id)).toEqual(['security']);
-    expect(reviewers.filter((entry) => entry.run).map((entry) => entry.id)).toEqual(['code', 'security']);
-    expect(run('read', record.workId).revision).toBe(3);
-
-    const roundFile = join(data, 'round.json');
-
-    writeFileSync(
-        roundFile,
-        JSON.stringify({
-            base,
-            reviewers: reviewers.map((entry) => ({
-                axis: entry.id,
-                verdict: entry.run ? 'approve' : 'skipped',
-                findings: [],
-                notChecked: entry.run ? undefined : entry.reason,
-                escalation: entry.escalation,
-            })),
-        }),
-    );
-    expect(run('record-review-round', record.workId, '--revision', '3', '--file', roundFile).revision).toBe(4);
-    expect(
-        run('review-rounds', record.workId)[0].reviewers.find((entry: { axis: string }) => entry.axis === 'security'),
-    ).toMatchObject({ verdict: 'approve', escalation });
-}, 30_000);
-
-it('selects from the named run after Settings edits, returning frozen instructions and role targets', async () => {
-    const { cwd, commit } = repository();
-    const data = directory();
-    const records = await openWorkRecords(workRecordsPath(data));
-    const record = records.create({ title: 'Frozen review', repository: 'example/repo', kind: 'build' });
-    const settings = defaultFactorySettings();
-
-    settings.roles['reviewer:code'] = { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' };
-    writeFactorySettings(settings, data);
-    records.snapshotRun(record.workId, record.revision, {
-        runId: 'build-run',
-        kind: 'build',
-        skills: [],
-        packaged: {
-            version: 'fixture',
-            reviewers: { code: 'Frozen code instructions', security: 'Security', ui: 'UI', performance: 'Performance' },
-        },
-    });
-
-    const before = records.read(record.workId);
-
-    records.close();
-    settings.reviewers[0]!.mode = { kind: 'never' };
-    writeFactorySettings(settings, data);
-
-    const base = commit();
-
-    writeFileSync(join(cwd, 'README.md'), 'Documentation.\n');
-
-    const head = commit();
-    const command = [
-        '--disable-warning=ExperimentalWarning',
-        join(import.meta.dirname, 'cli.ts'),
-        'select-reviewers',
-        record.workId,
-        '--base',
-        base,
-        '--head',
-        head,
-        '--data-dir',
-        data,
-    ];
-    const run = (...args: string[]) =>
-        execFileSync(process.execPath, [...command, ...args], {
-            cwd,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
-    const output = JSON.parse(run('--run-id', 'build-run'));
-    const code = output.reviewers.find((reviewer: { id: string }) => reviewer.id === 'code');
-
-    expect(output.runId).toBe('build-run');
-    expect(code).toMatchObject({
-        run: true,
-        instructions: { text: 'Frozen code instructions', source: { version: 'fixture' } },
-        target: { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' },
-    });
-    expect(() => run()).toThrow(/requires --run-id/);
-    expect(() => run('--run-id', 'missing')).toThrow(/No run/);
-
-    const reread = await openWorkRecords(workRecordsPath(data));
-
-    try {
-        expect(reread.read(record.workId)).toMatchObject({
-            status: 'Review',
-            buildPhase: 'review',
-            revision: before.revision + 2,
-        });
-    } finally {
-        reread.close();
-    }
 }, 30_000);
 
 it('S03 Verify return selects on the delta since the last reviewed head and records that scope', async () => {

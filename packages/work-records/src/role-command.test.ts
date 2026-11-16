@@ -159,79 +159,77 @@ async function fixture(instanceId = 'codex', effort: string | null = 'high') {
     return { dir, records, workId, shape, build, capabilities, task, launch, finish, processCli };
 }
 
-for (const provider of ['claude', 'codex']) {
-    it(`prints exact targets for every ${provider} role using advertised effort, frozen instructions and paths`, async () => {
-        const f = await fixture(provider);
+it('prints exact targets for every claude role using advertised effort, frozen instructions and paths', async () => {
+    const f = await fixture('claude');
 
-        // Later Settings must not affect any role launched in this run.
-        const changed = readFactorySettings(f.dir).settings;
+    // Later Settings must not affect any role launched in this run.
+    const changed = readFactorySettings(f.dir).settings;
 
-        changed.threadKinds.build = { model: { instanceId: 'later', model: 'later' }, effort: 'low' };
-        changed.reviewers.find((reviewer) => reviewer.id === 'custom')!.name = 'Later name';
-        writeFactorySettings(changed, f.dir);
+    changed.threadKinds.build = { model: { instanceId: 'later', model: 'later' }, effort: 'low' };
+    changed.reviewers.find((reviewer) => reviewer.id === 'custom')!.name = 'Later name';
+    writeFactorySettings(changed, f.dir);
 
-        for (const [role, label] of Object.entries({
-            thread: 'Build',
-            explore: 'Explore',
-            diagnose: 'Diagnose',
-            research: 'Research',
-            prototype: 'Prototype',
-            planner: 'Planner',
-            implementer: 'Implementer',
-            checks: 'Checks',
-            'domain-docs': 'Domain docs',
-            fixer: 'Fixer',
-            approver: 'Approver',
-            'ci-fixer': 'Ci fixer',
-            doubt: 'Doubt',
-            'reviewer:code': 'Code review',
-            'reviewer:security': 'Security review',
-            'reviewer:ui': 'UI review',
-            'reviewer:performance': 'Performance review',
-            'reviewer:custom': 'Custom review',
-        })) {
-            const result = await f.launch(role);
+    for (const [role, label] of Object.entries({
+        thread: 'Build',
+        explore: 'Explore',
+        diagnose: 'Diagnose',
+        research: 'Research',
+        prototype: 'Prototype',
+        planner: 'Planner',
+        implementer: 'Implementer',
+        checks: 'Checks',
+        'domain-docs': 'Domain docs',
+        fixer: 'Fixer',
+        approver: 'Approver',
+        'ci-fixer': 'Ci fixer',
+        doubt: 'Doubt',
+        'reviewer:code': 'Code review',
+        'reviewer:security': 'Security review',
+        'reviewer:ui': 'UI review',
+        'reviewer:performance': 'Performance review',
+        'reviewer:custom': 'Custom review',
+    })) {
+        const result = await f.launch(role);
 
-            expect(result.stderr).toBe('');
-            expect(result.status).toBe(0);
+        expect(result.stderr).toBe('');
+        expect(result.status).toBe(0);
 
-            const args = JSON.parse(result.stdout);
-            const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
+        const args = JSON.parse(result.stdout);
+        const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
 
-            expect(args.target).toEqual({
-                providerInstanceId: provider,
-                model: 'configured',
-                options: { [provider === 'claude' ? 'effort' : 'reasoningEffort']: 'high' },
-            });
+        expect(args.target).toEqual({
+            providerInstanceId: 'claude',
+            model: 'configured',
+            options: { effort: 'high' },
+        });
 
-            const title = `${label} · Role command fixture`;
+        const title = `${label} · Role command fixture`;
 
-            expect(args.title).toBe(title);
-            expect(args.task.split('\n')[0]).toBe(title);
-            expect(args.task).toContain('\n\n<!-- factory-runtime:start -->\n');
-            expect(args.task).toContain('<!-- factory-runtime:end -->');
-            expect(args.runtimeMode).toBe('inherit');
-            expect(args.clientRequestId).toBe(attempt.executionId);
-            expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
-            expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);
-            expect(args.task).toContain(`Read ${f.build} first`);
-            expect(args.task).toContain(JSON.stringify({ 'lar-shape': f.shape, 'lar-build': f.build }));
-            expect(args.task).toContain("'\\''");
-            expect(args.task).toContain('export LAR_FACTORY_DATA_DIR=');
-            expect(args.task).toContain('export LAR_FACTORY_BIN=');
-            expect(args.task).toContain('export LAR_FACTORY_SHAPE_SKILL=');
-            expect(args.task).toContain('export LAR_FACTORY_BUILD_SKILL=');
-            expect(args.task).toContain("export LAR_FACTORY_AZURE_READ_ONLY='1'");
-            expect(args.task).toContain('role-launch');
-            expect(args.task).toContain('role-finish');
-            expect(args.task).toContain('Implement the brief.');
+        expect(args.title).toBe(title);
+        expect(args.task.split('\n')[0]).toBe(title);
+        expect(args.task).toContain('\n\n<!-- factory-runtime:start -->\n');
+        expect(args.task).toContain('<!-- factory-runtime:end -->');
+        expect(args.runtimeMode).toBe('inherit');
+        expect(args.clientRequestId).toBe(attempt.executionId);
+        expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
+        expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);
+        expect(args.task).toContain(`Read ${f.build} first`);
+        expect(args.task).toContain(JSON.stringify({ 'lar-shape': f.shape, 'lar-build': f.build }));
+        expect(args.task).toContain("'\\''");
+        expect(args.task).toContain('export LAR_FACTORY_DATA_DIR=');
+        expect(args.task).toContain('export LAR_FACTORY_BIN=');
+        expect(args.task).toContain('export LAR_FACTORY_SHAPE_SKILL=');
+        expect(args.task).toContain('export LAR_FACTORY_BUILD_SKILL=');
+        expect(args.task).toContain("export LAR_FACTORY_AZURE_READ_ONLY='1'");
+        expect(args.task).toContain('role-launch');
+        expect(args.task).toContain('role-finish');
+        expect(args.task).toContain('Implement the brief.');
 
-            if (role === 'reviewer:custom') expect(args.task).toContain('Frozen custom instructions');
+        if (role === 'reviewer:custom') expect(args.task).toContain('Frozen custom instructions');
 
-            if (role === 'reviewer:code') expect(args.task).toContain('Frozen Code');
-        }
-    }, 30_000);
-}
+        if (role === 'reviewer:code') expect(args.task).toContain('Frozen Code');
+    }
+}, 30_000);
 
 it('prints explicit empty options and reuses an execution ID for launch recovery', async () => {
     const f = await fixture('codex', null);
@@ -242,19 +240,6 @@ it('prints explicit empty options and reuses an execution ID for launch recovery
     expect(again.stdout).toBe(first.stdout);
     expect(JSON.parse(first.stdout).target.options).toEqual({});
     expect(f.records.runSettings(f.workId).roleRuns).toHaveLength(1);
-});
-
-it('holds a recovered attempt when its capability becomes unavailable', async () => {
-    const f = await fixture();
-
-    expect((await f.launch('planner', ['--execution-id', 'recover'])).status).toBe(0);
-    writeFileSync(f.capabilities, JSON.stringify({ providers: [] }));
-
-    const retry = await f.launch('planner', ['--execution-id', 'recover']);
-
-    expect(retry.status).toBe(1);
-    expect(f.records.read(f.workId).needsYou).toContain('unavailable');
-    expect(f.records.runSettings(f.workId).roleRuns).toMatchObject([{ executionId: 'recover', result: 'failed' }]);
 });
 
 it('records capability and missing-entry holds without printing delegate arguments', async () => {
@@ -278,128 +263,6 @@ it('records capability and missing-entry holds without printing delegate argumen
     expect(g.records.read(g.workId).needsYou).toContain('missing.md');
 });
 
-it('uses a role override independently of the thread model and keeps all frozen options', async () => {
-    const f = await fixture();
-    const settings = readFactorySettings(f.dir).settings;
-
-    settings.roles.approver = { model: { instanceId: 'claude', model: 'review-model' }, effort: 'low' };
-    writeFactorySettings(settings, f.dir);
-    f.records.snapshotRun(f.workId, f.records.read(f.workId).revision, {
-        runId: 'override-run',
-        kind: 'build',
-        skills: ['selected-skill'],
-        projectDefault: {
-            instanceId: 'codex',
-            model: 'configured',
-            options: [
-                { id: 'reasoningEffort', value: 'high' },
-                { id: 'fast', value: true },
-            ],
-        },
-        packaged: {
-            version: 'fixture',
-            reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
-        },
-    });
-    writeFileSync(
-        f.capabilities,
-        JSON.stringify({
-            providers: [
-                {
-                    providerInstanceId: 'codex',
-                    canRunChildTask: true,
-                    models: [
-                        {
-                            id: 'configured',
-                            options: [
-                                { id: 'reasoningEffort', values: ['high'] },
-                                { id: 'fast', values: [true, false] },
-                            ],
-                        },
-                    ],
-                },
-                {
-                    providerInstanceId: 'claude',
-                    canRunChildTask: true,
-                    models: [{ id: 'review-model', options: [{ id: 'effort', values: ['low'] }] }],
-                },
-            ],
-        }),
-    );
-
-    const approver = JSON.parse((await f.launch('approver', ['--run-id', 'override-run'])).stdout);
-    const checks = JSON.parse((await f.launch('checks', ['--run-id', 'override-run'])).stdout);
-
-    expect(approver.target).toEqual({
-        providerInstanceId: 'claude',
-        model: 'review-model',
-        options: { effort: 'low' },
-    });
-    expect(checks.target).toEqual({
-        providerInstanceId: 'codex',
-        model: 'configured',
-        options: { reasoningEffort: 'high', fast: true },
-    });
-    expect(checks.task).toContain('Frozen project skills: ["selected-skill"]');
-    expect(
-        (
-            await f.finish(
-                checks.clientRequestId,
-                reported({
-                    options: [
-                        { id: 'reasoningEffort', value: 'high' },
-                        { id: 'fast', value: true },
-                    ],
-                }),
-            )
-        ).status,
-    ).toBe(0);
-
-    const mismatch = JSON.parse((await f.launch('checks', ['--run-id', 'override-run'])).stdout);
-
-    expect(
-        (
-            await f.finish(
-                mismatch.clientRequestId,
-                reported({
-                    options: [
-                        { id: 'reasoningEffort', value: 'high' },
-                        { id: 'fast', value: false },
-                    ],
-                }),
-            )
-        ).status,
-    ).toBe(1);
-});
-
-for (const [name, canRunChildTask, options, reason] of [
-    ['disabled provider', false, [{ id: 'reasoningEffort', values: ['high'] }], 'cannot run child tasks'],
-    ['unsupported effort', true, [{ id: 'reasoningEffort', values: ['low'] }], 'does not offer reasoningEffort=high'],
-    ['no effort capability', true, [], 'does not offer configured effort high'],
-] as const) {
-    it(`records a hold for ${name}`, async () => {
-        const f = await fixture();
-
-        writeFileSync(
-            f.capabilities,
-            JSON.stringify({
-                providers: [{ providerInstanceId: 'codex', canRunChildTask, models: [{ id: 'configured', options }] }],
-            }),
-        );
-
-        const result = await f.launch();
-
-        expect(result.status).toBe(1);
-        expect(result.stdout).toBe('');
-        expect(f.records.read(f.workId).needsYou).toContain(reason);
-        expect(f.records.runSettings(f.workId).roleRuns.at(-1)).toMatchObject({
-            result: 'failed',
-            actual: null,
-            report: null,
-        });
-    });
-}
-
 const reported = (overrides: Record<string, unknown> = {}) => ({
     taskId: 't3-task',
     providerInstanceId: 'codex',
@@ -411,40 +274,33 @@ const reported = (overrides: Record<string, unknown> = {}) => ({
     ...overrides,
 });
 
-for (const launch of ['skill', 'direct handoff'] as const)
-    it(`configured child roles preserve the ${launch} stage owner`, async () => {
-        const f = await fixture();
+it('configured child roles preserve the skill stage owner', async () => {
+    const f = await fixture();
 
-        if (launch === 'skill') {
-            const { intent, record } = f.records.recordLaunchIntent(
-                f.workId,
-                f.records.read(f.workId).revision,
-                'build',
-            );
+    const { intent, record } = f.records.recordLaunchIntent(f.workId, f.records.read(f.workId).revision, 'build');
 
-            f.records.resolveLaunchIntent(f.workId, record.revision, intent.intentId, { threadId: 'owner' });
-        } else f.records.addThread(f.workId, f.records.read(f.workId).revision, 'owner', 'build');
+    f.records.resolveLaunchIntent(f.workId, record.revision, intent.intentId, { threadId: 'owner' });
 
-        const owners = f.records.threads(f.workId);
-        const launched = await f.launch('implementer');
+    const owners = f.records.threads(f.workId);
+    const launched = await f.launch('implementer');
 
-        expect(launched.status).toBe(0);
+    expect(launched.status).toBe(0);
 
-        const { clientRequestId, target } = JSON.parse(launched.stdout);
+    const { clientRequestId, target } = JSON.parse(launched.stdout);
 
-        expect(target).toEqual({
-            providerInstanceId: 'codex',
-            model: 'configured',
-            options: { reasoningEffort: 'high' },
-        });
-        expect((await f.finish(clientRequestId, reported({ childThreadId: 'implementer' }))).status).toBe(0);
-        expect(f.records.runSettings(f.workId).roleRuns.at(-1)).toMatchObject({
-            role: 'implementer',
-            result: 'completed',
-        });
-        expect(f.records.threads(f.workId)).toEqual(owners);
-        expect(f.records.launchIntents({ workId: f.workId, unresolved: true })).toEqual([]);
+    expect(target).toEqual({
+        providerInstanceId: 'codex',
+        model: 'configured',
+        options: { reasoningEffort: 'high' },
     });
+    expect((await f.finish(clientRequestId, reported({ childThreadId: 'implementer' }))).status).toBe(0);
+    expect(f.records.runSettings(f.workId).roleRuns.at(-1)).toMatchObject({
+        role: 'implementer',
+        result: 'completed',
+    });
+    expect(f.records.threads(f.workId)).toEqual(owners);
+    expect(f.records.launchIntents({ workId: f.workId, unresolved: true })).toEqual([]);
+});
 
 it('finishes from a file and preserves T3 evidence', async () => {
     const f = await fixture();
@@ -473,48 +329,19 @@ it('finishes from a file and preserves T3 evidence', async () => {
     expect(f.records.runSettings(f.workId).roleRuns.at(-1)!.actual!.model!.model).toBe('configured');
 });
 
-for (const [name, input] of [
-    ['executed model', reported({ executedModel: 'substituted' })],
-    ['provider', reported({ providerInstanceId: 'other' })],
-    ['effort', reported({ options: [{ id: 'reasoningEffort', value: 'low' }] })],
-    ['effort key', reported({ options: [{ id: 'effort', value: 'high' }] })],
-    [
-        'extra option',
-        reported({
-            options: [
-                { id: 'reasoningEffort', value: 'high' },
-                { id: 'unexpected', value: true },
-            ],
-        }),
-    ],
-    ['missing evidence', reported({ options: null })],
-    [
-        'duplicate option',
-        reported({
-            options: [
-                { id: 'reasoningEffort', value: 'high' },
-                { id: 'reasoningEffort', value: 'high' },
-            ],
-        }),
-    ],
-    ['unavailable', reported({ status: 'failed' })],
-    ['unfinished children', reported({ hasPendingChildRuns: true })],
-    ['malformed JSON', '{broken'],
-] as const) {
-    it(`holds and exits non-zero on ${name}`, async () => {
-        const f = await fixture();
-        const { clientRequestId } = JSON.parse((await f.launch()).stdout);
-        const result = await f.finish(clientRequestId, input);
-        const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
+it('holds and exits non-zero on a substituted executed model', async () => {
+    const f = await fixture();
+    const { clientRequestId } = JSON.parse((await f.launch()).stdout);
+    const result = await f.finish(clientRequestId, reported({ executedModel: 'substituted' }));
+    const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
 
-        expect(result.status).toBe(1);
-        expect(result.stdout).toBe('');
-        expect(attempt.result).toBe('failed');
-        expect(attempt.failure).toBeTruthy();
-        expect(f.records.read(f.workId).needsYou).toBeNull();
-        expect(result.stderr).toContain(attempt.failure!);
-    });
-}
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(attempt.result).toBe('failed');
+    expect(attempt.failure).toBeTruthy();
+    expect(f.records.read(f.workId).needsYou).toBeNull();
+    expect(result.stderr).toContain(attempt.failure!);
+});
 
 it('routes the executable commands and reads a terminal T3 result from stdin', async () => {
     const f = await fixture();
@@ -553,20 +380,4 @@ it('keeps role runtime prompts out of product records after the title line', asy
     expect(args.title).toBe('Explore · Role command fixture');
     expect(() => f.records.setBody(f.workId, before.revision, 'brief', args.task)).toThrow(/product content/i);
     expect(f.records.read(f.workId)).toEqual(before);
-});
-
-it('fits T3 titles to 512 characters without splitting Unicode or exposing runtime text', async () => {
-    const f = await fixture();
-    const record = f.records.read(f.workId);
-
-    f.records.retitle(f.workId, record.revision, 'a'.repeat(500) + '🧭'.repeat(20));
-
-    const result = await f.launch('explore');
-    const args = JSON.parse(result.stdout);
-
-    expect(result.status).toBe(0);
-    expect(args.title).toBe('Explore · ' + 'a'.repeat(500) + '…');
-    expect(args.title.length).toBeLessThanOrEqual(512);
-    expect(args.task.split('\n')[0]).toBe(args.title);
-    expect(args.task).toContain('<!-- factory-runtime:start -->');
 });

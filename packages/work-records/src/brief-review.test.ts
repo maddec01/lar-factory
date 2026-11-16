@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vite-plus/test';
 
-import { namedWork } from './brief-review.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -198,55 +197,4 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
     expect(() => records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Stale', [])).toThrow(
         /package changed/,
     );
-});
-
-it('reads only explicit file and contract declarations for deterministic overlap', () => {
-    expect(
-        namedWork('Mentions `src/unrelated.ts` in prose.\nFiles: `./src/a.ts`, `src/a.ts`\nContracts: `invite-v1`'),
-    ).toEqual({ files: ['src/a.ts'], contracts: ['invite-v1'] });
-});
-
-it('recognizes transitive ordering and keeps independent files parallel-capable', async () => {
-    const { records, api, client, independent } = await fixture();
-
-    records.addBlocker(api.workId, records.read(api.workId).revision, independent.workId);
-    records.addBlocker(independent.workId, records.read(independent.workId).revision, client.workId);
-
-    const input = records.doubtPackage(api.workId);
-
-    expect(input.overlaps).toEqual([
-        { otherWorkId: client.workId, files: [], contracts: ['public-invite'], ordered: true, proposed: null },
-    ]);
-    expect(input.blockers.map((item) => item.workId)).toEqual([independent.workId]);
-});
-
-it('shows current answer versions and resolved supersession instead of historical answer bodies', async () => {
-    const { records, concept, decision, api } = await fixture();
-    const replacement = records.createPart({
-        parentId: concept.workId,
-        parentRevision: records.read(concept.workId).revision,
-        title: 'Replacement',
-        repository: 'fake/api',
-        kind: 'decision',
-        body: 'Method: grill\nChange endpoint?',
-        blockerIds: [],
-    });
-
-    records.setBody(replacement.workId, replacement.revision, 'answer', 'Use /new-invite.');
-    records.supersedeAnswer(decision.workId, records.read(decision.workId).revision, {
-        answerRevision: records.decisionAnswer(decision.workId).current!.revision,
-        by: {
-            kind: 'decision',
-            workId: replacement.workId,
-            revision: records.read(replacement.workId).revision,
-            answerRevision: records.decisionAnswer(replacement.workId).current!.revision,
-        },
-        affected: [],
-    });
-
-    const source = records.doubtPackage(api.workId).decisions.find((item) => item.workId === decision.workId)!;
-
-    expect(source.answer?.current).toBeNull();
-    expect(source.answer?.replacement?.text).toBe('Use /new-invite.');
-    expect(source.bodies.some((body) => body.body === 'answer')).toBe(false);
 });

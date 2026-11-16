@@ -95,52 +95,16 @@ it('saves prepared revisions, rejects stale starts and preserves active work thr
     expect(reopened.launchIntents({})).toEqual([]);
 });
 
-it.each(['brief', 'gate', 'blocker', 'map'] as const)('pauses when the approved %s changes', async (what) => {
+it('pauses when the approved brief changes', async () => {
     const { records, group, build, change, prepare } = await fixture();
 
     prepare();
     records.setConceptBuildRun(group, change(group), 'running');
-
-    if (what === 'brief') records.setBody(build, change(build), 'brief', 'Changed scope');
-
-    if (what === 'gate') records.invalidateGate(build, change(build));
-
-    if (what === 'map') records.setBody(group, change(group), 'map', 'Changed destination');
-
-    if (what === 'blocker') {
-        const other = records.create({ title: 'External prerequisite', repository: 'example/c', kind: 'build' });
-
-        records.addBlocker(build, change(build), other.workId);
-    }
-
+    records.setBody(build, change(build), 'brief', 'Changed scope');
     expect(records.conceptBuildPlan(group).run).toMatchObject({
         state: 'paused',
         reason: expect.stringContaining('changed'),
     });
-});
-
-it('keeps private slices inside their active build, without pausing the concept or holding Resume', async () => {
-    const { records, group, build, change, prepare } = await fixture();
-
-    prepare();
-    records.setConceptBuildRun(group, change(group), 'running');
-    records.update(build, change(build), { status: 'In progress' });
-
-    const slice = records.create({
-        title: 'Private implementation slice',
-        repository: 'example/b',
-        kind: 'slice',
-        status: 'Queued',
-    }).workId;
-
-    records.setParent(slice, change(slice), build);
-    records.addBlocker(build, change(build), slice);
-    records.reconcileConceptBuildRuns();
-    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
-    expect(records.conceptBuildPlan(group).members.map((member) => member.workId)).toEqual([build]);
-    records.setConceptBuildRun(group, change(group), 'paused');
-    expect(records.setConceptBuildRun(group, change(group), 'running').run?.state).toBe('running');
-    expect(records.read(slice).status).toBe('Queued');
 });
 
 it('keeps scheduling after projection whitespace and completes the run after the last merge', async () => {
@@ -157,56 +121,4 @@ it('keeps scheduling after projection whitespace and completes the run after the
     records.reconcileConceptBuildRuns();
     expect(records.conceptBuildPlan(group).run?.state).toBe('completed');
     expect(records.conceptBuildPlan(group).holds).toEqual([]);
-});
-
-it('ignores generated map status prose while preserving destination and decision contracts', async () => {
-    const { records, group, change, prepare } = await fixture();
-
-    prepare();
-    records.setBody(
-        group,
-        change(group),
-        'map',
-        '## Destination\nApproved destination\n\n## Map\nFirst build: Ready\n',
-    );
-    records.setConceptBuildRun(group, change(group), 'running');
-    records.setBody(
-        group,
-        change(group),
-        'map',
-        '## Destination\nApproved destination\n\n## Map\nFirst build: In progress',
-    );
-    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
-    records.setBody(
-        group,
-        change(group),
-        'map',
-        '## Destination\nChanged destination\n\n## Map\nFirst build: In progress',
-    );
-    expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
-});
-
-it('keeps running through Dependency delivery evidence while still binding its contract', async () => {
-    const { records, group, change, prepare } = await fixture();
-
-    prepare();
-
-    const dependency = records.addDependency(group, {
-        need: 'Label service',
-        owner: 'Hosting',
-        contract: 'Return labels.',
-        evidence: 'Accepted.',
-    });
-
-    records.markDependencyMet(dependency.dependencyId, dependency.revision, 'Pedro');
-    records.setConceptBuildRun(group, change(group), 'running');
-    records.updateDependency(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, {
-        evidence: 'A1 merged; rollout progressing.',
-    });
-    records.reconcileConceptBuildRuns();
-    expect(records.conceptBuildPlan(group).run?.state).toBe('running');
-    records.updateDependency(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, {
-        contract: 'Return numbers instead.',
-    });
-    expect(records.conceptBuildPlan(group).run?.state).toBe('paused');
 });

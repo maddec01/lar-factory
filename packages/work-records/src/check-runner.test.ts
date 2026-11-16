@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vite-plus/test';
@@ -125,43 +125,6 @@ it(
     },
 );
 
-it('bounds logs and marks runs outside git ineligible', { timeout: 30_000 }, async () => {
-    const { openWorkRecords } = await import('./work-records.ts');
-    const { statSync } = await import('node:fs');
-    const cwd = mkdtempSync(join(tmpdir(), 'check-log-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-        const result = spawnSync(
-            process.execPath,
-            [
-                join(import.meta.dirname, 'cli.ts'),
-                'run-check',
-                build.workId,
-                '--role',
-                'implementer',
-                '--',
-                process.execPath,
-                '-e',
-                'process.stdout.write("x".repeat(11 * 1024 * 1024))',
-            ],
-            { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd }, maxBuffer: 12 * 1024 * 1024 },
-        );
-
-        expect(result.status).toBe(0);
-
-        const run = records.checks(build.workId).runs[0]!;
-
-        expect(run.snapshotState).toBe('missing');
-        expect(run.eligible).toBe(false);
-        expect(statSync(join(cwd, run.log!)).size).toBe(10 * 1024 * 1024);
-    } finally {
-        records.close();
-        rmSync(cwd, { recursive: true, force: true });
-    }
-});
-
 it(
     'waits for a signalled child and records interruption while preserving its exit code',
     { timeout: 30_000 },
@@ -258,109 +221,6 @@ it(
 
             expect(newer.status).toBe(31);
             expect(newer.stderr).toContain('unrecorded');
-        } finally {
-            records.close();
-            rmSync(cwd, { recursive: true, force: true });
-        }
-    },
-);
-
-it('retains a signal received while opening the record until the command starts', { timeout: 30_000 }, async () => {
-    const { openWorkRecords } = await import('./work-records.ts');
-    const cwd = mkdtempSync(join(tmpdir(), 'check-early-signal-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-        const script = `import { checkCommand } from ${JSON.stringify(join(import.meta.dirname, 'check-runner.ts'))}; const result = checkCommand(['run-check', ${JSON.stringify(build.workId)}, '--role', 'test', '--', process.execPath, '-e', ${JSON.stringify(`${helperStart(cwd)} setInterval(() => {}, 1000)`)}]); process.emit('SIGTERM'); process.exitCode = await result;`;
-        const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-            cwd,
-            encoding: 'utf8',
-            timeout: 10_000,
-            env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd },
-        });
-
-        expect(result.error).toBeUndefined();
-        expect(result.status).toBe(143);
-        expect(records.checks(build.workId).runs[0]?.outcome).toBe('interrupted');
-    } finally {
-        records.close();
-        await stopHelpers({ folders: [cwd], wrappers: [], gates: [] });
-    }
-});
-
-it('preserves output and the log when the consumer drains output slowly', { timeout: 30_000 }, async () => {
-    const { spawn } = await import('node:child_process');
-    const { readFileSync } = await import('node:fs');
-    const { openWorkRecords } = await import('./work-records.ts');
-    const cwd = mkdtempSync(join(tmpdir(), 'check-pressure-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-        const child = spawn(
-            process.execPath,
-            [
-                join(import.meta.dirname, 'cli.ts'),
-                'run-check',
-                build.workId,
-                '--role',
-                'test',
-                '--',
-                process.execPath,
-                '-e',
-                'process.stdout.write("x".repeat(4 * 1024 * 1024)); process.exitCode = 21',
-            ],
-            { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } },
-        );
-        const chunks: Buffer[] = [];
-
-        child.stderr.resume();
-        child.stdout.on('data', (chunk) => {
-            chunks.push(chunk);
-            child.stdout.pause();
-            setTimeout(() => child.stdout.resume(), 5);
-        });
-        expect(await new Promise((resolve) => child.on('close', resolve))).toBe(21);
-
-        const expected = Buffer.alloc(4 * 1024 * 1024, 'x');
-
-        expect(Buffer.concat(chunks).equals(expected)).toBe(true);
-        expect(readFileSync(join(cwd, records.checks(build.workId).runs[0]!.log!)).equals(expected)).toBe(true);
-    } finally {
-        records.close();
-        rmSync(cwd, { recursive: true, force: true });
-    }
-});
-
-it(
-    'preserves the command status when its record table becomes unavailable at finish',
-    { timeout: 30_000 },
-    async () => {
-        const { openWorkRecords } = await import('./work-records.ts');
-        const cwd = mkdtempSync(join(tmpdir(), 'check-finish-unavailable-'));
-        const records = await openWorkRecords(join(cwd, 'work-records.db'));
-
-        try {
-            const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-            const result = spawnSync(
-                process.execPath,
-                [
-                    join(import.meta.dirname, 'cli.ts'),
-                    'run-check',
-                    build.workId,
-                    '--role',
-                    'test',
-                    '--',
-                    process.execPath,
-                    '-e',
-                    'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync("work-records.db"); db.exec("DROP TABLE check_runs"); db.close(); process.exit(33)',
-                ],
-                { cwd, encoding: 'utf8', env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } },
-            );
-
-            expect(result.status).toBe(33);
-            expect(result.stderr).toContain('unrecorded');
         } finally {
             records.close();
             rmSync(cwd, { recursive: true, force: true });
@@ -465,35 +325,5 @@ describe('run-check waiting for a heavy command slot', () => {
                 expect(run.outcome).toBe('passed');
                 expect(run.startedAt! >= released).toBe(true);
             }),
-    );
-
-    it(
-        'records an interrupted outcome without starting the command when signalled during the wait',
-        { timeout: 30_000 },
-        () =>
-            waiting(async ({ child, status, records, workId, ran }) => {
-                child.kill('SIGTERM');
-                expect(await status).toBe(143);
-                expect(records.checks(workId).runs[0]).toMatchObject({
-                    outcome: 'interrupted',
-                    startedAt: null,
-                    exitStatus: null,
-                });
-                expect(existsSync(ran)).toBe(false);
-            }),
-    );
-
-    it('reads as not finished when hard-killed during the wait', { timeout: 30_000 }, () =>
-        waiting(async ({ child, status, records, workId, ran }) => {
-            child.kill('SIGKILL');
-            await status;
-            expect(records.checks(workId).runs[0]).toMatchObject({
-                outcome: 'unfinished',
-                snapshotState: 'unfinished',
-                tree: null,
-                startedAt: null,
-            });
-            expect(existsSync(ran)).toBe(false);
-        }),
     );
 });

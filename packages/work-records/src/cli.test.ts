@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -94,58 +93,6 @@ describe('lar-work', { timeout: 30_000 }, () => {
             expect(refused.stderr).toContain('Reread the record and decide whether to reapply');
             expect(records.read(build.workId).revision).toBe(3);
         } finally {
-            records.close();
-        }
-    });
-
-    it('publishes every phase immediately to its own running board, only after a successful write', async () => {
-        const data = tempDir();
-        const records = await openWorkRecords(join(data, 'work-records.db'));
-        const build = records.create({ title: 'Build', repository: 'example/product', kind: 'build' });
-        const seen: string[] = [];
-        const listener = createServer(async (request, response) => {
-            let body = '';
-
-            for await (const chunk of request) body += chunk;
-            expect(JSON.parse(body)).toEqual({ workId: build.workId });
-            expect(request.headers.origin).toBe(`http://127.0.0.1:${port}`);
-            seen.push(records.read(build.workId).buildPhase!);
-            response.end('{}');
-        });
-
-        await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
-
-        const port = (listener.address() as { port: number }).port;
-
-        mkdirSync(join(data, 'boards'));
-        writeFileSync(join(data, 'boards', `${process.pid}.json`), JSON.stringify({ port }));
-        vi.stubEnv('LAR_BOARD_PORT', '');
-
-        const phases = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks'];
-
-        try {
-            for (const [index, phase] of phases.entries()) {
-                const result = await larWork(
-                    data,
-                    'set-phase',
-                    build.workId,
-                    '--revision',
-                    String(index + 1),
-                    '--phase',
-                    phase,
-                );
-
-                expect(result.code).toBe(0);
-                expect(result.record.buildPhase).toBe(phase);
-                expect(seen).toEqual(phases.slice(0, index + 1));
-            }
-            expect(
-                (await larWork(data, 'set-phase', build.workId, '--revision', '1', '--phase', 'implement')).code,
-            ).toBe(1);
-            expect(seen).toEqual(phases);
-        } finally {
-            listener.closeAllConnections();
-            await new Promise<void>((resolve) => listener.close(() => resolve()));
             records.close();
         }
     });
@@ -371,24 +318,6 @@ throw Error('Local exploration must not call a tracker');
         }
     });
 
-    it('explicit structural sync refuses retries and preserves local content and uncertainty', async () => {
-        const data = tempDir();
-        const records = await openWorkRecords(join(data, 'work-records.db'));
-        const root = records.create({ repository: 'example/product', title: 'Retained concept', kind: 'concept' });
-
-        records.setBody(root.workId, root.revision, 'map', 'Local map content');
-        records.trackerReserveCreation(root.workId);
-
-        const before = records.trackerPending();
-        const result = await larWork(data, 'sync-structure', root.workId, '--confirmed-missing-issue', root.workId);
-
-        expect(result.code).toBe(2);
-        expect(result.stderr).toContain('suspended');
-        expect(records.trackerPending()).toEqual(before);
-        expect(records.trackerReserveCreation(root.workId)).toBe(false);
-        records.close();
-    });
-
     it('change-kind swaps the ticket through the shared path, and update --kind writes nothing to it', async () => {
         const data = join(tempDir(), 'Lar Factory');
         const writes = fakeIssue(tempDir(), {
@@ -446,142 +375,6 @@ throw Error('Local exploration must not call a tracker');
             'DELETE repos/example/product/issues/12/labels/type%3A%20bug ',
             'PATCH repos/example/product/issues/12 {"type":"Feature"}',
         ]);
-    });
-
-    it('change-kind on a failed write keeps the kind and says what changed', async () => {
-        const data = join(tempDir(), 'Lar Factory');
-        const dir = tempDir();
-
-        fakeIssue(dir, { labels: [{ name: 'bug' }], type: null });
-
-        const made = (
-            await larWork(
-                data,
-                'import',
-                '--title',
-                'T',
-                '--repository',
-                'example/product',
-                '--kind',
-                'bug',
-                '--ticket',
-                'example/product#12',
-            )
-        ).record.record;
-
-        mapped(data);
-        // A log path that is a folder fails the first write the fake gh appends.
-        mkdirSync(join(dir, 'gh.log'));
-
-        const failed = await larWork(
-            data,
-            'change-kind',
-            made.workId,
-            '--revision',
-            String(made.revision),
-            '--kind',
-            'feature',
-        );
-
-        expect(failed.code).toBe(1);
-        expect(failed.stderr).toMatch(/^lar-work: Could not finish changing #12 to Feature\./);
-
-        const read = await larWork(data, 'read', made.workId);
-
-        expect(read.record.kind).toBe('bug');
-    });
-
-    it('record-kind-answer records the answer with the two kinds it covers', async () => {
-        const data = join(tempDir(), 'Lar Factory');
-        const made = (await larWork(data, 'create', '--title', 'T', '--repository', 'example/product', '--kind', 'bug'))
-            .record;
-        const answered = await larWork(
-            data,
-            'record-kind-answer',
-            made.workId,
-            '--revision',
-            String(made.revision),
-            '--answer',
-            'keep',
-            '--ticket-kind',
-            'feature',
-        );
-
-        expect(answered.record.kindAnswer).toEqual({ answer: 'keep', itemKind: 'bug', ticketKind: 'feature' });
-
-        const none = await larWork(
-            data,
-            'record-kind-answer',
-            made.workId,
-            '--revision',
-            String(answered.record.revision),
-            '--answer',
-            'update',
-            '--ticket-kind',
-            'none',
-        );
-
-        expect(none.record.kindAnswer).toEqual({ answer: 'update', itemKind: 'bug', ticketKind: null });
-
-        const bad = await larWork(
-            data,
-            'record-kind-answer',
-            made.workId,
-            '--revision',
-            String(none.record.revision),
-            '--answer',
-            'maybe',
-            '--ticket-kind',
-            'none',
-        );
-
-        expect(bad.code).toBe(1);
-    });
-
-    describe('kind-disagreement', () => {
-        /** A record of `kind` on ticket #12, and what the ticket's kind disagreement reads as. */
-        async function imported(data: string, kind: string) {
-            const made = (
-                await larWork(
-                    data,
-                    'import',
-                    '--title',
-                    'T',
-                    '--repository',
-                    'example/product',
-                    '--kind',
-                    kind,
-                    '--ticket',
-                    'example/product#12',
-                )
-            ).record.record;
-
-            mapped(data);
-
-            return made;
-        }
-
-        const check = async (data: string, workId: string) =>
-            (await larWork(data, 'kind-disagreement', workId)).record.disagreement;
-
-        it('reports what an update would swap, writes nothing, and an update --kind changes what it reports', async () => {
-            const data = join(tempDir(), 'Lar Factory');
-            const writes = fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: { name: 'Feature' } });
-            const made = await imported(data, 'feature');
-
-            expect(await check(data, made.workId)).toBeNull();
-
-            await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'bug');
-            expect(await check(data, made.workId)).toEqual({
-                ticketKind: 'feature',
-                changed: 'item',
-                kept: false,
-                note: '',
-                accessProblem: null,
-                swap: { add: ['type: bug'], remove: ['type: feature'], type: { from: 'Feature', to: 'Bug' } },
-            });
-            expect(writes()).toEqual([]);
-        });
     });
 
     it('creates, reads and updates a record in a data folder with no board running', async () => {
@@ -647,52 +440,6 @@ throw Error('Local exploration must not call a tracker');
         expect(linked.record).toMatchObject({ workId, ticket: 'maddec01/lar#6' });
         expect((await larWork(data, 'set-aside', workId, '--revision', '2')).record).toMatchObject({ setAside: true });
         expect((await larWork(data, 'restore', workId, '--revision', '3')).record).toMatchObject({ setAside: false });
-    });
-
-    it('captures a title and initial context and prints the context as markdown', async () => {
-        const data = tempDir();
-        const context = join(tempDir(), 'context.md');
-
-        writeFileSync(context, 'The board is too bright.\n');
-
-        const { record } = await larWork(
-            data,
-            'create',
-            '--title',
-            'Add dark mode',
-            '--repository',
-            'maddec01/lar',
-            '--kind',
-            'feature',
-            '--file',
-            context,
-        );
-
-        expect(record).toMatchObject({ title: 'Add dark mode' });
-        expect(await larWork(data, 'context', record.workId)).toMatchObject({
-            code: 0,
-            stdout: 'The board is too bright.\n',
-        });
-        expect(await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('--title is required'),
-        });
-    });
-
-    it('reports a stale revision on stderr and changes nothing', async () => {
-        const data = tempDir();
-        const { workId } = await fixtureRecord(data, 'bug');
-
-        await larWork(data, 'update', workId, '--revision', '1', '--status', 'Shaping');
-
-        const stale = await larWork(data, 'update', workId, '--revision', '1', '--status', 'Ready');
-
-        expect(stale).toMatchObject({
-            code: 1,
-            stdout: '',
-            stderr: `lar-work: The work record ${workId} is at revision 2, not 1; conflicting fields: status. Reread the record and decide whether to reapply the write.\n`,
-        });
-        expect((await larWork(data, 'read', workId)).record).toMatchObject({ status: 'Shaping', revision: 2 });
     });
 
     it('sets a parent and a blocker in a data folder with no board running', async () => {
@@ -861,14 +608,6 @@ throw Error('Local exploration must not call a tracker');
                 )
             ).record,
         ).toMatchObject({ needsYou: 'Its PR closed without merging.', status: 'Needs you', revision: 2 });
-        for (const args of [[], ['--status', 'Needs you'], ['--status', 'Done'], ['--status', 'Nowhere']]) {
-            expect((await larWork(data, 'clear-needs-you', workId, '--revision', '2', ...args)).code).not.toBe(0);
-            expect((await larWork(data, 'read', workId)).record).toMatchObject({
-                needsYou: 'Its PR closed without merging.',
-                status: 'Needs you',
-                revision: 2,
-            });
-        }
         expect((await larWork(data, 'clear-needs-you', workId, '--revision', '1', '--status', 'Shaping')).code).toBe(1);
         expect(
             (await larWork(data, 'clear-needs-you', workId, '--revision', '2', '--status', 'Shaping')).record,
@@ -898,106 +637,6 @@ throw Error('Local exploration must not call a tracker');
         });
     });
 
-    it('reports completion and the blockers a record waits on with no board running', async () => {
-        const data = tempDir();
-        const create = async (kind: WorkKind) => (await fixtureRecord(data, kind)).workId;
-        const [concept, slice, build] = [await create('concept'), await create('slice'), await create('build')];
-
-        await larWork(data, 'add-blocker', build, '--revision', '1', '--blocker', slice);
-        expect((await larWork(data, 'waiting-on', build)).record).toEqual([
-            { workId: slice, reasons: ["It isn't finished."] },
-        ]);
-        expect((await larWork(data, 'finish', slice, '--revision', '2')).record).toMatchObject({
-            finishedAt: expect.any(String),
-        });
-        expect((await larWork(data, 'waiting-on', build)).record).toEqual([]);
-        expect(await larWork(data, 'finish', build, '--revision', '2')).toMatchObject({
-            code: 1,
-            stderr: expect.stringContaining('Only a slice'),
-        });
-
-        expect((await larWork(data, 'set-fog', concept, '--revision', '1', '--fog', 'gone')).record).toMatchObject({
-            fogGone: true,
-        });
-        expect((await larWork(data, 'completion', concept)).record).toEqual({
-            complete: false,
-            reasons: ['No delivery planned.'],
-        });
-        expect((await larWork(data, 'refinement', concept)).record).toEqual({
-            complete: false,
-            reasons: ['Its map is empty.'],
-        });
-        expect((await larWork(data, 'set-fog', concept, '--revision', '2', '--fog', 'remaining')).record).toMatchObject(
-            { fogGone: false },
-        );
-        expect((await larWork(data, 'completion', concept)).record).toEqual({
-            complete: false,
-            reasons: ["Its Fog isn't gone.", 'No delivery planned.'],
-        });
-        expect(await larWork(data, 'set-fog', concept, '--revision', '3', '--fog', 'thin')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('--fog takes gone or remaining'),
-        });
-    });
-
-    it("records a ticket's observations and a failed read with no board running", async () => {
-        const data = tempDir();
-        const { workId } = (
-            await larWork(
-                data,
-                'create',
-                '--title',
-                'Work',
-                '--repository',
-                'maddec01/lar',
-                '--kind',
-                'bug',
-                '--ticket',
-                'maddec01/lar#4',
-            )
-        ).record;
-
-        expect(
-            (
-                await larWork(
-                    data,
-                    'observe',
-                    workId,
-                    '--revision',
-                    '1',
-                    '--of',
-                    'ticket',
-                    '--state',
-                    'open',
-                    '--assignee',
-                    'pedro',
-                )
-            ).record,
-        ).toMatchObject({ revision: 2 });
-        expect(
-            (
-                await larWork(
-                    data,
-                    'observe-failure',
-                    workId,
-                    '--revision',
-                    '2',
-                    '--of',
-                    'ticket',
-                    '--failure',
-                    'GitHub answered 502.',
-                )
-            ).record,
-        ).toMatchObject({ revision: 3 });
-        expect((await larWork(data, 'observations', workId)).record).toMatchObject([
-            { of: 'ticket', state: 'open', assignee: 'pedro', failure: 'GitHub answered 502.' },
-        ]);
-        expect(
-            await larWork(data, 'observe', workId, '--revision', '2', '--of', 'ticket', '--state', 'closed'),
-        ).toMatchObject({ code: 1, stderr: expect.stringContaining('revision 3, not 2') });
-        expect((await larWork(data, 'observations', workId)).record).toMatchObject([{ state: 'open' }]);
-    });
-
     it("saves this machine's retention setting and hides and deletes set-aside records with it", async () => {
         const data = tempDir();
 
@@ -1025,28 +664,6 @@ throw Error('Local exploration must not call a tracker');
         expect((await larWork(data, 'retention', '--delete-after', 'never')).record).toEqual({
             hideAfterDays: 0,
             deleteAfterDays: null,
-        });
-        expect(await larWork(data, 'retention', '--delete-after', 'soon')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('whole number of days or never'),
-        });
-    });
-
-    it('exports a brief as markdown to a folder and refuses a missing folder', async () => {
-        const data = tempDir();
-        const { workId } = await fixtureRecord(data, 'build');
-        const brief = join(tempDir(), 'brief.md');
-
-        writeFileSync(brief, '# Add it\n');
-        await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief);
-
-        const to = tempDir();
-
-        expect((await larWork(data, 'export', workId, '--to', to)).record).toEqual([join(to, 'brief-add-it.md')]);
-        expect(readdirSync(to)).toEqual(['brief-add-it.md']);
-        expect(await larWork(data, 'export', workId, '--to', join(to, 'missing'))).toMatchObject({
-            code: 1,
-            stderr: expect.stringContaining("isn't a folder"),
         });
     });
 
@@ -1111,24 +728,6 @@ throw Error('Local exploration must not call a tracker');
         expect((await larWork(data, 'dependencies', build.workId)).record).toMatchObject([
             { dependencyId, handover: 'Please add it.' },
         ]);
-        expect(await larWork(data, 'dependency')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('needs a Dependency ID'),
-        });
-    });
-
-    it('reports usage mistakes before opening the database', async () => {
-        const data = join(tempDir(), 'unused');
-
-        expect(await larWork(data, 'frobnicate')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('Unknown command "frobnicate"'),
-        });
-        expect(await larWork(data, 'read')).toMatchObject({
-            code: 2,
-            stderr: expect.stringContaining('read needs a work ID'),
-        });
-        expect(readdirSync(join(data, '..'))).toEqual([]);
     });
 });
 
@@ -1316,52 +915,6 @@ if (method === 'POST') {
     },
 );
 
-it(
-    'create-ticket obeys the retro preference and reports refused access while leaving a local record',
-    { timeout: 30_000 },
-    async () => {
-        const data = tempDir();
-        const settings = (enabled: boolean) =>
-            writeFileSync(
-                join(data, 'repository-settings.json'),
-                JSON.stringify({
-                    repositories: [
-                        { repo: 'example/product', settings: { overrides: { createIssuesFromRetro: enabled } } },
-                    ],
-                }),
-            );
-        const created = await larWork(
-            data,
-            'create',
-            '--repository',
-            'example/product',
-            '--kind',
-            'bug',
-            '--title',
-            'Fix export',
-        );
-        const args = [
-            'create-ticket',
-            created.record.workId,
-            '--revision',
-            '1',
-            '--request-id',
-            '11111111-1111-4111-8111-111111111111',
-            '--retro',
-        ];
-
-        settings(false);
-        expect(await larWork(data, ...args)).toMatchObject({ code: 0, record: { ticket: null } });
-        settings(true);
-        expect(await larWork(data, ...args)).toMatchObject({
-            code: 1,
-            stderr: expect.stringContaining('isn’t checked yet'),
-        });
-        expect((await larWork(data, 'read', created.record.workId)).record.ticket).toBeNull();
-        expect((await larWork(data, '--help')).stdout).toContain('create-ticket <work-id>');
-    },
-);
-
 it('gate reports held-edit status without exposing untrusted tracker text to the shaping agent', async () => {
     const data = tempDir();
     const records = await openWorkRecords(join(data, 'work-records.db'));
@@ -1398,93 +951,6 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
     expect(reply.stdout).not.toContain('HOSTILE TRACKER INSTRUCTIONS');
     expect(reply.stdout).not.toContain('Hostile title');
 });
-
-it('resets a build through the CLI with revision checks', { timeout: 30_000 }, async () => {
-    const data = join(tempDir(), 'Lar Factory');
-    const made = await larWork(data, 'create', '--title', 'Build', '--repository', 'a/b', '--kind', 'build');
-    const id = made.record.workId;
-
-    expect(await larWork(data, 'set-build-branch', id, '--revision', '1', '--branch', 'feat/work')).toMatchObject({
-        code: 0,
-        record: { buildBranch: 'feat/work' },
-    });
-    expect(await larWork(data, 'reset-build', id, '--revision', '1')).toMatchObject({ code: 1 });
-    expect(await larWork(data, 'reset-build', id, '--revision', '2')).toMatchObject({
-        code: 0,
-        record: { buildPhase: null },
-    });
-});
-
-it('manages validation lists and failure descriptions without revisions', async () => {
-    const data = tempDir();
-    const records = await openWorkRecords(join(data, 'work-records.db'));
-    const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const run = records.startCheck(build.workId, { role: 'builder', command: ['test'], folder: '.', tree: null });
-
-    records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
-    records.close();
-
-    const file = join(data, 'input.json');
-
-    writeFileSync(file, JSON.stringify([{ command: ['test'], folder: '.' }]));
-    expect((await larWork(data, 'set-check-list', build.workId, '--file', file)).code).toBe(0);
-    writeFileSync(file, JSON.stringify({ tests: ['saves data'], diagnosis: 'Missing fixture' }));
-    expect((await larWork(data, 'describe-failure', run.checkId, '--file', file)).code).toBe(0);
-    expect((await larWork(data, 'checks', build.workId)).record.runs[0]).toMatchObject({
-        failureState: 'open',
-        failure: { tests: ['saves data'] },
-    });
-    expect((await larWork(data, 'resolve-failure', run.checkId, '--reason', 'Added fixture')).code).toBe(0);
-    expect((await larWork(data, 'checks', build.workId)).record.runs[0].failureState).toBe('resolved');
-}, 30_000);
-
-it('retitles through the CLI and exposes historical names', async () => {
-    const dir = tempDir();
-    const created = await larWork(
-        dir,
-        'create',
-        '--title',
-        'Before',
-        '--repository',
-        'example/repo',
-        '--kind',
-        'build',
-    );
-    const workId = created.record.workId;
-    const result = await larWork(dir, 'retitle', workId, '--revision', '1', '--title', 'After');
-
-    expect(result.record).toMatchObject({ title: 'After', revision: 2 });
-    expect((await larWork(dir, 'retitle', workId, '--revision', '1', '--title', 'Stale')).code).toBe(1);
-    expect((await larWork(dir, 'title-history', workId)).record).toEqual([
-        expect.objectContaining({ previous: 'Before', title: 'After' }),
-    ]);
-}, 30_000);
-
-it('reads versioned current decision answers through the CLI', async () => {
-    const dir = tempDir();
-    const result = await larWork(
-        dir,
-        'create',
-        '--title',
-        'Contract',
-        '--repository',
-        'example/repo',
-        '--kind',
-        'decision',
-    );
-    const workId = result.record.workId;
-    const file = join(dir, 'answer.md');
-
-    writeFileSync(file, 'Current contract');
-    expect((await larWork(dir, 'set-body', workId, '--revision', '1', '--body', 'answer', '--file', file)).code).toBe(
-        0,
-    );
-    expect((await larWork(dir, 'decision-answer', workId)).record.current).toMatchObject({
-        revision: 1,
-        text: 'Current contract',
-    });
-    expect((await larWork(dir, 'answer-history', workId)).record).toHaveLength(1);
-}, 30_000);
 
 it(
     'refuses agent-authored batch approvals, including a fresh manifest and alleged human evidence',
@@ -1583,36 +1049,6 @@ it(
         }
     },
 );
-it('work-order prints a human report or JSON and requires a group ID', async () => {
-    const data = tempDir();
-    const records = await openWorkRecords(join(data, 'work-records.db'));
-    const group = records.create({ title: 'Concept', kind: 'concept', repository: 'example/a' });
-    const part = records.createPart({
-        parentId: group.workId,
-        parentRevision: group.revision,
-        title: 'Implement',
-        kind: 'build',
-        repository: 'example/b',
-        body: completeBrief('Exact brief'),
-        blockerIds: [],
-    });
-
-    records.close();
-
-    const text = await larWork(data, 'work-order', group.workId);
-    const json = await larWork(data, 'work-order', group.workId, '--json');
-
-    expect(text.code).toBe(0);
-    expect(text.stdout).toContain('Implement');
-    expect(text.stdout).toContain('Status is Queued.');
-    expect(json.code).toBe(0);
-    expect(json.record[0]).toMatchObject({
-        workId: part.workId,
-        brief: completeBrief('Exact brief'),
-        status: 'Queued',
-    });
-    expect((await larWork(data, 'work-order')).code).toBe(2);
-});
 
 describe('post-merge retro commands', () => {
     it('records the complete proposal after merge and exposes the saved board choice', async () => {

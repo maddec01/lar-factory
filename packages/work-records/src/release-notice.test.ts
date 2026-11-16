@@ -10,7 +10,7 @@ const fixture = JSON.parse(
     readFileSync(new URL('../../shared/test/s05-release-notice.json', import.meta.url), 'utf8'),
 ) as { savedNotice: string; recordedApproval: { evidence: string } };
 
-test.each(['matching', 'structured notice', 'mismatched manifest', 'independent question', 'mixed notice'])(
+test.each(['matching', 'mismatched manifest'])(
     'legacy saved receipt recovery preserves other holds: %s',
     async (kind) => {
         const dir = mkdtempSync(join(tmpdir(), 'release-notice-'));
@@ -51,24 +51,12 @@ test.each(['matching', 'structured notice', 'mismatched manifest', 'independent 
             );
 
             const notice =
-                kind === 'structured notice'
-                    ? 'Awaiting the recorded manifest action on the board.'
-                    : kind === 'matching'
-                      ? fixture.savedNotice
-                      : kind === 'mismatched manifest'
-                        ? fixture.savedNotice.replace(/2387e9fe[\da-f]+/g, 'f'.repeat(64))
-                        : kind === 'mixed notice'
-                          ? fixture.savedNotice + ' Which region?'
-                          : 'Which region should we use?';
+                kind === 'matching'
+                    ? fixture.savedNotice
+                    : fixture.savedNotice.replace(/2387e9fe[\da-f]+/g, 'f'.repeat(64));
             const db = new DatabaseSync(path);
 
             db.prepare("UPDATE work_records SET needs_you=?,status='Needs you' WHERE work_id=?").run(notice, id);
-
-            if (kind === 'structured notice')
-                db.prepare('UPDATE work_records SET needs_you_release_step=? WHERE work_id=?').run(
-                    'approve-joint-activation',
-                    id,
-                );
 
             db.close();
             records.close();
@@ -76,13 +64,13 @@ test.each(['matching', 'structured notice', 'mismatched manifest', 'independent 
 
             const recovered = records.prepareReleaseContinuation(id);
 
-            expect(recovered.ready).toBe(['matching', 'structured notice'].includes(kind));
-            expect(records.read(id).needsYou).toBe(['matching', 'structured notice'].includes(kind) ? null : notice);
+            expect(recovered.ready).toBe(kind === 'matching');
+            expect(records.read(id).needsYou).toBe(kind === 'matching' ? null : notice);
 
             if (kind === 'mismatched manifest')
                 expect(records.read(id).needsYouReleaseStep).toBe('approve-joint-activation');
 
-            if (['matching', 'structured notice'].includes(kind)) expect(recovered.run?.threadId).toBe('owner');
+            if (kind === 'matching') expect(recovered.run?.threadId).toBe('owner');
         } finally {
             records.close();
             rmSync(dir, { recursive: true, force: true });

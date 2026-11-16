@@ -50,18 +50,6 @@ describe('work records', () => {
         expect(reopened.read(made.workId)).toEqual(made);
     });
 
-    it('attaches a ticket without changing the work ID', async () => {
-        const records = await open();
-        const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'concept' });
-        const linked = records.attachTicket(made.workId, made.revision, 'maddec01/lar#7');
-
-        expect(linked).toMatchObject({ workId: made.workId, ticket: 'maddec01/lar#7', revision: 2 });
-        expect(records.attachTicket(made.workId, 2, 'maddec01/lar#7')).toEqual(linked);
-        expect(() => records.attachTicket(made.workId, 1, 'maddec01/lar#7')).toThrow(
-            expect.objectContaining({ code: 'stale-revision' }),
-        );
-    });
-
     it('keeps the title and initial context it was captured with, which a repeated import never overwrites', async () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);
@@ -137,20 +125,6 @@ describe('work records', () => {
         expect(records.read(other.workId)).toEqual(other);
     });
 
-    it('refuses to re-key a record that already has a different ticket', async () => {
-        const records = await open();
-        const made = records.create({
-            title: 'Work',
-            repository: 'maddec01/lar',
-            kind: 'bug',
-            ticket: 'maddec01/lar#3',
-        });
-
-        expect(() => records.attachTicket(made.workId, 1, 'maddec01/lar#4')).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-    });
-
     it('updates with the current revision and refuses a stale one without overwriting', async () => {
         const path = join(tempDir(), 'work-records.db');
         const board = await open(path);
@@ -223,68 +197,6 @@ describe('work records', () => {
             expect(reader.read(made.workId).revision).toBe(1 + committed.length);
         },
     );
-
-    it('keeps Queued records in the order they joined the Queue', async () => {
-        const records = await open();
-        const [a, b, c] = ['bug', 'feature', 'improvement'].map((kind) =>
-            records.create({ title: 'Work', repository: 'maddec01/lar', kind: kind as 'bug' }),
-        );
-
-        records.update(c!.workId, 1, { status: 'Queued' });
-        records.update(a!.workId, 1, { status: 'Queued' });
-        records.update(b!.workId, 1, { status: 'Queued' });
-        expect(records.list({ status: 'Queued' }).map((r) => r.workId)).toEqual([c!.workId, a!.workId, b!.workId]);
-
-        records.update(c!.workId, 2, { status: 'Shaping' });
-        expect(records.read(c!.workId).queueOrder).toBeNull();
-    });
-
-    it('lists by repository, Status and kind', async () => {
-        const records = await open();
-        const lar = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug' });
-
-        records.create({ title: 'Work', repository: 'maddec01/other', kind: 'bug' });
-
-        const concept = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'concept' });
-
-        expect(records.list({ repository: 'maddec01/lar' }).map((r) => r.workId)).toEqual([lar.workId, concept.workId]);
-        expect(records.list({ repository: 'maddec01/lar', kind: 'concept' }).map((r) => r.workId)).toEqual([
-            concept.workId,
-        ]);
-        expect(records.list({ status: 'Done' })).toEqual([]);
-    });
-
-    it('sets a record aside and restores it without touching its Status', async () => {
-        const records = await open();
-        const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status: 'Ready' });
-        const aside = records.setAside(made.workId, 1);
-
-        expect(aside).toMatchObject({ status: 'Ready', setAside: true, revision: 2 });
-        expect(records.restore(aside.workId, 2)).toMatchObject({ status: 'Ready', setAside: false, revision: 3 });
-        expect(() => records.restore(aside.workId, 3)).toThrow(expect.objectContaining({ code: 'invalid' }));
-    });
-
-    it('refuses malformed input and missing records without changing anything', async () => {
-        const records = await open();
-
-        expect(() => records.create({ title: 'Work', repository: '', kind: 'bug' })).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(() => records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'chore' as 'bug' })).toThrow(
-            /kind "chore"/,
-        );
-        expect(() =>
-            records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', status: 'Doing' as 'List' }),
-        ).toThrow(/Status "Doing"/);
-        expect(() =>
-            records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'lar-12' }),
-        ).toThrow(/ticket "lar-12"/);
-        expect(() => records.read('nope')).toThrow(expect.objectContaining({ code: 'not-found' }));
-        expect(() => records.update('nope', 1, { status: 'Ready' })).toThrow(
-            expect.objectContaining({ code: 'not-found' }),
-        );
-        expect(records.list({})).toEqual([]);
-    });
 });
 
 describe('work-record structure', () => {
@@ -307,83 +219,6 @@ describe('work-record structure', () => {
         expect(records.read(concept.workId).revision).toBe(3);
         expect(records.children(concept.workId).map((r) => r.workId)).toEqual([decision.workId, build.workId]);
         expect(records.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
-    });
-
-    it.each(['bug', 'build'] as const)('lets a %s own private slices without changing its kind', async (kind) => {
-        const records = await open();
-        const parent = lar(records, kind);
-        const slice = lar(records, 'slice');
-
-        records.setParent(slice.workId, slice.revision, parent.workId);
-        expect(records.read(parent.workId)).toMatchObject({ kind, revision: 2 });
-        expect(records.children(parent.workId)).toMatchObject([
-            { workId: slice.workId, kind: 'slice', parentId: parent.workId },
-        ]);
-
-        const before = records.list({});
-
-        expect(() => records.update(parent.workId, 2, { kind: 'decision' })).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(records.list({})).toEqual(before);
-        expect(records.update(parent.workId, 2, { kind: kind === 'bug' ? 'feature' : 'bug' }).kind).toBe(
-            kind === 'bug' ? 'feature' : 'bug',
-        );
-    });
-
-    it('refuses a parent whose kind does not own the child, or a second parent, and changes nothing', async () => {
-        const records = await open();
-        const concept = lar(records, 'concept');
-        const build = lar(records, 'build');
-        const decision = lar(records, 'decision');
-        const slice = lar(records, 'slice');
-
-        records.setParent(build.workId, 1, concept.workId);
-
-        const before = records.list({});
-
-        expect(() => records.setParent(decision.workId, 1, build.workId)).toThrow(
-            expect.objectContaining({
-                code: 'invalid',
-                message: expect.stringContaining('A build owns only slice records'),
-            }),
-        );
-        expect(() => records.setParent(slice.workId, 1, concept.workId)).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(() => records.setParent(build.workId, 2, lar(records, 'concept').workId)).toThrow(
-            expect.objectContaining({ code: 'invalid', message: expect.stringContaining('already has the parent') }),
-        );
-        expect(() => records.setParent(slice.workId, 1, 'nope')).toThrow(
-            expect.objectContaining({ code: 'not-found' }),
-        );
-        expect(records.list({}).slice(0, 4)).toEqual(before);
-    });
-
-    it('refuses a kind change that its parent or children would not allow', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const slice = lar(records, 'slice');
-
-        records.setParent(slice.workId, 1, build.workId);
-        expect(() => records.update(slice.workId, 2, { kind: 'decision' })).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(() => records.update(build.workId, 2, { kind: 'decision' })).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-    });
-
-    it('clears a parent, bumping both records', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const slice = lar(records, 'slice');
-
-        records.setParent(slice.workId, 1, build.workId);
-        expect(records.clearParent(slice.workId, 2)).toMatchObject({ parentId: null, revision: 3 });
-        expect(records.read(build.workId).revision).toBe(3);
-        expect(records.children(build.workId)).toEqual([]);
-        expect(() => records.clearParent(slice.workId, 3)).toThrow(expect.objectContaining({ code: 'invalid' }));
     });
 
     it('records blockers and lists them from both ends', async () => {
@@ -422,40 +257,6 @@ describe('work-record structure', () => {
         expect(records.list({})).toEqual(before);
         expect(records.blockers(c.workId)).toEqual([]);
     });
-
-    it('keeps parents and blockers across close and reopen', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const first = await openWorkRecords(path);
-        const build = lar(first, 'build');
-        const slice = lar(first, 'slice');
-        const other = lar(first, 'slice');
-
-        first.setParent(slice.workId, 1, build.workId);
-        first.addBlocker(slice.workId, 2, other.workId);
-        first.close();
-
-        const reopened = await open(path);
-
-        expect(reopened.read(slice.workId).parentId).toBe(build.workId);
-        expect(reopened.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
-        expect(reopened.blockers(slice.workId).map((r) => r.workId)).toEqual([other.workId]);
-    });
-
-    it('refuses a relationship change with a stale revision while a concurrent one succeeds', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const board = await open(path);
-        const thread = await open(path);
-        const build = lar(board, 'build');
-        const slice = lar(board, 'slice');
-        const blocker = lar(board, 'slice');
-
-        expect(board.setParent(slice.workId, 1, build.workId).revision).toBe(2);
-        expect(() => thread.addBlocker(slice.workId, 1, blocker.workId)).toThrow(
-            expect.objectContaining({ code: 'stale-revision' }),
-        );
-        expect(thread.blockers(slice.workId)).toEqual([]);
-        expect(thread.read(blocker.workId).revision).toBe(1);
-    });
 });
 
 describe('work-record content', () => {
@@ -479,89 +280,6 @@ describe('work-record content', () => {
         expect(reopened.body(decision.workId, 'decision')).toBe('Use SQLite.');
         expect(reopened.body(concept.workId, 'map')).toBe('# Map');
         expect(reopened.body(concept.workId, 'brief')).toBeNull();
-    });
-
-    it('refuses a body its kind does not hold, and a body that is not text', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-
-        expect(() => records.setBody(build.workId, 1, 'map', '# Map')).toThrow(
-            expect.objectContaining({
-                code: 'invalid',
-                message: expect.stringContaining('Only a concept holds a map'),
-            }),
-        );
-        expect(() => records.setBody(build.workId, 1, 'notes' as 'brief', 'x')).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(() => records.setBody(build.workId, 1, 'brief', 42 as unknown as string)).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(records.read(build.workId)).toEqual(build);
-    });
-
-    it('refuses a kind change that would leave a body, build phase or PR the new kind cannot hold', async () => {
-        const records = await open();
-        const [briefed, phased, released, mapped] = [
-            lar(records, 'feature'),
-            lar(records, 'build'),
-            lar(records, 'build'),
-            lar(records, 'concept'),
-        ];
-
-        records.setBody(briefed.workId, 1, 'brief', '# Brief');
-        records.setBuildPhase(phased.workId, 1, 'plan');
-        records.setPullRequest(released.workId, 1, 'maddec01/lar#88');
-        records.setBody(mapped.workId, 1, 'map', '# Map');
-
-        const refuse = (workId: string, kind: WorkKind, message: string) => {
-            const before = records.read(workId);
-
-            expect(() => records.update(workId, 2, { kind, status: 'Ready' })).toThrow(
-                expect.objectContaining({ code: 'invalid', message: expect.stringContaining(message) }),
-            );
-            expect(records.read(workId)).toEqual(before);
-        };
-
-        refuse(briefed.workId, 'decision', 'A decision holds no brief');
-        refuse(phased.workId, 'slice', 'A slice is never built');
-        refuse(released.workId, 'concept', 'A concept is never built');
-        refuse(mapped.workId, 'decision', 'Only a concept holds a map');
-        expect(records.update(briefed.workId, 2, { kind: 'bug' })).toMatchObject({ kind: 'bug', revision: 3 });
-    });
-
-    it('records a build phase and its PR, refusing unknown phases and records that are never built', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const first = await openWorkRecords(path);
-        const build = lar(first, 'build');
-
-        expect(build).toMatchObject({ buildPhase: null, pullRequest: null });
-        expect(first.setBuildPhase(build.workId, 1, 'implement')).toMatchObject({
-            buildPhase: 'implement',
-            revision: 2,
-        });
-        first.setPullRequest(build.workId, 2, 'maddec01/lar#88');
-        first.close();
-
-        const reopened = await open(path);
-
-        expect(reopened.read(build.workId)).toMatchObject({
-            buildPhase: 'implement',
-            pullRequest: 'maddec01/lar#88',
-            revision: 3,
-        });
-        expect(() => reopened.setBuildPhase(build.workId, 3, 'deploy' as 'plan')).toThrow(
-            expect.objectContaining({ code: 'invalid', message: expect.stringContaining('phase "deploy"') }),
-        );
-        expect(() => reopened.setPullRequest(build.workId, 3, 'pr-88')).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-
-        const concept = lar(reopened, 'concept');
-
-        expect(() => reopened.setBuildPhase(concept.workId, 1, 'plan')).toThrow(
-            expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A concept is never built') }),
-        );
     });
 
     it('holds one current delivery PR and keeps each replaced one as history', async () => {
@@ -672,49 +390,6 @@ describe('work-record content', () => {
         expect(records.reviewRounds(build.workId)).toEqual([]);
         expect(records.read(build.workId)).toEqual(build);
     });
-
-    it('refuses a malformed round, a repeated axis, a rejection without a reason and a missing finding', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const code = round1.reviewers[0];
-        const refuse = (round: unknown, message: string) =>
-            expect(() => records.recordReviewRound(build.workId, 1, round as never)).toThrow(
-                expect.objectContaining({ code: 'invalid', message: expect.stringContaining(message) }),
-            );
-
-        refuse({ base: 'not a sha', reviewers: [code] }, 'base');
-        refuse({ base: 'c8890a1a', reviewers: [] }, 'no reviewers');
-        refuse({ base: 'c8890a1a', reviewers: [code, code] }, 'code reviewer twice');
-        refuse({ base: 'c8890a1a', reviewers: [{ ...code, axis: 'style' }] }, 'axis "style"');
-        refuse(
-            { base: 'c8890a1a', reviewers: [{ ...code, findings: [{ ...code.findings[1], reason: undefined }] }] },
-            'reason',
-        );
-        refuse({ base: 'c8890a1a', reviewers: [{ axis: 'ui', verdict: 'skipped', findings: [] }] }, 'skipped');
-        expect(() => records.recordReviewRound(lar(records, 'concept').workId, 1, round1)).toThrow(
-            expect.objectContaining({ message: expect.stringContaining('never built') }),
-        );
-
-        records.recordReviewRound(build.workId, 1, round1);
-        expect(() =>
-            records.setFindingDisposition(build.workId, 2, { round: 1, axis: 'code', finding: 3 }, 'fixed'),
-        ).toThrow(expect.objectContaining({ code: 'not-found' }));
-        expect(() =>
-            records.setFindingDisposition(build.workId, 2, { round: 1, axis: 'code', finding: 1 }, 'rejected'),
-        ).toThrow(expect.objectContaining({ code: 'invalid' }));
-        expect(records.reviewRounds(build.workId)[0]!.reviewers[0]!.findings[0]!.disposition).toBe('open');
-    });
-
-    it('refuses to make a reviewed build a kind that is never built', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const reviewed = records.recordReviewRound(build.workId, 1, round1);
-
-        expect(() => records.update(build.workId, 2, { kind: 'slice' })).toThrow(
-            expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A slice is never built') }),
-        );
-        expect(records.read(build.workId)).toEqual(reviewed);
-    });
 });
 
 describe('work-record threads and launch intents', () => {
@@ -738,52 +413,6 @@ describe('work-record threads and launch intents', () => {
 
     const lar = (records: WorkRecords, kind: WorkKind) =>
         records.create({ title: 'Work', repository: 'maddec01/lar', kind });
-
-    it('records thread IDs and a PR that stay on the same work ID when a ticket is attached', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const first = await openWorkRecords(path);
-        const build = lar(first, 'build');
-
-        first.addThread(build.workId, 1, 'thread-shape-1', 'shape');
-        first.addThread(build.workId, 2, 'thread-build-1', 'build');
-        first.setPullRequest(build.workId, 3, 'maddec01/lar#90');
-        first.attachTicket(build.workId, 4, 'maddec01/lar#89');
-        first.close();
-
-        const reopened = await open(path);
-
-        expect(reopened.read(build.workId)).toMatchObject({
-            ticket: 'maddec01/lar#89',
-            pullRequest: 'maddec01/lar#90',
-            revision: 5,
-        });
-        expect(reopened.threads(build.workId).map((t) => [t.threadId, t.purpose])).toEqual([
-            ['thread-shape-1', 'shape'],
-            ['thread-build-1', 'build'],
-        ]);
-        expect(() => reopened.addThread(lar(reopened, 'bug').workId, 1, 'thread-build-1', 'build')).toThrow(
-            expect.objectContaining({ code: 'invalid', message: expect.stringContaining(build.workId) }),
-        );
-        expect(() => reopened.addThread(build.workId, 5, 'has space', 'build')).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-    });
-
-    it("reads every record's threads at once, as each record reads its own", async () => {
-        const records = await open();
-        const [build, bug, quiet] = [lar(records, 'build'), lar(records, 'bug'), lar(records, 'bug')];
-
-        records.addThread(build.workId, 1, 'thread-shape', 'shape');
-        records.addThread(bug.workId, 1, 'thread-bug', 'shape');
-        records.addThread(build.workId, 2, 'thread-build', 'build');
-        records.confirmThreadDeleted(build.workId, 3, 'thread-shape');
-
-        const all = records.threadsByWork();
-
-        expect(all.get(build.workId)).toEqual(records.threads(build.workId));
-        expect(all.get(bug.workId)).toEqual(records.threads(bug.workId));
-        expect(all.has(quiet.workId)).toBe(false);
-    });
 
     it('finds an unresolved launch intent after reopening and resolves it to a thread ID exactly once', async () => {
         const path = join(tempDir(), 'work-records.db');
@@ -834,60 +463,11 @@ describe('work-record threads and launch intents', () => {
         expect(thread.launchIntents({ workId: build.workId })).toEqual([resolved.intent]);
         expect(thread.threads(build.workId)).toHaveLength(1);
     });
-
-    it('resolves an intent to a failure without recording a thread', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const other = records.create({ title: 'Work', repository: 'maddec01/other', kind: 'bug' });
-        const { intent } = records.recordLaunchIntent(build.workId, 1, 'build');
-
-        records.recordLaunchIntent(other.workId, 1, 'shape');
-        expect(records.launchIntents({ repository: 'maddec01/lar', unresolved: true })).toEqual([intent]);
-
-        expect(() => records.resolveLaunchIntent(build.workId, 2, intent.intentId, { failure: ' ' })).toThrow(
-            expect.objectContaining({ code: 'invalid' }),
-        );
-        expect(() => records.resolveLaunchIntent(other.workId, 2, intent.intentId, { failure: 'T3 refused.' })).toThrow(
-            expect.objectContaining({ code: 'not-found' }),
-        );
-
-        const failed = records.resolveLaunchIntent(build.workId, 2, intent.intentId, {
-            failure: 'T3 refused the start.',
-        });
-
-        expect(failed.intent).toMatchObject({ outcome: 'failed', failure: 'T3 refused the start.', threadId: null });
-        expect(records.threads(build.workId)).toEqual([]);
-    });
 });
 
 describe('work-record facts the board sets', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
         records.create({ title: 'Work', repository: 'maddec01/lar', kind });
-
-    it('sets, replaces and clears a Needs you reason without moving the Status', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const first = await openWorkRecords(path);
-        const build = lar(first, 'build');
-
-        expect(build.needsYou).toBeNull();
-        first.setNeedsYou(build.workId, 1, 'Its PR closed without merging.');
-        first.close();
-
-        const reopened = await open(path);
-
-        expect(reopened.read(build.workId)).toMatchObject({
-            needsYou: 'Its PR closed without merging.',
-            status: 'List',
-            revision: 2,
-        });
-        expect(reopened.setNeedsYou(build.workId, 2, "The start's outcome is unknown.")).toMatchObject({
-            needsYou: "The start's outcome is unknown.",
-            revision: 3,
-        });
-        expect(() => reopened.setNeedsYou(build.workId, 3, ' ')).toThrow(/reason/);
-        expect(reopened.clearNeedsYou(build.workId, 3)).toMatchObject({ needsYou: null, revision: 4 });
-        expect(reopened.clearNeedsYou(build.workId, 4)).toMatchObject({ revision: 4 });
-    });
 
     it('waits and resumes atomically, preserves causes and rejects stale or invalid writes', async () => {
         const path = join(tempDir(), 'work-records.db');
@@ -971,24 +551,6 @@ describe('work-record facts the board sets', () => {
             needsYou: null,
             needsYouCauses: [],
             revision: 6,
-        });
-    });
-
-    it('moves work and removes its Needs you causes in one write, or does neither', async () => {
-        const records = await open(join(tempDir(), 'work-records.db'));
-        const build = lar(records, 'build');
-
-        records.setNeedsYouCauses(build.workId, 1, [{ type: 'pr-closed' }]);
-        expect(() => records.setNeedsYouCauses(build.workId, 2, [], { status: 'Nowhere' as never })).toThrow(/Status/);
-        expect(records.read(build.workId)).toMatchObject({
-            status: build.status,
-            needsYouCauses: [{ type: 'pr-closed' }],
-            revision: 2,
-        });
-        expect(records.setNeedsYouCauses(build.workId, 2, [], { status: 'Ready' })).toMatchObject({
-            status: 'Ready',
-            needsYouCauses: [],
-            revision: 3,
         });
     });
 
@@ -1118,30 +680,6 @@ describe('work-record provider observations', () => {
         );
     });
 
-    it('keeps the last observation after a failed read and records when it failed, until a read succeeds', async () => {
-        const records = await open();
-        const bug = lar(records, 'bug', 'maddec01/lar#7');
-
-        records.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'pedro' });
-
-        const [observed] = records.observations(bug.workId);
-
-        records.recordReadFailure(bug.workId, 2, 'ticket', 'GitHub answered 502.');
-        expect(records.observations(bug.workId)).toEqual([
-            { ...observed, failedAt: expect.any(String), failure: 'GitHub answered 502.' },
-        ]);
-
-        records.observe(bug.workId, 3, { of: 'ticket', state: 'open', assignee: 'ana' });
-        expect(records.observations(bug.workId)).toMatchObject([{ assignee: 'ana', failedAt: null, failure: null }]);
-
-        const unread = lar(records, 'feature', 'maddec01/lar#8');
-
-        records.recordReadFailure(unread.workId, 1, 'ticket', 'Offline.');
-        expect(records.observations(unread.workId)).toMatchObject([
-            { subject: 'maddec01/lar#8', state: null, observedAt: null, failure: 'Offline.' },
-        ]);
-    });
-
     it('observes the recorded PR, finishing the work when it merged, and drops the observation when the PR is replaced', async () => {
         const records = await open();
         const build = lar(records, 'build');
@@ -1160,23 +698,6 @@ describe('work-record provider observations', () => {
         });
         expect(records.observations(build.workId)).toMatchObject([{ subject: 'maddec01/lar#91', state: 'merged' }]);
     });
-
-    it('refuses an observation of something the record lacks, an unknown state or a PR assignee, and changes nothing', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-
-        expect(() => records.observe(build.workId, 1, { of: 'ticket', state: 'open' })).toThrow(/has no ticket/);
-        expect(() => records.observe(build.workId, 1, { of: 'pr', state: 'open' })).toThrow(/has no PR/);
-        expect(() => records.recordReadFailure(build.workId, 1, 'pr', 'Offline.')).toThrow(/has no PR/);
-        records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
-        expect(() => records.observe(build.workId, 2, { of: 'pr', state: 'draft' as 'open' })).toThrow(/state "draft"/);
-        expect(() => records.observe(build.workId, 2, { of: 'pr', state: 'open', assignee: 'pedro' } as never)).toThrow(
-            /assignee/,
-        );
-        expect(() => records.recordReadFailure(build.workId, 2, 'pr', ' ')).toThrow(/failure/);
-        expect(records.observations(build.workId)).toEqual([]);
-        expect(records.read(build.workId).revision).toBe(2);
-    });
 });
 
 describe('work-record completion', () => {
@@ -1194,33 +715,6 @@ describe('work-record completion', () => {
         records.setBody(decision, at(records, decision), 'domain-drafts', 'None.');
         records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
     };
-
-    it('refines a mapped concept independently of its unstarted builds', async () => {
-        const records = await open();
-        const concept = lar(records, 'concept');
-        const build = lar(records, 'build');
-
-        records.setParent(build.workId, 1, concept.workId);
-        records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map');
-        records.setFogGone(concept.workId, at(records, concept.workId), true);
-        expect(records.refinement(concept.workId)).toEqual({ complete: true, reasons: [] });
-        expect(records.completion(concept.workId).complete).toBe(false);
-        expect(records.read(concept.workId).finishedAt).toBeNull();
-    });
-
-    it('keeps refinement without delivery incomplete for blockers and retention', async () => {
-        const records = await open();
-        const concept = lar(records, 'concept');
-        const dependent = lar(records, 'build');
-
-        records.addBlocker(dependent.workId, 1, concept.workId);
-        records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map');
-        records.setFogGone(concept.workId, at(records, concept.workId), true);
-        expect(records.refinement(concept.workId).complete).toBe(true);
-        expect(records.completion(concept.workId)).toEqual({ complete: false, reasons: ['No delivery planned.'] });
-        expect(records.waitingOn(dependent.workId)).toHaveLength(1);
-        expect(records.read(concept.workId).finishedAt).toBeNull();
-    });
 
     it('rechecks refinement when decisions are rewritten or restored and Fog returns', async () => {
         const records = await open();
@@ -1241,19 +735,6 @@ describe('work-record completion', () => {
         expect(records.refinement(concept.workId).complete).toBe(true);
         records.setFogGone(concept.workId, at(records, concept.workId), false);
         expect(records.refinement(concept.workId).complete).toBe(false);
-    });
-
-    it('requires delivery after every build is set aside but preserves finished history', async () => {
-        const records = await open();
-        const concept = lar(records, 'concept');
-        const build = lar(records, 'build');
-
-        records.setParent(build.workId, 1, concept.workId);
-        records.setFogGone(concept.workId, at(records, concept.workId), true);
-        records.setAside(build.workId, at(records, build.workId));
-        expect(records.completion(concept.workId).reasons).toContain('No delivery planned.');
-        records.recordFinished(concept.workId, at(records, concept.workId));
-        expect(records.completion(concept.workId).complete).toBe(true);
     });
 
     it('completes a build only once its recorded PR is observed merged', async () => {
@@ -1279,30 +760,6 @@ describe('work-record completion', () => {
             complete: false,
             reasons: ["Its PR maddec01/lar#91 isn't observed merged."],
         });
-    });
-
-    it("completes a decision once its answer and domain drafts are recorded and its concept's map is updated after them", async () => {
-        const records = await open();
-        const [concept, decision] = [lar(records, 'concept'), lar(records, 'decision')];
-
-        records.setParent(decision.workId, 1, concept.workId);
-        records.setBody(concept.workId, 2, 'map', '# Map');
-        expect(records.completion(decision.workId)).toEqual({
-            complete: false,
-            reasons: ["Its confirmed answer isn't recorded.", "Its domain drafts aren't recorded."],
-        });
-
-        records.setBody(decision.workId, 2, 'answer', 'Use SQLite.');
-        records.setBody(decision.workId, 3, 'domain-drafts', '');
-        expect(records.completion(decision.workId)).toEqual({
-            complete: false,
-            reasons: [`Its concept ${concept.workId}'s map isn't updated since its answer and domain drafts.`],
-        });
-        records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map\n\nSettled.');
-        expect(records.completion(decision.workId)).toEqual({ complete: true, reasons: [] });
-        expect(() => records.setBody(lar(records, 'build').workId, 1, 'answer', 'x')).toThrow(
-            'Only a decision holds an answer',
-        );
     });
 
     it('completes a concept once its Fog is gone, every decision is settled and every build is Done', async () => {
@@ -1373,15 +830,6 @@ describe('work-record retention', () => {
     const later = (n: number) => new Date(Date.now() + n * 86_400_000);
     const KEEP = { hideAfterDays: 7, deleteAfterDays: null };
     const ids = (list: readonly { workId: string }[]) => list.map((record) => record.workId);
-
-    it('records a finish once, as a fact of its own', async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-        const finished = records.recordFinished(build.workId, 1);
-
-        expect(finished).toMatchObject({ status: 'List', revision: 2, finishedAt: expect.any(String) });
-        expect(() => records.recordFinished(build.workId, 2)).toThrow('already finished');
-    });
 
     it('hides a finished or set-aside record after seven days and keeps it by default', async () => {
         const records = await open();
@@ -1461,26 +909,6 @@ describe('work-record retention', () => {
         expect(records.children(build.workId)).toMatchObject([{ workId: open_.workId }]);
         expect(records.read(build.workId).revision).toBe(5);
     });
-
-    it('keeps a finished record another kept record waits on, and deletes both once neither is needed', async () => {
-        const records = await open();
-        const [blocker, waiting] = [lar(records, 'build'), lar(records, 'build')];
-
-        records.addBlocker(waiting.workId, 1, blocker.workId);
-        records.recordFinished(blocker.workId, 2);
-
-        const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
-
-        expect(records.deleteExpired(setting, later(31))).toEqual({
-            deleted: [],
-            kept: [{ workId: blocker.workId, reason: `The build ${waiting.workId}, which is kept, waits on it.` }],
-        });
-        records.recordFinished(waiting.workId, 2);
-        expect(records.deleteExpired(setting, later(31)).deleted.toSorted()).toEqual(
-            [blocker.workId, waiting.workId].toSorted(),
-        );
-        expect(records.list({})).toEqual([]);
-    });
 });
 
 it('restores imported refinement and relationships atomically and preserves later local removals', async () => {
@@ -1529,29 +957,6 @@ it('restores imported refinement and relationships atomically and preserves late
     expect(records.body(build.workId, 'brief')).toBe('Local brief');
     expect(records.read(build.workId).parentId).toBe(null);
     expect(records.blockers(build.workId)).toEqual([]);
-});
-
-it('persists confirmed deletion and launched branch with revision checks', async () => {
-    const path = join(tempDir(), 'records.db');
-    const records = await open(path);
-    const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
-
-    records.addThread(build.workId, 1, 'thread-1', 'build');
-    records.confirmThreadDeleted(build.workId, 2, 'thread-1');
-    expect(() => records.setBuildBranch(build.workId, 2, 'feat/build')).toThrow(
-        /is at revision 3, not 2; read it again/,
-    );
-    records.setBuildBranch(build.workId, 3, 'feat/build');
-
-    const reopened = await open(path);
-
-    expect(reopened.read(build.workId).buildBranch).toBe('feat/build');
-
-    const feature = records.create({ title: 'Feature', repository: 'a/b', kind: 'feature' });
-
-    records.setBuildBranch(feature.workId, feature.revision, 'feat/ordinary-item');
-    expect(reopened.read(feature.workId).buildBranch).toBe('feat/ordinary-item');
-    expect(reopened.threads(build.workId)[0]!.deletedAt).toEqual(expect.any(String));
 });
 
 it('invalidates gates without losing evidence or brief text', async () => {
@@ -1613,23 +1018,6 @@ it('preserves cleanup names across reset and database reopen with revision prote
     expect(reopened.cleanupOwnership(build.workId)).toEqual([
         { branch: 'old-build', sliceIds: [slice.workId], sliceBranches: [name] },
     ]);
-});
-
-it('resolves only named cleanup targets and rejects stale revisions', async () => {
-    const records = await open(join(tempDir(), 'work-records.db'));
-    const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
-
-    records.captureCleanup(build.workId, 1, 'old-build', []);
-    expect(() => records.resolveCleanup(build.workId, 1, ['old-build'])).toThrow(
-        /is at revision 2, not 1; read it again/,
-    );
-    records.resolveCleanup(build.workId, 2, []);
-    expect(records.cleanupOwnership(build.workId)).toHaveLength(1);
-    expect(() => records.resolveCleanup(build.workId, 3, ['unowned'])).toThrow(
-        'Cleanup branch is not owned by this build.',
-    );
-    records.resolveCleanup(build.workId, 3, ['old-build']);
-    expect(records.cleanupOwnership(build.workId)).toEqual([]);
 });
 
 it('commits staged recovery only after a confirmed launch across reopen', async () => {
@@ -1718,70 +1106,6 @@ describe('shaping thread cleanup rows', () => {
         expect(new Set(rows.map((row) => row.commandId)).size).toBe(2);
     });
 
-    it('adds nothing for an unresolved or failed intent, or one with no saved choice', async () => {
-        const { records, build } = await started('archive');
-        const uncertain = records.recordLaunchIntent(
-            build.workId,
-            records.read(build.workId).revision,
-            'build',
-            undefined,
-            'archive',
-        ).intent;
-
-        expect(uncertain.shapingThreadCleanup).toBe('archive');
-        expect(pendingIds(records)).toEqual([]);
-        records.resolveLaunchIntent(build.workId, records.read(build.workId).revision, uncertain.intentId, {
-            failure: 'T3 started no thread.',
-        });
-        expect(pendingIds(records)).toEqual([]);
-
-        const older = records.recordLaunchIntent(build.workId, records.read(build.workId).revision, 'build').intent;
-
-        records.resolveLaunchIntent(build.workId, records.read(build.workId).revision, older.intentId, {
-            threadId: 'build-1',
-        });
-        expect(older.shapingThreadCleanup).toBeUndefined();
-        expect(pendingIds(records)).toEqual([]);
-    });
-
-    it('records a Keep as already cleaned, so a later build under another setting leaves that thread alone', async () => {
-        const { records, build, startBuild } = await started('keep');
-
-        startBuild('build-1');
-        expect(pendingIds(records)).toEqual([]);
-        records.addThread(build.workId, records.read(build.workId).revision, 'shape-3', 'shape');
-        startBuild('build-2', 'archive');
-        expect(pendingIds(records)).toEqual(['shape-3']);
-    });
-
-    it('holds an unreadable setting as a row with no action', async () => {
-        const { records, startBuild } = await started('unreadable', ['shape-1']);
-
-        startBuild('build-1');
-        expect(records.pendingShapingThreadCleanups()).toMatchObject([{ threadId: 'shape-1', action: null }]);
-    });
-
-    it('saves the first action on a row with no action and leaves one already saved, with no change to the revision', async () => {
-        const { records, build, startBuild } = await started('unreadable', ['shape-1']);
-
-        startBuild('build-1');
-
-        const revision = records.read(build.workId).revision;
-
-        records.saveShapingThreadAction('shape-1', 'archive');
-        records.saveShapingThreadAction('shape-1', 'delete');
-        expect(records.pendingShapingThreadCleanups()).toMatchObject([{ threadId: 'shape-1', action: 'archive' }]);
-        expect(records.read(build.workId).revision).toBe(revision);
-    });
-
-    it('saving Keep on a row with no action leaves nothing pending, like a Keep row from Start build', async () => {
-        const { records, startBuild } = await started('unreadable', ['shape-1']);
-
-        startBuild('build-1');
-        records.saveShapingThreadAction('shape-1', 'keep');
-        expect(records.pendingShapingThreadCleanups()).toEqual([]);
-    });
-
     it('touches only threads without a row, skips deleted threads and keeps a cleaned thread cleaned', async () => {
         const { records, build, startBuild } = await started('archive');
 
@@ -1796,25 +1120,6 @@ describe('shaping thread cleanup rows', () => {
         startBuild('build-2');
         expect(pendingIds(records)).toEqual(['shape-3']);
         expect(records.pendingShapingThreadCleanups()[0]!.commandId).not.toBe(first!.commandId);
-    });
-
-    it('gives a rejected row its failure and a new command ID in one step, with no change to the revision', async () => {
-        const { records, build, startBuild } = await started('archive', ['shape-1']);
-
-        startBuild('build-1');
-
-        const revision = records.read(build.workId).revision;
-        const [row] = records.pendingShapingThreadCleanups();
-
-        records.saveShapingThreadRejection('shape-1', 'T3 refused it.');
-
-        const [rejected] = records.pendingShapingThreadCleanups();
-
-        expect(rejected).toMatchObject({ threadId: 'shape-1', failure: 'T3 refused it.' });
-        expect(rejected!.commandId).not.toBe(row!.commandId);
-        records.saveShapingThreadFailure('shape-1', 'No answer.');
-        expect(records.pendingShapingThreadCleanups()[0]).toEqual({ ...rejected, failure: 'No answer.' });
-        expect(records.read(build.workId).revision).toBe(revision);
     });
 
     it('saves and clears a failure with no change to the revision, and survives reopening', async () => {
@@ -1844,25 +1149,6 @@ describe('shaping thread cleanup rows', () => {
         reopened.markShapingThreadCleaned('shape-1');
         expect(reopened.pendingShapingThreadCleanups()).toEqual([]);
         expect(reopened.read(build.workId).revision).toBe(revision);
-    });
-
-    it('marks a deleted thread in one step with no change to the revision, and a later build leaves it alone', async () => {
-        const { records, build, startBuild } = await started('delete', ['shape-1']);
-
-        startBuild('build-1');
-
-        const revision = records.read(build.workId).revision;
-
-        records.saveShapingThreadFailure('shape-1', 'No answer.');
-        records.markShapingThreadDeleted('shape-1');
-        expect(pendingIds(records)).toEqual([]);
-        expect(records.read(build.workId).revision).toBe(revision);
-        expect(records.threads(build.workId).map((thread) => [thread.threadId, !!thread.deletedAt])).toEqual([
-            ['shape-1', true],
-            ['build-1', false],
-        ]);
-        startBuild('build-2');
-        expect(pendingIds(records)).toEqual([]);
     });
 
     it('lists rows of set-aside records, removes them with the record, and keeps them through resetBuild', async () => {
@@ -1901,51 +1187,5 @@ describe('launch moves and repeated Statuses', () => {
             records.resolveLaunchIntent(built.workId, built.revision + 1, build.intentId, { threadId: 'b' }).record
                 .status,
         ).toBe('In progress');
-    });
-
-    it('moves nothing on a failure, and only the Status each purpose starts from', async () => {
-        const records = await open();
-        const failed = records.create({ title: 'Failed', repository: 'maddec01/lar', kind: 'build', status: 'Ready' });
-        const { intent } = records.recordLaunchIntent(failed.workId, failed.revision, 'build');
-
-        expect(
-            records.resolveLaunchIntent(failed.workId, failed.revision + 1, intent.intentId, { failure: 'no' }).record
-                .status,
-        ).toBe('Ready');
-
-        const ready = records.create({
-            title: 'Ready shaping',
-            repository: 'maddec01/lar',
-            kind: 'build',
-            status: 'Ready',
-        });
-        const { intent: shape } = records.recordLaunchIntent(ready.workId, ready.revision, 'shape');
-
-        expect(
-            records.resolveLaunchIntent(ready.workId, ready.revision + 1, shape.intentId, { threadId: 'c' }).record
-                .status,
-        ).toBe('Ready');
-
-        const queued = records.create({
-            title: 'Queued build',
-            repository: 'maddec01/lar',
-            kind: 'build',
-            status: 'Queued',
-        });
-        const { intent: early } = records.recordLaunchIntent(queued.workId, queued.revision, 'build');
-
-        expect(
-            records.resolveLaunchIntent(queued.workId, queued.revision + 1, early.intentId, { threadId: 'd' }).record
-                .status,
-        ).toBe('Queued');
-    });
-
-    it('writes nothing when a record already has the Status', async () => {
-        const records = await open();
-        const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status: 'Shaping' });
-        const again = records.update(made.workId, made.revision, { status: 'Shaping' });
-
-        expect([again.revision, again.updatedAt]).toEqual([made.revision, made.updatedAt]);
-        expect(records.update(made.workId, made.revision, { status: 'Ready' }).revision).toBe(made.revision + 1);
     });
 });

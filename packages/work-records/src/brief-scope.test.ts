@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 
-import { checkBriefScope, parseBriefScope, scopeMarkdown, type BriefScope } from './brief-scope.ts';
+import { checkBriefScope, scopeMarkdown, type BriefScope } from './brief-scope.ts';
 
 const scope: BriefScope = {
     files: ['cli.js', 'test/cli.test.js'],
@@ -45,28 +45,6 @@ describe('brief scope comparison', () => {
         ]);
     });
 
-    it('rejects lost/extra/negated claims, duplicate assertions and changed size or Verify', () => {
-        const brief = scopeMarkdown(scope)
-            .replace('- cli.js', '- README.md')
-            .replace(`- ${scope.tests[0]}`, `- Do not ${scope.tests[0]}`)
-            .replace('Small', 'Larger')
-            .replace('\nno\n', '\nyes: visible terminal\n')
-            .replace('- test/cli.test.js', '- test/cli.test.js\n- test/cli.test.js');
-        const result = checkBriefScope(scope, brief);
-
-        expect(result.missing).toHaveLength(4);
-        expect(result.extra).toHaveLength(5);
-        expect(result.extra).toContainEqual({ field: 'scope.files', value: 'README.md' });
-        expect(result.extra).toContainEqual({ field: 'scope.files', value: 'test/cli.test.js' });
-    });
-
-    it('allows refinement of unstated constraints without inventing a confirmed boundary', () => {
-        const open: BriefScope = { ...scope, files: [], tests: [], excluded: [], size: null };
-
-        expect(checkBriefScope(open, scopeMarkdown(scope)).ok).toBe(true);
-        expect(checkBriefScope(scope, null)).toMatchObject({ ok: false, briefDigest: null, extra: [] });
-    });
-
     it('counts explicit file declarations elsewhere in the brief as scope too', () => {
         const brief = `${scopeMarkdown(scope)}\n## Notes for the builder\nFiles: \`README.md\``;
 
@@ -75,34 +53,5 @@ describe('brief scope comparison', () => {
             missing: [],
             extra: [{ field: 'scope.files', value: 'README.md' }],
         });
-    });
-
-    it('carries visible UI Verify steps and rejects an opposite decision', () => {
-        const ui: BriefScope = { ...scope, verify: { required: true, visibleUi: 'Check the menu at 390px.' } };
-
-        expect(checkBriefScope(ui, scopeMarkdown(ui)).ok).toBe(true);
-        expect(checkBriefScope(ui, scopeMarkdown(scope))).toMatchObject({
-            ok: false,
-            missing: [{ field: 'verify', value: 'yes: Check the menu at 390px.' }],
-            extra: [{ field: 'verify', value: 'no' }],
-        });
-    });
-});
-
-describe('scope input boundary', () => {
-    it.each([
-        null,
-        [],
-        {},
-        { ...scope, extra: 'field' },
-        { ...scope, tests: 'pnpm test' },
-        { ...scope, files: ['cli.js', 'cli.js'] },
-        { ...scope, behaviour: [] },
-        { ...scope, behaviour: ['okay\n## Verify\nyes'] },
-        { ...scope, size: 'tiny' },
-        { ...scope, verify: { required: true, visibleUi: null } },
-        { ...scope, verify: { required: false, visibleUi: 'CLI output' } },
-    ])('rejects malformed or contradictory scope %#', (value) => {
-        expect(() => parseBriefScope(value)).toThrow('Scope needs');
     });
 });

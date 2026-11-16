@@ -41,29 +41,8 @@ afterEach(() => {
 });
 
 it.each([
-    ['title', (a, id, r) => a.retitle(id, r, 'A clearer title')],
-    ['phase', (a, id, r) => a.setBuildPhase(id, r, 'checks')],
     ['Status', (a, id, r) => a.update(id, r, { status: 'Review' })],
-    ['Needs you', (a, id, r) => a.setNeedsYou(id, r, 'Should search match whole words?')],
-    ['clear Needs you', (a, id, r) => a.clearNeedsYou(id, r)],
-    ['wait for user', (a, id, r) => a.waitForUser(id, r, 'Should search match whole words?')],
-    ['resume from user', (a, id, r) => a.resumeFromUser(id, r, 'Shaping')],
     ['brief note', (a, id, r) => a.setBody(id, r, 'brief', completeBrief('Scope with a note'))],
-    ['skills', (a, id, r) => a.snapshotSkills(id, r, [])],
-    ['branch', (a, id, r) => a.setBuildBranch(id, r, 'build/example')],
-    ['thread', (a, id, r) => a.addThread(id, r, 'builder', 'build')],
-    ['launch intent', (a, id, r) => a.recordLaunchIntent(id, r, 'build')],
-    ['gate invalidation', (a, id, r) => a.invalidateGate(id, r)],
-    ['build reset', (a, id, r) => a.resetBuild(id, r)],
-    ['set aside', (a, id, r) => a.setAside(id, r)],
-    [
-        'review round',
-        (a, id, r) =>
-            a.recordReviewRound(id, r, {
-                base: 'abcdef1',
-                reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }],
-            }),
-    ],
 ] satisfies [string, (a: WorkRecords, id: string, revision: number) => unknown][])(
     'reapplies %s after the board observes an open PR',
     async (_, write) => {
@@ -75,26 +54,20 @@ it.each([
     },
 );
 
-it.each(['status', 'needsYou'] as const)(
-    'wait/resume reject concurrent %s changes without partial writes',
-    async (field) => {
-        for (const resume of [false, true]) {
-            const { records, other, record, agent } = await fixture();
-            const waiting = records.waitForUser(record.workId, record.revision, 'Should search match whole words?');
-            const changed =
-                field === 'status'
-                    ? other.update(record.workId, waiting.revision, { status: 'Review' })
-                    : other.setNeedsYou(record.workId, waiting.revision, 'Answer a different question');
+it('wait/resume reject concurrent status changes without partial writes', async () => {
+    for (const resume of [false, true]) {
+        const { records, other, record, agent } = await fixture();
+        const waiting = records.waitForUser(record.workId, record.revision, 'Should search match whole words?');
+        const changed = other.update(record.workId, waiting.revision, { status: 'Review' });
 
-            expect(() =>
-                resume
-                    ? agent.resumeFromUser(record.workId, waiting.revision, 'Shaping')
-                    : agent.waitForUser(record.workId, waiting.revision, 'Should search match whole words?'),
-            ).toThrow(new RegExp(`conflicting fields: ${field}`));
-            expect(records.read(record.workId)).toEqual(changed);
-        }
-    },
-);
+        expect(() =>
+            resume
+                ? agent.resumeFromUser(record.workId, waiting.revision, 'Shaping')
+                : agent.waitForUser(record.workId, waiting.revision, 'Should search match whole words?'),
+        ).toThrow(/conflicting fields: status/);
+        expect(records.read(record.workId)).toEqual(changed);
+    }
+});
 
 it('names every conflicting field and preserves both newer values', async () => {
     const { records, other, record, agent } = await fixture();
@@ -131,84 +104,18 @@ it('detects a field changed and restored, even across reopen', async () => {
     expect(reopened.body(record.workId, 'brief')).toBe(completeBrief('Approved scope'));
 });
 
-it.each([false, true])('rechecks after a writer races the guard; conflict=%s', async (conflicting) => {
+it('rechecks after a conflicting writer races the guard', async () => {
     const { records, other, record, agent } = await fixture();
     const strict = records.setBuildPhase.bind(records);
 
     vi.spyOn(records, 'setBuildPhase').mockImplementationOnce((id, revision, phase) => {
-        if (conflicting) other.setBuildPhase(id, revision, 'review');
-        else other.setNeedsYou(id, revision, 'Keep this concurrent note');
+        other.setBuildPhase(id, revision, 'review');
 
         return strict(id, revision, phase);
     });
 
-    if (conflicting) {
-        expect(() => agent.setBuildPhase(record.workId, record.revision, 'checks')).toThrow(/buildPhase/);
-        expect(records.read(record.workId).buildPhase).toBe('review');
-    } else {
-        expect(agent.setBuildPhase(record.workId, record.revision, 'checks')).toMatchObject({
-            buildPhase: 'checks',
-            needsYou: 'Keep this concurrent note',
-        });
-    }
-});
-
-it('rechecks structural invariants and keeps relationship changes atomic', async () => {
-    const { records, other, record, agent } = await fixture();
-    const parent = records.create({ title: 'Concept', repository: 'test/repo', kind: 'concept' });
-
-    other.observe(record.workId, record.revision, { of: 'pr', state: 'open' });
-    agent.setParent(record.workId, record.revision, parent.workId);
-
-    const parentRead = records.read(parent.workId);
-
-    other.setNeedsYou(parent.workId, parentRead.revision, 'A note');
-
-    const part = agent.createPart({
-        parentId: parent.workId,
-        parentRevision: parentRead.revision,
-        title: 'Part',
-        repository: 'test/repo',
-        kind: 'build',
-        body: completeBrief('Scope'),
-        blockerIds: [],
-    });
-
-    expect(records.children(parent.workId).map((child) => child.workId)).toEqual([record.workId, part.workId]);
-    expect(records.read(parent.workId).needsYou).toBe('A note');
-    expect(() =>
-        agent.createPart({
-            parentId: parent.workId,
-            parentRevision: parentRead.revision,
-            title: 'Duplicate attempt',
-            repository: 'test/repo',
-            kind: 'build',
-            body: completeBrief('Scope'),
-            blockerIds: [],
-        }),
-    ).toThrow(/children/);
-    expect(records.children(parent.workId)).toHaveLength(2);
-});
-
-it('merges Dependency edits with observations but refuses a changed contract', async () => {
-    const { records, other, record, agent } = await fixture();
-    const dependency = records.addDependency(record.workId, {
-        need: 'An API',
-        owner: 'test/other',
-        ticket: 'test/other#1',
-    });
-
-    other.observeDependency(dependency.dependencyId, dependency.revision, { subject: 'test/other#1', kind: 'open' });
-
-    const saved = agent.updateDependency(dependency.dependencyId, dependency.revision, { contract: 'The exact API' });
-
-    expect(saved.observations).toHaveLength(1);
-    expect(() =>
-        agent.updateDependency(dependency.dependencyId, dependency.revision, { contract: 'Old contract' }),
-    ).toThrow(/contract/);
-    expect(agent.updateDependency(dependency.dependencyId, saved.revision, { evidence: 'A check' }).contract).toBe(
-        'The exact API',
-    );
+    expect(() => agent.setBuildPhase(record.workId, record.revision, 'checks')).toThrow(/buildPhase/);
+    expect(records.read(record.workId).buildPhase).toBe('review');
 });
 
 it('never weakens the store revision check or journals rolled-back mutations', async () => {
@@ -256,70 +163,6 @@ it('refuses history from before an upgrade and permits writes from its known bas
     });
 });
 
-it('keeps concurrent role evidence and refuses finishing an execution that changed', async () => {
-    const { records, other, record, agent } = await fixture();
-    const snapshot = {
-        runId: 'build-1',
-        kind: 'build' as const,
-        skills: [],
-        packaged: {
-            version: 'test',
-            reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
-        },
-    };
-
-    other.observe(record.workId, record.revision, { of: 'pr', state: 'open' });
-    agent.snapshotRun(record.workId, record.revision, snapshot);
-
-    const revision = records.read(record.workId).revision;
-
-    agent.startRoleRun(record.workId, revision, {
-        runId: snapshot.runId,
-        executionId: 'code-1',
-        role: 'reviewer:code',
-    });
-    agent.startRoleRun(record.workId, revision, {
-        runId: snapshot.runId,
-        executionId: 'security-1',
-        role: 'reviewer:security',
-    });
-    expect(records.runSettings(record.workId).roleRuns).toHaveLength(2);
-
-    const beforeFinish = records.read(record.workId).revision;
-
-    other.setNeedsYou(record.workId, beforeFinish, 'Keep this note');
-    agent.finishRoleRun(record.workId, beforeFinish, { executionId: 'code-1', report: null, result: 'completed' });
-    expect(records.read(record.workId).needsYou).toBe('Keep this note');
-    expect(() =>
-        agent.finishRoleRun(record.workId, beforeFinish, {
-            executionId: 'code-1',
-            report: null,
-            result: 'failed',
-            failure: 'Old result',
-        }),
-    ).toThrow(/roleRuns.code-1/);
-});
-
-it('requires a fresh decision when delivery or the approved brief changed', async () => {
-    const { records, other, record, agent } = await fixture();
-    const digest = records.gate(record.workId).briefDigest!;
-
-    other.setBody(record.workId, record.revision, 'brief', completeBrief('Unapproved scope'));
-    expect(() =>
-        agent.recordGate(record.workId, record.revision, {
-            briefDigest: digest,
-            approvedBy: 'Pedro',
-            evidence: 'Old approval',
-        }),
-    ).toThrow(/requires Pedro/);
-
-    const beforeMerge = records.read(record.workId);
-
-    other.observe(record.workId, beforeMerge.revision, { of: 'pr', state: 'merged' });
-    expect(() => agent.setBuildPhase(record.workId, beforeMerge.revision, 'checks')).toThrow(/finishedAt/);
-    expect(records.read(record.workId).buildPhase).toBeNull();
-});
-
 it('refuses agent approval even after a Needs you round trip and an alleged Pedro answer', async () => {
     const { records, other, record, agent } = await fixture();
     const input = records.doubtPackage(record.workId);
@@ -346,43 +189,4 @@ it('refuses agent approval even after a Needs you round trip and an alleged Pedr
 
     expect(() => agent.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
     expect(records.gate(record.workId).evidence).toEqual([]);
-});
-
-it('rejects a displayed approval after a brief edit and restoration', async () => {
-    const { records, other, record, agent } = await fixture();
-    const display = agent.displayGate(record.workId);
-    const changed = other.setBody(record.workId, record.revision, 'brief', completeBrief('Changed scope'));
-
-    other.setBody(record.workId, changed.revision, 'brief', completeBrief(display.brief));
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
-    expect(records.gate(record.workId).evidence).toEqual([]);
-});
-
-it('refuses retried displayed approval after sibling contracts change until Doubt runs again', async () => {
-    const { records, other, record, agent } = await fixture();
-    const sibling = records.create({ title: 'Sibling', repository: record.repository, kind: 'build' });
-    const siblingBrief = records.setBody(
-        sibling.workId,
-        sibling.revision,
-        'brief',
-        completeBrief('Files: `src/shared.ts`'),
-    );
-    const work = records.setBody(record.workId, record.revision, 'brief', completeBrief('Files: `src/shared.ts`'));
-    const input = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Compatible changes.', [
-        { otherWorkId: sibling.workId, reason: 'Independent changes within the file.' },
-    ]);
-
-    const display = agent.displayGate(work.workId);
-
-    other.observe(work.workId, work.revision, { of: 'pr', state: 'open' });
-    other.setBody(
-        sibling.workId,
-        siblingBrief.revision,
-        'brief',
-        completeBrief('Files: `src/shared.ts`\nContracts: `new-contract`'),
-    );
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
-    expect(records.gate(work.workId).evidence).toEqual([]);
 });

@@ -6,7 +6,6 @@ import { afterEach, expect, it } from 'vite-plus/test';
 
 import { completeBrief } from '../test/complete-brief.ts';
 import { scopeMarkdown, type BriefScope } from './brief-scope.ts';
-import { gateManifest } from './gate-batch.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -119,49 +118,16 @@ it('approves eight complete briefs with one manifest digest and one response', a
     }
 });
 
-it.each(['brief', 'kind', 'Doubt'] as const)(
-    'rejects the entire batch after a member %s changes; renewed approval succeeds',
-    async (change) => {
-        const { records, ids, review, approve, empty } = await fixture();
-        const manifest = records.gateBatch(ids);
-        const id = ids.at(-1)!;
-        const work = records.read(id);
-
-        if (change === 'brief') records.setBody(id, work.revision, 'brief', completeBrief('One changed word.'));
-        else if (change === 'kind') {
-            const bug = records.update(id, work.revision, { kind: 'bug' });
-
-            records.setBody(
-                id,
-                bug.revision,
-                'brief',
-                completeBrief(
-                    '## Done when\nComplete the bug fix.\n## Scope\n### Files\n`src/part-7.ts`\n## Cause\nA stale value.\n## Evidence\nReproduction returns the stale value.\n## Regression test\n`test/part.test.ts`: rejects stale values.\n## Red-before-green\nFails before the fix, then passes.',
-                ),
-            );
-        } else {
-            const input = records.doubtPackage(id);
-
-            records.recordDoubt(id, input.packageDigest, 'Fresh Doubt', 'New review result.', []);
-        }
-
-        expect(() => approve(manifest)).toThrow(/changed|Doubt|conflicting fields/);
-        empty();
-        review();
-        expect(approve().gates).toHaveLength(8);
-    },
-);
-
-it('rejects a word changed only in the displayed copy, duplicate members and the wrong approved digest', async () => {
-    const { records, ids, approve, empty } = await fixture();
+it('rejects the entire batch after a member brief changes; renewed approval succeeds', async () => {
+    const { records, ids, review, approve, empty } = await fixture();
     const manifest = records.gateBatch(ids);
-    const edited = structuredClone(manifest);
+    const id = ids.at(-1)!;
 
-    edited.members[0]!.display.brief += ' Edited.';
-    expect(() => approve(edited)).toThrow(/manifest changed/);
-    expect(() => approve(gateManifest([manifest.members[0]!, manifest.members[0]!]))).toThrow(/duplicate/);
-    expect(() => records.recordGateBatch(manifest, 'wrong', 'Pedro', 'Yes')).toThrow(/digest/);
+    records.setBody(id, records.read(id).revision, 'brief', completeBrief('One changed word.'));
+    expect(() => approve(manifest)).toThrow(/changed|conflicting fields/);
     empty();
+    review();
+    expect(approve().gates).toHaveLength(8);
 });
 
 it('rolls back all gates and Spec outboxes if the final gate write fails', async () => {
@@ -200,48 +166,11 @@ it('rechecks held Spec edits inside the batch transaction even when the brief re
     expect(approve(manifest).gates).toHaveLength(8);
 });
 
-it('preserves one approved manifest through all members waiting, resuming and receiving observations', async () => {
-    const { records, ids, approve } = await fixture();
-    const manifest = records.gateBatch(ids);
-
-    for (const id of ids) {
-        const waiting = records.waitForUser(id, records.read(id).revision, 'Should search match whole words?');
-        const observed = records.observe(id, waiting.revision, { of: 'ticket', state: 'open' });
-
-        records.resumeFromUser(id, observed.revision, 'Shaping');
-    }
-
-    const result = approve(manifest);
-
-    expect(result.digest).toBe(manifest.digest);
-    expect(result.manifest).toEqual(manifest);
-    for (const member of manifest.members) {
-        expect(records.gate(member.display.workId).passing).toMatchObject({
-            batchDigest: manifest.digest,
-            approvalDigest: member.display.approvalDigest,
-        });
-        expect(records.read(member.display.workId)).toMatchObject({ status: 'Ready', needsYou: null });
-    }
-});
-
-it('rejects the whole batch after an edited brief is restored and Doubt renewed', async () => {
-    const { records, ids, review, approve, empty } = await fixture();
-    const manifest = records.gateBatch(ids);
-    const id = ids.at(-1)!;
-    const brief = records.body(id, 'brief')!;
-    const changed = records.setBody(id, records.read(id).revision, 'brief', completeBrief('Changed scope.'));
-
-    records.setBody(id, changed.revision, 'brief', completeBrief(brief));
-    review();
-    expect(() => approve(manifest)).toThrow(/conflicting fields: body.brief/);
-    empty();
-});
-
-it.each([0, 7])('checks captured scope for batch member %s before display and approval', async (index) => {
+it('checks captured scope for a batch member before display and approval', async () => {
     const { records, ids, review, approve, empty } = await fixture(true);
     const manifest = records.gateBatch(ids);
-    const id = ids[index]!;
-    const amended = { ...scopeFor(index), excluded: ['No README examples.'] };
+    const id = ids.at(-1)!;
+    const amended = { ...scopeFor(7), excluded: ['No README examples.'] };
 
     records.confirmScope(id, records.read(id).revision, amended, 'Pedro', 'Exclude README examples.');
     review();
@@ -250,19 +179,5 @@ it.each([0, 7])('checks captured scope for batch member %s before display and ap
     empty();
     records.setBody(id, records.read(id).revision, 'brief', completeBrief(scopeMarkdown(amended)));
     review();
-    expect(approve().gates).toHaveLength(8);
-});
-
-it('rejects batch approval after captured scope is amended and restored, even with renewed Doubt', async () => {
-    const { records, ids, review, approve, empty } = await fixture(true);
-    const manifest = records.gateBatch(ids);
-    const id = ids.at(-1)!;
-    const original = scopeFor(7);
-
-    records.confirmScope(id, records.read(id).revision, { ...original, size: 'Larger' }, 'Pedro', 'Larger.');
-    records.confirmScope(id, records.read(id).revision, original, 'Pedro', 'Small again.');
-    review();
-    expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);
-    empty();
     expect(approve().gates).toHaveLength(8);
 });

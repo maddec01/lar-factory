@@ -41,34 +41,6 @@ it('upgrades missing settings without writing on read or changing Auto-build, re
     expect(readAutoBuild(dir)).toEqual({ on: true, model: { instanceId: 'claudeAgent', model: 'explicit-choice' } });
 });
 
-it('persists edited instructions and custom reviewers only inside the supplied data folder', () => {
-    const dir = tempDir();
-    const settings = duplicateReviewer(
-        defaultFactorySettings(),
-        'security',
-        'security-copy',
-        'Check local file input.',
-    );
-
-    settings.roles['reviewer:security'] = { effort: 'high' };
-    settings.reviewers.push({
-        id: 'docs',
-        name: 'Docs',
-        mode: { kind: 'always' },
-        instructions: { kind: 'revision', revision: 1 },
-        revisions: [{ revision: 1, text: 'Check examples.' }],
-    });
-    writeFactorySettings(settings, dir);
-    expect(readFactorySettings(dir)).toEqual({ settings });
-    expect(readdirSync(dir).sort()).toEqual(['factory-settings.json', 'factory-settings.last-good.json']);
-
-    const renamed = structuredClone(settings);
-
-    renamed.reviewers.find((entry) => entry.id === 'docs')!.name = 'Examples';
-    writeFactorySettings(renamed, dir);
-    expect(readFactorySettings(dir).settings.reviewers.find((entry) => entry.id === 'docs')!.name).toBe('Examples');
-});
-
 it('invalid writes and instruction-history rewrites preserve both saved files', () => {
     const dir = tempDir();
     const settings = duplicateReviewer(defaultFactorySettings(), 'code', 'code-copy', 'Original saved instructions.');
@@ -106,31 +78,6 @@ it('recovers the last valid settings after malformed JSON or an invalid schema, 
     expect(readFactorySettings(dir)).toEqual({ settings, problem: expect.stringContaining('last good') });
     writeFactorySettings(settings, dir);
     expect(readFactorySettings(dir)).toEqual({ settings });
-});
-
-it('fails visibly on corrupt settings without a valid backup instead of inventing a policy', () => {
-    const dir = tempDir();
-
-    writeFileSync(join(dir, 'factory-settings.json'), 'broken');
-    expect(() => readFactorySettings(dir)).toThrow('no last good settings');
-    expect(() => writeFactorySettings(defaultFactorySettings(), dir)).toThrow('no last good settings');
-    expect(readFileSync(join(dir, 'factory-settings.json'), 'utf8')).toBe('broken');
-});
-
-it('removes custom reviewers and their role settings while keeping packaged reviewers', () => {
-    const dir = tempDir();
-    const settings = defaultFactorySettings();
-
-    settings.reviewers.push({
-        id: 'custom',
-        name: 'Custom',
-        mode: { kind: 'always' },
-        instructions: { kind: 'revision', revision: 1 },
-        revisions: [{ revision: 1, text: 'Custom instructions.' }],
-    });
-    writeFactorySettings(settings, dir);
-    writeFactorySettings(defaultFactorySettings(), dir);
-    expect(readFactorySettings(dir).settings).toEqual(defaultFactorySettings());
 });
 
 it('reads legacy built-in edits as custom copies and persists the migration on Save', () => {

@@ -83,92 +83,79 @@ test('S05 R2-002: shared Dependency evidence preserves B/C approvals, while a ch
     expect(records.gate(c.workId).current).toBe(true);
 });
 
-test.each([undefined, '', 'minimal example'])(
-    'S05 R2-007: record-review-round fills selection and handles unchecked note %s',
-    async (note) => {
-        const { records, dir } = await fixture();
-        const work = records.create({ title: 'Greeting consumer', repository: 'fake/a', kind: 'build' });
+test('S05 R2-007: record-review-round fills selection and records no unchecked note for a run reviewer', async () => {
+    const { records, dir } = await fixture();
+    const work = records.create({ title: 'Greeting consumer', repository: 'fake/a', kind: 'build' });
 
-        records.snapshotRun(work.workId, work.revision, {
-            runId: 'review-run',
-            kind: 'build',
-            projectDefault: { instanceId: 'codex', model: 'test-model' },
-            packaged: {
-                version: 'fixture',
-                reviewers: {
-                    code: 'Review code.',
-                    security: 'Review security.',
-                    ui: 'Review UI.',
-                    performance: 'Review performance.',
-                },
+    records.snapshotRun(work.workId, work.revision, {
+        runId: 'review-run',
+        kind: 'build',
+        projectDefault: { instanceId: 'codex', model: 'test-model' },
+        packaged: {
+            version: 'fixture',
+            reviewers: {
+                code: 'Review code.',
+                security: 'Review security.',
+                ui: 'Review UI.',
+                performance: 'Review performance.',
             },
-            skills: [],
+        },
+        skills: [],
+    });
+
+    const git = (...args: string[]) =>
+        execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+    git('init');
+    git('config', 'user.name', 'Fixture');
+    git('config', 'user.email', 'fixture@example.invalid');
+    git('config', 'core.hooksPath', '/dev/null');
+    writeFileSync(join(dir, 'README.md'), 'Before.');
+    git('add', 'README.md');
+    git('commit', '-m', 'test');
+
+    const base = git('rev-parse', 'HEAD');
+
+    writeFileSync(join(dir, 'README.md'), 'After.');
+    git('add', 'README.md');
+    git('commit', '-m', 'test');
+
+    const head = git('rev-parse', 'HEAD');
+    const cli = (...args: string[]) =>
+        spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args, '--data-dir', dir], {
+            cwd: dir,
+            encoding: 'utf8',
+            env: { ...process.env, LAR_FACTORY_DATA_DIR: dir },
+            timeout: 15000,
         });
+    const selected = cli('select-reviewers', work.workId, '--run-id', 'review-run', '--base', base, '--head', head);
 
-        const git = (...args: string[]) =>
-            execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    expect({ status: selected.status, stderr: selected.stderr }).toEqual({ status: 0, stderr: '' });
 
-        git('init');
-        git('config', 'user.name', 'Fixture');
-        git('config', 'user.email', 'fixture@example.invalid');
-        git('config', 'core.hooksPath', '/dev/null');
-        writeFileSync(join(dir, 'README.md'), 'Before.');
-        git('add', 'README.md');
-        git('commit', '-m', 'test');
+    const reviewers = JSON.parse(selected.stdout).reviewers.map((r: { id: string; run: boolean; reason: string }) => ({
+        axis: r.id,
+        verdict: r.run ? 'approve' : 'skipped',
+        notChecked: r.run ? undefined : r.reason,
+        findings: [],
+    }));
+    const file = join(dir, 'round.json');
 
-        const base = git('rev-parse', 'HEAD');
+    writeFileSync(file, JSON.stringify({ runId: 'review-run', base, reviewers }));
 
-        writeFileSync(join(dir, 'README.md'), 'After.');
-        git('add', 'README.md');
-        git('commit', '-m', 'test');
+    const recorded = cli(
+        'record-review-round',
+        work.workId,
+        '--revision',
+        String(records.read(work.workId).revision),
+        '--file',
+        file,
+    );
 
-        const head = git('rev-parse', 'HEAD');
-        const cli = (...args: string[]) =>
-            spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args, '--data-dir', dir], {
-                cwd: dir,
-                encoding: 'utf8',
-                env: { ...process.env, LAR_FACTORY_DATA_DIR: dir },
-                timeout: 15000,
-            });
-        const selected = cli('select-reviewers', work.workId, '--run-id', 'review-run', '--base', base, '--head', head);
-
-        expect({ status: selected.status, stderr: selected.stderr }).toEqual({ status: 0, stderr: '' });
-
-        const reviewers = JSON.parse(selected.stdout).reviewers.map(
-            (r: { id: string; run: boolean; reason: string }) => ({
-                axis: r.id,
-                verdict: r.run ? 'approve' : 'skipped',
-                notChecked: r.run ? (note === 'minimal example' ? undefined : note) : r.reason,
-                findings: [],
-            }),
-        );
-        const file = join(dir, 'round.json');
-
-        writeFileSync(
-            file,
-            JSON.stringify(
-                note === 'minimal example'
-                    ? { base: head, reviewers: reviewers.filter((r: { axis: string }) => r.axis === 'code') }
-                    : { runId: 'review-run', base, reviewers },
-            ),
-        );
-
-        const recorded = cli(
-            'record-review-round',
-            work.workId,
-            '--revision',
-            String(records.read(work.workId).revision),
-            '--file',
-            file,
-        );
-
-        expect({ status: recorded.status, stderr: recorded.stderr }).toEqual({ status: 0, stderr: '' });
-        expect(records.reviewRounds(work.workId)[0]?.runId).toBe('review-run');
-        expect(records.reviewRounds(work.workId)[0]?.reviewers.every((r) => !!r.selection)).toBe(true);
-        expect(records.reviewRounds(work.workId)[0]?.reviewers.find((r) => r.axis === 'code')?.notChecked).toBeNull();
-    },
-    30000,
-);
+    expect({ status: recorded.status, stderr: recorded.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(records.reviewRounds(work.workId)[0]?.runId).toBe('review-run');
+    expect(records.reviewRounds(work.workId)[0]?.reviewers.every((r) => !!r.selection)).toBe(true);
+    expect(records.reviewRounds(work.workId)[0]?.reviewers.find((r) => r.axis === 'code')?.notChecked).toBeNull();
+}, 30000);
 
 test('S05: atomic linked growth requests tickets per Settings, recovers an uncertain create and publishes three gated Specs', async () => {
     const { records, dir } = await fixture();

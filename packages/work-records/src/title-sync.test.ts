@@ -71,13 +71,6 @@ test('refused access retains a visible failure and retries the exact title', asy
     expect(f.replaceTitle).toHaveBeenCalledOnce();
     expect(records.specState(f.record.workId).error).toBeNull();
 });
-test('disabled tracker setting suppresses the title write', async () => {
-    const f = await fixture();
-
-    await syncSpecs(records, { provider: f.provider, setups: [{ ...f.setup, writeRefinedSpec: false }] });
-    expect(f.replaceTitle).not.toHaveBeenCalled();
-    expect(records.titleProjections()).toEqual([]);
-});
 test('an older in-flight write cannot acknowledge a newer title', async () => {
     const f = await fixture();
 

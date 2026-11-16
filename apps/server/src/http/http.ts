@@ -524,9 +524,7 @@ export function createBoardServer({
             what: 'the build to start',
             disabled: 'Starting builds is disabled in sample mode.',
             restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
-            run: forItem('Name the build to start.', (itemId, input) =>
-                commands.startBuild(itemId, input.model, input.drift),
-            ),
+            run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model)),
         },
         '/api/dismiss-start-error': {
             sampleWrite: 'refuse',

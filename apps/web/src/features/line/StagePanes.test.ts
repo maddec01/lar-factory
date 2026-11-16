@@ -132,10 +132,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
     await press(entries()[1]!);
     expect(dialog(), 'picking an entry doesn’t open the dialog').toBeNull();
     expect(posted()).toEqual([
-        [
-            '/api/start-build',
-            { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } },
-        ],
+        ['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }],
     ]);
     expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
 

@@ -320,7 +320,7 @@ export function createAutoBuild({
                 continue;
             }
 
-            const { body } = await commands.startBuild(item.id, choice, undefined, true, {
+            const { body } = await commands.startBuild(item.id, choice, true, {
                 automatic: !concept?.explicit,
                 ...(concept && { conceptId: concept.id }),
             });

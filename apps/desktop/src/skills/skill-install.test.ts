@@ -38,12 +38,10 @@ const asking =
     () =>
         Effect.sync(answer);
 
-/** Runs a launch's check at launch, or before a build, if it makes one, with T3 not running. */
-const check = (input: SkillInstall.LaunchInput, at: 'atLaunch' | 'beforeBuild' = 'atLaunch') =>
+/** Runs a launch's check at launch, if it makes one, with T3 not running. */
+const check = (input: SkillInstall.LaunchInput) =>
     SkillInstall.makeChecks(input, outage).pipe(
-        Effect.flatMap(
-            (checks) => (at === 'atLaunch' ? checks?.atLaunch : checks?.beforeBuild()) ?? Effect.succeed(undefined),
-        ),
+        Effect.flatMap((checks) => checks?.atLaunch ?? Effect.succeed(undefined)),
     );
 
 /** This launch's checks, which a packaged launch always makes. */
@@ -76,50 +74,18 @@ describe('makeChecks', () => {
 
                 NodeFS.writeFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
 
-                const third = yield* check(input, 'beforeBuild');
+                const third = yield* check(input);
 
                 assert.strictEqual(third?.installed, false);
                 assert.deepStrictEqual(
                     third?.drift.map(({ skill }) => skill),
                     ['lar-work'],
                 );
-                assert.strictEqual(SkillInstall.buildRefusal(third!), null);
                 assert.strictEqual(
                     NodeFS.readFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'utf8'),
                     'edited',
                 );
             }),
-    );
-
-    it.effect('asks before a build with Drift: Start anyway leaves the files, Replace and start overwrites them', () =>
-        Effect.gen(function* () {
-            const home = tempDir('skill-home-');
-            const made = yield* checks(launch({ home, bundle: makeBundle() }), outage);
-
-            yield* made.atLaunch;
-
-            const skill = NodePath.join(home, '.agents/skills/lar-work/SKILL.md');
-            const bundled = read(skill);
-
-            NodeFS.writeFileSync(skill, 'edited');
-
-            const asked = SkillInstall.buildAnswer(yield* made.beforeBuild());
-
-            assert.deepStrictEqual(asked.drift, ['lar-work']);
-            assert.include(asked.refusal, 'lar-work');
-            assert.strictEqual(read(skill), 'edited');
-
-            assert.deepStrictEqual(SkillInstall.buildAnswer(yield* made.beforeBuild('keep'), 'keep'), {
-                refusal: null,
-            });
-            assert.strictEqual(read(skill), 'edited');
-
-            const replaced = yield* made.beforeBuild('replace');
-
-            assert.deepStrictEqual(SkillInstall.buildAnswer(replaced, 'replace'), { refusal: null });
-            assert.deepStrictEqual(replaced.replaced, ['lar-work']);
-            assert.strictEqual(read(skill), bundled);
-        }),
     );
 
     it.effect('writes nothing on a dev run without the flag', () =>
@@ -184,97 +150,47 @@ describe('makeChecks with T3', () => {
         }),
     );
 
-    it.effect(
-        'after a restart with T3 down, keeps installing into T3’s recorded targets and refuses a build on their Clash',
-        () =>
-            Effect.gen(function* () {
-                const home = NodeFS.realpathSync(tempDir('skill-home-'));
-                const work = NodePath.join(home, 'work-claude');
+    it.effect('after a restart with T3 down, keeps installing into T3’s recorded targets and reports their Clash', () =>
+        Effect.gen(function* () {
+            const home = NodeFS.realpathSync(tempDir('skill-home-'));
+            const work = NodePath.join(home, 'work-claude');
 
-                NodeFS.mkdirSync(work);
+            NodeFS.mkdirSync(work);
 
-                const before = yield* checks(
-                    launch({ home, bundle: makeBundle() }),
-                    asking(() => answering([{ kind: 'claude', path: NodePath.join(work, 'skills') }])),
-                );
+            const before = yield* checks(
+                launch({ home, bundle: makeBundle() }),
+                asking(() => answering([{ kind: 'claude', path: NodePath.join(work, 'skills') }])),
+            );
 
-                yield* before.afterDiscovery;
-                NodeFS.rmSync(NodePath.join(work, 'skills/lar-work'));
-                NodeFS.mkdirSync(NodePath.join(work, 'skills/lar-work'));
+            yield* before.afterDiscovery;
+            NodeFS.rmSync(NodePath.join(work, 'skills/lar-work'));
+            NodeFS.mkdirSync(NodePath.join(work, 'skills/lar-work'));
 
-                const after = yield* checks(launch({ home, bundle: makeBundle(), version: '2.0.0' }), outage);
-                const target = after.state().targets.find(({ path }) => path === NodePath.join(work, 'skills'));
+            const after = yield* checks(launch({ home, bundle: makeBundle(), version: '2.0.0' }), outage);
+            const target = after.state().targets.find(({ path }) => path === NodePath.join(work, 'skills'));
 
-                assert.deepStrictEqual(target, { kind: 'claude', path: NodePath.join(work, 'skills'), required: true });
+            assert.deepStrictEqual(target, { kind: 'claude', path: NodePath.join(work, 'skills'), required: true });
 
-                const outcome = yield* after.atLaunch;
-                const checked = outcome.targets.find(({ paths }) => paths.includes(NodePath.join(work, 'skills')));
+            const outcome = yield* after.atLaunch;
+            const checked = outcome.targets.find(({ paths }) => paths.includes(NodePath.join(work, 'skills')));
 
-                assert.deepStrictEqual([checked?.required, checked?.active], [true, true]);
-                assert.include(SkillInstall.buildRefusal(outcome), NodePath.join(work, 'skills/lar-work'));
-            }),
+            assert.deepStrictEqual([checked?.required, checked?.active], [true, true]);
+            assert.deepStrictEqual(
+                outcome.blocked.flatMap(({ paths }) => paths.map(({ path }) => path)),
+                [NodePath.join(work, 'skills/lar-work')],
+            );
+        }),
     );
 
-    it.effect('runs a launch check and a build check that start together one after the other', () =>
+    it.effect('runs a launch check and a retry that start together one after the other', () =>
         Effect.gen(function* () {
             const home = tempDir('skill-home-');
             const made = yield* checks(launch({ home, bundle: makeBundle() }), outage);
-            const [launched, built] = yield* Effect.all([made.atLaunch, made.beforeBuild()], {
+            const [launched, retried] = yield* Effect.all([made.atLaunch, made.retry], {
                 concurrency: 'unbounded',
             });
 
-            assert.deepStrictEqual([launched.installed, built.installed], [true, false]);
+            assert.deepStrictEqual([launched.installed, retried.installed], [true, false]);
         }),
     );
-});
-
-describe('buildAnswer', () => {
-    const clean = {
-        installed: false,
-        version: '1.0.0',
-        skills: ['lar-work'],
-        conflicts: [],
-        blocked: [],
-        drift: [],
-        replaced: [],
-        warn: false,
-        targets: [],
-    };
-    const drift = [
-        {
-            skill: 'tdd',
-            paths: [
-                { place: 'agents' as const, path: '/home/.agents/skills/tdd' },
-                { place: 'agents' as const, path: '/work/skills/tdd' },
-            ],
-        },
-        { skill: 'grill', paths: [{ place: 'agents' as const, path: '/home/.agents/skills/grill' }] },
-    ];
-
-    it('never offers Start anyway for a Clash or a failed install', () => {
-        const blocked = [{ skill: 'grill', paths: [{ place: 'agents' as const, path: '/home/.agents/skills/grill' }] }];
-        const failed = {
-            kind: 'claude' as const,
-            path: '/home/.claude/skills',
-            paths: [],
-            required: true,
-            skills: [],
-            active: true,
-            finished: false,
-            error: { message: 'EACCES', changed: true },
-        };
-
-        for (const outcome of [
-            { ...clean, drift, blocked },
-            { ...clean, drift, targets: [failed] },
-            new SkillInstall.SkillInstallError({ message: 'EACCES', changed: false }),
-        ]) {
-            for (const choice of [undefined, 'keep' as const]) {
-                const answer = SkillInstall.buildAnswer(outcome, choice);
-
-                assert.isString(answer.refusal);
-                assert.strictEqual(answer.drift, undefined);
-            }
-        }
-    });
 });

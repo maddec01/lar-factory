@@ -1,14 +1,13 @@
 import {
     DONE_WINDOW_MS,
     REPOSITORY_OPERATIONS,
-    isSkillCheckRequest,
     normalizeItems,
     readBuilds,
     refKey,
     workMessage,
     runSettingsMessage,
 } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
+import type { BoardData, Item, RawItem } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import { execFile, execFileSync, spawn } from 'node:child_process';
@@ -276,9 +275,7 @@ export async function settleDecisions(board: Board, workId: string, decisions: s
 
 /**
  * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
- * `options.repositories` (null for no list file), unless the home already has a list. `skillCheck`, when given, plays
- * the board app: the board gets an IPC channel, and each skill check it asks for gets `skillCheck`'s answer to its
- * Drift choice, a refusal or null standing for an outcome without Drift.
+ * `options.repositories` (null for no list file), unless the home already has a list.
  */
 export async function startBoard(
     t: TestContext,
@@ -287,7 +284,6 @@ export async function startBoard(
     fastRefresh = false,
     env: Record<string, string> = {},
     directory?: string,
-    skillCheck?: (drift?: DriftChoice) => string | null | SkillCheckOutcome,
 ) {
     const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
     const stateFile = join(dir, 'github.json');
@@ -392,7 +388,7 @@ export async function startBoard(
                 ...env,
                 T3_SETTINGS: settingsFile,
             },
-            stdio: skillCheck ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+            stdio: ['ignore', 'pipe', 'pipe'],
             // The board leads its own process group, which the gh it runs joins.
             detached: true,
         },
@@ -416,23 +412,6 @@ export async function startBoard(
 
     watchdog?.unref();
     (watchdog?.stdin as Socket | undefined)?.unref();
-
-    let skillChecks = 0;
-
-    if (skillCheck)
-        child.on('message', (message) => {
-            if (!isSkillCheckRequest(message)) return;
-
-            skillChecks += 1;
-
-            const outcome = skillCheck(message.drift);
-
-            child.send({
-                type: 'skills-checked',
-                id: message.id,
-                ...(typeof outcome === 'object' && outcome ? outcome : { refusal: outcome }),
-            } satisfies SkillCheckAnswer);
-        });
 
     let logs = '';
 
@@ -555,8 +534,6 @@ export async function startBoard(
         logs: () => logs,
         /** Waits for a server log message, including one already printed, within the caller's test deadline. */
         untilLogged: (message: string) => logged((output) => (output.includes(message) ? message : undefined)),
-        /** How many skill checks the board has asked for. */
-        skillChecks: () => skillChecks,
         board,
         post,
         /** Posts the body with the session the board serves now, as the page does. */

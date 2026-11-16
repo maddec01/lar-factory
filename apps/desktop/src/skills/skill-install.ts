@@ -1,19 +1,12 @@
 // Installs the skills bundled in the app, with the engine in packages/shared/src/install-skills.ts. A packaged app
-// checks them at launch and before each Start build: it installs a new Release and reports Drift, which it leaves as
-// it is unless the User chooses Replace, or Replace and start before a build. A dev run does so only with INSTALL_FLAG.
+// checks them at launch: it installs a new Release and reports Drift, which it leaves as it is unless the User
+// chooses Replace. A dev run does so only with INSTALL_FLAG.
 // The launch installs into fallback targets after the board page finishes loading, then into the targets of T3's
 // provider instances once T3 answers. T3 can't unselect those. The
 // board's page can retry, replace Drift and tick a target. The main process runs every check and operation one at a
 // time, and keeps what they found for the page.
 
-import {
-    blockedBy,
-    listed,
-    type DriftChoice,
-    type InstallOperation,
-    type InstallSnapshot,
-    type SkillCheckOutcome,
-} from '@lar-factory/shared';
+import { type InstallOperation, type InstallSnapshot } from '@lar-factory/shared';
 import {
     InstallError,
     profileTargets,
@@ -154,12 +147,6 @@ export interface Checks {
     readonly atLaunch: Check;
     /** Asks T3, then checks the targets it reports as `atLaunch` does; undefined when T3 doesn't answer. */
     readonly afterDiscovery: Effect.Effect<InstallResult | undefined, SkillInstallError>;
-    /**
-     * The check before each Start build, after asking T3 again. With the User's Drift choice it reuses the answer T3
-     * gave the check that asked about Drift, so the build waits for T3 once; with `replace` it overwrites the Drift of
-     * every active target first, as Replace does.
-     */
-    readonly beforeBuild: (drift?: DriftChoice) => Check;
     /** The User's retry: always asks T3 again, then checks, which tries each failed target again. */
     readonly retry: Check;
     /** The User's Replace: reuses T3's last answer, or asks again if T3 didn't give one, then overwrites the Drift of every active target with this Release. */
@@ -219,9 +206,9 @@ export const makeChecks = (
                 }),
             );
             /**
-             * T3's last answer when it gave one, or a new one: a T3 that didn't answer may have started since. Replace and the
-             * check after the User's Drift choice reuse the last available answer however old it is, on purpose: they act on
-             * the targets the User was shown. Retry and Start build always ask T3 again.
+             * T3's last answer when it gave one, or a new one: a T3 that didn't answer may have started since. Replace
+             * reuses the last available answer however old it is, on purpose: it acts on the targets the User was shown.
+             * Retry always asks T3 again.
              */
             const reuse = Effect.suspend(() => (state.discovery === 'available' ? Effect.succeed(true) : learn));
             const progressed = (event: TargetProgress) => {
@@ -338,10 +325,6 @@ export const makeChecks = (
                         available ? check('discovery', { recordWarning: true }) : Effect.succeed(undefined),
                     ),
                 ),
-                beforeBuild: (drift) =>
-                    (drift ? reuse : learn).pipe(
-                        Effect.andThen(check('build', { recordWarning: false, replace: drift === 'replace' })),
-                    ),
                 retry: learn.pipe(Effect.andThen(check('retry', { recordWarning: true }))),
                 replace: reuse.pipe(Effect.andThen(check('replace', { recordWarning: true, replace: true }))),
                 tick: (path, ticked) =>
@@ -397,57 +380,6 @@ const discoverUntilAnswered = (checks: Checks, every: Duration.Input): Effect.Ef
     );
 
     return ask;
-};
-
-/** Each Install target the check failed in, as `<path>: <reason>`. */
-const failures = (outcome: InstallResult) =>
-    outcome.targets.flatMap(({ path, error }) => (error ? [`${path}: ${error.message}`] : []));
-
-/**
- * Why Start build can’t run after a check: a failed install or replacement, in any target, or a Clash, a path the app
- * didn't install that blocks a skill. Drift alone doesn't stop it here; buildAnswer asks the User about it.
- */
-export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): string | null => {
-    const couldnt = drift === 'replace' ? 'couldn’t replace its changed skills' : 'couldn’t install its skills';
-
-    if (outcome instanceof SkillInstallError)
-        return `Lar Factory ${couldnt}, so the build can’t start: ${outcome.message}`;
-
-    const failed = failures(outcome);
-
-    if (failed.length > 0) return `Lar Factory ${couldnt}, so the build can’t start. ${failed.join(' ')}`;
-
-    if (outcome.blocked.length === 0) return null;
-
-    const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join('')}.`);
-    const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
-
-    return `The build can’t start while a skill is blocked. ${skills.join(' ')} Move ${one ? 'that path' : 'each path'} away, then start the build again.`;
-};
-
-/**
- * What the check before a Start build tells the board server, given the User's Drift choice. A failure or a Clash
- * refuses the build. Drift asks for a choice until the User makes one: Start anyway (`keep`) starts with the skills
- * as they are, and Drift left after Replace and start refuses it.
- */
-export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): SkillCheckOutcome => {
-    const refusal = buildRefusal(outcome, drift);
-
-    if (refusal || outcome instanceof SkillInstallError || outcome.drift.length === 0 || drift === 'keep')
-        return { refusal };
-
-    const skills = outcome.drift.map(({ skill }) => skill);
-
-    if (drift === 'replace') {
-        return {
-            refusal: `Lar Factory couldn’t replace ${listed(skills)}, so the build can’t start. They still differ from release ${outcome.version}.`,
-        };
-    }
-
-    return {
-        refusal: `${listed(skills)} changed since Lar Factory installed ${skills.length > 1 ? 'them' : 'it'}. Replace and start, or start anyway.`,
-        drift: skills,
-    };
 };
 
 /** One app-scoped launch lifecycle. Only the board page's readiness signal releases installation and discovery. */

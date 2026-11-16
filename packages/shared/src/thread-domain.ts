@@ -173,8 +173,6 @@ export interface StartResult {
     error: string | null;
     /** The thread may have started; starting again could make a second one. */
     uncertain?: boolean;
-    /** The skills with Drift, when Start build waits for the User to replace them or start anyway. */
-    drift?: string[];
     /** The refusal passes by itself, as T3 or a read comes back, so Auto-build holds instead of pausing the build. */
     hold?: true;
 }

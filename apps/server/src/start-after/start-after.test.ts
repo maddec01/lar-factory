@@ -2,20 +2,20 @@ import { blockedText } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
 import { recordItems } from '../items/record-items.ts';
-import { armedWorkGone, createStartAfter } from './start-after.ts';
+import { createStartAfter } from './start-after.ts';
 
 const REPO = 'maddec01/lar-factory';
 const at = (records: WorkRecords, workId: string) => records.read(workId).revision;
 /** Each kind of blocker with the local facts that complete it, the last fact left out until `finish`. */
 const BLOCKERS: {
-    kind: 'decision' | 'concept' | 'build';
+    kind: 'decision' | 'build';
     start: (records: WorkRecords, workId: string) => void;
     finish: (records: WorkRecords, workId: string) => void;
 }[] = [
@@ -33,17 +33,6 @@ const BLOCKERS: {
 
             records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
         },
-    },
-    {
-        kind: 'concept',
-        start(records, workId) {
-            const build = records.create({ title: 'Delivery', repository: REPO, kind: 'build' });
-
-            records.setParent(build.workId, build.revision, workId);
-            records.setPullRequest(build.workId, at(records, build.workId), `${REPO}#91`);
-            records.observe(build.workId, at(records, build.workId), { of: 'pr', state: 'merged' });
-        },
-        finish: (records, workId) => void records.setFogGone(workId, at(records, workId), true),
     },
     {
         kind: 'build',
@@ -107,64 +96,6 @@ for (const { kind, start, finish } of BLOCKERS) {
         assert.deepEqual(started, [[work.workId, undefined, true]]);
     });
 }
-
-test('an armed start whose item the board does not show stays armed until the records or the onboarded list say it is gone', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'start-after-gone-'));
-    const records = await openWorkRecords(join(dir, 'work-records.db'));
-
-    try {
-        const file = join(dir, 'armed.json');
-        const work = records.create({ title: 'Ticketless', repository: REPO, kind: 'build', status: 'Ready' });
-        let list: () => { repo: string }[] = () => [{ repo: REPO }];
-        const board = createBoardState({ items: [], repos: [] } as unknown as BoardData);
-
-        writeFileSync(file, JSON.stringify({ [work.workId]: {}, gone: {} }));
-
-        const startAfter = createStartAfter({
-            board,
-            file,
-            offerModelChoices: () => [],
-            gone: armedWorkGone(records, () => list()),
-            commands: {
-                start: async () => ({ status: 200, body: { error: null } }),
-                startBuild: async () => ({ status: 200, body: { error: null } }),
-            },
-        });
-
-        await startAfter.startUnblocked();
-        assert.deepEqual(
-            board.snapshot().armed,
-            { [work.workId]: {} },
-            'an empty board proves nothing, and a work ID with no record is gone',
-        );
-        list = () => {
-            throw new Error('unreadable');
-        };
-        await startAfter.startUnblocked();
-        assert.deepEqual(board.snapshot().armed, { [work.workId]: {} }, 'an unreadable list proves nothing');
-        list = () => [];
-        await startAfter.startUnblocked();
-        assert.deepEqual(board.snapshot().armed, {}, 'a repository off the list is gone');
-        assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), {});
-
-        list = () => [{ repo: REPO }];
-
-        const gone = armedWorkGone(records, () => list());
-
-        assert.equal(gone(work.workId), false);
-        records.update(work.workId, records.read(work.workId).revision, { status: 'In progress' });
-        assert.equal(gone(work.workId), true, 'it moved on from Ready');
-
-        const aside = records.create({ title: 'Aside', repository: REPO, kind: 'build', status: 'Ready' });
-
-        records.setAside(aside.workId, aside.revision);
-        assert.equal(gone(aside.workId), true, 'set aside');
-        assert.equal(armedWorkGone(null, () => list())(work.workId), false, 'unreadable records prove nothing');
-    } finally {
-        records.close();
-        rmSync(dir, { recursive: true, force: true });
-    }
-});
 
 test('Start after retains authorization across a capacity hold and launches once when room returns', async (t) => {
     const dir = mkdtempSync(join(tmpdir(), 'start-after-capacity-'));

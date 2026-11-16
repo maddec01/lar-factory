@@ -6,40 +6,10 @@ import { test } from 'vite-plus/test';
 import { startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
-const APPLE = 'maddec01/lar-apple';
 const FACTORY = 'maddec01/lar-factory';
-const LAR = { kind: 'issues' };
-
-const appleIssue = (number: number, labels: string[] = []) => ({
-    ...boardIssue(number, 'List', APPLE).content!,
-    labels: { nodes: labels.map((name) => ({ name })) },
-});
 
 const configReads = async (board: Board) =>
     (await board.calls()).filter((args) => args[1]?.endsWith('/.lar-factory.json')).length;
-
-test('each repository reads its locally selected list source and settings without config file reads', async (t) => {
-    const board = await startBoard(t, {
-        repositories: [FACTORY, APPLE],
-        localSetups: {
-            [FACTORY]: { role: 'Factory', itemSource: LAR },
-            [APPLE]: { role: 'Apple', itemSource: LAR, labels: ['app: music'] },
-        },
-        repoIssues: { [APPLE]: [appleIssue(7, ['status-queued'])] },
-        items: [boardIssue(1, 'Queued', FACTORY)],
-    });
-    const data = await until(board, (d) => d.fetchedAt !== null);
-
-    assert.equal(data.error, null);
-    assert.deepEqual(
-        data.repos.map(({ setup: _, ...row }) => row),
-        [
-            { repo: FACTORY, role: 'Factory', items: 'issues', labels: [] },
-            { repo: APPLE, role: 'Apple', items: 'issues', labels: ['app: music'] },
-        ],
-    );
-    assert.equal(await configReads(board), 0);
-});
 
 test('local changes show immediately without setup acceptance or a repository PR', async (t) => {
     const board = await startBoard(

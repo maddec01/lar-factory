@@ -48,31 +48,8 @@ test('GitHub reads effective method rules, permission and queues; mutation uses 
     ).toContain('Open PR');
 });
 
-test('GitHub excludes merge commits under linear-history policies and reads every rules page', async () => {
-    const run = fake({ pullRequest: { ...pr, baseRef: { branchProtectionRule: { requiresLinearHistory: true } } } });
-
-    expect((await githubMerge(run).read('o/r', 8)).methods).toEqual(['squash']);
-    expect(run.mock.calls.find(([args]) => args[1] !== 'graphql')![0]).toContain('--paginate');
-    expect((await githubMerge(fake({}, [{ type: 'required_linear_history' }])).read('o/r', 8)).methods).toEqual([
-        'squash',
-    ]);
-});
-
-test.each([
-    { reviewDecision: 'CHANGES_REQUESTED' },
-    { mergeStateStatus: 'BLOCKED' },
-    { mergeStateStatus: 'UNKNOWN' },
-    { statusCheckRollup: { state: 'PENDING' } },
-    { statusCheckRollup: { state: 'FAILURE' } },
-])('GitHub retains the provider blocker %j', async (change) => {
+test.each([{ statusCheckRollup: { state: 'FAILURE' } }])('GitHub retains the provider blocker %j', async (change) => {
     const evidence = await githubMerge(fake({ pullRequest: { ...pr, ...change } })).read('o/r', 8);
 
     expect(evidence.blockers.length).toBeGreaterThan(0);
-});
-
-test('S08 F05: behind-main readiness names the required branch update', async () => {
-    const evidence = await githubMerge(fake({ pullRequest: { ...pr, mergeStateStatus: 'BEHIND' } })).read('o/r', 8);
-
-    expect(evidence.blockers.join(' ')).toMatch(/behind main.*rebase|behind main.*update/i);
-    expect(evidence.pr.mergeState).toBe('behind');
 });

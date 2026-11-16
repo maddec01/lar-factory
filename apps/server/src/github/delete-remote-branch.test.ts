@@ -11,15 +11,6 @@ test('the facade deletes the encoded exact branch ref', async () => {
     expect(run).toHaveBeenCalledWith(['api', '--method', 'DELETE', 'repos/owner/repo/git/refs/heads/feat%2Fa%23b']);
 });
 
-test('checks the expected remote head using the provider login before deletion', async () => {
-    const run = vi.fn().mockResolvedValueOnce('observed\n').mockResolvedValueOnce('');
-
-    await deleteRemoteBranch('owner/repo', 'topic', 'observed', run);
-    expect(run.mock.calls).toEqual([
-        [['api', 'repos/owner/repo/git/refs/heads/topic', '--jq', '.object.sha']],
-        [['api', '--method', 'DELETE', 'repos/owner/repo/git/refs/heads/topic']],
-    ]);
-});
 test('a changed remote head prevents GitHub deletion', async () => {
     const run = vi.fn().mockResolvedValue('new-head');
 

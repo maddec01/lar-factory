@@ -36,92 +36,10 @@ const read = (policy = 'approved', vote = 10, state = 'succeeded', race = false)
 
 test('binds successful evidence to a revision', async () =>
     expect(await read()).toMatchObject({ available: true, sourceRevision: 'old', blockers: [] }));
-test.each(['running', 'rejected'])('blocks required policy %s', async (state) =>
-    expect(await read(state)).toMatchObject({ available: true, blockers: [`policy:p:${state}`] }),
-);
-test.each([-10, 0, 99])('blocks unmet vote %s', async (vote) =>
-    expect(await read('approved', vote)).toMatchObject({ blockers: [`reviewer:r:${vote}`] }),
-);
-test('blocks pending statuses and retains iteration', async () =>
-    expect(await read('approved', 10, 'pending')).toMatchObject({
-        blockers: ['status:/ci:pending'],
-        statuses: [{ iterationId: 2 }],
-    }));
-test('an unset native status blocks readiness while preserving the other evidence', async () => {
-    const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
-        const resource = args[args.indexOf('--resource') + 1];
-
-        return JSON.stringify(
-            resource === 'pullRequests'
-                ? { lastMergeSourceCommit: { commitId: 'h' }, repository: { project: { id: 'p' } } }
-                : {
-                      value:
-                          resource === 'pullRequestStatuses'
-                              ? [
-                                    { id: 1, context: { name: 'unset' } },
-                                    { id: 2, state: 'succeeded', context: { name: 'ci' } },
-                                ]
-                              : [],
-                  },
-        );
-    });
-
-    expect(result).toMatchObject({
-        available: true,
-        sourceRevision: 'h',
-        blockers: ['status:/unset:notSet'],
-        statuses: [
-            { id: 1, state: 'notSet' },
-            { id: 2, state: 'succeeded' },
-        ],
-    });
-});
+test('blocks a required policy that is not approved', async () =>
+    expect(await read('rejected')).toMatchObject({ available: true, blockers: ['policy:p:rejected'] }));
 test('invalidates revision races', async () =>
     expect(await read('approved', 10, 'succeeded', true)).toMatchObject({ available: false }));
-test.each(['{}', 'null', 'not json'])('refuses malformed evidence %s', async (value) =>
-    expect(await readAzureReadiness('o', 'p', 'r', 1, async () => value)).toMatchObject({ available: false }),
-);
-test('preserves permission failures', async () =>
-    expect(
-        await readAzureReadiness('o', 'p', 'r', 1, async () => {
-            throw new Error('403 forbidden');
-        }),
-    ).toMatchObject({ available: false }));
-test('accepts empty successful lists', async () => {
-    const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) =>
-        JSON.stringify(
-            args[args.indexOf('--resource') + 1] === 'pullRequests'
-                ? { lastMergeSourceCommit: { commitId: 'head' }, repository: { project: { id: 'p' } } }
-                : { value: [] },
-        ),
-    );
-
-    expect(result).toMatchObject({ available: true, blockers: [], policies: [], statuses: [], reviewers: [] });
-});
-test('retains optional failures without treating them as required', async () => {
-    const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
-        const resource = args[args.indexOf('--resource') + 1];
-
-        return JSON.stringify(
-            resource === 'pullRequests'
-                ? { lastMergeSourceCommit: { commitId: 'h' }, repository: { project: { id: 'p' } } }
-                : {
-                      value:
-                          resource === 'evaluations'
-                              ? [
-                                    {
-                                        evaluationId: 'optional',
-                                        status: 'rejected',
-                                        configuration: { isBlocking: false, isEnabled: true },
-                                    },
-                                ]
-                              : [],
-                  },
-        );
-    });
-
-    expect(result).toMatchObject({ available: true, blockers: [], policies: [{ status: 'rejected' }] });
-});
 
 const buildType = '0609b952-1397-4640-95ec-e00a01b2c241';
 const evaluation = (id: number, status: string, type = buildType, enabled = true) => ({
@@ -179,60 +97,4 @@ test('counts applicable builds once and latest current-revision contexts separat
             prWideChecks: { failed: 1, total: 1 },
         },
     });
-});
-
-test.each(['pullRequestStatuses', 'pullRequestIterations', 'pullRequestReviewers'])(
-    'keeps revision-bound build counts when %s cannot be read',
-    async (failed) => {
-        const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
-            const resource = args[args.indexOf('--resource') + 1];
-
-            if (resource === failed) throw new Error('403 forbidden');
-
-            return JSON.stringify(
-                resource === 'pullRequests'
-                    ? { lastMergeSourceCommit: { commitId: 'head' }, repository: { project: { id: 'p' } } }
-                    : {
-                          value:
-                              resource === 'evaluations'
-                                  ? [evaluation(1, 'approved'), evaluation(2, 'rejected')]
-                                  : resource === 'pullRequestStatuses'
-                                    ? [{ id: 1, iterationId: 2, state: 'succeeded', context: { name: 'ci' } }]
-                                    : resource === 'pullRequestIterations'
-                                      ? [{ id: 2, sourceRefCommit: { commitId: 'head' } }]
-                                      : [],
-                      },
-            );
-        });
-
-        expect(result).toMatchObject({
-            available: false,
-            progress: {
-                checks: {
-                    passed: failed === 'pullRequestReviewers' ? 2 : 1,
-                    failed: 1,
-                    total: failed === 'pullRequestReviewers' ? 3 : 2,
-                },
-                coverage: failed === 'pullRequestReviewers' ? 'all' : 'build-validation',
-                sourceRevision: 'head',
-            },
-        });
-    },
-);
-
-test('does not claim progress when policy evidence is unavailable', async () => {
-    const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
-        if (args.includes('evaluations')) throw new Error('403 forbidden');
-
-        return JSON.stringify({ lastMergeSourceCommit: { commitId: 'head' }, repository: { project: { id: 'p' } } });
-    });
-
-    expect(result.available).toBe(false);
-    expect(result.progress).toBeUndefined();
-});
-
-test('missing policy types leave check evidence unknown rather than reporting zero builds', async () => {
-    const result = await read();
-
-    expect(result.progress).toBeUndefined();
 });

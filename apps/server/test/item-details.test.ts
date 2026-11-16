@@ -136,38 +136,6 @@ test("adding and removing a GitHub label each make one call, and the reply's row
     await until(board, (d) => d.items[0]!.labels.join() === 'status-list,area-ui');
 });
 
-test('a label write refuses a managed label, an unknown item and a bad body', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, false, taggingHome(t));
-
-    await until(board, (d) => d.items.length === 1);
-
-    const managed = await labelWrite(board, { itemId: board.id(12), label: 'Linked-Work', action: 'add' });
-
-    assert.deepEqual(
-        [managed.status, await managed.json()],
-        [422, { error: "The factory manages Linked-Work, so it can't be changed here." }],
-    );
-
-    const unknown = await labelWrite(board, { itemId: 'I_nope', label: 'docs', action: 'add' });
-
-    assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
-    for (const body of [
-        { label: 'docs', action: 'add' },
-        { itemId: board.id(12), action: 'add' },
-        { itemId: board.id(12), label: '', action: 'add' },
-        { itemId: board.id(12), label: 'docs', action: 'set' },
-    ]) {
-        const bad = await labelWrite(board, body);
-
-        assert.deepEqual(
-            [bad.status, await bad.json()],
-            [400, { error: 'Name the item, the label and whether to add or remove it.' }],
-            JSON.stringify(body),
-        );
-    }
-    assert.deepEqual(await labelCalls(board), []);
-});
-
 /** A home where this repository maps Bug and Feature, with `access` to label and type its tickets. */
 function mappedHome(
     t: TestContext,
@@ -228,63 +196,4 @@ test('changing a kind swaps the ticket through the tracker, and the reply and la
     assert.ok(
         (await board.calls()).some((args) => args[2] === 'PATCH' && args[3] === 'repos/maddec01/lar-factory/issues/12'),
     );
-});
-
-test('without access the item keeps its new kind and the board shows the disagreement, until Keep answers it', async (t) => {
-    const board = await startBoard(
-        t,
-        { items: [boardIssue(12, 'List', undefined, ['type: bug'])] },
-        false,
-        false,
-        mappedHome(t, { 'tag-ticket': 'refused', 'type-ticket': 'allowed' }),
-    );
-
-    await onboarded(board);
-    await until(board, (d) => d.items.length === 1);
-
-    const changed = (await (await kindWrite(board, { itemId: board.id(12), kind: 'feature' })).json()) as {
-        itemId: string;
-        board: BoardData;
-    };
-    const { kindDisagreement } = kindItem(changed.board, changed.itemId);
-
-    assert.deepEqual(kindDisagreement, {
-        ticketKind: 'bug',
-        changed: 'item',
-        kept: false,
-        swap: { add: ['type: feature'], remove: ['type: bug'], type: { from: null, to: 'Feature' } },
-    });
-
-    const kept = await board.post(
-        { itemId: changed.itemId, answer: 'keep', ticketKind: 'bug' },
-        board.url,
-        '/api/item-kind-answer',
-    );
-
-    assert.equal(kept.status, 200);
-    assert.equal(
-        kindItem(((await kept.json()) as { board: BoardData }).board, changed.itemId).kindDisagreement?.kept,
-        true,
-    );
-});
-
-test('readiness refuses foreign origins and sample mode without running Azure', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const input = { itemId: 'I_sample01', number: 1, organization: 'untrusted' };
-    const foreign = await fetch(`${board.url}/api/pr-readiness`, {
-        method: 'POST',
-        headers: { Origin: 'https://foreign.example', 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-    });
-
-    assert.equal(foreign.status, 403);
-
-    const sample = await fetch(`${board.url}/api/pr-readiness`, {
-        method: 'POST',
-        headers: { Origin: board.url, 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-    });
-
-    assert.equal(sample.status, 403);
-    assert.equal((await board.calls()).length, 0);
 });

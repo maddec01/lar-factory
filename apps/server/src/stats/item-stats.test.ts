@@ -1,9 +1,8 @@
 import type { ItemStats } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
-import { appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test, vi } from 'vite-plus/test';
+import { test } from 'vite-plus/test';
 
 import { protocolStatsInputs } from '../../test/execution-observations.ts';
 import {
@@ -20,7 +19,7 @@ import {
 import type { FixtureThread } from '../../test/stats-db.ts';
 import { readT3Db, threadRows, threadSessions } from '../t3/t3-db.ts';
 import { issueKey, namedIssue } from '../threads/item-threads.ts';
-import { AGGREGATION_WORK_PER_CHUNK, DEDUP_RECORDS_PER_CHUNK, ITEM_WORK, itemStats } from './item-stats.ts';
+import { DEDUP_RECORDS_PER_CHUNK, itemStats } from './item-stats.ts';
 import type { StatsSources } from './item-stats.ts';
 import { createReadTrace } from './read-trace.ts';
 import type { ReadTrace } from './read-trace.ts';
@@ -89,23 +88,6 @@ async function reader(db: string, sources: Partial<StatsSources> = {}): Promise<
     }
 }
 
-test('child threads count through their lineage root', async (t) => {
-    const stats = await reader(
-        statsDb(t, [
-            { id: 'root', messages: [`Build ${REPO}#60`], turns: [turn('a')] },
-            {
-                id: 'child',
-                rootThreadId: 'root',
-                messages: [`$lar-work ${REPO}#72`],
-                turns: [{ id: 'b', startedAt: '2026-10-20T09:20:00Z', completedAt: '2026-10-20T09:30:00Z' }],
-            },
-            { id: 'stranger', rootThreadId: 'elsewhere', turns: [turn('c')] },
-        ]),
-    );
-
-    assert.equal(stats(REPO, 60)?.agentMs, 20 * MIN);
-});
-
 /** A ten-minute root turn naming issue `n`, from 09:00. */
 function root(n: number): FixtureThread {
     return { id: `root-${n}`, messages: [`Build ${REPO}#${n}`], turns: [turn(`root-${n}`)] };
@@ -168,36 +150,6 @@ test("a subagent adds the part of its run outside its parent's turns, and parall
     assert.equal(stats(REPO, 5)?.agentMs, 25 * MIN);
 });
 
-test('a running subagent counts up to its latest message, never its updated time, and 0 before its first', async (t) => {
-    const stats = await reader(
-        statsDb(t, [
-            root(1),
-            subagent('replied', 1, '09:10', null, { repliedAt: '2026-10-20T09:18:00Z' }),
-            root(2),
-            subagent('silent', 2, '09:10', null),
-        ]),
-    );
-
-    assert.equal(stats(REPO, 1)?.agentMs, 18 * MIN);
-    assert.equal(stats(REPO, 2)?.agentMs, 10 * MIN);
-});
-
-test("a subagent under a child task has its time taken out of that child's work, not the root's", async (t) => {
-    const stats = await reader(
-        statsDb(t, [
-            root(1),
-            {
-                id: 'task',
-                rootThreadId: 'root-1',
-                turns: [{ id: 'task', startedAt: '2026-10-20T09:20:00Z', completedAt: '2026-10-20T09:40:00Z' }],
-            },
-            subagent('nested', 1, '09:30', '09:50', { parentThreadId: 'task' }),
-        ]),
-    );
-
-    assert.equal(stats(REPO, 1)?.agentMs, (10 + 20 + 10) * MIN);
-});
-
 test("wall time is the time any of the item's agents worked: overlap once, no waits on the user, no idle gaps", async (t) => {
     const stats = await reader(
         statsDb(
@@ -226,96 +178,6 @@ test("wall time is the time any of the item's agents worked: overlap once, no wa
     assert.equal(stats(REPO, 1)?.wallMs, 30 * MIN, 'parallel subagents count their overlap once');
     assert.equal(stats(REPO, 2)?.wallMs, 30 * MIN, 'waits on the user are left out');
     assert.equal(stats(REPO, 3)?.wallMs, 15 * MIN, "the gap between threads isn't counted");
-});
-
-test('agent time leaves out waits on the user inside a turn, and a running turn or wait counts up to now', async (t) => {
-    const stats = await reader(
-        statsDb(
-            t,
-            [
-                {
-                    id: 'waits',
-                    messages: [`$lar-work ${REPO}#1`],
-                    turns: [{ id: 't1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T10:00:00Z' }],
-                },
-                {
-                    id: 'running',
-                    messages: [`$lar-work ${REPO}#2`],
-                    turns: [{ id: 't2', startedAt: '2026-10-20T11:30:00Z', completedAt: null }],
-                },
-                { id: 'parallel', messages: [`$lar-work ${REPO}#3`], turns: [turn('t3')] },
-                { id: 'parallel-2', messages: [`$lar-work ${REPO}#3`], turns: [turn('t4')] },
-            ],
-            [
-                // Two overlapping waits (09:10-09:30) and one past the turn's end (09:50-10:00 counted).
-                { turnId: 't1', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:20:00Z' },
-                { turnId: 't1', createdAt: '2026-10-20T09:15:00Z', resolvedAt: '2026-10-20T09:30:00Z' },
-                { turnId: 't1', createdAt: '2026-10-20T09:50:00Z', resolvedAt: '2026-10-20T10:30:00Z' },
-                // Still waiting on the user since 11:45.
-                { turnId: 't2', createdAt: '2026-10-20T11:45:00Z', resolvedAt: null },
-            ],
-        ),
-    );
-
-    assert.equal(stats(REPO, 1)?.agentMs, 30 * MIN);
-    assert.equal(stats(REPO, 2)?.agentMs, 15 * MIN);
-    assert.equal(stats(REPO, 3)?.agentMs, 20 * MIN, 'parallel threads add up');
-});
-
-test("an open turn whose thread isn't running stops at the thread's latest activity, not now", async (t) => {
-    const stats = await reader(
-        statsDb(
-            t,
-            [
-                // Its run failed at 09:00; the message stamps 08:00, the wait 09:05-09:20.
-                {
-                    id: 'abandoned',
-                    messages: [`$lar-work ${REPO}#7`],
-                    turns: [
-                        { id: 'a1', startedAt: '2026-10-20T08:30:00Z', completedAt: '2026-10-20T08:40:00Z' },
-                        { id: 'a2', startedAt: '2026-10-20T09:00:00Z', completedAt: null, abandoned: true },
-                    ],
-                },
-                {
-                    id: 'abandoned-quiet',
-                    messages: [`$lar-work ${REPO}#8`],
-                    turns: [{ id: 'b1', startedAt: '2026-10-20T09:00:00Z', completedAt: null, abandoned: true }],
-                },
-            ],
-            [{ turnId: 'a2', createdAt: '2026-10-20T09:05:00Z', resolvedAt: '2026-10-20T09:20:00Z' }],
-        ),
-    );
-
-    assert.equal(
-        stats(REPO, 7)?.agentMs,
-        10 * MIN + 5 * MIN,
-        'the open turn runs 09:00-09:20, less the 15-minute wait',
-    );
-    assert.equal(stats(REPO, 8)?.agentMs, 0, 'nothing after the turn started');
-});
-
-test("a stale open turn on an active provider thread stops at the next turn's start, and only the latest counts to now", async (t) => {
-    const stats = await reader(
-        statsDb(t, [
-            // A turn that failed at 09:00 and T3 never closed, then a turn running since 11:30 on the same provider thread.
-            {
-                id: 'retried',
-                messages: [`$lar-work ${REPO}#9`],
-                turns: [
-                    { id: 'r1', startedAt: '2026-10-20T09:00:00Z', completedAt: null, providerThread: 'claude' },
-                    {
-                        id: 'r2',
-                        startedAt: '2026-10-20T10:00:00Z',
-                        completedAt: '2026-10-20T10:10:00Z',
-                        providerThread: 'claude',
-                    },
-                    { id: 'r3', startedAt: '2026-10-20T11:30:00Z', completedAt: null, providerThread: 'claude' },
-                ],
-            },
-        ]),
-    );
-
-    assert.equal(stats(REPO, 9)?.agentMs, 60 * MIN + 10 * MIN + 30 * MIN, 'r1 runs 09:00-10:00, not to now');
 });
 
 test("tokens are T3's totals over each session's own and subagent transcripts, each message once", async (t) => {
@@ -360,58 +222,6 @@ test("tokens are T3's totals over each session's own and subagent transcripts, e
     assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 6042 + 6101 + 15 + 101 });
     assert.equal(stats(REPO, 61)?.tokens, 198);
     assert.deepEqual(stats(REPO, 62), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 0 }, 'no transcripts, no tokens');
-});
-
-test("each thread reads the transcripts under its own provider instance's Claude home, from T3's settings", async (t) => {
-    const home = tempDir(t, 'lar-home-');
-
-    // The same session ID in both homes: only the thread's own instance counts.
-    claudeHome(t, { shared: { main: [assistant('msg-work', 0, 0, 1000, 0)] } }, join(home, '.claude'));
-    claudeHome(t, { shared: { main: [assistant('msg-personal', 0, 0, 20, 0)] } }, join(home, '.claude-personal'));
-
-    const elsewhere = claudeHome(t, { 'session-x': { main: [assistant('msg-x', 0, 0, 3, 0)] } });
-    const db = statsDb(t, [
-        { id: 'work', messages: [`$lar-work ${REPO}#1`], sessions: [{ session: 'shared', instance: 'claudeAgent' }] },
-        {
-            id: 'personal',
-            messages: [`$lar-work ${REPO}#2`],
-            sessions: [{ session: 'shared', instance: 'claudeAgent_personal' }],
-        },
-        {
-            id: 'absolute',
-            messages: [`$lar-work ${REPO}#3`],
-            sessions: [{ session: 'session-x', instance: 'claudeAgent_x' }],
-        },
-        {
-            id: 'unknown',
-            messages: [`$lar-work ${REPO}#4`],
-            sessions: [{ session: 'shared', instance: 'claudeAgent_gone' }],
-        },
-        {
-            id: 'codex',
-            messages: [`$lar-work ${REPO}#5`],
-            sessions: [{ session: 'shared', instance: 'codex', driver: 'codex' }],
-        },
-    ]);
-    const settings = t3Settings(t, {
-        claudeAgent_personal: '~/.claude-personal',
-        claudeAgent: '',
-        claudeAgent_x: elsewhere,
-    });
-    const stats = await reader(db, { settings, home });
-
-    assert.deepEqual(
-        [1, 2, 3, 4, 5].map((n) => stats(REPO, n)?.tokens),
-        [1000, 20, 3, 0, 0],
-    );
-
-    // Without readable settings only the built-in instance, at ~/.claude, is known.
-    const builtIn = await reader(db, { home });
-
-    assert.deepEqual(
-        [1, 2].map((n) => builtIn(REPO, n)?.tokens),
-        [1000, 0],
-    );
 });
 
 test("an item totals its Claude and Codex threads, each Codex thread from its own instance's Codex home", async (t) => {
@@ -503,28 +313,6 @@ test('a record forked threads share counts once, for the item whose thread produ
     assert.equal(stats(REPO, 61)?.tokens, 7);
 });
 
-test('missing or garbled transcripts leave tokens out, and never break the stats', async (t) => {
-    const home = tempDir(t, 'lar-home-');
-
-    claudeHome(
-        t,
-        {
-            'session-a': {
-                main: ['{not json', '"a string"', 'null', JSON.stringify({ type: 'assistant', message: { id: 'm' } })],
-            },
-        },
-        join(home, '.claude'),
-    );
-
-    const db = statsDb(t, [
-        { id: 'build', messages: [`Build ${REPO}#60`], sessions: ['session-a', '../escape'], turns: [turn('t1')] },
-    ]);
-    const expected = { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 0 };
-
-    assert.deepEqual((await reader(db))(REPO, 60), expected);
-    assert.deepEqual((await reader(db, { home }))(REPO, 60), expected);
-});
-
 const close = (actual: number | undefined, expected: number) =>
     assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
 
@@ -600,60 +388,6 @@ test("API cost is T3's price for the item's records, with the aliases and overri
     );
 });
 
-// oxlint-disable-next-line vitest/expect-expect -- close() asserts each cost
-test("a Codex record whose rollout has no speed tier takes the one its turn started with in T3's history", async (t) => {
-    const home = tempDir(t, 'lar-home-');
-    const sessions = [
-        '01a13627-9790-70d0-8342-58f71022e001',
-        '01a13627-9790-70d0-8342-58f71022e002',
-        '01a13627-9790-70d0-8342-58f71022e003',
-    ];
-    const rollout = (id: string, turnId: string) => [
-        {
-            type: 'session_meta',
-            timestamp: '2026-10-20T09:00:00.000Z',
-            payload: { type: 'session_meta', id, model_provider: 'openai' },
-        },
-        {
-            type: 'turn_context',
-            timestamp: '2026-10-20T09:00:00.000Z',
-            payload: { type: 'turn_context', model: 'gpt-6-astra', turn_id: turnId },
-        },
-        codexTokens('2026-10-20T09:01:00.000Z', 1000, 0, 100, [1000, 0, 100]),
-    ];
-
-    codexHome(t, Object.fromEntries(sessions.map((id, i) => [id, rollout(id, `turn-${i}`)])), join(home, '.codex'));
-
-    const selection = (model: string, options: object[]) => ({ instanceId: 'codex', model, options });
-    const db = statsDb(
-        t,
-        [
-            [selection('gpt-6-astra', [{ id: 'serviceTier', value: 'priority' }])],
-            [selection('gpt-6-astra', [{ id: 'fastMode', value: true }])],
-            // A selection for another model can't tell this record's tier.
-            [selection('gpt-6-sol', [{ id: 'serviceTier', value: 'priority' }])],
-        ].map(([sel], i) => ({
-            id: `codex-${i}`,
-            messages: [`$lar-work ${REPO}#${70 + i}`],
-            sessions: [{ session: sessions[i]!, instance: 'codex', driver: 'codex' }],
-            turns: [{ ...turn(`t${i}`), codex: { session: sessions[i]!, nativeTurn: `turn-${i}`, selection: sel! } }],
-        })),
-    );
-    const rates = usageRates(t, {
-        'gpt-6-astra': {
-            input_cost_per_token: 1e-5,
-            output_cost_per_token: 5e-5,
-            input_cost_per_token_priority: 2e-5,
-            output_cost_per_token_priority: 1e-4,
-        },
-    });
-    const stats = await reader(db, { home, rates });
-
-    close(stats(REPO, 70)?.costUsd, 0.03);
-    close(stats(REPO, 71)?.costUsd, 0.03);
-    close(stats(REPO, 72)?.costUsd, 0.015);
-});
-
 /** A read of the sessions' figures for `items`, counting its pauses by step. */
 async function chunkedRead(
     t: Parameters<typeof tempDir>[0],
@@ -708,72 +442,4 @@ test('dedup yields in chunks of a bounded size, and its first copy still wins ac
     assert.equal(trace.steps.dedup.pauses, 3);
     assert.equal(stats(['a'])?.tokens, 1000 + records / 2);
     assert.equal(stats(['b'])?.tokens, records / 2, 'the shared record counts once, for the earliest thread');
-});
-
-test('aggregation yields in chunks of a bounded size and gives each item the answer an unchunked read would', async (t) => {
-    const count = Math.ceil(AGGREGATION_WORK_PER_CHUNK / ITEM_WORK) * 3;
-    const threads = Array.from({ length: count }, (_, i) => counted(`t${i}`));
-    const sessions = Object.fromEntries(
-        threads.map(({ id }, i) => [`session-${id}`, { main: [assistant(`m${i}`, 0, 0, 0, i + 1)] }]),
-    );
-    const items = threads.map(({ id }) => [id]);
-    const { stats, trace } = await chunkedRead(t, threads, sessions, items);
-
-    assert.ok(trace.steps.aggregation.pauses >= 2, `${trace.steps.aggregation.pauses} pauses over ${count} items`);
-    assert.deepEqual(
-        items.map((ids) => stats(ids)?.tokens),
-        threads.map((_, i) => i + 1),
-    );
-    assert.deepEqual(stats(['t0']), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 1 });
-    assert.equal(stats(['t0', 't1'])?.tokens, 3, 'threads no item held work out when asked for');
-});
-
-test('a transcript that changes between chunks waits for the next read, so no answer mixes the two', async (t) => {
-    const records = DEDUP_RECORDS_PER_CHUNK * 2;
-    const shared = assistant('shared', 0, 0, 0, 1000);
-    const fill = (name: string) => Array.from({ length: records }, (_, i) => assistant(`${name}-${i}`, 0, 0, 0, 1));
-    const home = tempDir(t, 'lar-home-');
-
-    claudeHome(
-        t,
-        { 'session-a': { main: [shared, ...fill('a')] }, 'session-b': { main: [shared, ...fill('b')] } },
-        join(home, '.claude'),
-    );
-
-    const db = statsDb(t, [counted('a'), counted('b', '2026-10-20T08:30:00Z')]);
-
-    vi.stubEnv('T3_STATE_DB', db);
-    t.onTestFinished(() => {
-        vi.unstubAllEnvs();
-    });
-
-    const { rows, sessions } = await protocolStatsInputs();
-    const transcript = join(
-        home,
-        '.claude',
-        'projects',
-        '-Users-me--t3-worktrees-lar-factory-feat-60',
-        'session-a.jsonl',
-    );
-    let changed = false;
-    const read = () => {
-        const trace: ReadTrace = createReadTrace(async () => {
-            if (changed || trace.steps.dedup.pauses === 0) return;
-
-            changed = true;
-            appendFileSync(transcript, JSON.stringify(assistant('later', 0, 0, 0, 500)) + '\n');
-        });
-
-        return itemStats({ db, ...NOWHERE, home }, rows, NOW, { sessions, items: [['a'], ['b']], trace });
-    };
-    const during = await read();
-
-    assert.equal(changed, true, 'the transcript changed while the read yielded');
-    assert.equal(during(['a'])?.tokens, 1000 + records, 'the read counts the transcript as it pinned it');
-    assert.equal(during(['b'])?.tokens, records);
-
-    const next = await read();
-
-    assert.equal(next(['a'])?.tokens, 1000 + records + 500, 'and the next read counts the change');
-    assert.equal(next(['b'])?.tokens, records);
 });

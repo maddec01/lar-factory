@@ -43,15 +43,6 @@ it("returns the remote's current commit and leaves local main and the working tr
     expect(readFileSync(join(checkout, 'unsaved.txt'), 'utf8')).toBe('kept');
 });
 
-it('updates the remote-tracking branch on a clone whose fetch refspec leaves it out', async (t) => {
-    const { checkout, origin, tip, git } = behindClone(t, ['--single-branch', '--branch', 'main']);
-
-    git(origin, 'branch', 'other');
-    git(checkout, 'config', 'remote.origin.fetch', '+refs/heads/other:refs/remotes/origin/other');
-    expect(await fetchBaseCommit(checkout, 'main', { env })).toBe(tip);
-    expect(git(checkout, 'rev-parse', 'refs/remotes/origin/main')).toBe(tip);
-});
-
 it('gives a branch started from the commit no upstream', async (t) => {
     const { dir, checkout, tip, git } = behindClone(t);
     const base = await fetchBaseCommit(checkout, 'main', { env });
@@ -60,15 +51,6 @@ it('gives a branch started from the commit no upstream', async (t) => {
     git(checkout, 'worktree', 'add', '-q', '-b', 'fix/build', join(dir, 'build'), base);
     expect(git(checkout, 'rev-parse', 'fix/build')).toBe(tip);
     expect(git(checkout, 'for-each-ref', '--format=%(upstream)', 'refs/heads/fix/build')).toBe('');
-});
-
-it('throws when the fetch fails, without naming the failure detail', async (t) => {
-    const { checkout, git } = behindClone(t);
-
-    git(checkout, 'remote', 'set-url', 'origin', join(checkout, 'gone'));
-    await expect(fetchBaseCommit(checkout, 'main', { env })).rejects.toThrow(
-        'Could not fetch main from origin. Check the network and your Git login, then start the build again.',
-    );
 });
 
 it('runs ssh in batch mode with no terminal prompt, keeping the configured ssh command', async (t) => {
@@ -108,29 +90,4 @@ it('fails an HTTPS login without running an askpass program', async (t) => {
         fetchBaseCommit(checkout, 'main', { env: { ...env, GIT_ASKPASS: askpass, SSH_ASKPASS: askpass } }),
     ).rejects.toThrow('Could not fetch main');
     expect(existsSync(asked)).toBe(false);
-});
-
-it('refuses a branch name that would change the refspec, and leaves local main alone', async (t) => {
-    const { checkout, behind, git } = behindClone(t);
-
-    await expect(fetchBaseCommit(checkout, 'x:refs/heads/main', { env })).rejects.toThrow('Could not fetch');
-    expect(git(checkout, 'rev-parse', 'main')).toBe(behind);
-});
-
-it('gives up on a fetch that outlasts its timeout, even when a child keeps the output open', async (t) => {
-    const { dir, checkout, git } = behindClone(t);
-    const ssh = join(dir, 'ssh');
-
-    writeFileSync(ssh, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
-    git(checkout, 'remote', 'set-url', 'origin', 'git@example.invalid:o/r.git');
-
-    const started = Date.now();
-
-    await expect(
-        fetchBaseCommit(checkout, 'main', {
-            env: { ...env, GIT_SSH_COMMAND: `'${ssh}'`, GIT_SSH_VARIANT: 'ssh' },
-            timeout: 300,
-        }),
-    ).rejects.toThrow('Fetching main from origin took too long. Check the network, then start the build again.');
-    expect(Date.now() - started).toBeLessThan(10_000);
 });

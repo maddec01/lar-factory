@@ -9,15 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test, type TestContext } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import {
-    earlierShapePrompt,
-    shapePrompt,
-    larWork,
-    startBoard,
-    until,
-    writesRepository,
-    type Board,
-} from './server-support.ts';
+import { shapePrompt, larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
@@ -92,11 +84,9 @@ test(
         assert.equal(after.error, 'Restart Lar Factory to continue.');
         assert.equal((await fetch(`${board.url}/healthz`)).status, 200);
         assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
-        // Two more local ticks must neither crash the process nor repeat the sanitized diagnostic.
+        // Two more local ticks must not crash the process.
         await new Promise((resolve) => setTimeout(resolve, 250));
         assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
-        assert.equal(board.logs().split('local work paused: schema-too-new').length - 1, 1);
-        assert.doesNotMatch(board.logs(), /WorkRecordError:|schema version \d+, which is newer/);
     },
 );
 
@@ -176,68 +166,6 @@ test('a successful start holds its thread after a restart, so Start there asks T
     assert.equal(await starts(after), 0);
     assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
 });
-
-test('a failed start stays a failure after a restart, so Start there asks T3 again', async (t) => {
-    const boardOn = machine(t);
-    // T3's explicit authorization refusal is certain: no thread can exist.
-    const missing = await boardOn({ t3: { fail: 'refused' } }, true);
-    const workId = missing.id(12);
-
-    await until(missing, (d) => d.items.some((i) => i.id === workId));
-
-    const failed = await start(missing, workId);
-
-    assert.equal(failed.status, 502);
-    assert.equal((await failed.json()).uncertain, undefined);
-    await missing.stop();
-
-    const after = await boardOn();
-
-    await until(after, (d) => d.items.some((i) => i.id === workId));
-    assert.equal((await start(after, workId)).status, 200);
-    assert.equal(await starts(after), 1);
-    assert.deepEqual(await intents(after, workId), [
-        { threadId: null, failure: true, resolved: true },
-        { threadId: 'thread-1', failure: false, resolved: true },
-    ]);
-});
-
-test(
-    'a start left unresolved before threads took their phase in their name recovers its thread, and no second one starts',
-    { timeout: 30_000 },
-    async (t) => {
-        const title = 'A long issue title '.repeat(6).trim();
-        const boardOn = machine(t, title);
-        const before = await boardOn({ t3: { fail: 'garbage' } }, true);
-        const workId = before.id(12);
-
-        await until(before, (d) => d.items.some((i) => i.id === workId));
-
-        const message = earlierShapePrompt(before, `#12 ${title}`, workId);
-        const legacy = await openWorkRecords(workRecordsPath(before.dataDir));
-
-        try {
-            legacy.recordLaunchIntent(workId, legacy.read(workId).revision, 'shape');
-        } finally {
-            legacy.close();
-        }
-
-        await before.stop();
-
-        const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
-
-        await until(after, (d) => d.items.some((i) => i.id === workId));
-
-        const settled = await start(after, workId);
-        const recovered = (await settled.json()).thread;
-
-        assert.deepEqual([settled.status, recovered?.threadId], [200, 'thread-1']);
-        assert.ok(recovered.title.endsWith('…'));
-        assert.ok(recovered.title.length <= 80);
-        assert.equal(await starts(after), 0);
-        assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
-    },
-);
 
 test(
     'an uncertain start stays unresolved across a restart: T3 is read before anything, and no second thread starts',

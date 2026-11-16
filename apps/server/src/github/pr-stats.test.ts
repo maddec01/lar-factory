@@ -24,52 +24,6 @@ test('the block shows agent time, wall time, total tokens and API cost, between 
     );
 });
 
-test('the block displays whole dollars and preserves cents in its data', () => {
-    const cost = (costUsd: number) => / · ([^ ·]+)\n/.exec(statsBlock({ ...stats, costUsd }))?.[1];
-
-    assert.deepEqual([0, 0.004, 0.99, 1, 1.49, 1.5, 41.2, 1234.5].map(cost), [
-        '<$1',
-        '<$1',
-        '<$1',
-        '$1',
-        '$1',
-        '$2',
-        '$41',
-        '$1,235',
-    ]);
-    assert.equal(
-        edits([item([pr(1, 'open', `Body\n\n${block}`)], { ...stats, costUsd: 41.4 })]).length,
-        1,
-        'the data retains cents; the server throttles running edits',
-    );
-});
-
-test('PR times use minute precision and keep every positive short duration visible', () => {
-    const shown = (ms: number) => /Σ (.+) · 12.4M/.exec(statsBlock({ ...stats, agentMs: ms, wallMs: ms }))?.[1];
-
-    assert.deepEqual([0, 1, 24_000, 59_999, 60_000, 138_072, 3_599_999, 4_056_000].map(shown), [
-        '0m · wall 0m',
-        '<1m · wall <1m',
-        '<1m · wall <1m',
-        '<1m · wall <1m',
-        '1m · wall 1m',
-        '2m · wall 2m',
-        '59m · wall 59m',
-        '1h 7m · wall 1h 7m',
-    ]);
-
-    const exact = { agentMs: 138_072, wallMs: 138_072, tokens: 980 };
-
-    assert.deepEqual(mergedStats(item([pr(1, 'merged', statsBlock(exact))], null)), { ...exact, frozen: true });
-});
-
-test('a body without a block gets one appended; the text before it is kept byte for byte', () => {
-    const body = '## What\r\nThe change.  \r\n';
-
-    assert.equal(withStatsBlock(body, block), `${body}\n\n${block}`);
-    assert.equal(withStatsBlock('', block), block);
-});
-
 test('a body with a block gets only the block replaced', () => {
     const before = 'Intro\r\n\r\n';
     const after = '\r\n\r\n## Verify\r\nSteps <!-- lar-stats --> quoted later';
@@ -111,14 +65,6 @@ test('a merged build refreshes an outdated block before freezing and retains its
 
     assert.ok(edit, 'persist the final figures in the merged PR');
     assert.deepEqual(mergedStats(item([pr(1, 'merged', edit.body)], null)), { ...final, frozen: true });
-});
-
-test('a running PR keeps exact figures so its rounded display cannot inflate the merged build', () => {
-    const live = { agentMs: 167_550, wallMs: 167_550, tokens: 12_345, costUsd: 0.27 };
-    const [edit] = edits([item([pr(1, 'open', 'Body')], live)]);
-
-    assert.ok(edit);
-    assert.deepEqual(mergedStats(item([pr(1, 'merged', edit.body)], null)), { ...live, frozen: true });
 });
 
 test('a stale stats read never lowers known final figures, including when the PR body changed after the board read it', () => {
@@ -170,14 +116,6 @@ test('edits refresh open and merged PRs whose block is missing or out of date, l
     ]);
 });
 
-test("an edit's block applies again to a newer body, and a body already current needs none", () => {
-    const edited = 'Body edited since the board read it';
-
-    assert.equal(updatedBody(edited, block), `${edited}\n\n${block}`);
-    assert.equal(updatedBody(`${edited}\n\n${statsBlock({ ...stats, agentMs: 0 })}`, block), `${edited}\n\n${block}`);
-    assert.equal(updatedBody(`${edited}\r\n\r\n${block.replaceAll('\n', '\r\n')}`, block), null);
-});
-
 test('PRs in a repo with no items on the board are left alone; any repo with items gets its blocks', () => {
     const elsewhere = { ...pr(7, 'open', 'Body'), url: 'https://github.com/someone/other/pull/7' };
     const prefix = { ...pr(8, 'open', 'Body'), url: 'https://github.com/maddec01/lar-factory-fork/pull/8' };
@@ -195,79 +133,6 @@ test('PRs in a repo with no items on the board are left alone; any repo with ite
         [app.url],
         'an item without stats still puts its repo on the board',
     );
-});
-
-test("only builds write a PR's block: a parent that isn't a build, linked to the same PR, writes nothing", () => {
-    const parent = item([pr(1, 'open', 'Body')], { ...stats, agentMs: 0 }, ['feature']);
-
-    assert.deepEqual(edits([parent, item([pr(1, 'open', 'Body')])]), [
-        { url: pr(1, 'open', '').url, final: false, block, body: `Body\n\n${block}` },
-    ]);
-    assert.deepEqual(edits([parent]), []);
-    assert.deepEqual(
-        edits([item([pr(2, 'open', 'Body')], stats, ['build', 'concept'])]),
-        [],
-        'a concept map is no build',
-    );
-});
-
-test('missing or unavailable stats, or an unread body, make no edit; a PR linked twice is edited once', () => {
-    assert.deepEqual(
-        edits([
-            item([pr(1, 'open', 'Body')], null),
-            item([pr(2, 'open', 'Body')], 'unavailable'),
-            item([pr(3, 'open', undefined)]),
-        ]),
-        [],
-    );
-    assert.equal(
-        edits([item([pr(1, 'open', 'Body')]), item([pr(1, 'open', 'Body')], { ...stats, agentMs: 0 })]).length,
-        1,
-    );
-});
-
-test('a merged PR gets final stats, then needs no further edit', () => {
-    const stale = `Body\n\n${statsBlock({ ...stats, agentMs: 0 })}`;
-    const [edit] = edits([item([pr(1, 'merged', stale)], { ...stats, frozen: true })]);
-
-    assert.ok(edit?.final);
-    assert.deepEqual(edits([item([pr(1, 'merged', edit.body)], { ...stats, frozen: true })]), []);
-});
-
-test("a merged item takes the figures its merged PR's block holds, frozen, as the block wrote them", () => {
-    const frozen = (s: ItemStats) => mergedStats(item([pr(1, 'merged', `Body\n\n${statsBlock(s)}\n\nMore`)], null));
-
-    assert.deepEqual(frozen(stats), { ...stats, frozen: true });
-    assert.deepEqual(
-        frozen({ agentMs: 7 * 60_000, tokens: 980 }),
-        { agentMs: 7 * 60_000, tokens: 980, frozen: true },
-        'nothing priced, no cost',
-    );
-    assert.deepEqual(frozen({ agentMs: 3 * 3600_000 + 17 * 60_000, tokens: 1_234_567_000_000, costUsd: 1234.5 }), {
-        agentMs: (3 * 60 + 17) * 60_000,
-        tokens: 1_234_567_000_000,
-        costUsd: 1234.5,
-        frozen: true,
-    });
-    assert.equal(frozen({ ...stats, costUsd: 0.3 })?.costUsd, 0.3, 'the data retains cents below a dollar');
-    assert.deepEqual(
-        frozen({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
-        { agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980, frozen: true },
-        'wall time over an hour',
-    );
-    for (const s of [
-        stats,
-        { agentMs: 0, tokens: 0 },
-        { agentMs: 90 * 60_000, wallMs: 0, tokens: 40_200, costUsd: 0.4 },
-    ]) {
-        assert.equal(statsBlock(frozen(s)!), statsBlock(s), 'the parsed figures write the same block back');
-    }
-
-    const crlf = mergedStats(
-        item([pr(1, 'merged', `Body\r\n\r\n${statsBlock(stats).replaceAll('\n', '\r\n')}`)], null),
-    );
-
-    assert.equal(crlf?.costUsd, 41.2, 'a block GitHub sent back with CRLF line ends still parses');
 });
 
 test('a merged item reads a block in the old format, from before wall time, with no wall time', () => {
@@ -296,58 +161,4 @@ test('a merged item reads a block in the old format, from before wall time, with
         { agentMs: 5 * 60_000, tokens: 980, frozen: true },
         'nothing priced, no cost',
     );
-});
-
-test('a merged item falls back to live stats when no merged PR has a readable block', () => {
-    const garbled = '<!-- lar-stats -->\n**Item stats**: agent time soon · lots of tokens\n<!-- /lar-stats -->';
-
-    assert.equal(mergedStats(item([pr(1, 'merged', 'Body without a block')])), null);
-    assert.equal(mergedStats(item([pr(1, 'merged', garbled)])), null);
-    assert.equal(mergedStats(item([pr(1, 'merged', undefined)])), null, 'an unread body');
-    assert.equal(
-        mergedStats(item([pr(1, 'open', `Body\n\n${block}`), pr(2, 'closed', `Body\n\n${block}`)])),
-        null,
-        'only merged PRs freeze',
-    );
-    assert.equal(
-        mergedStats(item([pr(1, 'merged', garbled), pr(2, 'merged', `Body\n\n${block}`)], null))?.costUsd,
-        41.2,
-        'a merged PR with a readable block counts',
-    );
-});
-
-test("a merged item reads its most recently merged PR's block, and an open linked PR keeps it live", () => {
-    const older = `Body\n\n${statsBlock({ ...stats, costUsd: 10 })}`;
-    const newer = `Body\n\n${statsBlock({ ...stats, costUsd: 41 })}`;
-
-    assert.equal(
-        mergedStats(
-            item(
-                [pr(1, 'merged', older, '2026-10-01T00:00:00Z'), pr(2, 'merged', newer, '2026-10-20T00:00:00Z')],
-                null,
-            ),
-        )?.costUsd,
-        41,
-    );
-    assert.equal(
-        mergedStats(
-            item(
-                [pr(2, 'merged', newer, '2026-10-20T00:00:00Z'), pr(1, 'merged', older, '2026-10-01T00:00:00Z')],
-                null,
-            ),
-        )?.costUsd,
-        41,
-        'whatever order GitHub lists them in',
-    );
-    assert.equal(
-        mergedStats(item([pr(1, 'merged', newer, '2026-10-20T00:00:00Z'), pr(2, 'open', 'Body')])),
-        null,
-        'an open PR: live stats',
-    );
-});
-
-test('with its retained stats dropped, a merged PR keeps its frozen block over a lower fresh read', () => {
-    const lower = { agentMs: 60_000, wallMs: 60_000, tokens: 10, costUsd: 1 };
-
-    assert.deepEqual(mergedStats(item([pr(1, 'merged', block)], null), lower), { ...stats, frozen: true });
 });

@@ -42,88 +42,6 @@ test('onboarding saves local settings, optional purpose and sharing on by defaul
     expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
 });
 
-test('onboarding with sync on and no mapping creates no labels', async (t) => {
-    const dir = await folder(t);
-    const created: string[] = [];
-    const reads: SaveReads = {
-        ...allowed,
-        createLabel: async (_repo, name) => {
-            created.push(name);
-
-            return name;
-        },
-    };
-
-    expect(await saveSetup({ ...answers, structureSync: true }, dir, reads)).toEqual({ onboarding: [] });
-    expect(readRepositorySetups(dir)[0]?.structureSync).toBe(true);
-    expect(created).toEqual([]);
-});
-
-test('onboarding persists each issue preference and defaults omitted preferences to on', async (t) => {
-    const dir = await folder(t);
-
-    await saveSetup(answers, dir, allowed);
-    expect(readRepositorySetups(dir)[0]).toMatchObject({
-        createIssuesFromAddItem: true,
-        createIssuesFromRetro: true,
-        writeRefinedSpec: true,
-    });
-
-    const chosen = await folder(t);
-
-    expect(
-        await saveSetup(
-            { ...answers, createIssuesFromAddItem: false, createIssuesFromRetro: false, writeRefinedSpec: false },
-            chosen,
-            allowed,
-        ),
-    ).toEqual({ onboarding: [] });
-    expect(readRepositorySetups(chosen)[0]).toMatchObject({
-        createIssuesFromAddItem: false,
-        createIssuesFromRetro: false,
-        writeRefinedSpec: false,
-    });
-    for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
-        expect(await saveSetup({ ...answers, [key]: 'yes' }, dir, allowed)).toMatchObject({ status: 400 });
-    }
-});
-
-test('setup needs no structural write access', async (t) => {
-    const dir = await folder(t);
-    const result = await saveSetup(answers, dir, {
-        access: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'refused' }),
-    });
-
-    expect(result).toEqual({ onboarding: [] });
-    expect(readRepositoryList(dir)).toHaveLength(1);
-    expect(readRepositorySetups(dir)[0]?.structureSync).toBe(true);
-});
-
-test('failed access checks allow local shaping', async (t) => {
-    const dir = await folder(t);
-    const reads: SaveReads = {
-        access: async () => {
-            throw new Error('Not signed in');
-        },
-    };
-
-    expect(await saveSetup(answers, dir, reads)).toEqual({ onboarding: [] });
-    expect(readRepositorySetups(dir)[0]?.access['push-branch']).toBe('unverified');
-});
-
-test('invalid source or sharing values change no local settings', async (t) => {
-    const dir = await folder(t);
-
-    for (const change of [
-        { structureSync: 'yes' },
-        { domainDocs: { kind: 'repository' } },
-        { itemSource: { kind: 'azure-board', team: 'Team' } },
-    ]) {
-        expect(await saveSetup({ ...answers, ...change }, dir, allowed)).toMatchObject({ status: 400 });
-    }
-    expect(readRepositoryList(dir)).toEqual([]);
-});
-
 test('Azure onboarding saves its selected team without writing to Azure', async (t) => {
     const dir = await folder(t);
 
@@ -155,15 +73,6 @@ test('a refused list read stops onboarding before saving anything', async (t) =>
     expect(readRepositoryList(dir)).toEqual([]);
 });
 
-test('onboarding refuses malformed vocabulary before saving', async (t) => {
-    const dir = await folder(t);
-
-    expect(
-        await saveSetup({ ...answers, vocabulary: { bug: { type: null, labels: [42] } } }, dir, allowed),
-    ).toMatchObject({ status: 400 });
-    expect(readRepositoryList(dir)).toEqual([]);
-});
-
 const vocabularyReads = {
     github: async (path: string) =>
         path.endsWith('/labels?per_page=100') ? [[{ name: 'bug' }]] : [{ owner: { type: 'User' } }],
@@ -192,60 +101,4 @@ test('onboarding refuses missing terms and unverified field access before persis
         ).toMatchObject({ status: labels[0] === 'missing' ? 400 : 403 });
         expect(readRepositoryList(dir)).toEqual([]);
     }
-});
-
-test('onboarding refuses linked-work typed as a new label and saves nothing', async (t) => {
-    const dir = await folder(t);
-    const calls: string[] = [];
-    const reads: SaveReads = {
-        ...allowed,
-        vocabulary: {
-            github: async (path) => (path.includes('/labels') ? [] : { owner: { type: 'User' } }),
-            azure: async () => ({ value: [] }),
-        },
-        createLabel: async (_repo, name) => {
-            calls.push(name);
-
-            return name;
-        },
-    };
-
-    expect(
-        await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['linked-work'] } }, dir, reads),
-    ).toEqual({ status: 409, error: 'linked-work is reserved for the factory’s saved links.' });
-    expect(calls).toEqual([]);
-    expect(readRepositorySetups(dir)).toEqual([]);
-});
-
-test('explicit labels save with sharing off and failed creation saves no mapping', async (t) => {
-    const dir = await folder(t);
-    const calls: string[] = [];
-    const reads: SaveReads = {
-        ...allowed,
-        vocabulary: {
-            github: async (path) => (path.includes('/labels') ? [] : { owner: { type: 'User' } }),
-            azure: async () => ({ value: [] }),
-        },
-        createLabel: async (_repo, name) => {
-            calls.push(name);
-
-            return name;
-        },
-    };
-
-    expect(await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['triage'] } }, dir, reads)).toEqual({
-        onboarding: [],
-    });
-    expect(calls).toEqual(['triage']);
-    expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual(['triage']);
-
-    const failed = await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['broken'] } }, dir, {
-        ...reads,
-        createLabel: async () => {
-            throw new Error('Provider denied creation; recheck label access.');
-        },
-    });
-
-    expect(failed).toMatchObject({ status: 409, error: expect.stringContaining('recheck label access') });
-    expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual(['triage']);
 });

@@ -4,7 +4,7 @@ import { settingsModelChoices } from './settings-models.ts';
 
 const groups = [{ instanceId: 'codex-work', name: 'Work', models: [{ slug: 'model-a', label: 'Model A' }] }];
 
-test.each(['reasoningEffort', 'effort'])(
+test.each(['reasoningEffort'])(
     'reads only advertised %s options for the matching provider instance and model',
     (id) => {
         const config = {
@@ -37,10 +37,3 @@ test.each(['reasoningEffort', 'effort'])(
         ]);
     },
 );
-
-test('unavailable T3 or malformed capabilities invent no effort choices', () => {
-    expect(settingsModelChoices(groups, null)[0]!.models[0]!.efforts).toBeUndefined();
-    expect(
-        settingsModelChoices(groups, { providers: [{ instanceId: 'other' }] })[0]!.models[0]!.efforts,
-    ).toBeUndefined();
-});

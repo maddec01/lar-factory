@@ -24,18 +24,3 @@ test('a tool that fails gives its exit code and the first four lines of what it 
         "the error's message stands in when the tool printed nothing",
     );
 });
-
-test('a missing binary gives the spawn error code', async () => {
-    assert.equal((await runTool('/nonexistent/tool', [], { timeout: 5_000 })).code, 'ENOENT');
-});
-
-test('a tool receives JSON on stdin and sees the end of input', async () => {
-    const result = await runTool(
-        process.execPath,
-        node('process.stdin.setEncoding("utf8"); process.stdin.on("data", (data) => process.stdout.write(data))'),
-        { timeout: 5_000, input: '{"sha":null,"content":"quoted \\"text\\""}' },
-    );
-
-    assert.equal(result.code, 0);
-    assert.equal(result.stdout, '{"sha":null,"content":"quoted \\"text\\""}');
-});

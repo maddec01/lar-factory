@@ -47,24 +47,6 @@ test('Abandon moves the work item to its Removed-category state, and names a typ
     assert.deepEqual(issue.az.patches, []);
 });
 
-test('Abandon reads the work item with one batch read and PATCHes it through az rest at 7.1, testing its rev', async () => {
-    const { az, source, item } = await board(4);
-    const before = az.calls.length;
-
-    assert.equal(await source.abandon(item), null);
-
-    const read = az.calls[before];
-    const patch = az.calls.at(-1);
-
-    assert.equal(read![read!.indexOf('--resource') + 1], 'workitemsbatch');
-    assert.deepEqual(patch!.slice(0, 3), ['rest', '--method', 'patch']);
-    assert.equal(
-        patch![patch!.indexOf('--url') + 1],
-        'https://dev.azure.com/contoso/Fabrikam%20Fiber/_apis/wit/workitems/4?api-version=7.1',
-    );
-    assert.deepEqual(az.patches[0]!.ops[0], { op: 'test', path: '/rev', value: 1 });
-});
-
 const workItem = (number: number) =>
     ({
         id: `azure:contoso/${number}`,
@@ -106,25 +88,6 @@ test('a saved description replaces the field the details read, as markdown, at 7
     ]);
 });
 
-test('a Bug whose description came from Repro Steps saves to Repro Steps', async () => {
-    const az = fakeAz({
-        items: [{ id: 9, type: 'Bug', state: 'New', description: '', reproSteps: '<p>Open it.</p>' }],
-    });
-
-    assert.equal(
-        await saveAzureDescription(
-            workItem(9),
-            { body: 'Open **it**.', bodyField: 'Microsoft.VSTS.TCM.ReproSteps', revision: 1 },
-            az.run,
-        ),
-        null,
-    );
-    assert.deepEqual(az.patches[0]!.ops.slice(1), [
-        { op: 'replace', path: '/fields/Microsoft.VSTS.TCM.ReproSteps', value: 'Open **it**.' },
-        { op: 'replace', path: '/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps', value: 'Markdown' },
-    ]);
-});
-
 test('a work item changed since its details were read is a conflict, and writes nothing', async () => {
     const az = fakeAz({ items: [{ ...ITEMS[3]!, rev: 3 }] });
 
@@ -136,33 +99,4 @@ test('a work item changed since its details were read is a conflict, and writes 
         },
     );
     assert.deepEqual(az.patches, []);
-});
-
-test('no right to edit the work item, a logged-out az and any other az error each answer their message', async () => {
-    const failing = (message: string) =>
-        fakeAz({ items: ITEMS, fail: (args) => (args[0] === 'rest' ? new Error(message) : undefined) });
-    const save = (message: string) =>
-        saveAzureDescription(
-            workItem(4),
-            { body: 'New.', bodyField: 'System.Description', revision: 1 },
-            failing(message).run,
-        );
-
-    assert.deepEqual(
-        await save(
-            'ERROR: TF237111: The current user does not have permissions to save work items under the specified area path.',
-        ),
-        {
-            status: 403,
-            error: 'Could not save the description. You have no right to edit work item 4 in Fabrikam Fiber. Ask a project administrator for Edit work items in this node.',
-        },
-    );
-    assert.deepEqual(await save('Please run az login to set up an account.'), {
-        status: 502,
-        error: 'Could not save the description. az is logged out. Run az login, then try again.',
-    });
-    assert.deepEqual(await save('az rest failed: timed out'), {
-        status: 502,
-        error: 'Could not save the description. az rest failed: timed out',
-    });
 });

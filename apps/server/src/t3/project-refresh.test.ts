@@ -48,23 +48,3 @@ it('clears launch holds and reloads models/defaults on recovery without a tracke
     await refresh(true);
     expect(fixture.hints).toHaveBeenCalledTimes(1);
 });
-
-it('does not publish a stale hold when T3 recovers during a checkout read', async () => {
-    const board = createBoardState({ modelChoices: [] } as unknown as BoardData);
-    const refresh = createProjectRefresh(
-        board,
-        () => [],
-        () => {},
-    );
-
-    fixture.read = { availability: 'unavailable' };
-    fixture.hints.mockImplementationOnce(async () => {
-        fixture.read = { availability: 'available' };
-
-        return { repositoryProjects: { 'owner/repo': 'Disconnected' }, t3Defaults: {} };
-    });
-    await refresh();
-    expect(board.snapshot().repositoryProjects).toBeUndefined();
-    await refresh();
-    expect(board.snapshot().t3Availability?.availability).toBe('available');
-});

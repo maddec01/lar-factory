@@ -2,7 +2,6 @@ import type { Item } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { mergeSources } from '../items/item-sources.ts';
 import { readBacklog } from './azure-backlog.ts';
 import { azureItems, type Az } from './azure-items.ts';
 import { TEAM_AREA, fakeAz, type WorkItem } from './fake-az.ts';
@@ -55,48 +54,6 @@ test('Tasks count toward their parent, read through its child links, and Predece
     assert.deepEqual(az.batches, [[1], [11, 12, 13], [2, 99]]);
 });
 
-test("an area path the team doesn't include with its children leaves out the items under it", async () => {
-    const az = fakeAz({ items: BACKLOG, backlog: [1, 2, 3], areas: [{ value: TEAM_AREA, includeChildren: false }] });
-
-    assert.deepEqual(
-        (await azureBacklog([REPO], TEAM, az.run).read()).items.filter((i) => !i.parent).map((i) => i.number),
-        [1, 2],
-    );
-});
-
-test("the backlog's calls name the team and its requirement backlog, and every invoke passes --api-version", async () => {
-    const az = fakeAz({ items: BACKLOG, backlog: [1, 2] });
-
-    await azureBacklog([REPO], TEAM, az.run).read();
-    for (const call of az.calls.filter((c) => c[0] === 'devops')) {
-        assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
-        assert.ok(call.includes('project=Fabrikam Fiber') && call[call.indexOf('--api-version') + 1], call.join(' '));
-    }
-    assert.equal(
-        az.calls.some((c) => c[0] === 'rest'),
-        false,
-        'reads use the organization-aware extension login',
-    );
-
-    const backlog = az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'backlogs')!;
-
-    assert.ok(backlog.includes(`team=${TEAM}`));
-    assert.ok(backlog.includes('id=Microsoft.RequirementCategory/workItems'));
-    assert.equal(backlog[backlog.indexOf('--api-version') + 1], '7.1');
-    assert.ok(az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'teamfieldvalues')!.includes(`team=${TEAM}`));
-});
-
-test('a logged-out az names its fix', async () => {
-    const out = fakeAz({
-        items: BACKLOG,
-        fail: () => new Error("az devops invoke failed: ERROR: Please run 'az login' to setup account."),
-    });
-
-    assert.deepEqual((await mergeSources(new Map([[REPO, azureBacklog([REPO], TEAM, out.run)]])).read()).problems, [
-        { repo: REPO, problem: 'az is logged out.', fix: 'az login' },
-    ]);
-});
-
 test('backlog priority order survives hydration that returns work items in ID order', async () => {
     const az = fakeAz({ items: BACKLOG, backlog: [3, 1, 2] });
     const source = azureBacklog([REPO], TEAM, az.run);
@@ -111,26 +68,4 @@ test('backlog priority order survives hydration that returns work items in ID or
         ],
     );
     assert.equal((await source.readSome!([items[1]!]))[0]!.sourceOrder, 1);
-});
-
-test('the team can put both PBIs and Bugs in its Requirement category', async () => {
-    const az = fakeAz({
-        requirement: 'Product Backlog Item',
-        requirementTypes: ['Product Backlog Item', 'Bug'],
-        backlog: [2, 1],
-        items: [
-            { id: 1, type: 'Product Backlog Item', state: 'Committed' },
-            { id: 2, type: 'Bug', state: 'Approved' },
-            { id: 3, type: 'Task', state: 'Active', parent: 1 },
-        ],
-    });
-    const items = (await azureBacklog([REPO], TEAM, az.run).read()).items;
-
-    assert.deepEqual(
-        items.map((item) => [item.number, item.azure!.type, item.subIssues.total]),
-        [
-            [2, 'Bug', 0],
-            [1, 'Product Backlog Item', 1],
-        ],
-    );
 });

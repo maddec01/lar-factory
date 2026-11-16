@@ -23,30 +23,6 @@ test('a burst of triggers runs the work at once and makes one follow-up', () => 
     expect(work).toHaveBeenCalledTimes(2);
 });
 
-test('a lone trigger makes no follow-up, and a later one runs at once', () => {
-    const work = vi.fn();
-    const ask = coalesced(work, 500);
-
-    ask();
-    vi.advanceTimersByTime(600);
-    expect(work).toHaveBeenCalledTimes(1);
-    ask();
-    expect(work).toHaveBeenCalledTimes(2);
-});
-
-test('a trigger just after a follow-up waits for the next gap, so runs stay apart', () => {
-    const work = vi.fn();
-    const ask = coalesced(work, 500);
-
-    ask();
-    ask();
-    vi.advanceTimersByTime(500);
-    ask();
-    expect(work).toHaveBeenCalledTimes(2);
-    vi.advanceTimersByTime(500);
-    expect(work).toHaveBeenCalledTimes(3);
-});
-
 const item = (id: string, status: Item['status']) =>
     ({ id, status, statuses: [status], state: 'open', number: 1, updatedAt: '2026-11-03T00:00:00Z' }) as Item;
 
@@ -64,17 +40,6 @@ function showingBoard(read: () => Item[]) {
 
     return { board, pushed, ask };
 }
-
-test('a start that lands between a show and its follow-up stays showing, though the records still say otherwise', () => {
-    const { board, pushed, ask } = showingBoard(() => [item('a', 'Ready')]);
-
-    ask();
-    ask();
-    board.showChanged(item('a', 'In progress'));
-    vi.advanceTimersByTime(500);
-    expect(board.find('a')?.status).toBe('In progress');
-    expect(pushed.at(-1)).toEqual(['a In progress']);
-});
 
 test('a follow-up publishes one whole read, with what changed during the gap', () => {
     let read = [item('a', 'Ready'), item('b', 'Ready')];

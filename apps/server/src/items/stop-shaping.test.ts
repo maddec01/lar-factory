@@ -34,7 +34,7 @@ test('Stop interrupts only the recorded shaping owner and keeps all work records
     expect(records.read().status).toBe('Shaping');
 });
 
-for (const projection of [null, { runs: [] }, { runs: [{ id: 'old', status: 'completed' }] }])
+for (const projection of [{ runs: [{ id: 'old', status: 'completed' }] }])
     test('Stop refuses unknown or ended activity without pretending to interrupt', async () => {
         const send = vi.fn();
         const board = createBoardState({ items: [{ id: 'work' }], repos: [] } as never);

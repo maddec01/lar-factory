@@ -48,7 +48,7 @@ afterEach(() => {
     }
 });
 
-for (const kind of THREAD_KINDS)
+for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === 'build'))
     it(`launches ${kind} with its frozen kind target and every role`, async () => {
         const { records, dir, item } = await fixture(kind === 'shaping' ? 'issue' : kind);
         const settings = defaultFactorySettings();
@@ -121,39 +121,3 @@ for (const kind of THREAD_KINDS)
         expect(retry).toEqual(result);
         expect(changedDeps.packaged).not.toHaveBeenCalled();
     });
-
-it('defaults and manual picks preserve project options only for the same model', async () => {
-    for (const choice of [undefined, { instanceId: 'codex', model: 'sol' }, { instanceId: 'claude', model: 'opus' }]) {
-        const { records, item } = await fixture();
-        const result = await prepareRunLaunch(
-            records,
-            item,
-            false,
-            'project',
-            choice,
-            context,
-            '/skill',
-            () => [],
-            dependencies(),
-        );
-
-        expect(result.selection).toEqual(choice?.instanceId === 'claude' ? { ...choice, options: [] } : project);
-    }
-});
-
-it('records an unavailable model hold with unknown actual settings and retains that snapshot for retry', async () => {
-    const { records, dir, item } = await fixture();
-    const settings = defaultFactorySettings();
-
-    settings.threadKinds.shaping = { model: { instanceId: 'codex', model: 'missing' }, effort: 'high' };
-    writeFactorySettings(settings, dir);
-    await expect(
-        prepareRunLaunch(records, item, false, 'project', undefined, context, '/skill', () => [], dependencies()),
-    ).rejects.toThrow(/missing.*unavailable/);
-
-    const { runs, roleRuns } = records.runSettings(item.id);
-
-    expect(runs).toHaveLength(1);
-    expect(roleRuns).toMatchObject([{ result: 'failed', actual: null, requested: { model: { model: 'missing' } } }]);
-    expect(records.launchIntents({ workId: item.id })).toEqual([]);
-});

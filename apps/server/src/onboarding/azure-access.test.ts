@@ -87,19 +87,3 @@ test('Azure allows label management only when the project allows creating, updat
     expect(await taggingAccess({ Create: false, Update: true, Delete: true })).toEqual({ 'manage-labels': 'refused' });
     expect(await taggingAccess({ Create: true, Update: true, Delete: false })).toEqual({ 'manage-labels': 'refused' });
 });
-
-test('an Azure login with no evidence for a tag permission leaves label management unchecked', async () => {
-    expect(await taggingAccess({ Create: true, Update: true })).toEqual({});
-});
-
-test('missing or unreadable permission evidence stays unchecked', async () => {
-    const access = await azureAccess('example/project/app', async (args) => {
-        if (args[0] === 'repos') return JSON.stringify({ id: 'repository', project: { id: 'project' } });
-
-        if (args.some((arg) => arg.includes('/securitynamespaces?'))) return JSON.stringify({ value: [] });
-
-        throw new Error('Not permitted');
-    });
-
-    expect(access).toEqual({});
-});

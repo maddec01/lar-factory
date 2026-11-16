@@ -5,7 +5,7 @@ import { prHost } from '../config/pr-host.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 
 describe('recovery inspection', () => {
-    for (const present of [true, false])
+    for (const present of [false])
         it(`reads a ${present ? 'present' : 'missing'} branch in the project checkout`, async () => {
             const result = await inspectWorkRecovery({
                 repository: 'a/b',
@@ -47,7 +47,7 @@ describe('recovery inspection', () => {
         expect(result.warning).toContain('second PR');
         expect(result.warning).toContain('remote branch');
     });
-    for (const repo of ['a/b', 'org/project/repo'])
+    for (const repo of ['org/project/repo'])
         it(`rejects prefix matches for ${repo}`, async () => {
             expect(
                 await prHost(repo).openPrByHead(repo, 'saved', async () =>

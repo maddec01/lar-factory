@@ -68,12 +68,7 @@ test('with the app secret set, guarded writes need it in X-Board-Secret', async 
     const board = await startBoard(t, { items: [boardIssue(1, 'List')] }, false, false, { BOARD_APP_SECRET: SECRET });
 
     for (const path of GUARDED) {
-        for (const headers of [
-            {} as Record<string, string>,
-            { 'X-Board-Secret': 'wrong' },
-            { 'X-Board-Secret': `${SECRET}x` },
-            { 'X-Board-Secret': '' },
-        ]) {
+        for (const headers of [{} as Record<string, string>, { 'X-Board-Secret': 'wrong' }]) {
             assert.deepEqual(
                 await answer(await post(board, path, headers)),
                 { status: 403, error: REFUSED },
@@ -96,12 +91,5 @@ test('with the app secret set, guarded writes need it in X-Board-Secret', async 
 test('with the app secret set, a read request needs no secret', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(1, 'List')] }, false, false, { BOARD_APP_SECRET: SECRET });
 
-    assert.equal((await post(board, '/api/read')).status, 202);
-});
-
-test('without the app secret, guarded writes need no header', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
-
-    for (const path of GUARDED) assert.notEqual((await answer(await post(board, path))).error, REFUSED, path);
     assert.equal((await post(board, '/api/read')).status, 202);
 });

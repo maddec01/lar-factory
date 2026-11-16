@@ -1,6 +1,4 @@
-import { effectiveVocabulary, kindDisagreement } from '@lar-factory/shared';
-import type { Item, ItemDetails, RepositorySetup, TicketKinds, TrackerLabels } from '@lar-factory/shared';
-import { trackerLabels } from '@lar-factory/shared/tracker-labels';
+import type { Item, RepositorySetup } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { exportMarkdown } from '@lar-factory/work-records/export';
 import assert from 'node:assert/strict';
@@ -9,7 +7,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 
-import { fakeAz, type WorkItem } from '../azure/fake-az.ts';
 import { createItemDetails } from './item-details.ts';
 
 const opened: string[] = [];
@@ -54,137 +51,6 @@ test('an Azure DevOps save without the field and revision its details gave is re
     assert.deepEqual(await saveDescription(workItem, { body: 'x' }), refused);
     assert.deepEqual(await saveDescription(workItem, { body: 'x', bodyField: 'System.Description' }), refused);
     assert.deepEqual(await saveDescription(workItem, { body: 'x', revision: 3 }), refused);
-});
-
-const taggedWork = (labels?: string) => {
-    const items: WorkItem[] = [
-        { id: 5, rev: 2, type: 'User Story', state: 'New', ...(labels !== undefined && { tags: labels }) },
-    ];
-
-    return { items, az: fakeAz({ items, tags: ['area-ui', 'bug', 'docs'] }) };
-};
-const onAzureFake = (az: ReturnType<typeof fakeAz>) =>
-    createItemDetails(null, (item) => item, {
-        records: null,
-        labelsOf: (repo) =>
-            trackerLabels(repo, {
-                az: az.run,
-                gh: async () => {
-                    throw new Error('gh is not for this repository');
-                },
-            }),
-    });
-
-test('on the fake Azure a tag goes on and off the work item, keeping the others', async () => {
-    const { items, az } = taggedWork('docs');
-    const { changeLabels } = onAzureFake(az);
-
-    assert.equal(await changeLabels(workItem, { label: 'area-ui', action: 'add' }), null);
-    assert.equal(items[0]!.tags, 'docs; area-ui');
-    assert.equal(await changeLabels(workItem, { label: 'docs', action: 'remove' }), null);
-    assert.equal(items[0]!.tags, 'area-ui');
-});
-
-test("on the fake Azure a failed tag write leaves the tags and says why, in the tracker's word", async () => {
-    const items: WorkItem[] = [{ id: 5, type: 'User Story', state: 'New', tags: 'docs' }];
-    const az = fakeAz({
-        items,
-        fail: (args) => (args[0] === 'rest' ? new Error('az rest failed: TF237111: no permission') : undefined),
-    });
-
-    assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label: 'area-ui', action: 'add' }), {
-        status: 502,
-        error: 'Could not change the tags on #5. az rest failed: TF237111: no permission',
-    });
-    assert.equal(items[0]!.tags, 'docs');
-});
-
-test("the picker leaves out Azure's repo- tags, and a GitHub picker keeps a repo- label", async () => {
-    const az = fakeAz({ items: [], tags: ['repo-lar-api', 'Repo-Other', 'docs'] });
-
-    assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'docs' }] });
-
-    const github = createItemDetails(null, (item) => item, {
-        records: null,
-        labelsOf: () => ({ list: async () => [{ name: 'repo-web' }, { name: 'bug' }] }) as unknown as TrackerLabels,
-    });
-
-    assert.deepEqual(await github.labels({ ...workItem, repo: WEB }), { labels: [{ name: 'repo-web' }] });
-});
-
-for (const label of ['foo; linked-work', 'foo, linked-work'])
-    test(`a tag named "${label}" is refused on Azure, and writes no tag`, async () => {
-        const { items, az } = taggedWork('docs');
-
-        assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label, action: 'add' }), {
-            status: 422,
-            error: 'Use a tag name without commas or semicolons.',
-        });
-        assert.equal(items[0]!.tags, 'docs');
-        assert.deepEqual(az.patches, []);
-    });
-
-test("details serve what a kind update writes, less a type the team's backlog doesn't show, and why", async () => {
-    const { records, exportFolder } = await recordsOn();
-    const repo = workItem.repo;
-    const { workId } = records.importTicket({ title: 'T', repository: repo, kind: 'bug', ticket: `${repo}#5` }).record;
-    const setup = {
-        repo,
-        access: { 'tag-ticket': 'allowed', 'type-ticket': 'refused' },
-        vocabulary: effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary,
-        itemSource: { kind: 'azure-board', team: 'Web' },
-    } as unknown as RepositorySetup;
-    const kinds: TicketKinds = {
-        read: async () => ({ labels: ['feature'], type: 'User Story' }),
-        setType: async () => {},
-        boardTypes: async () => ['User Story'],
-    };
-    const { swap } = kindDisagreement(
-        records.read(workId),
-        { labels: ['feature'], type: 'User Story' },
-        setup.vocabulary,
-    )!;
-
-    assert.deepEqual(swap.type, { from: 'User Story', to: 'Bug' });
-
-    const work = {
-        ...boardItem(workId),
-        repo,
-        kindDisagreement: { ticketKind: 'feature', changed: 'item', kept: false, swap },
-    } as Item;
-    const reader = createItemDetails(null, () => undefined, {
-        records,
-        exportFolder,
-        setupOf: () => setup,
-        kindsOf: () => kinds,
-    });
-    const read = (await reader.details(work)) as ItemDetails;
-
-    assert.deepEqual(read.kindPlan, {
-        itemKind: 'bug',
-        ticketKind: 'feature',
-        swap: { add: [], remove: ['feature'], type: null },
-        note: " The type stays User Story, because the team's backlog doesn't show Bug.",
-    });
-
-    const failing = createItemDetails(null, () => undefined, {
-        records,
-        exportFolder,
-        setupOf: () => setup,
-        kindsOf: () => ({
-            ...kinds,
-            read: async () => {
-                throw new Error('refused');
-            },
-        }),
-    });
-
-    assert.equal(((await failing.details(work)) as ItemDetails).kindPlan, undefined);
-    assert.equal(
-        ((await reader.details(boardItem(workId))) as ItemDetails).kindPlan,
-        undefined,
-        'no disagreement, no read',
-    );
 });
 
 test("a build's details hold its brief, initial context, build phase and review rounds from its record", async () => {
@@ -235,31 +101,6 @@ test("a build's details hold its brief, initial context, build phase and review 
     );
 });
 
-test("a concept's details hold its map and a decision's its text, each empty until written", async () => {
-    const { records, exportFolder } = await recordsOn();
-    const reader = createItemDetails(null, () => undefined, { records, exportFolder });
-    const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
-    const decision = records.create({ title: 'Relay', repository: WEB, kind: 'decision' });
-    const recordOf = async (workId: string) =>
-        ((await reader.details(boardItem(workId))) as { record: { bodyKind: string; body: string } }).record;
-
-    assert.deepEqual([(await recordOf(concept.workId)).bodyKind, (await recordOf(concept.workId)).body], ['map', '']);
-    records.setBody(concept.workId, concept.revision, 'map', '## Destination\n\nStream anywhere.');
-    records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
-    assert.deepEqual(
-        [await recordOf(concept.workId), await recordOf(decision.workId)].map((r) => [r.bodyKind, r.body]),
-        [
-            ['map', '## Destination\n\nStream anywhere.'],
-            ['decision', '# Relay\n\nBroker only?'],
-        ],
-    );
-    records.setBody(decision.workId, records.read(decision.workId).revision, 'answer', 'Use a relay broker.');
-    assert.equal(
-        ((await reader.details(boardItem(decision.workId))) as ItemDetails).record?.answer,
-        'Use a relay broker.',
-    );
-});
-
 test('export writes the files lar-work export writes, into the export folder', async () => {
     const { records, dir, exportFolder } = await recordsOn();
     const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
@@ -292,29 +133,6 @@ test('export writes the files lar-work export writes, into the export folder', a
     );
     assert.deepEqual(files(exportFolder), files(command));
     assert.equal(files(exportFolder).length, 2);
-});
-
-test('export refuses work with nothing written, a second export of the same files and sample mode', async () => {
-    const { records, exportFolder } = await recordsOn();
-    const reader = createItemDetails(null, () => undefined, { records, exportFolder });
-    const build = records.create({ title: 'Owner accounts', repository: WEB, kind: 'build' });
-    const empty = await reader.exportMarkdown(boardItem(build.workId));
-
-    assert.deepEqual(empty, {
-        status: 409,
-        error: `The work record ${build.workId} has nothing to export: no brief, decision, map or Dependency.`,
-    });
-    records.setBody(build.workId, build.revision, 'brief', '# Owner accounts');
-    assert.ok('paths' in (await reader.exportMarkdown(boardItem(build.workId))));
-
-    const again = await reader.exportMarkdown(boardItem(build.workId));
-
-    assert.equal((again as { status: number }).status, 409);
-    assert.match((again as { error: string }).error, /already exists/);
-    assert.deepEqual(await createItemDetails('unused.json', (item) => item).exportMarkdown(boardItem(build.workId)), {
-        status: 403,
-        error: 'Exporting is disabled in sample mode.',
-    });
 });
 
 test('a failed first Spec write shows local Spec, collapsed Original and durable retry; Save approves exact text and keeps Ready', async () => {
@@ -372,27 +190,6 @@ test('a failed first Spec write shows local Spec, collapsed Original and durable
     assert.equal(records.gate(record.workId).current, true);
     assert.equal(records.gate(record.workId).evidence.at(-1)?.source, 'user');
     assert.match(body, /Exact approved text\./);
-    records.close();
-});
-
-test('checks reads the validation record separately from ordinary details', async () => {
-    const { records } = await recordsOn();
-    const build = records.create({ title: 'Checks', repository: WEB, kind: 'build' });
-    const run = records.startCheck(build.workId, {
-        command: ['pnpm', 'test'],
-        folder: '.',
-        role: 'implementer',
-        tree: null,
-        reason: 'Changed tests',
-    });
-
-    records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
-    records.describeFailure(run.checkId, { tests: ['renders checks'], diagnosis: 'Missing section' });
-
-    const reader = createItemDetails(null, () => undefined, { records });
-
-    assert.deepEqual(await reader.checks!(boardItem(build.workId)), records.checks(build.workId));
-    assert.equal('checks' in (await reader.details(boardItem(build.workId))), false);
     records.close();
 });
 

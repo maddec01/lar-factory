@@ -1,7 +1,6 @@
 import {
     DONE_WINDOW_MS,
     REPOSITORY_OPERATIONS,
-    earlierWorkMessage,
     isSkillCheckRequest,
     normalizeItems,
     readBuilds,
@@ -179,7 +178,7 @@ async function recordIssues(
 }
 
 /** The lar-work command threads run. */
-export const LAR_WORK = join(dirname(fileURLToPath(import.meta.resolve('@lar-factory/work-records'))), 'cli.ts');
+const LAR_WORK = join(dirname(fileURLToPath(import.meta.resolve('@lar-factory/work-records'))), 'cli.ts');
 
 /** Runs lar-work on the database in `dataDir` as a thread does, and returns the record it printed. */
 export async function larWork(dataDir: string, ...args: string[]): Promise<{ workId: string; revision: number }> {
@@ -708,6 +707,3 @@ export const shapePrompt = (board: Board, title: string, id: string) =>
         id,
         workMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir))))),
     );
-/** The shaping message a board sent before threads took their phase in their name. */
-export const earlierShapePrompt = (board: Board, title: string, id: string) =>
-    earlierWorkMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir)))));

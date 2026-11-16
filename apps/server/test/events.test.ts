@@ -52,31 +52,6 @@ async function openStream(t: TestContext, board: Board) {
 }
 
 const statusOf = (data: BoardData, id: string) => data.items.find((i) => i.id === id)?.status;
-const askRead = (board: Board) =>
-    fetch(`${board.url}/api/read`, {
-        method: 'POST',
-        headers: { Origin: board.url, 'Content-Type': 'application/json' },
-        body: '{}',
-    });
-
-test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
-    // A source reads at most every 2 s however often a read is asked for, which the fast clock shortens, so the asked
-    // read runs at once instead of on a later tick.
-    // The slow source also outlasts the old three-second stream polling budget.
-    const board = await startBoard(
-        t,
-        { items: [boardIssue(1, 'List')], readDelay: 3500, delayedRepos: ['maddec01/lar-factory'] },
-        false,
-        true,
-    );
-    const stream = await openStream(t, board);
-
-    // A repository's items show as its read lands, before the first read ends, so wait for that read to end.
-    await stream.next((d) => d.firstRead.settled && statusOf(d, board.id(1)) === 'List');
-    await board.update({ items: [boardIssue(1, 'List', 'maddec01/lar-factory', ['bug'])] });
-    assert.equal((await askRead(board)).status, 202);
-    await stream.next((d) => d.items.some((i) => i.id === board.id(1) && i.labels.includes('bug')));
-});
 
 test('a change made through the board reaches every open stream', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });

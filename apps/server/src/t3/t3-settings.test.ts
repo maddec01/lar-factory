@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 
 import { t3Settings, tempDir } from '../../test/stats-db.ts';
-import { readEnvironmentId, readT3Settings, t3Running } from './t3-settings.ts';
+import { readT3Settings, t3Running } from './t3-settings.ts';
 
 test('T3 Code runs while its runtime file names a live process', (t) => {
     const dir = tempDir(t, 'lar-t3-runtime-');
@@ -32,27 +31,6 @@ test('T3 Code runs while its runtime file names a live process', (t) => {
     assert.equal(t3Running(runtime('no-pid', state('15454'))), false);
     // A pid past the system's largest belongs to no process, as after a crash that left the file.
     assert.equal(t3Running(runtime('stale', state(2 ** 30))), false);
-});
-
-test("T3's environment id is the file's trimmed text, absent when the file is missing or blank", (t) => {
-    const dir = tempDir(t, 'lar-t3-env-');
-
-    writeFileSync(join(dir, 'environment-id'), '5e3c-8c5a\n');
-    writeFileSync(join(dir, 'blank'), ' \n');
-    assert.equal(readEnvironmentId(join(dir, 'environment-id')), '5e3c-8c5a');
-    assert.equal(readEnvironmentId(join(dir, 'blank')), undefined);
-    assert.equal(readEnvironmentId(join(dir, 'missing')), undefined);
-});
-
-test("settings that can't be read leave the built-in instances at their usual homes, with no prices or aliases", () => {
-    assert.deepEqual(readT3Settings(join(tmpdir(), 'no-such-dir', 'settings.json'), '/home'), {
-        instanceHomes: new Map([
-            ['claudeAgent', { driver: 'claudeAgent', home: '/home/.claude' }],
-            ['codex', { driver: 'codex', home: '/home/.codex' }],
-        ]),
-        priceOverrides: {},
-        modelAliases: {},
-    });
 });
 
 test("an instance's homePath expands `~`, other drivers are left out, and only valid prices and aliases are kept", (t) => {

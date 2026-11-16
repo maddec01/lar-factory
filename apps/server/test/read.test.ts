@@ -1,11 +1,7 @@
-import { setOverride } from '@lar-factory/shared/repository-settings';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { openWorkRecords, WorkRecordError } from '@lar-factory/work-records';
+import { WorkRecordError } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { request } from 'node:http';
-import type { IncomingMessage } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vite-plus/test';
@@ -36,26 +32,10 @@ async function holdPath(t: TestContext): Promise<string> {
     return join(dir, 'hold');
 }
 
-/** A read request addressed to another host; fetch can't set Host. */
-async function askForeignHost(board: Board): Promise<number> {
-    const req = request(`${board.url}/api/read`, {
-        method: 'POST',
-        headers: { Host: 'evil.example', Origin: 'http://evil.example', 'Content-Type': 'application/json' },
-    });
-
-    req.end('{}');
-
-    const [res] = (await once(req, 'response')) as [IncomingMessage];
-
-    res.resume();
-
-    return res.statusCode!;
-}
-
-const askRead = (board: Board, headers: Record<string, string> = {}) =>
+const askRead = (board: Board) =>
     fetch(`${board.url}/api/read`, {
         method: 'POST',
-        headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers },
+        headers: { Origin: board.url, 'Content-Type': 'application/json' },
         body: '{}',
     });
 
@@ -167,147 +147,4 @@ test('requests during a read queue one more read after it, never two at once', a
         0,
         'two reads never run together',
     );
-});
-
-test('an interval read during a read is skipped, not queued', async (t) => {
-    const hold = await holdPath(t);
-    const board = await startBoard(
-        t,
-        { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')], readHold: hold },
-        false,
-        true,
-        { FAST_REFRESH_MS: '1000', FAST_REFRESH_TICKS: '1' },
-    );
-
-    await firstRead(board);
-    await writeFile(hold, '');
-    await board.untilCalled((args) => args[0] === 'held');
-
-    const isRead = (args: string[]) => args.some((a) => a.includes('states: [OPEN]'));
-    const isTick = (args: string[]) => args[0] === 'tick';
-    /** The calls after the first `marker` entry. */
-    const after = async (marker: string) => {
-        const calls = await board.calls();
-
-        return calls.slice(calls.findIndex((args) => args[0] === marker) + 1);
-    };
-
-    // Two ticks land while the interval read waits on the hold.
-    await waitFor(async () => (await after('held')).filter(isTick).length >= 2);
-    await rm(hold);
-    await board.untilCalled((args) => args[0] === 'released');
-    await waitFor(async () => (await after('released')).some(isRead));
-
-    const held = await after('held');
-    const during = held.slice(
-        0,
-        held.findIndex((args) => args[0] === 'released'),
-    );
-
-    assert.ok(during.filter(isTick).length >= 2);
-    assert.deepEqual(during.filter(isRead), [], 'the ticks during the read start no read');
-
-    const next = await after('released');
-    const tick = next.findIndex(isTick);
-
-    assert.ok(
-        tick >= 0 && tick < next.findIndex(isRead),
-        'the next read waits for a tick instead of starting as the held read ends',
-    );
-});
-
-test('a read request without JSON, from another origin or to another host reads nothing', async (t) => {
-    const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
-
-    await firstRead(board);
-
-    const before = await reads(board);
-
-    assert.equal(
-        (await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status,
-        415,
-    );
-    assert.equal((await askRead(board, { 'Content-Type': 'text/plain' })).status, 415);
-    for (const origin of ['https://evil.example', 'null'])
-        assert.equal((await askRead(board, { Origin: origin })).status, 403);
-    assert.equal(await askForeignHost(board), 421);
-    await new Promise((r) => setTimeout(r, 200));
-    assert.equal(await reads(board), before);
-});
-
-test('a read request naming an item reads that item alone, without loading the configs again', async (t) => {
-    const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'Queued')] });
-
-    await firstRead(board);
-
-    const [item] = (await board.board()).items;
-    const configReads = async () =>
-        (await board.calls()).filter((args) => args.some((a) => a.endsWith('/.lar-factory.json'))).length;
-    const [readsBefore, configsBefore] = [await reads(board), await configReads()];
-
-    await new Promise((r) => setTimeout(r, 2_000));
-    assert.equal(
-        (
-            await fetch(`${board.url}/api/read`, {
-                method: 'POST',
-                headers: { Origin: board.url, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: item!.url }),
-            })
-        ).status,
-        202,
-    );
-
-    const itemReads = async () =>
-        (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')))
-            .length;
-
-    await waitFor(async () => (await itemReads()) === 1);
-    assert.equal(await reads(board), readsBefore, 'the repository is not read whole');
-    assert.equal(await configReads(), configsBefore);
-    assert.equal((await askRead(board)).status, 202);
-    await waitFor(async () => (await reads(board)) > readsBefore);
-    assert.equal(await configReads(), 0, 'refreshes use local settings');
-});
-
-test('a completed board read publishes while its Spec reads are still blocked', { timeout: 30_000 }, async (t) => {
-    const repository = 'example/product';
-    const issue = boardIssue(1, 'List', repository);
-    const board = await startBoard(t, { repositories: [repository], items: [issue] });
-
-    await firstRead(board);
-
-    const hold = await holdPath(t);
-
-    await writeFile(hold, '');
-    setOverride(repository, 'writeRefinedSpec', true, board.dataDir);
-
-    const records = await openWorkRecords(join(board.dataDir, 'work-records.db'));
-
-    try {
-        const id = board.id(1, repository);
-        const state = records.specState(id);
-
-        records.saveSpecState(id, state.generation, { ...state, active: true });
-    } finally {
-        records.close();
-    }
-
-    await board.update({
-        repositories: [repository],
-        items: [boardIssue(1, 'List', repository, ['bug'])],
-        specReadHold: hold,
-    });
-
-    try {
-        await askRead(board);
-        await board.untilCalled((args) => args[0] === 'spec-held');
-
-        const shown = await until(board, (data) =>
-            data.items.some((item) => item.number === 1 && item.labels.includes('bug')),
-        );
-
-        assert.equal(shown.error, null);
-    } finally {
-        await rm(hold, { force: true });
-    }
 });

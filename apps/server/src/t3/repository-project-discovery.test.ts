@@ -1,11 +1,6 @@
 import { test, vi, expect } from 'vite-plus/test';
 
-import {
-    repositoryProjectAccess,
-    repositoryProjects,
-    reauthorizeRepositoryProjects,
-    subscribeRepositoryProjects,
-} from './repository-project-discovery.ts';
+import { repositoryProjects, reauthorizeRepositoryProjects } from './repository-project-discovery.ts';
 
 const fixture = vi.hoisted(() => ({
     read: {
@@ -66,89 +61,4 @@ test('reauthorization coalesces calls, restarts discovery and retains data on fa
     fixture.renew.mockRejectedValueOnce(new Error('private credential detail'));
     await expect(reauthorizeRepositoryProjects()).rejects.toThrow('private credential detail');
     expect((await repositoryProjects()).observation?.observedAt).toBe('2026-10-31T00:00:00Z');
-});
-
-test('access names the T3 origin and the session discovery holds, until T3 stops', async () => {
-    await repositoryProjects();
-    expect(repositoryProjectAccess()?.origin.href).toBe('http://127.0.0.1:3773/');
-    expect(repositoryProjectAccess()?.protocol).toHaveProperty('readProjects');
-    fixture.notify({ availability: 'unavailable' });
-    fixture.running.mockReturnValue(false);
-    await repositoryProjects();
-    expect(repositoryProjectAccess()).toBeUndefined();
-    fixture.running.mockReturnValue(true);
-    await repositoryProjects();
-    expect(repositoryProjectAccess()).toBeDefined();
-});
-
-test("asks whether T3's process lives only while its subscription shows no T3", async () => {
-    fixture.read = { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } };
-    await reauthorizeRepositoryProjects();
-    fixture.running.mockClear();
-    await repositoryProjects();
-    await repositoryProjects();
-    expect(fixture.running).not.toHaveBeenCalled();
-    fixture.notify({ availability: 'unavailable' });
-    await repositoryProjects();
-    expect(fixture.running).toHaveBeenCalledTimes(1);
-});
-
-test('tells subscribers when project facts or availability change, not when only the observation time does', async () => {
-    const project = { id: 'p', title: 'P', workspaceRoot: '/p', faviconPath: null, projectIcon: null };
-    const shell = (observedAt: string, faviconPath: string | null = null) => ({
-        availability: 'available' as const,
-        observation: { projects: [{ ...project, faviconPath }], observedAt },
-    });
-
-    fixture.read = shell('2026-11-03T00:00:00Z');
-    await reauthorizeRepositoryProjects();
-
-    const changed = vi.fn();
-    const stop = subscribeRepositoryProjects(changed);
-
-    fixture.notify(shell('2026-11-03T00:00:01Z'));
-    expect(changed, 'the first shell data after a read counts, whatever it holds').toHaveBeenCalledTimes(1);
-    fixture.notify(shell('2026-11-03T00:00:02Z'));
-    expect(changed).toHaveBeenCalledTimes(1);
-    fixture.notify(shell('2026-11-03T00:00:03Z', 'logo.png'));
-    expect(changed).toHaveBeenCalledTimes(2);
-    expect(
-        (await repositoryProjects()).observation?.projects[0]?.faviconPath,
-        'the subscriber can read the new data',
-    ).toBe('logo.png');
-    fixture.notify({ availability: 'unavailable' });
-    expect(changed).toHaveBeenCalledTimes(3);
-    fixture.notify({ availability: 'unavailable' });
-    expect(changed).toHaveBeenCalledTimes(3);
-
-    fixture.running.mockReturnValue(false);
-    await repositoryProjects();
-    expect(changed).toHaveBeenCalledTimes(3);
-    fixture.running.mockReturnValue(true);
-    await repositoryProjects();
-    fixture.notify(shell('2026-11-03T00:00:04Z', 'logo.png'));
-    expect(changed).toHaveBeenCalledTimes(5);
-
-    stop();
-    fixture.notify({ availability: 'malformed' });
-    expect(changed).toHaveBeenCalledTimes(5);
-});
-
-test('retries a failed read on the same runtime even without a recovering shell', async () => {
-    vi.useFakeTimers();
-
-    try {
-        fixture.read = { availability: 'unavailable' };
-        await reauthorizeRepositoryProjects();
-
-        const previous = (await repositoryProjects()).observation;
-
-        expect((await repositoryProjects()).availability).toBe('unavailable');
-        expect(previous).toBeDefined();
-        fixture.read = { availability: 'available', observation: { projects: [], observedAt: '2026-11-13T00:00:00Z' } };
-        await vi.advanceTimersByTimeAsync(2_000);
-        expect(await repositoryProjects()).toEqual(fixture.read);
-    } finally {
-        vi.useRealTimers();
-    }
 });

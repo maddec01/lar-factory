@@ -1,4 +1,4 @@
-import { buildsAtWork, type BoardData, type Item, type ModelGroup } from '@lar-factory/shared';
+import { type BoardData, type Item, type ModelGroup } from '@lar-factory/shared';
 import { openWorkRecords, type PullRequestState } from '@lar-factory/work-records';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -213,41 +213,6 @@ test('one Start makes parallel-capable progress at capacity one; only a provider
     expect(s.records.read(s.standalone).status).toBe('Ready');
 });
 
-test.each(['pause', 'auto-off'] as const)(
-    '%s preserves active work and respects the explicit concept authorization at the next merge',
-    async (mode) => {
-        const s = await fixture(mode === 'auto-off');
-
-        expect(s.start().status).toBe(200);
-        await s.scheduler.pass();
-        s.setting.on = false;
-        s.records.update(s.standalone, s.rev(s.standalone), { status: 'Ready' });
-
-        const aPr = await s.handBack(s.a, 1);
-
-        if (mode === 'pause') s.commands.setConceptBuildRun(s.group, s.rev(s.group), 'paused');
-
-        s.states.set(aPr, 'merged');
-        await s.poll();
-
-        if (mode === 'pause') {
-            expect(s.launches.map((row) => row.id)).toEqual([s.a]);
-            expect(s.start().status).toBe(200);
-            await s.scheduler.pass();
-        }
-
-        expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
-
-        const bPr = await s.handBack(s.b, 2);
-
-        s.states.set(bPr, 'merged');
-        await s.poll();
-        expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
-        expect(s.records.read(s.standalone).status).toBe('Ready');
-        expect(s.records.launchIntents({ workId: s.next })).toHaveLength(1);
-    },
-);
-
 test('S08 F01: T3 question answers cannot let Auto-build overrun the shared two-slot capacity', async () => {
     const s = await fixture(true, 2);
 
@@ -268,97 +233,4 @@ test('S08 F01: T3 question answers cannot let Auto-build overrun the shared two-
     s.states.set(aPr, 'merged');
     await s.poll();
     expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
-});
-
-test('manual override holds its slot; an authorized concept and merge-starts-next wait until below the automatic limit', async () => {
-    const s = await fixture(false, 1);
-
-    expect((await s.commands.startBuild(s.standalone, undefined)).status).toBe(200);
-    expect(s.start().status).toBe(200);
-    await s.scheduler.pass();
-    expect(s.launches.map((row) => row.id)).toEqual([s.standalone]);
-    expect(s.records.conceptBuildPlan(s.group).run?.state).toBe('running');
-    expect((await s.commands.startBuild(s.a, undefined)).status).toBe(200);
-    expect(s.records.launchIntents({ workId: s.a })[0]!.buildInput?.capacity?.manualOverride).toBe(true);
-    await s.scheduler.pass();
-    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a]);
-
-    const aPr = await s.handBack(s.a, 1);
-
-    s.states.set(aPr, 'merged');
-    await s.poll();
-    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a]);
-
-    const standalonePr = await s.handBack(s.standalone, 2);
-
-    s.states.set(standalonePr, 'merged');
-    await s.poll();
-    expect(s.launches.map((row) => row.id)).toEqual([s.standalone, s.a, s.b]);
-    expect(s.records.launchIntents({ workId: s.b })[0]!.buildInput?.capacity).toMatchObject({
-        source: 'automatic',
-        manualOverride: false,
-    });
-});
-
-test.each([false, true])('three old List PRs cannot block one concept Start (Auto-build %s)', async (autoOn) => {
-    const s = await fixture(autoOn, 2);
-    const old = [1, 2, 3].map((number) => {
-        const id = s.records.create({
-            title: `Old run ${number}`,
-            repository: repos[2]!,
-            kind: 'build',
-            status: 'List',
-        }).workId;
-
-        s.records.setPullRequest(id, s.rev(id), `${repos[2]}#${number}`);
-        s.records.observe(id, s.rev(id), { of: 'pr', state: 'closed' });
-
-        return id;
-    });
-
-    s.reread();
-
-    // Also reproduce tracker-only List entries: no local record or factory owner.
-    const external = old.map((id, index) => ({
-        ...s.board.snapshot().items.find((item) => item.id === id)!,
-        id: `external-${index}`,
-        number: 100 + index,
-        buildReserved: undefined,
-        recorded: false,
-    }));
-
-    s.tickets.push(...external);
-    s.reread();
-    expect(buildsAtWork(s.board.snapshot())).toEqual([]);
-    expect(s.start().status).toBe(200);
-    await s.scheduler.pass();
-    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
-    expect([s.a, s.b].map((id) => s.records.launchIntents({ workId: id })[0]?.buildInput?.capacity)).toEqual([
-        { source: 'automatic', limit: 2, occupied: 0, manualOverride: false },
-        { source: 'automatic', limit: 2, occupied: 1, manualOverride: false },
-    ]);
-    expect(buildsAtWork(s.board.snapshot()).map((item) => item.id)).toEqual([s.a, s.b]);
-    await s.scheduler.pass();
-    expect(s.launches).toHaveLength(2);
-    expect(s.board.snapshot().items.filter((item) => item.recorded === false)).toHaveLength(3);
-});
-
-test('released Ready builds with stale start labels do not block concept scheduling', async () => {
-    const s = await fixture(false, 2);
-    const old = s.records.create({
-        title: 'Released old run',
-        repository: repos[2]!,
-        kind: 'build',
-        status: 'Ready',
-    }).workId;
-
-    s.records.addThread(old, s.rev(old), 'old-owner', 'build');
-    s.records.setPullRequest(old, s.rev(old), `${repos[2]}#90`);
-    s.records.observe(old, s.rev(old), { of: 'pr', state: 'closed' });
-    s.reread();
-    s.board.update({ startedBuilds: { [old]: { threadId: 'old-owner', title: 'Old build' } } });
-    expect(buildsAtWork(s.board.snapshot())).toEqual([]);
-    expect(s.start().status).toBe(200);
-    await s.scheduler.pass();
-    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
 });

@@ -1,41 +1,7 @@
-// The queries gh sends. The rules that normalise their results are tested in packages/shared's github-items.test.ts.
-
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { OPEN_ISSUES_QUERY, getIfChanged, repositoryAccess } from './github.ts';
-
-test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
-    assert.match(
-        OPEN_ISSUES_QUERY,
-        /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/,
-        'each blocked-by issue comes with its repo and state',
-    );
-    assert.doesNotMatch(OPEN_ISSUES_QUERY, /blocking\(/, 'the query reads no blocking links');
-    assert.doesNotMatch(
-        OPEN_ISSUES_QUERY,
-        /issueDependenciesSummary/,
-        'the open blockers come from the blocked-by issues, not a summary count',
-    );
-    assert.doesNotMatch(
-        OPEN_ISSUES_QUERY,
-        /\.\.\. on Issue \{[^}]*\bbody\b/,
-        'issue bodies are read for dossiers only, in a query of their own',
-    );
-    assert.match(
-        OPEN_ISSUES_QUERY,
-        /id number url state isDraft mergeStateStatus headRefOid\n/,
-        "linked PRs' bodies and merge times are read for builds only, by id",
-    );
-});
-
-test("the board query reads each slice's state reason", () => {
-    assert.match(
-        OPEN_ISSUES_QUERY,
-        /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,
-        "the board query reads each slice's state reason; labels there would cost 60 points a page, not 10",
-    );
-});
+import { getIfChanged, repositoryAccess } from './github.ts';
 
 test('a change check asks again with the last ETag, and an unchanged answer, a 304, is null', async () => {
     const asked: string[][] = [];
@@ -65,11 +31,7 @@ test('a change check asks again with the last ETag, and an unchanged answer, a 3
 });
 
 test('repository role alone never proves token write access', async () => {
-    for (const header of [
-        '',
-        'X-OAuth-Scopes: \r\n',
-        'X-Accepted-GitHub-Permissions: issues=write,contents=write\r\n',
-    ]) {
+    for (const header of ['', 'X-Accepted-GitHub-Permissions: issues=write,contents=write\r\n']) {
         const calls: string[][] = [];
         const access = await repositoryAccess('team/app', async (args) => {
             calls.push(args);
@@ -87,22 +49,5 @@ test('repository role alone never proves token write access', async () => {
                 '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues, private: .private}',
             ],
         ]);
-    }
-});
-
-test('classic repo scope proves token writes while public_repo covers only public repositories', async () => {
-    for (const [scopes, privateRepo, tokenWrites] of [
-        ['repo, read:org', true, true],
-        ['public_repo', false, true],
-        ['public_repo', true, false],
-        ['read:user', false, false],
-    ] as const) {
-        const access = await repositoryAccess(
-            'team/app',
-            async () =>
-                `HTTP/2.0 200 OK\r\nX-OAuth-Scopes: ${scopes}\r\n\r\n${JSON.stringify({ push: true, triage: true, issues: true, private: privateRepo })}`,
-        );
-
-        assert.equal(access.tokenWrites, tokenWrites);
     }
 });

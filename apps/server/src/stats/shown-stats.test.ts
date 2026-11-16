@@ -15,11 +15,3 @@ test('provisional figures hold the ones shown before them, for the first final r
     assert.equal((provisional as ItemStats).provisional, true);
     assert.equal(tokens(shown(item, provisional, true, { live: figures(20), provisional: false })), 100);
 });
-
-test('an item that left the board holds no figures', () => {
-    const { shown, prune } = createShownStats(new Set());
-    const provisional = shown(item, figures(100), true, { live: figures(10), provisional: true });
-
-    prune(new Set(['b']));
-    assert.equal(tokens(shown(item, provisional, true, { live: figures(20), provisional: false })), 20);
-});

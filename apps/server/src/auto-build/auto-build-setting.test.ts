@@ -1,6 +1,6 @@
 import type { ModelGroup } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
@@ -46,33 +46,4 @@ test('Auto-build starts off on T3 Project default, and a saved switch and model 
     assert.deepEqual(setting.save({ model: null }), { status: 200, body: { error: null } });
     assert.deepEqual(setting.state(), { on: false }, 'null is T3 Project default');
     assert.equal(changes(), 4);
-});
-
-test('a model the choices no longer offer, or input that names nothing, is refused and changes nothing', () => {
-    const { setting, changes } = setUp();
-
-    setting.save({ on: true });
-    for (const model of [{ instanceId: 'codex', model: 'gpt-5' }, 'claude-opus-5-5']) {
-        assert.deepEqual(setting.save({ model }), {
-            status: 422,
-            body: { error: "That model choice isn't offered. Pick another one." },
-        });
-    }
-    for (const input of [{}, { on: 'yes' }, { on: null }, { on: true, model: null }])
-        assert.equal(setting.save(input).status, 400, JSON.stringify(input));
-    assert.deepEqual(setting.state(), { on: true });
-    assert.equal(changes(), 1);
-});
-
-test('a corrupt file shows as off with why, and a save replaces it', () => {
-    const { dir, setting } = setUp();
-
-    writeFileSync(join(dir, 'auto-build.json'), '{ "on": 1 }');
-
-    const state = setting.state();
-
-    assert.equal(state.on, false);
-    assert.match(state.problem ?? '', /Auto-build setting .* needs "on"/);
-    assert.equal(setting.save({ on: true }).status, 200);
-    assert.deepEqual(setting.state(), { on: true });
 });

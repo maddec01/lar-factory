@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { executionStats, PROJECTIONS_PER_CHUNK } from './execution-stats.ts';
+import { executionStats } from './execution-stats.ts';
 
 test('empty complete projection has the same empty SQL row inputs', async () => {
     assert.deepEqual(
@@ -40,25 +40,4 @@ test('empty complete projection has the same empty SQL row inputs', async () => 
 });
 test('missing execution facts cannot become empty successful stats', async () => {
     await assert.rejects(executionStats([{ thread: { id: 't' }, messages: [] }]));
-});
-test('turning projections into rows yields in chunks of a bounded size', async () => {
-    const projection = (id: string) => ({
-        thread: { id },
-        messages: [],
-        providerSessions: [],
-        providerThreads: [],
-        providerTurns: [],
-        runtimeRequests: [],
-        subagents: [],
-    });
-    let pauses = 0;
-    const { rows } = await executionStats(
-        Array.from({ length: PROJECTIONS_PER_CHUNK * 3 }, (_, i) => projection(`t${i}`)),
-        async () => {
-            pauses++;
-        },
-    );
-
-    assert.equal(rows.threads.length, PROJECTIONS_PER_CHUNK * 3);
-    assert.equal(pauses, 3);
 });

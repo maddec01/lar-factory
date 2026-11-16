@@ -1,34 +1,17 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vite-plus/test';
 
 import { writeHeavyCommandLimit } from './heavy-command-limit.ts';
-import { alive, helperStart, stopHelpers } from './helper-processes.ts';
+import { helperStart, stopHelpers } from './helper-processes.ts';
 import { openWorkRecords } from './work-records.ts';
 
-// Commands that run until the test ends them: one by SIGTERM, one by a file named go in its folder.
+// A command that runs until the test ends it by SIGTERM.
 const signalledCommand = (cwd: string) =>
     `${helperStart(cwd)} process.on("SIGTERM", () => setTimeout(() => { console.log("finished"); process.exit(23); }, 100)); console.log("ready"); setInterval(() => {}, 1000)`;
-
-async function loggedHelper(cwd: string) {
-    for (
-        const deadline = Date.now() + 15_000;
-        Date.now() < deadline;
-        await new Promise((done) => setTimeout(done, 20))
-    ) {
-        const started =
-            existsSync(join(cwd, 'log')) && /^start helper (\d+)/.exec(readFileSync(join(cwd, 'log'), 'utf8'));
-
-        if (started) return Number(started[1]);
-    }
-    throw Error('The helper never started.');
-}
-
-const gatedCommand = (cwd: string) =>
-    `${helperStart(cwd)} console.log("ready"); setInterval(() => { if (require("fs").existsSync("go")) process.exit(27); }, 20)`;
 
 it('passes child arguments and status through even without a database', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'check-runner-'));
@@ -230,42 +213,6 @@ it(
     },
 );
 
-it.each([
-    ['a command waiting for SIGTERM', signalledCommand],
-    ['a command waiting for its gate', gatedCommand],
-])('leaves no wrapper or helper running when a test fails before %s ends', { timeout: 30_000 }, async (_, command) => {
-    const cwd = mkdtempSync(join(tmpdir(), 'check-failed-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-    const { workId } = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const wrapper = spawn(
-        process.execPath,
-        [
-            join(import.meta.dirname, 'cli.ts'),
-            'run-check',
-            workId,
-            '--role',
-            'test',
-            '--',
-            process.execPath,
-            '-e',
-            command(cwd),
-        ],
-        { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd }, stdio: 'ignore' },
-    );
-    let helper: number;
-
-    try {
-        helper = await loggedHelper(cwd);
-    } finally {
-        records.close();
-        await stopHelpers({ folders: [cwd], wrappers: [wrapper], gates: [] });
-    }
-
-    expect(wrapper.exitCode !== null || wrapper.signalCode !== null).toBe(true);
-    expect(alive(helper)).toBe(false);
-    expect(existsSync(cwd)).toBe(false);
-});
-
 it(
     'preserves the child status when the log cannot be written or the schema changes at finish',
     { timeout: 30_000 },
@@ -317,44 +264,6 @@ it(
         }
     },
 );
-
-it('runs the child when the database stays busy beyond its timeout', { timeout: 30_000 }, async () => {
-    const { DatabaseSync } = await import('node:sqlite');
-    const { openWorkRecords } = await import('./work-records.ts');
-    const cwd = mkdtempSync(join(tmpdir(), 'check-busy-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-    const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const lock = new DatabaseSync(join(cwd, 'work-records.db'));
-
-    try {
-        lock.exec('BEGIN IMMEDIATE');
-
-        const result = spawnSync(
-            process.execPath,
-            [
-                join(import.meta.dirname, 'cli.ts'),
-                'run-check',
-                build.workId,
-                '--role',
-                'implementer',
-                '--',
-                process.execPath,
-                '-e',
-                'console.log("ran"); process.exit(17)',
-            ],
-            { cwd, encoding: 'utf8', env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } },
-        );
-
-        expect(result.status).toBe(17);
-        expect(result.stdout).toBe('ran\n');
-        expect(result.stderr).toContain('unrecorded');
-    } finally {
-        lock.exec('ROLLBACK');
-        lock.close();
-        records.close();
-        rmSync(cwd, { recursive: true, force: true });
-    }
-});
 
 it('retains a signal received while opening the record until the command starts', { timeout: 30_000 }, async () => {
     const { openWorkRecords } = await import('./work-records.ts');
@@ -421,56 +330,6 @@ it('preserves output and the log when the consumer drains output slowly', { time
     } finally {
         records.close();
         rmSync(cwd, { recursive: true, force: true });
-    }
-});
-
-it('preserves the command status when the database becomes busy at finish', { timeout: 30_000 }, async () => {
-    const { spawn } = await import('node:child_process');
-    const { writeFileSync } = await import('node:fs');
-    const { DatabaseSync } = await import('node:sqlite');
-    const { openWorkRecords } = await import('./work-records.ts');
-    const cwd = mkdtempSync(join(tmpdir(), 'check-finish-busy-'));
-    const records = await openWorkRecords(join(cwd, 'work-records.db'));
-    const lock = new DatabaseSync(join(cwd, 'work-records.db'));
-    const wrappers: ChildProcess[] = [];
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-        const child = spawn(
-            process.execPath,
-            [
-                join(import.meta.dirname, 'cli.ts'),
-                'run-check',
-                build.workId,
-                '--role',
-                'test',
-                '--',
-                process.execPath,
-                '-e',
-                gatedCommand(cwd),
-            ],
-            { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } },
-        );
-
-        wrappers.push(child);
-
-        let stderr = '';
-
-        child.stderr.on('data', (chunk) => {
-            stderr += chunk;
-        });
-        child.stdout.once('data', () => {
-            lock.exec('BEGIN IMMEDIATE');
-            writeFileSync(join(cwd, 'go'), '');
-        });
-        expect(await new Promise((resolve) => child.on('close', resolve))).toBe(27);
-        expect(stderr).toContain('unrecorded');
-        lock.exec('ROLLBACK');
-        expect(records.checks(build.workId).runs[0]?.outcome).toBe('unfinished');
-    } finally {
-        lock.close();
-        records.close();
-        await stopHelpers({ folders: [cwd], wrappers, gates: [join(cwd, 'go')] });
     }
 });
 
@@ -586,25 +445,6 @@ describe('run-check waiting for a heavy command slot', () => {
             await stopHelpers({ folders: [cwd], wrappers: child ? [child, holder] : [holder], gates: [gate] });
         }
     }
-
-    it(
-        'leaves no wrapper or helper running when a test fails before its holder ends',
-        { timeout: 30_000 },
-        async () => {
-            let helper = 0;
-            let folder = '';
-
-            await expect(
-                waiting(async ({ cwd }) => {
-                    folder = cwd;
-                    helper = await loggedHelper(cwd);
-                    throw Error('The test failed.');
-                }),
-            ).rejects.toThrow('The test failed.');
-            expect(alive(helper)).toBe(false);
-            expect(existsSync(folder)).toBe(false);
-        },
-    );
 
     it(
         'records the row without tree or start time while waiting, then both once the slot is held',

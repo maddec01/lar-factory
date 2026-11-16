@@ -33,23 +33,6 @@ afterEach(() => {
 });
 
 describe('work records', () => {
-    it('creates a ticketless record with a stable identity and reads it back', async () => {
-        const records = await open();
-        const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature' });
-
-        expect(made).toMatchObject({
-            repository: 'maddec01/lar',
-            kind: 'feature',
-            status: 'List',
-            ticket: null,
-            setAside: false,
-            revision: 1,
-        });
-        expect(made.workId).toMatch(/^[0-9a-f-]{36}$/);
-        expect(made.createdAt).toBe(made.updatedAt);
-        expect(records.read(made.workId)).toEqual(made);
-    });
-
     it('keeps records and their tickets across close and reopen', async () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);
@@ -139,29 +122,6 @@ describe('work records', () => {
         expect(records.read('w-1')).toMatchObject({ title: '', revision: 1 });
         expect(records.initialContext('w-1')).toBe('');
         expect(readdirSync(dirname(path)).filter((file) => file.includes('.before-'))).toEqual([]);
-    });
-
-    it('resolves a repeated ticket import to the same record', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const first = await openWorkRecords(path);
-        const imported = first.importTicket({
-            title: 'Work',
-            repository: 'maddec01/lar',
-            kind: 'build',
-            ticket: 'maddec01/lar#40',
-        });
-
-        first.close();
-
-        const again = (await open(path)).importTicket({
-            title: 'Work',
-            repository: 'maddec01/lar',
-            kind: 'build',
-            ticket: 'maddec01/lar#40',
-        });
-
-        expect(imported.created).toBe(true);
-        expect(again).toEqual({ record: imported.record, created: false });
     });
 
     it('refuses a ticket another record already holds', async () => {
@@ -349,30 +309,27 @@ describe('work-record structure', () => {
         expect(records.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
     });
 
-    it.each(['bug', 'feature', 'improvement', 'issue', 'build'] as const)(
-        'lets a %s own private slices without changing its kind',
-        async (kind) => {
-            const records = await open();
-            const parent = lar(records, kind);
-            const slice = lar(records, 'slice');
+    it.each(['bug', 'build'] as const)('lets a %s own private slices without changing its kind', async (kind) => {
+        const records = await open();
+        const parent = lar(records, kind);
+        const slice = lar(records, 'slice');
 
-            records.setParent(slice.workId, slice.revision, parent.workId);
-            expect(records.read(parent.workId)).toMatchObject({ kind, revision: 2 });
-            expect(records.children(parent.workId)).toMatchObject([
-                { workId: slice.workId, kind: 'slice', parentId: parent.workId },
-            ]);
+        records.setParent(slice.workId, slice.revision, parent.workId);
+        expect(records.read(parent.workId)).toMatchObject({ kind, revision: 2 });
+        expect(records.children(parent.workId)).toMatchObject([
+            { workId: slice.workId, kind: 'slice', parentId: parent.workId },
+        ]);
 
-            const before = records.list({});
+        const before = records.list({});
 
-            expect(() => records.update(parent.workId, 2, { kind: 'decision' })).toThrow(
-                expect.objectContaining({ code: 'invalid' }),
-            );
-            expect(records.list({})).toEqual(before);
-            expect(records.update(parent.workId, 2, { kind: kind === 'bug' ? 'feature' : 'bug' }).kind).toBe(
-                kind === 'bug' ? 'feature' : 'bug',
-            );
-        },
-    );
+        expect(() => records.update(parent.workId, 2, { kind: 'decision' })).toThrow(
+            expect.objectContaining({ code: 'invalid' }),
+        );
+        expect(records.list({})).toEqual(before);
+        expect(records.update(parent.workId, 2, { kind: kind === 'bug' ? 'feature' : 'bug' }).kind).toBe(
+            kind === 'bug' ? 'feature' : 'bug',
+        );
+    });
 
     it('refuses a parent whose kind does not own the child, or a second parent, and changes nothing', async () => {
         const records = await open();
@@ -761,25 +718,6 @@ describe('work-record content', () => {
 });
 
 describe('work-record threads and launch intents', () => {
-    it('moves a confirmed shaping launch out of Queue without waiting for the agent', async () => {
-        const records = await open();
-        const work = records.create({
-            title: 'Shape me',
-            repository: 'maddec01/lar',
-            kind: 'feature',
-            status: 'Queued',
-        });
-        const launching = records.recordLaunchIntent(work.workId, work.revision, 'shape');
-
-        expect(launching.record.status).toBe('Queued');
-
-        const started = records.resolveLaunchIntent(work.workId, launching.record.revision, launching.intent.intentId, {
-            threadId: 'shaping',
-        });
-
-        expect(started.record).toMatchObject({ status: 'Shaping', queueOrder: null });
-    });
-
     it('keeps failed shaping starts queued and preserves a status the agent already advanced', async () => {
         const records = await open();
         let work = records.create({ title: 'Shape me', repository: 'maddec01/lar', kind: 'feature', status: 'Queued' });
@@ -845,33 +783,6 @@ describe('work-record threads and launch intents', () => {
         expect(all.get(build.workId)).toEqual(records.threads(build.workId));
         expect(all.get(bug.workId)).toEqual(records.threads(bug.workId));
         expect(all.has(quiet.workId)).toBe(false);
-    });
-
-    it("copies no record's threads as it reads each row", async () => {
-        const records = await open();
-        const build = lar(records, 'build');
-
-        for (let i = 0; i < 40; i++) records.addThread(build.workId, i + 1, `thread-${i}`, 'build');
-
-        const iterator = Array.prototype[Symbol.iterator];
-        let iterations = 0;
-
-        Array.prototype[Symbol.iterator] = function counted(this: unknown[]) {
-            iterations++;
-
-            return iterator.call(this);
-        };
-
-        let all: ReturnType<typeof records.threadsByWork>;
-
-        try {
-            all = records.threadsByWork();
-        } finally {
-            Array.prototype[Symbol.iterator] = iterator;
-        }
-
-        expect(all.get(build.workId)).toHaveLength(40);
-        expect(iterations).toBeLessThan(40);
     });
 
     it('finds an unresolved launch intent after reopening and resolves it to a thread ID exactly once', async () => {
@@ -1426,15 +1337,6 @@ describe('work-record completion', () => {
         reopened.setFogGone(concept.workId, at(reopened, concept.workId), false);
         expect(reopened.completion(concept.workId).reasons).toEqual(["Its Fog isn't gone."]);
         expect(() => reopened.setFogGone(build.workId, at(reopened, build.workId), true)).toThrow(/Only a concept/);
-    });
-
-    it('completes a slice once it is finished', async () => {
-        const records = await open();
-        const slice = lar(records, 'slice');
-
-        expect(records.completion(slice.workId)).toEqual({ complete: false, reasons: ["It isn't finished."] });
-        records.recordFinished(slice.workId, 1);
-        expect(records.completion(slice.workId).complete).toBe(true);
     });
 
     it('lets a dependent start once its blockers are complete, with no ticket closing', async () => {

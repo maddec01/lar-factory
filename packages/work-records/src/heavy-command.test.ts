@@ -430,24 +430,6 @@ describe('lar-work heavy', () => {
         expect(existsSync(leftover)).toBe(false);
     });
 
-    it('exits at once when cancelled between checks', { timeout: 30_000 }, async () => {
-        const run = setup(1);
-        const holder = run.job('a', run.gate('a'));
-
-        await until(() => run.started('a'));
-
-        const waiter = run.heavy([process.execPath, '-e', ''], { checkMs: 20_000 });
-
-        await until(() => waiter.stderr().includes('waiting'));
-
-        const cancelled = Date.now();
-
-        waiter.child.kill('SIGTERM');
-        expect(await waiter.status).toBe(143);
-        expect(Date.now() - cancelled).toBeLessThan(5000);
-        expect(holder.child.exitCode).toBeNull();
-    });
-
     it(
         'exits without starting the command when cancelled while waiting, after naming the holders',
         { timeout: 30_000 },

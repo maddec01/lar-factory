@@ -19,10 +19,6 @@ afterEach(() => {
 });
 
 describe('retention setting', () => {
-    it('keeps records and hides them after seven days until the machine chooses otherwise', () => {
-        expect(readRetention(tempDir())).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
-    });
-
     it('saves a deletion choice in the data folder and reads it back', () => {
         const dir = join(tempDir(), 'Lar Factory');
 

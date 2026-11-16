@@ -11,11 +11,11 @@ import { KIND_BADGES } from '@/features/items';
 import { SAMPLE_READ_ONLY } from '@/services/board/board.service';
 import { ChangeFailed, RetryAction } from '@/ui/board';
 
-// Each kind's icon and name without its hue: the dialog marks kind without colour, as the board does.
+// Each kind's icon, name and hue: the dialog marks kind in its colour, as the board and Add item do.
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
-    const { name, icon: Icon } = KIND_BADGES[value]!;
+    const { name, icon: Icon, hue } = KIND_BADGES[value]!;
 
-    return { value, label: name, icon: <Icon aria-hidden="true" /> };
+    return { value, label: name, icon: <Icon aria-hidden="true" />, hue };
 });
 
 /**

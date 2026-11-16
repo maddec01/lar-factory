@@ -207,7 +207,10 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
     board.update({
         ...sampleActivityFrom(JSON.parse(remapped) as BoardData, Date.now()),
         capture: { ...board.snapshot().capture!, enabled: true },
-        firstRead: SETTLED_FIRST_READ,
+        // `BOARD_SAMPLE_FIRST_READ` holds the sample on an unsettled first read, to show the loading screen.
+        firstRead: process.env.BOARD_SAMPLE_FIRST_READ
+            ? JSON.parse(process.env.BOARD_SAMPLE_FIRST_READ)
+            : SETTLED_FIRST_READ,
     });
     await refresh();
 

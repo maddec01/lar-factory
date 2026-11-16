@@ -75,16 +75,11 @@ export function moving(parent: Item, parts: Part[], unavailable: boolean): Movin
 }
 
 /** The repositories the parts work in beyond the dossier's own, which its row already names. */
-export const otherRepos = (parent: Item, m: Moving, data: BoardData) =>
-    [
-        ...new Set(
-            m.parts
-                .filter((p) => repoKey(p.item) !== repoKey(parent))
-                .map((p) => repoName(repoKey(p.item), data.repos)),
-        ),
-    ]
-        .map((name) => `+ ${name}`)
-        .join(' ');
+export const otherRepos = (parent: Item, m: Moving, data: BoardData): string[] => [
+    ...new Set(
+        m.parts.filter((p) => repoKey(p.item) !== repoKey(parent)).map((p) => repoName(repoKey(p.item), data.repos)),
+    ),
+];
 
 /** The one thing to say next: what waits on you (a part in Needs you first), else what can start, else what's moving. */
 export function nextOf(

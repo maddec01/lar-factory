@@ -36,9 +36,10 @@ export function ItemRow({
             onOpen={onOpen}
             source={
                 <>
-                    <RowKindMark item={item} listed />
-                    {/* Every row names where its ticket lives, a GitHub issue too, so no row's mark reads as missing. */}
+                    {/* Where its ticket lives first, a GitHub issue too, so no row's mark reads as missing; then its kind,
+                        in the order every board surface shows them. */}
                     <SourceIcon item={item} bare always />
+                    <RowKindMark item={item} listed />
                 </>
             }
             title={<ItemTitle reference={item.number ? ref(item) : undefined} title={rowTitle(item.title)} />}

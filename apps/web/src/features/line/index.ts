@@ -1,6 +1,7 @@
 export { ItemAgents } from './ActivityLine';
 export { ConceptOpenQuestions, ConceptPartsBar } from './ConceptExtras';
 export { isDone, partsOf, unreadParts, unreadPartsText } from './DossierParts';
+export { ItemCard } from './ItemCard';
 export { PartsList } from './PartsList';
 export { partRef, partState } from './PartState';
 export { PartTitle } from './PartTitle';

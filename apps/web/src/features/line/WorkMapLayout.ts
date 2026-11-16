@@ -6,7 +6,7 @@ import { itemName, plural, projectWorkMap, repoKey } from '@lar-factory/shared';
 
 import type { Part } from './DossierParts';
 import { DECISION_KINDS, isHistory, partWaves, upstreamOf } from './DossierParts';
-import { MAP_NODE_HEIGHT } from '@/ui/board';
+import { MAP_NODE_HEIGHT, MAP_NODE_WIDTH } from '@/ui/board';
 
 const DECISIONS = 'Decisions';
 const CHECK = 'e2e';
@@ -16,20 +16,15 @@ const HISTORY = 'history';
 const keyOf = (p: Part) => p.item.id;
 
 const LABEL_W = 116;
-/** The cards' least height, room for a three-line title; layout() takes the height its cards measure at. */
+/** The cards' size, a desk card's on every screen. */
 const NODE_H = MAP_NODE_HEIGHT;
 /** The room between two nodes in a column, where an arrow over a column runs. */
 const GAP = 24;
 /** The room above a lane's first row and below its last: the lane fits its cards closely. */
 const PAD = 12;
 const TOP = PAD;
-const MIN_COL = 252;
-const MAX_COL = 340;
 /** A column's gutter each side of its card. */
 const GUTTER = 14;
-/** How far the next column shows past the frame's edge when the map scrolls: its gutter and the card's edge, short of
- *  the card's text (items.css pads a card 16px). */
-const PEEK = GUTTER + 12;
 /** The history toggle's line, and the room above and below it. */
 const GROUP_H = 28;
 const GROUP_PAD = 8;
@@ -143,15 +138,10 @@ export function layout(
     const edges = edgesOf(parts, check);
     const labelledFrom = new Set(edges.filter((e) => e.from === HISTORY && e.label).map((e) => e.to));
     const cols = Math.max(1, Math.max(-1, ...depth.values()) + 1 + offset + (check ? 1 : 0));
-    const room = Math.max(MIN_COL, width - LABEL_W);
-    // Wider than the frame, the columns share its room so the frame's edge shows only the next card's edge, its padding
-    // under the frame's fade, never its text: at rest and at each column the map snaps to as it scrolls.
-    const shown = Math.max(1, Math.floor((room - PEEK) / MIN_COL));
-    const colW =
-        cols <= Math.floor(room / MIN_COL)
-            ? Math.min(MAX_COL, Math.floor(room / cols))
-            : Math.floor((room - PEEK) / shown);
-    const nodeW = colW - 2 * GUTTER;
+    // Every column holds a desk-sized card whatever the frame's width: a wider frame leaves room after the last column,
+    // a narrower one scrolls sideways.
+    const nodeW = MAP_NODE_WIDTH;
+    const colW = nodeW + 2 * GUTTER;
     const placed: Placed[] = [];
     const bands: { lane: string; top: number; height: number }[] = [];
     let top = 0;

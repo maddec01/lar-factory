@@ -11,7 +11,8 @@
     --row-gap: --spacing(3);
     --row-line: --spacing(7);
     --row-glyph: 1.5rem;
-    --row-source: clamp(7rem, 11cqi, 10rem);
+    /* The provider and project, on one fixed track so every list's projects line up whatever the window's width. */
+    --row-source: 8.5rem;
     /* Room for a state on one line, such as "Blocked · starts after #202". */
     --row-state: 11rem;
     /* The action column, on Your desk and every lane alike, so their columns line up down the board. */
@@ -27,7 +28,7 @@
     display: grid;
     flex: 1;
     min-width: 0;
-    grid-template-columns: var(--row-glyph) minmax(0, max-content) minmax(0, auto) minmax(0, 1fr);
+    grid-template-columns: var(--row-glyph) minmax(0, 1fr) auto;
     grid-template-rows: minmax(var(--row-line), auto);
     column-gap: var(--row-gap);
     align-items: center;
@@ -129,42 +130,8 @@
     text-align: right;
 }
 
-/* Under 1024px of row the project and state give up room to the title. */
-@container (width < 64rem) {
-    .row-first,
-    .row-second,
-    .row-slices {
-        --row-source: 7rem;
-        --row-state: 9.5rem;
-        --row-side: 8rem;
-    }
-}
-
-/* A concept's own row (not the part rows in its parts box, which are lane rows) has no neighbours in its pane, so what it does next takes whatever room its title leaves, instead
-   of a lane's fixed activity track; its progress and end keep the lanes' tracks, so they still line up. */
-[data-dossier] .row-first:not([data-parts-frame] *) > .row-cols {
-    flex: 0 1 auto;
-}
-[data-dossier] .row-first:not([data-parts-frame] *) > .row-meta {
-    flex: 1 1 0;
-    /* A row with nothing at work keeps its tracks at the row's end, as every other row does. */
-    justify-content: end;
-    /* Never narrower than its tracks, so the title gives way first and nothing leaves the row. */
-    min-width: min-content;
-    max-width: none;
-    grid-template-columns: minmax(14rem, 1fr) 10rem 8.5rem;
-}
-[data-dossier] .row-meta:not([data-parts-frame] *) > :first-child:not([data-col='progress'], .row-meta-end) {
-    justify-self: end;
-}
-
-/* On compact boards a concept keeps its one line: its title gives way first, then its other projects, and what it does
-   next keeps a readable name beside its parts bar, count and cost. */
-@container (width < 64rem) {
-    [data-dossier] .row-first:not([data-parts-frame] *) > .row-meta {
-        grid-template-columns: minmax(9rem, 1fr) 9rem 6rem;
-    }
-}
+/* Every list's rows, a concept's own and its parts' included, keep the same fixed tracks at every window width, so
+   their columns line up wherever they sit; only the title takes what the window gives. */
 
 /* A second line with nothing in any of its cells takes no room, so a one-line row stays one line high. */
 .row-second:not(
@@ -187,11 +154,8 @@
     }
 }
 
-/* A row that waits on you is already on Your desk, which says the ask: here it reads like its lane's other rows, its
-   light a little softer and its state in plain words, so each waiting item has one amber place. */
-[data-stage] li[data-attention] [data-glyph] {
-    opacity: 0.8;
-}
+/* A row that waits on you says its wait in the desk's amber (WaitWord) and keeps its light at full strength, so each
+   waiting item catches the eye wherever it sits; a blocked one reads in red (RowBlocked). */
 
 /* A row's focus ring, the design system's inset one, frames the whole row with its actions, not the text band of the
    button that opens it. */
@@ -212,35 +176,60 @@ li.desk-row:has([data-row-open]:focus-visible) {
     outline-offset: 1px;
 }
 
-/* On a row, in the item dialog and in a counter's list the project's icon is a quiet mark beside its name, without its
-   colour; List and Settings keep its colour, where telling projects apart is the point. On a light page a project's own
-   image, often a dark tile, is the darkest thing on its line, so it fades further there, to sit under the title it marks;
-   a drawn icon or initial keeps its weight. */
-:is(.row-cols, .desk-tile, .list-row, [data-dossier], [data-item-dialog], [data-counter-list]) [data-project-icon] {
-    filter: grayscale(1);
-    opacity: 0.75;
-
-    &:has(img:not([hidden])) {
-        opacity: 0.5;
-
-        @variant dark {
-            opacity: 0.75;
-        }
-    }
+/* A row reads in two columns: where the work lives (its source and project) on one fixed width, so every title starts at
+   the same place, a long project name cut short with an ellipsis and named whole on hover; then what it is, its kind
+   mark, number and title, which takes the rest and ends in an ellipsis. */
+.row-cols [data-title-cell] > [data-row-identity] {
+    flex: 0 0 var(--row-source);
+    width: var(--row-source);
+    margin-right: --spacing(1);
+}
+.row-cols [data-title-cell] > :is([data-title], [data-row-open], button) {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-/* A lane row's facts sit together at its end, on fixed tracks so every lane's columns line up and nothing moves on
-   hover: what its thread does (or what holds it) ends where the progress track starts; the progress track (bar and
-   count) has one width whether or not the row has slices; the end track holds the cost and state, and on hover or focus
-   the row's action stands over it, never wider than it. */
+/* A project's name too long for its room fades out over its last 1.5rem instead of ending in an ellipsis
+   (RepoIdentity marks it data-cut), so a list of projects stays clean; its tooltip names it whole. */
+[data-repo-name][data-cut] {
+    mask-image: linear-gradient(to right, black calc(100% - 1.5rem), transparent);
+}
+
+/* What an item is and where it lives reads as one group, the same on a row, a part and a desk card: its kind, its
+   tracker and its project's icon, each on the same 16px square with its glyph at 14px, then the project's name, all
+   6px apart, so the marks feel like a set rather than three sizes in a line. */
+[data-row-identity] {
+    column-gap: --spacing(1.5);
+}
+[data-row-identity] > :is([data-kind-mark], [role='img']) {
+    width: --spacing(4);
+    height: --spacing(4);
+}
+[data-row-identity] > :is([data-kind-mark], [role='img']) > svg {
+    width: --spacing(3.5);
+    height: --spacing(3.5);
+}
+[data-row-identity] [data-repo-cell] {
+    column-gap: --spacing(1.5);
+}
+
+/* A project's icon shows in its own colours wherever it sits, as T3 shows it, so a project reads the same here as
+   there. */
+
+/* A row's facts sit at its end on three fixed tracks, the same on every row of every list (lanes, concepts and a
+   concept's parts) at any window width, so a column never moves with what a row says: what is going on (what its
+   thread does, its state or what holds it), its progress (a bar and its count), then its cost and age. A row with
+   nothing for a track leaves it empty. */
 .row-meta {
+    --row-activity: 14rem;
+    --row-progress: 10rem;
+    --row-end: 7rem;
     display: grid;
-    flex: 0 1 auto;
-    grid-template-columns: var(--row-activity, 20rem) 10rem var(--row-end, 8.5rem);
+    flex: none;
+    grid-template-columns: var(--row-activity) var(--row-progress) var(--row-end);
     column-gap: --spacing(4);
     align-items: center;
     min-width: 0;
-    max-width: 62%;
     font-size: var(--text-xs);
     line-height: --spacing(4);
     color: var(--color-fg-muted);
@@ -256,36 +245,13 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 .row-meta > [data-col='progress'] {
     grid-column: 2;
-    justify-self: start;
-    overflow: visible;
-}
-.row-meta > [data-col='progress'] {
+    justify-self: stretch;
     white-space: nowrap;
     color: var(--color-fg-soft);
 }
 .row-meta > .row-meta-end {
     grid-column: 3;
     justify-self: stretch;
-}
-/* Under 1280px of row the activity gives its room to the title first. */
-@container (width < 80rem) {
-    .row-meta {
-        grid-template-columns: var(--row-activity, 13rem) 9.5rem var(--row-end, 8rem);
-    }
-    .row-meta:not(:has(> [data-col='progress'])):has(> :not(.row-meta-end)) {
-        grid-template-columns: minmax(0, max-content) var(--row-end, 8rem);
-    }
-    .row-meta:not(:has(> [data-col='progress'])) > :not(.row-meta-end) {
-        max-width: 22.5rem;
-    }
-    .row-meta:not(:has(> [data-col='progress'])):has(> :not(.row-meta-end)) > .row-meta-end {
-        grid-column: 2;
-    }
-}
-
-/* With no progress to show, a long state, such as "Blocked · starts after #31", takes the progress track's room too. */
-.row-meta:not(:has(> [data-col='progress'])) > .row-meta-end {
-    grid-column: 2 / 4;
 }
 .row-meta [data-col='bar'] {
     display: block;
@@ -295,13 +261,21 @@ li.desk-row:has([data-row-open]:focus-visible) {
 .row-meta [data-col='bar'] > * {
     width: 100%;
 }
+/* The end's cost and age each keep a fixed slot, flush right, so both line up down the list. */
 .row-meta-end {
     color: var(--color-fg-muted);
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.25rem;
     align-items: center;
-    justify-content: flex-end;
-    column-gap: --spacing(3);
+    column-gap: --spacing(2);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.row-meta-end > * {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+    overflow: hidden;
 }
 [data-stage] li[data-item] .row-first {
     position: relative;
@@ -316,18 +290,9 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 
 /* A row that says every agent figure at its end (RowMetaEnd full, a concept dialog's part) gives its end track their
-   width, and what its thread does gives way first. */
+   width; every part in that list is full, so its columns still line up. */
 .row-meta:has(> .row-meta-end[data-full]) {
-    --row-activity: minmax(0, 13rem);
-    --row-end: minmax(8rem, max-content);
-}
-
-/* A row with nothing at work and no progress keeps only its end track, so its title has the room. */
-.row-meta:not(:has(> :not(.row-meta-end))) {
-    grid-template-columns: minmax(8.5rem, max-content);
-}
-.row-meta:not(:has(> :not(.row-meta-end))) > .row-meta-end {
-    grid-column: 1;
+    --row-end: 16rem;
 }
 
 /* In a row's end, a held reason reads a step above its age or cost. */
@@ -336,10 +301,10 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 
 /* A row's action takes no room at rest, so every row's facts end on the row's edge. On hover or focus it stands at that
-   same edge in place of the row's cost and state, which fade out under it, and it is always in the same place. It is as
-   wide as its label up to 11rem: a short action covers only the end track; only a held part's or Queue row's "Start
-   after Part 15", which has no progress beside it, reaches past it, whole rather than cut. A phone keeps the action
-   under the title (Pane's narrow rules). */
+   same edge, always in the same place, and whatever the row shows under it fades out into it: the row's content is
+   masked from a short fade before the action to nothing under it, so the action never needs to know, or replace, what
+   is beneath it. It is as wide as its label up to 11rem. A phone keeps the action under the title (Pane's narrow
+   rules). */
 .row-first,
 [data-part] > div {
     --row-action: 11rem;
@@ -353,7 +318,8 @@ li.desk-row:has([data-row-open]:focus-visible) {
     :is([data-stage] li[data-item], [data-dossier], [data-parts-frame]) .row-first > .row-side {
         position: absolute;
         inset-block: 0;
-        right: var(--row-inset);
+        /* As far from the row's right edge as the button stands from its top and bottom: a 28px button in a 40px row. */
+        right: --spacing(1.5);
         width: auto;
         max-width: var(--row-action);
         min-height: 0;
@@ -364,14 +330,15 @@ li.desk-row:has([data-row-open]:focus-visible) {
 }
 @media (hover: hover) {
     @container (width >= 41.25rem) {
-        /* Only the action fades, and only in: the facts under it step aside at once and the action leaves at once, so
-           the two never read on top of each other mid-way, however a pointer or focus moves. */
+        /* The action fades in over the row; the content under it fades out into it with a mask, whatever it is. On focus it
+           shows only while the reader moves by keyboard (data-keys, keyboardNavigation.ts): a row clicked open gets its
+           focus back when its dialog closes, and that focus alone must not leave the action on a row the pointer has left. */
         :is([data-stage] li[data-item], [data-dossier], [data-parts-frame]) .row-first > .row-side {
             opacity: 0;
         }
         :is([data-stage] li[data-item], [data-dossier] .row-first, [data-parts-frame] .row-first):is(
                 :hover,
-                :focus-within,
+                :root[data-keys] :has(:focus-visible),
                 :has([aria-haspopup][aria-expanded='true'])
             )
             .row-side,
@@ -379,37 +346,46 @@ li.desk-row:has([data-row-open]:focus-visible) {
             opacity: 1;
             transition: opacity var(--motion-duration-fast) var(--ease-standard);
         }
-        :is([data-stage] li[data-item], [data-dossier] .row-first, [data-parts-frame] .row-first):is(
+        [data-stage] li[data-item]:is(:hover, :root[data-keys] :has(:focus-visible), :has([aria-haspopup][aria-expanded='true'])):has(
+                .row-side > :not(:empty)
+            )
+            .row-first
+            > .row-meta,
+        :is([data-dossier], [data-parts-frame]) .row-first:is(
                 :hover,
-                :focus-within,
+                :root[data-keys] :has(:focus-visible),
                 :has([aria-haspopup][aria-expanded='true'])
             ):has(.row-side > :not(:empty))
-            :is(.row-meta-end, .row-cols > [data-col='state']) {
-            opacity: 0;
+            > .row-meta {
+            /* Only the facts at the row's end reach under the action, and they end where it ends, so they fade over the 3rem
+               before the action starts, less a little air; the title and project, never under it, keep still. */
+            --row-fade-end: calc(100% + var(--row-inset) - --spacing(1.5) - var(--row-side-width, var(--row-action)) - 0.5rem);
+            mask-image: linear-gradient(
+                to right,
+                black calc(var(--row-fade-end) - 3rem),
+                transparent var(--row-fade-end)
+            );
         }
     }
 }
 
-/* Whatever opens an item on click (a row, a card, a part, a fold) shows the pointer; buttons keep their own cursor. */
-:is(.row-cols, .row-meta, .desk-tile, .list-row, [data-part] [data-row-open], [data-dossier-open]) {
-    cursor: pointer;
+/* A row or a card that opens its item wherever it is clicked underlines its title while the pointer is over any of it,
+   so it reads as the link it is; over one of its own controls (its action, Open thread, a slices toggle), which does
+   something else, the title doesn't. A concept's line expands on a click instead, so only its title's own words
+   underline, on their own hover (DossierTitle). */
+@media (hover: hover) {
+    :is([data-stage] li[data-item], [data-part], .list-row, .desk-tile):hover:not(
+            :has(:is(button, a, [role='button'], [role='menuitem']):not([data-row-open]):hover)
+        )
+        [data-title]:not([data-opens-title]) {
+        text-decoration-line: underline;
+        text-underline-offset: 2px;
+    }
 }
 
-/* A lane row with progress but nothing at work keeps no empty activity track, so its title has that room; its progress
-   and end stay on the same right-anchored tracks as its neighbours'. */
-.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
-    grid-template-columns: 10rem var(--row-end, 8.5rem);
-}
-.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) > [data-col='progress'] {
-    grid-column: 1;
-}
-.row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) > .row-meta-end {
-    grid-column: 2;
-}
-@container (width < 80rem) {
-    .row-meta:has(> [data-col='progress']):not(:has(> :not([data-col='progress'], .row-meta-end))) {
-        grid-template-columns: 9.5rem var(--row-end, 8rem);
-    }
+/* Whatever opens an item on click (a row, a card, a part, a fold) shows the pointer, as every control does (base.css). */
+:is(.row-cols, .row-meta, .desk-tile, .list-row, [data-part] [data-row-open], [data-dossier-open]) {
+    cursor: pointer;
 }
 
 /* A concept's Parts view toggle holds two buttons and never needs to scroll. The design system's ViewToggle scrolls

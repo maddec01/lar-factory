@@ -16,13 +16,14 @@ import { partState } from './PartState';
 import { figuresOf, opensItem } from './RowDetails';
 import { threadText } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
+import { workLabel } from './WorkLabel';
 import {
     Age,
-    AzureFields,
     checksCount,
-    hasFigures,
+    checksWord,
     prChecks,
     SliceBar,
+    WorkingBar,
     SliceList,
     StartAfterError,
     StartMessage,
@@ -30,7 +31,6 @@ import {
 } from '@/features/items';
 import {
     ChecksBar,
-    QueueAge,
     RowBlocked,
     RowCount,
     RowFirst,
@@ -87,6 +87,8 @@ export function PartRow({
     const checks = prChecks(item);
     const slices = item.slices.length;
     const sliceCount = item.slices.filter((x) => x.progress === 'done').length;
+    // A part at work names what runs, so its bar says something is going on even with no slices to count.
+    const atWork = done || held ? undefined : workLabel(item, !!showsActivity);
 
     return (
         <StageRowItem item={item.id} picked={isPicked} attention={asksYou} part>
@@ -95,47 +97,54 @@ export function PartRow({
                     <PartIdentity item={item} home={home} />
                 </RowOpen>
                 <RowMeta onClick={opensItem(item, onOpen)}>
-                    {held && <RowBlocked>{state}</RowBlocked>}
-                    {showsActivity && <ActivityLine item={item} />}
+                    {/* What is going on, in one column, as a lane row reads: what its thread does, else what it asks of
+                        you, else its state, else what holds it. */}
+                    {showsActivity ? (
+                        <ActivityLine item={item} />
+                    ) : asksYou ? (
+                        <RowState title={word}>
+                            <WaitWord>{word}</WaitWord>
+                        </RowState>
+                    ) : held ? (
+                        <RowBlocked>{state}</RowBlocked>
+                    ) : (
+                        <RowState title={threadText(item, shown.working)}>{state}</RowState>
+                    )}
                     {checks ? (
                         <RowProgress
                             bar={<ChecksBar checks={checks} still={still} />}
-                            count={<RowCount title={checksCount(checks)}>{checksCount(checks)}</RowCount>}
+                            count={
+                                <RowCount pr title={checksCount(checks)}>
+                                    {checksWord(checks)}
+                                </RowCount>
+                            }
+                        />
+                    ) : slices > 0 && !partsCounted ? (
+                        <RowProgress
+                            bar={<SliceBar item={item} still={still} />}
+                            count={
+                                <RowSliceToggle
+                                    open={unfolded}
+                                    label={unfolded ? 'Hide slices' : 'Show slices'}
+                                    onToggle={() => setUnfolded(!unfolded)}
+                                >
+                                    {`${sliceCount}/${slices} slices`}
+                                </RowSliceToggle>
+                            }
                         />
                     ) : (
-                        slices > 0 &&
-                        !partsCounted && (
+                        atWork && (
                             <RowProgress
-                                bar={<SliceBar item={item} still={still} />}
-                                count={
-                                    <RowSliceToggle
-                                        open={unfolded}
-                                        label={unfolded ? 'Hide slices' : 'Show slices'}
-                                        onToggle={() => setUnfolded(!unfolded)}
-                                    >
-                                        {`${sliceCount}/${slices} slices done`}
-                                    </RowSliceToggle>
-                                }
+                                bar={<WorkingBar label={atWork} still={still} />}
+                                count={<RowCount title={atWork}>{atWork}</RowCount>}
                             />
                         )
                     )}
-                    <RowMetaEnd full={full}>
-                        <Figures s={figures} item={item} full={full} />
-                        {/* A part with nothing else to say at its end says how long it has waited, as a lane row does. */}
-                        {(held || showsActivity) && !(figures && hasFigures(figures)) && (
-                            <QueueAge>
-                                <Age at={item.updatedAt} />
-                            </QueueAge>
-                        )}
-                        {!held &&
-                            !showsActivity &&
-                            (asksYou ? (
-                                <WaitWord>{word}</WaitWord>
-                            ) : (
-                                <RowState title={threadText(item, shown.working)}>{state}</RowState>
-                            ))}
-                        <AzureFields azure={item.azure} />
-                    </RowMetaEnd>
+                    <RowMetaEnd
+                        full={full}
+                        cost={<Figures s={figures} item={item} full={full} />}
+                        age={!done && <Age at={item.updatedAt} />}
+                    />
                 </RowMeta>
                 <RowSide>
                     {/* The same action as its Work map card, so switching views never changes what a part offers. */}

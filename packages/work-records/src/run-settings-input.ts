@@ -6,11 +6,12 @@ import {
     resolveFactorySettings,
     reviewerInstructions,
 } from '@lar-factory/shared/factory-settings';
-import type {
-    ExecutionSettings,
-    ReviewSelectionEvidence,
-    RunSettings,
-    SnapshotRunInput,
+import {
+    isRelease,
+    type ExecutionSettings,
+    type ReviewSelectionEvidence,
+    type RunSettings,
+    type SnapshotRunInput,
 } from '@lar-factory/shared/run-settings';
 import { createHash } from 'node:crypto';
 
@@ -77,7 +78,15 @@ function selection(value: unknown): ModelSelection | null | undefined {
 
 /** Resolve once. Callers cannot supply a pre-resolved snapshot or read arbitrary instruction paths. */
 export function captureRunSettings(workId: string, value: SnapshotRunInput, settings: unknown): RunSettings {
-    const input = runObject(value, ['runId', 'kind', 'projectDefault', 'threadSelection', 'packaged', 'skills']);
+    const input = runObject(value, [
+        'runId',
+        'kind',
+        'projectDefault',
+        'threadSelection',
+        'packaged',
+        'skills',
+        'release',
+    ]);
     const runId = runText(input.runId);
 
     if (!THREAD_KINDS.includes(input.kind as never)) invalidRun('Unknown run kind.');
@@ -97,6 +106,8 @@ export function captureRunSettings(workId: string, value: SnapshotRunInput, sett
     const skills = (input.skills as unknown[]).map(runText);
 
     if (new Set(skills).size !== skills.length) invalidRun('Duplicate run skill.');
+
+    if (input.release !== undefined && !isRelease(input.release)) invalidRun('Invalid run release.');
 
     const resolve = (role?: Parameters<typeof resolveFactorySettings>[2]) => {
         const { model, effort, options } = resolveFactorySettings(parsed, kind, role, context);
@@ -141,6 +152,7 @@ export function captureRunSettings(workId: string, value: SnapshotRunInput, sett
         roles,
         reviewers,
         skills,
+        ...(input.release !== undefined && { release: input.release as string }),
     };
 }
 

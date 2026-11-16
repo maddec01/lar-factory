@@ -1,5 +1,5 @@
 import { defaultFactorySettings, FACTORY_ROLES, type FactorySettings } from '@lar-factory/shared/factory-settings';
-import type { RoleRunFinish, SnapshotRunInput } from '@lar-factory/shared/run-settings';
+import { frozenBuildMethodLine, type RoleRunFinish, type SnapshotRunInput } from '@lar-factory/shared/run-settings';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -122,6 +122,43 @@ it('records the release a run starts on, and none for a run started without one 
         expect(() => records.snapshotRun(workId, revision(), { ...input('run-3'), release })).toThrow(
             'Invalid run release.',
         );
+});
+
+it('freezes the project Build method, keeps it after the setting changes, and reads a run without one as TDD', async () => {
+    const { records, workId, revision } = await fixture();
+    const proveIt = records.snapshotRun(workId, revision(), { ...input('run-1'), buildMethod: 'prove-it' });
+
+    expect(records.snapshotRun(workId, revision(), { ...input('run-1'), buildMethod: 'tdd' })).toEqual(proveIt);
+    expect(proveIt.buildMethod).toBe('prove-it');
+    expect(records.snapshotRun(workId, revision(), { ...input('run-2'), buildMethod: 'tdd' }).buildMethod).toBe('tdd');
+    expect(records.snapshotRun(workId, revision(), input('run-3')).buildMethod).toBe('tdd');
+    expect(records.runSettings(workId).runs.map((run) => run.buildMethod)).toEqual(['prove-it', 'tdd', 'tdd']);
+    expect(() =>
+        records.snapshotRun(workId, revision(), {
+            ...input('run-4'),
+            buildMethod: 'waterfall' as SnapshotRunInput['buildMethod'],
+        }),
+    ).toThrow('Invalid run build method.');
+});
+
+it('prints Prove it for a run frozen with it, and TDD for a run saved before Build methods', async () => {
+    const { dir, records, workId, revision } = await fixture();
+    const { buildMethod: _, ...legacy } = records.snapshotRun(workId, revision(), input('run-1'));
+    const database = await openDatabase(workRecordsPath(dir));
+
+    try {
+        database.db
+            .prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)')
+            .run(workId, 'legacy', JSON.stringify({ ...legacy, runId: 'legacy' }));
+    } finally {
+        database.close();
+    }
+
+    expect(records.runSettings(workId, 'legacy').runs[0]).not.toHaveProperty('buildMethod');
+    expect(frozenBuildMethodLine(records.runSettings(workId, 'legacy').runs[0]!)).toBe('Frozen build method: TDD');
+    expect(
+        frozenBuildMethodLine(records.snapshotRun(workId, revision(), { ...input('run-2'), buildMethod: 'prove-it' })),
+    ).toBe('Frozen build method: Prove it');
 });
 
 it('captures only once; later edits, retry, handoff and reopening keep the snapshot, while the next run sees edits', async () => {

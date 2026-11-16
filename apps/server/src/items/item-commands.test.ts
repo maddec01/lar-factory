@@ -1359,6 +1359,7 @@ for (const kind of ['build'] as ('issue' | 'concept' | 'decision' | 'build')[])
         assert.equal(message.split('\n')[0], `${kind === 'build' ? 'Build' : 'Shaping'} #5 Configured`);
         assert.equal(message.match(/<!-- factory-runtime:start -->/g)?.length, 2);
         assert.equal(message.match(/<!-- factory-runtime:end -->/g)?.length, 2);
+        assert.equal(message.match(/^Frozen build method: TDD$/gm)?.length, 1);
         assert.match(start.mock.calls[0]![1], new RegExp(runs[0]!.runId));
         assert.ok(
             start.mock.calls[0]![1].includes(JSON.stringify(runs[0]!.roles)),

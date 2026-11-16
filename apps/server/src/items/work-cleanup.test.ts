@@ -80,6 +80,34 @@ it("compares a branch with no upstream against the remote's default branch, not 
     expect(logged).toEqual(['refs/remotes/origin/main..refs/heads/saved']);
 });
 
+for (const branch of ['main', 'live'])
+    it(`protects the ${branch} branch from cleanup`, async () => {
+        const plan = await inspectCleanup({
+            repository: 'a/b',
+            checkout: '/project',
+            item: {} as Item,
+            branch,
+            sliceIds: [],
+            defaultBranch: 'main',
+            liveWorktreePaths: ['/live'],
+            writable: true,
+            provider: { branchExists: async () => true, openPrByHead: async () => null },
+            git: async (_tool, args) => ({
+                code: 0,
+                stderr: '',
+                detail: '',
+                stdout: args.includes('ls-files')
+                    ? ''
+                    : args.includes('worktree')
+                      ? 'worktree /live\nbranch refs/heads/live\n\n'
+                      : 'main\nlive\n',
+            }),
+        });
+
+        expect(plan.localBranches).toEqual([]);
+        expect(plan.remoteAvailable).toBe(false);
+    });
+
 it('rejects changed losses before running any deletion', async () => {
     const plan = {
         branch: 'old',

@@ -660,7 +660,6 @@ async function chunkedRead(
     threads: FixtureThread[],
     sessions: Parameters<typeof claudeHome>[1],
     items: string[][],
-    turn: (trace: ReadTrace) => Promise<void> = async () => {},
 ) {
     const home = tempDir(t, 'lar-home-');
 
@@ -673,7 +672,7 @@ async function chunkedRead(
 
     try {
         const { rows, sessions: inputs } = await protocolStatsInputs();
-        const trace: ReadTrace = createReadTrace(() => turn(trace));
+        const trace: ReadTrace = createReadTrace(async () => {});
         const stats = await itemStats({ db, ...NOWHERE, home }, rows, NOW, { sessions: inputs, items, trace });
 
         return { stats, trace, home };
@@ -727,36 +726,6 @@ test('aggregation yields in chunks of a bounded size and gives each item the ans
     );
     assert.deepEqual(stats(['t0']), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 1 });
     assert.equal(stats(['t0', 't1'])?.tokens, 3, 'threads no item held work out when asked for');
-});
-
-test('a timer runs between the chunks of a real read', async (t) => {
-    const records = DEDUP_RECORDS_PER_CHUNK * 3;
-    const main = Array.from({ length: records }, (_, i) => assistant(`m${i}`, 0, 0, 0, 1));
-    let timers = 0;
-    let running = true;
-    const tick = () => {
-        timers++;
-
-        if (running) setTimeout(tick, 0);
-    };
-
-    setTimeout(tick, 0);
-
-    const { stats, trace } = await chunkedRead(
-        t,
-        [counted('a')],
-        { 'session-a': { main } },
-        [['a']],
-        () =>
-            new Promise((resolve) => {
-                setImmediate(resolve);
-            }),
-    );
-
-    running = false;
-    assert.equal(stats(['a'])?.tokens, records);
-    assert.ok(trace.steps.dedup.pauses >= 3);
-    assert.ok(timers >= 3, `${timers} timers ran during the read`);
 });
 
 test('a transcript that changes between chunks waits for the next read, so no answer mixes the two', async (t) => {

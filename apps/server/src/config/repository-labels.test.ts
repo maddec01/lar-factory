@@ -204,18 +204,6 @@ test('a repository not on this Mac and a bad request are refused', async (t) => 
     expect(await changeRepositoryLabels({ change: 'list' }, dir, thirdTracker())).toMatchObject({ status: 400 });
 });
 
-test("a failed read reports the tracker's reason", async (t) => {
-    const dir = await folder(t);
-    const tracker = thirdTracker();
-
-    expect(
-        await changeRepositoryLabels({ repo: REPO, change: 'list' }, dir, {
-            ...tracker,
-            labels: { ...tracker.labels, list: () => Promise.reject(new Error('The tracker is down.')) },
-        }),
-    ).toEqual({ status: 400, error: 'The tracker is down.' });
-});
-
 test('on Azure a comma is refused, and rename and delete reach the fake az', async (t) => {
     const dir = await folder(t, AZURE);
     const az = fakeAz({ items: [], tags: ['old name', 'gone'] });

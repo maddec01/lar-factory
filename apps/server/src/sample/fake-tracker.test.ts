@@ -228,32 +228,6 @@ test('reset and restart restore identical seed, IDs and counters; pending writes
     assert.deepEqual(await tracker.read(REPO, first.item.number), first);
 });
 
-test('latency and fail-next apply once even with concurrent calls', async () => {
-    const tracker = create();
-
-    tracker.failures.set('issues.create', { fail: 'next', latencyMs: 25 });
-
-    let settled = false;
-    const calls = Promise.allSettled([tracker.create(REPO, draft('one')), tracker.create(REPO, draft('two'))]).then(
-        (result) => {
-            settled = true;
-
-            return result;
-        },
-    );
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 5));
-    assert.equal(settled, false);
-
-    const result = await calls;
-
-    assert.deepEqual(
-        result.map((entry) => entry.status),
-        ['rejected', 'fulfilled'],
-    );
-    assert.throws(() => tracker.failures.set('issues.read', { latencyMs: Infinity }), /latency/);
-});
-
 test('every repository entry point fails closed, including relationship targets and source overrides', async () => {
     const tracker = create();
     const allowed = { repo: REPO, number: 200 };

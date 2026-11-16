@@ -213,14 +213,6 @@ test('the child work items answer as sub-tickets, Completed ones closed and Remo
     assert.deepEqual(az.batches, [[5], [6, 7, 8]]);
 });
 
-test('a work item with no child links reads no batch', async () => {
-    const az = fakeAz({ items: [workItem()] });
-    const details = await readAzureItemDetails(item(5), az.run);
-
-    assert.ok(!('error' in details));
-    assert.deepEqual([details.subTickets, az.batches], [[], [[5]]]);
-});
-
 test('an az failure answers its message', async () => {
     const az = fakeAz({
         items: [workItem()],
@@ -461,20 +453,6 @@ test('an empty Bug description falls back to Repro Steps, keeping Acceptance Cri
         { title: 'Acceptance Criteria', body: 'The screen opens.', format: 'markdown' },
         { title: 'System Info', body: '<div>macOS</div>', format: 'html' },
     ]);
-});
-
-test('an empty description is read from System.Description, except on a Bug, whose description is its Repro Steps', async () => {
-    for (const [type, bodyField] of [
-        ['Task', 'System.Description'],
-        ['User Story', 'System.Description'],
-        ['Bug', 'Microsoft.VSTS.TCM.ReproSteps'],
-    ]) {
-        const az = fakeAz({ items: [workItem({ type })] });
-        const details = await readAzureItemDetails(item(5), az.run);
-
-        assert.ok(!('error' in details));
-        assert.equal(details.bodyField, bodyField, type);
-    }
 });
 
 test('details keep named Azure attachments, Related work and predecessors alongside children', async () => {

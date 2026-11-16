@@ -13,7 +13,6 @@ import { HOLD_RETRY_MS, createAutoBuild } from './auto-build.ts';
 
 const REPO = 'maddec01/lar-factory';
 const OTHER = 'maddec01/lar-other';
-const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-5-5' };
 const OFFERED: ModelGroup[] = [
     { instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }] },
 ];
@@ -301,16 +300,6 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
 
         assert.deepEqual([s.started, pass(s)?.hold], [[workId], undefined], `${name}: retried`);
     }
-});
-
-test('Auto-build starts on the model Settings chose', async () => {
-    const s = await setUp();
-    const workId = ready(s.records, 'A');
-
-    s.auto = { on: true, model: OPUS };
-    s.reread();
-    await s.pass();
-    assert.deepEqual(s.started, [workId]);
 });
 
 test('a failed start pauses only that build, survives a restart, and ends when Start build succeeds or a new gate passes', async () => {

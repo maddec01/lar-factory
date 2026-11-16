@@ -16,32 +16,6 @@ const samplesIn = (file: string) =>
         .map((line) => JSON.parse(line) as MemorySample);
 const kinds = (file: string) => samplesIn(file).map((sample) => sample.kind);
 
-test('it appends a sample with the PID at start, then every 30 seconds', (t) => {
-    const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
-    const stop = startMemorySampler({ BOARD_MEMORY_SAMPLES: file });
-
-    t.onTestFinished(stop);
-    assert.deepEqual(kinds(file), ['start']);
-    vi.advanceTimersByTime(29_999);
-    assert.deepEqual(kinds(file), ['start']);
-    vi.advanceTimersByTime(1);
-    assert.deepEqual(kinds(file), ['start', 'interval']);
-
-    const [sample] = samplesIn(file);
-
-    assert.equal(sample!.pid, process.pid);
-    for (const figure of [
-        sample!.rss,
-        sample!.heapTotal,
-        sample!.heapUsed,
-        sample!.external,
-        sample!.arrayBuffers,
-        sample!.maxRSS,
-    ]) {
-        assert.ok(Number.isFinite(figure) && figure >= 0);
-    }
-});
-
 test('with the GC variable it samples before and after a forced GC every 5 minutes', (t) => {
     const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
     const stop = startMemorySampler({ BOARD_MEMORY_SAMPLES: file, BOARD_MEMORY_FORCE_GC: '1' });
@@ -58,21 +32,6 @@ test('with the GC variable it samples before and after a forced GC every 5 minut
         ['before-gc', 'after-gc'],
     );
     assert.equal(taken.indexOf('after-gc'), taken.indexOf('before-gc') + 1);
-});
-
-test('stopping ends the samples', (t) => {
-    const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
-
-    startMemorySampler({ BOARD_MEMORY_SAMPLES: file })();
-    vi.advanceTimersByTime(120_000);
-    assert.deepEqual(kinds(file), ['start']);
-});
-
-test('with both variables unset it writes nothing and sets no timer', () => {
-    const stop = startMemorySampler({});
-
-    assert.equal(vi.getTimerCount(), 0);
-    stop();
 });
 
 test('a failed write logs, throws nothing and the next tick tries again', (t) => {

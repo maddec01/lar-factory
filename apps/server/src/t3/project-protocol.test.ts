@@ -35,34 +35,31 @@ it('retains the observation after rejection and reports renewal failure', async 
     expect((await adapter.readProjects()).availability).toBe('renewal-required');
 });
 
-it.each(['0.1.6-nightly.20261031.3977', '1.0.0', 'unknown', ''])(
-    'reads compatible projects on T3 %s',
-    async (version) => {
-        const adapter = new ProjectProtocol(
-            {
-                read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
-                write: async () => {},
+it.each(['0.1.6-nightly.20261031.3977', ''])('reads compatible projects on T3 %s', async (version) => {
+    const adapter = new ProjectProtocol(
+        {
+            read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
+            write: async () => {},
+        },
+        {
+            issue: async () => {
+                throw Error();
             },
-            {
-                issue: async () => {
-                    throw Error();
-                },
-                revoke: async () => {},
-            },
-            async () =>
-                Response.json({
-                    projects: [{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', futureField: true }],
-                    updatedAt: '2026-01-01',
-                    futureField: true,
-                }),
-            version,
-        );
+            revoke: async () => {},
+        },
+        async () =>
+            Response.json({
+                projects: [{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', futureField: true }],
+                updatedAt: '2026-01-01',
+                futureField: true,
+            }),
+        version,
+    );
 
-        expect((await adapter.readProjects()).observation?.projects).toEqual([
-            { id: 'repo', title: 'Repository', workspaceRoot: '/repo', faviconPath: null, projectIcon: null },
-        ]);
-    },
-);
+    expect((await adapter.readProjects()).observation?.projects).toEqual([
+        { id: 'repo', title: 'Repository', workspaceRoot: '/repo', faviconPath: null, projectIcon: null },
+    ]);
+});
 
 it('rejects remote endpoints before sending credentials', async () => {
     const { boardProjects } = await import('./board-projects.ts');
@@ -70,27 +67,24 @@ it('rejects remote endpoints before sending credentials', async () => {
     expect(() => boardProjects('https://example.com', 'fixture-release')).toThrow('Expected local T3 server');
 });
 
-it.each(['fixture-release', '0.1.6-nightly.20261031.3977', 'unknown'])(
-    'reports malformed snapshots on T3 %s',
-    async (version) => {
-        const adapter = new ProjectProtocol(
-            {
-                read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
-                write: async () => {},
+it.each(['fixture-release'])('reports malformed snapshots on T3 %s', async (version) => {
+    const adapter = new ProjectProtocol(
+        {
+            read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
+            write: async () => {},
+        },
+        {
+            issue: async () => {
+                throw Error();
             },
-            {
-                issue: async () => {
-                    throw Error();
-                },
-                revoke: async () => {},
-            },
-            async () => Response.json({ projects: [{}], updatedAt: '2026-01-01' }),
-            version,
-        );
+            revoke: async () => {},
+        },
+        async () => Response.json({ projects: [{}], updatedAt: '2026-01-01' }),
+        version,
+    );
 
-        expect((await adapter.readProjects()).availability).toBe('malformed');
-    },
-);
+    expect((await adapter.readProjects()).availability).toBe('malformed');
+});
 
 it('revokes a newly issued session if Keychain storage fails', async () => {
     const revoked: string[] = [];

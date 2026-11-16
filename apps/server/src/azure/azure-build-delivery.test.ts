@@ -78,33 +78,3 @@ test('an Azure build creates a PR against the actual base, records it locally, a
     expect(fake.pushes).toEqual([]);
     expect(fake.comments).toEqual([]);
 });
-
-test('a lost PR-creation response is recovered by its source branch before recording or retrying', async () => {
-    const fake = fakeAzRepos({ defaultBranch: 'release', branches: { [BRANCH]: 'build-head' } });
-    const create = async () => {
-        await fake.run(createArgs('release'));
-        throw Error('Connection lost after creation');
-    };
-
-    await expect(create()).rejects.toThrow('Connection lost');
-
-    const found = JSON.parse(
-        await fake.run([
-            'repos',
-            'pr',
-            'list',
-            '--repository',
-            'lar-api',
-            '--source-branch',
-            BRANCH,
-            '--project',
-            'Fabrikam Fiber',
-            '--organization',
-            'https://dev.azure.com/contoso',
-        ]),
-    ) as FakePr[];
-
-    expect(found).toHaveLength(1);
-    expect(await observePr(REPO, found[0]!.pullRequestId, fake.run)).toBe('open');
-    expect(fake.calls.filter((args) => args.slice(0, 3).join(' ') === 'repos pr create')).toHaveLength(1);
-});

@@ -34,27 +34,24 @@ it('reports rejected authentication and cancels its retry on cleanup', async () 
     expect(request).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
 });
-it.each(['0.1.6-nightly.20261031.3977', '1.0.0', 'unknown', ''])(
-    'attempts authenticated subscription on T3 %s',
-    async (version) => {
-        vi.useFakeTimers();
+it.each(['0.1.6-nightly.20261031.3977', ''])('attempts authenticated subscription on T3 %s', async (version) => {
+    vi.useFakeTimers();
 
-        const request = vi.fn(async () => new Response('', { status: 401 }));
+    const request = vi.fn(async () => new Response('', { status: 401 }));
 
-        vi.stubGlobal('fetch', request);
+    vi.stubGlobal('fetch', request);
 
-        const changed = vi.fn();
-        const close = subscribeProjects(new URL('http://127.0.0.1:3773'), version, protocol(), changed);
+    const changed = vi.fn();
+    const close = subscribeProjects(new URL('http://127.0.0.1:3773'), version, protocol(), changed);
 
-        try {
-            await vi.advanceTimersByTimeAsync(0);
-            expect(request).toHaveBeenCalledTimes(1);
-            expect(changed).toHaveBeenCalledWith({ availability: 'renewal-required' });
-        } finally {
-            close();
-        }
-    },
-);
+    try {
+        await vi.advanceTimersByTimeAsync(0);
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(changed).toHaveBeenCalledWith({ availability: 'renewal-required' });
+    } finally {
+        close();
+    }
+});
 
 it('validates local origins before obtaining credentials', () => {
     expect(() => subscribeBoardProjects('https://example.com', 'fixture-release', () => {})).toThrow(

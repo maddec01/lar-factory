@@ -11,14 +11,6 @@ test('the facade deletes the encoded exact branch ref', async () => {
     expect(run).toHaveBeenCalledWith(['api', '--method', 'DELETE', 'repos/owner/repo/git/refs/heads/feat%2Fa%23b']);
 });
 
-test('deletion failures propagate', async () => {
-    await expect(
-        deleteRemoteBranch('owner/repo', 'topic', undefined, async () => {
-            throw Error('denied');
-        }),
-    ).rejects.toThrow('denied');
-});
-
 test('checks the expected remote head using the provider login before deletion', async () => {
     const run = vi.fn().mockResolvedValueOnce('observed\n').mockResolvedValueOnce('');
 

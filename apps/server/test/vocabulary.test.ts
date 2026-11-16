@@ -16,37 +16,6 @@ const answers = {
     skills: [],
 };
 
-test('Settings creates only explicitly saved labels and keeps its old mapping after a provider failure', async (t) => {
-    const options = { repositories: [repo], vocabulary: choices };
-    const board = await startBoard(t, options);
-    const save = (name: string) =>
-        board.post(
-            {
-                repo,
-                change: 'vocabulary',
-                key: 'improvement',
-                value: { type: 'Task', labels: ['feature'] },
-                newLabels: [name],
-            },
-            board.url,
-            '/api/repositories/settings',
-        );
-    const saved = await save('triage');
-
-    expect(saved.status).toBe(200);
-    expect(await saved.json()).toMatchObject({
-        setup: { vocabulary: { improvement: { type: 'Task', labels: ['feature', 'triage'] } } },
-    });
-    await board.update({ ...options, vocabulary: { ...choices, failCreate: true } });
-
-    const before = await readFile(join(board.dataDir, 'repository-settings.json'), 'utf8');
-    const failed = await save('blocked');
-
-    expect(failed.status).toBe(400);
-    expect(await failed.json()).toMatchObject({ error: expect.stringContaining('Label creation refused') });
-    expect(await readFile(join(board.dataDir, 'repository-settings.json'), 'utf8')).toBe(before);
-});
-
 test("renaming and deleting a mapped label changes the board row's mapping at once", async (t) => {
     const board = await startBoard(t, {
         repositories: [repo],

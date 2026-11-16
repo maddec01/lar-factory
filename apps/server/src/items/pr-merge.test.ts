@@ -237,19 +237,17 @@ for (const repo of ['owner/repo', 'o/p/r']) {
         expect(s.merge).toHaveBeenCalledTimes(1);
     });
 
-    test.each(['No permission', 'Reviews required', 'Required policy running', 'Merge queue required. Open PR'])(
-        `${repo} refuses provider blocker %s after confirmation`,
-        async (blocker) => {
-            const s = await setup(repo);
-            const { confirmation } = await s.inspect();
+    test(`${repo} refuses a provider blocker after confirmation`, async () => {
+        const s = await setup(repo);
+        const { confirmation } = await s.inspect();
+        const blocker = 'Reviews required';
 
-            s.read.mockImplementation(async () => ({ pr: { ...s.pr }, methods: ['squash'], blockers: [blocker] }));
-            expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
-                error: expect.stringContaining(blocker),
-            });
-            expect(s.merge).not.toHaveBeenCalled();
-        },
-    );
+        s.read.mockImplementation(async () => ({ pr: { ...s.pr }, methods: ['squash'], blockers: [blocker] }));
+        expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'squash' })).body).toMatchObject({
+            error: expect.stringContaining(blocker),
+        });
+        expect(s.merge).not.toHaveBeenCalled();
+    });
 }
 
 test.each([

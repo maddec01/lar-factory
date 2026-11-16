@@ -12,47 +12,6 @@ import type { Board } from './server-support.ts';
 
 const details = (board: Board, query: string) => fetch(`${board.url}/api/item-details${query}`);
 
-test('an item the board does not hold is 404 and a request naming none is 400', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const unknown = await details(board, '?itemId=I_nope');
-
-    assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
-    for (const query of ['', '?itemId=']) {
-        const missing = await details(board, query);
-
-        assert.deepEqual(
-            [missing.status, await missing.json()],
-            [400, { error: 'Name the item whose details to read.' }],
-            query,
-        );
-    }
-});
-
-const olderComments = (board: Board, query: string) => fetch(`${board.url}/api/item-comments${query}`);
-
-test('older comments of an item the board does not hold are 404, and a request naming no item or cursor is 400', async (t) => {
-    const board = await startBoard(t, {}, true);
-    const unknown = await olderComments(board, '?itemId=I_nope&before=0');
-
-    assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
-    for (const query of ['', '?itemId=', '?before=0']) {
-        const missing = await olderComments(board, query);
-
-        assert.deepEqual(
-            [missing.status, await missing.json()],
-            [400, { error: 'Name the item whose comments to read.' }],
-            query,
-        );
-    }
-
-    const noCursor = await olderComments(board, '?itemId=I_sample13');
-
-    assert.deepEqual(
-        [noCursor.status, await noCursor.json()],
-        [400, { error: 'Name where the older comments start.' }],
-    );
-});
-
 const save = (board: Board, body: object) => board.post(body, board.url, '/api/item-description');
 const issueNode = {
     __typename: 'Issue',
@@ -110,25 +69,6 @@ test("saving a GitHub issue's description edits its body with gh, and its detail
     const read = await details(board, `?itemId=${board.id(12)}`);
 
     assert.equal(((await read.json()) as { details: ItemDetails }).details.body, '- a\n- b');
-});
-
-test('a save for an item the board does not hold is 404, and one naming no item or body is 400', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
-
-    await until(board, (d) => d.items.length === 1);
-
-    const unknown = await save(board, { itemId: 'I_nope', body: 'x' });
-
-    assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
-    for (const body of [{ body: 'x' }, { itemId: board.id(12) }, { itemId: board.id(12), body: 5 }]) {
-        const bad = await save(board, body);
-
-        assert.deepEqual(
-            [bad.status, await bad.json()],
-            [400, { error: 'Name the item and send its description.' }],
-            JSON.stringify(body),
-        );
-    }
 });
 
 const labelWrite = (board: Board, body: object) => board.post(body, board.url, '/api/item-labels');

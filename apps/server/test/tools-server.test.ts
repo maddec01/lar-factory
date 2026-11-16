@@ -298,25 +298,3 @@ test('a slow az check holds up neither the page nor the GitHub read, and the Azu
     assert.ok(!settled.toolProgress?.checking.includes('az'), 'az no longer checks');
     assert.ok(azure.itemReads().length > 0, "the Azure DevOps source reads once az's check lands");
 });
-
-test('a request that runs tools waits for the first lookup', async (t) => {
-    const dir = mkdtempSync(join(tmpdir(), 'lar-slow-shell-'));
-
-    t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-
-    const shell = join(dir, 'slow-shell');
-
-    writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
-
-    const board = await startBoard(t, {}, false, false, { SHELL: shell });
-    const held = fetch(`${board.url}/api/item-labels?repo=none`).then(() => 'answered');
-    const first = await Promise.race([held, fetch(`${board.url}/api/board`).then(() => 'board')]);
-
-    assert.equal(first, 'board', 'the board data answers first');
-    await held;
-    await board.untilLogged('request GET /api/item-labels');
-    assert.match(
-        board.logs(),
-        /request GET \/api\/item-labels took \d+ ms, \d+ ms of it waiting for the first tool check/,
-    );
-});

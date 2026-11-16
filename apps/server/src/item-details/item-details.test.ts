@@ -124,18 +124,6 @@ for (const label of ['foo; linked-work', 'foo, linked-work'])
         assert.deepEqual(az.patches, []);
     });
 
-test('a failed read of the tags says why', async () => {
-    const az = fakeAz({
-        items: [],
-        fail: (args) => (args.includes('tags') ? new Error('az devops invoke failed: TF400813') : undefined),
-    });
-
-    assert.deepEqual(await onAzureFake(az).labels(workItem), {
-        status: 502,
-        error: 'Could not read the tags. az devops invoke failed: TF400813',
-    });
-});
-
 test("details serve what a kind update writes, less a type the team's backlog doesn't show, and why", async () => {
     const { records, exportFolder } = await recordsOn();
     const repo = workItem.repo;

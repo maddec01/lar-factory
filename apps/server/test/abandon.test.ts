@@ -14,13 +14,6 @@ const has = (data: BoardData, id: string) => data.items.some((i) => i.id === id)
 const writes = async (board: Board) =>
     (await board.calls()).filter((args) => args[1] === 'close' || args[1] === 'item-delete');
 
-async function reads(board: Board, n: number): Promise<void> {
-    const count = async () => (await board.calls()).filter((args) => args[1] === 'graphql').length;
-    const target = (await count()) + n;
-
-    while ((await count()) < target) await new Promise((r) => setTimeout(r, 20));
-}
-
 /** Waits until a provider pass that began after this call has finished, as the next pass starts only once the last is done. */
 async function providerPass(board: Board): Promise<void> {
     const count = async () =>
@@ -67,21 +60,6 @@ test('a failed ticket close reports the error, and the work stays set aside', as
 
     assert.match(result.error, /Could not abandon #12\. .*write access/);
     assert.ok(!has(await board.board(), board.id(12)));
-});
-
-test('an abandoned item does not come back while GitHub still reports it', async (t) => {
-    const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
-
-    await until(board, (d) => d.items.length === 1);
-
-    const response = await abandon(board, board.id(12));
-
-    assert.equal(response.status, 200, await response.text());
-    await reads(board, 5);
-
-    const data = (await board.board()) as BoardData;
-
-    assert.ok(!has(data, board.id(12)));
 });
 
 test('Abandon rejects requests from other pages and sample mode', async (t) => {

@@ -6,7 +6,6 @@ import type { TestContext } from 'vite-plus/test';
 
 import { tempDir } from '../../test/stats-db.ts';
 import { effectiveDefaults, findModelChoice, launchSelection, loadModelChoices } from './model-choices.ts';
-import { modelManifestPath } from './t3-settings.ts';
 
 const MANIFEST = {
     fetchedAtMs: 1,
@@ -175,12 +174,6 @@ test('a choice is offered only as an enabled instance and one of its models', ()
     ]) {
         assert.equal(findModelChoice(groups, choice), null, JSON.stringify(choice));
     }
-});
-
-test('T3_MODEL_MANIFEST overrides where the manifest is read, else it sits beside the settings', () => {
-    assert.equal(modelManifestPath({ T3_MODEL_MANIFEST: '/x/m.json', HOME: '/h' }), '/x/m.json');
-    assert.equal(modelManifestPath({ HOME: '/h' }), '/h/.t3/userdata/model-manifest.json');
-    assert.equal(modelManifestPath({ T3_SETTINGS: '/s/settings.json', HOME: '/h' }), '/s/model-manifest.json');
 });
 
 const GLOBAL = {

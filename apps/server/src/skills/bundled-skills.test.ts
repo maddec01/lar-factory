@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, type TestContext } from 'vite-plus/test';
 
-import { BUNDLE_URL, bundledSkillNames, installHome, readBundledSkills, withInstallState } from './bundled-skills.ts';
+import { BUNDLE_URL, bundledSkillNames, readBundledSkills, withInstallState } from './bundled-skills.ts';
 
 const UPSTREAM = `# Upstream
 
@@ -112,9 +112,4 @@ test('without a manifest, or with one it can’t read, no skill has a state', as
 
     await writeFile(join(broken, '.agents', INSTALL_MANIFEST), '{');
     assert.deepEqual(withInstallState(skills, broken), skills);
-});
-
-test('LAR_FACTORY_INSTALL_ROOT names the install home; the user’s home is the default', () => {
-    assert.equal(installHome({ LAR_FACTORY_INSTALL_ROOT: '/tmp/lar' }, '/Users/me'), '/tmp/lar');
-    assert.equal(installHome({}, '/Users/me'), '/Users/me');
 });

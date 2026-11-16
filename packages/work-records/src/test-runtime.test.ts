@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test } from 'vite-plus/test';
+import { DatabaseSync } from 'node:sqlite';
+import { expect, test, vi } from 'vite-plus/test';
 
+import { testRuntimeCommand } from './test-runtime.ts';
 import { openWorkRecords } from './work-records.ts';
 
 const packaged = {
@@ -87,3 +89,74 @@ test('a build role runs the runtime frozen at run start despite the shell and la
         rmSync(dir, { recursive: true, force: true });
     }
 }, 30_000);
+
+test('a run whose frozen runtime no longer matches its node is held before any test runs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'test-runtime-mismatch-'));
+    const records = await openWorkRecords(join(dir, 'work-records.db'));
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    try {
+        const work = records.create({ title: 'Bug', repository: 'fake/app', kind: 'bug' });
+
+        writeFileSync(
+            join(dir, 'project-runtimes.json'),
+            JSON.stringify({ 'fake/app': { node: process.execPath, version: 'v0.0.0' } }),
+        );
+        records.snapshotRun(work.workId, work.revision, { runId: 'build-1', kind: 'build', skills: [], packaged });
+
+        const marker = join(dir, 'ran');
+        const code = await testRuntimeCommand([
+            work.workId,
+            '--data-dir',
+            dir,
+            '--run-id',
+            'build-1',
+            '--role',
+            'checks',
+            '--',
+            process.execPath,
+            '-e',
+            `require('node:fs').writeFileSync(${JSON.stringify(marker)}, '')`,
+        ]);
+
+        expect(code).toBe(1);
+        expect(existsSync(marker)).toBe(false);
+        expect(stderr.mock.calls.join('')).toContain(
+            `frozen test runtime mismatch: expected v0.0.0, found ${process.version}. Tests were not executed.`,
+        );
+    } finally {
+        stderr.mockRestore();
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('legacy run settings with no frozen runtime hold the run instead of borrowing another', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'test-runtime-legacy-'));
+    const records = await openWorkRecords(join(dir, 'work-records.db'));
+
+    try {
+        const work = records.create({ title: 'Preparation', repository: 'fake/app', kind: 'feature' });
+        const later = records.snapshotRun(work.workId, work.revision, {
+            runId: 'later',
+            kind: 'shaping',
+            skills: [],
+            packaged,
+        });
+        // Emulate a persisted pre-runtime snapshot; it must not borrow 'later' or mutable project settings.
+        const legacy = new DatabaseSync(join(dir, 'work-records.db'));
+
+        legacy
+            .prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)')
+            .run(work.workId, 'legacy', JSON.stringify({ ...later, runId: 'legacy', testRuntime: undefined }));
+        legacy.close();
+
+        expect(() => records.testRuntime(work.workId, 'legacy')).toThrow(
+            'Run legacy (shaping) held: legacy run settings have no frozen test runtime. Tests were not executed.',
+        );
+        expect(records.testRuntime(work.workId, 'later')).toEqual(later.testRuntime);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

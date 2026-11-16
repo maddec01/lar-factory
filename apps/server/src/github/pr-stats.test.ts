@@ -77,6 +77,23 @@ test('a stale stats read never lowers known final figures, including when the PR
     assert.equal(updatedBody(body, statsBlock({ ...stale, frozen: true })), null);
 });
 
+test('markers count only alone on their own line, so a marker quoted in prose is left as it is', () => {
+    const prose = 'The board writes `<!-- lar-stats -->` and <!-- /lar-stats --> markers.';
+
+    assert.equal(withStatsBlock(prose, block), `${prose}\n\n${block}`);
+
+    const quotedThenReal = `Quote: <!-- lar-stats --> here\r\n<!-- lar-stats -->\r\nold\r\n<!-- /lar-stats -->\r\nEnd <!-- /lar-stats -->`;
+
+    assert.equal(
+        withStatsBlock(quotedThenReal, block),
+        `Quote: <!-- lar-stats --> here\r\n${block}\r\nEnd <!-- /lar-stats -->`,
+    );
+    assert.equal(
+        withStatsBlock('<!-- lar-stats -->\nno end, then <!-- /lar-stats --> inline', block),
+        `<!-- lar-stats -->\nno end, then <!-- /lar-stats --> inline\n\n${block}`,
+    );
+});
+
 test('edits refresh open and merged PRs whose block is missing or out of date, leaving closed ones alone', () => {
     const current = `Body\n\n${block}`;
 

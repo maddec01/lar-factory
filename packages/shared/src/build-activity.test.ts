@@ -5,7 +5,6 @@ import {
     buildsAtWork,
     canRetryBuild,
     delegatedWorkRunning,
-    limitNumber,
     workingAgain,
     type Item,
     type StartProgress,
@@ -224,11 +223,6 @@ it('counts builds against the build limit while they start, build or work again,
         buildsAtWork({ items, startProgress }, true).map((i) => i.id),
         'unknown activity retains a started build reservation',
     ).toEqual(['starting', 'may', 'progress', 'review', 'again']);
-});
-
-it('a limit allows its number, or what Automatic gives', () => {
-    expect(limitNumber({ limit: 'automatic', automatic: 3 })).toBe(3);
-    expect(limitNumber({ limit: 5, automatic: 3 })).toBe(5);
 });
 
 it('excludes a coordinating linked parent while counting real child builds and explicit parent build evidence', () => {

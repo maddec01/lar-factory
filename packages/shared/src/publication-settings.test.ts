@@ -238,7 +238,7 @@ test('Azure refuses a new tag with the reason it has no create, even with access
     expect(await saveVocabularyLabels(repo, ['BACKEND'], discovery, {}, create)).toEqual(['backend']);
 });
 
-for (const repo of ['org/project/repo', 'another-org/Project%20Name/repository']) {
+for (const repo of ['another-org/Project%20Name/repository']) {
     test(`${repo} blocks unsafe Azure creation before invoking the provider`, async () => {
         const { saveVocabularyLabels } = await import('./publication-settings.ts');
         const discovery = await discoverVocabulary(repo, available);

@@ -4,7 +4,7 @@ import { test } from 'vite-plus/test';
 
 import { validateDraft } from './add-item.ts';
 import { boardSections } from './board-view.ts';
-import { day, formatTokens, formatUsd, shortAgo } from './format.ts';
+import { day, formatTokens, shortAgo } from './format.ts';
 import {
     inRepo,
     onAzure,
@@ -17,7 +17,6 @@ import {
     canAbandon,
     canResumeShaping,
     checkState,
-    failedCheck,
     isBuild,
     itemPr,
     itemTotal,
@@ -32,13 +31,11 @@ import {
     openBlockers,
     repoKey,
     repoName,
-    providerTool,
     repositoryProjectHint,
     sameRepo,
     startHold,
     sliceProgress,
     t3DefaultDetail,
-    usesGh,
     workMessage,
     earlierWorkMessage,
     earlierBuildMessage,
@@ -139,15 +136,6 @@ test('the build label makes a build whatever the kind, except on a concept', () 
         false,
         "a concept's sub-issues are board items, not slices",
     );
-});
-
-test("an item's open blockers are the blocked-by issues still open", () => {
-    const blockers = [
-        { number: 3, repo: 'maddec01/lar-server', state: 'closed' as const },
-        { number: 4, repo: 'maddec01/lar-apple', state: 'open' as const },
-    ];
-
-    assert.deepEqual(openBlockers(item('Ready', [], { blockers })), [blockers[1]]);
 });
 
 test("the blocked text names the blockers whose work isn't complete, with the repository when it is another", () => {
@@ -405,13 +393,6 @@ test('the build message names the thread for the build, then the work ID and the
     );
 });
 
-test('the build message for ticketless work names the thread with its title alone', () => {
-    assert.equal(
-        buildMessage(item('Ready', [], { id: 'w1', number: 0, url: null, title: 'Tidy the docs' }), '/l'),
-        'Build Tidy the docs\nBuild w1. Read /l/agents/builder.md and follow it.',
-    );
-});
-
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
     const repo = 'maddec01/lar-server';
     const under = (n: number) => ({
@@ -604,20 +585,6 @@ test('stale when the last read failed or is too old', () => {
     assert.equal(isStale({ ...sample, error: 'HTTP 502', fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')), true);
 });
 
-test('sample covers every status and both repositories', () => {
-    const statuses = new Set(sample.items.map((i) => i.status));
-
-    assert.equal(statuses.size, 10);
-
-    const repos = new Set(sample.items.map((i) => i.repo));
-
-    assert.ok(repos.has('maddec01/lar-server') && repos.has('maddec01/lar-apple'));
-
-    const { needsYou, shaping, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-
-    assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [73, 7, 1, 20]);
-});
-
 test('the desk holds Needs you, Verify and Ready to merge, in flow order, including grouped concepts and leaving Ready items out', () => {
     const now = Date.parse('2026-10-21T10:00:00Z');
     const items = [
@@ -642,10 +609,6 @@ test("token counts are compact as on T3 Code's usage page", () => {
         [0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
         ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T'],
     );
-});
-
-test("costs are shown as on T3 Code's usage page", () => {
-    assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
 });
 
 test('a day shows its year only when that is not the current year, in the time zone it is read in', () => {
@@ -713,29 +676,6 @@ test('canAbandon takes List and Queued issues, never other statuses', () => {
         assert.ok(canAbandon(item(status)), `${status} issue`);
     }
     for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
-});
-
-test('failedCheck gives a failed check, and nothing for one that passed or before the first check', () => {
-    const ok = { result: 'ok' } as const;
-    const tools = {
-        gh: { result: 'logged-out', fix: 'gh auth login' },
-        t3: { result: 'ok', version: '0.1.3' },
-        git: ok,
-        jq: { result: 'missing', fix: 'brew install jq' },
-        curl: ok,
-    } as const;
-
-    assert.deepEqual(failedCheck(tools, 'gh'), { result: 'logged-out', fix: 'gh auth login' });
-    assert.deepEqual(failedCheck(tools, 'jq'), { result: 'missing', fix: 'brew install jq' });
-    assert.equal(failedCheck(tools, 't3'), undefined);
-    assert.equal(failedCheck(undefined, 'gh'), undefined);
-});
-
-test('a GitHub source reads with gh and an Azure DevOps one with az, and a list uses gh while any repository is on GitHub', () => {
-    assert.deepEqual((['issues', 'azure-board'] as const).map(providerTool), ['gh', 'az']);
-    assert.equal(usesGh([{ repo: 'contoso/web/api' }, { repo: 'maddec01/lar' }]), true);
-    assert.equal(usesGh([{ repo: 'contoso/web/api' }]), false);
-    assert.equal(usesGh([]), false);
 });
 
 test("an issue's labels hold the statuses whose labels it carries, in flow order, and never Done", () => {

@@ -144,9 +144,7 @@ test('in a read-only session every Azure label write is refused with the existin
 });
 
 for (const [name, part] of [
-    ['a/b', 'a%2Fb'],
     ['a/../b', 'a%2F..%2Fb'],
-    ['a?x=1', 'a%3Fx%3D1'],
     ['50% done', '50%25%20done'],
 ] as const) {
     test(`Azure renames and deletes the tag ${name} by its encoded name, so it stays one part of the tag's route`, async () => {

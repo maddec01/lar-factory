@@ -120,7 +120,6 @@ function SettingsModal() {
     // Each push parses into new objects, so only the text can tell that nothing Settings shows changed.
     const shown = useBoardStore((state) => JSON.stringify(settingsData(state.data)));
     const data = useMemo(() => JSON.parse(shown) as SettingsData, [shown]);
-    const targets = useSettingsStore((state) => state.targets);
     const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
     const { section, project, setSection, setOpen } = useSettingsStore();
     // The title bar's Update pill follows the updater too, but it isn't there above the missing-t3 notice.
@@ -139,7 +138,6 @@ function SettingsModal() {
     const all = pages({
         data,
         app: !!boardApp(),
-        targets,
         version,
         archive: { items: archived, problem: archiveProblem },
     });

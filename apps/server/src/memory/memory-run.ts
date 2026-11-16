@@ -3,7 +3,7 @@
 //   pnpm run memory:run --app <path to Lar Factory.app> --out <new folder> [--minutes 30] [--force-gc]
 //   pnpm run memory:run --report <folder>    writes the report again from a finished run's folder
 // Quit the installed board first: the app allows one running copy. LAR_FACTORY_INSTALL_ROOT keeps the launch from
-// rewriting ~/.local/bin/lar-work and the installed skills. Start no builds during a run, as they would name that folder.
+// rewriting the lar-work launcher in ~/.local/bin. Start no builds during a run, as they would name that folder.
 
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';

@@ -3,7 +3,6 @@
 // reads and server restarts keep the loaded board visible.
 
 import {
-    boardApp,
     BRAND_BLOCK_COLOR,
     BRAND_MARK_BAR,
     BRAND_MARK_BLOCK,
@@ -16,7 +15,6 @@ import { createPortal } from 'react-dom';
 
 import { stepText } from './StepText';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { useInstallStore } from '@/services/install/install.hooks';
 import { LoadingScreen as Screen } from '@/ui/board';
 
 /** The draw (lar-apple's LarLogoMark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
@@ -133,17 +131,6 @@ export function LoadingScreen() {
     const { current, leaving, rolled } = useLines(stepText(read));
 
     useInertBoard(phase !== 'gone');
-
-    const installs = useInstallStore((state) => state.snapshot?.installs);
-    const follow = useInstallStore((state) => state.follow);
-
-    useEffect(follow, [follow]);
-    useEffect(() => {
-        if (phase === 'gone' && installs)
-            void boardApp()
-                ?.boardReady()
-                .catch(() => {});
-    }, [phase, installs]);
 
     if (phase === 'gone') return null;
 

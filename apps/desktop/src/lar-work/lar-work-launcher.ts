@@ -8,7 +8,8 @@
 // needs an admin on Apple Silicon Macs, and /opt/homebrew/bin belongs to Homebrew.
 //
 // A packaged app rewrites the launcher on each launch where it no longer names this app, so it follows the app after
-// it moves or updates. A file at that path without the launcher's mark is not the app's: it stays, and the launch logs it.
+// it moves or updates. A dev run installs it only with LAUNCHER_FLAG. A file at that path without the launcher's mark is
+// not the app's: it stays, and the launch logs it.
 
 import { DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import * as Effect from 'effect/Effect';
@@ -17,6 +18,14 @@ import * as NodePath from 'node:path';
 
 /** The launcher's second line, which tells a launcher the app wrote from a file it didn't. */
 const MARK = '# Installed by the Lar Factory app, which rewrites this file on launch.';
+
+/** Installs the launcher from a dev run. A packaged app ignores it and installs on every launch. */
+const LAUNCHER_FLAG = '--install-launcher';
+/** Puts the launcher under this folder instead of the user's home, for dev runs and tests. */
+const ROOT_ENV = 'LAR_FACTORY_INSTALL_ROOT';
+
+/** The home the launcher goes in: the folder ROOT_ENV names when it is set and not empty, else `home`. */
+export const installHome = (home: string, env: Readonly<Record<string, string | undefined>>) => env[ROOT_ENV] || home;
 
 export const launcherPath = (home: string) => NodePath.join(home, '.local/bin/lar-work');
 
@@ -92,11 +101,11 @@ export const install = (input: InstallInput): InstallOutcome => {
     return { kind: 'installed', path };
 };
 
-/** Installs the launcher in a packaged app or an explicitly opted-in dev run. Never fails. */
+/** Installs the launcher in a packaged app, or in a dev run whose `argv` holds LAUNCHER_FLAG. Never fails. */
 export const onLaunch = Effect.fn('LarWorkLauncher.onLaunch')(function* (
-    input: InstallInput & { readonly isPackaged: boolean; readonly installInDevelopment?: boolean },
+    input: InstallInput & { readonly isPackaged: boolean; readonly argv: ReadonlyArray<string> },
 ) {
-    if (!input.isPackaged && !input.installInDevelopment) return;
+    if (!input.isPackaged && !input.argv.includes(LAUNCHER_FLAG)) return;
 
     yield* Effect.try(() => install(input)).pipe(
         Effect.flatMap((outcome) => {

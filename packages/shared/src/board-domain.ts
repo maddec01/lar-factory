@@ -1,6 +1,5 @@
 // Instructions sent to work threads; separate from board copy.
 
-import type { SkillStatus } from './install-skills.ts';
 import { type Item, type Checks, type CheckState, type Pipeline, SLOW_CHECKS_MS } from './item-domain.ts';
 import type { RepositorySetup, OnboardingRepository, ProjectIcon } from './model-settings.ts';
 import type { ToolChecks, ToolProgress } from './model-tools.ts';
@@ -84,8 +83,6 @@ export interface BundledSkill {
     source: string;
     /** A Copy's Date in UPSTREAM.md, the day of the upstream commit it matches; absent for Lar's own. */
     date?: string;
-    /** A skill's state in the install manifest; absent for a checklist, and before the first install that records it. */
-    status?: SkillStatus;
 }
 
 /**

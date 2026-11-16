@@ -1,15 +1,6 @@
 // The IPC channels between the main process and the preload. Kept apart from the backend, so the
 // sandboxed preload bundles no Node code.
 
-// The skill install: the page reads its state at once and gets each change; the others are the page's operations.
-export const INSTALL_BOARD_READY = 'board-app:install-board-ready';
-export const INSTALL_GET_STATE = 'board-app:install-get-state';
-export const INSTALL_STATE = 'board-app:install-state';
-export const INSTALL_CLOSE_OVERVIEW = 'board-app:install-close-overview';
-export const INSTALL_RETRY = 'board-app:install-retry';
-export const INSTALL_REPLACE = 'board-app:install-replace';
-export const INSTALL_SET_TICK = 'board-app:install-set-tick';
-
 // The window's full screen, as T3 Code's: the page reads it at once and gets each change on macOS.
 export const GET_WINDOW_FULLSCREEN_STATE = 'board-app:get-window-fullscreen-state';
 export const WINDOW_FULLSCREEN_STATE = 'board-app:window-fullscreen-state';

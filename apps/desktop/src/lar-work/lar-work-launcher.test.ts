@@ -1,7 +1,6 @@
 import { assert, beforeAll, describe, it } from '@effect/vitest';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { defaultTargets, installSkills } from '@lar-factory/shared/install-skills';
-import { installTargets } from '@lar-factory/shared/install-targets';
+import * as Effect from 'effect/Effect';
 import electron from 'electron';
 // Builds the lar-work bundle as the pack step does and runs it, directly and through the launcher, with Electron's
 // Node from a folder that holds no factory files.
@@ -10,7 +9,7 @@ import * as NodeFS from 'node:fs';
 import * as NodePath from 'node:path';
 import { build } from 'vite-plus/pack';
 
-import { makeBundle, tempDir } from '../../test/support.ts';
+import { tempDir } from '../../test/support.ts';
 import { larWorkPack } from '../../vite.config.ts';
 import * as LarWorkLauncher from './lar-work-launcher.ts';
 
@@ -48,27 +47,11 @@ describe('install', () => {
             { driver: 'claudeAgent', home: tempDir('claude-home-') },
             { driver: 'codex', home: tempDir('codex-home-') },
         ];
-
-        // Claude Code makes its home folder; the app installs only where one exists.
-        NodeFS.mkdirSync(NodePath.join(agents[0]!.home, '.claude'));
-
-        const targets = agents.map(
-            ({ driver, home }) => installTargets(driver, appHome, { environment: [{ name: 'HOME', value: home }] })[0]!,
-        );
-
-        // As the app installs: into the fallback targets and those of T3's instances.
-        installSkills(appHome, makeBundle(), '1.0.0', { targets: [...defaultTargets(appHome), ...targets] });
-
-        const workIds = agents.map(({ driver, home }, index) => {
-            assert.isTrue(NodeFS.existsSync(NodePath.join(targets[index]!.path, 'lar-work/SKILL.md')));
-
+        const workIds = agents.map(({ driver, home }) => {
             const created = runFrom(
                 LarWorkLauncher.launcherPath(appHome),
                 ['create', '--title', driver, '--repository', 'maddec01/lar', '--kind', 'build'],
-                {
-                    cwd: tempDir('worktree-'),
-                    home,
-                },
+                { cwd: tempDir('worktree-'), home },
             );
 
             assert.strictEqual(created.status, 0, created.stderr);
@@ -83,4 +66,36 @@ describe('install', () => {
             assert.strictEqual(JSON.parse(read.stdout).title, agents[index]!.driver);
         }
     });
+});
+
+describe('onLaunch', () => {
+    const launch = (home: string, argv: ReadonlyArray<string>) =>
+        LarWorkLauncher.onLaunch({
+            isPackaged: false,
+            argv,
+            home,
+            executablePath: ELECTRON,
+            commandFile,
+            dataDir: boardDataDir(home),
+        });
+
+    it.effect('installs nothing from a dev run without the launcher flag', () =>
+        Effect.gen(function* () {
+            const home = tempDir('dev-home-');
+
+            yield* launch(home, ['.']);
+
+            assert.isFalse(NodeFS.existsSync(LarWorkLauncher.launcherPath(home)));
+        }),
+    );
+
+    it.effect('installs the launcher from a dev run with --install-launcher', () =>
+        Effect.gen(function* () {
+            const home = tempDir('dev-home-');
+
+            yield* launch(home, ['.', '--install-launcher']);
+
+            assert.isTrue(NodeFS.existsSync(LarWorkLauncher.launcherPath(home)));
+        }),
+    );
 });

@@ -1,58 +1,12 @@
-import { day, type BundledSkill, type TargetSnapshot } from '@lar-factory/shared';
-// Settings' Skills page: the folders the app installs its skills into, and who wrote each bundled skill.
-import { Inline, InlineLink, Link, Text } from '@lar-works/design-system';
+import { day, type BundledSkill } from '@lar-factory/shared';
+// Settings' Skills page: who wrote each bundled skill.
+import { InlineLink, Link, Text } from '@lar-works/design-system';
 
-import { TargetSwitch, TargetsNote } from './AppRows';
 import { custom, type Group, type PagesInput, type Row } from './SettingsModel';
-import { BlockedReason, InstallState } from './SkillInstallStatus';
-import { TargetProgress } from './TargetProgress';
-import { TargetReaders } from './TargetReaders';
 import { LoadFailed, MetaLine } from '@/ui/board';
 
-/** Why a target can't be unticked, or nothing. */
-function lockedReason({ locked, instances }: TargetSnapshot): string | undefined {
-    if (!locked) return undefined;
-
-    return instances.length > 0
-        ? 'T3 Code’s provider instances read it, so it stays ticked.'
-        : 'Claude’s skill links point here, so it stays ticked.';
-}
-
 /**
- * What a target's row says: for a selected target whose provider home doesn't exist, that it isn't installed until
- * the home does, since its switch shows off; otherwise why it can't be unticked, or nothing.
- */
-function targetNote(target: TargetSnapshot): string | undefined {
-    if (!target.homeMissing) return lockedReason(target);
-
-    const home = target.path.replace(/\/skills$/, '');
-    const why = target.instances.length > 0 ? 'T3 Code’s provider instances read it; ' : '';
-
-    return `Not installed until ${home} exists. ${why}Lar Factory installs here once it exists.`;
-}
-
-export function targetGroup({ targets }: PagesInput): Group {
-    return {
-        title: 'Skill folders',
-        note: <TargetsNote />,
-        rows: (targets ?? []).map((target) => ({
-            id: `target-${target.path}`,
-            title: target.path,
-            description: targetNote(target),
-            control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
-            below: (
-                <>
-                    <TargetReaders target={target} />
-                    <TargetProgress target={target} />
-                </>
-            ),
-        })),
-    };
-}
-
-/**
- * Who wrote each skill and checklist the app bundles, under which licence, its last update, its install state and a
- * link to its source. A Copy's last update is its Date in UPSTREAM.md; Lar's own skills update with the app.
+ * Who wrote each skill and checklist the app bundles, under which licence, its last update and a link to its source. A Copy's last update is its Date in UPSTREAM.md; Lar's own skills update with the app.
  */
 export function bundledGroup({ data, version }: PagesInput): Group {
     const skills = data.bundledSkills ?? [];
@@ -84,16 +38,12 @@ export function bundledGroup({ data, version }: PagesInput): Group {
                               )}
                           </Text>
                       ) : null}
-                      <BlockedReason status={skill.status} />
                   </>
               ),
               control: custom(() => (
-                  <Inline as="span" space="related" align="center">
-                      <InstallState status={skill.status} />
-                      <Link variant="caption" external aria-label={`${skill.name} source`} href={skill.source}>
-                          Source
-                      </Link>
-                  </Inline>
+                  <Link variant="caption" external aria-label={`${skill.name} source`} href={skill.source}>
+                      Source
+                  </Link>
               )),
           }))
         : [
@@ -114,5 +64,5 @@ export function bundledGroup({ data, version }: PagesInput): Group {
               },
           ];
 
-    return { title: 'Bundled skills', help: 'The skills and checklists the app installs, and who wrote them.', rows };
+    return { title: 'Bundled skills', help: 'The skills and checklists the app bundles, and who wrote them.', rows };
 }

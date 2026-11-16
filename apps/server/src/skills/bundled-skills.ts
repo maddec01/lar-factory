@@ -1,7 +1,6 @@
-// Reads the two bundled Lar skills, their included authors and install states for Settings.
+// Reads the two bundled Lar skills and their included authors for Settings.
 
 import type { BundledSkill } from '@lar-factory/shared';
-import { readSkillStatus } from '@lar-factory/shared/install-skills';
 import { readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -91,22 +90,9 @@ export function bundledSkillNames(url: URL = bundleUrl()): string[] {
         .map((entry) => entry.name);
 }
 
-/** The home the board app installs skills into: LAR_FACTORY_INSTALL_ROOT when set, else the user's home. */
+/** The home the board app installs the lar-work launcher under: LAR_FACTORY_INSTALL_ROOT when set, else the user's home. */
 export function installHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
     return env.LAR_FACTORY_INSTALL_ROOT || home;
-}
-
-/** `skills` with each skill's state from the install manifest in `home`; unchanged when there is none or it can't be read. */
-export function withInstallState(skills: BundledSkill[], home: string): BundledSkill[] {
-    let status;
-
-    try {
-        status = readSkillStatus(home);
-    } catch {
-        return skills;
-    }
-
-    return skills.map((skill) => (status?.[skill.name] ? { ...skill, status: status[skill.name] } : skill));
 }
 
 /** The bundle's skills, or none when it can't be read, with the reason. */

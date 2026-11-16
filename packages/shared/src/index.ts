@@ -1,11 +1,10 @@
 // The modules the server, the page and the desktop app share. None of them uses Node, so
-// the page can bundle them; the skill installer, which does, is @lar-factory/shared/install-skills.
+// the page can bundle them.
 
 export * from './model.ts';
 export * from './verification.ts';
 export * from './thread-activity.ts';
 export * from './format.ts';
-export * from './blocked-skill.ts';
 export * from './brand-mark.ts';
 export * from './board-view.ts';
 export * from './start-menu.ts';
@@ -15,7 +14,6 @@ export * from './github-items.ts';
 export * from './linked-flow.ts';
 export * from './page-data.ts';
 export * from './board-app.ts';
-export * from './install-snapshot.ts';
 export * from './is-record.ts';
 export * from './custom-labels.ts';
 export * from './managed-labels.ts';

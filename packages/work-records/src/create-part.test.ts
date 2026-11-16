@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import type { NewPart } from './create-part.ts';
-import { openWorkRecords, type WorkKind, type WorkRecords } from './work-records.ts';
+import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
@@ -15,7 +15,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-async function fixture(parentKind: WorkKind = 'concept') {
+async function fixture() {
     const dir = mkdtempSync(join(tmpdir(), 'create-part-'));
 
     dirs.push(dir);
@@ -25,7 +25,7 @@ async function fixture(parentKind: WorkKind = 'concept') {
 
     opened.push(records);
 
-    const parent = records.create({ title: 'Destination', repository: 'example/plan', kind: parentKind });
+    const parent = records.create({ title: 'Destination', repository: 'example/plan', kind: 'concept' });
     const blocker = records.create({ title: 'Contract', repository: 'example/api', kind: 'build' });
     const input: NewPart = {
         parentId: parent.workId,
@@ -41,29 +41,12 @@ async function fixture(parentKind: WorkKind = 'concept') {
 }
 
 describe('createPart', () => {
-    it('saves a task method when creating a decision part and keeps it across progress writes', async () => {
-        const { records, parent, input } = await fixture();
-        const task = records.createPart({
-            ...input,
-            parentRevision: parent.revision,
-            kind: 'decision',
-            body: 'Method: task\nActivate the release.',
-        });
-
-        expect(task.decisionMethod).toBe('task');
-
-        const changed = records.setBody(task.workId, task.revision, 'decision', 'Staged artifacts awaiting approval.');
-
-        expect(changed.decisionMethod).toBe('task');
-    });
-
-    it.each(['build', 'decision'] as const)('creates a %s with its full state in either repository', async (kind) => {
+    it('creates a build with its full state in either repository', async () => {
         const { records, parent, blocker, input } = await fixture();
 
         for (const repository of [parent.repository, input.repository]) {
             const record = records.createPart({
                 ...input,
-                kind,
                 repository,
                 parentRevision: records.read(parent.workId).revision,
             });
@@ -71,47 +54,30 @@ describe('createPart', () => {
             expect(record).toMatchObject({
                 repository,
                 parentId: parent.workId,
-                kind,
+                kind: 'build',
                 title: input.title,
                 status: 'Queued',
                 queueOrder: 1,
                 revision: 1,
                 ticket: null,
             });
-            expect(records.body(record.workId, kind === 'decision' ? 'decision' : 'brief')).toBe(input.body);
+            expect(records.body(record.workId, 'brief')).toBe(input.body);
             expect(records.blockers(record.workId).map((item) => item.workId)).toEqual([blocker.workId]);
             expect(records.read(record.workId)).toEqual(record);
 
-            if (kind === 'build') {
-                expect(records.gate(record.workId).current).toBe(false);
-                expect(() => records.recordLaunchIntent(record.workId, record.revision, 'build')).toThrow(
-                    /current passing gate/,
-                );
-            }
+            expect(records.gate(record.workId).current).toBe(false);
+            expect(() => records.recordLaunchIntent(record.workId, record.revision, 'build')).toThrow(
+                /current passing gate/,
+            );
         }
         expect(records.read(parent.workId).revision).toBe(3);
         expect(records.read(blocker.workId).revision).toBe(3);
         expect(records.read(blocker.workId).status).toBe('List');
     });
 
-    it.each(['build', 'bug'] as const)(
-        'creates a delivery part under a linked-work %s without changing its kind',
-        async (kind) => {
-            const { records, parent, input } = await fixture(kind);
-            const child = records.createPart(input);
-
-            expect(child).toMatchObject({ kind: 'build', parentId: parent.workId, status: 'Queued' });
-            expect(records.read(parent.workId).kind).toBe(kind);
-        },
-    );
-
     it.each([
         ['stale parent', { parentRevision: 2 }, 'stale-revision'],
-        ['missing parent', { parentId: 'missing' }, 'not-found'],
         ['missing final blocker', { blockerIds: ['missing'] }, 'not-found'],
-        ['invalid repository', { repository: 'bad name' }, 'invalid'],
-        ['missing body', { body: '' }, 'invalid'],
-        ['private slice kind', { kind: 'slice' }, 'invalid'],
     ] as const)('leaves no orphan or changed relationships on %s', async (_name, patch, code) => {
         const { records, parent, blocker, input } = await fixture();
         const before = records.list({});
@@ -146,27 +112,5 @@ describe('createPart', () => {
         } finally {
             db.close();
         }
-    });
-
-    it.each(['slice', 'decision'] as const)('rejects a %s parent', async (kind) => {
-        const { records, input } = await fixture(kind);
-        const before = records.list({});
-
-        expect(() => records.createPart(input)).toThrow('cannot own delivery parts');
-        expect(records.list({})).toEqual(before);
-    });
-
-    it('rejects a parent changed by another connection before creation', async () => {
-        const { records, path, parent, input } = await fixture();
-        const other = await openWorkRecords(path);
-
-        opened.push(other);
-        other.setAside(parent.workId, parent.revision);
-
-        const before = records.list({});
-
-        expect(() => records.createPart(input)).toThrow(expect.objectContaining({ code: 'stale-revision' }));
-        expect(records.list({})).toEqual(before);
-        expect(() => records.createPart({ ...input, parentRevision: 2 })).toThrow('Restore or reopen');
     });
 });

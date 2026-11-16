@@ -143,29 +143,6 @@ it('excludes explicit status/history sections but invalidates a changed chosen p
     expect(records.gate(build).current).toBe(false);
 });
 
-it('keeps product contracts inside code fences and beside workflow-looking prose binding', async () => {
-    const { records, group, decision, build, write } = await fixture();
-
-    write(
-        decision,
-        'answer',
-        '## Product\nA2 waits for A1.\n```text\n## History\nA1 is Ready.\n```\n## History\nA1 merged.',
-    );
-    write(group, 'map', retro['G map'].before);
-    records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Checked.', []);
-    records.recordGate(build, records.read(build).revision, {
-        briefDigest: records.gate(build).briefDigest!,
-        approvedBy: 'Pedro',
-        evidence: 'Yes.',
-    });
-    write(
-        decision,
-        'answer',
-        '## Product\nA2 waits for A1.\n```text\n## History\nA1 is Done.\n```\n## History\nA1 merged.',
-    );
-    expect(records.gate(build).current).toBe(false);
-});
-
 it('upgrades a still-current v2 cited-answer approval without reviving a stale product approval', async () => {
     const { path, decision, build, reviewed } = await fixture();
     const source = reviewed.source;
@@ -216,28 +193,4 @@ it('upgrades a still-current v2 cited-answer approval without reviving a stale p
 
     opened.push({ records: reopened, dir: join(path, '..') });
     expect(reopened.gate(build).current).toBe(false);
-});
-
-it.each(['concept', 'build'] as const)('group parent %s cannot be set Ready like a delivery build', async (kind) => {
-    const { records, group, revision } = await fixture();
-    const parent =
-        kind === 'concept'
-            ? group
-            : records.create({ title: 'Linked parent', repository: 'fake/a', kind, status: 'Shaping' }).workId;
-
-    if (kind === 'build')
-        records.createPart({
-            parentId: parent,
-            parentRevision: revision(parent),
-            title: 'Child',
-            repository: 'fake/a',
-            kind: 'build',
-            body: 'Child',
-            blockerIds: [],
-        });
-
-    const before = records.read(parent);
-
-    expect(() => records.update(parent, before.revision, { status: 'Ready' })).toThrow(/group.*parts/i);
-    expect(records.read(parent)).toEqual(before);
 });

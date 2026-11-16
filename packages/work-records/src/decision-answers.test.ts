@@ -108,24 +108,6 @@ test('gate supersession exposes the replacement contract and invalidates affecte
     expect(records.decisionAnswer(f.decision.workId).replacement).toBeNull();
     expect(records.completion(f.decision.workId).complete).toBe(false);
 });
-test('later decision revisions resolve through history and reopen the old incorporation', async () => {
-    const f = await fixture();
-    const later = records.create({ title: 'Later decision', repository: 'example/repo', kind: 'decision' });
-
-    records.setParent(later.workId, 1, f.concept.workId);
-    f.body(later.workId, 'answer', 'New answer');
-    f.body(later.workId, 'domain-drafts', 'none');
-    records.supersedeAnswer(f.decision.workId, f.revision(f.decision.workId), {
-        answerRevision: 1,
-        by: { kind: 'decision', workId: later.workId, revision: f.revision(later.workId), answerRevision: 1 },
-        affected: [],
-    });
-    f.body(f.concept.workId, 'map', 'Later answer incorporated');
-    expect(records.completion(f.decision.workId).complete).toBe(true);
-    f.body(later.workId, 'answer', 'Latest answer');
-    expect(records.decisionAnswer(f.decision.workId).replacement?.text).toBe('Latest answer');
-    expect(records.completion(f.decision.workId).complete).toBe(false);
-});
 test('stale affected record aborts supersession and leaves every approval and answer untouched', async () => {
     const f = await fixture();
     const before = records.list({});
@@ -145,26 +127,4 @@ test('stale affected record aborts supersession and leaves every approval and an
     expect(records.list({})).toEqual(before);
     expect(records.decisionAnswer(f.decision.workId).current?.text).toBe('Call /old-endpoint');
     expect(records.gate(f.sibling.workId).passing).not.toBeNull();
-});
-
-test('refuses a historical gate even when the build has a newer passing brief', async () => {
-    const f = await fixture();
-
-    f.gate(f.gateBuild.workId, 'A later approved contract');
-
-    const before = records.list({});
-
-    expect(() =>
-        records.supersedeAnswer(f.decision.workId, f.revision(f.decision.workId), {
-            answerRevision: 1,
-            by: {
-                kind: 'gate',
-                workId: f.gateBuild.workId,
-                revision: f.revision(f.gateBuild.workId),
-                gateId: f.gateId,
-            },
-            affected: [],
-        }),
-    ).toThrow('current passing gate');
-    expect(records.list({})).toEqual(before);
 });

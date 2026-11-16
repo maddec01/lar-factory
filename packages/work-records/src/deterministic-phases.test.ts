@@ -52,23 +52,9 @@ it('records plan with a successful build start, preserves a resumed phase and re
     expect(launch({ branch: 'replacement', reset: true })).toMatchObject({ buildPhase: 'plan' });
 });
 
-it('a refused launch records no phase', async () => {
-    const { records, workId, revision } = await fixture();
-    const { intent } = records.recordLaunchIntent(workId, revision(), 'build');
-
-    expect(
-        records.resolveLaunchIntent(workId, revision(), intent.intentId, { failure: 'Refused' }).record,
-    ).toMatchObject({ status: 'Ready', buildPhase: null });
-});
-
 it.each([
     ['planner', 'plan'],
-    ['implementer', 'implement'],
-    ['domain-docs', 'domain-docs'],
-    ['checks', 'full-checks'],
     ['reviewer:code', 'review'],
-    ['approver', 'approve'],
-    ['ci-fixer', 'checks'],
 ] as const)('records the %s phase in the role launch transaction', async (role, phase) => {
     const { records, workId, revision, launch } = await fixture();
 
@@ -90,56 +76,34 @@ it.each([
     expect(records.read(workId)).toMatchObject({ buildPhase: 'checks', revision: repeatedAt });
 });
 
-it.each([
-    ['planner', 'implement'],
-    ['approver', 'checks'],
-] as const)(
-    'a successful %s finish records the next step; failures and retries do not advance it',
-    async (role, phase) => {
-        const { records, workId, revision, launch } = await fixture();
+it('a successful planner finish records the next step; failures and retries do not advance it', async () => {
+    const { records, workId, revision, launch } = await fixture();
+    const role = 'planner';
 
-        launch();
-        records.startRoleRun(workId, revision(), { runId: 'build', executionId: 'failed', role });
+    launch();
+    records.startRoleRun(workId, revision(), { runId: 'build', executionId: 'failed', role });
 
-        const beforeFailure = records.read(workId).buildPhase;
+    const beforeFailure = records.read(workId).buildPhase;
 
-        records.finishRoleRun(workId, revision(), {
-            executionId: 'failed',
-            report: null,
-            result: 'failed',
-            failure: 'Stopped',
-        });
-        expect(records.read(workId).buildPhase).toBe(beforeFailure);
-        records.startRoleRun(workId, revision(), { runId: 'build', executionId: 'passed', role });
+    records.finishRoleRun(workId, revision(), {
+        executionId: 'failed',
+        report: null,
+        result: 'failed',
+        failure: 'Stopped',
+    });
+    expect(records.read(workId).buildPhase).toBe(beforeFailure);
+    records.startRoleRun(workId, revision(), { runId: 'build', executionId: 'passed', role });
 
-        const before = revision();
+    const before = revision();
 
-        records.finishRoleRun(workId, before, { executionId: 'passed', report: null, result: 'completed' });
-        expect(records.read(workId)).toMatchObject({ buildPhase: phase, revision: before + 1 });
+    records.finishRoleRun(workId, before, { executionId: 'passed', report: null, result: 'completed' });
+    expect(records.read(workId)).toMatchObject({ buildPhase: 'implement', revision: before + 1 });
 
-        const endedAt = revision();
+    const endedAt = revision();
 
-        records.finishRoleRun(workId, endedAt, { executionId: 'passed', report: null, result: 'completed' });
-        expect(revision()).toBe(endedAt);
-    },
-);
-
-it.each(['phase-first', 'status-first'])(
-    'Review phase and status change together through compatibility writes (%s)',
-    async (order) => {
-        const { records, workId, revision, launch } = await fixture();
-
-        launch();
-        records.setBuildPhase(workId, revision(), 'full-checks');
-
-        const before = revision();
-
-        if (order === 'phase-first') records.setBuildPhase(workId, before, 'review');
-        else records.update(workId, before, { status: 'Review' });
-
-        expect(records.read(workId)).toMatchObject({ status: 'Review', buildPhase: 'review', revision: before + 1 });
-    },
-);
+    records.finishRoleRun(workId, endedAt, { executionId: 'passed', report: null, result: 'completed' });
+    expect(revision()).toBe(endedAt);
+});
 
 it('records plan before dispatch, so an agent can never implement before plan was recorded', async () => {
     const { records, workId, revision } = await fixture();

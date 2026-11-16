@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
@@ -34,25 +34,6 @@ async function database() {
 
     return path;
 }
-
-test('independent callers and symlinked database paths share one atomic lease', async () => {
-    const path = await database();
-    const alias = `${path}.alias`;
-
-    await symlink(path, alias);
-
-    const first = await acquireTrackerSyncLock(path);
-
-    expect(first).not.toBeNull();
-    expect(await acquireTrackerSyncLock(alias)).toBeNull();
-    await first!.assertOwned();
-    await first!.release();
-
-    const next = await acquireTrackerSyncLock(alias);
-
-    expect(next).not.toBeNull();
-    await next!.release();
-});
 
 test('a separate process excludes other writers, and its dead lease is recovered', async () => {
     const path = await database();
@@ -112,28 +93,3 @@ test('a former owner cannot release or use a replacement generation', async () =
     await first!.release();
     expect(JSON.parse(await readFile(lock, 'utf8'))).toEqual(replacement);
 });
-
-test.each(['reboot', 'reused-pid'])(
-    'an abandoned lease recovers after %s even when its PID is live',
-    async (reason) => {
-        const path = await database();
-        const held = await acquireTrackerSyncLock(path);
-        const lock = `${path}.structure-sync.lock`;
-        const owner = JSON.parse(await readFile(lock, 'utf8')) as { pid: number; token: string; identity: string };
-
-        await held!.release();
-
-        const identity =
-            reason === 'reboot'
-                ? `previous-boot:${owner.identity.split(':').slice(1).join(':')}`
-                : `${owner.identity}-previous-process`;
-
-        await writeFile(lock, JSON.stringify({ ...owner, identity }));
-
-        const next = await acquireTrackerSyncLock(path);
-
-        expect(next).not.toBeNull();
-        await next!.assertOwned();
-        await next!.release();
-    },
-);

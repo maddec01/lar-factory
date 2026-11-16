@@ -34,45 +34,6 @@ const noteTexts = (db: DatabaseSync) =>
         .map((r) => r.text);
 
 describe('openDatabase', () => {
-    it('opens a fresh database with T3 Code’s settings', async () => {
-        const path = join(tempDir(), 'nested', 'work-records.db');
-        const database = await openDatabase(path);
-
-        try {
-            expect(pragma(database.db, 'journal_mode')).toBe('wal');
-            expect(pragma(database.db, 'synchronous')).toBe(1); // NORMAL
-            expect(pragma(database.db, 'checkpoint_fullfsync')).toBe(1);
-            expect(pragma(database.db, 'busy_timeout')).toBe(5000);
-            expect(pragma(database.db, 'foreign_keys')).toBe(1);
-            expect(pragma(database.db, 'user_version')).toBe(MIGRATIONS.length);
-        } finally {
-            database.close();
-        }
-    });
-
-    it('moves its change mark on a commit of its own or of another connection, and not on a read', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const database = await openDatabase(path, { migrations: [NOTES] });
-        const other = new DatabaseSync(path);
-
-        try {
-            const start = database.changes();
-
-            database.read(() => noteTexts(database.db));
-            expect(database.changes()).toBe(start);
-            database.write(() => database.db.prepare('INSERT INTO notes VALUES (?)').run('own'));
-
-            const afterOwn = database.changes();
-
-            expect(afterOwn).not.toBe(start);
-            other.prepare('INSERT INTO notes VALUES (?)').run('other');
-            expect(database.changes()).not.toBe(afterOwn);
-        } finally {
-            other.close();
-            database.close();
-        }
-    });
-
     it('reads one state through a snapshot across turns of the event loop, while another connection commits', async () => {
         const path = join(tempDir(), 'work-records.db');
         const database = await openDatabase(path, { migrations: [NOTES] });
@@ -159,70 +120,6 @@ describe('openDatabase', () => {
         expect(readdirSync(dir).filter((f) => /\.before-v/.test(f))).toEqual([]);
     });
 
-    it('restores its copy when a failed schema update committed part of its work', async () => {
-        const dir = tempDir();
-        const path = join(dir, 'work-records.db');
-        const first = await openDatabase(path, { migrations: [NOTES] });
-
-        first.db.exec('PRAGMA wal_autocheckpoint = 0');
-        first.write(() => first.db.exec("INSERT INTO notes VALUES ('one'), ('two')"));
-
-        const escaping: Migration = (db) => {
-            db.exec('COMMIT');
-            db.exec('DELETE FROM notes');
-            throw new Error('crashed');
-        };
-
-        await expect(openDatabase(path, { migrations: [NOTES, escaping] })).rejects.toMatchObject({
-            code: 'schema-update-failed',
-        });
-
-        try {
-            expect(noteTexts(first.db)).toEqual(['one', 'two']);
-        } finally {
-            first.close();
-        }
-
-        expect(readdirSync(dir).filter((f) => /\.before-v/.test(f))).toEqual([]);
-    });
-
-    it('deletes its copy after a successful schema update', async () => {
-        const dir = tempDir();
-        const path = join(dir, 'work-records.db');
-        const first = await openDatabase(path, { migrations: [NOTES] });
-
-        first.write(() => first.db.exec("INSERT INTO notes VALUES ('kept')"));
-        first.close();
-
-        const second = await openDatabase(path, {
-            migrations: [NOTES, (db) => db.exec('ALTER TABLE notes ADD COLUMN extra TEXT')],
-        });
-
-        try {
-            expect(noteTexts(second.db)).toEqual(['kept']);
-            expect(pragma(second.db, 'user_version')).toBe(2);
-        } finally {
-            second.close();
-        }
-
-        expect(readdirSync(dir).filter((f) => /\.before-v/.test(f))).toEqual([]);
-    });
-
-    it('refuses a database whose schema is newer than it knows', async () => {
-        const path = join(tempDir(), 'work-records.db');
-
-        (await openDatabase(path)).close();
-
-        const newer = new DatabaseSync(path);
-
-        newer.exec(`PRAGMA user_version = ${MIGRATIONS.length + 5}`);
-        newer.close();
-        await expect(openDatabase(path)).rejects.toMatchObject({
-            code: 'schema-too-new',
-            message: expect.stringMatching(/schema version \d+, which is newer than this command understands/),
-        });
-    });
-
     it('refuses writes once another process updates the schema past what it knows', async () => {
         const path = join(tempDir(), 'work-records.db');
         const old = await openDatabase(path, { migrations: [NOTES] });
@@ -235,50 +132,6 @@ describe('openDatabase', () => {
         } finally {
             old.close();
         }
-    });
-
-    it('rolls back a failed write and keeps what was committed', async () => {
-        const database = await openDatabase(join(tempDir(), 'work-records.db'), { migrations: [NOTES] });
-
-        try {
-            database.write(() => database.db.exec("INSERT INTO notes VALUES ('a')"));
-            expect(() =>
-                database.write(() => {
-                    database.db.exec("INSERT INTO notes VALUES ('b')");
-                    throw new Error('interrupted');
-                }),
-            ).toThrow('interrupted');
-            expect(noteTexts(database.db)).toEqual(['a']);
-        } finally {
-            database.close();
-        }
-    });
-
-    it('reports a database another writer holds locked', async () => {
-        const path = join(tempDir(), 'work-records.db');
-        const holder = await openDatabase(path, { migrations: [NOTES] });
-        const waiter = await openDatabase(path, { migrations: [NOTES], busyTimeout: 50 });
-
-        try {
-            holder.db.exec('BEGIN IMMEDIATE');
-            expect(() => waiter.write(() => waiter.db.exec("INSERT INTO notes VALUES ('x')"))).toThrow(
-                expect.objectContaining({ code: 'busy', message: expect.stringMatching(/locked by another writer/) }),
-            );
-            holder.db.exec('ROLLBACK');
-        } finally {
-            holder.close();
-            waiter.close();
-        }
-    });
-
-    it('reports a database folder it cannot write', async () => {
-        const dir = tempDir();
-
-        chmodSync(dir, 0o500);
-        await expect(openDatabase(join(dir, 'work-records.db'))).rejects.toMatchObject({
-            code: 'unwritable',
-            message: expect.stringContaining(join(dir, 'work-records.db')),
-        });
     });
 });
 

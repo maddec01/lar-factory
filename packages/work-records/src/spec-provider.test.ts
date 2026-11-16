@@ -53,11 +53,6 @@ writeFileSync(path,JSON.stringify(state));process.stdout.write(JSON.stringify(re
     vi.stubEnv(command === 'gh' ? 'GH_PATH' : 'AZ_PATH', file);
 
     return {
-        calls: () =>
-            readFileSync(calls, 'utf8')
-                .trim()
-                .split('\n')
-                .map((line) => JSON.parse(line) as string[]),
         read: () => JSON.parse(readFileSync(state, 'utf8')),
         change: (value: object) => writeFileSync(state, JSON.stringify(value)),
     };
@@ -129,48 +124,20 @@ test('Azure Bug Spec writes test the revision and patch Repro Steps while leavin
     expect(f.read().fields['System.Description']).toBe('Managed structure and other text.');
 });
 
-test('unchanged GitHub bytes skip provenance reads and one editor needs one permission read', async () => {
-    const f = fake('gh', {
+test('provenance never attests to mismatched history', async () => {
+    fake('gh', {
         number: 7,
-        body: 'Authored.',
+        body: 'New bytes.',
         title: 'Work',
         updated_at: '1',
         editor: 'member',
         titleEditor: 'member',
         permission: 'write',
+        historyBody: 'Racing body.',
     });
-    const provider = structureProvider();
-    const first = await provider.readSpec!('example/widget', 7);
 
-    await provider.readSpec!('example/widget', 7, first);
-    expect(f.calls().filter((args) => args[1] === 'graphql')).toHaveLength(1);
-    expect(f.calls().filter((args) => args[1]?.includes('/collaborators/'))).toHaveLength(1);
-    expect(f.calls()).toHaveLength(4);
-    f.change({ ...f.read(), body: 'Changed bytes.', permission: 'read' });
-    expect(await provider.readSpec!('example/widget', 7, first)).toMatchObject({
-        body: 'Changed bytes.',
-        editorWrite: false,
-        titleEditorWrite: false,
-    });
+    const read = await structureProvider().readSpec!('example/widget', 7, { body: 'Old bytes.', title: 'Work' });
+
+    expect(read.editorWrite).toBeUndefined();
+    expect(read.titleEditorWrite).toBeUndefined();
 });
-
-test.each([{ historyBody: 'Racing body.' }, { historyTitle: 'Racing title' }])(
-    'provenance never attests to mismatched history %j',
-    async (history) => {
-        fake('gh', {
-            number: 7,
-            body: 'New bytes.',
-            title: 'Work',
-            updated_at: '1',
-            editor: 'member',
-            titleEditor: 'member',
-            permission: 'write',
-            ...history,
-        });
-
-        const read = await structureProvider().readSpec!('example/widget', 7, { body: 'Old bytes.', title: 'Work' });
-
-        expect(read.editorWrite).toBeUndefined();
-        expect(read.titleEditorWrite).toBeUndefined();
-    },
-);

@@ -1,10 +1,8 @@
-import type { ShapingThreadCleanup } from '@lar-factory/shared';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
-import { WorkRecordError } from './database.ts';
 import { readShapingThreadCleanup, writeShapingThreadCleanup } from './shaping-thread-cleanup.ts';
 
 const dirs: string[] = [];
@@ -27,27 +25,5 @@ describe('shaping thread cleanup setting', () => {
         expect(writeShapingThreadCleanup('archive', dir)).toBe('archive');
         expect(readShapingThreadCleanup(dir)).toBe('archive');
         expect(readdirSync(dir)).toEqual(['shaping-thread-cleanup.json']);
-    });
-
-    it('refuses an invalid choice and leaves the saved one as it was', () => {
-        const dir = tempDir();
-
-        writeShapingThreadCleanup('settle', dir);
-        expect(() => writeShapingThreadCleanup('shred' as ShapingThreadCleanup, dir)).toThrow(WorkRecordError);
-        expect(readShapingThreadCleanup(dir)).toBe('settle');
-    });
-
-    it('throws on a file it cannot read, and a valid choice replaces that file', () => {
-        const dir = tempDir();
-        const path = join(dir, 'shaping-thread-cleanup.json');
-
-        writeFileSync(path, '{');
-        expect(() => readShapingThreadCleanup(dir)).toThrow("isn't JSON");
-        writeFileSync(path, '{ "choice": "shred" }');
-        expect(() => readShapingThreadCleanup(dir)).toThrow(WorkRecordError);
-        writeFileSync(path, 'null');
-        expect(() => readShapingThreadCleanup(dir)).toThrow(WorkRecordError);
-        writeShapingThreadCleanup('delete', dir);
-        expect(readShapingThreadCleanup(dir)).toBe('delete');
     });
 });

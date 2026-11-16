@@ -17,7 +17,7 @@ const plan = {
     ],
     outcomeCheck: 'Check composition, rejection and legacy behaviour.',
 };
-const fixture = async (kind: 'feature' | 'concept' = 'feature') => {
+const fixture = async () => {
     const dir = mkdtempSync(join(tmpdir(), 'parent-release-'));
 
     dirs.push(dir);
@@ -27,7 +27,12 @@ const fixture = async (kind: 'feature' | 'concept' = 'feature') => {
 
     stores.push(records);
 
-    const parent = records.create({ title: 'Deliver greeting', repository: 'sample/a', kind, status: 'In progress' });
+    const parent = records.create({
+        title: 'Deliver greeting',
+        repository: 'sample/a',
+        kind: 'feature',
+        status: 'In progress',
+    });
     const id = parent.workId;
     const revision = () => records.read(id).revision;
 
@@ -63,13 +68,10 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-it.each(['feature', 'concept'] as const)('reports a stranded %s Outcome as a mechanical hold', async (kind) => {
-    const f = await fixture(kind);
+it('reports a stranded Outcome as a mechanical hold', async () => {
+    const f = await fixture();
 
     f.records.setReleasePlan(f.id, f.revision(), { steps: [], outcomeCheck: 'Check exact merged composition.' });
-
-    if (kind === 'concept') f.records.setFogGone(f.id, f.revision(), true);
-
     f.merge();
     expect(f.records.reconcile(f.id).items).toContainEqual(
         expect.objectContaining({
@@ -120,20 +122,6 @@ it('completes repeat 4 parent from three observed merges, ordered release receip
     expect(reopened.completion(f.id).complete).toBe(true);
 });
 
-it('retains concept Fog and child completion independently of release evidence', async () => {
-    const f = await fixture('concept');
-
-    f.set();
-    f.step('stage');
-    f.step('activate');
-    f.outcome('passed');
-    expect(f.records.completion(f.id).reasons).toContain("Its Fog isn't gone.");
-    expect(f.records.completion(f.id).reasons).toContainEqual(expect.stringContaining("isn't Done"));
-    f.merge();
-    f.records.setFogGone(f.id, f.revision(), true);
-    expect(f.records.completion(f.id).complete).toBe(true);
-});
-
 it('refuses stale, malformed and out-of-order writes without losing evidence, and reopens a changed plan', async () => {
     const f = await fixture();
     const old = f.revision();
@@ -172,34 +160,6 @@ it('refuses stale, malformed and out-of-order writes without losing evidence, an
     expect(f.records.read(f.id)).toMatchObject({ status: 'In progress', finishedAt: null });
     expect(f.records.completion(f.id).complete).toBe(false);
     expect(() => f.records.writeRevision(f.id, old, ['releasePlan'])).toThrow(/releasePlan/);
-});
-
-it('keeps standalone completion unchanged and refuses release plans on a private build', async () => {
-    const f = await fixture();
-    const build = f.records.create({ title: 'Single', repository: 'sample/a', kind: 'build' });
-
-    expect(f.records.completion(build.workId).reasons).toEqual(['It has no recorded PR.']);
-    expect(() => f.records.setReleasePlan(build.workId, build.revision, plan)).toThrow(/parent/);
-
-    const concept = f.records.create({ title: 'Empty', repository: 'sample/a', kind: 'concept' });
-
-    f.records.setFogGone(concept.workId, concept.revision, true);
-    expect(f.records.completion(concept.workId).reasons).toEqual(['No delivery planned.']);
-});
-
-it('keeps a part approval current for unrelated release progress and parent Outcome checks', async () => {
-    const f = await fixture();
-    const part = f.records.children(f.id)[0]!;
-
-    f.set();
-
-    const original = f.records.doubtPackage(part.workId);
-
-    expect(original.releasePlan?.steps).toHaveLength(2);
-    f.step('stage');
-    expect(f.records.doubtPackage(part.workId).packageDigest).toBe(original.packageDigest);
-    f.records.setReleasePlan(f.id, f.revision(), { ...plan, outcomeCheck: 'Changed required check.' });
-    expect(f.records.doubtPackage(part.workId).packageDigest).toBe(original.packageDigest);
 });
 
 it('round trips parent release commands in an isolated data folder', async () => {

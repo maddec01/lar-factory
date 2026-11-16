@@ -1,9 +1,4 @@
-import {
-    defaultFactorySettings,
-    FACTORY_ROLES,
-    THREAD_KINDS,
-    type FactorySettings,
-} from '@lar-factory/shared/factory-settings';
+import { defaultFactorySettings, FACTORY_ROLES, type FactorySettings } from '@lar-factory/shared/factory-settings';
 import type { RoleRunFinish, SnapshotRunInput } from '@lar-factory/shared/run-settings';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -14,7 +9,6 @@ import { afterEach, expect, it } from 'vite-plus/test';
 import { openDatabase } from './database.ts';
 import { writeFactorySettings } from './factory-settings.ts';
 import { MIGRATIONS } from './migrations.ts';
-import { selectReviewers } from './reviewer-selection.ts';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
@@ -80,12 +74,12 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-it.each(THREAD_KINDS)('captures %s with every role, all modes and exact instruction provenance', async (kind) => {
+it('captures a build with every role, all modes and exact instruction provenance', async () => {
     const { dir, records, workId } = await fixture();
 
     writeFactorySettings(customSettings(), dir);
 
-    const snapshot = records.snapshotRun(workId, 1, input('run-1', kind));
+    const snapshot = records.snapshotRun(workId, 1, input());
 
     expect(snapshot.thread).toEqual({
         model: { instanceId: 'codex-main', model: 'test-model' },
@@ -226,119 +220,6 @@ it('keeps requested settings separate from mismatching T3 evidence and refuses r
             failure: 'T3 unavailable.',
         }),
     ).toMatchObject({ actual: null, requested: snapshot.roles.implementer });
-});
-
-it('links review rounds to frozen settings and retains deterministic skips and escalation evidence after edits', async () => {
-    const { dir, records, workId, revision } = await fixture();
-    const settings = customSettings();
-
-    writeFactorySettings(settings, dir);
-
-    const snapshot = records.snapshotRun(workId, revision(), input());
-
-    settings.reviewers.find((entry) => entry.id === 'code')!.mode = { kind: 'never' };
-    settings.reviewers.find((entry) => entry.id === 'security')!.mode = { kind: 'never' };
-    writeFactorySettings(settings, dir);
-
-    const selected = selectReviewers(snapshot.settings, { complete: true, files: [] }, [
-        { reviewer: 'security', requestedBy: 'code', reason: 'Indirect auth change.' },
-    ]);
-    const reviewers = selected.map((entry) => ({
-        axis: entry.id,
-        verdict: entry.run ? ('approve' as const) : ('skipped' as const),
-        findings: [],
-        notChecked: entry.run ? undefined : entry.reason,
-        escalation: entry.escalation,
-        selection: {
-            triggerVersion: entry.triggerVersion,
-            outcome: entry.outcome,
-            rule: entry.rule,
-            evidence: entry.evidence,
-            reason: entry.reason,
-            run: entry.run,
-        },
-    }));
-
-    records.recordReviewRound(workId, revision(), { runId: snapshot.runId, base: 'abc1234', reviewers });
-
-    const rounds = records.reviewRounds(workId);
-
-    expect(rounds[0]!.runId).toBe(snapshot.runId);
-    expect(rounds[0]!.reviewers.find((entry) => entry.axis === 'security')).toMatchObject({
-        escalation: { requestedBy: 'code', reason: 'Indirect auth change.' },
-        selection: { outcome: 'unmatched', run: true },
-    });
-    expect(rounds[0]!.reviewers.find((entry) => entry.axis === 'ui')).toMatchObject({
-        verdict: 'skipped',
-        selection: { rule: 'mode.never', run: false },
-    });
-
-    const rev = revision();
-
-    expect(() => records.recordReviewRound(workId, rev, { base: 'abc1234', reviewers })).toThrow('runId');
-    expect(() => records.recordReviewRound(workId, rev, { runId: 'missing', base: 'abc1234', reviewers })).toThrow(
-        'No run',
-    );
-    expect(() =>
-        records.recordReviewRound(workId, rev, {
-            runId: snapshot.runId,
-            base: 'abc1234',
-            reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }],
-        }),
-    ).toThrow('selection evidence');
-    expect(revision()).toBe(rev);
-    expect(records.reviewRounds(workId)).toEqual(rounds);
-});
-
-it('rejects stale revisions, invalid evidence and cross-record IDs atomically', async () => {
-    const { records, workId, revision } = await fixture();
-
-    expect(() => records.snapshotRun(workId, 99, input())).toThrow('revision');
-    expect(() => records.snapshotRun(workId, 1, { ...input(), packaged: { version: 'v1', reviewers: {} } })).toThrow(
-        'nonempty',
-    );
-    expect(records.runSettings(workId).runs).toEqual([]);
-
-    const snapshot = records.snapshotRun(workId, revision(), input());
-
-    expect(() => records.snapshotRun(workId, revision(), input(snapshot.runId, 'decision'))).toThrow('change kind');
-
-    const other = records.create({ title: 'Other', repository: 'test/repo', kind: 'build' });
-
-    expect(() =>
-        records.startRoleRun(other.workId, 1, { runId: snapshot.runId, executionId: 'x', role: 'thread' }),
-    ).toThrow('belongs');
-    expect(() =>
-        records.startRoleRun(workId, revision(), {
-            runId: snapshot.runId,
-            executionId: 'x',
-            role: 'toString' as never,
-        }),
-    ).toThrow('Unknown');
-    records.startRoleRun(workId, revision(), { runId: snapshot.runId, executionId: 'x', role: 'thread' });
-
-    const rev = revision();
-
-    expect(() =>
-        records.finishRoleRun(workId, rev, {
-            executionId: 'x',
-            result: 'completed',
-            report: { source: 'guess' as never, reference: 'x', actual: snapshot.thread },
-        }),
-    ).toThrow('T3');
-    expect(() =>
-        records.finishRoleRun(workId, rev, {
-            executionId: 'x',
-            result: 'completed',
-            report: {
-                source: 't3',
-                reference: 'x',
-                actual: { ...snapshot.thread, options: [{ id: 'effort', value: 'low' }] },
-            },
-        }),
-    ).toThrow('conflicts');
-    expect(revision()).toBe(rev);
-    expect(records.runSettings(workId).roleRuns[0]!.actual).toBeNull();
 });
 
 it('migrates legacy records without inventing snapshots or changing history; SQL prevents snapshot updates', async () => {

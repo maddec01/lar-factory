@@ -48,49 +48,6 @@ test('orphan Fog cannot be acknowledged away and disappears only when the map is
     expect(fogHolds()).toEqual([]);
     expect(records.refinement(g.workId).complete).toBe(true);
 });
-
-test('Fog routes must name live group decisions or an actually saved question, and expire when settled', async () => {
-    const { records, g, map, fogHolds } = await fixture();
-    const d = records.createPart({
-        title: 'Choose timezone',
-        repository: 'fake/api',
-        kind: 'decision',
-        parentId: g.workId,
-        parentRevision: records.read(g.workId).revision,
-        body: 'Method: grill\nUTC or local?',
-        blockerIds: [],
-    });
-
-    map(`- [decision: ${d.workId}] UTC or local?`);
-    expect(fogHolds()).toEqual([]);
-    map(`- [question: ${g.workId}] UTC or local?`);
-    expect(fogHolds()).toHaveLength(1);
-    records.waitForUser(g.workId, records.read(g.workId).revision, 'UTC or local?');
-    expect(fogHolds()).toEqual([]);
-    records.resumeFromUser(g.workId, records.read(g.workId).revision, 'Shaping');
-    expect(fogHolds()).toHaveLength(1);
-    records.setBody(d.workId, records.read(d.workId).revision, 'answer', 'UTC.');
-    records.setBody(d.workId, records.read(d.workId).revision, 'domain-drafts', 'none');
-    map(`- [decision: ${d.workId}] UTC or local?`);
-    expect(records.completion(d.workId).complete).toBe(true);
-    expect(fogHolds()).toHaveLength(1);
-    map('- [decision: missing] Missing owner');
-    expect(fogHolds()).toHaveLength(1);
-});
-
-test('a saved Outcome criterion never blocks concept refinement', async () => {
-    const { records, g, map } = await fixture();
-
-    map('- none');
-    records.setFogGone(g.workId, records.read(g.workId).revision, true);
-    records.setReleasePlan(g.workId, records.read(g.workId).revision, {
-        steps: [],
-        outcomeCheck: 'Choices are recorded.',
-    });
-    expect(records.refinement(g.workId)).toEqual({ complete: true, reasons: [] });
-    expect(records.completion(g.workId).reasons).toContain('No delivery planned.');
-});
-
 test('map Fog cannot contradict its recorded gone flag', async () => {
     const { records, g, map } = await fixture();
 

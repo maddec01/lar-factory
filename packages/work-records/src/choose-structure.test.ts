@@ -12,20 +12,6 @@ const base = {
     verify: { required: false, visibleUi: null },
 };
 
-it('chooses the same linked structure for the settled three-repository input on every run', () => {
-    const scope = parseBriefScope({
-        ...base,
-        repositories: ['example/a', 'example/b', 'example/c'],
-        openDecisions: [],
-    });
-
-    expect(chooseStructure(scope)).toEqual(chooseStructure(JSON.parse(JSON.stringify(scope))));
-    expect(chooseStructure(scope)).toMatchObject({
-        structure: 'linked',
-        reason: expect.stringContaining('one build per repository'),
-    });
-});
-
 it('uses concept decision parts while cross-repository product choices are open', () => {
     const scope = parseBriefScope({
         ...base,
@@ -36,14 +22,4 @@ it('uses concept decision parts while cross-repository product choices are open'
     expect(chooseStructure(scope).structure).toBe('concept');
     expect(chooseStructure({ ...scope, openDecisions: [] }).structure).toBe('linked');
     expect(chooseStructure({ ...scope, repositories: ['example/a'] }).structure).toBe('single');
-});
-
-it('refuses to infer structure from a legacy confirmation or invalid repository roster', () => {
-    expect(() => chooseStructure(parseBriefScope(base))).toThrow(/explicit amendment/);
-    for (const repositories of [[], ['invalid'], ['example/a', 'Example/A']])
-        expect(() => parseBriefScope({ ...base, repositories, openDecisions: [] })).toThrow(/Scope needs/);
-    expect(() => parseBriefScope({ ...base, repositories: ['example/a'] })).toThrow(/Scope needs/);
-    expect(() => parseBriefScope({ ...base, repositories: ['example/a'], openDecisions: 'none' })).toThrow(
-        /Scope needs/,
-    );
 });

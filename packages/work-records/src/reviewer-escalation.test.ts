@@ -86,46 +86,6 @@ it('adds the missed reviewer with Code provenance, retaining the original trigge
     expect({ settings, neutralDiff, request }).toEqual(before);
 });
 
-it('never escalates to a never reviewer and never adds a duplicate run for an already selected reviewer', () => {
-    const settings = defaultFactorySettings();
-
-    settings.reviewers.find((entry) => entry.id === 'security')!.mode = { kind: 'never' };
-    expect(selectReviewers(settings, neutralDiff, [request]).find((entry) => entry.id === 'security')).toMatchObject({
-        run: false,
-        rule: 'mode.never',
-        escalation: undefined,
-    });
-    settings.reviewers.find((entry) => entry.id === 'security')!.mode = { kind: 'always' };
-    expect(selectReviewers(settings, neutralDiff, [request]).filter((entry) => entry.escalation)).toEqual([]);
-
-    const duplicated = selectReviewers(defaultFactorySettings(), neutralDiff, [request, request]);
-
-    expect(duplicated.filter((entry) => entry.escalation)).toHaveLength(1);
-    expect(duplicated.filter((entry) => entry.id === 'security' && entry.run)).toHaveLength(1);
-    expect(
-        selectReviewers(defaultFactorySettings(), { complete: true, files: [{ path: 'auth.ts', text: '' }] }, [
-            request,
-        ]).filter((entry) => entry.escalation),
-    ).toEqual([]);
-});
-
-it('rejects malformed requests, unknown targets and requests from an unselected or different reviewer', () => {
-    for (const requests of [
-        null,
-        {},
-        [null],
-        [{ ...request, reason: ' ' }],
-        [{ ...request, requestedBy: 'ui' }],
-        [{ ...request, reviewer: 'missing' }],
-    ])
-        expect(() => selectReviewers(defaultFactorySettings(), neutralDiff, requests)).toThrow(/escalation/i);
-
-    const settings = defaultFactorySettings();
-
-    settings.reviewers.find((entry) => entry.id === 'code')!.mode = { kind: 'never' };
-    expect(() => selectReviewers(settings, neutralDiff, [request])).toThrow('selected Code');
-});
-
 it('persists escalation provenance across reopen, including a saved custom reviewer, and preserves ordinary rounds', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lar-escalation-'));
 

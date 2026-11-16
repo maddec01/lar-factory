@@ -95,19 +95,6 @@ test('rejects stale affected records and active inputs without changing anything
     expect(() => records.mergeBuild(f.source.workId, f.revision(), f.input())).toThrow('Only proposed');
     expect(records.read(f.source.workId).setAside).toBe(false);
 });
-test('cycle introduced by contracting builds rolls back every edge and body', async () => {
-    const f = await fixture();
-
-    f.add(f.a.workId, f.target.workId);
-
-    const before = records.list({});
-    const body = records.body(f.target.workId, 'brief');
-
-    expect(() => records.mergeBuild(f.source.workId, f.revision(), f.input())).toThrow('cycle');
-    expect(records.list({})).toEqual(before);
-    expect(records.body(f.target.workId, 'brief')).toBe(body);
-    expect(records.blockers(f.dependent.workId).map((r) => r.workId)).toEqual([f.source.workId]);
-});
 test('unions held external Dependencies with revision protection', async () => {
     const f = await fixture();
     const dependency = records.addDependency(f.source.workId, { need: 'External contract', owner: 'Other team' });

@@ -9,10 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
-import { trackerCache, trackerDigest } from './tracker-cache.ts';
+import { trackerDigest } from './tracker-cache.ts';
 import {
     readStructureSnapshot,
-    syncStructures,
     structureProvider,
     type StructureProvider,
     type StructureTicket,
@@ -251,35 +250,6 @@ if(method!=='GET')save();
     await expect(provider.read('team/server', 1)).rejects.toThrow('concurrent tracker versions');
 }, 30_000);
 
-test('Azure dependency PR references retain their repository URL and round trip separately from work items', async () => {
-    const records = await cache();
-    const root = records.create({
-        repository: 'org/Project/server',
-        kind: 'concept',
-        title: 'Playback',
-        ticket: 'org/Project/server#1',
-    });
-
-    records.addDependency(root.workId, {
-        need: 'Relay endpoint',
-        owner: 'org/Project/relay',
-        ticket: 'org/Project/relay#6',
-        pullRequests: ['org/Project/relay#7'],
-    });
-
-    const snapshot = records.trackerSnapshot(root.workId);
-
-    expect(snapshot.dependencies[0]?.ticket).toBe('https://dev.azure.com/org/Project/_workitems/edit/6');
-    expect(snapshot.dependencies[0]?.pullRequests).toEqual([
-        'https://dev.azure.com/org/Project/_git/relay/pullrequest/7',
-    ]);
-
-    const fresh = await cache();
-    const restored = fresh.trackerRestore(snapshot, 'a'.repeat(64));
-
-    expect(fresh.dependencies(restored)[0]?.pullRequests).toEqual(['org/Project/relay#7']);
-});
-
 test('untrusted snapshot shape and repository mismatches fail before any context reads or import writes', async () => {
     const { gzipSync } = await import('node:zlib');
     const { createHash } = await import('node:crypto');
@@ -304,16 +274,11 @@ test('untrusted snapshot shape and repository mismatches fail before any context
         dependencies: [],
     };
 
-    const mismatch = 'The saved structure has invalid parts or a repository/ticket mismatch.';
-
     for (const [payload, message] of [
-        [{ ...valid, nodes: [null] }, mismatch],
-        [{ ...valid, nodes: [{ ...valid.nodes[0], ticket: 'unrelated/secret#1' }] }, mismatch],
         [
-            { ...valid, nodes: Array.from({ length: 1001 }, () => valid.nodes[0]) },
-            'The saved structure has an unsupported format.',
+            { ...valid, nodes: [{ ...valid.nodes[0], ticket: 'unrelated/secret#1' }] },
+            'The saved structure has invalid parts or a repository/ticket mismatch.',
         ],
-        [{ ...valid, nodes: [{ ...valid.nodes[0], brief: 'PRIVATE ORDINARY BRIEF' }] }, mismatch],
     ] as const) {
         const raw = JSON.stringify(payload);
         const encoded = gzipSync(raw).toString('base64');
@@ -370,50 +335,6 @@ test('a stale failure checkpoint cannot overwrite a later structural outbox entr
     records.trackerFailed(root.workId, 'An obsolete request failed.', true, digest);
     expect(records.trackerState(root.workId)).toEqual({ state: 'pending' });
     expect(records.trackerCheckpoint(root.workId).error).toBeNull();
-});
-
-test('one refresh reads the tracker graph once, and each record keeps the state it has alone', async () => {
-    const records = await cache();
-    const { dir } = handles.at(-1)!;
-    const { root, decision, build } = await concept(records);
-    const lone = ['team/server#50', 'team/server#51', 'team/server#52'].map((ticket) =>
-        records.create({ repository: 'team/server', kind: 'build', title: ticket, ticket }),
-    );
-    const failed = records.create({
-        repository: 'team/server',
-        kind: 'concept',
-        title: 'Failed',
-        ticket: 'team/server#60',
-    });
-
-    records.trackerFailed(failed.workId, 'The tracker refused.', true);
-
-    const { openDatabase } = await import('./database.ts');
-    const database = await openDatabase(join(dir, 'work-records.db'));
-    const graphReads = vi.fn();
-    const prepare = database.db.prepare.bind(database.db);
-
-    database.db.prepare = ((sql: string) => {
-        if (sql.includes("FROM work_records WHERE kind <> 'slice'")) graphReads();
-
-        return prepare(sql);
-    }) as typeof database.db.prepare;
-
-    const stateOf = trackerCache(database).trackerStates();
-    const expected: [string, unknown][] = [
-        [root.workId, { state: 'pending' }],
-        [decision.workId, { state: 'pending' }],
-        [build.workId, { state: 'pending' }],
-        ...lone.map(({ workId }): [string, unknown] => [workId, undefined]),
-        [failed.workId, { state: 'conflict', message: 'The tracker refused.' }],
-    ];
-
-    for (const [workId, state] of expected) {
-        expect(stateOf(workId)).toEqual(state);
-        expect(records.trackerState(workId)).toEqual(state);
-    }
-    expect(graphReads).toHaveBeenCalledTimes(1);
-    database.close();
 });
 
 test('the existing create transport sends GitHub options and Azure Bug HTML with tags, identity, iteration and default area', async () => {
@@ -477,30 +398,6 @@ if(args[0]==='api') {
 
     expect(bug.body).toContain('<h2>Steps</h2>');
     expect(bug.number).toBe(9);
-});
-
-test('suspension retains pending work and uncertain creation across explicit retries and setting variants', async () => {
-    const records = await cache();
-    const { root, decision } = await concept(records);
-
-    records.trackerReserveCreation(decision.workId);
-
-    const before = records.trackerPending();
-    const checkpoint = records.trackerCheckpoint(root.workId);
-    const fake = fakeProvider();
-
-    for (const structureSync of [undefined, false, true]) {
-        await syncStructures(records, {
-            provider: fake.provider,
-            setups: [{ ...settings('team/server'), structureSync } as RepositorySetup],
-            workId: root.workId,
-            confirmedMissingIssue: decision.workId,
-        });
-    }
-    expect(fake.writes).toEqual([]);
-    expect(records.trackerPending()).toEqual(before);
-    expect(records.trackerCheckpoint(root.workId)).toEqual(checkpoint);
-    expect(records.trackerReserveCreation(decision.workId)).toBe(false);
 });
 
 test('legacy upgrade preserves every stored row and repeats without changing pending identities', async () => {

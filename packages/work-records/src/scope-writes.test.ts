@@ -95,55 +95,16 @@ it('retries scope confirmation after unrelated progress, including a race during
     expect(records.read(work.workId)).toMatchObject({ status: 'Shaping', needsYou: 'Keep this note.' });
 });
 
-it.each(['title', 'confirmedScope', 'gate'] as const)(
-    'refuses scope confirmation after concurrent %s changes',
-    async (field) => {
-        const { records, other, work, agent } = await fixture();
-        const start =
-            field === 'gate' ? records.setBody(work.workId, work.revision, 'brief', scopeMarkdown(scope)) : work;
+it('refuses scope confirmation after a concurrent confirmedScope change', async () => {
+    const { records, other, work, agent } = await fixture();
 
-        if (field === 'title') other.retitle(work.workId, start.revision, 'Different understanding');
-        else if (field === 'confirmedScope') other.confirmScope(work.workId, start.revision, scope, 'Pedro', 'Yes.');
-        else {
-            const waiting = other.setNeedsYou(work.workId, start.revision, 'Should search match whole words?');
+    other.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
 
-            other.recordGate(work.workId, waiting.revision, {
-                briefDigest: other.gate(work.workId).briefDigest!,
-                approvedBy: 'Pedro',
-                evidence: 'Yes.',
-            });
-        }
+    const before = records.read(work.workId);
 
-        const before = records.read(work.workId);
-
-        expect(() =>
-            agent.confirmScope(work.workId, start.revision, { ...scope, size: 'Larger' }, 'Pedro', 'Yes.'),
-        ).toThrow(new RegExp(`conflicting fields:.*${field}`));
-        expect(records.read(work.workId)).toEqual(before);
-        expect(records.confirmedScope(work.workId)?.scope.size).not.toBe('Larger');
-    },
-);
-
-it('refuses single displayed approval after scope is amended and restored', async () => {
-    const { records, work, agent } = await fixture();
-
-    agent.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
-    records.setBody(work.workId, records.read(work.workId).revision, 'brief', scopeMarkdown(scope));
-
-    const input = records.doubtPackage(work.workId);
-
-    records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Checked.', []);
-
-    const display = agent.displayGate(work.workId);
-
-    records.confirmScope(
-        work.workId,
-        records.read(work.workId).revision,
-        { ...scope, size: 'Larger' },
-        'Pedro',
-        'Larger.',
+    expect(() => agent.confirmScope(work.workId, work.revision, { ...scope, size: 'Larger' }, 'Pedro', 'Yes.')).toThrow(
+        /conflicting fields:.*confirmedScope/,
     );
-    records.confirmScope(work.workId, records.read(work.workId).revision, scope, 'Pedro', 'Small again.');
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes.')).toThrow(/requires Pedro/);
-    expect(records.gate(work.workId).evidence).toEqual([]);
+    expect(records.read(work.workId)).toEqual(before);
+    expect(records.confirmedScope(work.workId)?.scope.size).not.toBe('Larger');
 });

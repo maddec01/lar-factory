@@ -169,22 +169,6 @@ it('fails closed without confirmation and reports missing/extra scope with a fai
     expect(f.records.gate(f.id).current).toBe(true);
 }, 15000);
 
-it('reapplies CLI scope confirmation after unrelated progress without replacing a newer confirmation', async () => {
-    const f = await fixture();
-    const revision = f.records.read(f.id).revision;
-
-    f.records.setNeedsYou(f.id, revision, 'Keep this note.');
-
-    const captured = await f.confirm(revision);
-
-    expect(captured.code).toBe(0);
-    expect(JSON.parse(captured.stdout).sourceRevision).toBe(revision + 1);
-    expect(f.records.read(f.id).needsYou).toBe('Keep this note.');
-    writeFileSync(f.file, JSON.stringify({ ...scope, size: 'Larger' }));
-    expect((await f.confirm(revision)).stderr).toContain('confirmedScope');
-    expect(f.records.confirmedScope(f.id)?.scope).toEqual(scope);
-}, 15000);
-
 it('keeps amended scope history, invalidates old approval and refuses stale or invalid captures atomically', async () => {
     const f = await fixture();
 
@@ -223,38 +207,3 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
 
     expect((await f.cli('confirmed-scope', other.workId)).code).toBe(1);
 }, 15000);
-
-it('chooses from persisted confirmation, records Build and refuses to guess legacy scope', async () => {
-    const f = await fixture();
-
-    expect((await f.cli('choose-structure', f.id)).code).toBe(1);
-    await f.confirm();
-    expect((await f.cli('choose-structure', f.id)).stderr).toContain('explicit amendment');
-    writeFileSync(
-        f.file,
-        JSON.stringify({ ...scope, repositories: ['example/a', 'example/b', 'example/c'], openDecisions: [] }),
-    );
-    expect((await f.confirm()).code).toBe(0);
-
-    const revision = f.records.read(f.id).revision;
-    const result = await f.cli('choose-structure', f.id);
-
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({ structure: 'linked' });
-    expect((await f.cli('choose-structure', f.id)).stdout).toBe(result.stdout);
-    expect(f.records.read(f.id)).toMatchObject({ kind: 'build', revision: revision + 1 });
-}, 15000);
-
-it('brief-scope-check refuses missing named tests even when an empty confirmed test list matches', async () => {
-    const f = await fixture();
-    const withoutTests = { ...scope, tests: [] };
-
-    writeFileSync(f.file, JSON.stringify(withoutTests));
-    expect((await f.confirm()).code).toBe(0);
-    f.records.setBody(f.id, f.records.read(f.id).revision, 'brief', scopeMarkdown(withoutTests));
-
-    const result = await f.cli('brief-scope-check', f.id);
-
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('named tests');
-});

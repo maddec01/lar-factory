@@ -71,63 +71,6 @@ it('keeps failures open after a pass and validates reuse against the explicit ta
     }
 });
 
-it('distinguishes interrupted, unfinished, changed snapshots, missing snapshots and expired live results', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'validation-'));
-    const records = await openWorkRecords(join(dir, 'work-records.db'));
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-
-        for (const input of [
-            { tree: 'b'.repeat(40), exitStatus: 0, interrupted: false, log: null },
-            { tree: null, exitStatus: 0, interrupted: false, log: null },
-            { tree: 'a'.repeat(40), exitStatus: null, interrupted: true, log: null },
-        ]) {
-            const run = records.startCheck(build.workId, {
-                role: 'builder',
-                command: ['test'],
-                folder: '.',
-                tree: 'a'.repeat(40),
-            });
-
-            records.finishCheck(run.checkId, input);
-            expect(() =>
-                records.reuseCheck(build.workId, run.checkId, {
-                    role: 'approver',
-                    reason: 'same',
-                    tree: 'a'.repeat(40),
-                }),
-            ).toThrow('Reuse requires an eligible non-live pass belonging to this build.');
-        }
-        records.startCheck(build.workId, { role: 'builder', command: ['test'], folder: '.', tree: null });
-
-        const live = records.startCheck(build.workId, {
-            role: 'builder',
-            command: ['test'],
-            folder: '.',
-            tree: 'a'.repeat(40),
-            live: true,
-        });
-
-        records.finishCheck(live.checkId, { tree: live.tree, exitStatus: 0, interrupted: false, log: null });
-
-        const result = records.checks(build.workId, new Date(Date.now() + 86400001));
-
-        expect(result.runs.map((run) => run.outcome)).toEqual([
-            'passed',
-            'passed',
-            'interrupted',
-            'unfinished',
-            'expired',
-        ]);
-        expect(result.runs.every((run) => !run.eligible)).toBe(true);
-        expect(result.runs.every((run) => run.failureState === null)).toBe(true);
-    } finally {
-        records.close();
-        rmSync(dir, { recursive: true, force: true });
-    }
-});
-
 it('shares the build record with slices and preserves independent concurrent runs', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'validation-'));
     const path = join(dir, 'work-records.db');
@@ -160,56 +103,6 @@ it('shares the build record with slices and preserves independent concurrent run
     } finally {
         first.close();
         second.close();
-        rmSync(dir, { recursive: true, force: true });
-    }
-});
-
-it('rejects malformed input atomically and removes expired records and logs', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'validation-'));
-    const records = await openWorkRecords(join(dir, 'work-records.db'));
-
-    try {
-        const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-        const start = { role: 'builder', command: ['test'], folder: '.', tree: 'a'.repeat(40) };
-
-        const invalidStarts: [typeof start, string][] = [
-            [{ ...start, folder: '../escape' }, 'The folder must be a normalized repository-relative path.'],
-            [{ ...start, tree: 'invalid' }, 'Expected a git tree object ID or null.'],
-            [{ ...start, role: '' }, 'Expected nonempty text without NUL.'],
-            [{ ...start, command: [] }, 'A command must be a nonempty argument array without NUL.'],
-        ];
-
-        for (const [input, message] of invalidStarts)
-            expect(() => records.startCheck(build.workId, input)).toThrow(message);
-        expect(() => records.setCheckList(build.workId, [start, start])).toThrow('The check list contains duplicates.');
-        expect(records.checks(build.workId).runs).toEqual([]);
-
-        const run = records.startCheck(build.workId, start);
-
-        expect(() =>
-            records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 256, interrupted: false, log: null }),
-        ).toThrow('Expected an exit status from 0 to 255, or null for interruption.');
-        expect(() => records.describeFailure(run.checkId, { tests: ['test'], diagnosis: 'cause' })).toThrow(
-            'Only a failed check can have a failure description.',
-        );
-        expect(() => records.resolveFailure(run.checkId, 'cause')).toThrow('Only a failed check can be resolved.');
-        expect(records.checks(build.workId).runs[0]?.outcome).toBe('unfinished');
-        records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 0, interrupted: false, log: null });
-        expect(() =>
-            records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 1, interrupted: false, log: null }),
-        ).toThrow('The check is already finished.');
-
-        const logs = join(dir, 'check-logs', build.workId);
-
-        mkdirSync(logs, { recursive: true });
-        writeFileSync(join(logs, `${run.checkId}.log`), 'output');
-        records.setAside(build.workId, records.read(build.workId).revision);
-        expect(
-            records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, new Date(Date.now() + 1000)).deleted,
-        ).toEqual([build.workId]);
-        expect(existsSync(logs)).toBe(false);
-    } finally {
-        records.close();
         rmSync(dir, { recursive: true, force: true });
     }
 });

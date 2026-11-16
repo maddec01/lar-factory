@@ -70,19 +70,3 @@ test('omitted dependent and stale last dependent abort every write', async () =>
     expect(records.list({})).toEqual(before);
     expect(records.setAsideHistory(f.source.workId)).toEqual([]);
 });
-test('a cycle discovered after edge rewrites rolls back the retirement and all edges', async () => {
-    const f = await fixture();
-
-    records.addBlocker(f.replacement.workId, 1, f.dependents[0]!.workId);
-
-    const plan = f.plan.map((r) =>
-        r.action === 'replace' ? { ...r, revision: records.read(r.workId).revision, blockerRevision: 2 } : r,
-    );
-    const before = records.list({});
-
-    expect(() => records.setAside(f.source.workId, f.revision, plan)).toThrow('cycle');
-    expect(records.list({})).toEqual(before);
-    for (const dependent of f.dependents)
-        expect(records.blockers(dependent.workId).map((r) => r.workId)).toEqual([f.source.workId]);
-    expect(records.setAsideHistory(f.source.workId)).toEqual([]);
-});

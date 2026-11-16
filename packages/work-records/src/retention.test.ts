@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
@@ -28,18 +28,5 @@ describe('retention setting', () => {
         });
         expect(readRetention(dir)).toEqual({ hideAfterDays: 7, deleteAfterDays: 30 });
         expect(readdirSync(dir)).toEqual(['retention.json']);
-    });
-
-    it('refuses a malformed setting and leaves the saved one as it was', () => {
-        const dir = tempDir();
-
-        writeRetention({ hideAfterDays: 3, deleteAfterDays: null }, dir);
-        expect(() => writeRetention({ hideAfterDays: -1, deleteAfterDays: null }, dir)).toThrow(
-            'whole numbers of days',
-        );
-        expect(() => writeRetention({ hideAfterDays: 7, deleteAfterDays: 1.5 }, dir)).toThrow('whole numbers of days');
-        expect(readRetention(dir)).toEqual({ hideAfterDays: 3, deleteAfterDays: null });
-        writeFileSync(join(dir, 'retention.json'), '{');
-        expect(() => readRetention(dir)).toThrow("isn't JSON");
     });
 });

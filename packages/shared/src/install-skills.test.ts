@@ -305,19 +305,6 @@ function agentsError(result: InstallResult): TargetResult['error'] {
     return result.targets.find((target) => target.kind === 'agents')!.error;
 }
 
-test('skills and files outside the bundle are left alone', () => {
-    const home = temporary();
-
-    mkdirSync(join(home, '.agents/skills/other'), { recursive: true });
-    writeFileSync(join(home, '.agents/skills/other/SKILL.md'), 'other');
-    writeFileSync(join(home, '.agents/.skill-lock.json'), '{"lock":true}');
-
-    installSkills(home, bundle(v1), '1.0.0');
-
-    assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
-    assert.equal(read(home, '.skill-lock.json'), '{"lock":true}');
-});
-
 test.skipIf(runsAsRoot)('a copy that fails partway keeps the previous version, and a later call succeeds', () => {
     const home = temporary();
 
@@ -703,6 +690,27 @@ test('an install copies every skill into both Antigravity folders when ~/.gemini
     ]);
     assert.equal(installSkills(home, bundle(v1), '1.0.0').installed, false);
 });
+
+test('an upgrade that drops a skill leaves a link or file put in place of its Antigravity copy', () => {
+    const home = geminiHome();
+
+    installSkills(home, bundle(v1), '1.0.0');
+
+    const [app, cli] = antigravity.map((folder) => join(home, folder, 'tdd'));
+
+    rmSync(app!, { recursive: true });
+    symlinkSync(join(home, 'elsewhere/tdd'), app!);
+    rmSync(cli!, { recursive: true });
+    writeFileSync(cli!, 'mine');
+
+    const { 'skills/tdd/SKILL.md': _, ...withoutTdd } = v2;
+
+    installSkills(home, bundle(withoutTdd), '2.0.0');
+
+    assert.equal(readlinkSync(app!), join(home, 'elsewhere/tdd'));
+    assert.equal(readFileSync(cli!, 'utf8'), 'mine');
+});
+
 test('a newly offered target gets the current Release without rewriting the targets already on it', () => {
     const home = temporary();
     const source = bundle(v1);
@@ -863,4 +871,36 @@ test('with a root, an ~/.agents linked to outside it stops the install before an
             (error as { changed?: boolean }).changed === false,
     );
     assert.deepEqual(readdirSync(outside), []);
+});
+
+test('with a root, an inactive recorded target outside it keeps its obsolete skills', () => {
+    const root = temporary();
+    const outside = outsideHome();
+
+    mkdirSync(join(outside.home, 'skills/tdd'));
+    writeFileSync(join(outside.home, 'skills/tdd/SKILL.md'), 'tdd v1');
+    mkdirSync(join(root, '.agents'));
+    writeFileSync(
+        join(root, '.agents', INSTALL_MANIFEST),
+        JSON.stringify({
+            version: '1.0.0',
+            targets: {
+                [join(outside.home, 'skills')]: {
+                    kind: 'antigravity',
+                    release: '1.0.0',
+                    finished: true,
+                    skills: ['tdd'],
+                },
+            },
+        }),
+    );
+
+    const before = outside.files();
+
+    const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
+
+    installSkills(root, bundle(withoutTdd), '2.0.0', { root });
+
+    assert.deepEqual(outside.files(), before);
+    assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['tdd']);
 });

@@ -1,5 +1,5 @@
 import type { Item } from '@lar-factory/shared';
-import { mkdtemp, rm, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vite-plus/test';
@@ -134,6 +134,61 @@ it('requires explicit confirmation before discarding local losses', async () => 
             },
         }),
     ).rejects.toThrow('Confirm loss');
+});
+
+it('deletes only the owned branch and its worktree, and never names main', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'cleanup-local-')));
+    const checkout = join(root, 'project');
+    const worktree = join(root, 'project-owned');
+
+    await mkdir(checkout);
+    await mkdir(worktree);
+
+    try {
+        const plan = {
+            branch: 'owned',
+            localBranches: ['owned'],
+            worktreePaths: [worktree],
+            dirtyFiles: [],
+            unpushedCommits: [],
+            remoteBranch: null,
+            localAvailable: true,
+            remoteAvailable: false,
+        };
+        const calls: string[][] = [];
+        const result = await executeCleanup({
+            plan,
+            expectedPlan: plan,
+            checkout,
+            repository: 'a/b',
+            local: true,
+            remote: false,
+            confirmedLoss: true,
+            git: async (_tool, args) => {
+                calls.push(args);
+
+                return {
+                    code: 0,
+                    stderr: '',
+                    detail: '',
+                    stdout: args.includes('list')
+                        ? `worktree ${checkout}\nbranch refs/heads/main\n\nworktree ${worktree}\nbranch refs/heads/owned\n\n`
+                        : args.includes('rev-parse')
+                          ? `${checkout}\n`
+                          : '',
+                };
+            },
+        });
+
+        expect(result).toEqual({ errors: [], remainingBranches: [] });
+        expect(calls.filter((args) => args.includes('remove') || args.includes('branch'))).toEqual([
+            ['-C', checkout, 'worktree', 'remove', '--force', '--', worktree],
+            ['-C', checkout, 'branch', '-D', '--', 'owned'],
+        ]);
+        expect(calls.flat()).not.toContain('main');
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
 });
 
 it('refuses unsafe root and symlink worktrees before invoking Git', async () => {

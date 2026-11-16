@@ -78,4 +78,22 @@ describe('markdown export', () => {
         expect(readdirSync(to)).toEqual(['decision-choice.md']);
         expect(readFileSync(join(to, 'decision-choice.md'), 'utf8')).toBe('mine');
     });
+
+    it('keeps a temporary file it did not make', async () => {
+        const records = await open();
+        const build = lar(records, 'build');
+
+        records.setBody(build.workId, 1, 'brief', '# Brief');
+
+        const to = tempDir();
+        const temporary = join(to, `.brief-brief.md.${process.pid}.tmp`);
+
+        writeFileSync(temporary, 'mine');
+
+        expect(() => exportMarkdown(records, build.workId, to)).toThrow(
+            expect.objectContaining({ code: 'export-failed' }),
+        );
+        expect(readdirSync(to)).toEqual([`.brief-brief.md.${process.pid}.tmp`]);
+        expect(readFileSync(temporary, 'utf8')).toBe('mine');
+    });
 });

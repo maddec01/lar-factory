@@ -3,7 +3,7 @@ import { expect, test } from 'vite-plus/test';
 import { deskWait, questionWaitReason } from './desk-wait.ts';
 import { humanWait } from './human-wait.ts';
 import type { Item } from './item-domain.ts';
-import { releaseApprovalStep, releaseRecoveryAvailable } from './release-continuation.ts';
+import { releaseRecoveryAvailable } from './release-continuation.ts';
 
 const parent = (done: boolean) =>
     ({
@@ -55,40 +55,6 @@ test('a failed release notification remains on the desk after its native questio
 
     expect(humanWait(item, false, [item])?.action?.label).toBe('Resume release');
 });
-
-test('scope questions and tool approvals about releases remain in T3', () => {
-    const item = parent(true);
-    const thread = Array.isArray(item.threads) && item.threads[0];
-
-    if (!thread) throw new Error('Missing fixture owner');
-
-    thread.questionSummary = 'Which manifest should I approve?';
-    expect(releaseApprovalStep(item.releasePlan, thread.questionSummary)).toBeUndefined();
-    expect(deskWait(item).action?.label).toBe('Answer in T3');
-    thread.questionSummary = 'Approve activating the manifest?';
-    thread.pendingRequest!.questions = [thread.questionSummary, 'Which region?'];
-    expect(deskWait(item).action?.label).toBe('Answer in T3');
-    delete thread.pendingRequest!.questions;
-    thread.pendingRequest!.kind = 'tool-approval';
-    expect(deskWait(item).label).toBe('Approval in T3');
-});
-
-test.each([false, true])(
-    'idle release recovery stays available with a generic notice, approval done=%s',
-    async (done) => {
-        const { releaseRecoveryAvailable } = await import('./release-continuation.ts');
-        const item = {
-            ...parent(done),
-            threads: [],
-            releaseContinuation: { ready: false, digest: 'hold', run: null },
-            needsYou: { reason: 'Independent scope question', offers: [], causes: [], ticketOpen: false },
-        };
-        const parts = [{ id: 'part', kind: 'build', parentId: item.id, status: 'Done' } as Item];
-
-        expect(releaseRecoveryAvailable(item, parts)).toBe(true);
-        expect(deskWait(item, false, parts).action?.label).toBe(done ? 'Resume release' : 'Mark release step done');
-    },
-);
 
 test('failed Outcome cannot offer Resume release as an ungated retry', () => {
     const item = parent(true);

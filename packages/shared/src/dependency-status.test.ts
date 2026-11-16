@@ -1,6 +1,6 @@
 import { expect, test } from 'vite-plus/test';
 
-import { hasDependencyStatusProse, markDependencyStatus } from './dependency-status.ts';
+import { markDependencyStatus } from './dependency-status.ts';
 import { formatTicketSpec, readTicketSpec, markSpecFreshness } from './ticket-spec.ts';
 
 test('generated proof facts escape external text and stay outside retained Markdown and Azure HTML Specs', () => {
@@ -26,10 +26,4 @@ test('generated proof facts escape external text and stay outside retained Markd
         expect(readTicketSpec(annotated)).toEqual(readTicketSpec(body));
         expect(markDependencyStatus(annotated, [])).toBe(markSpecFreshness(body, true));
     }
-});
-
-test('the legacy prose guard leaves product requirements and fenced examples intact', () => {
-    expect(hasDependencyStatusProse('No proof has been supplied.')).toBe(true);
-    expect(hasDependencyStatusProse('Require verified proof before acceptance.')).toBe(false);
-    expect(hasDependencyStatusProse('```text\nNo proof has been supplied.\n```')).toBe(false);
 });

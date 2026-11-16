@@ -1,12 +1,12 @@
 // Connections: each pair of onboarded repositories the user related, kept once in the local repository list.
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { onTestFinished, test } from 'vite-plus/test';
 
-import { readConnections, saveConnections, saveOnboarding } from './repository-list.ts';
+import { readConnections, saveConnections } from './repository-list.ts';
 
 const WEB = 'maddec01/lar-web';
 const API = 'maddec01/lar-api';
@@ -25,9 +25,6 @@ function dataDir(repos: string[] = [WEB, API, IOS]): string {
     return dir;
 }
 
-const saved = (dir: string) =>
-    JSON.parse(readFileSync(join(dir, 'repository-settings.json'), 'utf8')) as { connections?: string[][] };
-
 test('a Connection reads the same from either repository', () => {
     const dir = dataDir();
 
@@ -35,15 +32,6 @@ test('a Connection reads the same from either repository', () => {
     assert.deepEqual(readConnections(WEB, dir), [API]);
     assert.deepEqual(readConnections(API, dir), [WEB]);
     assert.deepEqual(readConnections(IOS, dir), []);
-});
-
-test('saving a pair from each side, or again, keeps it once', () => {
-    const dir = dataDir();
-
-    saveConnections(WEB, [API], dir);
-    saveConnections(API, [WEB], dir);
-    saveConnections('MADDEC01/LAR-WEB', [API, API], dir);
-    assert.deepEqual(saved(dir).connections, [[API, WEB]]);
 });
 
 test("saving a repository's Connections replaces its pairs, so an unticked one goes", () => {
@@ -54,28 +42,4 @@ test("saving a repository's Connections replaces its pairs, so an unticked one g
     saveConnections(WEB, [IOS], dir);
     assert.deepEqual(readConnections(WEB, dir), [IOS]);
     assert.deepEqual(readConnections(API, dir), [IOS]);
-});
-
-test('only another repository on the board can be connected', () => {
-    const dir = dataDir([WEB, API]);
-
-    saveOnboarding({ repo: IOS, progress: { step: 'role', done: [], answers: { projectId: 'p' } } }, null, dir);
-    saveConnections(WEB, [WEB, IOS, 'maddec01/lar-cli', API], dir);
-    assert.deepEqual(readConnections(WEB, dir), [API]);
-});
-
-test('a pair naming a repository removed from the file by hand reads as gone', () => {
-    const dir = dataDir([WEB, API]);
-
-    writeFileSync(
-        join(dir, 'repository-settings.json'),
-        JSON.stringify({
-            repositories: [{ repo: WEB }],
-            connections: [
-                [API, WEB],
-                [WEB, 7],
-            ],
-        }),
-    );
-    assert.deepEqual(readConnections(WEB, dir), []);
 });

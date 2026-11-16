@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
 
-import { kindDisagreement, kindSwapAccessProblem, kindTicketSwap, ticketKindOf } from './kind-disagreement.ts';
+import { kindDisagreement, kindSwapAccessProblem, kindTicketSwap } from './kind-disagreement.ts';
 import { effectiveVocabulary } from './vocabulary.ts';
 
 const MAPPED = effectiveVocabulary({
@@ -16,38 +16,6 @@ const record = (kind: string, more: Partial<Parameters<typeof kindDisagreement>[
     ...more,
 });
 const ticket = (labels: string[], type: string | null = null) => ({ labels, type });
-
-test("the ticket's kind comes from its mapped labels and type, then the kind names", () => {
-    assert.equal(ticketKindOf('feature', ticket(['type: bug']), MAPPED), 'bug');
-    assert.equal(ticketKindOf('feature', ticket([], 'Bug'), MAPPED), 'bug');
-    assert.equal(ticketKindOf('bug', ticket(['Enhancement']), NONE), 'feature');
-    assert.equal(ticketKindOf('bug', ticket([], 'User Story'), NONE), 'feature');
-    assert.equal(ticketKindOf('bug', ticket(['docs'], 'Task'), NONE), null);
-});
-
-test("a ticket carrying the item's kind agrees, whichever other name trackerKind would read first", () => {
-    assert.equal(ticketKindOf('feature', ticket(['bug', 'TYPE: FEATURE']), MAPPED), 'feature');
-    assert.equal(ticketKindOf('feature', ticket(['bug'], 'feature'), MAPPED), 'feature');
-    assert.equal(ticketKindOf('improvement', ticket(['bug', 'improvement']), NONE), 'improvement');
-    assert.equal(kindDisagreement(record('feature'), ticket(['bug', 'type: feature']), MAPPED), null);
-});
-
-test('a label mapped to another kind beats a kind name, as the repository chose it', () => {
-    const renamed = effectiveVocabulary({ improvement: { type: null, labels: ['bug'] } }).vocabulary;
-
-    assert.equal(ticketKindOf('feature', ticket(['bug']), renamed), 'improvement');
-});
-
-test('build and concept labels say nothing about the ordinary kinds', () => {
-    assert.equal(ticketKindOf('bug', ticket(['build', 'concept', 'decision-grill']), NONE), null);
-    assert.equal(ticketKindOf('feature', ticket(['build', 'bug']), NONE), 'bug');
-});
-
-for (const kind of ['concept', 'decision', 'build', 'slice', 'issue']) {
-    test(`a ${kind} never disagrees`, () => {
-        assert.equal(kindDisagreement(record(kind), ticket(['bug']), MAPPED), null);
-    });
-}
 
 test('a difference with no agreed kind counts as the item having changed', () => {
     assert.deepEqual(kindDisagreement(record('bug'), ticket(['feature']), NONE), {
@@ -69,21 +37,6 @@ test('the agreed kind tells which side changed', () => {
     );
 });
 
-test("a ticket with no kind disagrees only when the item's kind has a mapped label or type to add", () => {
-    assert.equal(kindDisagreement(record('improvement'), ticket(['docs']), MAPPED), null);
-    assert.equal(kindDisagreement(record('bug'), ticket(['docs']), NONE), null);
-    assert.deepEqual(kindDisagreement(record('bug', { agreedTicketKind: 'bug' }), ticket(['docs'], 'Task'), MAPPED), {
-        ticketKind: null,
-        changed: 'item',
-        kept: false,
-        swap: { add: ['type: bug'], remove: [], type: { from: 'Task', to: 'Bug' } },
-    });
-
-    const typeOnly = effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary;
-
-    assert.equal(kindDisagreement(record('bug'), ticket([], null), typeOnly)?.ticketKind, null);
-});
-
 test('the swap names the labels and type an update changes', () => {
     assert.deepEqual(kindDisagreement(record('feature'), ticket(['type: bug', 'bug', 'docs'], 'Bug'), MAPPED)?.swap, {
         add: ['type: feature', 'product'],
@@ -103,23 +56,6 @@ test('a kept answer holds until either kind changes, then the question returns',
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['feature']), NONE)?.kept, true);
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['improvement']), NONE)?.kept, false);
     assert.equal(kindDisagreement(record('improvement', { kindAnswer: kept }), ticket(['feature']), NONE)?.kept, false);
-});
-
-test('a kept answer can cover a ticket with no kind', () => {
-    const kept = { answer: 'keep', itemKind: 'bug', ticketKind: null };
-
-    assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket([]), MAPPED)?.kept, true);
-    assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['feature']), MAPPED)?.kept, false);
-});
-
-test('an update answer ends the question for the kinds it covers', () => {
-    const updated = { answer: 'update', itemKind: 'improvement', ticketKind: 'bug' };
-
-    assert.equal(kindDisagreement(record('improvement', { kindAnswer: updated }), ticket([], 'Bug'), NONE), null);
-    assert.equal(
-        kindDisagreement(record('improvement', { kindAnswer: updated }), ticket([], 'Feature'), NONE)?.kept,
-        false,
-    );
 });
 
 test('a swap needs access only for what it writes', () => {

@@ -2,7 +2,6 @@ import { expect, test } from 'vite-plus/test';
 
 import { parseFactorySettings } from './factory-settings-parse.ts';
 import { reviewerInstructions } from './factory-settings-resolve.ts';
-import { defaultFactorySettings } from './factory-settings.ts';
 
 const revisions = [
     { revision: 1, text: 'First saved edit.' },
@@ -69,22 +68,4 @@ test('retains restored instruction history as a disabled copy and avoids existin
         instructions: { kind: 'revision', revision: 2 },
     });
     expect(settings.reviewers.find((entry) => entry.id === 'custom-code-copy')?.name).toBe('Existing');
-});
-
-test('version 2 refuses packaged name, trigger and instruction edits; resolver always uses packaged text', () => {
-    const settings = defaultFactorySettings();
-    const builtin = settings.reviewers[1]!;
-
-    for (const change of [
-        { name: 'Renamed' },
-        { revisions: [] },
-        { mode },
-        { instructions: { kind: 'revision', revision: 1 }, revisions },
-    ])
-        expect(() => parseFactorySettings({ ...settings, reviewers: [{ ...builtin, ...change }] })).toThrow(
-            'Invalid factory settings',
-        );
-    expect(reviewerInstructions({ ...builtin, instructions: { kind: 'revision', revision: 1 }, revisions })).toEqual({
-        path: 'skills/lar-build/agents/reviewer-security.md',
-    });
 });

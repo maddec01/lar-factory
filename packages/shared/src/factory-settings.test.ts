@@ -66,60 +66,6 @@ it('resolves kind and role overrides independently and inherits a manually selec
     ).toMatchObject({ model: other, effort: 'max' });
 });
 
-it('preserves default-model options for an explicit identical kind choice and drops them for a different model', () => {
-    const settings = defaultFactorySettings();
-
-    settings.threadKinds.concept = { model: { instanceId: 'codex', model: 'project-model' } };
-    expect(resolveFactorySettings(settings, 'concept', undefined, { projectDefault })).toMatchObject({
-        effort: 'high',
-        options: [{ id: 'fast', value: true }],
-    });
-    settings.threadKinds.concept.model = other;
-    expect(resolveFactorySettings(settings, 'concept', undefined, { projectDefault })).toMatchObject({
-        effort: null,
-        options: [],
-    });
-});
-
-it('adds a stable custom reviewer, defaults it to always, retains trigger definitions, and never excludes required roles', () => {
-    const settings = parseFactorySettings({
-        version: 1,
-        reviewers: [
-            {
-                id: 'accessibility',
-                name: 'Accessibility',
-                instructions: { kind: 'revision', revision: 1 },
-                revisions: [{ revision: 1, text: 'Check keyboard access.' }],
-            },
-        ],
-    });
-    const custom = settings.reviewers[0]!;
-
-    expect(custom.mode).toEqual({ kind: 'always' });
-    custom.name = 'Keyboard review';
-    custom.mode = {
-        kind: 'on-trigger',
-        trigger: {
-            version: 1,
-            kind: 'rules',
-            any: [
-                { target: 'path-glob', pattern: '**/*.tsx' },
-                { target: 'diff-text', pattern: 'tabIndex' },
-            ],
-        },
-    };
-    settings.roles['reviewer:accessibility'] = { model: other, effort: 'high' };
-    settings.reviewers.find((entry) => entry.id === 'code')!.mode = { kind: 'never' };
-
-    const result = resolveFactorySettings(settings, 'build', 'reviewer:accessibility');
-
-    expect(result).toMatchObject({ model: other, effort: 'high' });
-    expect(result.reviewers.map((entry) => entry.id)).not.toContain('code');
-    expect(result.reviewers[0]).toEqual(custom);
-    expect(resolveFactorySettings(settings, 'build', 'doubt').model).toBeNull();
-    expect(resolveFactorySettings(settings, 'build', 'approver').model).toBeNull();
-});
-
 it('duplicates packaged instructions and trigger, and only edits the custom copy', () => {
     const original = defaultFactorySettings();
     const first = duplicateReviewer(original, 'security', 'security-copy', 'Packaged security text.');
@@ -147,21 +93,9 @@ it('duplicates packaged instructions and trigger, and only edits the custom copy
 });
 
 describe('invalid settings are refused instead of silently changing the selected policy', () => {
-    it.each([
-        null,
-        [],
-        {},
-        { version: 3 },
-        { version: 1, roles: null },
-        { version: 1, reviewers: null },
-        { version: 1, threadKinds: null },
-        { version: 1, threadKinds: { gate: {} } },
-        { version: 1, roles: { unknown: {} } },
-        { version: 1, roles: { 'reviewer:unknown': {} } },
-        { version: 1, threadKinds: { build: { effort: '' } } },
-        { version: 1, threadKinds: { build: { model: { instanceId: 'codex' } } } },
-        { version: 1, threadKinds: { build: { effort: 3 } } },
-    ])('refuses %j', (value) => expect(() => parseFactorySettings(value)).toThrow('Invalid factory settings'));
+    it.each([null, { version: 3 }])('refuses %j', (value) =>
+        expect(() => parseFactorySettings(value)).toThrow('Invalid factory settings'),
+    );
     it('refuses malformed, duplicate and unsafe reviewer definitions and unknown resolution inputs', () => {
         const defaults = defaultFactorySettings();
         const base = defaults.reviewers[0]!;

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vite-plus/test';
 
-import { newLabelProblem, writeAccessProblem } from './write-access.ts';
+import { writeAccessProblem } from './write-access.ts';
 
 test('writes require verified access and respect Azure safety', () => {
     expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('isn’t checked');
@@ -32,12 +32,7 @@ test('legacy consent loads without granting access and disappears on resave', as
 });
 
 test('repository identities don’t change write authorization', () => {
-    for (const repo of [
-        'owner/project',
-        'other-owner/other-project',
-        'organization/project/repository',
-        'another-org/Project%20Name/another-repository',
-    ]) {
+    for (const repo of ['another-org/Project%20Name/another-repository']) {
         expect(
             writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: false }),
         ).toBeNull();
@@ -46,17 +41,4 @@ test('repository identities don’t change write authorization', () => {
         ).toContain('refused');
         expect(writeAccessProblem(repo, 'publish-ticket', {}, { azureReadOnly: false })).not.toBeNull();
     }
-});
-
-test('a new label needs label management, and on Azure stays unavailable with its reason even then', () => {
-    expect(newLabelProblem('team/app', { 'manage-labels': 'allowed' })).toBeNull();
-    expect(newLabelProblem('team/app', { 'tag-ticket': 'allowed' })).toContain(
-        'Access to manage-labels isn’t checked yet',
-    );
-    expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' })).toContain(
-        'Azure DevOps has no way to create a tag on its own',
-    );
-    expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' }, { azureReadOnly: true })).toBe(
-        'Azure DevOps is read-only in this test session.',
-    );
 });

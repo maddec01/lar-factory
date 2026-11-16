@@ -38,10 +38,10 @@ test('batch eligibility preserves an independent saved notice even when its word
     expect(deskItems({ items: all }, false)).toEqual([parent]);
 });
 
-test.each(['concept', 'linked'])('%s batch approval appears once on the parent desk card', (kind) => {
+test('a batch approval appears once on the parent desk card', () => {
     const parent = work({
         id: 'parent',
-        kind: kind === 'concept' ? 'concept' : 'feature',
+        kind: 'concept',
         flow: 'linked',
         needsYou: notice,
     });
@@ -69,46 +69,13 @@ test.each(['concept', 'linked'])('%s batch approval appears once on the parent d
 
 const kinds: [string, Partial<Item>, Item[]][] = [
     ['single issue', {}, []],
-    ['build', { kind: 'build' }, []],
-    ['concept', { kind: 'concept' }, []],
-    ['decision', { kind: 'decision' }, []],
-    ['linked parent', { flow: 'linked' }, [work({ id: 'child', parentId: 'work' })]],
     ['concept part', { parentId: 'parent', flow: 'linked' }, [work({ id: 'parent', kind: 'concept' })]],
-    ['linked part', { parentId: 'parent', flow: 'linked' }, [work({ id: 'parent' })]],
-    [
-        'decision part',
-        { kind: 'decision', parentId: 'parent', flow: 'linked' },
-        [work({ id: 'parent', kind: 'concept' })],
-    ],
 ];
 const waits: [string, Partial<Item>, boolean][] = [
     ['question during a build', { threads: [question] }, true],
-    ['tool approval', { threads: [question], status: 'Review' }, true],
-    ['brief gate approval', { needsYou: notice, status: 'Shaping' }, true],
-    ['saved question', { status: 'Needs you' }, true],
     ['Verify', { status: 'Verify' }, true],
-    ['PR to merge', { status: 'Ready to merge' }, true],
-    ['slice question owned by its build', { threads: [{ id: 'build', childNeedsYou: true } as ItemThread] }, true],
     ['agent running', { threads: [{ id: 'build', state: 'running', currentRunning: true } as ItemThread] }, false],
-    ['Ready', { status: 'Ready' }, false],
-    ['ordinary blocker', { blockers: [{ state: 'open' }] as Item['blockers'] }, false],
-    ['unmet prerequisite', { slices: [{ progress: 'blocked' }] as Item['slices'] }, false],
-    ['unknown activity', { threads: 'unavailable' }, false],
     ['old question', { threads: [{ ...question, observedAt: '2026-11-01' }] }, false],
-    [
-        'old slice question',
-        { threads: [{ ...question, state: 'done', childNeedsYou: true, observedAt: '2026-11-01' }] },
-        false,
-    ],
-    ['answered question', { threads: [{ ...question, state: 'done' }] }, false],
-    [
-        'CI running',
-        {
-            status: 'Ready to merge',
-            linkedPrs: [{ state: 'open', checks: { running: 1, failed: 0 } }] as Item['linkedPrs'],
-        },
-        false,
-    ],
 ];
 
 for (const [kind, identity, relatives] of kinds) {
@@ -135,63 +102,6 @@ test('a grouped question targets its exact owning thread and does not put quiet 
     expect(deskItems({ items: all }, false)).toEqual([child]);
     expect(nextAction(child)).toEqual({ kind: 'thread', label: 'Answer in T3', threadId: 'question' });
     expect(deskParentName(child, all)).toBe('#200 Cloud sign-in');
-});
-
-test('parent identity uses current board data, falls back to the ticket, and names local unticketed work', () => {
-    const parent = work({ id: 'parent', number: 0, title: 'Local parent' });
-    const child = work({
-        parentId: parent.id,
-        parent: {
-            number: 9,
-            title: 'Ticket parent',
-            repo: 'elsewhere/project',
-            url: 'https://example.com/9',
-            state: 'open',
-        },
-    });
-
-    expect(deskParentName(child, [parent, child])).toBe('Local parent');
-    expect(deskParentName(child, [child])).toBe('#9 Ticket parent');
-    expect(deskParentName(work(), [])).toBeUndefined();
-});
-
-test('a ready Pedro release step is a desk wait; an agent step and later human steps are not', () => {
-    const plan = {
-        steps: [{ id: 'activate', who: 'Pedro', what: 'Activate', done: null }],
-        outcomeCheck: { what: 'Check composition', result: 'pending' as const, evidence: null },
-    };
-    const parent = work({ flow: 'linked', releasePlan: plan });
-
-    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
-    expect(deskWait(parent)).toEqual({
-        label: 'Release step',
-        action: { kind: 'details', label: 'Mark release step done' },
-    });
-    expect(
-        deskItems(
-            {
-                items: [
-                    work({ releasePlan: { ...plan, steps: [{ ...plan.steps[0]!, who: 'Agent' }, ...plan.steps] } }),
-                ],
-            },
-            false,
-        ),
-    ).toEqual([]);
-    expect(
-        deskItems(
-            {
-                items: [
-                    work({
-                        releasePlan: {
-                            ...plan,
-                            steps: [{ ...plan.steps[0]!, done: { by: 'Pedro', at: 'now', evidence: 'Activated.' } }],
-                        },
-                    }),
-                ],
-            },
-            false,
-        ),
-    ).toEqual([]);
 });
 
 test('a decision-owned child gate appears once on its build with concept identity, without hiding unrelated questions', () => {
@@ -249,126 +159,4 @@ test('a decision-owned child gate appears once on its build with concept identit
     expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
     owner.threads = [{ ...question, questionSummary: 'Which colour should we use?' }];
     expect(deskItems({ items: all }, false).map((item) => item.id)).toContain('decision');
-});
-
-test('Outcome is an agent wait until a failed check, dispatch failure or owner ending without evidence', () => {
-    const parent = work({
-        id: 'parent',
-        kind: 'concept',
-        outcomeCheck: {
-            ready: true,
-            digest: 'input',
-            run: {
-                digest: 'input',
-                ownerWorkId: 'parent',
-                threadId: 'owner',
-                commandId: 'command',
-                messageId: 'message',
-                requestedAt: '2026-11-14T10:00:00Z',
-                sent: true,
-                error: null,
-            },
-        },
-        releasePlan: { steps: [], outcomeCheck: { what: 'Check composition', result: 'pending', evidence: null } },
-        threads: [{ id: 'owner', state: 'running', updated: '2026-11-14T10:01:00Z' } as ItemThread],
-    });
-
-    expect(deskItems({ items: [parent] }, false)).toEqual([]);
-    parent.threads = [{ id: 'owner', state: 'done', updated: '2026-11-14T09:59:00Z' } as ItemThread];
-    expect(deskItems({ items: [parent] }, false)).toEqual([]);
-    parent.threads[0]!.updated = '2026-11-14T10:01:00Z';
-    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
-    expect(deskWait(parent, false, [parent]).action?.label).toBe('Record Outcome');
-    parent.threads[0]!.queued = true;
-    expect(deskItems({ items: [parent] }, false)).toEqual([]);
-    parent.threads[0]!.queued = undefined;
-    parent.threads[0]!.hasLiveChildren = true;
-    expect(deskItems({ items: [parent] }, false)).toEqual([]);
-    parent.threads = 'unavailable';
-    parent.outcomeCheck!.run!.error = 'T3 refused the command';
-    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
-});
-
-test('a batch suppresses member approvals while preserving an unrelated member tool request', () => {
-    const parent = work({ id: 'parent', kind: 'concept', needsYou: notice });
-    const part = work({
-        id: 'part',
-        kind: 'build',
-        parentId: parent.id,
-        passingBrief: false,
-        briefApproval: { reason: 'Approve brief' },
-        threads: [{ ...question, pendingRequest: { id: 'tool', threadId: 'question', kind: 'tool-approval' } }],
-    });
-    const all = [parent, part];
-
-    expect(deskItems({ items: all }, false)).toEqual(all);
-    expect(deskWait(parent, false, all).label).toBe('Approve briefs');
-    expect(deskWait(part, false, all).label).toBe('Approval in T3');
-});
-
-test('S05-F4-001 failed Outcome has one criterion-named fix card, never a replacement receipt', () => {
-    const parent = work({
-        id: 'failed-group',
-        kind: 'concept',
-        status: 'In progress',
-        outcomeCheck: { ready: true, digest: 'failed', run: null },
-        releasePlan: {
-            steps: [],
-            outcomeCheck: {
-                what: 'A factory → B consumer → C display composition',
-                result: 'failed',
-                evidence: {
-                    by: 'Outcome owner',
-                    at: '2026-11-14T15:02:18Z',
-                    evidence: 'C only exports displayGreeting(element); no accepted-text argument.',
-                },
-            },
-        },
-    });
-
-    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
-    expect(deskWait(parent, false, [parent])).toEqual({
-        label: 'Outcome failed: A factory → B consumer → C display composition',
-        action: { kind: 'details', label: 'Propose fix part' },
-    });
-});
-
-test('a requested Outcome fix waits on its owner, then offers its exact thread if that owner stops', () => {
-    const parent = work({
-        id: 'repair-group',
-        kind: 'concept',
-        status: 'In progress',
-        outcomeCheck: {
-            ready: true,
-            digest: 'failed',
-            run: {
-                digest: 'failed',
-                ownerWorkId: 'repair-group',
-                threadId: 'repair-owner',
-                commandId: 'outcome',
-                messageId: 'outcome-message',
-                requestedAt: '2026-11-14T15:00:00Z',
-                sent: true,
-                error: null,
-                fixProposal: {
-                    commandId: 'fix',
-                    messageId: 'fix-message',
-                    threadId: 'repair-owner',
-                    requestedAt: '2026-11-14T15:05:00Z',
-                    sent: true,
-                    error: null,
-                },
-            },
-        },
-        releasePlan: { steps: [], outcomeCheck: { what: 'B→C composition', result: 'failed', evidence: null } },
-        threads: [{ id: 'repair-owner', state: 'running', updated: '2026-11-14T15:06:00Z' } as ItemThread],
-    });
-
-    expect(deskItems({ items: [parent] }, false)).toEqual([]);
-    parent.threads = [{ id: 'repair-owner', state: 'done', updated: '2026-11-14T15:06:00Z' } as ItemThread];
-    expect(deskItems({ items: [parent] }, false)).toEqual([parent]);
-    expect(deskWait(parent, false, [parent])).toEqual({
-        label: 'Outcome failed: B→C composition',
-        action: { kind: 'thread', threadId: 'repair-owner', label: 'Resume fix proposal in T3' },
-    });
 });

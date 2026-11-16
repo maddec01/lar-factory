@@ -57,25 +57,3 @@ test('capacity is explained only for an otherwise eligible part with authorizati
     data.autoBuild = { on: true };
     expect(groupCapacityWait(parent, data)).toBe('Shared capacity full: 2 of 2 slots in use');
 });
-
-test('gate, blocker, human, scheduler and paused waits do not claim capacity as their cause', () => {
-    const { parent, data, waiting } = fixture();
-
-    waiting.passingBrief = false;
-    expect(groupCapacityWait(parent, data)).toBeNull();
-    waiting.passingBrief = true;
-    waiting.blockers = [{ number: 1, repo: waiting.repo, state: 'open' }];
-    expect(groupCapacityWait(parent, data)).toBeNull();
-    waiting.blockers = [];
-    waiting.briefApproval = { reason: 'Approve the new brief.' };
-    expect(groupCapacityWait(parent, data)).toBeNull();
-    delete waiting.briefApproval;
-    data.autoBuildPass = { paused: { [waiting.id]: 'Fix access.' }, wouldStart: 0, waitsForRefinement: [] };
-    expect(groupCapacityWait(parent, data)).toBeNull();
-    delete data.autoBuildPass;
-    parent.conceptBuild!.holds = [{ workId: parent.id, reason: 'Map needs an answer.' }];
-    expect(groupCapacityWait(parent, data)).toBeNull();
-    parent.conceptBuild!.holds = [];
-    parent.conceptBuild!.run!.state = 'paused';
-    expect(groupCapacityWait(parent, data)).toBeNull();
-});

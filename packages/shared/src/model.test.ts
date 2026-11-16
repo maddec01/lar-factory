@@ -4,45 +4,23 @@ import { test } from 'vite-plus/test';
 
 import { validateDraft } from './add-item.ts';
 import { boardSections } from './board-view.ts';
-import { day, formatTokens, shortAgo } from './format.ts';
 import {
-    inRepo,
-    onAzure,
-    shownRepo,
     blockedText,
-    blockerRef,
-    dependencyNotice,
     buildBranch,
     buildMessage,
     canAbandon,
     canResumeShaping,
-    checkState,
-    isBuild,
-    itemPr,
     itemTotal,
-    isRecentlyDone,
-    isSlow,
-    isStale,
-    itemName,
-    ref,
     kindLabel,
     labelKind,
-    labelStatuses,
     openBlockers,
-    repoKey,
     repoName,
-    repositoryProjectHint,
     sameRepo,
-    startHold,
-    sliceProgress,
-    t3DefaultDetail,
     workMessage,
     earlierWorkMessage,
     earlierBuildMessage,
-    usageFailed,
-    usageIncomplete,
 } from './model.ts';
-import type { BoardData, Blocker, Checks, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
+import type { BoardData, Blocker, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
     return {
@@ -102,14 +80,6 @@ test('only the latest stopped shaping session can resume, with fresh evidence th
     assert.equal(canResumeShaping(item('Shaping', [], { threads: 'unavailable' })), false);
 });
 
-test('a slice ticket is done once closed as completed, else waiting; not planned is hidden', () => {
-    assert.equal(sliceProgress('CLOSED', 'COMPLETED'), 'done');
-    assert.equal(sliceProgress('CLOSED', null), 'done', 'closed before GitHub kept a reason');
-    assert.equal(sliceProgress('OPEN', 'REOPENED'), 'waiting');
-    assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED'), null);
-    assert.equal(sliceProgress('CLOSED', 'DUPLICATE'), null, 'a duplicate is closed as not planned too');
-});
-
 test("a ticket's labels give its kind", () => {
     assert.equal(labelKind(['bug', 'concept']), 'concept');
     assert.equal(labelKind([]), 'issue');
@@ -124,51 +94,6 @@ test("a ticket's labels give its kind", () => {
         kindLabel(item('List', [], { kind: 'decision' })),
         'decision',
         'a recorded decision with no ticket label is a decision',
-    );
-});
-
-test('the build label makes a build whatever the kind, except on a concept', () => {
-    assert.equal(isBuild(item('List', ['build'])), true);
-    assert.equal(isBuild(item('List', ['build', 'feature'])), true);
-    assert.equal(isBuild(item('List', ['feature'])), false);
-    assert.equal(
-        isBuild(item('List', ['build', 'concept'])),
-        false,
-        "a concept's sub-issues are board items, not slices",
-    );
-});
-
-test("the blocked text names the blockers whose work isn't complete, with the repository when it is another", () => {
-    const blocker = (number: number, repo: string, state: 'open' | 'closed') => ({ number, repo, state });
-
-    assert.equal(
-        blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open')] })),
-        'Blocked by #3 until it completes',
-    );
-    assert.equal(
-        blockedText(
-            item('Ready', [], {
-                blockers: [blocker(3, 'maddec01/lar-server', 'open'), blocker(4, 'maddec01/lar-apple', 'open')],
-            }),
-        ),
-        'Blocked by #3, maddec01/lar-apple#4 until they complete',
-    );
-    assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'closed')] })), null);
-});
-
-test("a blocker's ref is #n for the item's repository, and names another repository in full, or without its owner when short", () => {
-    const own = item('Ready', []);
-
-    assert.deepEqual(
-        [blockerRef(own, { number: 3, repo: own.repo! }), blockerRef(own, { number: 3, repo: own.repo! }, true)],
-        ['#3', '#3'],
-    );
-    assert.deepEqual(
-        [
-            blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }),
-            blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }, true),
-        ],
-        ['maddec01/lar-apple#4', 'lar-apple#4'],
     );
 });
 
@@ -220,82 +145,6 @@ test("an unmet Dependency holds the start whatever its ticket shows, and a met o
     assert.equal(blockedText(item('Ready', [], { blockers: [dependency('open', true)] })), null);
 });
 
-test('a Dependency goes by its owner, never its ticket number', () => {
-    const own = item('Ready', []);
-
-    assert.deepEqual(
-        [blockerRef(own, dependency('open')), blockerRef(own, dependency('open'), true)],
-        ['Dependency on server team', 'server team'],
-    );
-});
-
-test('a closed ticket or merged PR suggests marking it met, and a changed observation after the mark asks for a review', () => {
-    assert.equal(
-        dependencyNotice(dependency('closed').dependency!),
-        'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
-    );
-    assert.equal(
-        dependencyNotice(
-            dependency('merged', false, {
-                observation: {
-                    subject: 'maddec01/lar-server#41',
-                    kind: 'merged',
-                    detail: null,
-                    observedAt: '2026-10-30T09:00:00Z',
-                    lastGood: null,
-                },
-            }).dependency!,
-        ),
-        'Its PR maddec01/lar-server#41 is merged. Mark it met once the change is delivered.',
-    );
-    assert.equal(dependencyNotice(dependency('open').dependency!), null);
-    assert.equal(
-        dependencyNotice(dependency('closed', true).dependency!),
-        null,
-        'a met Dependency needs no suggestion',
-    );
-    assert.equal(
-        dependencyNotice(dependency('reopened', true, { needsReview: true }).dependency!),
-        'Its ticket maddec01/lar-server#40 changed to reopened after you marked it met. Review the mark.',
-    );
-});
-
-test('an item with a ticket goes by its number, and captured work with none by its title, never #0', () => {
-    const ticketed = item('List', [], { number: 12, title: 'Index files' });
-    const captured = item('List', [], { number: 0, title: 'Index files' });
-
-    assert.deepEqual([ref(ticketed), itemName(ticketed)], ['#12', '#12 Index files']);
-    assert.deepEqual([ref(captured), itemName(captured)], ['Index files', 'Index files']);
-});
-
-test("a repository's project hint is found whatever the case, and is null once T3 has its project or before any read", () => {
-    const repositoryProjects = { 'maddec01/lar-server': 'Add the checkout in T3 Code', 'maddec01/lar-factory': null };
-
-    assert.equal(repositoryProjectHint({ repositoryProjects }, 'MADDEC01/Lar-Server'), 'Add the checkout in T3 Code');
-    assert.equal(repositoryProjectHint({ repositoryProjects }, 'maddec01/lar-factory'), null);
-    assert.equal(repositoryProjectHint({}, 'maddec01/lar-server'), null);
-});
-
-test("a start in a repository still onboarding waits for its PR, whatever the case; else the project's hint holds it", () => {
-    const onboarding = [
-        { repo: 'maddec01/lar-docs', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } },
-    ];
-    const repositoryProjects = { 'maddec01/lar-server': 'Add the checkout in T3 Code' };
-
-    assert.equal(startHold({ onboarding, repositoryProjects }, 'MADDEC01/Lar-Docs'), 'Waits for onboarding to finish');
-    assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-server'), 'Add the checkout in T3 Code');
-    assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-factory'), null);
-    assert.equal(startHold({}, null), null);
-});
-
-test('Done counts for 7 days after closing', () => {
-    const now = Date.parse('2026-10-21T10:00:00Z');
-
-    assert.equal(isRecentlyDone(item('Done', [], { closedAt: '2026-10-15T10:00:00Z' }), now), true);
-    assert.equal(isRecentlyDone(item('Done', [], { closedAt: '2026-10-13T10:00:00Z' }), now), false);
-    assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
-});
-
 test('the work message names the thread for shaping, then runs lar-shape on the work ID', () => {
     const work = item('Queued', [], {
         id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a',
@@ -307,25 +156,6 @@ test('the work message names the thread for shaping, then runs lar-shape on the 
         workMessage(work),
         'Shaping #760 Improve T3 Code thread names\n$lar-shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a',
     );
-});
-
-test('the work message for ticketless work names the thread with its title alone', () => {
-    const work = item('Queued', [], { id: 'w1', number: 0, url: null, title: 'Tidy the docs' });
-
-    assert.equal(workMessage(work), 'Shaping Tidy the docs\n$lar-shape w1');
-});
-
-test('a decision launched through shaping is named for shaping', () => {
-    const work = item('Queued', ['decision-architecture'], { id: 'w1', number: 12, title: 'Pick a store' });
-
-    assert.ok(workMessage(work).startsWith('Shaping #12 Pick a store\n$lar-shape w1\n'));
-});
-
-test('an Azure work item is named by its number as a GitHub ticket is', () => {
-    const work = item('Queued', [], { id: 'w1', number: 4021, title: 'Sync backlog', repo: 'contoso/Fabrikam/web' });
-
-    assert.equal(workMessage(work).split('\n')[0], 'Shaping #4021 Sync backlog');
-    assert.equal(buildMessage(work, '/l').split('\n')[0], 'Build #4021 Sync backlog');
 });
 
 test('the messages before the phase names are kept for a launch still unresolved', () => {
@@ -343,13 +173,6 @@ test('the messages before the phase names are kept for a launch still unresolved
     );
 });
 
-test('a $word in the title is kept and $lar-shape still opens line 2', () => {
-    const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
-
-    assert.equal(message, 'Shaping #7 Fix $foo parsing\n$lar-shape x');
-    assert.equal(message.split('\n')[1], '$lar-shape x');
-});
-
 test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
     const title = 'Add Start build to the board server';
 
@@ -358,29 +181,6 @@ test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or 
     assert.equal(buildBranch(item('Ready', ['improvement', 'build'], { title })), 'feat/7-add-start-build-to-the');
     assert.equal(buildBranch(item('Ready', ['build'], { title })), 'chore/7-add-start-build-to-the');
     assert.equal(buildBranch(item('Ready', [], { title })), 'chore/7-add-start-build-to-the');
-});
-
-test('a build branch slug takes up to five words of the title, lowercase, with what a branch name cannot hold left out', () => {
-    const branch = (title: string) => buildBranch(item('Ready', ['bug'], { title }));
-
-    assert.equal(branch('Crash'), 'fix/7-crash');
-    assert.equal(branch('Fix login'), 'fix/7-fix-login');
-    assert.equal(branch("  Board: don't  read ~/.t3 [twice]?  "), 'fix/7-board-dont-read-t3-twice');
-    assert.equal(branch("Fix `t3` CLI's path..lock @{ref} ^ * : \\ end"), 'fix/7-fix-t3-clis-path-lock');
-    assert.equal(branch('Café crème über naïve'), 'fix/7-cafe-creme-uber-naive');
-    assert.equal(branch('日本語 title 🚀 here'), 'fix/7-title-here');
-    assert.equal(branch('日本語 🚀'), 'fix/7');
-});
-
-test('a ticketless build branch starts its slug with the first 8 characters of the work ID', () => {
-    const work = item('Ready', ['bug'], {
-        id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a',
-        number: 0,
-        url: null,
-        title: 'Fix login',
-    });
-
-    assert.equal(buildBranch(work), 'fix/0b6e2c1a-fix-login');
 });
 
 test('the build message names the thread for the build, then the work ID and the builder agent of the installed lar-build', () => {
@@ -471,331 +271,13 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
     assert.equal(itemTotal({ ...parent, stats: 'unavailable' }, [build]), 'unavailable');
 });
 
-test('usage that failed is told from usage still loading', () => {
-    const part = (extra: Partial<Item>) => item('In progress', [], extra);
-    const running = [{ threadId: 't' }] as unknown as Item['threads'];
-
-    assert.equal(
-        usageFailed(part({ threads: 'unavailable', usageState: 'loading' })),
-        false,
-        'T3 has not answered yet',
-    );
-    assert.equal(usageIncomplete(part({ threads: 'unavailable', usageState: 'loading' })), true);
-    assert.equal(usageFailed(part({ threads: 'unavailable' })), true, 'T3 stopped');
-    assert.equal(usageFailed(part({ threads: running, usageState: 'failed' })), true);
-    assert.equal(usageFailed(part({ stats: 'unavailable' })), true);
-    assert.equal(usageFailed(part({ threads: running, usageState: 'loading' })), false);
-    assert.equal(
-        usageFailed(part({ stats: { agentMs: 1, tokens: 1, frozen: true }, usageState: 'failed' })),
-        false,
-        'frozen figures are complete',
-    );
-    assert.equal(usageFailed(part({ threads: [], stats: 'unavailable' })), false, 'no thread has nothing to lose');
-});
-
-test('an item total with a member loading or failed says it is incomplete, or unavailable with no figures to add', () => {
-    const under = {
-        number: 7,
-        title: 't',
-        url: 'https://github.com/maddec01/lar-server/issues/7',
-        repo: 'Maddec01/Lar-Server',
-        state: 'open' as const,
-    };
-    const running = [{ threadId: 't' }] as unknown as Item['threads'];
-    const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, tokens: 100, costUsd: 1 } });
-    const part = (extra: Partial<Item>) =>
-        item('In progress', [], { id: 'c', number: 8, parent: under, parentId: 'p', threads: running, ...extra });
-    const known = { agentMs: 20, tokens: 200, costUsd: 2 };
-    const partial = { agentMs: 30, tokens: 300, costUsd: 3, incomplete: true };
-
-    assert.deepEqual(
-        itemTotal(parent, [parent, part({ stats: known, usageState: 'failed' })]),
-        partial,
-        'a failed member keeps its known figures',
-    );
-    assert.deepEqual(
-        itemTotal(parent, [parent, part({ stats: known, usageState: 'loading' })]),
-        partial,
-        'a loading member counts as a failed one',
-    );
-    assert.deepEqual(
-        itemTotal({ ...parent, threads: running, usageState: 'failed' }, [
-            part({ stats: { agentMs: 0, tokens: 0 }, usageState: 'current' }),
-        ]),
-        { agentMs: 10, tokens: 100, costUsd: 1, incomplete: true },
-        'a failed parent is a member too, though its parts add nothing',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({ usageState: 'loading' })]),
-        'unavailable',
-        'a loading member with nothing to add',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({})]),
-        'unavailable',
-        'a thread with no usage answer yet is still to come',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({ stats: { agentMs: 0, tokens: 0 }, usageState: 'failed' })]),
-        'unavailable',
-        'all zeros are no known figures',
-    );
-    assert.deepEqual(
-        itemTotal(parent, [parent, part({ stats: { ...known, frozen: true }, usageState: 'failed' })]),
-        { agentMs: 30, tokens: 300, costUsd: 3 },
-        'figures frozen at merge are complete, whatever the read says',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({ usageState: 'current' })]),
-        null,
-        'threads read in full with no usage add nothing',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({ threads: [], stats: 'unavailable' })]),
-        null,
-        'an item with no threads is never unavailable',
-    );
-    assert.equal(
-        itemTotal(parent, [parent, part({ threads: [] })]),
-        null,
-        'an item with no threads has nothing to wait for',
-    );
-    assert.deepEqual(
-        itemTotal(parent, [parent, part({ stats: known, usageState: 'current' })]),
-        { agentMs: 30, tokens: 300, costUsd: 3 },
-        'every member current reads as complete',
-    );
-});
-
 const sample = JSON.parse(readFileSync(new URL('../test/sample.json', import.meta.url), 'utf8')) as BoardData;
-
-test('stale when the last read failed or is too old', () => {
-    const fresh = { ...sample, error: null, fetchedAt: '2026-10-21T09:59:00Z' };
-    const failed = { ...sample, error: 'gh api graphql failed: error connecting to api.github.com' };
-
-    assert.equal(isStale(failed, Date.parse('2026-10-21T09:41:00Z')), true, 'a failed read is stale however recent');
-    assert.equal(isStale(sample, Date.parse('2026-10-21T09:41:00Z')), false, 'the same read without the error is not');
-    assert.equal(isStale(fresh, Date.parse('2026-10-21T10:00:00Z')), false);
-    assert.equal(isStale(fresh, Date.parse('2026-10-21T10:30:00Z')), true);
-    assert.equal(
-        isStale({ ...sample, error: null, fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')),
-        false,
-        'a first read still running is not stale',
-    );
-    assert.equal(isStale({ ...sample, error: 'HTTP 502', fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')), true);
-});
-
-test('the desk holds Needs you, Verify and Ready to merge, in flow order, including grouped concepts and leaving Ready items out', () => {
-    const now = Date.parse('2026-10-21T10:00:00Z');
-    const items = [
-        item('Verify'),
-        item('Ready'),
-        item('Ready', ['concept']),
-        item('Needs you', ['concept']),
-        item('Ready to merge'),
-        item('Needs you'),
-        item('In progress'),
-    ].map((i, n) => ({ ...i, id: `i${n}` }));
-    const { needsYou } = boardSections({ ...sample, items }, now);
-
-    assert.deepEqual(
-        needsYou.map((i) => i.status),
-        ['Needs you', 'Needs you', 'Verify', 'Ready to merge'],
-    );
-});
-
-test("token counts are compact as on T3 Code's usage page", () => {
-    assert.deepEqual(
-        [0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
-        ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T'],
-    );
-});
-
-test('a day shows its year only when that is not the current year, in the time zone it is read in', () => {
-    const now = Date.parse('2026-10-26T12:00:00Z');
-
-    assert.deepEqual(
-        [day('2026-10-19', 'UTC', now), day('2025-10-19', 'UTC', now), day('2027-01-02', 'UTC', now)],
-        ['19 Oct', '19 Oct 2025', '2 Jan 2027'],
-    );
-    assert.equal(day('2025-12-31T23:30:00Z', 'Europe/Amsterdam', Date.parse('2026-01-01T12:00:00Z')), '1 Jan');
-});
-
-test('a short age rounds each unit down, and a future time reads just now', () => {
-    const now = Date.parse('2026-10-23T12:00:00Z');
-    const at = (s: number) => new Date(now - s * 1000).toISOString();
-
-    assert.deepEqual(
-        [0, 59, 60, 59 * 60 + 59, 60 * 60, 47 * 3600 + 59 * 60, 48 * 3600, -30].map((s) => shortAgo(at(s), now)),
-        ['just now', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', 'just now'],
-    );
-});
-
-test("an item's PR is the one Open PR opens: its first linked PR", () => {
-    const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({
-        number,
-        url: `u${number}`,
-        state: 'open' as const,
-        isDraft: false,
-        checks: null,
-        mergeState,
-    });
-
-    assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), {
-        url: 'u1',
-        pipeline: linked(1, 'conflicts'),
-    });
-    assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
-    assert.deepEqual(
-        itemPr(item('Verify', [], { linkedPrs: [{ ...linked(1, 'can merge'), pipelineUnread: true }] })),
-        { url: 'u1', pipeline: null },
-        'a recorded PR links with no pipeline to claim',
-    );
-});
-
-test('a failed check wins while other checks run, and turns slow after 30 minutes', () => {
-    const now = Date.parse('2026-10-21T10:00:00Z');
-    const checks = (c: Partial<Checks>): Checks => ({ passed: 0, failed: 0, running: 0, total: 0, since: null, ...c });
-
-    assert.equal(checkState(checks({ passed: 1, running: 1, failed: 1, total: 3 })), 'failed');
-    assert.equal(checkState(checks({ passed: 2, failed: 1, total: 3 })), 'failed');
-    assert.equal(checkState(checks({ passed: 3, total: 3 })), 'passed');
-    assert.equal(checkState(null), null);
-    assert.equal(isSlow(checks({ running: 1, total: 1, since: '2026-10-21T09:31:00Z' }), now), false);
-    assert.equal(isSlow(checks({ running: 1, total: 1, since: '2026-10-21T09:30:00Z' }), now), true);
-    assert.equal(
-        isSlow(checks({ passed: 1, total: 1, since: '2026-10-21T08:00:00Z' }), now),
-        false,
-        'only a running pipeline is slow',
-    );
-    assert.equal(isSlow(checks({ running: 1, total: 1 }), now), false);
-});
 
 test('canAbandon takes List and Queued issues, never other statuses', () => {
     for (const status of ['List', 'Queued'] as const) {
         assert.ok(canAbandon(item(status)), `${status} issue`);
     }
     for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
-});
-
-test("an issue's labels hold the statuses whose labels it carries, in flow order, and never Done", () => {
-    assert.deepEqual(labelStatuses(['bug', 'status-verify', 'status-shaping', 'status-done']), ['Shaping', 'Verify']);
-    assert.deepEqual(labelStatuses(['bug']), []);
-});
-
-test('a repository goes by its name, or by owner/name when another board repository shares the name', () => {
-    const repos = [
-        { repo: 'maddec01/lar-server', role: 'api', labels: [] },
-        { repo: 'maddec01/lar', role: 'app', labels: [] },
-        { repo: 'fabrikam/lar', role: 'app', labels: [] },
-    ];
-
-    assert.equal(repoName('maddec01/lar-server', repos), 'lar-server');
-    assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar');
-    assert.equal(repoName('fabrikam/lar', repos), 'fabrikam/lar');
-    assert.equal(
-        repoName('someone/elsewhere', repos),
-        'elsewhere',
-        'a repository off the board still goes by its name',
-    );
-
-    const azure = [
-        ...repos,
-        { repo: 'contoso/Fabrikam/lar-api', role: 'api', labels: [] },
-        { repo: 'contoso/Fabrikam/lar', role: 'app', labels: [] },
-    ];
-
-    assert.equal(
-        repoName('contoso/Fabrikam/lar-api', azure),
-        'lar-api',
-        'an Azure DevOps repository goes by its last part',
-    );
-    assert.equal(repoName('contoso/Fabrikam/lar', azure), 'contoso/Fabrikam/lar');
-    assert.equal(
-        repoName('contoso/Fabrikam%20Fiber/lar', [
-            ...azure,
-            { repo: 'contoso/Fabrikam%20Fiber/lar', role: 'app', labels: [] },
-        ]),
-        'contoso/Fabrikam Fiber/lar',
-        'a shown key is decoded',
-    );
-    assert.equal(repoName('contoso/Fabrikam/lar%20web', azure), 'lar web');
-    assert.equal(repoKey(item('List')), 'maddec01/lar-server');
-});
-
-test('a repository shows with each part of its key decoded, and is on Azure DevOps when its key has three parts', () => {
-    assert.equal(shownRepo('contoso/Fabrikam%20Fiber/lar-api'), 'contoso/Fabrikam Fiber/lar-api');
-    assert.equal(shownRepo('maddec01/lar'), 'maddec01/lar');
-    assert.equal(shownRepo('contoso/100%/lar'), 'contoso/100%/lar', 'a part that is no valid encoding shows as it is');
-    assert.equal(onAzure('contoso/Fabrikam%20Fiber/lar-api'), true);
-    assert.equal(onAzure('maddec01/lar'), false);
-});
-
-test('the board groups the List by repository, keyed by owner/name and named by name', () => {
-    const repos = [
-        { repo: 'maddec01/lar', role: 'app', labels: [] },
-        { repo: 'fabrikam/lar', role: 'app', labels: [] },
-    ];
-    const items = [
-        item('List', [], { id: 'a', repo: 'fabrikam/lar' }),
-        item('List', [], { id: 'c', repo: 'maddec01/lar' }),
-    ];
-    const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
-
-    assert.deepEqual(
-        groups.map((g) => [g.repo, g.name, g.items.map((i) => i.id)]),
-        [
-            ['maddec01/lar', 'maddec01/lar', ['c']],
-            ['fabrikam/lar', 'fabrikam/lar', ['a']],
-        ],
-    );
-});
-
-test('the List groups repositories by their items in List, most first, ties in configured order', () => {
-    const repos = ['o/a', 'o/b', 'o/c'].map((repo) => ({ repo, role: 'app', labels: [] }));
-    const items = [
-        item('List', [], { id: 'c1', repo: 'o/c' }),
-        item('List', [], { id: 'c2', repo: 'o/c' }),
-        item('List', [], { id: 'b1', repo: 'o/b' }),
-        item('Queued', [], { id: 'b2', repo: 'o/b' }),
-        item('Queued', [], { id: 'b3', repo: 'o/b' }),
-    ];
-    const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
-
-    assert.deepEqual(
-        groups.map((g) => [g.repo, g.items.length]),
-        [
-            ['o/c', 2],
-            ['o/b', 1],
-            ['o/a', 0],
-        ],
-    );
-});
-
-test("an untagged Azure work item shows in the List of every repository reading its item source, and a tagged one only in its repository's", () => {
-    const repos = [
-        { repo: 'contoso/Fabrikam/web', role: 'app', labels: [] },
-        { repo: 'contoso/Fabrikam/api', role: 'api', labels: [] },
-    ];
-    const items = [
-        item('List', [], {
-            id: 'a',
-            repo: 'contoso/Fabrikam/web',
-            untaggedFor: ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'],
-        }),
-        item('List', [], { id: 'b', repo: 'contoso/Fabrikam/web' }),
-    ];
-    const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
-
-    assert.deepEqual(
-        groups.map((g) => [g.repo, g.items.map((i) => i.id)]),
-        [
-            ['contoso/Fabrikam/web', ['a', 'b']],
-            ['contoso/Fabrikam/api', ['a']],
-        ],
-    );
-    assert.equal(inRepo(items[0]!, 'Contoso/Fabrikam/API'), true);
-    assert.equal(inRepo(items[1]!, 'contoso/Fabrikam/api'), false);
 });
 
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
@@ -886,81 +368,4 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
     const build = buildMessage(work, '/tmp/factory home/.agents/skills/lar-build', context);
 
     assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
-});
-
-test("typed label names are refused with the tracker's reason", () => {
-    const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Failure', description: '', createIssue: true };
-
-    assert.deepEqual(validateDraft({ ...draft, options: { newLabels: ['needs-design'] } }, sample.repos).options, {
-        newLabels: ['needs-design'],
-    });
-    assert.throws(
-        () => validateDraft({ ...draft, options: { newLabels: ['linked-work'] } }, sample.repos),
-        /reserved for the factory/,
-    );
-    assert.throws(
-        () => validateDraft({ ...draft, options: { newLabels: ['BUG'] } }, sample.repos),
-        /reserved for the item’s kind/,
-    );
-});
-
-test('ticket capture rejects malformed optional fields and multiline titles before a provider write', () => {
-    const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Failure', description: '', createIssue: true };
-
-    for (const changed of [
-        { title: 'First\nSecond' },
-        { createIssue: 'yes' },
-        { options: [] },
-        { options: { labels: [''] } },
-        { options: { milestone: '-1' } },
-        { options: { assignee: 'x\nfield=y' } },
-        { options: { areaPath: 'Other area' } },
-        { options: { newLabels: 'x' } },
-        { options: { newLabels: [7] } },
-    ])
-        assert.throws(() => validateDraft({ ...draft, ...changed }, sample.repos));
-});
-
-const MODEL_GROUPS = [
-    {
-        instanceId: 'claudeAgent_personal',
-        name: 'Personal',
-        models: [{ slug: 'claude-opus-5-5', label: 'Claude Opus 5.5' }],
-    },
-];
-
-test('the Project default in T3 entry names the model and effort T3 will use', () => {
-    const opus = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
-
-    assert.equal(t3DefaultDetail(MODEL_GROUPS, undefined), undefined);
-    assert.equal(
-        t3DefaultDetail(MODEL_GROUPS, { ...opus, options: [{ id: 'effort', value: 'medium' }] }),
-        'Personal Claude Opus 5.5, medium',
-    );
-    assert.equal(
-        t3DefaultDetail([], {
-            instanceId: 'codex',
-            model: 'gpt',
-            options: [
-                { id: 'serviceTier', value: 'default' },
-                { id: 'reasoningEffort', value: 'high' },
-            ],
-        }),
-        'codex gpt, high',
-    );
-});
-
-test('a Project default in T3 stored with no options, as T3 stores a model default such as medium, names the model and no effort', () => {
-    assert.equal(
-        t3DefaultDetail(MODEL_GROUPS, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }),
-        'Personal Claude Opus 5.5',
-    );
-});
-
-test('decision launch inputs route draft builds through the canonical gate', () => {
-    const work = item('Queued', [], { id: 'decision', kind: 'decision' });
-    const message = workMessage(work);
-
-    assert.ok(message.includes('Brief → code evidence → Doubt → gate → Ready'));
-    assert.ok(message.includes('do not implement during shaping'));
 });

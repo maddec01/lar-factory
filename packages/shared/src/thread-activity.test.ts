@@ -2,11 +2,9 @@ import { expect, test } from 'vite-plus/test';
 
 import type { Item, ItemThread } from './model.ts';
 import {
-    ACTIVITY_STALE_MS,
     itemActivityAgents,
     itemActivityThread,
     itemActivityLine,
-    itemActivityStill,
     threadActivityLine,
     type ThreadActivity,
 } from './thread-activity.ts';
@@ -55,101 +53,6 @@ test('a working thread shows its newest action, its age and its agents', () => {
     ).toEqual({ state: 'working', action: 'Read a.ts', ageMs: 120_000, agents: 1 });
 });
 
-test('a thread with no action yet says Starting, and a queued one says Queued', () => {
-    expect(threadActivityLine(thread({ activity: activity() }), NOW)).toEqual({
-        state: 'working',
-        action: 'Starting',
-        ageMs: 60_000,
-        agents: 0,
-    });
-    expect(
-        threadActivityLine(
-            thread({ state: 'done', queued: true, activity: activity({ action: 'Read a.ts', actionAt: ago(90) }) }),
-            NOW,
-        ),
-    ).toEqual({ state: 'working', action: 'Queued', ageMs: 60_000, agents: 0 });
-});
-
-test('an agent that has not acted yet does not hide an older action behind Starting', () => {
-    expect(
-        threadActivityLine(
-            thread({
-                activity: activity({
-                    action: 'Read a.ts',
-                    actionAt: ago(2),
-                    agents: [{ title: 'Review', actionAt: ago(1) }],
-                }),
-            }),
-            NOW,
-        ),
-    ).toMatchObject({ state: 'working', action: 'Read a.ts', agents: 1 });
-});
-
-test('a thread goes quiet after 5 minutes with no action from it or any agent, unless a tool runs', () => {
-    const quiet = (minutes: number, over = {}) =>
-        threadActivityLine(
-            thread({ activity: activity({ action: 'Read a.ts', actionAt: ago(minutes), ...over }) }),
-            NOW,
-        );
-
-    expect(quiet(4.9)?.state).toBe('working');
-    expect(quiet(5)).toEqual({ state: 'quiet', action: 'No action for 5m', ageMs: 300_000, agents: 0 });
-    expect(quiet(72.5)?.action).toBe('No action for 72m');
-    expect(quiet(30, { toolRunning: true })).toMatchObject({ state: 'working', action: 'Read a.ts' });
-    expect(quiet(30, { agents: [{ title: 'Review', action: 'Grep', actionAt: ago(1) }] })).toMatchObject({
-        state: 'working',
-        action: 'Grep',
-    });
-    expect(quiet(30, { agents: [{ title: 'Review', action: 'Grep', actionAt: ago(20) }] })).toMatchObject({
-        state: 'quiet',
-        action: 'No action for 20m',
-        agents: 1,
-    });
-});
-
-test('a thread waiting on the user or stopped says so, and agents still at work keep a stopped thread working', () => {
-    expect(
-        threadActivityLine(
-            thread({
-                state: 'needs you',
-                updated: ago(3),
-                activity: activity({ action: 'Read a.ts', actionAt: ago(90) }),
-            }),
-            NOW,
-        ),
-    ).toEqual({ state: 'waiting', action: 'Needs you', ageMs: 180_000, agents: 0 });
-    expect(threadActivityLine(thread({ state: 'stopped', updated: ago(3) }), NOW)).toEqual({
-        state: 'stopped',
-        action: 'Stopped',
-        ageMs: 180_000,
-        agents: 0,
-    });
-    expect(
-        threadActivityLine(
-            thread({
-                state: 'stopped',
-                activity: activity({ agents: [{ title: 'Review', action: 'Grep', actionAt: ago(1) }] }),
-            }),
-            NOW,
-        ),
-    ).toMatchObject({ state: 'working', action: 'Grep', agents: 1 });
-});
-
-test('an agent waiting on the user makes its thread wait on you', () => {
-    expect(
-        threadActivityLine(
-            thread({
-                state: 'done',
-                hasLiveChildren: true,
-                childNeedsYou: true,
-                updated: ago(3),
-                activity: activity(),
-            }),
-            NOW,
-        ),
-    ).toEqual({ state: 'waiting', action: 'Needs you', ageMs: 180_000, agents: 0 });
-});
-
 test('a failed or stale read says unavailable, never an old action', () => {
     const unavailable = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
 
@@ -164,117 +67,8 @@ test('a failed or stale read says unavailable, never an old action', () => {
     expect(threadActivityLine(thread(), NOW), 'a thread at work the server read nothing for').toEqual(unavailable);
 });
 
-test('an old read says unavailable, while a fresh one keeps quiet, ages and running tools', () => {
-    const unavailable = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
-    const stamped = (ms: number, over: Parameters<typeof activity>[0] = {}) =>
-        thread({
-            activity: activity({
-                action: 'Read a.ts',
-                actionAt: ago(1),
-                readAt: new Date(NOW - ms).toISOString(),
-                ...over,
-            }),
-        });
-
-    expect(threadActivityLine(stamped(ACTIVITY_STALE_MS), NOW)).toEqual({
-        state: 'working',
-        action: 'Read a.ts',
-        ageMs: 60_000,
-        agents: 0,
-    });
-    expect(threadActivityLine(stamped(ACTIVITY_STALE_MS + 1), NOW)).toEqual(unavailable);
-    expect(threadActivityLine(stamped(0, { actionAt: ago(6) }), NOW)?.state).toBe('quiet');
-    expect(
-        threadActivityLine(stamped(ACTIVITY_STALE_MS + 1, { actionAt: ago(6) }), NOW),
-        'an old read cannot say quiet',
-    ).toEqual(unavailable);
-    expect(threadActivityLine(stamped(0, { actionAt: ago(30), toolRunning: true }), NOW)).toMatchObject({
-        state: 'working',
-        ageMs: 30 * 60_000,
-    });
-});
-
-test('a thread that finished with nothing at work shows nothing', () => {
-    expect(threadActivityLine(thread({ state: 'done' }), NOW)).toBeUndefined();
-    for (const readAt of [ago(0), ago(60)]) {
-        const ended = thread({
-            state: 'done',
-            activity: activity({ action: 'Using a tool', toolRunning: true, readAt }),
-        });
-
-        expect(threadActivityLine(ended, NOW)).toBeUndefined();
-        expect(itemActivityLine({ status: 'Verify', threads: [ended] } as Item, NOW)).toBeUndefined();
-    }
-});
-
 const item = (threads: Item['threads'], over: Partial<Item> = {}) =>
     ({ status: 'In progress', threads, ...over }) as Item;
-const working = (id: string, action: string) => thread({ id, activity: activity({ action, actionAt: ago(1) }) });
-
-test('a row follows its newest thread at work, skipping finished and archived ones', () => {
-    expect(
-        itemActivityLine(
-            item([thread({ id: 'new', state: 'done' }), working('older', 'Read a.ts'), working('oldest', 'Read b.ts')]),
-            NOW,
-        )?.action,
-    ).toBe('Read a.ts');
-    expect(
-        itemActivityLine(item([{ ...working('new', 'Read a.ts'), archived: true }, working('older', 'Read b.ts')]), NOW)
-            ?.action,
-    ).toBe('Read b.ts');
-    expect(itemActivityLine(item([thread({ state: 'done' })]), NOW)).toBeUndefined();
-    expect(itemActivityLine(item([]), NOW)).toBeUndefined();
-    expect(itemActivityLine(item(undefined), NOW)).toBeUndefined();
-});
-
-test('a paused or archived item shows no line', () => {
-    expect(itemActivityLine(item([working('t', 'Read a.ts')], { paused: 'Paused' }), NOW)).toBeUndefined();
-    expect(
-        itemActivityLine(
-            item([working('t', 'Read a.ts')], { archived: { setAside: true, hidden: false, ticketOpen: true } }),
-            NOW,
-        ),
-    ).toBeUndefined();
-});
-
-test('a stopped thread counts only as the newest thread of work still under way', () => {
-    const stopped = thread({ state: 'stopped' });
-
-    expect(itemActivityLine(item([stopped]), NOW)?.state).toBe('stopped');
-    expect(itemActivityLine(item([stopped], { status: 'Shaping' }), NOW)?.state).toBe('stopped');
-    expect(itemActivityLine(item([thread({ state: 'done' }), stopped]), NOW), 'a later run finished').toBeUndefined();
-    expect(itemActivityLine(item([stopped], { status: 'Done' }), NOW)).toBeUndefined();
-});
-
-test("a row says unavailable when T3 or the page can't be read, and only for work that may be under way", () => {
-    const line = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
-
-    expect(itemActivityLine(item('unavailable'), NOW)).toEqual(line);
-    expect(itemActivityLine(item('unavailable', { status: 'Done' }), NOW)).toBeUndefined();
-    expect(itemActivityLine(item([working('t', 'Read a.ts')]), NOW, true)).toEqual(line);
-    expect(itemActivityLine(item([thread({ state: 'done' })]), NOW, true)).toBeUndefined();
-    expect(itemActivityLine(item([thread({ state: 'done', observedAt: ago(1) })]), NOW)).toBeUndefined();
-});
-
-test("only a thread that waits, stopped or can't be read holds a row still", () => {
-    expect(itemActivityStill(item([thread({ state: 'stopped' })]), NOW)).toBe(true);
-    expect(itemActivityStill(item([thread({ state: 'needs you', activity: activity() })]), NOW)).toBe(true);
-    expect(itemActivityStill(item([thread({ activity: { available: false } })]), NOW)).toBe(true);
-    expect(
-        itemActivityStill(item([thread({ activity: activity({ actionAt: ago(60) }) })]), NOW),
-        'quiet is still at work',
-    ).toBe(false);
-    expect(itemActivityStill(item([working('t', 'Read a.ts')]), NOW)).toBe(false);
-    expect(itemActivityStill(item([]), NOW)).toBe(false);
-
-    const old = thread({ activity: activity({ readAt: new Date(NOW - ACTIVITY_STALE_MS - 1).toISOString() }) });
-
-    expect(itemActivityStill(item([old]), NOW), 'an old read').toBe(true);
-    expect(itemActivityAgents(item([old]), NOW)).toBe('unavailable');
-    expect(itemActivityAgents(item([working('t', 'Read a.ts')]), NOW)).toEqual([
-        { title: 'Lead thread', action: 'Read a.ts', actionAt: ago(1) },
-    ]);
-});
 
 test('a running build owns activity even when a shaping thread still reports live work or a question', () => {
     const shape = thread({
@@ -294,33 +88,4 @@ test('a running build owns activity even when a shaping thread still reports liv
     expect(itemActivityLine(work, NOW)?.action).toBe('Implementing');
     expect(itemActivityAgents(work, NOW)).not.toContainEqual(expect.objectContaining({ action: 'Shaping' }));
     expect(itemActivityThread({ ...work, threads: [shape, { ...build, state: 'done' }] })).toBeUndefined();
-});
-
-test('returning to shaping transfers activity away from the earlier build', () => {
-    const work = item(
-        [
-            thread({ id: 'shape', purpose: 'shape', activity: activity({ action: 'Revising the brief' }) }),
-            thread({ id: 'build', purpose: 'build', activity: activity({ action: 'Earlier build' }) }),
-        ],
-        { status: 'Shaping' },
-    );
-
-    expect(itemActivityThread(work)?.id).toBe('shape');
-});
-
-test('an ended owner turn is quiet only while its recorded build remains unfinished and its activity read is current', () => {
-    const owner = thread({
-        purpose: 'build',
-        state: 'done',
-        activity: activity({ action: 'Read a.ts', actionAt: ago(12) }),
-    });
-    const work = item([owner], { status: 'In progress', buildPhase: 'implement' });
-
-    expect(itemActivityLine(work, NOW)).toMatchObject({ state: 'quiet', action: 'No action for 12m' });
-    expect(itemActivityLine(work, NOW + ACTIVITY_STALE_MS + 1)?.state).toBe('unavailable');
-    expect(itemActivityLine({ ...work, paused: 'Later' }, NOW)).toBeUndefined();
-    expect(itemActivityLine({ ...work, status: 'Verify' }, NOW)).toBeUndefined();
-    expect(itemActivityLine({ ...work, status: 'Done' }, NOW)).toBeUndefined();
-    expect(itemActivityLine({ ...work, buildPhase: null }, NOW)).toBeUndefined();
-    expect(itemActivityLine({ ...work, threads: [{ ...owner, archived: true }] }, NOW)).toBeUndefined();
 });

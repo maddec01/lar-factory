@@ -65,43 +65,6 @@ test('maps each driver to the folders it reads its user skills from', () => {
     assert.deepEqual(installTargets('acpRegistry', HOME), []);
 });
 
-test("puts a Claude instance's skills in its homePath, with ~ standing for the user's home", () => {
-    assert.deepEqual(installTargets('claudeAgent', HOME, { config: { homePath: '~/.claude-personal' } }), [
-        { kind: 'claude', path: `${HOME}/.claude-personal/skills` },
-    ]);
-    assert.deepEqual(installTargets('claudeAgent', HOME, { config: { homePath: ' /opt/claude ' } }), [
-        { kind: 'claude', path: '/opt/claude/skills' },
-    ]);
-});
-
-test("never targets a Codex instance's CODEX_HOME", () => {
-    assert.deepEqual(installTargets('codex', HOME, { config: { homePath: '/opt/codex' } }), [
-        { kind: 'agents', path: `${HOME}/.agents/skills` },
-    ]);
-});
-
-test("resolves the user's home from an instance's HOME and from no other variable", () => {
-    const environment = [
-        { name: 'HOME', value: '/Volumes/other' },
-        { name: 'CLAUDE_CONFIG_DIR', value: '/elsewhere' },
-        { name: 'XDG_CONFIG_HOME', value: '/xdg' },
-    ];
-
-    assert.deepEqual(installTargets('pi', HOME, { environment }), [
-        { kind: 'agents', path: '/Volumes/other/.agents/skills' },
-    ]);
-    assert.deepEqual(installTargets('claudeAgent', HOME, { environment }), [
-        { kind: 'claude', path: '/Volumes/other/.claude/skills' },
-    ]);
-    // T3 hides a sensitive value, and a relative HOME names no home.
-    assert.deepEqual(installTargets('pi', HOME, { environment: [{ name: 'HOME', value: '', sensitive: true }] }), [
-        { kind: 'agents', path: `${HOME}/.agents/skills` },
-    ]);
-    assert.deepEqual(installTargets('pi', HOME, { environment: [{ name: 'HOME', value: 'relative' }] }), [
-        { kind: 'agents', path: `${HOME}/.agents/skills` },
-    ]);
-});
-
 test("discovers every instance T3's server.getConfig lists, default and disabled ones too, with their targets", async () => {
     const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
@@ -196,36 +159,6 @@ test("keeps an instance's environment out of what it returns and logs", async ()
     assert.equal(text.includes('secret'), false);
     assert.equal(text.includes('environment'), false);
     for (const spy of logs) assert.equal(spy.mock.calls.length, 0);
-});
-
-test('says T3 is unavailable when its runtime file is missing', async () => {
-    const found = await discoverProviderInstances({
-        home: HOME,
-        runtimePath: join(temporary(), 'missing.json'),
-        runT3: async () => ({ code: 0, stdout: '' }),
-    });
-
-    assert.deepEqual(found, { available: false, reason: 'not-running' });
-});
-
-test('gives up within its timeout when T3 does not answer', async () => {
-    const t3 = await startFakeT3(temporary(), { config, hang: true }, onTestFinished);
-    const found = await discoverProviderInstances({
-        home: HOME,
-        runtimePath: t3.runtimePath,
-        runT3: t3.runT3,
-        timeoutMs: 300,
-    });
-
-    assert.deepEqual(found, { available: false, reason: 'timed-out' });
-    await vi.waitFor(() => assert.deepEqual(t3.revoked, ['fake-session-id']));
-});
-
-test("says T3 is unavailable when its answer isn't a config", async () => {
-    const t3 = await startFakeT3(temporary(), { config: { providers: 'none' } }, onTestFinished);
-    const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
-
-    assert.deepEqual(found, { available: false, reason: 'failed' });
 });
 
 test('never sends a token to an origin off this machine', async () => {

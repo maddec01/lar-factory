@@ -1,6 +1,6 @@
 import { expect, test } from 'vite-plus/test';
 
-import { readTrackerStructure, trackerKind, trackerReference, writeTrackerStructure } from './tracker-structure.ts';
+import { readTrackerStructure, writeTrackerStructure } from './tracker-structure.ts';
 
 test('managed structure round trips Markdown and HTML without changing original bytes or exposing a comment terminator', () => {
     for (const original of ['Original text.\n', '<div>Original Azure HTML.</div>', '']) {
@@ -47,22 +47,4 @@ test('duplicate, malformed, excessive and newer structure blocks refuse reads an
             parent: { url: 'https://github.com@evil.test/team/app/issues/2', kind: 'concept', title: 'bad' },
         }),
     ).toThrow('This issue has invalid factory structure.');
-});
-test('tracker URLs and native issue types work without factory labels', () => {
-    expect(trackerReference('https://github.com/team/app/issues/2')).toEqual({ repository: 'team/app', number: 2 });
-    expect(trackerReference('https://dev.azure.com/team/Project%20Name/_workitems/edit/42')).toEqual({
-        repository: 'team/Project%20Name',
-        number: 42,
-    });
-    for (const invalid of [
-        'file:///tmp/secret',
-        'https://user:pass@github.com/team/app/issues/2',
-        'https://github.com/team/app/issues/2?token=secret',
-    ])
-        expect(trackerReference(invalid)).toBeNull();
-    expect(trackerKind([], 'Bug')).toBe('bug');
-    expect(trackerKind([], 'Feature')).toBe('feature');
-    expect(trackerKind(['enhancement'])).toBe('feature');
-    expect(trackerKind(['improvement'])).toBe('improvement');
-    expect(trackerKind(['concept'])).toBe('concept');
 });

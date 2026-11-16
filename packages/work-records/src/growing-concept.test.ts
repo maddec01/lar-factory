@@ -365,6 +365,64 @@ test('S06: linked growth also saves all parts and its map without reclassifying 
     expect(records.blockers(result.keys.view!).map((r) => r.workId)).toEqual([result.keys.producer]);
 });
 
+test('S06: an amended scope across repositories turns single work into a linked parent with a build per repository', async () => {
+    const { records } = await fixture();
+    const bug = records.create({ title: 'Wrong total', repository: 'fake/a', kind: 'bug' });
+    const scope: BriefScope = {
+        repositories: ['fake/a'],
+        openDecisions: [],
+        files: [],
+        tests: [],
+        behaviour: ['Totals match.'],
+        excluded: [],
+        size: null,
+        verify: { required: false, visibleUi: null },
+    };
+
+    records.confirmScope(bug.workId, bug.revision, scope, 'Pedro', 'Yes.');
+    expect(records.chooseStructure(bug.workId).structure).toBe('single');
+
+    const amended = { ...scope, repositories: ['fake/a', 'fake/b'] };
+
+    records.confirmScope(bug.workId, records.read(bug.workId).revision, amended, 'Pedro', 'The API sums too.');
+    expect(records.chooseStructure(bug.workId).structure).toBe('linked');
+
+    const parent = records.read(bug.workId);
+
+    records.createParts(parent.workId, parent.revision, {
+        map: 'API totals, then the view.',
+        parts: [
+            {
+                key: 'api',
+                title: 'API totals',
+                repository: 'fake/b',
+                kind: 'build',
+                body: completeBrief('Sum.'),
+                blockerIds: [],
+            },
+            {
+                key: 'view',
+                title: 'View totals',
+                repository: 'fake/a',
+                kind: 'build',
+                body: completeBrief('Show.'),
+                blockerIds: ['$api'],
+            },
+        ],
+    });
+
+    expect(records.read(parent.workId).kind).toBe('build');
+    expect(
+        records
+            .children(parent.workId)
+            .map((part) => [part.repository, part.kind, part.status])
+            .sort(([a], [b]) => a!.localeCompare(b!)),
+    ).toEqual([
+        ['fake/a', 'build', 'Queued'],
+        ['fake/b', 'build', 'Queued'],
+    ]);
+});
+
 test('S06: upgrading a still-current legacy review preserves its approval through unrelated growth', async () => {
     const { records, dir, g, part, approve } = await fixture();
     const b01 = part('b01 static title', 'Static title.');

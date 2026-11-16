@@ -13,7 +13,7 @@ Incorporate amendments and present the revised understanding for confirmation.
 Silence leaves the checkpoint pending in Needs you.
 Show the item's stated constraints using `lar-work --help`'s scope schema. On confirmation, save that JSON with `lar-work confirm-scope <work ID> --revision N --file <scope.json> --identity <user> --evidence "<explicit response>"`; reuse `lar-work confirmed-scope <work ID>` on resume, and change it only after an explicit amendment.
 
-Capture `repositories` and `openDecisions` in that scope, then run `lar-work choose-structure <work ID>` (which records Concept or Build) and follow its result: `single` keeps this flow; `linked` keeps one parent and creates one build per repository with dependency blockers; `concept` records the open decisions as parts. Release and activation belong in the parent's release steps.
+Capture `repositories` and `openDecisions` in that scope, then run `lar-work choose-structure <work ID>` (which records Concept or Build) and follow its result: `single` keeps this flow; `linked` makes this item a parent without a brief: one `create-parts` batch per [Structure](shared/issue-tracker/structure.md) saves its map and one build per scope repository with dependency blockers, then this thread ends after [Reconcile group](shared/reconcile-group.md); `concept` records the open decisions as parts. Release and activation belong in the parent's release steps.
 
 On resume, reuse an explicit confirmation recorded in the thread or the brief's
 Confirmed section only when the proposed understanding is unchanged. Keep the
@@ -38,10 +38,12 @@ Anything the user adds or corrects is another open question. Then:
   description. Show the variants as below, ask for the user's pick, and keep
   it and the branch for the brief's **Confirmed** and **Notes for the builder**.
 
-- **Another repository changes, after following `choose-structure`** (its role says it serves or uses what this
+- **Another repository changes** (its role says it serves or uses what this
   item changes, or the work needs a change there): route that part per
   [Other repositories](shared/issue-tracker/other-repositories.md),
-  and keep shaping this repository's part while the user chooses. Name each
+  and keep shaping this repository's part while the user chooses. A repository
+  to shape there is an amendment: confirm the new `repositories`, rerun
+  `choose-structure` and follow its result. Name each
   proposed build or recorded Dependency in the brief's **Notes for the
   builder**. This item is a build only if its own repository changes.
 - **No open questions**: write the brief.

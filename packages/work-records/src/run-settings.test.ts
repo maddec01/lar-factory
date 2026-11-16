@@ -107,6 +107,23 @@ it('captures a build with every role, all modes and exact instruction provenance
     expect(snapshot.settingsDigest).toMatch(/^[a-f0-9]{64}$/);
 });
 
+it('records the release a run starts on, and none for a run started without one or saved before releases', async () => {
+    const { records, workId, revision } = await fixture();
+    const onRelease = records.snapshotRun(workId, revision(), { ...input('run-1'), release: '2.0.0' });
+    const without = records.snapshotRun(workId, revision(), input('run-2'));
+
+    expect(onRelease.release).toBe('2.0.0');
+    expect(without).not.toHaveProperty('release');
+    expect(records.runSettings(workId).runs.map((run) => run.release)).toEqual(['2.0.0', undefined]);
+    expect(() =>
+        records.startRoleRun(workId, revision(), { runId: 'run-2', executionId: 'exec-1', role: 'thread' }),
+    ).not.toThrow();
+    for (const release of ['', '../2.0.0', 'a/b'])
+        expect(() => records.snapshotRun(workId, revision(), { ...input('run-3'), release })).toThrow(
+            'Invalid run release.',
+        );
+});
+
 it('captures only once; later edits, retry, handoff and reopening keep the snapshot, while the next run sees edits', async () => {
     const { dir, records, workId, revision } = await fixture();
     const settings = customSettings();

@@ -13,6 +13,13 @@ export interface ExecutionSettings {
     options: ModelSelectionOption[];
 }
 
+/** The running app release the desktop app gives the board server; only a packaged app sets it. */
+export const APP_RELEASE_ENV = 'BOARD_APP_VERSION';
+
+/** Whether `value` can name a release folder: one nonempty path segment, never `.` or `..`. */
+export const isRelease = (value: unknown): value is string =>
+    typeof value === 'string' && /^[\w.+-]+$/.test(value) && value !== '.' && value !== '..';
+
 export interface SnapshotRunInput {
     /** Stable across retries and handoff; use a new ID only for a new logical run. */
     runId: string;
@@ -22,6 +29,8 @@ export interface SnapshotRunInput {
     /** The launch bridge supplies the installed package version and exact instruction text, not a mutable path. */
     packaged: { version: string; reviewers: Partial<Record<BuiltinReviewer, string>> };
     skills: string[];
+    /** The app release the run starts on, which names its release folder; absent without a packaged app. */
+    release?: string;
 }
 
 export interface RunReviewer {
@@ -51,6 +60,8 @@ export interface RunSettings {
     roles: Record<FactoryRole, ExecutionSettings>;
     reviewers: RunReviewer[];
     skills: string[];
+    /** The app release the run started on; absent on runs started without a packaged app and on runs saved before releases. */
+    release?: string;
 }
 
 export interface RoleRunInput {

@@ -38,10 +38,6 @@ export const statusColor = Object.fromEntries(
     Object.entries(boardStatusState).map(([status, state]) => [status, statusStateColors[state]]),
 ) as Record<BoardStatus, string>;
 
-/** Each stage's identity colour on a stage bar (StageTrack's current segment): its status's colour, except Review,
- *  whose stage is violet so the bar tells it from building. Never for a status light, glyph or word. */
-export const stageColor: Record<BoardStatus, string> = { ...statusColor, Review: 'var(--color-board-review)' };
-
 /** The board's role colours (board/tokens.css) and the empty track, as CSS colour values, for a glyph, a dot or a bar
  *  segment the board colours by what it means. Each is a state's colour, except `review` (the Review stage's identity,
  *  for a stage bar only). Never for text. */

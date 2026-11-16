@@ -81,7 +81,7 @@ export const errorScript = (reason: string): string =>
     `window.larLoading?.error(${JSON.stringify(`The board server didn't start: ${reason}. Trying again.`)})`;
 
 /** How long the mark takes to draw, as the board page's (apps/web/src/app/shell/loading/LoadingScreen.tsx). */
-export const DRAW_MS = 1750;
+const DRAW_MS = 1750;
 
 /**
  * How long to wait before the board page may open on the finished mark: what is left of the draw since the starting

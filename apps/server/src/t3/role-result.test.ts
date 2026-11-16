@@ -41,16 +41,16 @@ test('only the exact role-launch task can supply a terminal result; malformed an
     expect(read).not.toHaveBeenCalled();
 });
 
-test.each([{ ...child, runs: [{ status: 'running', modelSelection: selection }] }])(
-    'unavailable or unsettled child evidence holds for the owner, without inventing a result: %j',
-    async (value) => {
-        const result = await readRoleResult(attempt, { thread: { id: 'owner' }, subagents: [task] }, async () => value);
+test('an unsettled child run holds for the owner, without inventing a result', async () => {
+    const result = await readRoleResult(attempt, { thread: { id: 'owner' }, subagents: [task] }, async () => ({
+        ...child,
+        runs: [{ status: 'running', modelSelection: selection }],
+    }));
 
-        expect(result.hold).toBeTruthy();
-        expect(result.finish).toBeUndefined();
-        expect(result.absent).toBeUndefined();
-    },
-);
+    expect(result.hold).toBeTruthy();
+    expect(result.finish).toBeUndefined();
+    expect(result.absent).toBeUndefined();
+});
 
 test('a real failed terminal task retains its actual model and failure; a mismatch cannot become success', async () => {
     const failed = await readRoleResult(

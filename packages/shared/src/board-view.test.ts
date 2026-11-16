@@ -164,40 +164,37 @@ describe('placementOf', () => {
         placementOf(item, { unavailable: false, all: [item], ...facts });
     const sections = (item: Item, facts?: Partial<PlacementFacts>) => place(item, facts).sections;
 
-    test.each(['concept'] as const)(
-        '%s groups keep parents and children in the dock and add human waits to the desk',
-        (kind) => {
-            const parent = concept({ kind, flow: 'linked' });
+    test('concept groups keep parents and children in the dock and add human waits to the desk', () => {
+        const parent = concept({ kind: 'concept', flow: 'linked' });
 
-            for (const status of [
-                'List',
-                'Queued',
-                'Shaping',
-                'Ready',
-                'In progress',
-                'Review',
-                'Verify',
-                'Ready to merge',
-                'Needs you',
-                'Done',
-            ] as const) {
-                const child = part({ status, repo: 'owner/other', threads: [buildThread] });
-                const all = [parent, child];
+        for (const status of [
+            'List',
+            'Queued',
+            'Shaping',
+            'Ready',
+            'In progress',
+            'Review',
+            'Verify',
+            'Ready to merge',
+            'Needs you',
+            'Done',
+        ] as const) {
+            const child = part({ status, repo: 'owner/other', threads: [buildThread] });
+            const all = [parent, child];
 
-                const expected: BoardSection[] = ['Needs you', 'Verify', 'Ready to merge'].includes(status)
-                    ? ['desk', 'dock']
-                    : ['dock'];
+            const expected: BoardSection[] = ['Needs you', 'Verify', 'Ready to merge'].includes(status)
+                ? ['desk', 'dock']
+                : ['dock'];
 
-                assert.deepEqual(sections(child, { all }), expected, status);
+            assert.deepEqual(sections(child, { all }), expected, status);
 
-                if (status !== 'List' && status !== 'Done') {
-                    const changed = { ...parent, status };
+            if (status !== 'List' && status !== 'Done') {
+                const changed = { ...parent, status };
 
-                    assert.deepEqual(sections(changed, { all: [changed, child] }), expected, `parent ${status}`);
-                }
+                assert.deepEqual(sections(changed, { all: [changed, child] }), expected, `parent ${status}`);
             }
-        },
-    );
+        }
+    });
 
     describe('Your desk', () => {
         test.each<[string, Item, boolean]>([

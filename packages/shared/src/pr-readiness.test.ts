@@ -15,15 +15,19 @@ const item = (patch: Partial<LinkedPr> = {}): Pick<Item, 'status' | 'linkedPrs'>
     linkedPrs: [{ ...pr, ...patch }],
 });
 
-test.each([
-    [{ checks: { failed: 1, passed: 2, running: 1, total: 4, since: null } }, 'Checks failed', 'Review failed checks'],
-] as const)('current evidence overrides the recorded stage: %j', (patch, word, action) => {
-    expect(prReadiness(item(patch))).toMatchObject({ word, action });
+test('failed checks override the recorded stage', () => {
+    expect(prReadiness(item({ checks: { failed: 1, passed: 2, running: 1, total: 4, since: null } }))).toMatchObject({
+        word: 'Checks failed',
+        action: 'Review failed checks',
+    });
 });
-test.each(['stale'] as const)('withdraws readiness for %s check evidence', (state) => {
+test('withdraws readiness for stale check evidence', () => {
     expect(
         prReadiness(
-            item({ checkProgress: { state }, checks: { passed: 3, failed: 0, running: 0, total: 3, since: null } }),
+            item({
+                checkProgress: { state: 'stale' },
+                checks: { passed: 3, failed: 0, running: 0, total: 3, since: null },
+            }),
         ),
     ).toMatchObject({ word: 'Review PR', action: 'Review PR', state: 'waiting' });
 });

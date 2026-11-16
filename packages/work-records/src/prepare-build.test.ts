@@ -165,7 +165,7 @@ it('Pedro manual starts record free claims and overrides; automatic claims wait 
     });
 });
 
-it.each(['open'] as const)('a recorded List PR (%s) without a factory start never consumes a claim', async (state) => {
+it('a recorded open List PR without a factory start never consumes a claim', async () => {
     const { records, rev, ready } = await fixture();
     const old = records.create({
         title: 'Old tracker work',
@@ -175,7 +175,7 @@ it.each(['open'] as const)('a recorded List PR (%s) without a factory start neve
     }).workId;
 
     records.setPullRequest(old, rev(old), 'example/a#4');
-    records.observe(old, rev(old), { of: 'pr', state });
+    records.observe(old, rev(old), { of: 'pr', state: 'open' });
 
     const id = ready('Fresh');
 
@@ -187,22 +187,19 @@ it.each(['open'] as const)('a recorded List PR (%s) without a factory start neve
     });
 });
 
-it.each(['merged'] as const)(
-    'a terminal factory PR (%s) releases its slot even before status reconciliation',
-    async (state) => {
-        const { records, rev, ready } = await fixture();
-        const old = ready('Old factory build');
-        const intent = records.prepareBuild(old, rev(old), capacity).intent;
+it('a merged factory PR releases its slot even before status reconciliation', async () => {
+    const { records, rev, ready } = await fixture();
+    const old = ready('Old factory build');
+    const intent = records.prepareBuild(old, rev(old), capacity).intent;
 
-        records.resolveLaunchIntent(old, rev(old), intent.intentId, { threadId: 'old-builder' });
-        records.setPullRequest(old, rev(old), 'example/a#4');
-        records.observe(old, rev(old), { of: 'pr', state });
+    records.resolveLaunchIntent(old, rev(old), intent.intentId, { threadId: 'old-builder' });
+    records.setPullRequest(old, rev(old), 'example/a#4');
+    records.observe(old, rev(old), { of: 'pr', state: 'merged' });
 
-        const id = ready('Fresh');
+    const id = ready('Fresh');
 
-        expect(records.prepareBuild(id, rev(id), capacity).intent.buildInput?.capacity?.occupied).toBe(0);
-    },
-);
+    expect(records.prepareBuild(id, rev(id), capacity).intent.buildInput?.capacity?.occupied).toBe(0);
+});
 
 it('S05-F2-001: board actions cannot create independent owner notices', async () => {
     const { records } = await fixture();

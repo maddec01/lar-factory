@@ -31,70 +31,64 @@ describe('thread launch', () => {
         ).toEqual({ thread: null, error: 'T3 launch authorization failed.', uncertain: true });
         expect(subscribeProjects).not.toHaveBeenCalled();
     });
-    it.each(['preparing'])(
-        'freezes the request before sending, and replays the same command after an %s launch',
-        async (state) => {
-            vi.useFakeTimers();
-            vi.mocked(boardSessionAuthority).mockReturnValue({
-                issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
-                revoke: vi.fn().mockResolvedValue(undefined),
+    it('freezes the request before sending, and replays the same command after a preparing launch', async () => {
+        vi.useFakeTimers();
+        vi.mocked(boardSessionAuthority).mockReturnValue({
+            issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
+            revoke: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const remember = vi.fn();
+        const payloads: unknown[] = [];
+
+        vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
+            expect(remember).toHaveBeenCalledOnce();
+            payloads.push(execution!.payload);
+            execution!.accept({
+                threadId: 'same-thread',
+                resumed: payloads.length > 1,
+                projection: {
+                    thread: { id: 'same-thread', modelSelection: selection },
+                    messages: [{ role: 'user', text: 'Continue' }],
+                    runs:
+                        payloads.length > 1
+                            ? [{ id: 'run', status: 'running', modelSelection: selection }]
+                            : [{ status: 'preparing' }],
+                },
             });
 
-            const remember = vi.fn();
-            const payloads: unknown[] = [];
+            return vi.fn();
+        });
 
-            vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
-                expect(remember).toHaveBeenCalledOnce();
-                payloads.push(execution!.payload);
-                execution!.accept({
-                    threadId: 'same-thread',
-                    resumed: payloads.length > 1,
-                    projection: {
-                        thread: { id: 'same-thread', modelSelection: selection },
-                        messages:
-                            payloads.length > 1 || state === 'preparing' ? [{ role: 'user', text: 'Continue' }] : [],
-                        runs:
-                            payloads.length > 1
-                                ? [{ id: 'run', status: 'running', modelSelection: selection }]
-                                : state === 'preparing'
-                                  ? [{ status: 'preparing' }]
-                                  : [],
-                    },
-                });
+        const first = launchThread(
+            'project',
+            'Continue',
+            selection,
+            workspace,
+            'approval-required',
+            ORIGIN,
+            'intent',
+            remember,
+        );
 
-                return vi.fn();
-            });
-
-            const first = launchThread(
-                'project',
-                'Continue',
-                selection,
-                workspace,
-                'approval-required',
-                ORIGIN,
-                'intent',
-                remember,
-            );
-
-            await vi.advanceTimersByTimeAsync(30_000);
-            expect(await first).toMatchObject({ thread: null, uncertain: true });
-            expect(remember).toHaveBeenCalledWith({
-                projectId: 'project',
-                text: 'Continue',
-                selection,
-                workspace,
-                runtimeMode: 'approval-required',
-            });
-            expect(
-                await launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN, 'intent'),
-            ).toMatchObject({
-                thread: { threadId: 'same-thread', title: 'Continue' },
-                error: null,
-                executionReport: { source: 't3', reference: 'run' },
-            });
-            expect(payloads[1]).toEqual(payloads[0]);
-        },
-    );
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(await first).toMatchObject({ thread: null, uncertain: true });
+        expect(remember).toHaveBeenCalledWith({
+            projectId: 'project',
+            text: 'Continue',
+            selection,
+            workspace,
+            runtimeMode: 'approval-required',
+        });
+        expect(
+            await launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN, 'intent'),
+        ).toMatchObject({
+            thread: { threadId: 'same-thread', title: 'Continue' },
+            error: null,
+            executionReport: { source: 't3', reference: 'run' },
+        });
+        expect(payloads[1]).toEqual(payloads[0]);
+    });
     it('sends the whole selection and workspace, and tells a refusal from a lost answer', async () => {
         const revoke = vi.fn().mockResolvedValue(undefined);
 

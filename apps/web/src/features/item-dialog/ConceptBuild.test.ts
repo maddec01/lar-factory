@@ -25,10 +25,10 @@ async function show(plan: ConceptBuildPlan, parts: Item[] = []) {
 
 const button = () => $<HTMLButtonElement>('[data-concept-build-run] button')!;
 
-test.each(['running'] as const)('the %s run posts the displayed revision and exact opposite action', async (state) => {
-    const id = await show({ run: { state, startedAt: '2026-01-01', prepared: {} }, holds: [], members: [] });
+test('the running run posts the displayed revision and exact opposite action', async () => {
+    const id = await show({ run: { state: 'running', startedAt: '2026-01-01', prepared: {} }, holds: [], members: [] });
 
-    expect(text(button())).toBe(state === 'running' ? 'Pause concept builds' : 'Start concept builds');
+    expect(text(button())).toBe('Pause concept builds');
     await settle(() => button().click());
     expect(posted()).toContainEqual([
         '/api/concept-build-run',
@@ -36,7 +36,7 @@ test.each(['running'] as const)('the %s run posts the displayed revision and exa
             session: 's1',
             itemId: id,
             revision: 7,
-            state: state === 'running' ? 'paused' : 'running',
+            state: 'paused',
         },
     ]);
 });

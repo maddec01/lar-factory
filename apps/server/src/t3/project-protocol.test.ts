@@ -35,7 +35,7 @@ it('retains the observation after rejection and reports renewal failure', async 
     expect((await adapter.readProjects()).availability).toBe('renewal-required');
 });
 
-it.each(['0.1.6-nightly.20261031.3977'])('reads compatible projects on T3 %s', async (version) => {
+it('reads compatible projects on T3 0.1.6-nightly.20261031.3977', async () => {
     const adapter = new ProjectProtocol(
         {
             read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
@@ -53,7 +53,7 @@ it.each(['0.1.6-nightly.20261031.3977'])('reads compatible projects on T3 %s', a
                 updatedAt: '2026-01-01',
                 futureField: true,
             }),
-        version,
+        '0.1.6-nightly.20261031.3977',
     );
 
     expect((await adapter.readProjects()).observation?.projects).toEqual([

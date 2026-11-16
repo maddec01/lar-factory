@@ -88,7 +88,7 @@ test('queuing a source issue switches the open dialog to its new local work ID',
     expect($('[data-item-dialog] [data-action-error]')).toBeNull();
 });
 
-test.each([true])('deleted-thread move inspects cleanup and cleans only after success %s', async (success) => {
+test('deleted-thread move inspects cleanup and cleans only after success', async () => {
     const data = structuredClone(sample);
     const item = data.items[0]!;
 
@@ -130,31 +130,24 @@ test.each([true])('deleted-thread move inspects cleanup and cleans only after su
 
     expect(inputs.map((input) => input.checked)).toEqual([false, false]);
 
-    if (success) await press(inputs[0]!);
+    await press(inputs[0]!);
 
     await press($$<HTMLButtonElement>('#needs-you-dialog button').find((el) => text(el) === 'Proceed')!);
 
-    if (success) {
-        expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
-        expect(text($('#needs-you-dialog'))).toContain('draft.txt');
-        await press(
-            $$<HTMLButtonElement>('#needs-you-dialog button').find((el) => text(el) === 'Confirm loss and proceed')!,
-        );
-    }
+    expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+    expect(text($('#needs-you-dialog'))).toContain('draft.txt');
+    await press(
+        $$<HTMLButtonElement>('#needs-you-dialog button').find((el) => text(el) === 'Confirm loss and proceed')!,
+    );
 
     expect(posted().at(-1)?.[0]).toBe('/api/needs-you');
-    await answer(success ? { error: null, board: data } : { error: 'Move refused' }, success ? 200 : 409);
-    expect(posted().some((call) => call[0] === '/api/execute-owned-cleanup')).toBe(success);
-
-    if (!success) expect(text($('#needs-you-dialog [role="alert"]'))).toBe('Move refused');
-
-    if (success) {
-        expect(posted().at(-1)?.[1]).toEqual({
-            itemId: item.id,
-            options: { token: 'saved', local: true, remote: false, confirmedLoss: true },
-        });
-        await answer({ errors: ['Remote refused'], remainingBranches: ['slice/old'] });
-        expect(text($('[data-needs-you-reason]'))).toContain('Remote refused');
-        expect(text($('[data-needs-you-reason]'))).toContain('slice/old');
-    }
+    await answer({ error: null, board: data }, 200);
+    expect(posted().some((call) => call[0] === '/api/execute-owned-cleanup')).toBe(true);
+    expect(posted().at(-1)?.[1]).toEqual({
+        itemId: item.id,
+        options: { token: 'saved', local: true, remote: false, confirmedLoss: true },
+    });
+    await answer({ errors: ['Remote refused'], remainingBranches: ['slice/old'] });
+    expect(text($('[data-needs-you-reason]'))).toContain('Remote refused');
+    expect(text($('[data-needs-you-reason]'))).toContain('slice/old');
 });

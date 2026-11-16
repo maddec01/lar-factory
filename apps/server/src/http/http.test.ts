@@ -47,13 +47,13 @@ it("leaves the page's security headers as they were", async () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
 });
 
-it.each([true])('sample mode refuses merge writes before commands, including T3 reads %s', async (sampleReadsT3) => {
+it('sample mode refuses merge writes before commands, including when it reads T3', async () => {
     const mergePr = vi.fn();
     const { server } = createBoardServer({
         board: createBoardState({ repos: [], items: [] } as unknown as BoardData),
         commands: { mergePr },
         sample: true,
-        sampleReadsT3,
+        sampleReadsT3: true,
         page: { template: '<html></html>', assets: new Map() },
         ready: () => undefined,
     } as unknown as HttpDeps);

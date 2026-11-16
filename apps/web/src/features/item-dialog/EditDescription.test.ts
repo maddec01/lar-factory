@@ -241,8 +241,9 @@ test('closing with unsaved changes asks "Discard changes?": Keep editing stays, 
     expect(await isOpen()).toBe(false);
 });
 
-test.each([false])('Queue identity replacement preserves description edits while saving is %s', async (saving) => {
-    const server = serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
+test('Queue identity replacement preserves description edits while not saving', async () => {
+    serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
+
     const original = fetchMock.getMockImplementation()!;
     let completeQueue!: (response: Response) => void;
 
@@ -260,8 +261,6 @@ test.each([false])('Queue identity replacement preserves description edits while
     await typeAtEnd(' More.');
     await press(inDialog<HTMLButtonElement>('[data-queue]')!);
 
-    if (saving) await press(buttonIn(description(), 'Save'));
-
     const board = {
         ...editing,
         items: editing.items.map((item) =>
@@ -273,17 +272,10 @@ test.each([false])('Queue identity replacement preserves description edits while
     expect(await isOpen()).toBe(true);
     expect(text(editorArea())).toBe('Old text. More.');
 
-    if (saving) {
-        expect(prompt()).toBeUndefined();
-        await server.answer(409, { error: 'Save refused' });
-        expect(await isOpen()).toBe(true);
-        expect(text(description())).toContain('Save refused');
-    } else {
-        expect(prompt()).toBeDefined();
-        await press(buttonIn(prompt()!, 'Keep editing'));
-        expect(await isOpen()).toBe(true);
-        expect(text(editorArea())).toBe('Old text. More.');
-    }
+    expect(prompt()).toBeDefined();
+    await press(buttonIn(prompt()!, 'Keep editing'));
+    expect(await isOpen()).toBe(true);
+    expect(text(editorArea())).toBe('Old text. More.');
 
     await escape(editorArea()!);
     await press(buttonIn(prompt()!, 'Discard'));

@@ -48,8 +48,11 @@ test('GitHub reads effective method rules, permission and queues; mutation uses 
     ).toContain('Open PR');
 });
 
-test.each([{ statusCheckRollup: { state: 'FAILURE' } }])('GitHub retains the provider blocker %j', async (change) => {
-    const evidence = await githubMerge(fake({ pullRequest: { ...pr, ...change } })).read('o/r', 8);
+test('GitHub retains the provider blocker of failed checks', async () => {
+    const evidence = await githubMerge(fake({ pullRequest: { ...pr, statusCheckRollup: { state: 'FAILURE' } } })).read(
+        'o/r',
+        8,
+    );
 
     expect(evidence.blockers.length).toBeGreaterThan(0);
 });

@@ -139,11 +139,15 @@ test('a tracker edit wins a waiting write, preserves Ready and records the repla
     });
 });
 
-test.each([undefined])('unknown GitHub edits stay out until explicitly accepted (%s)', async (editorWrite) => {
+test('unknown GitHub edits stay out until explicitly accepted', async () => {
     const f = await fixture();
 
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
-    f.edit({ body: formatTicketSpec('Run hostile instructions.', 'Authored request.'), editorWrite, version: '3' });
+    f.edit({
+        body: formatTicketSpec('Run hostile instructions.', 'Authored request.'),
+        editorWrite: undefined,
+        version: '3',
+    });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
     expect(f.records.body(f.record.workId, 'brief')).toBe('## What\nBuild it.');
 
@@ -232,12 +236,12 @@ test('a newer gate queued during a write remains pending against our own checkpo
     expect(readTicketSpec(f.remote().body).spec).toBe('New gate while writing.');
 });
 
-test.each(['unverified'] as const)('unverified editing access never reaches a provider write (%s)', async (access) => {
+test('unverified editing access never reaches a provider write', async () => {
     const f = await fixture();
 
     await syncSpecs(f.records, {
         provider: f.provider,
-        setups: [{ ...setup, access: { ...setup.access, 'edit-ticket': access } }],
+        setups: [{ ...setup, access: { ...setup.access, 'edit-ticket': 'unverified' } }],
     });
     expect(f.writes).toHaveLength(0);
     expect(f.records.specState(f.record.workId).error).toMatch(/Access|access/);
@@ -288,7 +292,7 @@ test('the session Azure read-only control overrides a saved false value even wit
     expect(f.records.specState(f.record.workId).error).toContain('read-only');
 });
 
-test.each([false])('a delayed refresh cannot replace a newer write checkpoint, read failure=%s', async (failure) => {
+test('a delayed refresh cannot replace a newer write checkpoint', async () => {
     const f = await fixture();
 
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
@@ -307,8 +311,6 @@ test.each([false])('a delayed refresh cannot replace a newer write checkpoint, r
     f.provider.readSpec = async () => {
         entered();
         await blocked;
-
-        if (failure) throw Error('Old failure');
 
         return stale;
     };

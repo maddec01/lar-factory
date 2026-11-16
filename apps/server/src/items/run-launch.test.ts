@@ -10,12 +10,8 @@ import { afterEach, expect, it, vi } from 'vite-plus/test';
 import { prepareRunLaunch, type RunLaunchDeps } from './run-launch.ts';
 
 const opened: { records: WorkRecords; dir: string }[] = [];
-const context = {
-    dataDir: '/fixture',
-    bin: '/fixture/bin',
-    shapeSkill: '/fixture/lar-shape/SKILL.md',
-    buildSkill: '/fixture/lar-build/SKILL.md',
-};
+/** No delegation model, so the project default decides. */
+const context = {};
 const project = { instanceId: 'codex', model: 'sol', options: [{ id: 'reasoningEffort', value: 'high' }] };
 const packaged = {
     version: 'fixture-1',
@@ -66,7 +62,7 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
             'project',
             undefined,
             context,
-            '/skill',
+            () => '/skill',
             () => ['testing'],
             dependencies(),
         );
@@ -112,7 +108,7 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
             'project',
             project,
             context,
-            '/changed',
+            () => '/changed',
             () => {
                 throw Error('must not reread skills');
             },
@@ -127,10 +123,20 @@ it('freezes the running release in a new run, and none without one', async () =>
     const launch = async (release: string | undefined) => {
         const { records, item } = await fixture('build');
 
-        return prepareRunLaunch(records, item, true, 'project', undefined, context, '/skill', () => [], {
-            ...dependencies(),
-            release: () => release,
-        });
+        return prepareRunLaunch(
+            records,
+            item,
+            true,
+            'project',
+            undefined,
+            context,
+            () => '/skill',
+            () => [],
+            {
+                ...dependencies(),
+                release: () => release,
+            },
+        );
     };
 
     expect((await launch('2.0.0')).snapshot.release).toBe('2.0.0');

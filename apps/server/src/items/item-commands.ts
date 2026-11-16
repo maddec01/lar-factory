@@ -72,7 +72,7 @@ import { readRepositorySetups } from '../config/repository-settings.ts';
 import { readJsonRecord } from '../json-file.ts';
 import { log } from '../log.ts';
 import { installHome } from '../skills/bundled-skills.ts';
-import { factorySkillDir } from '../skills/factory-skill-dir.ts';
+import { skillEntries } from '../skills/skill-entries.ts';
 import { developmentModel } from '../t3/development-model.ts';
 import { verifyRecoveredExecution } from '../t3/execution-report.ts';
 import { liveWorktreePaths, protocolStartedThread } from '../t3/item-execution.ts';
@@ -202,10 +202,13 @@ export interface ItemCommands {
 }
 
 export interface ItemCommandsDeps {
-    /** Exact installation/data handoff. Null is reserved for deterministic protocol tests. */
     inspectWorkRecovery?: typeof inspectWorkRecovery;
     checkoutOf?: (projectId: string) => Promise<string>;
-    factoryContext?: FactoryThreadContext | null;
+    /**
+     * The data and command handoff of every thread, whose skill entries come from each run's release. Null skips run
+     * settings in deterministic protocol tests, whose messages then carry this board's handoff.
+     */
+    factoryContext?: FactoryEnvironment | null;
     runLaunchDeps?: RunLaunchDeps;
     readRoleProjection?: (threadId: string) => Promise<unknown>;
     verifyRecoveredExecution?: typeof verifyRecoveredExecution;
@@ -312,13 +315,12 @@ function track<T>(
     return tracked;
 }
 
-/** Where lar-build is installed, for the build message: under the board app's install root, else the home. */
-const larBuild = () => factorySkillDir('lar-build');
-const currentFactoryContext = (): FactoryThreadContext => ({
+/** A thread's factory context before its run's skill entries. */
+type FactoryEnvironment = Omit<FactoryThreadContext, 'shapeSkill' | 'buildSkill'>;
+
+const currentFactoryContext = (): FactoryEnvironment => ({
     dataDir: boardDataDir(),
     bin: join(installHome(), '.local/bin'),
-    shapeSkill: join(factorySkillDir('lar-shape'), 'SKILL.md'),
-    buildSkill: join(factorySkillDir('lar-build'), 'SKILL.md'),
     delegationModel: developmentModel(),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
@@ -456,6 +458,12 @@ export function createItemCommands({
     // Only settled starts can be retried; requests arriving during a retry share its pending result.
     const finishedStarts = new WeakMap<Promise<Start>, string>();
     const settled = new WeakSet<Promise<Start>>();
+    const environment = factoryContext ?? currentFactoryContext();
+    /** The factory context of a run that froze `release`, or of a start without run settings. */
+    const contextFor = (release: string | undefined): FactoryThreadContext => ({
+        ...environment,
+        ...skillEntries(release, environment.dataDir),
+    });
 
     /** Saves only this ticket, retaining its text while a closed-ticket persistence failure is retried. */
     async function abandonmentRecord(item: Item) {
@@ -850,25 +858,16 @@ export function createItemCommands({
 
         if (running) return running;
 
-        // An intent recorded before thread names carried a phase started its thread with the earlier message.
-        const messages =
-            intent.purpose === PURPOSES.startedBuilds
-                ? [
-                      buildMessage(item, larBuild(), factoryContext),
-                      earlierBuildMessage(item, larBuild(), factoryContext),
-                  ]
-                : [workMessage(item, factoryContext), earlierWorkMessage(item, factoryContext)];
         const evidence = records!.runSettings(item.id).roleRuns.find((run) => run.executionId === intent.intentId);
-
-        if (evidence) {
-            const snapshot = records!.runSettings(item.id, evidence.runId).runs[0]!;
-
-            messages.splice(
-                0,
-                messages.length,
-                ...messages.map((message) => `${message}\n\n${runSettingsMessage(snapshot)}`),
-            );
-        }
+        const snapshot = evidence && records!.runSettings(item.id, evidence.runId).runs[0]!;
+        // The launch built its message from the run's release, so recovery rebuilds it the same way.
+        const context = contextFor(snapshot?.release);
+        // An intent recorded before thread names carried a phase started its thread with the earlier message.
+        const messages = (
+            intent.purpose === PURPOSES.startedBuilds
+                ? [buildMessage(item, context), earlierBuildMessage(item, context)]
+                : [workMessage(item, context), earlierWorkMessage(item, context)]
+        ).map((message) => (snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message));
 
         return track(
             settling,
@@ -1028,7 +1027,7 @@ export function createItemCommands({
         item: Item,
         record: StartRecord,
         projectId: string,
-        message: string,
+        messageFor: (context: FactoryThreadContext) => string,
         choice: ModelChoice | undefined,
         ask: (message: string, selection?: ModelSelection, context?: LaunchContext) => Promise<StartResult>,
         prepare: () => void = () => {},
@@ -1036,7 +1035,7 @@ export function createItemCommands({
         stagedRecovery?: { branch: string; reset: boolean; message?: string },
         preparation?: BuildPreparation,
     ): Promise<Start> {
-        if (!records) return ask(message, choice);
+        if (!records) return ask(messageFor(contextFor(undefined)), choice);
 
         const purpose = PURPOSES[record];
         const unresolved = records
@@ -1077,9 +1076,11 @@ export function createItemCommands({
         }
 
         let run: Awaited<ReturnType<typeof prepareRunLaunch>> | undefined;
+        let message: string;
 
-        if (factoryContext) {
-            try {
+        // The message is built after the run is saved, so it reads the skills of the release the run froze.
+        try {
+            if (factoryContext)
                 run = await prepareRunLaunch(
                     records,
                     item,
@@ -1087,18 +1088,20 @@ export function createItemCommands({
                     projectId,
                     choice,
                     factoryContext,
-                    larBuild(),
+                    (release) => dirname(contextFor(release).buildSkill),
                     () => records.read(item.id).skills ?? skillsOf(item.repo),
                     runLaunchDeps,
                 );
-                message += `\n\n${run.message}`;
 
-                if (stagedRecovery) stagedRecovery = { ...stagedRecovery, message };
-            } catch (error) {
-                reread();
+            message = messageFor(contextFor(run?.snapshot.release));
 
-                return { thread: null, error: (error as Error).message, refused: true, hold: true };
-            }
+            if (run) message += `\n\n${run.message}`;
+
+            if (stagedRecovery) stagedRecovery = { ...stagedRecovery, message };
+        } catch (error) {
+            reread();
+
+            return { thread: null, error: (error as Error).message, refused: true, hold: true };
         }
 
         const cleanup = record === 'startedBuilds' ? savedShapingThreadCleanup() : undefined;
@@ -1748,13 +1751,12 @@ export function createItemCommands({
                         if (records) reread();
 
                         const current = board.find(item.id) ?? item;
-                        const message = workMessage(current, factoryContext);
 
                         return launch(
                             current,
                             'started',
                             repoProject.projectId,
-                            message,
+                            (context) => workMessage(current, context),
                             choice,
                             (text, selection, context) =>
                                 startIn(
@@ -1955,7 +1957,7 @@ export function createItemCommands({
                                     item,
                                     'started',
                                     project.projectId,
-                                    workMessage(item, factoryContext),
+                                    (context) => workMessage(item, context),
                                     choice,
                                     (text, selection, context) =>
                                         startIn(
@@ -2013,11 +2015,6 @@ export function createItemCommands({
                             const branch = continuing
                                 ? inspection.branch
                                 : buildBranch(item) + '-recovery-' + randomUUID().slice(0, 8);
-                            const message = buildMessage(
-                                !continuing ? { ...item, slices: [] } : item,
-                                larBuild(),
-                                factoryContext,
-                            );
                             const workspace =
                                 continuing && inspection.worktreePath
                                     ? {
@@ -2031,7 +2028,7 @@ export function createItemCommands({
                                 item,
                                 'startedBuilds',
                                 project.projectId,
-                                message,
+                                (context) => buildMessage(!continuing ? { ...item, slices: [] } : item, context),
                                 choice,
                                 (text, selection, context) =>
                                     startIn(
@@ -2057,7 +2054,7 @@ export function createItemCommands({
                                     }
                                 },
                                 true,
-                                { branch, reset: !continuing, message },
+                                { branch, reset: !continuing },
                             );
 
                             return {
@@ -2216,13 +2213,12 @@ export function createItemCommands({
                         };
                         // Refreshing the Spec can change the title, so use the current record.
                         const current = board.find(item.id) ?? item;
-                        const message = buildMessage(current, larBuild(), factoryContext);
 
                         return launch(
                             current,
                             'startedBuilds',
                             repoProject.projectId,
-                            message,
+                            (context) => buildMessage(current, context),
                             choice,
                             (text, selection, context) =>
                                 startIn(

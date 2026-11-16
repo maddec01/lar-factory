@@ -46,24 +46,22 @@ function factoryEnvironment(context: FactoryThreadContext): string {
     ].join('\n');
 }
 
-function shapeInstructions(item: Item, context?: FactoryThreadContext | null): string {
+function shapeInstructions(item: Item, context: FactoryThreadContext): string {
     const decision =
         item.kind === 'decision'
             ? '\nDecision-authored builds are drafts: Brief → code evidence → Doubt → gate → Ready. Record blockers and Dependencies; do not implement during shaping.'
             : '';
 
-    if (!context) return `$lar-shape ${item.id}${decision}`;
-
     return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.${decision}\n\n${factoryEnvironment(context)}`;
 }
 
 /** The work message. Line 1, which T3 titles the thread from, is `Shaping` and the item's name in a sentence; then come its instructions, with its work ID. */
-export function workMessage(item: Item, context?: FactoryThreadContext | null): string {
+export function workMessage(item: Item, context: FactoryThreadContext): string {
     return `Shaping ${itemName(item)}\n${shapeInstructions(item, context)}`;
 }
 
 /** The work message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
-export function earlierWorkMessage(item: Item, context?: FactoryThreadContext | null): string {
+export function earlierWorkMessage(item: Item, context: FactoryThreadContext): string {
     return `${itemName(item)}\n${shapeInstructions(item, context)}`;
 }
 
@@ -89,15 +87,15 @@ export function buildBranch(item: Item): string {
 }
 
 /** The build message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
-export function earlierBuildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
-    const message = `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
+export function earlierBuildMessage(item: Item, context: FactoryThreadContext): string {
+    const larBuild = context.buildSkill.replace(/\/SKILL\.md$/, '');
 
-    return context ? `${message}\n\n${factoryEnvironment(context)}` : message;
+    return `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.\n\n${factoryEnvironment(context)}`;
 }
 
-/** Start build's message. Line 1, which T3 titles the thread from, is `Build` and the item's name in a sentence; then come the build's work ID and the builder agent of the lar-build installed at `larBuild`. */
-export function buildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
-    return `Build ${itemName(item)}\n${earlierBuildMessage(item, larBuild, context)}`;
+/** Start build's message. Line 1, which T3 titles the thread from, is `Build` and the item's name in a sentence; then come the build's work ID and the builder agent of the lar-build whose entry the context names. */
+export function buildMessage(item: Item, context: FactoryThreadContext): string {
+    return `Build ${itemName(item)}\n${earlierBuildMessage(item, context)}`;
 }
 
 /** The snapshot is authoritative across compaction, retries and handoff; no live Settings are consulted by roles. */

@@ -76,7 +76,7 @@ const message = (home: string, workId: string, dataDir?: string) =>
     withRunPrompt(
         dataDir ?? testFactoryContext(home).dataDir,
         workId,
-        buildMessage({ id: workId, number: 12, title: 'Issue 12' } as Item, `${home}/.agents/skills/lar-build`, {
+        buildMessage({ id: workId, number: 12, title: 'Issue 12' } as Item, {
             ...testFactoryContext(home),
             ...(dataDir ? { dataDir } : {}),
         }),

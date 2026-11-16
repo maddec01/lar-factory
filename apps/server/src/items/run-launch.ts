@@ -27,7 +27,7 @@ const defaults: RunLaunchDeps = {
             BUILTIN_REVIEWERS.map((id) => [id, readFileSync(join(skill, 'agents', `reviewer-${id}.md`), 'utf8')]),
         );
 
-        // Content-address the installed instruction bundle, including local drift, rather than claiming a release version.
+        // Content-address the reviewer texts the run reads, rather than claiming a release version.
         return { version: `sha256:${createHash('sha256').update(JSON.stringify(reviewers)).digest('hex')}`, reviewers };
     },
     release: () => runningRelease(),
@@ -40,8 +40,9 @@ export async function prepareRunLaunch(
     build: boolean,
     projectId: string,
     choice: ModelChoice | undefined,
-    context: FactoryThreadContext,
-    skill: string,
+    context: Pick<FactoryThreadContext, 'delegationModel'>,
+    /** The lar-build folder of a release, whose reviewer texts a new run freezes. */
+    larBuild: (release: string | undefined) => string,
     skills: () => readonly string[],
     deps: RunLaunchDeps = defaults,
 ) {
@@ -58,7 +59,7 @@ export async function prepareRunLaunch(
             kind,
             projectDefault: project,
             ...(choice && { threadSelection: launchSelection(choice, project) }),
-            packaged: deps.packaged(skill),
+            packaged: deps.packaged(larBuild(release)),
             skills: [...skills()],
             ...(release && { release }),
         });

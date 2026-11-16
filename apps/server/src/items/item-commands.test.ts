@@ -11,9 +11,10 @@ import type {
 } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, test, vi } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
@@ -841,7 +842,15 @@ test('Start writes a launch intent before it asks T3, and records the thread T3 
 
     assert.equal((await commands.start(work.workId, undefined)).status, 200);
     assert.equal(unresolved, 1, 'the intent is on the record while T3 starts the thread');
-    assert.deepEqual(started, [`Shaping Tidy the docs\n$lar-shape ${work.workId}`]);
+    assert.deepEqual(
+        started.map((message) => message.split('\n').slice(0, 2)),
+        [
+            [
+                'Shaping Tidy the docs',
+                `Shape ${work.workId}. Read '${CHECKOUT_SKILLS}/lar-shape/SKILL.md' and follow it.`,
+            ],
+        ],
+    );
     assert.deepEqual(
         records.threads(work.workId).map((t) => [t.threadId, t.purpose]),
         [['thread-1', 'shape']],
@@ -1295,8 +1304,6 @@ for (const kind of ['build'] as ('issue' | 'concept' | 'decision' | 'build')[])
             factoryContext: {
                 dataDir: dir,
                 bin: '/fixture/bin',
-                shapeSkill: '/fixture/lar-shape/SKILL.md',
-                buildSkill: '/fixture/lar-build/SKILL.md',
             },
             skillsOf: () => [],
             runLaunchDeps: {
@@ -1369,6 +1376,103 @@ for (const kind of ['build'] as ('issue' | 'concept' | 'decision' | 'build')[])
         );
         assert.equal(roleRuns.at(-1)!.executionId, records.launchIntents({ workId: record.workId })[0]!.intentId);
     });
+
+/** The checkout's assembled skills, which a board without an app version reads for every run. */
+const CHECKOUT_SKILLS = fileURLToPath(new URL('../../../../.assembled-skills/skills', import.meta.url));
+
+/**
+ * The build prompt of a run frozen while the app ran `captured`, started once the app runs `running`, with release
+ * folders for `folders` in the data folder.
+ */
+async function promptAfterUpdate(captured: string | undefined, running: string | undefined, folders: string[]) {
+    const { defaultFactorySettings } = await import('@lar-factory/shared/factory-settings');
+    const { writeFactorySettings } = await import('@lar-factory/work-records/factory-settings');
+    const { executionSettingsOf } = await import('@lar-factory/shared/execution-target');
+    const records = await openRecords();
+    const dir = opened.at(-1)!.dir;
+    const settings = defaultFactorySettings();
+
+    settings.threadKinds.build = { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' };
+    writeFactorySettings(settings, dir);
+
+    for (const release of folders)
+        for (const skill of ['lar-shape', 'lar-build']) {
+            mkdirSync(join(dir, 'bundles', release, 'skills', skill), { recursive: true });
+            writeFileSync(join(dir, 'bundles', release, 'skills', skill, 'SKILL.md'), skill);
+        }
+
+    const record = records.importTicket({
+        title: 'Updated',
+        repository: WEB,
+        kind: 'build',
+        status: 'Ready',
+        ticket: `${WEB}#9`,
+    }).record;
+
+    approveBuild(records, record.workId);
+
+    const start = vi.fn<NonNullable<ItemCommandsDeps['startThread']>>(async (_project, _message, selection) => ({
+        thread: { threadId: 'updated', title: 'Updated' },
+        error: null,
+        executionReport: { source: 't3', reference: 'updated', actual: executionSettingsOf(selection!) },
+    }));
+    let available = false;
+    const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, {
+        factoryContext: { dataDir: dir, bin: '/fixture/bin' },
+        skillsOf: () => [],
+        runLaunchDeps: {
+            defaults: () => ({ selection: null, runtimeMode: 'full-access' }),
+            models: async () =>
+                available
+                    ? [{ instanceId: 'claude', model: 'opus', options: [{ id: 'effort', values: ['high'] }] }]
+                    : [],
+            packaged: () => ({
+                version: 'fixture',
+                reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+            }),
+            release: () => process.env.BOARD_APP_VERSION || undefined,
+        },
+        startThread: start,
+    });
+
+    vi.stubEnv('BOARD_DEV_SKILLS_DIR', undefined);
+    vi.stubEnv('BOARD_BUNDLE_DIR', '/app/bundle');
+    vi.stubEnv('BOARD_APP_VERSION', captured);
+    // The models are unavailable, so the first start freezes the run and holds before T3.
+    assert.equal(((await commands.startBuild(record.workId, undefined)).body as StartResult).hold, true);
+    assert.equal(records.runSettings(record.workId).runs[0]!.release, captured);
+
+    available = true;
+    vi.stubEnv('BOARD_APP_VERSION', running);
+    assert.equal((await commands.startBuild(record.workId, undefined)).status, 200);
+
+    return { prompt: start.mock.calls[0]![1], dir };
+}
+
+test("a run keeps reading its release's lar-build after the app moves to another release", async () => {
+    const { prompt, dir } = await promptAfterUpdate('1.0.0', '2.0.0', ['1.0.0', '2.0.0']);
+
+    assert.ok(prompt.includes(`Read ${join(dir, 'bundles/1.0.0/skills/lar-build')}/agents/builder.md`), prompt);
+    assert.ok(prompt.includes(`LAR_FACTORY_SHAPE_SKILL='${join(dir, 'bundles/1.0.0/skills/lar-shape/SKILL.md')}'`));
+    assert.ok(!prompt.includes('2.0.0'));
+});
+
+for (const [captured, why] of [
+    [undefined, 'no frozen release'],
+    ['1.0.0', 'a missing release folder'],
+] as const)
+    test(`a run with ${why} reads the running release`, async () => {
+        const { prompt, dir } = await promptAfterUpdate(captured, '2.0.0', ['2.0.0']);
+
+        assert.ok(prompt.includes(`Read ${join(dir, 'bundles/2.0.0/skills/lar-build')}/agents/builder.md`), prompt);
+    });
+
+test("a server without an app version reads the checkout's assembled skills, even for a run saved on a release", async () => {
+    const { prompt } = await promptAfterUpdate('1.0.0', undefined, ['1.0.0']);
+
+    assert.ok(prompt.includes(`Read ${CHECKOUT_SKILLS}/lar-build/agents/builder.md`), prompt);
+    assert.ok(!prompt.includes('bundles'));
+});
 
 // How the owner was recorded and what T3 shows of it vary independently; the thread states are classified once, in the
 // Start build and resume tests above.

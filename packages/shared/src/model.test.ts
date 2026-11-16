@@ -145,32 +145,26 @@ test("an unmet Dependency holds the start whatever its ticket shows, and a met o
     assert.equal(blockedText(item('Ready', [], { blockers: [dependency('open', true)] })), null);
 });
 
-test('the work message names the thread for shaping, then runs lar-shape on the work ID', () => {
+const context = { dataDir: '/d', bin: '/b', shapeSkill: '/s/SKILL.md', buildSkill: '/l/SKILL.md' };
+
+test('the work message names the thread for shaping, then reads the supplied lar-shape entry for the work ID', () => {
     const work = item('Queued', [], {
         id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a',
         number: 760,
         title: 'Improve T3 Code thread names',
     });
+    const [title, instructions] = workMessage(work, context).split('\n');
 
-    assert.equal(
-        workMessage(work),
-        'Shaping #760 Improve T3 Code thread names\n$lar-shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a',
-    );
+    assert.equal(title, 'Shaping #760 Improve T3 Code thread names');
+    assert.equal(instructions, "Shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a. Read '/s/SKILL.md' and follow it.");
+    assert.ok(!workMessage(work, context).includes('$lar-shape'));
 });
 
 test('the messages before the phase names are kept for a launch still unresolved', () => {
     const work = item('Ready', [], { id: 'w1', number: 7, title: 'T' });
 
-    assert.equal(earlierWorkMessage(work), '#7 T\n$lar-shape w1');
-    assert.equal(earlierBuildMessage(work, '/l'), 'Build w1. Read /l/agents/builder.md and follow it.');
-
-    const context = { dataDir: '/d', bin: '/b', shapeSkill: '/s/SKILL.md', buildSkill: '/l/SKILL.md' };
-
     assert.equal(earlierWorkMessage(work, context), workMessage(work, context).replace('Shaping ', ''));
-    assert.equal(
-        earlierBuildMessage(work, '/l', context),
-        buildMessage(work, '/l', context).split('\n').slice(1).join('\n'),
-    );
+    assert.equal(earlierBuildMessage(work, context), buildMessage(work, context).split('\n').slice(1).join('\n'));
 });
 
 test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
@@ -183,13 +177,18 @@ test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or 
     assert.equal(buildBranch(item('Ready', [], { title })), 'chore/7-add-start-build-to-the');
 });
 
-test('the build message names the thread for the build, then the work ID and the builder agent of the installed lar-build', () => {
-    assert.equal(
-        buildMessage(
-            item('Ready', [], { id: 'w1', number: 760, title: 'Improve T3 Code thread names' }),
-            '/Users/me/.agents/skills/lar-build',
-        ),
-        'Build #760 Improve T3 Code thread names\nBuild w1. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.',
+test('the build message names the thread for the build, then the work ID and the builder agent of the supplied lar-build', () => {
+    assert.deepEqual(
+        buildMessage(item('Ready', [], { id: 'w1', number: 760, title: 'Improve T3 Code thread names' }), {
+            ...context,
+            buildSkill: '/data/bundles/2.0.0/skills/lar-build/SKILL.md',
+        })
+            .split('\n')
+            .slice(0, 2),
+        [
+            'Build #760 Improve T3 Code thread names',
+            'Build w1. Read /data/bundles/2.0.0/skills/lar-build/agents/builder.md and follow it.',
+        ],
     );
 });
 
@@ -347,25 +346,33 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
     const context = {
         dataDir: "/tmp/O'Brien $(literal)/data",
         bin: '/tmp/factory home/.local/bin',
-        shapeSkill: '/tmp/factory home/.agents/skills/lar-shape/SKILL.md',
-        buildSkill: '/tmp/factory home/.agents/skills/lar-build/SKILL.md',
+        shapeSkill: '/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md',
+        buildSkill: '/tmp/factory home/data/bundles/2.0.0/skills/lar-build/SKILL.md',
         azureReadOnly: true,
     };
     const work = item('Queued', [], { id: 'w-safe' });
     const message = workMessage(work, context);
 
-    assert.ok(message.includes("Read '/tmp/factory home/.agents/skills/lar-shape/SKILL.md'"));
+    assert.ok(message.includes("Read '/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md'"));
     assert.ok(message.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
     assert.ok(message.includes('export PATH='));
     assert.ok(message.includes("export LAR_FACTORY_BIN='/tmp/factory home/.local/bin'"));
-    assert.ok(message.includes("export LAR_FACTORY_SHAPE_SKILL='/tmp/factory home/.agents/skills/lar-shape/SKILL.md'"));
-    assert.ok(message.includes("export LAR_FACTORY_BUILD_SKILL='/tmp/factory home/.agents/skills/lar-build/SKILL.md'"));
+    assert.ok(
+        message.includes(
+            "export LAR_FACTORY_SHAPE_SKILL='/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md'",
+        ),
+    );
+    assert.ok(
+        message.includes(
+            "export LAR_FACTORY_BUILD_SKILL='/tmp/factory home/data/bundles/2.0.0/skills/lar-build/SKILL.md'",
+        ),
+    );
     assert.ok(message.includes("export LAR_FACTORY_AZURE_READ_ONLY='1'"));
     assert.ok(message.includes('every child task prompt'));
     assert.ok(message.includes('Do not build'));
     assert.equal(workMessage(work, context), message, 'recovery uses a stable first message');
 
-    const build = buildMessage(work, '/tmp/factory home/.agents/skills/lar-build', context);
+    const build = buildMessage(work, context);
 
     assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
 });

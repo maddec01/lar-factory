@@ -1,5 +1,5 @@
 import { executionTarget } from '@lar-factory/shared/execution-target';
-import type { RoleRunInput, RunSettings } from '@lar-factory/shared/run-settings';
+import { frozenBuildMethodLine, type RoleRunInput, type RunSettings } from '@lar-factory/shared/run-settings';
 import { randomUUID } from 'node:crypto';
 import { accessSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
@@ -56,6 +56,7 @@ function preamble(snapshot: RunSettings, role: string, dataDir: string): string 
         `Frozen role settings: ${JSON.stringify(snapshot.roles)}`,
         `Frozen test runtime: ${JSON.stringify(snapshot.testRuntime)}`,
         `Frozen project skills: ${JSON.stringify(snapshot.skills)}`,
+        frozenBuildMethodLine(snapshot),
         `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. Stop if either command exits non-zero; cancel a mismatched active child.`,
         `Select reviewers with --run-id ${snapshot.runId}; carry runId and selection evidence into review records.`,
         'Apply the supplied skill shared/orchestration.md, including its wait rules. Final report: at most 300 words; no whole files, logs or screenshots.',

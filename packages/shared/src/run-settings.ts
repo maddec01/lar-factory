@@ -20,6 +20,17 @@ export const APP_RELEASE_ENV = 'BOARD_APP_VERSION';
 export const isRelease = (value: unknown): value is string =>
     typeof value === 'string' && /^[\w.+-]+$/.test(value) && value !== '.' && value !== '..';
 
+/** How a project's builds work: test first (TDD), or Prove it. */
+export const BUILD_METHODS = ['tdd', 'prove-it'] as const;
+
+export type BuildMethod = (typeof BUILD_METHODS)[number];
+
+export const isBuildMethod = (value: unknown): value is BuildMethod => BUILD_METHODS.includes(value as BuildMethod);
+
+/** The runtime blocks' line naming a run's frozen Build method; a run saved without one is TDD. */
+export const frozenBuildMethodLine = (run: Pick<RunSettings, 'buildMethod'>): string =>
+    `Frozen build method: ${run.buildMethod === 'prove-it' ? 'Prove it' : 'TDD'}`;
+
 export interface SnapshotRunInput {
     /** Stable across retries and handoff; use a new ID only for a new logical run. */
     runId: string;
@@ -31,6 +42,8 @@ export interface SnapshotRunInput {
     skills: string[];
     /** The app release the run starts on, which names its release folder; absent without a packaged app. */
     release?: string;
+    /** The project's Build method as the run starts; TDD when absent. */
+    buildMethod?: BuildMethod;
 }
 
 export interface RunReviewer {
@@ -62,6 +75,8 @@ export interface RunSettings {
     skills: string[];
     /** The app release the run started on; absent on runs started without a packaged app and on runs saved before releases. */
     release?: string;
+    /** The project's Build method the run started with; absent on runs saved before Build methods, which are TDD. */
+    buildMethod?: BuildMethod;
 }
 
 export interface RoleRunInput {

@@ -7,6 +7,7 @@ import {
     reviewerInstructions,
 } from '@lar-factory/shared/factory-settings';
 import {
+    isBuildMethod,
     isRelease,
     type ExecutionSettings,
     type ReviewSelectionEvidence,
@@ -86,6 +87,7 @@ export function captureRunSettings(workId: string, value: SnapshotRunInput, sett
         'packaged',
         'skills',
         'release',
+        'buildMethod',
     ]);
     const runId = runText(input.runId);
 
@@ -108,6 +110,8 @@ export function captureRunSettings(workId: string, value: SnapshotRunInput, sett
     if (new Set(skills).size !== skills.length) invalidRun('Duplicate run skill.');
 
     if (input.release !== undefined && !isRelease(input.release)) invalidRun('Invalid run release.');
+
+    if (input.buildMethod !== undefined && !isBuildMethod(input.buildMethod)) invalidRun('Invalid run build method.');
 
     const resolve = (role?: Parameters<typeof resolveFactorySettings>[2]) => {
         const { model, effort, options } = resolveFactorySettings(parsed, kind, role, context);
@@ -153,6 +157,7 @@ export function captureRunSettings(workId: string, value: SnapshotRunInput, sett
         reviewers,
         skills,
         ...(input.release !== undefined && { release: input.release as string }),
+        buildMethod: value.buildMethod ?? 'tdd',
     };
 }
 

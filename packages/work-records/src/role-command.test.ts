@@ -221,6 +221,7 @@ it('prints exact targets for every claude role using advertised effort, frozen i
         expect(args.task).toContain('export LAR_FACTORY_SHAPE_SKILL=');
         expect(args.task).toContain('export LAR_FACTORY_BUILD_SKILL=');
         expect(args.task).toContain("export LAR_FACTORY_AZURE_READ_ONLY='1'");
+        expect(args.task).toContain('Frozen project skills: []\nFrozen build method: TDD\nFor every child role');
         expect(args.task).toContain('role-launch');
         expect(args.task).toContain('role-finish');
         expect(args.task).toContain('Implement the brief.');

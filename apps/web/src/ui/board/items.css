@@ -1,6 +1,3 @@
-/* An item's parts (StartControls.tsx): the Start control's group and its message line. */
-
-/* The Start control's group, and the line under it with Start's message or error. */
 .start {
     margin: 0;
     font-size: var(--text-xs);
@@ -21,19 +18,96 @@
     position: relative;
 }
 
-/* Your desk's cards: one row that scrolls sideways, each card the same size whatever it says, an even amber tint with a
-   hairline of its tone and the cards' 12px radius, so what waits on you is the board's one warm surface. A hovered card
-   warms a little. Every card shows its title on up to two lines and each line under it once, cut with an ellipsis, so
-   the desk keeps one height with cards or without them and the lanes under it never move. */
 .desk {
     --desk-card-width: 18rem;
     --desk-gap: --spacing(3);
-    --desk-gutter: 1rem;
-    /* Exactly the head, a two-line title, two lines under it (such as its question and parent) and the foot. */
+    --desk-gutter: var(--spacing-gutter-app);
     --desk-card-height: 10.5rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    isolation: isolate;
+    margin: auto calc(-1 * var(--desk-gutter)) 0;
+    padding: --spacing(2) var(--desk-gutter) --spacing(3);
+    border-top: 1px solid var(--lar-glass-bar-edge);
+    @apply glass-bar;
 }
-/* The row reaches into the board's side gutter, and its fade is that gutter's width, so the fade only touches the
-   neighbouring card peeking past the edge, never a card in view. */
+.desk-cards {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+        grid-template-rows var(--motion-duration-slow) var(--ease-emphasized),
+        opacity var(--motion-duration-base) var(--ease-standard);
+}
+.desk-cards > .desk-grid {
+    min-height: 0;
+}
+.desk[data-open] > .desk-cards {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+.desk[data-open] .desk-grid {
+    margin-bottom: --spacing(1.5);
+}
+.desk-line {
+    display: flex;
+    align-items: center;
+    gap: --spacing(3);
+    min-height: --spacing(8);
+    padding-inline: --spacing(4) --spacing(3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.desk-line[data-empty] {
+    cursor: default;
+}
+.desk-line-rule {
+    flex: none;
+    width: 1px;
+    height: --spacing(3.5);
+    background: var(--color-line-strong);
+}
+.desk-line-latest {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: --spacing(3);
+    min-width: 0;
+    transition: opacity var(--motion-duration-fast) var(--ease-standard);
+}
+.desk[data-open] .desk-line-latest {
+    visibility: hidden;
+    opacity: 0;
+}
+.desk-line-title {
+    flex: 0 1 auto;
+    min-width: --spacing(24);
+    max-width: 45%;
+    overflow: hidden;
+    color: var(--color-fg);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.desk-line-detail {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-fg-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.desk-line-toggle {
+    flex: none;
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-fg-muted);
+    transition: color var(--motion-duration-fast) var(--ease-standard);
+}
+.desk-line:not([data-empty]):hover .desk-line-toggle {
+    color: var(--color-fg);
+}
 .desk-grid {
     --scroll-fade-row: var(--desk-gutter);
     display: flex;
@@ -42,7 +116,6 @@
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
     scroll-padding-inline: var(--desk-gutter);
-    /* Room for a card's focus ring and its arrival pulse, which the scrolling row would otherwise clip. */
     padding: 0.375rem var(--desk-gutter);
     margin: -0.375rem calc(-1 * var(--desk-gutter));
     scrollbar-width: none;
@@ -56,9 +129,6 @@
     height: var(--desk-card-height);
     scroll-snap-align: start;
 }
-/* Every card, on the desk and on a work map alike, lays its parts on the same rows: the head, the title on up to two
-   lines, the lines under it, the foot with what it waits for, then anything under the foot (a map part's slices). The
-   card's fixed height holds a two-line title and two lines under it, or a one-line title and three. */
 .desk-tile {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
@@ -77,15 +147,11 @@
 }
 .desk-tile > [data-card-foot] {
     grid-row: 4;
-    /* Into the card's side padding, so its action stands as far from the card's right edge as from its bottom: the card
-       is 16px in at each side (its padding and hairline) but 11px at the bottom. */
     margin-right: -5px;
 }
 .desk-tile > [data-map-slices] {
     grid-row: 5;
 }
-/* The head keeps the project's name whole and lets the stage's word give way first, ending in an ellipsis; the track
-   itself never shrinks. */
 .desk-tile [data-card-head] > [data-row-identity] {
     flex-shrink: 0;
     max-width: 65%;
@@ -107,8 +173,6 @@
 .desk-tile [data-card-head] :is([data-stage-track], [data-checks-track], [data-checks-word]) {
     flex-shrink: 0;
 }
-/* The head, title and foot keep their size; the lines between take what is left and show whole lines only, each one line
-   cut with an ellipsis, so a card with more to say drops its last lines rather than squeezing them. */
 .desk-tile > :not(.desk-more) {
     flex-shrink: 0;
 }
@@ -131,25 +195,14 @@
 .desk-tile .desk-more > * > * {
     display: inline;
 }
-/* A thread's activity line keeps its own row of dot, words and age, its words giving way first (ActivityLine). */
 .desk-tile .desk-more > [data-map-activity] {
     display: flex;
 }
 .desk-tile .desk-more > [data-map-activity] > * {
     display: flex;
 }
-/* A part with nothing to say, such as an empty dependency proof, takes no line and no gap. */
 .desk-tile .desk-more > :empty {
     display: none;
-}
-/* An empty desk keeps the row's height, saying why in its place, so the lanes under it stay where they were. */
-.desk-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: var(--desk-card-height);
-    border: 1px dashed var(--color-line-control);
-    border-radius: var(--radius-xl);
 }
 .desk-tile {
     container-type: inline-size;
@@ -162,24 +215,17 @@
     cursor: pointer;
 }
 
-/* A card's action reads on one line whether it is a button or a link (Open PR, Review failed checks), so their labels
-   share the UI text's line height and sit on the same baseline across a row of cards. */
 .desk-tile [data-col='side'] [data-slot='button'],
 .desk-tile [data-col='side'] [data-slot='dropdown-trigger'] {
     line-height: var(--text-ui--line-height);
 }
 
-/* The board's one card, on Your desk and in a concept's work map alike: the cards' 12px radius, a hairline, and a
-   thicker bar down its leading edge in the colour of what it needs (amber waits on you, the accent works, green is
-   done); a card that waits on you takes an even amber tint too, and one held by other work a thin dashed edge, with no
-   bar, a step firmer than the hairline so its dashes read on a white card yet stay quiet. */
 .board-card {
     position: relative;
     overflow: hidden;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-xl);
     background: var(--color-surface-card);
-    /* The bar is drawn inside the edge, as the design system's attention recipe draws it, so it follows the radius. */
     box-shadow: inset 3px 0 0 0 var(--board-card-bar, transparent);
     transition: background-color var(--motion-duration-fast) var(--ease-standard);
 }
@@ -202,16 +248,10 @@
     border-color: var(--color-line-control);
 }
 
-/* The confirmation includes the full provider URL and source revision. */
 #merge-pr-dialog {
     overflow-wrap: anywhere;
 }
 
-/* The board's life (BoardLife.ts), on a read that moves things, never on the first paint. A row that changed lane slides
-   the last few pixels into place from the side it came from and flashes the current navy wash, which fades over 1.2 s
-   back to its own fill; a card that landed on Your desk pulses its amber edge once, a ring leaving the card. Reduced
-   motion keeps the wash and the ring's colour, without the travel. Both pause behind an open overlay, as the design
-   system's loops do. */
 @keyframes board-row-arrive {
     from {
         transform: translateY(var(--board-arrive-from, 0));
@@ -261,13 +301,10 @@ body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='ope
     animation-play-state: paused;
 }
 
-/* A desk row offers its one next step; its other destinations (Open PR, Open thread) are in its dialog, so the action
-   column never grows over the row's state. */
 .wait-actions > :not(:first-child) {
     display: none;
 }
 
-/* An item dialog's side with nothing to show takes no column and draws no rule. */
 aside[data-item-aside]:empty {
     display: none;
 }
@@ -275,15 +312,12 @@ aside[data-item-aside]:empty {
     grid-template-columns: minmax(0, 1fr);
 }
 
-/* On a phone a row's start sits on the title's edge, as its other actions do. */
 @container (width < 41.25rem) {
     .row-side .start-group {
         margin-left: 0;
     }
 }
 
-/* In the dialog's sidebar the ticket's facts read as properties, as its status, project and kind above them do: a muted
-   label in a fixed column beside each value, one under another. */
 [data-item-aside] [data-meta-facts] {
     display: grid;
     gap: --spacing(1);
@@ -301,8 +335,6 @@ aside[data-item-aside]:empty {
     min-height: --spacing(6);
 }
 
-/* Need you's counter, pressed while Your desk shows, makes its cards glow once: their own amber tint deepens and
-   fades back, with no ring added and their content untouched. */
 @keyframes desk-flash {
     from {
         background-color: color-mix(in srgb, var(--color-warning) 22%, var(--color-surface-card));
@@ -317,27 +349,20 @@ aside[data-item-aside]:empty {
     }
 }
 
-/* On a narrow desk card the kind keeps its icon (named on hover) so the project stays readable; a Work map card names
-   no project in its head, so its kind keeps its words. */
 @container (width < 21rem) {
     .desk-row [data-card-head] [data-kind-name] {
         display: none;
     }
 }
 
-/* An item opened from the List takes its place: the List stays open under the item's backdrop, hidden, so a shorter
-   item dialog never shows its rows around its edges, and it comes back as the item closes. */
 [data-list-modal][data-under-item] {
     visibility: hidden;
 }
 
-/* A dialog footer with nothing to do takes no band: the ticket's link lives beside its project in the sidebar. */
 [data-slot='modal-footer']:not(:has(button, a)) {
     display: none;
 }
 
-/* The dialog's Kind reads as a value like the facts beside it (12px, regular, a 14px icon, on their 24px line); it shows
-   it can change, its chevron, only on hover, focus or while open. */
 [data-item-aside] [data-kind-control] [data-slot='trigger'] {
     height: --spacing(6);
     font-size: var(--text-xs);
@@ -361,8 +386,6 @@ aside[data-item-aside]:empty {
     opacity: 1;
 }
 
-/* The Project row keeps its ticket link on its line: the project name gives up room first and truncates, so the link
-   never drops under it on a narrow sidebar. */
 [data-item-aside] :has(> [data-ticket-link]) {
     flex-wrap: nowrap;
 }
@@ -374,19 +397,10 @@ aside[data-item-aside]:empty {
     text-overflow: ellipsis;
 }
 
-/* A card held by other work keeps its step and track in the muted text and the neutral state colour (WorkMapParts), so
-   its foot ("Blocked by #139") reads as its one state while the head stays readable. */
-/* A card's thread activity keeps to one line: its words give way first, ending in an ellipsis, with its age and agents
-   beside them; the line's tooltip says it in full. */
 [data-map-activity] [data-activity] {
     flex-wrap: nowrap;
 }
 
-/* A card's action, on your desk and on a work map alike, shows at its foot's end on hover, keyboard focus or while its
-   menu is open, as a row's does, and the foot's words under it stay: only the foot fades out into the action with a
-   mask, from a short fade before it to nothing under it, so the rest of the card reads on. The words take the foot's
-   width so the mask measures from the foot's edge; --card-side-width is the action's width (BoardCard). Without a
-   pointer that hovers, the action stays. */
 .desk-tile [data-card-foot] {
     position: relative;
 }
@@ -434,23 +448,16 @@ aside[data-item-aside]:empty {
     }
 }
 
-/* Hovering a map card lights its arrows; the cards at their other ends take the muted text colour as their edge, so the
-   related work stands out while every card stays readable. */
 [data-map-related] .board-card {
     border-color: var(--color-fg-muted);
 }
 
-/* A title-bar counter's list (shipped, spend, need you…) is 30rem wide on a desktop window, past the status popover's
-   24rem, so a row's title keeps the end that tells it from its neighbours; it never runs past the window. */
 [role='dialog']:has([data-counter-list]) {
     width: min(30rem, calc(100vw - 2rem));
 }
-/* It takes focus as it opens, so its title names it, without a ring around the whole panel. */
 [role='dialog']:has([data-counter-list]):focus-visible {
     outline: none;
 }
-/* Its rows are two or three lines tall, so its fade is a short edge cue: 1rem, under the 1.5rem every popover's list
-   has, which leaves the last row it shows readable while the list plainly goes on past it. */
 [data-scroll-fade]:has(> [data-counter-list]) {
     scroll-padding-block: 1rem;
     mask-image: linear-gradient(
@@ -465,8 +472,6 @@ aside[data-item-aside]:empty {
     mask-image: none;
 }
 
-/* A part in the concept's own project names it too, quieter than a project of its own, so every parts-list row has its
-   project and none reads with a gap. */
 [data-row-identity] > [data-repo-cell][data-repo-home] {
     color: var(--color-fg-muted);
 }

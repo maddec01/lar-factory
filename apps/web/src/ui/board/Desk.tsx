@@ -1,28 +1,33 @@
-import { ScrollRowArrows, SectionTitle, StatusIndicator, useScrollRow } from '@lar-works/design-system';
+import { ScrollRowArrows, StatusIndicator, useScrollRow } from '@lar-works/design-system';
 import { useScrollFade } from '@lar-works/design-system/primitives';
-import { type ReactNode, useCallback } from 'react';
+import { type ReactNode, useCallback, useId, useState } from 'react';
 
 import { useArrival } from './BoardLife';
+import { TintedActions } from './ButtonDensity';
+import { ROW_OPENS } from './RowStyles';
 
-interface DeskSectionProps {
-    /** The section's heading, such as "Your desk". */
-    title: string;
-    /** How many rows show; with none, `empty` says why, in the row's place. */
-    count: number;
-    /** The first read may still add rows; hide its provisional zero. */
-    loading?: boolean;
-    /** What the section says when nothing awaits you, a HeaderEmpty. */
-    empty?: ReactNode;
-    /** The rows, one DeskCard each. */
-    children?: ReactNode;
+export interface DeskLatest {
+    title: ReactNode;
+    name: string;
+    detail: string;
+    action: ReactNode;
+    onOpen: () => void;
 }
 
-/** "Your desk": the items awaiting your action, as one row of same-size cards under a section title, the board's one
- *  loud surface: each card an even amber tint with a hairline of the same tone, so what waits on you is the first thing
- *  the eye finds. The row scrolls sideways, fading at an edge with more cards past it, with arrows in the header, and
- *  keeps its height whether it holds cards or not, so the lanes under it never jump. An empty desk says why in the
- *  row's place. Its heading is `#desk-h`. */
-export function DeskSection({ title, count, loading = false, empty, children }: DeskSectionProps) {
+export function DeskDrawer({
+    count,
+    latest,
+    empty,
+    children,
+}: {
+    count: number;
+    latest?: DeskLatest | undefined;
+    empty: ReactNode;
+    children?: ReactNode;
+}) {
+    const [wantsOpen, setOpen] = useState(false);
+    const open = wantsOpen && count > 0;
+    const cardsId = useId();
     const { setViewport, className: fade } = useScrollFade({ axis: 'horizontal', row: true });
     const { setRow, scroll, canScrollBack, canScrollForward } = useScrollRow<HTMLOListElement>(count);
     const setList = useCallback(
@@ -34,83 +39,72 @@ export function DeskSection({ title, count, loading = false, empty, children }: 
     );
 
     return (
-        <section className="desk grid shrink-0 scroll-mt-16 gap-3" aria-labelledby="desk-h">
-            <div className="flex min-h-9 items-center justify-between gap-3 pr-3 pl-4">
-                <SectionTitle
-                    id="desk-h"
-                    level="h2"
-                    title={title}
-                    icon={<StatusIndicator state={count ? 'waiting' : 'off'} />}
-                    count={count}
-                    countLoading={loading}
-                />
-                {(canScrollBack || canScrollForward) && (
-                    <ScrollRowArrows
-                        size="sm"
-                        onScroll={scroll}
-                        canScrollBack={canScrollBack}
-                        canScrollForward={canScrollForward}
-                        backLabel="Previous cards"
-                        forwardLabel="Next cards"
-                    />
+        <section className="desk" data-open={open || undefined} aria-labelledby="desk-h">
+            <h2 id="desk-h" className="sr-only">
+                Your desk
+            </h2>
+            <TintedActions tinted={false}>
+                <div id={cardsId} className="desk-cards" inert={!open}>
+                    <ol ref={setList} aria-label="Your desk" className={`desk-grid m-0 list-none ${fade}`}>
+                        {children}
+                    </ol>
+                </div>
+                {count > 0 && latest ? (
+                    <div
+                        className="desk-line"
+                        onClick={(event) => {
+                            if (!(event.target as Element).closest('button, a')) setOpen(!open);
+                        }}
+                    >
+                        <StatusIndicator state="waiting" />
+                        <span className="text-fg shrink-0 font-medium">{count} need you</span>
+                        <span className="desk-line-latest" inert={open}>
+                            <span className="desk-line-rule" aria-hidden="true" />
+                            <button
+                                type="button"
+                                className={`desk-line-title rounded-xs ${ROW_OPENS}`}
+                                title={latest.name}
+                                onClick={latest.onOpen}
+                            >
+                                {latest.title}
+                            </button>
+                            <span className="desk-line-detail" title={latest.detail}>
+                                {latest.detail}
+                            </span>
+                            <span className="wait-actions flex shrink-0 items-center gap-2">{latest.action}</span>
+                        </span>
+                        {open && (canScrollBack || canScrollForward) && (
+                            <ScrollRowArrows
+                                size="sm"
+                                onScroll={scroll}
+                                canScrollBack={canScrollBack}
+                                canScrollForward={canScrollForward}
+                                backLabel="Previous cards"
+                                forwardLabel="Next cards"
+                            />
+                        )}
+                        <button
+                            type="button"
+                            className="desk-line-toggle focus-ring rounded-xs"
+                            aria-expanded={open}
+                            aria-controls={cardsId}
+                            onClick={() => setOpen(!open)}
+                        >
+                            {open ? 'Hide' : count > 1 ? `+${count - 1} more` : 'Show'}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="desk-line" data-empty>
+                        <StatusIndicator state="off" />
+                        <p className="text-fg-muted m-0 flex min-w-0 items-center truncate">{empty}</p>
+                    </div>
                 )}
-            </div>
-            {count > 0 ? (
-                <ol ref={setList} aria-label={title} className={`desk-grid m-0 list-none ${fade}`}>
-                    {children}
-                </ol>
-            ) : (
-                <div className="desk-empty">{empty}</div>
-            )}
+            </TintedActions>
         </section>
     );
 }
 
-/**
- * Brings Your desk into view, as need you's counter does when pressed: off screen (or under the title bar), the board
- * scrolls smoothly up to it; on screen, its cards glow once, so the eye finds them. False when there is no desk to show,
- * so the counter opens its list instead.
- */
-export function bringDeskIntoView(): boolean {
-    const desk = document.querySelector<HTMLElement>('section.desk');
-
-    if (!desk?.querySelector('.desk-tile')) return false;
-
-    const bar = document.querySelector('.title-bar')?.getBoundingClientRect().bottom ?? 0;
-    const { top } = desk.getBoundingClientRect();
-    const offScreen = top < bar || top > window.innerHeight / 2;
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (offScreen) desk.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
-
-    // The glow starts as the scroll settles, restarting if a glow still runs, and clears itself.
-    window.setTimeout(
-        () => {
-            delete desk.dataset.flash;
-            void desk.offsetWidth;
-            desk.dataset.flash = '';
-            window.clearTimeout(Number(desk.dataset.flashTimer));
-            desk.dataset.flashTimer = String(window.setTimeout(() => delete desk.dataset.flash, 1400));
-        },
-        offScreen && !still ? 350 : 0,
-    );
-
-    return true;
-}
-
-/**
- * An item on your desk: its card (ItemCard, the board's one card) as an entry in the desk's row. One that lands on the
- * desk after the board has shown slides in and flashes (BoardLife).
- */
-export function DeskCard({
-    item,
-    children,
-}: {
-    /** The item's id, as `data-item`. */
-    item: string;
-    /** The item's card. */
-    children: ReactNode;
-}) {
+export function DeskCard({ item, children }: { item: string; children: ReactNode }) {
     const arrived = useArrival('desk', item);
 
     return (
@@ -120,13 +114,7 @@ export function DeskCard({
     );
 }
 
-/** A desk card's next step as a hint, such as what its status waits for. */
-export function DeskHint({
-    children,
-}: {
-    /** The hint, such as what the status waits for. */
-    children?: string | undefined;
-}) {
+export function DeskHint({ children }: { children?: string | undefined }) {
     return (
         <span className="truncate" title={children}>
             {children}

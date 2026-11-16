@@ -1,4 +1,3 @@
-// The board's UI layer: its compositions of the design system's components, its icon glossary and its kind badge.
 export { WaitWord } from './Attention';
 export {
     AddItemButton,
@@ -22,7 +21,6 @@ export {
     BoardCounter,
     CounterAge,
     CounterDash,
-    CounterWords,
     QuietGlyph,
     CounterFigure,
     CounterItem,
@@ -30,7 +28,7 @@ export {
     CounterPartial,
 } from './Counters';
 export { noteBoardPlaces } from './BoardLife';
-export { bringDeskIntoView, DeskCard, DeskHint, DeskSection } from './Desk';
+export { DeskCard, DeskDrawer, type DeskLatest, DeskHint } from './Desk';
 export { BoardCard, CardActivity, CardBriefs, CardMeter, CardPartOf, CardQuestion } from './BoardCard';
 export { FilterBar, FilterChip, FilterChoice, FilterChoices, FilterMenu } from './Filters';
 export { ListButton, ListGroupItem, ListHeader, ListItemRow, ListResults, ListRowGrid } from './List';

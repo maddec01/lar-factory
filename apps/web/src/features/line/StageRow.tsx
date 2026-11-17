@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { ActivityLine } from './ActivityLine';
 import { AutoBuildNote } from './AutoBuildNote';
 import { Figures } from './Columns';
+import { ChecksProgress } from './RowChecks';
 import { figuresOf, opensItem } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
@@ -40,10 +41,9 @@ import {
     hasLiveThread,
     useActivityUnavailable,
     useShownStatus,
-    checksCount,
-    checksWord,
     prChecks,
 } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
 import {
     QueuePlace,
     RowBlocked,
@@ -64,7 +64,6 @@ import {
     StageRowItem,
     VerifyEvidence,
     WaitWord,
-    ChecksBar,
     RowCount,
 } from '@/ui/board';
 
@@ -132,6 +131,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const activity = useActivityState(item);
     const [slices, setSlices] = useState(false);
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
+    const disconnected = useBoardStore((state) => !!state.clientError);
     const unavailable = useActivityUnavailable();
     // A row whose item is on Your desk waits on you, wherever it sits on the board.
     const yours = placementOf(item, {
@@ -153,7 +153,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const showsActivity =
         n === undefined && activity && activity !== 'unavailable' && activity !== 'stopped' && activity !== 'waiting';
     const figures = figuresOf(item, data);
-    const checks = prChecks(item);
+    const checks = prChecks(item, data, disconnected);
     // A row at work names what runs, so its bar says something is going on even with no slices to count.
     // A thread paused on you (a question, an approval) keeps its bar, its light travelling in amber.
     const waiting = activity === 'waiting';
@@ -162,7 +162,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const held = shown.blocked ? state : blocked && !shown.blocked ? blocked : '';
     // The checks' count already says how the pipeline stands, so a state about the checks would say it twice.
     // A Queue row's heading says Queued, so it says no state of its own.
-    const endState = n !== undefined || shown.blocked || (prChecks(item) && state.startsWith('Checks ')) ? '' : state;
+    const endState = n !== undefined || shown.blocked || (checks && state.startsWith('Checks ')) ? '' : state;
 
     // The lane's heading already shows its stage's glyph, so a row draws its own only when it says more: running work,
     // a light, a held or stopped state, or a wait on you.
@@ -217,15 +217,8 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         )
                     )}
                     {checks ? (
-                        // In review the PR's checks are what move, so they take the slices' place.
-                        <RowProgress
-                            bar={<ChecksBar checks={checks} still={still} />}
-                            count={
-                                <RowCount pr title={checksCount(checks)}>
-                                    {checksWord(checks)}
-                                </RowCount>
-                            }
-                        />
+                        // An open PR's checks are what move, so they take the slices' place.
+                        <ChecksProgress {...checks} still={still} />
                     ) : item.slices.length > 0 ? (
                         <RowProgress
                             bar={<SliceBar item={item} still={still} />}

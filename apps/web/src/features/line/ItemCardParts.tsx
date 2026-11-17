@@ -20,7 +20,7 @@ import { isDone, openWaits, partActivity } from './DossierParts';
 import { ACTIVITY_WORD, partDetail, RUNS } from './MapCardFacts';
 import { partState } from './PartState';
 import { lastSeen } from './StageStatus';
-import { checksWord, useActivityUnavailable, useShownStatus } from '@/features/items';
+import { checksStale, checksWord, useActivityUnavailable, useShownStatus } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { type CardCheckState, DeskHint } from '@/ui/board';
 
@@ -63,18 +63,15 @@ const counts = (checks: Checks) =>
 
 /**
  * What the card's widget shows of its open PR's checks, with the rest of what the board knows for its tooltip; undefined
- * with no open PR, so the stage track shows instead. Checks the board can't vouch for (disconnected, a project it can't
- * read, a stale observation) keep their counts, dimmed.
+ * with no open PR, so the stage track shows instead. Checks the board can't vouch for (`checksStale`) keep their counts,
+ * dimmed.
  */
 export function cardChecks(item: Item, data: BoardData, disconnected: boolean) {
     const pr = item.linkedPrs[0];
 
     if (!pr || pr.state !== 'open') return undefined;
 
-    const stale =
-        disconnected ||
-        !!data.itemSourceProblems?.some((p) => p.repo === item.repo) ||
-        pr.checkProgress?.state === 'stale';
+    const stale = checksStale(item, pr, data, disconnected);
     const unread = pr.pipelineUnread || (!pr.checkProgress && !pr.checks);
     const unavailable = pr.checkProgress?.state === 'unavailable';
     const detail = [

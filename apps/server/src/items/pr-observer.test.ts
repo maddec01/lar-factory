@@ -101,7 +101,7 @@ test('a failed Azure check read keeps the last known check counts, marked stale'
     const azure = 'org/project/repo';
     const { records, record, options, read } = await fixture(azure);
     const url = prUrl(azure, 4);
-    const checks = { passed: 3, failed: 1, running: 0, total: 4 };
+    const checks = { passed: 3, failed: 1, running: 0, total: 4, since: null };
     const pr: LinkedPr = {
         number: 4,
         url,
@@ -120,7 +120,12 @@ test('a failed Azure check read keeps the last known check counts, marked stale'
     read.mockResolvedValueOnce(pr);
     await observer.poll(0);
     // The Azure read finds the PR but not its checks, as `readObservedPr` reports a failed check read.
-    read.mockResolvedValueOnce({ ...pr, checks: null, mergeState: 'checking', checkProgress: { state: 'unavailable' } });
+    read.mockResolvedValueOnce({
+        ...pr,
+        checks: null,
+        mergeState: 'checking',
+        checkProgress: { state: 'unavailable' },
+    });
     await observer.poll(300_000);
     expect(shown()).toMatchObject({ checks, checkProgress: { state: 'stale' } });
     read.mockRejectedValueOnce(new Error('Azure PR progress unavailable.'));

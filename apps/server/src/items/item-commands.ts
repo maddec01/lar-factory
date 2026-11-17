@@ -47,7 +47,7 @@ import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { executionMismatch } from '@lar-factory/shared/execution-target';
 import { unseenMerge } from '@lar-factory/shared/group-reconciliation';
-import type { BuildMethod } from '@lar-factory/shared/run-settings';
+import type { BuildMethod, ExecutionSettings } from '@lar-factory/shared/run-settings';
 import {
     readShapingThreadCleanup,
     WorkRecordError,
@@ -74,12 +74,13 @@ import { log } from '../log.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { skillEntries } from '../skills/skill-entries.ts';
 import { developmentModel } from '../t3/development-model.ts';
-import { verifyRecoveredExecution } from '../t3/execution-report.ts';
+import { verifyLaunchedExecution, verifyRecoveredExecution } from '../t3/execution-report.ts';
 import { liveWorktreePaths, protocolStartedThread } from '../t3/item-execution.ts';
 import { resumeLaunch, type LaunchContext } from '../t3/launch-thread.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
+import { startStep, timeStart } from '../t3/start-steps.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { fetchBaseCommit } from './base-commit.ts';
@@ -448,6 +449,8 @@ export function createItemCommands({
     const asking = new Set<string>();
     /** Intent settlements in flight by intent ID, so a refresh and a Start share one. */
     const settling = new Map<string, Promise<Start>>();
+    /** By intent ID, a promise each settlement resolves once its replay rereads a created thread, so a refresh stops waiting. */
+    const rereading = new Map<string, Promise<void>>();
     /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
     const starts = new Map<string, Promise<Start>>();
     /** Start builds by item id, kept like Starts, so an item started while Queued can still start its build. */
@@ -515,8 +518,16 @@ export function createItemCommands({
             /* The next read shows them. */
         }
 
-        for (const { workId, purpose } of intents)
-            if (isStartPurpose(purpose)) put(workId, purpose, { phase: 'may-have-started', message: MAY_HAVE_STARTED });
+        // An intent still asking T3, or rereading the thread T3 created, is starting, not lost.
+        for (const { intentId, workId, purpose } of intents)
+            if (isStartPurpose(purpose))
+                put(
+                    workId,
+                    purpose,
+                    asking.has(intentId)
+                        ? { phase: 'starting' }
+                        : { phase: 'may-have-started', message: MAY_HAVE_STARTED },
+                );
         for (const purpose of START_PURPOSES)
             for (const itemId of running[purpose]) put(itemId, purpose, { phase: 'starting' });
         board.update({ startProgress: progress });
@@ -738,6 +749,8 @@ export function createItemCommands({
 
             const work = begin(item, choice);
 
+            startStep('board checks');
+
             if (typeof work !== 'function') return work;
 
             const purpose = PURPOSES[record];
@@ -795,7 +808,8 @@ export function createItemCommands({
         };
 
         try {
-            const answer = await run();
+            // One line per Start times each step, from the request reaching the server to T3's answer.
+            const answer = await timeStart(run, (steps) => log(`${purpose} start of ${itemId} took ${steps}`));
             const { error, uncertain } = answer.body as Partial<StartResult>;
 
             if (error && !uncertain) fail(error);
@@ -877,6 +891,23 @@ export function createItemCommands({
                 : [workMessage(item, form), earlierWorkMessage(item, form), reconcileMessage(item, form)],
         );
 
+        let rereadStarted = () => {};
+
+        rereading.set(intent.intentId, new Promise((resolve) => (rereadStarted = resolve)));
+
+        /** Rereads the created thread a replay returned while the intent shows as asking, so no refresh replays it again. */
+        const rereadThread = async (threadId: string, requested: ExecutionSettings) => {
+            asking.add(intent.intentId);
+            pushStarts();
+            rereadStarted();
+
+            try {
+                return await verifyLaunchedExecution(threadId, requested, readRoleProjection);
+            } finally {
+                asking.delete(intent.intentId);
+            }
+        };
+
         return track(
             settling,
             intent.intentId,
@@ -920,7 +951,9 @@ export function createItemCommands({
                         const { report, failure } =
                             replayed?.executionReport !== undefined
                                 ? { report: replayed.executionReport, failure: replayed.error }
-                                : await verifyRecovered(found.threadId, evidence.requested);
+                                : replayed
+                                  ? await rereadThread(found.threadId, evidence.requested)
+                                  : await verifyRecovered(found.threadId, evidence.requested);
 
                         executionFailure = failure;
                         records!.finishRoleRun(item.id, records!.read(item.id).revision, {
@@ -986,7 +1019,7 @@ export function createItemCommands({
                     };
 
                 return { thread: null, error: MAY_HAVE_STARTED, uncertain: true };
-            })(),
+            })().finally(() => rereading.delete(intent.intentId)),
         );
     }
 
@@ -1105,6 +1138,7 @@ export function createItemCommands({
                     runLaunchDeps,
                 );
 
+            startStep('run settings');
             context = { ...contextFor(run?.snapshot.release), ...(run && { run: run.snapshot, earlier: run.earlier }) };
             message = messageFor(context);
 
@@ -1163,21 +1197,36 @@ export function createItemCommands({
         }
 
         asking.add(intent.intentId);
+        startStep('launch intent and run records');
 
-        const result = await ask(message, run?.selection ?? choice, {
-            commandId: intent.intentId,
-            remember: (request) =>
-                write(item.id, (revision) => records!.saveLaunchRequest(item.id, revision, intent.intentId, request)),
-        }).finally(() => asking.delete(intent.intentId));
+        let result: StartResult;
 
-        if (run && !result.uncertain) {
-            if (result.thread && result.executionReport === undefined) {
-                const verified = await verifyRecovered(result.thread.threadId, run.snapshot.thread);
+        // The intent stays asking until a created thread's run reports its selection, so no refresh replays it meanwhile.
+        try {
+            result = await ask(message, run?.selection ?? choice, {
+                commandId: intent.intentId,
+                remember: (request) =>
+                    write(item.id, (revision) =>
+                        records!.saveLaunchRequest(item.id, revision, intent.intentId, request),
+                    ),
+            });
+
+            if (run && result.thread && result.executionReport === undefined) {
+                const verified = await verifyLaunchedExecution(
+                    result.thread.threadId,
+                    run.snapshot.thread,
+                    readRoleProjection,
+                );
 
                 result.executionReport = verified.report;
                 result.error = verified.failure;
+                startStep('model check');
             }
+        } finally {
+            asking.delete(intent.intentId);
+        }
 
+        if (run && !result.uncertain) {
             const report = result.executionReport ?? null;
             const failure =
                 result.error ??
@@ -1375,6 +1424,7 @@ export function createItemCommands({
 
         try {
             branch = await baseOf(repo);
+            startStep('default branch');
         } catch {
             return {
                 thread: null,
@@ -1388,6 +1438,8 @@ export function createItemCommands({
             return await fetchBase(projectId, branch);
         } catch (error) {
             return { thread: null, error: (error as Error).message, refused: true, hold: true };
+        } finally {
+            startStep('base fetch');
         }
     }
 
@@ -1406,15 +1458,20 @@ export function createItemCommands({
 
             if (repoProject.error !== undefined) continue;
 
-            const { thread } = await settle(item, intent, repoProject.projectId);
+            const shown = settle(item, intent, repoProject.projectId).then(({ thread }) => {
+                if (thread)
+                    board.update({
+                        [record]: { ...board.snapshot()[record], [item.id]: thread },
+                    } satisfies Partial<BoardData>);
 
-            if (thread)
-                board.update({
-                    [record]: { ...board.snapshot()[record], [item.id]: thread },
-                } satisfies Partial<BoardData>);
+                showStarts();
+                board.push();
+            });
 
-            showStarts();
-            board.push();
+            // A replay rereading its created thread already shows Starting, so the refresh goes on without it, and
+            // a failure after that is logged rather than left unhandled.
+            shown.catch((error) => log(`can't settle the start of ${item.id}: ${(error as Error).message}`));
+            await Promise.race([shown, rereading.get(intent.intentId) ?? shown]);
         }
     }
 
@@ -1782,6 +1839,8 @@ export function createItemCommands({
 
                     return async () => {
                         const repoProject = await projectOf(repo);
+
+                        startStep('T3 project');
 
                         if (repoProject.error !== undefined)
                             return { thread: null, error: repoProject.error, refused: true };
@@ -2225,17 +2284,34 @@ export function createItemCommands({
                     const { repo } = item;
 
                     return async () => {
-                        if (records) {
-                            await refreshSpecs(records, { workId: item.id });
-                            reread();
-                        }
+                        // The Spec refresh reads the ticket while the project and base are read and fetched.
+                        const refreshed = records
+                            ? refreshSpecs(records, { workId: item.id }).then(() => startStep('ticket Spec refresh'))
+                            : undefined;
+
+                        // A failed refresh fails the start once awaited below, not as an unhandled rejection meanwhile.
+                        refreshed?.catch(() => {});
 
                         const repoProject = await projectOf(repo);
 
-                        if (repoProject.error !== undefined)
+                        startStep('T3 project');
+
+                        /** Waits for the Spec refresh, then shows its records. */
+                        const showRefreshed = async () => {
+                            await refreshed;
+
+                            if (records) reread();
+                        };
+
+                        if (repoProject.error !== undefined) {
+                            await showRefreshed();
+
                             return { thread: null, error: repoProject.error, refused: true, hold: true };
+                        }
 
                         const base = await freshBase(repo, repoProject.projectId);
+
+                        await showRefreshed();
 
                         if (typeof base !== 'string') return base;
 

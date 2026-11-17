@@ -7,6 +7,7 @@ import type {
     NeedsYouCause,
     OperationAccess,
     ShapingThreadCleanup,
+    StartedThread,
     StartResult,
     Status,
 } from '@lar-factory/shared';
@@ -22,11 +23,32 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, test, vi } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
+import { boardSessionAuthority } from '../t3/board-session.ts';
+import { launchThread, type LaunchContext } from '../t3/launch-thread.ts';
+import { subscribeProjects } from '../t3/project-subscription.ts';
+import { sendThreadCommand } from '../t3/thread-commands.ts';
 import { createItemCommands, type ItemCommands, type ItemCommandsDeps } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
 import { NO_THREAD } from './needs-you-causes.ts';
 import { finishCompleted, observeRecords } from './observe-records.ts';
 import { archivedItems, recordItems } from './record-items.ts';
+
+// Launch tests answer through the real launch with T3's connection stubbed; every other test keeps the real modules.
+vi.mock('../t3/board-session.ts', async (original) => {
+    const actual = await original<typeof import('../t3/board-session.ts')>();
+
+    return { ...actual, boardSessionAuthority: vi.fn(actual.boardSessionAuthority) };
+});
+vi.mock('../t3/project-subscription.ts', async (original) => {
+    const actual = await original<typeof import('../t3/project-subscription.ts')>();
+
+    return { ...actual, subscribeProjects: vi.fn(actual.subscribeProjects) };
+});
+vi.mock('../t3/thread-commands.ts', async (original) => {
+    const actual = await original<typeof import('../t3/thread-commands.ts')>();
+
+    return { ...actual, sendThreadCommand: vi.fn(actual.sendThreadCommand) };
+});
 
 const WEB = 'contoso/Fabrikam/web';
 
@@ -59,6 +81,8 @@ const queued = (id: number, extra: Partial<Item> = {}): Item => ({
 const opened: { records: WorkRecords; dir: string }[] = [];
 
 afterEach(() => {
+    vi.useRealTimers();
+    for (const mocked of [boardSessionAuthority, subscribeProjects, sendThreadCommand]) vi.mocked(mocked).mockReset();
     vi.unstubAllEnvs();
     for (const { records, dir } of opened.splice(0)) {
         records.close();
@@ -1665,7 +1689,7 @@ for (const purpose of ['build'] as ('shape' | 'build')[]) {
             startAnswer: () => ({
                 thread: null,
                 uncertain: true,
-                error: 'T3 created the thread; its first turn is not running yet. The board will resume the same launch.',
+                error: 'T3 has not confirmed the first turn. The board will resume the same launch.',
             }),
             recover: async () => 'unknown',
         });
@@ -1962,11 +1986,20 @@ async function runBoard(kind: 'issue' | 'build', records?: WorkRecords) {
 
     const t3 = {
         available: true,
-        answer: (selection: ModelSelection): StartResult => ({
+        answer: (
+            selection: ModelSelection,
+            _message: string,
+            _context?: LaunchContext,
+        ): StartResult | Promise<StartResult> => ({
             thread: { threadId: `thread-${t3.started.length}`, title: 't' },
             error: null,
             executionReport: { source: 't3', reference: 't', actual: executionSettingsOf(selection) },
         }),
+        recover: async (): Promise<StartedThread | 'absent' | 'unknown'> => 'absent',
+        /** The thread projection T3 shows for a reread. */
+        read: async (_threadId: string): Promise<unknown> => {
+            throw new Error('T3 is not running.');
+        },
         started: [] as string[],
         recovered: [] as string[][],
     };
@@ -1991,16 +2024,17 @@ async function runBoard(kind: 'issue' | 'build', records?: WorkRecords) {
             }),
             release: () => process.env.BOARD_APP_VERSION || undefined,
         },
-        startThread: async (_project, message, selection) => {
+        startThread: async (_project, message, selection, _worktree, _run, _defaults, _launch, launchContext) => {
             t3.started.push(message);
 
-            return t3.answer(selection!);
+            return t3.answer(selection!, message, launchContext);
         },
         recoverThread: async (_project, messages) => {
             t3.recovered.push([...messages]);
 
-            return 'absent';
+            return t3.recover();
         },
+        readRoleProjection: (threadId) => t3.read(threadId),
     };
     const entries = (release: string) => ({
         'lar-shape': join(dir, 'bundles', release, 'skills/lar-shape/SKILL.md'),
@@ -2015,7 +2049,7 @@ async function runBoard(kind: 'issue' | 'build', records?: WorkRecords) {
 
     if (kind === 'build') approveBuild(records, work.workId);
 
-    const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, deps);
+    const { commands, board } = commandsOn([], undefined, records, [], undefined, undefined, undefined, deps);
     const start = () =>
         kind === 'build' ? commands.startBuild(work.workId, undefined) : commands.start(work.workId, undefined);
     /** Settles the unresolved launch as T3 confirming it started nothing, so the next Start retries the run. */
@@ -2033,7 +2067,20 @@ async function runBoard(kind: 'issue' | 'build', records?: WorkRecords) {
         });
     };
 
-    return { records, dir, bin, context, deps, t3, entries, workId: work.workId, start, startedNothing };
+    return {
+        records,
+        dir,
+        bin,
+        context,
+        deps,
+        t3,
+        entries,
+        workId: work.workId,
+        start,
+        startedNothing,
+        commands,
+        board,
+    };
 }
 
 for (const kind of ['issue', 'build'] as const)
@@ -2279,4 +2326,313 @@ for (const earlier of [false, true])
         await s.commands.start(id, undefined);
         assert.ok((board.t3.recovered[0] ?? []).includes(sent), 'recovery matches the message it sent');
         assert.equal(board.t3.started.length, 1);
+    });
+
+const CREATED = 'created-thread';
+const MAY_HAVE_OPENED = /may have opened a T3 thread/;
+const UNREPORTED = 'T3 did not report the launched model and options. Hold until the thread selection can be verified.';
+
+/** A board whose launches reach the real T3 launch, with T3's connection stubbed and `answer` standing in for T3. */
+async function launchBoard(kind: 'issue' | 'build' = 'issue') {
+    const board = await runBoard(kind);
+    const runtime = join(board.dir, 'server-runtime.json');
+    const t3 = {
+        /** T3's answer to each launch or replay of it: a value it accepts, an exit it rejects with, or none. */
+        answer: (_message: string, _selection: ModelSelection): { accept?: unknown; reject?: unknown } => ({}),
+        authorized: true,
+        launches: 0,
+    };
+
+    writeFileSync(runtime, JSON.stringify({ origin: 'http://localhost:3773' }));
+    vi.stubEnv('T3_SERVER_RUNTIME', runtime);
+    vi.mocked(boardSessionAuthority).mockImplementation(() => ({
+        issue: async () => {
+            if (!t3.authorized) throw new Error('unavailable');
+
+            return { token: 'private', sessionId: 'session', expiresAt: '2099-01-01' };
+        },
+        revoke: async () => {},
+    }));
+    vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
+        const payload = execution!.payload as { initialMessage: { text: string }; modelSelection: ModelSelection };
+        const { accept, reject } = t3.answer(payload.initialMessage.text, payload.modelSelection);
+
+        t3.launches++;
+
+        if (accept) execution!.accept(accept);
+
+        if (reject) execution!.reject!(reject);
+
+        return () => {};
+    });
+    board.t3.answer = (selection, message, context) =>
+        launchThread(
+            'project',
+            message,
+            selection,
+            { type: 'root' },
+            'full-access',
+            undefined,
+            context?.commandId,
+            context?.remember,
+        );
+
+    const progress = () => board.board.snapshot().startProgress?.[board.workId]?.shape;
+    const message = () => {
+        const shown = progress();
+
+        return shown && 'message' in shown ? shown.message : '';
+    };
+    const intents = () => board.records.launchIntents({ workId: board.workId });
+    const roleRun = () => board.records.runSettings(board.workId).roleRuns.find((run) => run.role === 'thread');
+    const refresh = () => board.commands.reconcileStarts(board.board.snapshot().items);
+
+    return { ...board, launch: t3, progress, message, intents, roleRun, refresh };
+}
+
+/** T3's launch answer: the thread it created, whose first turn is the given run. */
+const created = (message: string, selection: ModelSelection, run: Record<string, unknown>) => ({
+    accept: {
+        threadId: CREATED,
+        resumed: false,
+        projection: {
+            thread: { id: CREATED, modelSelection: selection },
+            messages: [{ role: 'user', text: message }],
+            runs: [{ id: 'run-1', ...run }],
+        },
+    },
+});
+
+/** The thread projection a reread shows, whose run reports `selection` once it is given. */
+const projection = (selection?: ModelSelection) => ({
+    thread: { id: CREATED },
+    runs: [{ id: 'run-1', status: selection ? 'running' : 'queued', ...(selection && { modelSelection: selection }) }],
+});
+
+test('a created thread whose first turn is queued with the requested model links to the card at once', async () => {
+    const board = await launchBoard();
+
+    board.launch.answer = (message, selection) =>
+        created(message, selection, { status: 'queued', modelSelection: selection });
+
+    const reply = await board.start();
+
+    assert.equal(reply.status, 200);
+    assert.deepEqual((reply.body as StartResult).thread, { threadId: CREATED, title: 'Shaping #5 Configured' });
+    assert.deepEqual(
+        board.intents().map(({ outcome, threadId }) => [outcome, threadId]),
+        [['started', CREATED]],
+    );
+    assert.equal(board.roleRun()?.result, 'completed');
+    assert.equal(board.progress(), undefined);
+    assert.equal(board.records.read(board.workId).status, 'Shaping');
+});
+
+for (const interrupt of ['accepted', 'rejected'] as const)
+    test(`a created thread whose queued run reports another model holds the item, and ${interrupt === 'accepted' ? 'an accepted' : 'a rejected'} interrupt says so`, async () => {
+        const board = await launchBoard();
+
+        vi.mocked(sendThreadCommand).mockResolvedValue(
+            interrupt === 'accepted'
+                ? { outcome: 'accepted', sequence: 1 }
+                : { outcome: 'rejected', reason: 'Run run-1 is not interruptible.' },
+        );
+        board.launch.answer = (message, selection) =>
+            created(message, selection, { status: 'queued', modelSelection: { ...selection, model: 'other' } });
+
+        const { error, hold } = (await board.start()).body as StartResult;
+
+        assert.match(error!, /other/);
+        assert.equal(hold, true);
+        assert.equal(
+            /Interrupt not confirmed: Run run-1 is not interruptible\./.test(error!),
+            interrupt === 'rejected',
+        );
+        assert.equal(board.records.read(board.workId).needsYou, error);
+        assert.deepEqual(
+            vi
+                .mocked(sendThreadCommand)
+                .mock.calls.map(([command]) => [command.type, 'runId' in command && command.runId]),
+            [['run.interrupt', 'run-1']],
+        );
+        assert.equal(board.intents()[0]!.threadId, CREATED);
+        assert.equal(board.roleRun()?.result, 'failed');
+    });
+
+test('a created thread whose queued run reports no model is reread until one does, showing Starting meanwhile', async () => {
+    const board = await launchBoard();
+    let reported: ModelSelection | undefined;
+    let reads = 0;
+    let ready = false;
+
+    vi.useFakeTimers();
+    board.launch.answer = (message, selection) => {
+        reported = selection;
+
+        return created(message, selection, { status: 'queued' });
+    };
+    board.t3.read = async () => {
+        reads++;
+
+        return projection(ready ? reported : undefined);
+    };
+
+    const reply = board.start();
+
+    await vi.advanceTimersByTimeAsync(500);
+    assert.equal(board.intents()[0]!.outcome, null, 'the intent stays unresolved while the thread is reread');
+    await board.refresh();
+    await vi.advanceTimersByTimeAsync(31_000);
+    await board.refresh();
+    assert.equal(board.progress()?.phase, 'starting');
+    assert.equal(board.launch.launches, 1, 'no refresh replays the intent');
+    ready = true;
+    await vi.advanceTimersByTimeAsync(1_000);
+    assert.equal((await reply).status, 200);
+    assert.equal(board.intents()[0]!.threadId, CREATED);
+    assert.equal(board.roleRun()?.result, 'completed');
+    assert.equal(board.progress(), undefined);
+    assert.ok(reads > 30, 'it rereads every second');
+});
+
+test('a created thread whose run reports no model within 60 seconds of the reread links and holds', async () => {
+    const board = await launchBoard();
+
+    vi.useFakeTimers();
+    board.launch.answer = (message, selection) => created(message, selection, { status: 'queued' });
+    board.t3.read = async () => {
+        throw new Error('T3 is busy.');
+    };
+
+    const reply = board.start();
+
+    await vi.advanceTimersByTimeAsync(59_000);
+    assert.equal(board.intents()[0]!.outcome, null);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    const { thread, error, hold } = (await reply).body as StartResult;
+
+    assert.deepEqual([thread?.threadId, error, hold], [CREATED, UNREPORTED, true]);
+    assert.equal(board.intents()[0]!.threadId, CREATED);
+    assert.equal(board.records.read(board.workId).needsYou, UNREPORTED);
+});
+
+test('a replay that finds a created thread with no reported model rereads it, and refresh and Start share that replay', async () => {
+    const board = await launchBoard();
+    let reported: ModelSelection | undefined;
+
+    vi.useFakeTimers();
+
+    // The first answer is lost, so the intent stays unresolved with its saved request.
+    const first = board.start();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    assert.equal((await first).status, 202);
+    assert.equal(board.progress()?.phase, 'may-have-started');
+    assert.match(board.message(), MAY_HAVE_OPENED);
+
+    board.launch.answer = (message, selection) => {
+        reported = selection;
+
+        return created(message, selection, { status: 'queued' });
+    };
+    board.t3.read = async () => projection();
+    await board.refresh();
+    assert.equal(board.launch.launches, 2, 'the refresh replays the launch and returns while it rereads');
+    assert.equal(board.progress()?.phase, 'starting');
+    assert.equal(board.intents()[0]!.outcome, null);
+
+    const click = board.start();
+
+    await vi.advanceTimersByTimeAsync(31_000);
+    await board.refresh();
+    assert.equal(board.launch.launches, 2, 'neither a Start click nor a later refresh replays it again');
+    board.t3.read = async () => projection(reported);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const reply = await click;
+
+    assert.equal(reply.status, 200);
+    assert.equal((reply.body as StartResult).thread?.threadId, CREATED);
+    assert.equal(board.intents()[0]!.threadId, CREATED);
+    assert.equal(board.roleRun()?.result, 'completed');
+    assert.equal(board.progress(), undefined);
+});
+
+const uncertainLaunches: [string, (board: Awaited<ReturnType<typeof launchBoard>>) => Promise<unknown>][] = [
+    [
+        'a lost T3 answer',
+        async (board) => {
+            board.launch.answer = () => ({ reject: { _tag: 'Interrupted' } });
+            await board.start();
+        },
+    ],
+    [
+        'a timed-out T3 answer',
+        async (board) => {
+            vi.useFakeTimers();
+
+            const reply = board.start();
+
+            await vi.advanceTimersByTimeAsync(30_000);
+            await reply;
+        },
+    ],
+    [
+        'a refusal carrying a thread ID',
+        async (board) => {
+            board.launch.answer = () => ({
+                reject: {
+                    _tag: 'Failure',
+                    cause: [{ _tag: 'Fail', error: { message: 'Refused.', threadId: CREATED } }],
+                },
+            });
+            await board.start();
+        },
+    ],
+    [
+        'a replay whose authorization fails',
+        async (board) => {
+            board.launch.answer = () => ({ reject: { _tag: 'Interrupted' } });
+            await board.start();
+            board.launch.authorized = false;
+            await board.start();
+        },
+    ],
+    [
+        'recovery without a saved launch request while T3 shows no matching thread',
+        async (board) => {
+            board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+            await board.start();
+            await board.start();
+            assert.equal(board.t3.recovered.length, 1);
+        },
+    ],
+];
+
+for (const [name, launch] of uncertainLaunches)
+    test(`${name} leaves the intent unresolved and shows the may-have-opened message`, async () => {
+        const board = await launchBoard();
+
+        await launch(board);
+        assert.deepEqual(
+            board.intents().map((intent) => intent.outcome),
+            [null],
+        );
+        assert.equal(board.progress()?.phase, 'may-have-started');
+        assert.match(board.message(), MAY_HAVE_OPENED);
+    });
+
+for (const [name, answer] of [
+    ['refused', { reject: { _tag: 'Failure', cause: [{ _tag: 'Fail', error: { message: 'No base ref.' } }] } }],
+    ['failed', null],
+] as const)
+    test(`a ${name} start without a thread shows phase failed`, async () => {
+        const board = await launchBoard();
+
+        board.launch.answer = () => answer ?? {};
+        board.launch.authorized = answer !== null;
+        await board.start();
+        assert.equal(board.progress()?.phase, 'failed');
+        assert.equal(board.intents()[0]!.outcome, 'failed');
     });

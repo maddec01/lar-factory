@@ -16,7 +16,9 @@ export function Counters() {
     const { data, now, clientError } = useBoardStore();
     const s = boardSections(data, now, clientError);
     const builds = useBuilds();
-    const { items: building, limit } = builds;
+    const { items: building, limit, waiting } = builds;
+    // Builds waiting on an open PR hold no slot: the counter names them beside the limit, never in its count.
+    const waitingNote = waiting.length ? `${waiting.length} waiting on their PR` : undefined;
     const costs = data.items
         .map((item) => ({ item, cost: costOf(item) }))
         .filter((x) => x.cost > 0)
@@ -75,7 +77,7 @@ export function Counters() {
                 </Counter>
             )}
 
-            {building.length > 0 && (
+            {(building.length > 0 || waiting.length > 0) && (
                 <Counter
                     label="building"
                     icon={<QuietGlyph>{glyph('In progress')}</QuietGlyph>}
@@ -83,11 +85,15 @@ export function Counters() {
                     count={countFor(building.length)}
                     value={<>{countOf(building.length)}</>}
                     hint={hintFor(building.length, builds.text)}
-                    detail={limit === undefined ? undefined : `Shared limit ${limit}`}
+                    detail={
+                        [limit === undefined ? undefined : `Shared limit ${limit}`, waitingNote]
+                            .filter(Boolean)
+                            .join(' · ') || undefined
+                    }
                     foot={
                         reading
                             ? undefined
-                            : 'All builds count toward this limit. At capacity, you can start an item over the limit; automatic starts wait for a slot.'
+                            : "A build with an open PR doesn't count toward this limit. At capacity, you can start an item over the limit; automatic starts wait for a slot."
                     }
                 >
                     {listOf(building, 'Nothing building right now.')}

@@ -15,7 +15,7 @@ or `running` while it runs. Then:
   beside the PR link, each with its caption and absolute path, when that
   reviewer ran. Then run [Retro](retro.md) in this turn only when the runtime
   block says `Frozen retro: on` and this is the build's first handback, so
-  `lar-work retro <work ID>` shows no saved suggestions. A handback after failed
+  `lar-work retro <work ID>` prints `null`. A handback after failed
   Verify, or with `Frozen retro: off`, skips Retro. Then run `status.sh` to set
   **Verify** or **Ready to merge** per the approved brief's Verify decision,
   never a recommendation. After failed Verify, set **Verify** on this PR again;

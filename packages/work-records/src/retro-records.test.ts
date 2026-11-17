@@ -45,16 +45,14 @@ async function setup() {
     return { records, id, at, merge, dir };
 }
 
-test('retro requires both Done and confirmation of the recorded delivery PR merge', async () => {
+test('the retro build phase requires both Done and confirmation of the recorded delivery PR merge', async () => {
     const s = await setup();
 
     for (const status of ['Ready to merge', 'Needs you', 'Done', 'Verify'] as const) {
         s.records.update(s.id, s.at(), { status });
         expect(() => s.records.setBuildPhase(s.id, s.at(), 'retro')).toThrow(/confirmed merge/);
-        expect(() => s.records.prepareRetro(s.id)).toThrow(/confirmed merge/);
     }
     s.merge();
-    expect(s.records.prepareRetro(s.id)?.delivery?.threadId).toBe('build-thread');
     expect(s.records.setBuildPhase(s.id, s.at(), 'retro').status).toBe('Done');
 });
 
@@ -66,7 +64,6 @@ test('a build proposes its own retro before merge and the board takes the choice
     const proposal = s.records.proposeRetro(s.id, s.at(), suggestions);
 
     expect(proposal).toMatchObject({ pr: 'owner/repo#1', suggestions, choice: null });
-    expect(proposal.delivery).toBeUndefined();
     expect(s.records.read(s.id).status).toBe('Ready to merge');
     expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toEqual(proposal);
     expect(() => s.records.chooseRetro(s.id, s.at() - 1, [], 'Pedro')).toThrow(/revision|changed/i);
@@ -129,5 +126,5 @@ test('a stored retro that still carries its thread delivery keeps parsing and ta
 
     s.records.saveRetro(s.id, legacy);
     expect(s.records.retro(s.id)).toEqual(legacy);
-    expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toMatchObject({ suggestions, delivery: legacy.delivery });
+    expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toMatchObject({ suggestions });
 });

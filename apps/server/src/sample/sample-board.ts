@@ -174,7 +174,6 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             readProjection: async (id) => ({ thread: { id }, runtimeRequests: [], turnItems: [], runs: [] }),
         },
         retroDeps: {
-            send: verification.dependencies.send,
             identity: verification.dependencies.identity,
             capture: { provider, labels: tracker.labels },
         },

@@ -7,7 +7,6 @@ import type { WorkRecord } from './work-records.ts';
 
 export interface RetroRecords {
     retro(id: string): Retro | null;
-    prepareRetro(id: string): Retro | null;
     proposeRetro(id: string, revision: number, suggestions: RetroSuggestion[]): Retro;
     chooseRetro(id: string, revision: number, selected: number[], by: string): Retro;
     saveRetro(id: string, retro: Retro): void;
@@ -53,53 +52,9 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
 
         return record;
     };
-    const merged = (id: string) => {
-        const record = read(id);
-
-        if (record.status !== 'Done' || !record.finishedAt || !prMerged(id, record.pullRequest))
-            invalid('Retro requires Done and a confirmed merge of the delivery PR.');
-
-        return record;
-    };
 
     return {
         retro: (id) => database.read(() => get(id)),
-        prepareRetro: (id) =>
-            database.write(() => {
-                const record = merged(id);
-                const prior = get(id);
-
-                if (prior) return prior;
-
-                if (record.buildPhase !== 'checks') return null;
-
-                const thread = db
-                    .prepare(
-                        "SELECT thread_id FROM threads WHERE work_id=? AND purpose='build' AND deleted_at IS NULL ORDER BY rowid DESC LIMIT 1",
-                    )
-                    .get(id);
-
-                if (!thread) return null;
-
-                const retro: Retro = {
-                    pr: record.pullRequest!,
-                    suggestions: null,
-                    choice: null,
-                    captures: [],
-                    delivery: {
-                        threadId: String(thread.thread_id),
-                        commandId: randomUUID(),
-                        messageId: randomUUID(),
-                        sent: false,
-                        error: null,
-                    },
-                };
-
-                db.prepare("UPDATE work_records SET build_phase='retro' WHERE work_id=?").run(id);
-                save(id, retro);
-
-                return retro;
-            }),
         proposeRetro: (id, revision, suggestions) =>
             database.write(() => {
                 const prior = get(id);
@@ -133,17 +88,11 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
                     invalid('Retro suggestions are already recorded.');
                 }
 
-                if (retro.delivery) {
-                    retro.delivery.sent = true;
-                    retro.delivery.error = null;
-                }
-
                 retro.suggestions = suggestions;
                 retro.captures = suggestions.map(() => ({
                     requestId: randomUUID(),
                     ticketRequestId: randomUUID(),
                     workId: null,
-                    error: null,
                     complete: false,
                 }));
                 save(id, retro);

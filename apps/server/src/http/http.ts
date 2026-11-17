@@ -359,11 +359,6 @@ export function createBoardServer({
             what: 'the follow-up choice',
             run: forItem('Name the build.', (id, input) => commands.chooseRetro(id, input)),
         },
-        '/api/retry-retro': {
-            sampleWrite: 'fake',
-            what: 'the retro request',
-            run: forItem('Name the build.', (id) => commands.retryRetro(id)),
-        },
         '/api/inspect-verification': {
             sampleWrite: 'fake',
             what: 'the recorded Verify head',

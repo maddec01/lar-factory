@@ -1,7 +1,19 @@
 import type { Retro } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, fetchMock, fresh, mountPage, posted, sample, settle, text } from '@/test/PageTest';
+import {
+    $,
+    answer,
+    fetchMock,
+    fresh,
+    holdPosts,
+    mountPage,
+    posted,
+    sample,
+    settle,
+    text,
+    toast,
+} from '@/test/PageTest';
 
 const retro: Retro = {
     pr: 'owner/repo#8',
@@ -15,7 +27,6 @@ const retro: Retro = {
         requestId: 'capture',
         ticketRequestId: 'ticket',
         workId: null,
-        error: null,
         complete: false,
     })),
     choice: null,
@@ -57,4 +68,31 @@ test('a compact card before merge opens the full choice in details and creates o
     await settle(() => details().querySelectorAll<HTMLInputElement>('input[type=checkbox]')[4]!.click());
     await settle(() => button('Create chosen follow-ups').click());
     expect(posted()).toContainEqual(['/api/choose-retro', { itemId: item.id, revision: 7, selected: [4] }]);
+});
+
+test('a pick whose follow-up creation failed stops waiting and shows a toast naming the follow-up', async () => {
+    holdPosts(board);
+    await mountPage(board);
+    await openChoice();
+    await settle(() => details().querySelectorAll<HTMLInputElement>('input[type=checkbox]')[4]!.click());
+    await settle(() => button('Create chosen follow-ups').click());
+    expect(
+        [button('Create chosen follow-ups'), button('No follow-ups')].map((node) => node.getAttribute('aria-busy')),
+        'the pressed button spins while the pick saves',
+    ).toEqual(['true', null]);
+
+    const chosen = { ...retro, choice: { selected: [4], by: 'Pedro', at: 'today' } };
+
+    await answer(
+        {
+            error: 'Could not create follow-up "Follow-up 5": Provider unavailable',
+            board: fresh({ ...sample, items: [{ ...item, retro: chosen }] }),
+        },
+        409,
+    );
+    expect(text(toast())).toContain('Could not create follow-up "Follow-up 5"');
+    expect(text(details())).not.toContain('Choose follow-ups');
+    expect([...document.querySelectorAll('.desk-row')].some((row) => text(row).includes('Choose follow-ups'))).toBe(
+        false,
+    );
 });

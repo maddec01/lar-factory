@@ -218,3 +218,19 @@ test.each([false, true])(
         }
     },
 );
+
+test('a retained Kind survives tracker changes and stale agent writes cannot overwrite a newer Kind', async () => {
+    const records = await open();
+    const r = records.create({ title: 'Greeting', repository: REPO, kind: 'build', ticket: `${REPO}#12` });
+    const classified = records.update(r.workId, r.revision, { deliveryKind: 'bug' });
+    const tracker = fakeTracker({ labels: ['type: bug'], type: 'Bug' });
+    const result = await changeKind(records, r.workId, classified.revision, 'feature', {
+        setup: setupOf(REPO),
+        ...tracker,
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.record).toMatchObject({ kind: 'build', deliveryKind: 'feature', agreedTicketKind: 'feature' });
+    expect(tracker.ticket).toEqual({ labels: ['type: feature'], type: 'Feature' });
+    expect(() => records.writeRevision(r.workId, classified.revision, ['deliveryKind'])).toThrow(/deliveryKind/);
+});

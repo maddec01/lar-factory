@@ -1,5 +1,7 @@
 import {
     buildActivity,
+    buildBranch,
+    visibleKind,
     effectiveVocabulary,
     deskItems,
     deskWait,
@@ -817,3 +819,75 @@ test('recorded work is linked only as a concept, a concept part or a group acros
         },
     );
 });
+
+const singleScope = {
+    tests: [],
+    behaviour: ['Greet the visitor.'],
+    excluded: [],
+    size: null,
+    verify: { required: false, visibleUi: null },
+    repositories: [REPO],
+    openDecisions: [],
+};
+
+test.each(['bug', 'feature'] as const)(
+    'single-flow %s keeps its Kind through shaping, reads and later edits',
+    async (kind) => {
+        const records = await open();
+        const r = records.create({ title: 'Greeting', repository: REPO, kind, status: 'Shaping', ticket: `${REPO}#7` });
+
+        records.confirmScope(r.workId, r.revision, singleScope, 'Pedro', 'Yes.');
+        assert.equal(records.chooseStructure(r.workId).structure, 'single');
+
+        const reader = await openReader();
+        const saved = reader.read(r.workId);
+
+        assert.equal(saved.kind, 'build');
+        assert.equal(saved.deliveryKind, kind);
+
+        const item = recordItems(reader, [], [REPO]).find((i) => i.id === r.workId)!;
+
+        assert.equal(visibleKind(item), kind);
+        assert.equal(item.flow, 'single');
+        assert.equal(buildBranch(item), kind === 'bug' ? 'fix/7-greeting' : 'feat/7-greeting');
+
+        const revision = saved.revision;
+
+        records.chooseStructure(r.workId);
+        assert.equal(reader.read(r.workId).revision, revision, 'repeating the choice preserves classification');
+
+        const result = await changeKind(records, r.workId, revision, 'improvement', {
+            kinds: {
+                read: async () => ({ labels: [], type: null }),
+                boardTypes: async () => null,
+                setType: async () => {
+                    throw new Error('Unexpected tracker write');
+                },
+            },
+        });
+
+        assert.equal(result.error, null);
+        assert.equal(result.record.kind, 'build');
+        assert.equal(result.record.deliveryKind, 'improvement');
+        assert.equal(visibleKind(recordItems(reader, [], [REPO]).find((i) => i.id === r.workId)!), 'improvement');
+    },
+);
+
+test.each([{ structure: 'linked', openDecisions: [], kind: 'build' }] as const)(
+    'multi-repository $structure keeps grouping without assigning a delivery Kind',
+    async (choice) => {
+        const records = await open();
+        const r = records.create({ title: 'Greeting', repository: REPO, kind: 'feature' });
+
+        records.confirmScope(
+            r.workId,
+            r.revision,
+            { ...singleScope, repositories: [REPO, OTHER_REPO], openDecisions: choice.openDecisions },
+            'Pedro',
+            'Yes.',
+        );
+        assert.equal(records.chooseStructure(r.workId).structure, choice.structure);
+        assert.equal(records.read(r.workId).kind, choice.kind);
+        assert.equal(records.read(r.workId).deliveryKind, null);
+    },
+);

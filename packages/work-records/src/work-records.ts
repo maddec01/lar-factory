@@ -4,6 +4,9 @@
 
 import {
     readTicketSpec,
+    SWAP_KINDS,
+    visibleKind,
+    type SwapKind,
     releaseHolds,
     parseDecisionMethod,
     type Item,
@@ -312,6 +315,8 @@ export interface WorkRecord {
     /** The repository the work belongs to, as the board names it: `owner/name`. */
     repository: string;
     kind: WorkKind;
+    /** The user's Kind retained alongside the internal build workflow. Null on unclassified builds. */
+    deliveryKind?: SwapKind | null;
     /** Saved independently of the decision body after its initial method header is imported. */
     decisionMethod?: Item['decisionMethod'];
     status: Status;
@@ -346,7 +351,7 @@ export interface WorkRecord {
     finishedAt: string | null;
     /** The kind the record and its ticket last agreed on, or null when a change never settled one. */
     agreedTicketKind: WorkKind | null;
-    /** The user's answer to a kind disagreement, or null while none holds. Changing the record's kind drops it. */
+    /** The user's answer to a kind disagreement, or null while none holds. Changing the user-facing Kind drops it. */
     kindAnswer: KindAnswer | null;
     /** Counts the record's changes; every change names the revision it read. */
     revision: number;
@@ -477,6 +482,7 @@ export interface WorkRecords
         change: {
             status?: Status;
             kind?: WorkKind;
+            deliveryKind?: SwapKind | null;
             agreedTicketKind?: WorkKind;
             decisionMethod?: Item['decisionMethod'];
         },
@@ -648,6 +654,7 @@ interface Row {
     initial_context: string;
     repository: string;
     kind: WorkKind;
+    delivery_kind: SwapKind | null;
     decision_method: Exclude<Item['decisionMethod'], undefined>;
     status: Status;
     queue_order: number | null;
@@ -677,6 +684,7 @@ const fromRow = (row: Row): WorkRecord => ({
     title: row.title,
     repository: row.repository,
     kind: row.kind,
+    deliveryKind: row.delivery_kind,
     decisionMethod: row.decision_method,
     status: row.status,
     queueOrder: row.queue_order,
@@ -1068,7 +1076,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     };
 
     const updateRow =
-        db.prepare(`UPDATE work_records SET kind = ?, decision_method = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
+        db.prepare(`UPDATE work_records SET kind = ?, delivery_kind = ?, decision_method = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
     pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, needs_you_causes = ?, skills = ?, finished_at = ?, agreed_ticket_kind = ?, kind_answer = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
     /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
      * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
@@ -1104,6 +1112,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
             updateRow.run(
                 next.kind,
+                next.delivery_kind,
                 next.decision_method,
                 next.status,
                 next.queue_order,
@@ -1358,7 +1367,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 const kind = choice.structure === 'concept' ? 'concept' : 'build';
 
-                if (r.kind !== kind) records.update(id, r.revision, { kind });
+                const kept = choice.structure === 'single' ? visibleKind(r) : null;
+                const deliveryKind = SWAP_KINDS.includes(kept as SwapKind) ? (kept as SwapKind) : null;
+
+                records.update(id, r.revision, { kind, deliveryKind });
 
                 return choice;
             }),
@@ -1562,9 +1574,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     ]) as unknown as Row[]
                 ).map(fromRow),
             ),
-        update: (workId, revision, { status, kind, agreedTicketKind, decisionMethod }) => {
+        update: (workId, revision, { status, kind, deliveryKind, agreedTicketKind, decisionMethod }) => {
             const nextStatus = status === undefined ? undefined : checkStatus(status);
             const nextKind = kind === undefined ? undefined : checkKind(kind);
+            const delivery =
+                deliveryKind == null ? deliveryKind : checkOneOf(SWAP_KINDS, deliveryKind, 'delivery kind');
             const method =
                 decisionMethod == null
                     ? decisionMethod
@@ -1572,6 +1586,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const agreed = agreedTicketKind === undefined ? undefined : checkKind(agreedTicketKind);
 
             return change(workId, revision, (row) => {
+                const nextDelivery =
+                    (nextKind ?? row.kind) === 'build' ? (delivery === undefined ? row.delivery_kind : delivery) : null;
+
+                if (delivery && (nextKind ?? row.kind) !== 'build')
+                    throw invalid('Only builds retain a delivery Kind.');
+
                 if (method !== undefined && (nextKind ?? row.kind) !== 'decision')
                     throw invalid('Only a decision holds a method.');
 
@@ -1579,6 +1599,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 if (
                     (nextStatus ?? row.status) === row.status &&
                     (nextKind ?? row.kind) === row.kind &&
+                    nextDelivery === row.delivery_kind &&
                     (agreed ?? row.agreed_ticket_kind) === row.agreed_ticket_kind &&
                     (method === undefined || method === row.decision_method)
                 )
@@ -1670,9 +1691,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         ? { build_phase: 'review' as const }
                         : {}),
                     kind: nextKind ?? row.kind,
+                    delivery_kind: nextDelivery,
                     queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),
                     agreed_ticket_kind: agreed ?? row.agreed_ticket_kind,
-                    kind_answer: agreed || (nextKind && nextKind !== row.kind) ? null : row.kind_answer,
+                    kind_answer:
+                        agreed ||
+                        visibleKind({ kind: nextKind ?? row.kind, deliveryKind: nextDelivery }) !==
+                            visibleKind(fromRow(row))
+                            ? null
+                            : row.kind_answer,
                 };
             });
         },
@@ -1684,7 +1711,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             return change(workId, revision, (row) => ({
                 kind_answer: JSON.stringify({
                     answer: checked,
-                    itemKind: row.kind,
+                    itemKind: visibleKind(fromRow(row)),
                     ticketKind: covered,
                 } satisfies KindAnswer),
             }));

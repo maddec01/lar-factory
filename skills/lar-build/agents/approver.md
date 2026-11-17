@@ -40,7 +40,11 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    (its template, title format and required links) per `project-rules.md`
    and citing other-repo work per `../shared/cross-repo-citations.md`. Where
    the repository sets no title format, use a conventional title naming the
-   change as the user would (it becomes the release note). A PR needs no
+   change as the user would (it becomes the release note). Read the build with
+   `lar-work read <work ID>`: `deliveryKind` is its retained user Kind, falling
+   back to `kind` when absent. Use `fix:` for Bug and `feat:` for Feature or
+   Improvement when the repository uses conventional titles; an internal
+   `kind: build` alone does not imply `chore:`. A PR needs no
    factory ticket; when a repository rule demands one the build lacks, stop and
    report that rule to the builder. The body, written with the
    `<lar-build>/write-pr.md` skill inside any template the repository sets,

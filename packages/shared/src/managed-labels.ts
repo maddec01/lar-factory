@@ -36,6 +36,10 @@ export const kindLabels = (kind: Kind, vocabulary?: EffectiveVocabulary): string
 export const SWAP_KINDS = ['bug', 'feature', 'improvement'] as const;
 export type SwapKind = (typeof SWAP_KINDS)[number];
 
+/** The user-facing Kind of delivery work; the internal build kind still controls its workflow. */
+export const visibleKind = <K extends string>(item: { kind: K; deliveryKind?: SwapKind | null }): K | SwapKind =>
+    item.kind === 'build' ? (item.deliveryKind ?? item.kind) : item.kind;
+
 /** Whether an item can change kind: an ordinary one, with or without a kind. Concepts, decisions and builds can't. */
 export const kindCanChange = (kind: Kind): boolean =>
     kind === 'issue' || (SWAP_KINDS as readonly Kind[]).includes(kind);
@@ -82,11 +86,11 @@ export function kindLabelSwap(
 
 /** The labels a row shows, in the ticket's order: none that are managed or that the repository maps to the item's kind. */
 export function shownLabels(
-    item: Pick<Item, 'kind' | 'labels'>,
+    item: Pick<Item, 'kind' | 'deliveryKind' | 'labels'>,
     vocabulary?: EffectiveVocabulary,
     isManaged: (name: string) => boolean = isManagedLabel,
 ): string[] {
-    const mapped = new Set(kindLabels(item.kind, vocabulary));
+    const mapped = new Set([...kindLabels(item.kind, vocabulary), ...kindLabels(visibleKind(item), vocabulary)]);
 
     return item.labels.slice(0, LABEL_LIMIT).filter((label) => !isManaged(label) && !mapped.has(label.toLowerCase()));
 }

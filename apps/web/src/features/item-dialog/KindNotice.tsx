@@ -1,6 +1,6 @@
 // The item dialog's notice for an item whose kind and its ticket's disagree, with its two answers.
 
-import { kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
+import { visibleKind, kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, KindTicketSwap, SwapKind } from '@lar-factory/shared';
 import { Alert, Button, InlineLink, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
@@ -28,7 +28,7 @@ function swapLine(item: Item, { add, remove, type }: KindTicketSwap, note: strin
 
     return note
         ? `Update writes nothing to #${item.number}.${note}`
-        : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
+        : `Update writes nothing to #${item.number}, as ${kindName(visibleKind(item) as SwapKind)} has no mapped ${noun} or type.`;
 }
 
 /**
@@ -52,9 +52,10 @@ export function KindNotice({
     const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
     const [reopened, setReopened] = useState(false);
     const [readFor, setReadFor] = useState<string | null>(null);
-    const kinds = `${item.kind} ${disagreement?.ticketKind}`;
+    const kinds = `${visibleKind(item)} ${disagreement?.ticketKind}`;
     const held = read.state === 'loaded' ? read.details.kindPlan : undefined;
-    const plan = held?.itemKind === item.kind && held.ticketKind === disagreement?.ticketKind ? held : undefined;
+    const plan =
+        held?.itemKind === visibleKind(item) && held.ticketKind === disagreement?.ticketKind ? held : undefined;
     const planStale =
         !item.setAside &&
         disagreement?.changed === 'item' &&
@@ -93,7 +94,7 @@ export function KindNotice({
         );
     }
 
-    const mine = kindName(item.kind as SwapKind);
+    const mine = kindName(visibleKind(item) as SwapKind);
     const said = ticketKind && kindName(ticketKind);
     const keep = () => {
         setReopened(false);
@@ -129,7 +130,7 @@ export function KindNotice({
                         <Button
                             {...buttonKind('other')}
                             disabled={busy || checking || problem !== null}
-                            onClick={() => void start(item.id, item.kind as SwapKind)}
+                            onClick={() => void start(item.id, visibleKind(item) as SwapKind)}
                         >
                             {said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}
                         </Button>

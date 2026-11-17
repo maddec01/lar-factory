@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
 import { reduceBlockers } from './blocker-graph.ts';
+import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
@@ -47,27 +47,34 @@ it('names an implying path and rolls back all records; diamond edges remain nece
 });
 
 it('drops redundant blockers recorded before the rule so later writes succeed', async () => {
-    const { a, b, c, d, add } = await fixture();
+    dir = mkdtempSync(join(tmpdir(), 'blocker-graph-'));
 
-    add(a, d);
-    add(b, c);
-    records.close();
+    const path = join(dir, 'work.db');
+    const legacy = await openDatabase(path, {
+        migrations: MIGRATIONS.slice(0, MIGRATIONS.lastIndexOf(reduceBlockers)),
+    });
 
-    const legacy = new DatabaseSync(join(dir, 'work.db'));
-
-    legacy
-        .prepare('INSERT INTO blockers(work_id, blocker_id) VALUES (?, ?), (?, ?)')
-        .run(a.workId, c.workId, a.workId, b.workId);
-    // Rerun the blocker rule's migration, and the ones after it, as an older database would.
-    legacy.exec(`PRAGMA user_version = ${MIGRATIONS.lastIndexOf(reduceBlockers)}`);
+    for (const id of ['a', 'b', 'c', 'd'])
+        legacy.db
+            .prepare(
+                "INSERT INTO work_records(work_id,title,repository,kind,status,revision,created_at,updated_at) VALUES (?,?,'test/repo','build','List',1,'now','now')",
+            )
+            .run(id, id);
+    legacy.db.exec("INSERT INTO blockers(work_id,blocker_id) VALUES ('a','d'),('b','c'),('a','c'),('a','b')");
     legacy.close();
-    records = await openWorkRecords(join(dir, 'work.db'));
+    records = await openWorkRecords(path);
 
-    expect(new Set(records.blockers(a.workId).map((r) => r.workId))).toEqual(new Set([b.workId, d.workId]));
-    expect(records.blockers(b.workId).map((r) => r.workId)).toEqual([c.workId]);
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => records.read(id));
+    const add = (work: NonNullable<typeof a>, blocker: NonNullable<typeof a>) =>
+        records.addBlocker(work.workId, records.read(work.workId).revision, blocker.workId);
+
+    expect(records.read('a').deliveryKind).toBeNull();
+
+    expect(new Set(records.blockers(a!.workId).map((r) => r.workId))).toEqual(new Set([b!.workId, d!.workId]));
+    expect(records.blockers(b!.workId).map((r) => r.workId)).toEqual([c!.workId]);
 
     const lone = records.create({ title: 'Lone', repository: 'test/repo', kind: 'build' })!;
 
     expect(records.setAside(lone.workId, lone.revision).setAside).toBeTruthy();
-    expect(() => add(d, c)).not.toThrow();
+    expect(() => add(d!, c!)).not.toThrow();
 });

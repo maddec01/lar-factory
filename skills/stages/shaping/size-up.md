@@ -43,7 +43,7 @@ Save the settled understanding with
 An explicit amendment uses this same response path; do not ask for a second
 confirmation of the answer.
 
-Capture `repositories` and `openDecisions` in that scope, then run `lar-work choose-structure <work ID>` (which records Concept or Build) and follow its result: `single` keeps this flow; `linked` makes this item a parent without a brief: one `create-parts` batch per [Structure](shared/issue-tracker/structure.md) saves its map and one build per scope repository with dependency blockers, then this thread ends after [Reconcile group](shared/reconcile-group.md); `concept` records the open decisions as parts. Release and activation belong in the parent's release steps.
+Capture `repositories` and `openDecisions` in that scope, then run `lar-work choose-structure <work ID>` (which records Concept or Build, keeping Bug, Feature or Improvement for single-flow work) and follow its result: `single` keeps this flow; `linked` makes this item a parent without a brief: one `create-parts` batch per [Structure](shared/issue-tracker/structure.md) saves its map and one build per scope repository with dependency blockers, then this thread ends after [Reconcile group](shared/reconcile-group.md); `concept` records the open decisions as parts. Release and activation belong in the parent's release steps.
 
 On resume, reuse `lar-work confirmed-scope <work ID>` when the understanding is
 unchanged, whether its source is the submitted request or an explicit answer.

@@ -4,7 +4,7 @@ import { labelsOnRow, type Item } from '@lar-factory/shared';
 
 import { useBoardStore } from '@/services/board/board.hooks';
 
-export type LabelledItem = Pick<Item, 'kind' | 'labels' | 'labelColors' | 'repo'>;
+export type LabelledItem = Pick<Item, 'kind' | 'deliveryKind' | 'labels' | 'labelColors' | 'repo'>;
 
 /** The labels of `item` that its row shows, under its repository's mappings. */
 export function useShownLabels(item: LabelledItem): string[] {

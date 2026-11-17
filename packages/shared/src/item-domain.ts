@@ -355,6 +355,8 @@ export interface Item {
     statuses: Status[];
     /** Its work record's kind, or on an item source's read the kind its labels give. */
     kind: Kind;
+    /** Bug, Feature or Improvement retained when single-flow shaping selects the build workflow. */
+    deliveryKind?: import('./managed-labels.ts').SwapKind | null;
     /** Board flow, projected from typed work relationships; private build slices never make it linked. */
     flow: 'single' | 'linked';
     /** The method in a local decision's body; null when no recognized method is written. */

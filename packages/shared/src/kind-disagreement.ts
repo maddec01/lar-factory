@@ -1,4 +1,4 @@
-import { SWAP_KINDS, kindLabelSwap, kindLabels, kindNames, sameLabel } from './managed-labels.ts';
+import { SWAP_KINDS, kindLabelSwap, kindLabels, kindNames, sameLabel, visibleKind } from './managed-labels.ts';
 import type { SwapKind } from './managed-labels.ts';
 // Whether an item's kind and its ticket's disagree, for rows, item details and lar-work. A ticket carrying the item's kind
 // agrees, whichever other name trackerKind would read first, so this reads the mappings and never trackerKind alone.
@@ -88,18 +88,20 @@ export function kindSwapAccessProblem(
 
 /**
  * The record's disagreement with `ticket`, or null when there is none to show: they agree, an update answer covers these two
- * kinds, the record isn't a Bug, Feature or Improvement, or the ticket has no kind and the item's has nothing mapped to add.
+ * kinds, the visible Kind isn't Bug, Feature or Improvement, or the ticket has no kind and the item's has nothing mapped to add.
  */
 export function kindDisagreement(
     record: {
         kind: string;
+        deliveryKind?: SwapKind | null;
         agreedTicketKind: string | null;
         kindAnswer: { answer: string; itemKind: string; ticketKind: string | null } | null;
     },
     ticket: TicketKindFacts,
     vocabulary?: EffectiveVocabulary,
 ): KindDisagreement | null {
-    const { kind, agreedTicketKind, kindAnswer } = record;
+    const { agreedTicketKind, kindAnswer } = record;
+    const kind = visibleKind(record);
 
     if (!isSwapKind(kind)) return null;
 

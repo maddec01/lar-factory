@@ -3,6 +3,7 @@
 // new kind only after the ticket has. Without access for a write it needs, only the record changes.
 import {
     SWAP_KINDS,
+    visibleKind,
     kindCanChange,
     kindDisagreement,
     kindSwapAccessProblem,
@@ -103,7 +104,7 @@ export async function checkKind(
 
         if (!disagreement) return null;
 
-        const { swap, note } = await plannedSwap(ticket, record.kind as SwapKind, setup, boardTypes);
+        const { swap, note } = await plannedSwap(ticket, visibleKind(record) as SwapKind, setup, boardTypes);
 
         return { ...disagreement, swap, note, accessProblem: swapProblem(record.repository, swap, setup) };
     } catch (error) {
@@ -122,7 +123,7 @@ export async function changeKind(
 
     const record = records.read(workId);
 
-    if (!kindCanChange(record.kind as Kind))
+    if (!kindCanChange(visibleKind(record) as Kind))
         throw new WorkRecordError('invalid', `A ${record.kind} has no kind to change.`);
 
     if (record.revision !== revision)
@@ -132,9 +133,10 @@ export async function changeKind(
         );
 
     const name = KIND_NAMES[kind];
+    const classification = record.kind === 'build' ? { deliveryKind: kind } : { kind };
     // A read or observation can bump the record while the tracker answers, so the writes below take its revision then.
     const itemOnly = (why: string): KindChangeResult => ({
-        record: records.update(workId, records.read(workId).revision, { kind }),
+        record: records.update(workId, records.read(workId).revision, classification),
         line: `This item is now ${name}. ${why}`,
         error: null,
         labelChanges: [],
@@ -175,7 +177,10 @@ export async function changeKind(
             done.push(`type ${ticket.type ?? 'none'} to ${swap.type.to}`);
         }
 
-        const swapped = records.update(workId, records.read(workId).revision, { kind, agreedTicketKind: kind });
+        const swapped = records.update(workId, records.read(workId).revision, {
+            ...classification,
+            agreedTicketKind: kind,
+        });
         // A type this change leaves alone can still read as another kind. The user chose this update, so that doesn't ask again.
         const left = kindDisagreement(
             swapped,

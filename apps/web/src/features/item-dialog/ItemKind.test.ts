@@ -170,3 +170,22 @@ test('when the ticket changed, the notice offers updating the item and writes no
     expect(notice()).toBeNull();
     expect(shownKind()).toBe('Bug');
 });
+
+test('a shaped single-flow build shows its retained Kind on the row and in its editable summary', async () => {
+    const before = boardWith({ kind: 'build', deliveryKind: 'bug', status: 'Ready' });
+    const { answer } = serve(before);
+
+    await mountPage(before);
+    expect($(`[data-item="${ID}"] [data-kind-mark][aria-label="Bug"]`)).not.toBeNull();
+    await openItem();
+    expect(shownKind()).toBe('Bug');
+    await choose('Feature');
+    expect(sent()).toEqual([{ itemId: ID, kind: 'feature' }]);
+    await answer(200, {
+        error: null,
+        itemId: ID,
+        line: 'Changed Kind.',
+        board: boardWith({ kind: 'build', deliveryKind: 'feature', status: 'Ready' }),
+    });
+    expect(shownKind()).toBe('Feature');
+});

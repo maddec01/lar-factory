@@ -2,7 +2,7 @@ import { changeKind } from './change-kind.ts';
 import { createRecordTicket } from './create-ticket.ts';
 import { WorkRecordError, type WorkRecords } from './work-records.ts';
 
-const kindFields = ['kind', 'kindAnswer', 'ticket'];
+const kindFields = ['kind', 'deliveryKind', 'kindAnswer', 'ticket'];
 const ticketFields = ['ticket', 'title', 'kind', 'body.brief', 'gate'];
 
 /** Anchor the local kind commit to the intent from before provider calls, including on partial recovery. */

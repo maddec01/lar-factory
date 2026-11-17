@@ -8,11 +8,13 @@ export interface ThreadAgent {
     model?: string;
     /** The agent's newest action; absent until it takes one. */
     action?: string;
+    /** Original command or tool title, available on demand. */
+    actionDetail?: string;
     /** When it took that action, or started; absent when T3 records neither. */
     actionAt?: string;
 }
 
-/** What a thread and its agents are doing now. `available: false` when T3 can't be read, so no old action reads as current. */
+/** What a thread and its agents are doing now. Brief failed reads can retain a recent value with its original readAt. */
 export type ThreadActivity =
     | { available: false }
     | {
@@ -21,6 +23,7 @@ export type ThreadActivity =
           readAt: string;
           /** The thread's newest action; absent until it takes one. */
           action?: string;
+          actionDetail?: string;
           actionAt?: string;
           /** A command or other tool still runs for the thread or an agent. Waiting on an agent doesn't count. */
           toolRunning: boolean;
@@ -33,6 +36,7 @@ export type ThreadActivityState = 'working' | 'quiet' | 'waiting' | 'stopped' | 
 export interface ThreadActivityLine {
     state: ThreadActivityState;
     action: string;
+    actionDetail?: string;
     /** How long ago the action happened. */
     ageMs?: number;
     agents: number;
@@ -53,6 +57,9 @@ const QUIET_MS = 5 * 60_000;
  * read at least every 10, so this leaves about 18 seconds for a slow pass before a row changes.
  */
 export const ACTIVITY_STALE_MS = 30_000;
+
+/** A failed shell or activity read may keep its last action for this long, without renewing its read time. */
+export const ACTIVITY_RETAIN_MS = 15_000;
 
 /** Whether T3's answer for a thread is lost: its read failed or has gone old. */
 export function activityLost(activity: ThreadActivity | undefined, now: number): boolean {
@@ -81,7 +88,12 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
     )
         return undefined;
 
-    if (thread.observedAt || activity?.available === false || activityLost(activity, now)) return UNAVAILABLE;
+    if (
+        (thread.observedAt && (!activity?.available || now - Date.parse(activity.readAt) >= ACTIVITY_RETAIN_MS)) ||
+        activity?.available === false ||
+        activityLost(activity, now)
+    )
+        return UNAVAILABLE;
 
     const agents = activity?.agents ?? [];
 
@@ -100,8 +112,10 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
         return { state: 'working', action: 'Queued', ageMs: ageOf(thread.updated, now), agents: 0 };
 
     const newest = [
-        { action: activity.action, actionAt: activity.actionAt ?? thread.updated },
-        ...agents.flatMap(({ action, actionAt }) => (actionAt ? [{ action, actionAt }] : [])),
+        { action: activity.action, actionDetail: activity.actionDetail, actionAt: activity.actionAt ?? thread.updated },
+        ...agents.flatMap(({ action, actionDetail, actionAt }) =>
+            actionAt ? [{ action, actionDetail, actionAt }] : [],
+        ),
     ].reduce((best, next) => (Date.parse(next.actionAt) > Date.parse(best.actionAt) ? next : best));
     const ageMs = ageOf(newest.actionAt, now);
 
@@ -111,7 +125,13 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
     // A thread that has just started may be newer than an agent's last action, and has no words of its own.
     const action = newest.action ?? activity.action ?? agents.find((agent) => agent.action)?.action ?? 'Starting';
 
-    return { state: 'working', action: activityAction(action)!, ageMs, agents: agents.length };
+    return {
+        state: 'working',
+        action: activityAction(action)!,
+        ...(newest.actionDetail && { actionDetail: newest.actionDetail }),
+        ageMs,
+        agents: agents.length,
+    };
 }
 
 /** Statuses whose work may be under way, so a stopped thread or a T3 that can't be read matters to the row. */
@@ -173,9 +193,18 @@ export function itemActivityAgents(
 
     if (!state || state === 'stopped' || !activity?.available) return undefined;
 
-    const { action, actionAt, agents } = activity;
+    const { action, actionDetail, actionAt, agents } = activity;
     const listed = [
-        ...(action ? [{ title: 'Lead thread', action, ...(actionAt ? { actionAt } : {}) }] : []),
+        ...(action
+            ? [
+                  {
+                      title: 'Lead thread',
+                      action,
+                      ...(actionDetail && { actionDetail }),
+                      ...(actionAt ? { actionAt } : {}),
+                  },
+              ]
+            : []),
         ...agents,
     ];
 

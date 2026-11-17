@@ -4,3 +4,4 @@ export { notify } from './Notices';
 export { closeKeepingFocus, refocus, showToast } from './ToastActions';
 export { T3Missing } from './ToolNotices';
 export { Warnings } from './Warnings';
+export { CompletionNotices } from './CompletionNotices';

@@ -1,4 +1,4 @@
-import type { ItemThread } from '@lar-factory/shared';
+import { threadActivityLine, type ItemThread } from '@lar-factory/shared';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test, vi, type TestContext } from 'vite-plus/test';
@@ -65,6 +65,55 @@ const shells = [
 ];
 const atWork: ItemThread = { id: 'build', title: 'Build', state: 'done', hasRunningChildren: true, updated: AT };
 
+for (const toolName of ['AskUserQuestion', 'mcp__t3-code__delegate_task'])
+    test(`a continuation after ${toolName} says Resuming until its next action, while a new owner says Starting`, (t) => {
+        const path = activityDb(t);
+        const writer = new DatabaseSync(path);
+        const owner: ItemThread = { id: 'shape', title: 'Shape', purpose: 'shape', state: 'running', updated: AT };
+        const action = () => {
+            const reads = activityReads(
+                () => new DatabaseSync(path, { readOnly: true }),
+                () => activityFamilies([{ id: 'shape', status: 'running', updatedAt: AT }]),
+            );
+
+            try {
+                return threadActivityLine(reads.read(owner), Date.parse(AT))?.action;
+            } finally {
+                reads.close();
+            }
+        };
+
+        t.onTestFinished(() => writer.close());
+        writer.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('shape-1', 'shape', 1, 'running')");
+        expect(action()).toBe('Starting');
+        writer
+            .prepare('INSERT INTO orchestration_v2_projection_turn_items VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .run(
+                'question-or-child',
+                'shape',
+                'shape-1',
+                1,
+                'dynamic_tool',
+                'completed',
+                JSON.stringify({ toolName, completedAt: AT }),
+            );
+        writer.exec("UPDATE orchestration_v2_projection_runs SET status='completed' WHERE run_id='shape-1'");
+        writer.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('shape-2', 'shape', 2, 'running')");
+        expect(action()).toBe('Resuming');
+        writer
+            .prepare('INSERT INTO orchestration_v2_projection_turn_items VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .run(
+                'next-action',
+                'shape',
+                'shape-2',
+                2,
+                'command_execution',
+                'running',
+                JSON.stringify({ input: 'pnpm test', startedAt: AT }),
+            );
+        expect(action()).toBe('Running tests');
+    });
+
 test('a pass reads the agents under a build, its child tasks and their native subagents, and leaves out finished and stale ones', (t) => {
     const path = activityDb(t);
     const reads = activityReads(
@@ -78,8 +127,8 @@ test('a pass reads the agents under a build, its child tasks and their native su
         readAt: expect.any(String),
         toolRunning: true,
         agents: [
-            { title: 'Slice', model: 'opus', action: 'pnpm test', actionAt: AT },
-            { title: 'explorer', action: 'Read b.ts', actionAt: AT },
+            { title: 'Slice', model: 'opus', action: 'Running tests', actionDetail: 'CI=1 pnpm test', actionAt: AT },
+            { title: 'explorer', action: 'Reading b.ts', actionDetail: 'Read /a/b.ts', actionAt: AT },
         ],
     });
 });
@@ -98,7 +147,12 @@ test('a reused activity connection reads new actions and finished agents on the 
     const pass = () => activityReads(database.open, () => activityFamilies(shells), database.release);
     const first = pass();
 
-    expect(first.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm test' }, { action: 'Read b.ts' }] });
+    expect(first.read(atWork).activity).toMatchObject({
+        agents: [
+            { action: 'Running tests', actionDetail: 'CI=1 pnpm test' },
+            { action: 'Reading b.ts', actionDetail: 'Read /a/b.ts' },
+        ],
+    });
     first.close();
     writer
         .prepare('UPDATE orchestration_v2_projection_turn_items SET payload_json = ? WHERE turn_item_id = ?')
@@ -107,7 +161,9 @@ test('a reused activity connection reads new actions and finished agents on the 
 
     const next = pass();
 
-    expect(next.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm run typecheck' }] });
+    expect(next.read(atWork).activity).toMatchObject({
+        agents: [{ action: 'Checking types', actionDetail: 'pnpm run typecheck' }],
+    });
     next.close();
     // A schema failure is unavailable immediately, then a new connection can recover on the next pass.
     writer.exec('ALTER TABLE orchestration_v2_projection_turn_items RENAME TO hidden_items');
@@ -122,7 +178,7 @@ test('a reused activity connection reads new actions and finished agents on the 
 
     expect(recovered.read(atWork).activity).toMatchObject({
         available: true,
-        agents: [{ action: 'pnpm run typecheck' }],
+        agents: [{ action: 'Checking types', actionDetail: 'pnpm run typecheck' }],
     });
     recovered.close();
 });
@@ -149,4 +205,84 @@ test('a read that fails, or a T3 that cannot be read, says unavailable, and no r
     t.onTestFinished(() => retained.close());
     expect(retained.read({ ...atWork, observedAt: AT }).activity).toEqual({ available: false });
     expect(open).not.toHaveBeenCalled();
+});
+
+test('a transient shell or database failure retains the same run’s last action without renewing it, then expires or recovers', (t) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(AT));
+    t.onTestFinished(() => {
+        vi.useRealTimers();
+    });
+
+    const path = activityDb(t);
+    const open = () => new DatabaseSync(path, { readOnly: true });
+    const first = activityReads(open, () => activityFamilies(shells));
+    const seen = first.read(atWork);
+
+    first.close();
+    expect(seen.activity?.available).toBe(true);
+
+    const failed = () => {
+        throw Error('brief read failure');
+    };
+    const pass = (thread: ItemThread, previous: ItemThread, shell = false) => {
+        const reads = activityReads(failed, () => (shell ? undefined : activityFamilies(shells)), undefined, [
+            previous,
+        ]);
+        const shown = reads.read(shell ? { ...thread, observedAt: AT } : thread);
+
+        reads.close();
+
+        return shown;
+    };
+
+    vi.advanceTimersByTime(4_000);
+
+    const cached = pass(atWork, seen, true);
+
+    expect(cached.observedAt).toBe(AT);
+    expect(cached.activity).toEqual(seen.activity);
+    expect(threadActivityLine(cached, Date.now())?.state).toBe('working');
+    expect(pass(atWork, seen).activity).toEqual(seen.activity);
+    expect(pass({ ...atWork, updated: new Date().toISOString() }, seen).activity).toEqual({ available: false });
+    vi.advanceTimersByTime(11_000);
+    expect(threadActivityLine(cached, Date.now())?.state).toBe('unavailable');
+    expect(pass(atWork, cached).activity).toEqual({ available: false });
+
+    const recovered = activityReads(open, () => activityFamilies(shells), undefined, [cached]);
+
+    expect(recovered.read(atWork).activity).toMatchObject({ available: true, readAt: new Date().toISOString() });
+    recovered.close();
+});
+
+test('activity describes the action and retains its original command or file detail', (t) => {
+    const path = activityDb(t);
+    const writer = new DatabaseSync(path);
+
+    t.onTestFinished(() => writer.close());
+    for (const [type, payload, action, actionDetail] of [
+        [
+            'command_execution',
+            { input: '/bin/zsh -lc "export EXAMPLE=value; CI=1 pnpm test"' },
+            'Running tests',
+            '/bin/zsh -lc "export EXAMPLE=value; CI=1 pnpm test"',
+        ],
+        ['command_execution', { input: 'node scripts/work.mjs' }, 'Running a command', 'node scripts/work.mjs'],
+        ['file_change', { fileName: '/sandbox/src/greeting.js' }, 'Editing greeting.js', '/sandbox/src/greeting.js'],
+    ] as const) {
+        writer
+            .prepare('UPDATE orchestration_v2_projection_turn_items SET type=?, payload_json=? WHERE turn_item_id=?')
+            .run(type, JSON.stringify({ ...payload, startedAt: AT, updatedAt: AT }), 'i1');
+
+        const reads = activityReads(
+            () => new DatabaseSync(path, { readOnly: true }),
+            () => activityFamilies(shells),
+        );
+
+        try {
+            expect(reads.read(atWork).activity).toMatchObject({ agents: [{ action, actionDetail }, {}] });
+        } finally {
+            reads.close();
+        }
+    }
 });

@@ -1,5 +1,5 @@
 import { plural, releaseHolds, type ReleaseEvidence, type ReleasePlan } from '@lar-factory/shared';
-import { CopyButton, Disclosure, Text, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import { CopyButton, Disclosure, Text } from '@lar-works/design-system';
 import { CheckIcon, CircleIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -11,23 +11,15 @@ function RecordedAt({ evidence }: { evidence: ReleaseEvidence }) {
     return <Moment at={evidence.at} />;
 }
 
-/** Keep receipts short; pointer and keyboard users can inspect or copy the exact evidence. */
+/** The checklist says Done or the Outcome result; exact revisions and commands stay in its details. */
 function Evidence({ evidence }: { evidence: ReleaseEvidence }) {
-    const hashes = evidence.evidence.replace(/\b[a-f0-9]{64}\b/gi, (hash) => `${hash.slice(0, 12)}…`);
-    const short = hashes.length > 160 ? `${hashes.slice(0, 160)}…` : hashes;
-
     return (
-        <div className="text-fg-muted flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span tabIndex={0} className="min-w-0 wrap-anywhere">
-                        {short}
-                    </span>
-                </TooltipTrigger>
-                <TooltipPopup>{evidence.evidence}</TooltipPopup>
-            </Tooltip>
+        <Disclosure label="Evidence details" presentation="section">
+            <Text variant="caption" tone="muted" breaks>
+                {evidence.evidence}
+            </Text>
             <CopyButton label="Copy full release evidence" copiedLabel="Evidence copied" value={evidence.evidence} />
-        </div>
+        </Disclosure>
     );
 }
 

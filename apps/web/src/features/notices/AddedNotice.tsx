@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom';
 
 import { SLOT } from './notice-slot';
 import { clearToast } from './ToastActions';
+import { useActionToast } from './useActionToast';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { TitleLink, useActionStore, useItemAction } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -33,7 +34,7 @@ export const ViewButton = ({ item }: { item: Item }) => (
 export function AddedNotice({ item }: { item: Item }) {
     const current = useBoardStore((state) => state.data.items.find((value) => value.id === item.id));
     const action = useItemAction(item.id);
-    const { hold, fail } = useNotificationControls();
+    const { fail } = useNotificationControls();
     // 'added', 'pending', 'success', or the error that stopped it.
     const [result, setResult] = useState<string>('added');
     const mounted = useRef(true);
@@ -47,9 +48,7 @@ export function AddedNotice({ item }: { item: Item }) {
             mounted.current = false;
         };
     }, []);
-    useEffect(() => {
-        hold(result !== 'added' && result !== 'success');
-    }, [hold, result]);
+    useActionToast(result !== 'added' && result !== 'success');
 
     const failed = !['added', 'pending', 'success'].includes(result);
 

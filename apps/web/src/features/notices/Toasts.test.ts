@@ -3,7 +3,20 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, fetchMock, mountPage, moved, sample, settle, text } from '@/test/PageTest';
+import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '@/test/PageTest';
+
+test('an action notice without interaction expires at fifteen seconds', async () => {
+    await mountPage();
+
+    const { notify } = await import('./Notices');
+
+    await settle(() => notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' }));
+    await settle(() => vi.advanceTimersByTime(10_000));
+    await settle(() => vi.advanceTimersByTime(4_999));
+    expect(text(toast())).toContain('View item');
+    await settle(() => vi.advanceTimersByTime(1));
+    expect(toast()).toBeNull();
+});
 
 test('a poll that started before the page’s own write doesn’t bring back older data', async () => {
     await mountPage();

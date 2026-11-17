@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 export interface Toast {
     /** One toast per slot: a new one replaces the last. */
     slot: string;
-    /** A failure is a red alert that stays until it's closed; a success is green and clears itself after 5 s. */
+    /** A failure stays until closed; successful board actions get 15 s, held while hovered or focused. */
     failed?: boolean;
     /** Names the toast for its close button, such as "Moved #61". */
     what: string;

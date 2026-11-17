@@ -125,8 +125,6 @@ export function WorkMap({
                                 <MapLaneName lane="decisions">Prerequisites</MapLaneName>
                             ) : b.lane === DECISIONS ? (
                                 <MapLaneName lane="decisions">{DECISIONS}</MapLaneName>
-                            ) : b.lane === home ? (
-                                <MapLaneName lane="builds">Builds</MapLaneName>
                             ) : (
                                 <MapRepo repo={b.lane} data={data} />
                             )}
@@ -233,7 +231,7 @@ export function WorkMap({
             {showHistory && (
                 <MapHistoryList>
                     {history.map((p) => (
-                        <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} home={home} />
+                        <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} />
                     ))}
                 </MapHistoryList>
             )}

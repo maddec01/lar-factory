@@ -13,7 +13,7 @@ export function useActivityState(item: Item): ThreadActivityState | undefined {
     const { label } = useActivityFeedback(item);
     const state = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
 
-    return label === 'Starting' || label === 'May have started' ? undefined : state;
+    return ['Starting', 'Resuming', 'Publishing Spec…', 'May have started'].includes(label) ? undefined : state;
 }
 
 /** Whether `item`'s row stops animating, which a read going old changes with no new data. */

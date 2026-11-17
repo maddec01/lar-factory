@@ -37,10 +37,8 @@ export function ItemSummary({ item, openPart }: { item: Item; openPart?: ((itemI
     // A plan waiting to reach its tracker is said on the source mark; one that failed to save takes a line of its own.
     const unsaved = !!item.sync && item.sync.state !== 'saved';
     const syncFailed = item.sync?.state === 'error' || item.sync?.state === 'conflict';
-    // The List is a place, so its status says the item is on it; a parts count is Progress's, so Status says the stage
-    // it stands at.
-    const word =
-        shown.word === 'List' ? 'On the List' : /^\d+\/\d+ parts done$/.test(shown.word) ? item.status : shown.word;
+    // Keep the presenter's live delivery progress: a group's stored stage may still be Shaping.
+    const word = shown.word === 'List' ? 'On the List' : shown.word;
 
     return (
         <Summary

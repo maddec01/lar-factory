@@ -133,8 +133,8 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                     errors={errors}
                 />
             </SettingsGroup>
-            <EditVocabulary key={repo} setup={setup} />
-            <LabelsSection key={repo} repo={repo} setup={setup} />
+            <EditVocabulary key={`vocabulary-${repo}`} setup={setup} />
+            <LabelsSection key={`labels-${repo}`} repo={repo} setup={setup} />
             <SettingsGroup title="Docs and skills">
                 <FieldRow
                     id="domainDocs"

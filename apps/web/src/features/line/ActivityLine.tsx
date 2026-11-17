@@ -5,7 +5,7 @@
 
 import type { Item, ThreadAgent } from '@lar-factory/shared';
 import { itemActivityAgents, itemActivityLine, plural, shortAge, modelDisplayName } from '@lar-factory/shared';
-import { Alert } from '@lar-works/design-system';
+import { Alert, Disclosure, Text } from '@lar-works/design-system';
 
 import { useShownStatus } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -15,6 +15,8 @@ import {
     AgentAge,
     AgentList as DesignAgentList,
     AgentRow,
+    DetailFact,
+    FactList,
     WorkingAgents,
 } from '@/ui/board';
 
@@ -29,14 +31,14 @@ function AgentList({ agents, details = false }: { agents: ThreadAgent[]; details
 
     return (
         <DesignAgentList>
-            {agents.map(({ title, model, action, actionAt }, index) => (
+            {agents.map(({ title, model, action, actionDetail, actionAt }, index) => (
                 <AgentRow
                     key={index}
                     // One agent leads with what it does: its thread's name says nothing a reader needs.
-                    title={agents.length === 1 && action ? action : title}
+                    title={agents.length === 1 && action ? action : [title, action].filter(Boolean).join(' · ')}
                     model={details && model ? modelDisplayName(groups, model) : undefined}
                     age={details && actionAt ? <LiveAge at={actionAt} /> : undefined}
-                    action={agents.length === 1 ? undefined : action}
+                    action={details ? undefined : actionDetail}
                     state={action === 'Waiting for your answer' ? 'waiting' : 'working'}
                 />
             ))}
@@ -67,7 +69,22 @@ export function ItemAgents({ item }: { item: Item }) {
                     message="The board couldn’t read the latest thread activity from T3. Check that T3 is connected, or open the thread there. The board tries again automatically."
                 />
             ) : (
-                <AgentList agents={agents} details />
+                <>
+                    <AgentList agents={agents} details />
+                    {agents.some((agent) => agent.actionDetail) && (
+                        <Disclosure label="Activity details" presentation="section">
+                            <FactList>
+                                {agents.map((agent, index) =>
+                                    agent.actionDetail ? (
+                                        <DetailFact key={index} label={agent.title} presentation="record">
+                                            <Text breaks>{agent.actionDetail}</Text>
+                                        </DetailFact>
+                                    ) : null,
+                                )}
+                            </FactList>
+                        </Disclosure>
+                    )}
+                </>
             )}
         </WorkingAgents>
     );

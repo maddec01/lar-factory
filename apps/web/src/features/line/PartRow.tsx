@@ -2,7 +2,7 @@
 // what holds it or what its thread does, its checks or slices, its cost or state, and what it asks next.
 
 import type { BoardData } from '@lar-factory/shared';
-import { needsAnswer } from '@lar-factory/shared';
+import { humanWait } from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { ActivityLine } from './ActivityLine';
@@ -27,6 +27,7 @@ import {
     StartAfterError,
     StartMessage,
     useShownStatus,
+    useActivityUnavailable,
 } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
@@ -70,6 +71,7 @@ export function PartRow({
     const isPicked = usePicked(item);
     const disconnected = useBoardStore((state) => !!state.clientError);
     const shown = useShownStatus(item);
+    const unavailable = useActivityUnavailable();
     const activity = useActivityState(item);
     const still = useActivityStill(item);
     const [unfolded, setUnfolded] = useState(false);
@@ -78,11 +80,11 @@ export function PartRow({
     // A part whose word already counts its parts shows that one count, not its slices too.
     const partsCounted = word.endsWith(' parts done');
     // A part that waits on you says so in amber, as its desk card does.
-    const asksYou = !done && (needsAnswer(item) || item.status === 'Needs you');
+    const asksYou = !done && !!humanWait(item, unavailable, data.items);
     // What holds a part reads where its activity would, as a lane row's blocker does: "Blocked by #139".
     const held = !done && openWaits(part).length > 0;
     const state = partState(item, data, word);
-    const showsActivity = !held && activity && !['unavailable', 'stopped', 'waiting'].includes(activity);
+    const showsActivity = !asksYou && !held && activity && !['unavailable', 'stopped', 'waiting'].includes(activity);
     const figures = figuresOf(item, data);
     const checks = prChecks(item, data, disconnected);
     const slices = item.slices.length;
@@ -106,6 +108,7 @@ export function PartRow({
                     ) : asksYou ? (
                         <RowState title={word}>
                             <WaitWord>{word}</WaitWord>
+                            {activity === 'working' && <ActivityLine item={item} />}
                         </RowState>
                     ) : held ? (
                         <RowBlocked>{state}</RowBlocked>

@@ -118,7 +118,9 @@ export function StartControl({
     const verb = pending
         ? afterSlot
             ? 'Arming…'
-            : 'Starting…'
+            : resume
+              ? 'Resuming…'
+              : 'Starting…'
         : error || retry
           ? 'Retry start'
           : stopped && !resume

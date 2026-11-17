@@ -244,3 +244,26 @@ test('a changed brief labels the ticket Spec outdated and retains the last appro
     assert.match(body, /Approved D1/);
     assert.doesNotMatch(body, /Proposed D2/);
 });
+
+test('a newly created ticket shows its submitted description before the tracker list has read it', async () => {
+    const { records } = await recordsOn();
+    const work = records.create({
+        title: 'Greeting',
+        context: 'Greet visitors by name.',
+        repository: WEB,
+        kind: 'feature',
+        ticket: `${WEB}#99`,
+    });
+
+    try {
+        const details = await createItemDetails(null, () => undefined, { records }).details({
+            ...boardItem(work.workId),
+            number: 99,
+        });
+
+        assert.ok(!('error' in details));
+        assert.equal(details.body, 'Greet visitors by name.');
+    } finally {
+        records.close();
+    }
+});

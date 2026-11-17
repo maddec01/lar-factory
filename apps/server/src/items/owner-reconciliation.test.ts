@@ -1,3 +1,4 @@
+import { deskWait, placementOf } from '@lar-factory/shared';
 import { openWorkRecords } from '@lar-factory/work-records';
 import { roleFinish } from '@lar-factory/work-records/run-settings';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -5,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { reconcileOwnerActivity } from './owner-reconciliation.ts';
+import { executionItemThreads } from '../t3/item-execution.ts';
+import { reconcileOwnerActivity, reconcileOwnerQuestion } from './owner-reconciliation.ts';
 import { recordItems } from './record-items.ts';
 
 test('S05 F3: terminal approver 55.779, continuation 56.264, reconciliation 56.343; owner saves first', async () => {
@@ -136,4 +138,67 @@ test('S05 F3: terminal approver 55.779, continuation 56.264, reconciliation 56.3
         records.close();
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+test('the request-free owner and its resolved notice are published together, including an idle owner', async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'question-truth-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    t.onTestFinished(() => {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    const { workId } = records.create({
+        title: 'Greeting',
+        repository: 'fake/app',
+        kind: 'feature',
+        status: 'Shaping',
+    });
+
+    records.addThread(workId, records.read(workId).revision, 'owner', 'shape');
+    records.waitForUser(workId, records.read(workId).revision, 'Gold or amber?');
+
+    // Round 2: the legacy instructions wrote Needs you, the 2 s local poll saw it, then T3 opened its request.
+    const observe = (pendingRuntimeRequest: unknown) => {
+        const item = recordItems(records, [], ['fake/app'])[0]!;
+
+        item.threads = executionItemThreads([
+            {
+                id: 'owner',
+                title: 'Shape',
+                status: 'running',
+                updatedAt: new Date().toISOString(),
+                pendingRuntimeRequest,
+            },
+        ])(['owner'])!.map((thread) => ({ ...thread, purpose: 'shape' }));
+
+        return reconcileOwnerQuestion(records, item);
+    };
+
+    observe(null);
+
+    const question = observe({ id: 'question', kind: 'user-input' });
+
+    expect(deskWait(question).label).toBe('Question');
+    expect(placementOf(question, { unavailable: false, all: [question] }).sections).toContain('desk');
+
+    const item = recordItems(records, [], ['fake/app'])[0]!;
+
+    item.threads = [
+        { id: 'owner', title: 'Shape', purpose: 'shape', state: 'done', updated: new Date().toISOString() },
+    ];
+
+    const cached = {
+        ...item,
+        threads: item.threads.map((thread) => ({ ...thread, observedAt: new Date().toISOString() })),
+    };
+
+    expect(reconcileOwnerQuestion(records, cached).needsYou).toBeDefined();
+
+    const resolved = reconcileOwnerQuestion(records, item);
+
+    expect(resolved.status).toBe('Shaping');
+    expect(resolved.needsYou).toBeUndefined();
+    expect(placementOf(resolved, { unavailable: false, all: [resolved] }).sections).not.toContain('desk');
 });

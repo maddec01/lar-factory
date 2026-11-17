@@ -268,3 +268,134 @@ test('an idle unfinished build with an open PR shows as waiting on its PR, in it
     await press(opener('I_sample13'));
     expect(text(dialog())).toContain('Waiting on its PR');
 });
+
+test('a brief gate leads the shaping row while its owner finishes a command', async () => {
+    const now = '2026-10-21T10:00:00.000Z';
+    const data = fresh(
+        withItem('I_sample13', {
+            parentId: null,
+            parent: null,
+            flow: 'single',
+            status: 'Shaping',
+            slices: [],
+            blockers: [],
+            linkedPrs: [],
+            briefApproval: { reason: 'Review the brief.', digest: 'brief' },
+            passingBrief: false,
+            threads: [
+                {
+                    ...thread('shape', 'running'),
+                    purpose: 'shape',
+                    currentRunning: true,
+                    updated: now,
+                    activity: {
+                        available: true,
+                        readAt: now,
+                        action: 'Running a command',
+                        actionAt: now,
+                        toolRunning: true,
+                        agents: [],
+                    },
+                },
+            ],
+        }),
+    );
+
+    await mountPage(data);
+    expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('Approve brief');
+    expect(text(meta('I_sample13'))).toMatch(/^Approve brief/);
+    expect(text(meta('I_sample13'))).toContain('Running a command');
+});
+
+test('a PR row and its desk review wait change together when the owner hands back', async () => {
+    const pr = sample.items
+        .find((i) => i.id === 'I_sample14')!
+        .linkedPrs.map((pr) => ({
+            ...pr,
+            state: 'open' as const,
+            checks: null,
+            mergeState: 'checking' as const,
+            pipelineUnread: true as const,
+        }));
+    const at = (running: boolean) =>
+        fresh(
+            withItem('I_sample13', {
+                parentId: null,
+                parent: null,
+                flow: 'single',
+                status: 'Ready to merge',
+                slices: [],
+                blockers: [],
+                linkedPrs: pr,
+                threads: [
+                    {
+                        ...thread('build', running ? 'running' : 'done'),
+                        purpose: 'build',
+                        ...(running && { currentRunning: true }),
+                    },
+                ],
+            }),
+        );
+
+    await mountPage(at(true));
+    expect($('.desk-row[data-item="I_sample13"]')).toBeNull();
+    expect(text(meta('I_sample13'))).not.toContain('Review PR');
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() => useBoardStore.getState().receive(at(false)));
+    expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('Review PR');
+    expect(text(meta('I_sample13'))).toContain('Review PR');
+});
+
+test('an approved shaping owner keeps Publishing Spec until Build is available, including its resumed run', async () => {
+    const now = '2026-10-21T10:00:00.000Z';
+    const item = {
+        ...sample.items.find((item) => item.id === 'I_sample13')!,
+        parentId: null,
+        parent: null,
+        flow: 'single' as const,
+        status: 'Shaping' as const,
+        passingBrief: true,
+        briefApproval: undefined,
+        briefReviewing: undefined,
+        needsYou: undefined,
+        blockers: [],
+        buildStarted: undefined,
+        slices: [],
+        threads: [
+            {
+                id: 'shape',
+                title: 'Shape',
+                purpose: 'shape',
+                state: 'running' as const,
+                updated: now,
+                currentRunning: true as const,
+                activity: { available: true as const, readAt: now, agents: [], toolRunning: false },
+            },
+        ],
+    } satisfies Item;
+    const board = fresh({ ...sample, items: [item], startProgress: { [item.id]: { shape: { phase: 'starting' } } } });
+
+    await mountPage(board);
+    expect(text(meta(item.id))).toContain('Publishing Spec…');
+    expect(text(meta(item.id))).not.toMatch(/Starting|Working/);
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() =>
+        useBoardStore.getState().receive({
+            ...board,
+            startProgress: {},
+            items: [
+                {
+                    ...item,
+                    status: 'Ready',
+                    threads: [{ ...item.threads[0]!, state: 'done', currentRunning: undefined, activity: undefined }],
+                },
+            ],
+        }),
+    );
+    expect(text(row(item.id))).not.toContain('Publishing Spec');
+    expect(text(startBuild(item.id))).toBe('Build');
+});

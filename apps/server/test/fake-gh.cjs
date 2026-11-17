@@ -344,6 +344,12 @@ const main = async () => {
         return void process.stdout.write(`${options.prs?.[args[2]] ?? 'OPEN'}\n`);
 
     if (args[1] === 'graphql') {
+        if (options.readHold) {
+            fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["read-held"]\n');
+
+            while (!fs.existsSync(options.readHold)) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+
         if (options.fail === 'read') {
             process.stderr.write('HTTP 502: Bad Gateway');
             process.exitCode = 1;

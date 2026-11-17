@@ -3,7 +3,8 @@
 // The details are read when the dialog opens on an item, once per open. The next open reuses the details cached for the
 // item's updatedAt, else reads again. A reply for a dialog that has since closed or moved to another item is ignored.
 // `refresh` reads them again while the dialog stays open, showing the new ones without a loading state; a failed read
-// keeps the ones on show. Refreshes never overlap: one asked for while another reads starts once that one ends, and any
+// keeps the ones on show. Merge and completion observations refresh an open dialog after any active description edit.
+// Refreshes never overlap: one asked for while another reads starts once that one ends, and any
 // more asked for meanwhile share it, so each caller still gets a read that began after it asked.
 //
 // The older comments come one page of 10 per call, from the cursor the details gave and then the one each page gave.

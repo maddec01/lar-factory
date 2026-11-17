@@ -21,6 +21,9 @@ import {
     workingAgain,
     currentBuildThread,
     delegatedWorkRunning,
+    isLiveThread,
+    openQuestionThread,
+    stoppedRunThread,
 } from './domain.ts';
 import { type OperationAccess } from './model-settings.ts';
 
@@ -279,6 +282,21 @@ export function buildAccessProblem(
         : null;
 }
 
+/** An approved brief is still being published before its build can start. */
+export const publishingSpec = (item: Item): boolean =>
+    ['Shaping', 'Ready'].includes(item.status) &&
+    !!item.passingBrief &&
+    !item.needsYou &&
+    !item.briefApproval &&
+    !openQuestionThread(item) &&
+    !stoppedRunThread(item) &&
+    !item.buildStarted &&
+    (item.status === 'Shaping' ||
+        !!item.specSync?.pending ||
+        (Array.isArray(item.threads) && item.threads.some(isLiveThread))) &&
+    !item.specSync?.error &&
+    !item.specSync?.warning;
+
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
     if (item.briefReviewing) {
         const running =
@@ -296,9 +314,20 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
         };
     }
 
-    if (start?.phase === 'starting') return { label: 'Starting', running: false };
-
     if (start?.phase === 'may-have-started') return { label: 'May have started', running: false };
+
+    if (publishingSpec(item)) return { label: 'Publishing Spec…', running: false };
+
+    if (start?.phase === 'starting')
+        return {
+            label:
+                item.status === 'Shaping' &&
+                Array.isArray(item.threads) &&
+                item.threads.some((thread) => thread.purpose === 'shape')
+                    ? 'Resuming'
+                    : 'Starting',
+            running: false,
+        };
 
     if (workingAgain(item, stale)) return { label: 'Working', running: true };
 
@@ -343,7 +372,7 @@ const BUILD_PHASE_WORDS: Record<string, string> = {
     checks: 'Checks',
     'full-checks': 'Checks',
     'domain-docs': 'Updating docs',
-    approve: 'Awaiting approval',
+    approve: 'Final check',
     retro: 'Retro',
 };
 

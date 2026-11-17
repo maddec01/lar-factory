@@ -65,6 +65,19 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
         if (changed && (item.buildPhase === 'review' || item.staleGate || gateChanged) && !edit.editing) void refresh();
     }, [item.revision, item.buildPhase, item.staleGate, gateState, edit.editing, refresh]);
 
+    const terminal = JSON.stringify([
+        item.status === 'Done',
+        item.linkedPrs.filter((pr) => pr.state === 'merged').map((pr) => pr.url),
+    ]);
+    const seenTerminal = useRef(terminal);
+
+    useEffect(() => {
+        if (edit.editing || terminal === seenTerminal.current) return;
+
+        seenTerminal.current = terminal;
+        void refresh();
+    }, [terminal, edit.editing, refresh]);
+
     const [expanded, toggleExpanded] = useExpand();
 
     return (

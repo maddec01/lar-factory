@@ -1,6 +1,13 @@
 // Thread activity: what a thread and its agents are doing now, from T3's turn items and subagent records.
 
-import { isLiveThread, type Item, type ItemThread, type ThreadActivity, type ThreadAgent } from '@lar-factory/shared';
+import {
+    ACTIVITY_RETAIN_MS,
+    isLiveThread,
+    type Item,
+    type ItemThread,
+    type ThreadActivity,
+    type ThreadAgent,
+} from '@lar-factory/shared';
 import type { DatabaseSync } from 'node:sqlite';
 
 import { activityItems, unfinishedAgents, type ActivityAgentRow, type ActivityItemRow } from './t3-db.ts';
@@ -18,14 +25,13 @@ export interface ActivityFamily {
 const UNFINISHED = new Set(['pending', 'running', 'waiting']);
 /** Tools that block on a child thread. Waiting on an agent isn't a tool at work. */
 const WAITS_ON_AGENT = /(^|[._])(delegate_task|t3_thread_wait)$/;
-const MAX_ACTION = 120;
 
 const lastSegment = (path: string): string => path.replace(/\/+$/, '').split('/').pop() || path;
 
 const ASSIGNMENT = /^[A-Za-z_]\w*=(?:'[^']*'|"(?:[^"\\]|\\.)*"|[^\s;&'"])*/;
 const SEPARATOR = /^\s*(?:;|&&|\n)\s*/;
 
-/** The command with its shell wrapper, as Codex runs commands, and its leading `export`s and environment assignments gone. */
+/** A stable category after removing the shell wrapper and leading environment setup. */
 function commandAction(input: string): string {
     const wrapped = /^\S*\b(?:ba|z|da)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/.exec(input.trim());
     const command = wrapped ? (wrapped[1] === '"' ? wrapped[2]!.replace(/\\(["\\$`])/g, '$1') : wrapped[2]!) : input;
@@ -56,7 +62,33 @@ function commandAction(input: string): string {
 
     const line = (rest || command).trim().split('\n')[0]!;
 
-    return line.length > MAX_ACTION ? `${line.slice(0, MAX_ACTION - 1)}…` : line;
+    if (/^(?:rg|grep|find)\b/.test(line)) return 'Searching files';
+
+    if (/^(?:cat|sed|head|tail|ls)\b/.test(line)) return 'Reading files';
+
+    if (/^git\s+(?:status|diff|log|show)\b/.test(line)) return 'Checking changes';
+
+    if (/^git\s+push\b/.test(line)) return 'Pushing changes';
+
+    if (/^git\s+commit\b/.test(line)) return 'Committing changes';
+
+    if (/^gh\s+pr\s+create\b/.test(line)) return 'Opening PR';
+
+    if (
+        /^(?:pnpm|npm|yarn|bun|npx|nx|pytest|vitest|jest|playwright|cypress|tsc|eslint|shellcheck|knip|xcodebuild|\.\/gradlew)\b/.test(
+            line,
+        )
+    ) {
+        if (/\b(?:test(?::[\w-]+)?|pytest|vitest|jest|playwright|cypress)\b/.test(line)) return 'Running tests';
+
+        if (/\b(?:typecheck|tsc)\b/.test(line)) return 'Checking types';
+
+        if (/\b(?:lint|eslint|shellcheck|knip|check)\b/.test(line)) return 'Checking code';
+
+        if (/\b(?:build|assemble|bundle)\b/.test(line)) return 'Building';
+    }
+
+    return 'Running a command';
 }
 
 /** A tool's title with any path shortened to its file name, or its name without the server it came from. */
@@ -66,7 +98,12 @@ function toolAction({ title, toolName }: ActivityItemRow): string | undefined {
     if (title) {
         const path = /^(\w+) ((?:[~/]|\S+\/).*)$/.exec(title);
 
-        return path ? `${path[1]} ${lastSegment(path[2]!)}` : title;
+        const words = path ? `${path[1]} ${lastSegment(path[2]!)}` : title;
+
+        return words.replace(
+            /^(Read|Edit|Write|Search)\b/,
+            (verb) => ({ Read: 'Reading', Edit: 'Editing', Write: 'Writing', Search: 'Searching' })[verb]!,
+        );
     }
 
     return toolName ? 'Using a tool' : undefined;
@@ -76,13 +113,13 @@ function toolAction({ title, toolName }: ActivityItemRow): string | undefined {
 function actionOf(item: ActivityItemRow): string | undefined {
     switch (item.type) {
         case 'command_execution':
-            return item.input ? commandAction(item.input) : (item.title ?? undefined);
+            return item.input ? commandAction(item.input) : 'Running a command';
         case 'dynamic_tool':
             return toolAction(item);
         case 'file_change':
-            return item.fileName ? `Edit ${lastSegment(item.fileName)}` : (item.title ?? undefined);
+            return item.fileName ? `Editing ${lastSegment(item.fileName)}` : 'Editing files';
         case 'web_search':
-            return item.title ?? 'Search the web';
+            return 'Searching the web';
         case 'reasoning':
             return item.streaming ? 'Thinking' : undefined;
         case 'assistant_message':
@@ -105,13 +142,20 @@ const underWay = (item: ActivityItemRow): boolean =>
  * Only live runs name an action, so a new run with no items cannot show its previous run's tool.
  * Native subagent items have no run and use their agent's liveness. Finished text moves the time on.
  */
-function actionFrom(items: ActivityItemRow[]): { action?: string; actionAt?: string; toolRunning: boolean } {
+function actionFrom(items: ActivityItemRow[]): {
+    action?: string;
+    actionDetail?: string;
+    actionAt?: string;
+    toolRunning: boolean;
+} {
     const shown = items.filter((item) => item.runLive !== 0);
     const newestFirst = shown.filter((item) => timeOf(item)).sort((a, b) => timeOf(b)!.localeCompare(timeOf(a)!));
-    const action = newestFirst.map((item) => actionOf(underWay(item) ? item : { ...item, streaming: 0 })).find(Boolean);
+    const latest = newestFirst.find((item) => actionOf(underWay(item) ? item : { ...item, streaming: 0 }));
+    const action = latest && actionOf(underWay(latest) ? latest : { ...latest, streaming: 0 });
+    const actionDetail = latest?.input ?? latest?.title ?? latest?.fileName ?? latest?.toolName;
 
     return {
-        ...(action ? { action } : {}),
+        ...(action ? { action, ...(actionDetail && actionDetail !== action ? { actionDetail } : {}) } : {}),
         ...(newestFirst[0] ? { actionAt: timeOf(newestFirst[0]) } : {}),
         toolRunning: shown.some((item) => isTool(item) && underWay(item) && !WAITS_ON_AGENT.test(item.toolName ?? '')),
     };
@@ -141,19 +185,28 @@ function threadActivity({ items, runLive, agents, commandRunning, readAt }: Acti
     const { toolRunning, ...own } = actionFrom(runLive ? items : []);
     let anyTool = toolRunning || commandRunning;
     const working = agents.map(({ row, items: agentItems }): ThreadAgent => {
-        const { toolRunning: agentTool, action, actionAt } = actionFrom(agentItems);
+        const { toolRunning: agentTool, action, actionDetail, actionAt } = actionFrom(agentItems);
 
         anyTool ||= agentTool;
 
         return {
             title: agentTitle(row.title),
             ...(row.model ? { model: row.model } : {}),
-            ...(action ? { action } : {}),
+            ...(action ? { action, ...(actionDetail && actionDetail !== action ? { actionDetail } : {}) } : {}),
             ...((actionAt ?? row.startedAt) ? { actionAt: (actionAt ?? row.startedAt)! } : {}),
         };
     });
 
-    return { available: true, readAt, ...own, toolRunning: anyTool, agents: working };
+    // Answering a request or finishing a child can start another run without going through the board's Start
+    // command. Earlier turn items still establish that this owner is continuing, even before its next action.
+    return {
+        available: true,
+        readAt,
+        ...(runLive && items.length && !own.action ? { action: 'Resuming' } : {}),
+        ...own,
+        toolRunning: anyTool,
+        agents: working,
+    };
 }
 
 const UNAVAILABLE: ThreadActivity = { available: false };
@@ -182,13 +235,33 @@ export const holdsActivityRead = (items: Item[]): boolean =>
 
 /**
  * One refresh pass's activity reads, sharing one open database, opened once a thread at work needs it, and one read per
- * thread, whether it is at work itself or another's agent. A failed read or a T3 that can't be read gives an unavailable value, never a retained action.
+ * thread, whether it is at work itself or another's agent. A failed read can retain a recent action from the same run,
+ * with its original read time; cached shell observations stay marked as such for every execution decision.
  */
 export function activityReads(
     open: () => DatabaseSync,
     families: () => ((threadId: string) => ActivityFamily) | undefined,
     release: (db: DatabaseSync | undefined, failed: boolean) => void = (db) => db?.close(),
+    previous: readonly ItemThread[] = [],
 ) {
+    const last = new Map(previous.map((thread) => [thread.id, thread]));
+    const withActivity = (thread: ItemThread, activity: ThreadActivity): ItemThread => {
+        const seen = last.get(thread.id);
+        const retained = seen?.activity;
+
+        return {
+            ...thread,
+            activity:
+                !activity.available &&
+                seen &&
+                retained?.available &&
+                seen.state === thread.state &&
+                seen.updated === thread.updated &&
+                Date.now() - Date.parse(retained.readAt) < ACTIVITY_RETAIN_MS
+                    ? retained
+                    : activity,
+        };
+    };
     let db: DatabaseSync | undefined;
     let failed = false;
     let familyOf: ReturnType<typeof families> | null = null;
@@ -248,7 +321,7 @@ export function activityReads(
                 return finished;
             }
 
-            if (thread.observedAt) return { ...thread, activity: UNAVAILABLE };
+            if (thread.observedAt) return withActivity(thread, UNAVAILABLE);
 
             let activity = read.get(thread.id);
 
@@ -263,7 +336,7 @@ export function activityReads(
                 read.set(thread.id, activity);
             }
 
-            return { ...thread, activity };
+            return withActivity(thread, activity);
         },
         close() {
             release(db, failed);

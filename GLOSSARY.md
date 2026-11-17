@@ -140,6 +140,10 @@ _Avoid_: auto-start.
 How the agent works inside a build's steps: TDD (test first) or Prove it (build, then prove by reproduction, driving the feature and the repo's checks). Each project sets one, and a run keeps the method it started with.
 _Avoid_: testing mode, build style.
 
+**Retro**:
+The build's look back at its own work, run at handback, which proposes follow-up items for you to choose on the board. A factory-wide switch, on by default, turns it off, and a run keeps the choice it started with.
+_Avoid_: retrospective, post-merge retro.
+
 **Model choice**:
 The provider instance and model the board starts a thread on, or Project default in T3. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.

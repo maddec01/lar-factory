@@ -16,24 +16,14 @@ export function buildReservations(records: WorkRecords): string[] {
                 (!attempted.has(row.workId) && !!row.buildPhase) ||
                 records.threads(row.workId).some((thread) => thread.purpose === 'build');
 
-            if (!started) return false;
-
-            const terminalPr =
-                !!row.pullRequest &&
-                records
-                    .observations(row.workId)
-                    .some(
-                        (observation) =>
-                            observation.of === 'pr' && ['closed', 'merged'].includes(observation.state ?? ''),
-                    );
-
             return reservesBuildSlot({
                 kind: row.kind,
                 status: row.status,
-                complete: !!row.finishedAt || terminalPr || records.completion(row.workId).complete,
+                complete: !!row.finishedAt || records.completion(row.workId).complete,
                 retired: row.setAside,
                 coordinating: false,
                 deliveryStarted: started,
+                pullRequest: !!row.pullRequest,
             });
         })
         .map((row) => row.workId);

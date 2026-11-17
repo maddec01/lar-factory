@@ -181,7 +181,13 @@ test('one Start makes parallel-capable progress at capacity one; only a provider
 
     const aPr = await s.handBack(s.a, 1);
 
-    expect(s.launches.map((row) => row.id)).toEqual([s.a]);
+    // A waiting on its open PR frees the one slot for the independent build.
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+
+    const bPr = await s.handBack(s.b, 2);
+
+    // Both PRs are open and the slot is free, so only A's merge holds its dependent.
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
     expect(s.records.read(s.next).status).toBe('Ready');
     s.records.attachTicket(s.a, s.rev(s.a), 'example/a#91');
     s.records.observe(s.a, s.rev(s.a), { of: 'ticket', state: 'closed' });
@@ -198,11 +204,7 @@ test('one Start makes parallel-capable progress at capacity one; only a provider
     s.states.set(aPr, 'merged');
     await s.poll();
     expect(s.records.read(s.a).finishedAt).toBeTruthy();
-    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
-
-    const bPr = await s.handBack(s.b, 2);
-
-    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b]);
+    expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);
     s.states.set(bPr, 'merged');
     await s.poll();
     expect(s.launches.map((row) => row.id)).toEqual([s.a, s.b, s.next]);

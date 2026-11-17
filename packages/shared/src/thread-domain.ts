@@ -230,7 +230,7 @@ export function workingAgain(item: Item, unavailable = false): boolean {
 
 /**
  * The builds that count against the build limit, in every repository: a build whose start is in flight or may have
- * started, and every factory-started delivery through Pedro waits until completion or set-aside.
+ * started, and every factory-started delivery through Pedro waits until its PR opens, completion or set-aside.
  * A concept never counts.
  */
 export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, _unavailable = false): Item[] {
@@ -252,12 +252,11 @@ export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, _
         return reservesBuildSlot({
             kind: item.kind,
             status: item.status,
-            complete:
-                (item.completion?.complete ?? item.status === 'Done') ||
-                ['closed', 'merged'].includes(item.linkedPrs?.[0]?.state ?? ''),
+            complete: item.completion?.complete ?? item.status === 'Done',
             retired: !!item.setAside || !!item.archived,
             coordinating: parentOnly && !pending,
             deliveryStarted: deliveryStarted || pending,
+            pullRequest: !!item.linkedPrs?.length,
         });
     });
 }

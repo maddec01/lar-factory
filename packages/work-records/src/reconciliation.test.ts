@@ -1,3 +1,4 @@
+import { reconcileWaitItems } from '@lar-factory/shared/group-reconciliation';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -183,3 +184,186 @@ test('superseded endpoint, sibling contract removal and scope changes reopen Dou
     ).toContain('/reconnect');
     expect(records.gate(consumer.workId).current).toBe(false);
 }, 20000);
+
+/** A linked group of two builds with PRs and a Pedro release step, reconciled clean. */
+async function linked(release: 'step' | 'ships-with' | 'none' = 'none') {
+    const dir = mkdtempSync(join(tmpdir(), 'reconcile-merge-'));
+    const records = await openWorkRecords(join(dir, 'records.db'));
+
+    opened.push({ records, dir });
+
+    const group = records.create({
+        title: 'Group',
+        repository: 'fake/app',
+        kind: 'feature',
+        status: 'In progress',
+    }).workId;
+    const at = (id = group) => records.read(id).revision;
+
+    records.addThread(group, at(), 'group-owner', 'shape');
+
+    const part = (n: number) => {
+        const id = records.createPart({
+            parentId: group,
+            parentRevision: at(),
+            title: `Part ${n}`,
+            repository: 'fake/app',
+            kind: 'build',
+            body: `## What\nPart ${n}.\nBlocked by: none`,
+            blockerIds: [],
+        }).workId;
+
+        records.setPullRequest(id, at(id), `fake/app#${n}`);
+
+        return id;
+    };
+    const [first, second] = [part(1), part(2)] as [string, string];
+
+    if (release !== 'none')
+        records.setReleasePlan(group, at(), {
+            steps:
+                release === 'step'
+                    ? [{ id: 'activate', who: 'Pedro', what: 'Activate' }]
+                    : [{ id: 'ship', who: 'Agent', what: 'Ship together', shipsWith: [first, second] }],
+            outcomeCheck: 'Check the merged parts together.',
+        });
+
+    const settle = () => {
+        for (const id of [first, second]) {
+            const pkg = records.doubtPackage(id);
+
+            if (!records.currentDoubt(id))
+                records.recordDoubt(
+                    id,
+                    pkg.packageDigest,
+                    'Doubt',
+                    'Briefs agree.',
+                    pkg.overlaps.map((o) => ({ otherWorkId: o.otherWorkId, reason: 'Independent parts.' })),
+                );
+        }
+
+        let report = records.reconcile(group);
+
+        for (const item of report.items.filter((i) => !i.requiresFix))
+            report = records.resolveReconcile(group, item.key, item.digest, 'Checked.');
+
+        return report;
+    };
+
+    expect(settle().items.map((i) => i.summary)).toEqual([]);
+
+    const merge = (id: string) => records.observe(id, at(id), { of: 'pr', state: 'merged' });
+    const waits = () => reconcileWaitItems(records.reconciliation(group));
+
+    return { records, group, first, second, at, merge, waits, settle };
+}
+
+test('after a part merges, the board pass resolves lifecycle-only items, including a sibling at Verify', async () => {
+    const { records, group, first, second, at, merge, waits } = await linked();
+
+    records.update(second, at(second), { status: 'Verify' });
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+    merge(first);
+
+    const report = records.reconcileAfterMerge(group)!;
+
+    expect(report.items.filter((i) => i.key.startsWith('map:'))).toEqual([]);
+    expect(report.completed).toContainEqual(
+        expect.objectContaining({ key: `map:${first}`, evidence: expect.stringContaining('fake/app#1') }),
+    );
+    expect(waits()).toEqual([]);
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+});
+
+test('an item whose brief also changed stays open after the pass and waits', async () => {
+    const { records, group, first, second, at, merge, waits } = await linked();
+
+    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+    merge(first);
+    records.reconcileAfterMerge(group);
+
+    expect(waits()).toContainEqual(expect.objectContaining({ key: `map:${second}`, changes: ['brief'] }));
+    expect(waits().map((i) => i.key)).not.toContain(`map:${first}`);
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+});
+
+test('the last merge with a pending release step leaves only the release flow waiting', async () => {
+    for (const release of ['step', 'ships-with'] as const) {
+        const { records, group, first, second, merge, waits } = await linked(release);
+
+        merge(first);
+        merge(second);
+        records.reconcileAfterMerge(group);
+
+        expect(waits()).toEqual([]);
+
+        if (release === 'ships-with')
+            expect(records.reconciliation(group).pending).toContainEqual(
+                expect.objectContaining({ key: 'release-evidence:ship' }),
+            );
+    }
+});
+
+test('recording release evidence or the Outcome check after the last merge leaves no wait', async () => {
+    const { records, group, first, second, at, merge, waits, settle } = await linked('step');
+
+    merge(first);
+    merge(second);
+    records.reconcileAfterMerge(group);
+    records.completeReleaseStep(group, at(), 'activate', 'Pedro', 'Activated.');
+    records.reconcile(group);
+    expect(records.reconciliation(group).pending).toContainEqual(
+        expect.objectContaining({ key: 'release:activate', changes: ['evidence'] }),
+    );
+    expect(waits()).toEqual([]);
+
+    const run = records.prepareOutcomeCheck(group).run!;
+
+    records.recordOutcomeCheck(group, at(), 'passed', 'Owner', 'Passed on merged SHAs.', run.digest);
+    records.reconcile(group);
+    expect(records.reconciliation(group).pending).toContainEqual(
+        expect.objectContaining({ key: `release-outcome:${group}` }),
+    );
+    expect(waits()).toEqual([]);
+    expect(settle().items).toEqual([]);
+});
+
+test('a sibling moving to Verify after the pass, with no new merge, raises no wait', async () => {
+    const { records, group, first, second, at, merge, waits } = await linked();
+
+    merge(first);
+    records.reconcileAfterMerge(group);
+    records.update(second, at(second), { status: 'Verify' });
+
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+    records.reconcile(group);
+    expect(waits()).toEqual([]);
+});
+
+test('a part added while another item is open runs the pass once it merges, and stays open as added', async () => {
+    const { records, group, second, at, merge, waits } = await linked();
+
+    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+    records.reconcile(group);
+
+    const third = records.createPart({
+        parentId: group,
+        parentRevision: at(),
+        title: 'Part 3',
+        repository: 'fake/app',
+        kind: 'build',
+        body: '## What\nPart 3.\nBlocked by: none',
+        blockerIds: [],
+    }).workId;
+
+    records.setPullRequest(third, at(third), 'fake/app#3');
+    records.reconcile(group);
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+    merge(third);
+
+    const report = records.reconcileAfterMerge(group)!;
+
+    expect(report.items).toContainEqual(expect.objectContaining({ key: `map:${third}`, changes: ['added'] }));
+    expect(waits().map((i) => i.key)).toEqual(expect.arrayContaining([`map:${second}`, `map:${third}`]));
+    expect(records.reconcileAfterMerge(group)).toBeNull();
+});

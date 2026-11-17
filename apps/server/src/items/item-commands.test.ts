@@ -1,4 +1,4 @@
-import { buildsAtWork, effectiveVocabulary } from '@lar-factory/shared';
+import { buildsAtWork, deskWait, effectiveVocabulary } from '@lar-factory/shared';
 import type {
     BoardData,
     Item,
@@ -1769,4 +1769,85 @@ test('an unrecorded List issue with an open PR consumes no board slot or manual 
         buildsAtWork(board.snapshot()).map((item) => item.id),
         [build.workId],
     );
+});
+
+/** An In progress group of two built parts with PRs, its checklist reconciled clean. */
+async function reconciledGroup() {
+    const records = await openRecords();
+    const id = records.create({ title: 'Group', repository: WEB, kind: 'feature', status: 'In progress' }).workId;
+    const at = (workId = id) => records.read(workId).revision;
+
+    records.addThread(id, at(), 'group-owner', 'shape');
+
+    const [first, second] = [1, 2].map((n) => {
+        const part = records.createPart({
+            parentId: id,
+            parentRevision: at(),
+            title: `Part ${n}`,
+            repository: WEB,
+            kind: 'build',
+            body: `## What\nPart ${n}.\nBlocked by: none`,
+            blockerIds: [],
+        }).workId;
+
+        records.setPullRequest(part, at(part), `${WEB}#${n}`);
+
+        return part;
+    }) as [string, string];
+
+    for (const part of [first, second])
+        records.recordDoubt(part, records.doubtPackage(part).packageDigest, 'Doubt', 'Briefs agree.', []);
+    for (const item of records.reconcile(id).items) records.resolveReconcile(id, item.key, item.digest, 'Checked.');
+
+    return { records, id, first, second, at };
+}
+
+test('after a part merges, the board reconciles its group and a remaining change starts the parent thread', async () => {
+    const { records, id, first, second, at } = await reconciledGroup();
+
+    const s = recordedCommands(records, {
+        shown: (ids) => ids.map((tid) => ({ id: tid, title: 't', state: 'done', updated: '2026-11-17T00:00:00Z' })),
+    });
+    const wait = () => deskWait(s.board.find(id)!, false, s.board.snapshot().items).label;
+
+    const passes: string[] = [];
+    const reconcileAfterMerge = records.reconcileAfterMerge.bind(records);
+
+    records.reconcileAfterMerge = (group) => (passes.push(group), reconcileAfterMerge(group));
+    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+    s.reread();
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+    assert.deepEqual(passes, [], 'a refresh with no new merge reads no group again');
+    records.observe(first, at(first), { of: 'pr', state: 'merged' });
+    s.reread();
+    assert.notEqual(wait(), 'Reconcile group', 'nothing waits before the board pass saves the checklist');
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+    assert.deepEqual(passes, [id]);
+    s.reread();
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+    assert.deepEqual(passes, [id], 'the saved merge is not passed again');
+
+    assert.ok(records.reconciliation(id).completed.some((done) => done.key === `map:${first}`));
+    assert.equal(wait(), 'Reconcile group');
+    assert.equal((await s.commands.start(id, undefined)).status, 200);
+    assert.match(s.started[0]!, /^Reconciling Group\nReconcile group /);
+});
+
+test('a group past Shaping is refused a start with nothing waiting in its checklist, or while its thread is live', async () => {
+    const { records, id, first, second, at } = await reconciledGroup();
+    const idle = recordedCommands(records, {
+        shown: (ids) => ids.map((tid) => ({ id: tid, title: 't', state: 'done', updated: '2026-11-17T00:00:00Z' })),
+    });
+
+    assert.equal((await idle.commands.start(id, undefined)).status, 409, 'nothing waits');
+
+    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+    records.observe(first, at(first), { of: 'pr', state: 'merged' });
+
+    const live = recordedCommands(records);
+
+    await live.commands.reconcileStarts(live.board.snapshot().items);
+    assert.ok(records.reconciliation(id).pending?.some((item) => item.key === `map:${second}`));
+    assert.equal((await live.commands.start(id, undefined)).status, 409, 'its thread is live');
+    assert.deepEqual(live.started, []);
 });

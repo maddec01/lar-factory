@@ -1,7 +1,7 @@
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { expect, test } from 'vite-plus/test';
 
-import { $, mountPage, sample, fresh, settle, text, pressMenu } from '@/test/PageTest';
+import { $, answer, fresh, holdPosts, mountPage, pressMenu, sample, settle, text, toast } from '@/test/PageTest';
 
 const base = sample.items.find((item) => item.id === 'I_sample12')!;
 const thread: ItemThread = {
@@ -157,4 +157,50 @@ test('a linked batch has one Approve card naming parent and members', async () =
     const { useItemDialogStore } = await import('@/features/item-dialog');
 
     expect(useItemDialogStore.getState().itemId).toBe(parent.id);
+});
+
+test('Reconcile group offers Retry start after a failed start, and a tag in its place once it may have started', async () => {
+    holdPosts();
+
+    const pending = [
+        {
+            key: 'map:part',
+            digest: 'd',
+            kind: 'map' as const,
+            workId: 'part',
+            summary: 'Part: reconcile map and affected records (brief).',
+            changes: ['brief'],
+            requiresFix: false,
+        },
+    ];
+    const data = board({
+        status: 'In progress',
+        threads: [],
+        reconciliation: { groupId: base.id, digest: 'r', items: pending, completed: [], pending },
+    });
+    const reconcile = () => card().querySelector<HTMLButtonElement>('[data-reconcile-group]');
+
+    await mountPage(data);
+    expect(text(reconcile())).toBe('Reconcile group');
+    await settle(() => reconcile()!.click());
+    await answer({
+        thread: null,
+        error: 'T3 is unreachable.',
+        board: { ...data, startProgress: { [base.id]: { shape: { phase: 'failed', message: 'T3 is unreachable.' } } } },
+    });
+    expect(text(reconcile())).toBe('Retry start');
+    expect(text(toast())).toContain('T3 is unreachable.');
+    expect(text(toast())).toContain('Couldn’t start reconciling');
+    expect(text(toast())).not.toContain('clear the start error');
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    await settle(() =>
+        useBoardStore.getState().receive({
+            ...data,
+            startProgress: { [base.id]: { shape: { phase: 'may-have-started', message: 'Check T3.' } } },
+        }),
+    );
+    expect(reconcile(), 'no second start').toBeNull();
+    expect(text(card().querySelector('.started-tag.unsure'))).toBe('May have started');
 });

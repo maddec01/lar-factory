@@ -36,7 +36,7 @@ export * from './item-next-action.ts';
 export * from './sample-clock.ts';
 export * from './pr-merge.ts';
 
-export { dependencyProofs, deskWait, questionWaitReason } from './desk-wait.ts';
+export { dependencyProofs, deskWait, questionWaitReason, reconcileGroupWaits } from './desk-wait.ts';
 export { questionOwnerParent } from './question-thread.ts';
 export * from './work-map.ts';
 

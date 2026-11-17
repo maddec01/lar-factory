@@ -60,6 +60,13 @@ export function workMessage(item: Item, context: FactoryThreadContext): string {
     return `Shaping ${itemName(item)}\n${shapeInstructions(item, context)}`;
 }
 
+/** Reconcile group's message: line 1 is `Reconciling` and the group's name; then the group's work ID and the checklist to settle. */
+export function reconcileMessage(item: Item, context: FactoryThreadContext): string {
+    const larShape = context.shapeSkill.replace(/\/SKILL\.md$/, '');
+
+    return `Reconciling ${itemName(item)}\nReconcile group ${item.id}. Read ${shellPath(`${larShape}/shared/reconcile-group.md`)} and follow it: run lar-work reconcile ${item.id}, then repair or resolve its items. The board already resolved items whose only changes are Status, queue order or finish time. Do not build.\n\n${factoryEnvironment(context)}`;
+}
+
 /** The work message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
 export function earlierWorkMessage(item: Item, context: FactoryThreadContext): string {
     return `${itemName(item)}\n${shapeInstructions(item, context)}`;

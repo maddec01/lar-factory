@@ -99,7 +99,8 @@ export function prepareBuildClaim(records: WorkRecords, workId: string, input: B
 
     counted.delete(workId);
 
-    const full = !ownsSlot && counted.size >= input.limit;
+    // A build waiting on its PR holds no slot, so CI fixes, review feedback and restarts never wait.
+    const full = !ownsSlot && !work.pullRequest && counted.size >= input.limit;
 
     const manual = input.manual === true;
 

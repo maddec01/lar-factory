@@ -227,3 +227,27 @@ it('S05-F2-001: board actions cannot create independent owner notices', async ()
         /release step approve-joint-activation/,
     );
 });
+
+it('a build whose PR is open frees its slot and restarts even when the limit is full', async () => {
+    const { records, other, rev, ready } = await fixture();
+    const start = (id: string, preparation = capacity) => {
+        const intent = records.prepareBuild(id, rev(id), preparation).intent;
+
+        records.resolveLaunchIntent(id, rev(id), intent.intentId, { threadId: `owner-${intent.intentId}` });
+    };
+    const a = ready('Building A');
+    const b = ready('Building B');
+    const next = ready('Next');
+    const limit = { limit: 2 };
+
+    start(a, limit);
+    start(b, limit);
+    expect(() => other.prepareBuild(next, rev(next), limit)).toThrow(/capacity/);
+
+    records.setPullRequest(a, rev(a), 'example/a#9');
+    records.observe(a, rev(a), { of: 'pr', state: 'open' });
+    start(next, limit);
+
+    records.update(a, rev(a), { status: 'Review' });
+    expect(other.buildReadiness(a, { ...limit, recovery: true }).capacity).toMatchObject({ manualOverride: false });
+});

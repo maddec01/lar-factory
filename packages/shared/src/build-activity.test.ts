@@ -113,7 +113,7 @@ it('S08 F01: every started build retains its slot throughout Pedro waits and han
     expect(buildsAtWork({ items: items.map((item) => ({ ...item, setAside: true })) })).toEqual([]);
 });
 
-it('PR links and status labels cannot create factory reservations, and terminal PRs release legacy builds', () => {
+it('PR links and status labels cannot create factory reservations, and any linked PR releases legacy builds', () => {
     const base = { kind: 'build', threads: [], slices: [], linkedPrs: [] } as unknown as Item;
     const items = [
         { ...base, id: 'status-only', status: 'In progress' },
@@ -123,7 +123,7 @@ it('PR links and status labels cannot create factory reservations, and terminal 
             status: 'List',
             linkedPrs: [{ state }],
         })),
-        ...(['closed', 'merged'] as const).map((state) => ({
+        ...(['open', 'closed', 'merged'] as const).map((state) => ({
             ...base,
             id: `factory-${state}`,
             status: 'Review',

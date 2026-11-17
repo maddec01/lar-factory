@@ -7,8 +7,8 @@ never the shaping conversation. Follow supplied instructions; do not discover gu
 in checkouts, parents or home folders. Read named code and supplied domain-doc paths;
 missing evidence is not approval.
 Run `lar-work brief-scope-check <work ID>` first; missing confirmation or drift
-is an incomplete finding. Check destination, current answers, siblings/overlaps,
-files/contracts, blockers, Dependencies and release constraints together. Challenge
+is an incomplete finding. Check destination, current answers, siblings,
+contracts, blockers, Dependencies and release constraints together. Challenge
 endpoint, hosting, redirect and CORS assumptions against code in every affected repo.
 
 Normally run no suite, build, typecheck or lint. Run only the smallest command

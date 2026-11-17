@@ -6,18 +6,16 @@ and board approval, or its generated board wait.
 1. Run `lar-work gate <work ID>`. Resolve held edits in `specSync`; report read
    failures and warnings. Review its refreshed `display.brief` against code.
 2. Read the [domain-doc setting](shared/domain-docs-setting.md) for Doubt.
-   For grouped or overlapping work, follow [Reconcile group](shared/reconcile-group.md).
-   Run `lar-work build-overlap <work ID>`. Review declared Files/Contracts and
-   semantic conflicts, including other concepts and standalone work. Record
-   ordering in brief/map declarations and run `sync-blockers` on the parent or
-   standalone ID, or save reasons as
-   `[ {"otherWorkId":"ID","reason":"why no ordering is needed"} ]`.
+   For grouped work, follow [Reconcile group](shared/reconcile-group.md).
+   Review declared Contracts and semantic conflicts with other concepts and
+   standalone work. Record blockers in brief/map declarations and run
+   `sync-blockers` on the parent or standalone ID.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
    gets that exact package, repository paths, resolved domain-doc setting/paths,
    [Doubt](doubt.md) and the orchestration guide's **Wait for delegated work**, no conversation.
    Fix findings within the destination; ask for scope changes. Every amendment
    ends here: rerun Doubt after edits before ending the turn.
-   Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>" [--file <ordering reasons.json>]`.
+   Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>"`.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
 4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`

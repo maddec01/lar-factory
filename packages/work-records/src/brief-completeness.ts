@@ -45,48 +45,19 @@ export function requireCompleteBrief(kind: string, brief: string): void {
     if (!content('done when', 'behaviour', 'acceptance', 'acceptance criteria'))
         missing.push('acceptance (Done when / Behaviour)');
 
-    if (!content('files', 'affected files', 'affected areas')) missing.push('affected files (Scope / Files)');
-
-    const named = (value: string, testNamesOnly = false) =>
-        value.split('\n').some((line) => {
-            // Markdown quoting is optional. A file alone is not a named case.
-            const file = /[\w./-]+\.[a-z][\w]*/i.exec(line);
-            const caseText =
-                file &&
-                (!testNamesOnly ||
-                    /test|spec/i.test(file[0]) ||
-                    /\btest\b/i.test(line) ||
-                    /^`?\s*:/.test(line.slice(file.index + file[0].length))) &&
-                line
-                    .replace(file[0], '')
-                    .replace(/[`*:,“”"'()]/g, '')
-                    .trim()
-                    .replace(/^(?:in|tests?)\b\s*/i, '');
-
-            return (
-                (caseText && /[a-z]/i.test(caseText) && !/^(?:todo|tbd|none|n\/a)\.?$/i.test(caseText)) ||
-                /\b(?:test|case)\b.+\b(?:asserts?|verif(?:y|ies)|expects?|checks?)\b.+/i.test(line)
-            );
-        });
-
     if (kind === 'bug') {
         if (!content('cause')) missing.push('cause');
 
         if (!content('evidence')) missing.push('evidence');
 
-        if (!named(content('regression test')))
+        if (!content('regression test'))
             missing.push(
-                'named regression test (Regression test: name a test file plus its case; e.g. test/name.test.js: keeps one-character names)',
+                'named regression test (Regression test: describe the test case that reproduces the bug; e.g. one-character names are kept)',
             );
 
         if (!content('red-before-green')) missing.push('red-before-green');
-    } else if (
-        !named(content('tests')) &&
-        !named(content('done when', 'behaviour', 'acceptance', 'acceptance criteria'), true)
-    )
-        missing.push(
-            'named tests (Tests or Done when: name a test file plus its case, or a test case with an assertion; e.g. test/cli.test.js: omitted name prints Hello, friend!)',
-        );
+    } else if (!content('tests'))
+        missing.push('named tests (Tests: describe at least one test case; e.g. empty name prints Hello, friend!)');
 
     if (missing.length)
         throw new WorkRecordError(

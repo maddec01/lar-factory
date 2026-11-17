@@ -175,3 +175,24 @@ test('consumption Code checklist refuses a constant-only approval and survives r
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('a brief needs no Files section and names tests by described case alone', () => {
+    const tests = '## Done when\n- Names survive trimming.\n## Tests\n- Empty name prints Hello, friend!\n';
+    const bug =
+        '## Done when\n- Names survive trimming.\n## Cause\nThe length guard requires two characters.\n## Evidence\nparseName("A") returned friend.\n## Regression test\nEmpty name prints Hello, friend!\n## Red-before-green\nObserve failure before the fix.\n';
+
+    expect(() => requireCompleteBrief('build', tests)).not.toThrow();
+    expect(() => requireCompleteBrief('bug', bug)).not.toThrow();
+});
+
+test('a test-like line under Done when is not a named test', () => {
+    const brief =
+        '## Done when\n- `test/cli.test.js`: omitted name prints Hello, friend!\n## Tests\n- TBD\n## Scope\n### Files\n- `cli.js`\n';
+
+    expect(() => requireCompleteBrief('build', brief)).toThrow(
+        'named tests (Tests: describe at least one test case; e.g. empty name prints Hello, friend!)',
+    );
+    expect(() => requireCompleteBrief('bug', brief)).toThrow(
+        'named regression test (Regression test: describe the test case that reproduces the bug',
+    );
+});

@@ -7,6 +7,9 @@ import { readExecutionProjection } from './execution-capabilities.ts';
 import { parseSelection } from './model-choices.ts';
 import { sendThreadCommand } from './thread-commands.ts';
 
+/** The run states T3 can still interrupt: queued with the thread it created, or on its way to running. */
+const LIVE_RUNS = ['queued', 'preparing', 'starting', 'running'];
+
 /** A run's reported selection takes precedence over the thread's next-turn selection. */
 export function executionReport(projection: unknown, threadId: string): RoleRunFinish['report'] {
     if (!isRecord(projection) || !isRecord(projection.thread) || projection.thread.id !== threadId) return null;
@@ -42,7 +45,7 @@ export function executionReport(projection: unknown, threadId: string): RoleRunF
     };
 }
 
-/** Hold a mismatched active run before accepting its work. The prompt also verifies before starting roles. */
+/** Hold a mismatched queued or active run before accepting its work. The prompt also verifies before starting roles. */
 export async function verifyExecution(projection: unknown, threadId: string, requested: ExecutionSettings) {
     const report = executionReport(projection, threadId);
     let failure = report
@@ -51,7 +54,7 @@ export async function verifyExecution(projection: unknown, threadId: string, req
 
     if (failure && isRecord(projection) && Array.isArray(projection.runs)) {
         for (const run of projection.runs.filter(isRecord)) {
-            if (run.status !== 'running' || typeof run.id !== 'string') continue;
+            if (!LIVE_RUNS.includes(String(run.status)) || typeof run.id !== 'string') continue;
 
             const stopped = await sendThreadCommand({
                 type: 'run.interrupt',
@@ -65,6 +68,28 @@ export async function verifyExecution(projection: unknown, threadId: string, req
     }
 
     return { report, failure };
+}
+
+/**
+ * Rereads a launched thread every second until its latest run reports a selection, then verifies it. A failed read
+ * counts as no selection yet. After `wait` milliseconds it verifies the last read as it is.
+ */
+export async function verifyLaunchedExecution(
+    threadId: string,
+    requested: ExecutionSettings,
+    read: (threadId: string) => Promise<unknown> = readExecutionProjection,
+    wait = 60_000,
+) {
+    const until = Date.now() + wait;
+
+    for (;;) {
+        const projection = await read(threadId).catch(() => null);
+
+        if (executionReport(projection, threadId) || Date.now() >= until)
+            return verifyExecution(projection, threadId, requested);
+
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
 }
 
 export async function verifyRecoveredExecution(threadId: string, requested: ExecutionSettings) {

@@ -115,7 +115,8 @@ async function readExecutionValue(tag: string, payload: Record<string, unknown>)
             }
         });
     } finally {
-        await authority.revoke(session.sessionId).catch(() => {});
+        // The value needs no revoked session, so it doesn't wait for the revoke.
+        void authority.revoke(session.sessionId).catch(() => {});
     }
 }
 

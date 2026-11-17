@@ -31,8 +31,7 @@ describe('thread launch', () => {
         ).toEqual({ thread: null, error: 'T3 launch authorization failed.', uncertain: true });
         expect(subscribeProjects).not.toHaveBeenCalled();
     });
-    it('freezes the request before sending, and replays the same command after a preparing launch', async () => {
-        vi.useFakeTimers();
+    it('freezes the request before sending, and links a created thread whose first turn is not running yet', async () => {
         vi.mocked(boardSessionAuthority).mockReturnValue({
             issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
             revoke: vi.fn().mockResolvedValue(undefined),
@@ -52,8 +51,8 @@ describe('thread launch', () => {
                     messages: [{ role: 'user', text: 'Continue' }],
                     runs:
                         payloads.length > 1
-                            ? [{ id: 'run', status: 'running', modelSelection: selection }]
-                            : [{ status: 'preparing' }],
+                            ? [{ id: 'run', status: 'queued', modelSelection: selection }]
+                            : [{ id: 'run', status: 'preparing' }],
                 },
             });
 
@@ -71,8 +70,8 @@ describe('thread launch', () => {
             remember,
         );
 
-        await vi.advanceTimersByTimeAsync(30_000);
-        expect(await first).toMatchObject({ thread: null, uncertain: true });
+        // A run that reports no selection yet leaves the report unset, for the board to reread.
+        expect(await first).toEqual({ thread: { threadId: 'same-thread', title: 'Continue' }, error: null });
         expect(remember).toHaveBeenCalledWith({
             projectId: 'project',
             text: 'Continue',

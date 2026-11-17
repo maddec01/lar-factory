@@ -3,8 +3,9 @@ import { executionSettingsOf } from '@lar-factory/shared/execution-target';
 import { randomUUID } from 'node:crypto';
 
 import { boardSessionAuthority } from './board-session.ts';
-import { verifyExecution } from './execution-report.ts';
+import { executionReport, verifyExecution } from './execution-report.ts';
 import { subscribeProjects } from './project-subscription.ts';
+import { startStep } from './start-steps.ts';
 import { serverRuntimeOrigin } from './t3-settings.ts';
 import { rejectionReason } from './thread-commands.ts';
 
@@ -57,12 +58,14 @@ export async function launchThread(
     remember?: (request: ThreadLaunchRequest) => void,
 ): Promise<StartResult> {
     remember?.({ projectId, text, selection, workspace, runtimeMode });
+    startStep('T3 settings and saved launch request');
 
     const authority = boardSessionAuthority('t3', 'orchestration:operate');
     let session;
 
     try {
         session = await authority.issue();
+        startStep('T3 authorization');
     } catch {
         return { thread: null, error: 'T3 launch authorization failed.' };
     }
@@ -117,23 +120,17 @@ export async function launchThread(
 
                             clearTimeout(timer);
                             stop?.();
+                            startStep('T3 answer');
 
-                            if (
-                                value.projection.runs.every(
-                                    (run) =>
-                                        isRecord(run) &&
-                                        ['queued', 'preparing', 'starting'].includes(String(run.status)),
-                                )
-                            ) {
-                                resolve({
-                                    ...lost,
-                                    error: 'T3 created the thread; its first turn is not running yet. The board will resume the same launch.',
-                                });
+                            // A created thread counts as started before its first turn runs. While its run reports no
+                            // selection, the report stays unset for the board to reread.
+                            const thread = { threadId: value.threadId, title: text.split('\n')[0] ?? text };
+
+                            if (!executionReport(value.projection, value.threadId)) {
+                                resolve({ thread, error: null });
 
                                 return;
                             }
-
-                            const thread = { threadId: value.threadId, title: text.split('\n')[0] ?? text };
 
                             void verifyExecution(value.projection, value.threadId, executionSettingsOf(selection)).then(
                                 ({ report, failure }) =>
@@ -184,6 +181,7 @@ export async function launchThread(
             }
         });
     } finally {
-        await authority.revoke(session.sessionId).catch(() => {});
+        // The answer needs no revoked session, so it doesn't wait for the revoke.
+        void authority.revoke(session.sessionId).catch(() => {});
     }
 }

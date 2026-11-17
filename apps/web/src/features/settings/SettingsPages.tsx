@@ -55,7 +55,7 @@ export function pages(input: PagesInput): Page[] {
             id: 'factory',
             label: 'Reviewers and models',
             keywords:
-                'instructions trigger effort planner implementer approver CI fixer Doubt shaping concept decision build',
+                'instructions trigger effort planner implementer approver CI fixer Doubt shaping concept decision build retro',
             icon: <conceptIcons.agents />,
             description:
                 'Reviewers, models and effort for future runs on this Mac. Save changes to apply your choices.',

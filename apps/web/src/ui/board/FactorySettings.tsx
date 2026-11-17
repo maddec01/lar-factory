@@ -7,6 +7,7 @@ import {
     SettingsGroup,
     SettingsRow,
     Stack,
+    Switch,
     Textarea,
 } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
@@ -66,6 +67,24 @@ export function FactoryChoice({
     return (
         <SettingsRow label={label} description={description}>
             <OptionSelect label={label} presentation="setting" value={value} options={options} onChange={onChange} />
+        </SettingsRow>
+    );
+}
+
+export function FactorySwitch({
+    label,
+    on,
+    onChange,
+    description,
+}: {
+    label: string;
+    on: boolean;
+    onChange: (on: boolean) => void;
+    description?: string;
+}) {
+    return (
+        <SettingsRow label={label} description={description}>
+            <Switch checked={on} aria-label={label} onCheckedChange={onChange} />
         </SettingsRow>
     );
 }

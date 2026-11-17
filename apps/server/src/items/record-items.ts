@@ -30,6 +30,7 @@ import { WorkRecordError, type Dependency, type WorkRecord, type WorkRecords } f
 
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
+import { itemReviewers } from '../item-details/reviewers.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
 import { briefDoubtHold } from './brief-doubt-hold.ts';
 import { needsYouNotice } from './needs-you-causes.ts';
@@ -339,6 +340,9 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }),
             recorded: true,
             buildPhase: record.buildPhase,
+            ...(['In progress', 'Review'].includes(record.status) && {
+                reviewers: itemReviewers(records, record.workId),
+            }),
             buildReserved: reservations.has(record.workId),
             ...(activeBuild && { buildStarted: true as const }),
             verification: records.verification(record.workId),

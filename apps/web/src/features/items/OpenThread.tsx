@@ -15,7 +15,6 @@ import {
 import { Button, ButtonLink, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { useOnRowItself } from './RowContext';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { EarlierThread, EarlierThreadList, useButtonKind } from '@/ui/board';
 
@@ -69,8 +68,8 @@ function latestThread(
 
 /**
  * Opens the latest thread, or the phase's recorded `threadId`, in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
- * it as a square icon button with an accessible label, as a desk card's corner does. Concept `part` shortcuts are quiet icons with tooltips. On a row, Open thread is always that
- * icon, with a tooltip on hover and keyboard focus that says its label or why it can't open; other labels stay as text.
+ * it as a square icon button with an accessible label, as a desk card's corner does, and a tooltip on hover and keyboard focus that says its label or why it
+ * can't open, wherever it sits: a row, a desk card beside its named actions, a concept `part`'s quiet shortcut. Other labels stay as text.
  */
 export function OpenThread({
     item,
@@ -104,9 +103,7 @@ export function OpenThread({
             : ['Answer in T3', 'Approve brief'].includes(label) && !question
               ? 'Open thread'
               : label;
-    const onRow = useOnRowItself();
     const iconOnly = part || given;
-    const tooltip = (part || onRow) && iconOnly;
     // Concept parts use the board's quiet control recipe, named by their label.
     const named = iconOnly ? { 'aria-label': actionLabel, iconOnly: true } : {};
     const shown = iconOnly ? null : actionLabel;
@@ -119,7 +116,6 @@ export function OpenThread({
                 icon={ICON.thread}
                 data-open-thread={item.id}
                 href={thread.link}
-                title={iconOnly && !tooltip ? actionLabel : undefined}
                 {...named}
             >
                 {shown}
@@ -130,14 +126,14 @@ export function OpenThread({
                 leftIcon={ICON.thread}
                 data-open-thread={item.id}
                 disabled
-                title={tooltip ? undefined : thread.reason}
+                title={iconOnly ? undefined : thread.reason}
                 {...named}
             >
                 {shown}
             </Button>
         );
 
-    if (!tooltip) return button;
+    if (!iconOnly) return button;
 
     return (
         <Tooltip>

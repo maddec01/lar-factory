@@ -7,6 +7,3 @@ export const ON_ROW = createContext<boolean | 'card'>(false);
 
 /** Truthy on a row or a card: starts take their compact, tinted form. */
 export const useOnRow = () => Boolean(useContext(ON_ROW));
-
-/** On a stage row itself, where Open thread is an icon: not on a card. */
-export const useOnRowItself = () => useContext(ON_ROW) === true;

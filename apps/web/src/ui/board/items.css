@@ -55,7 +55,7 @@
     align-items: center;
     gap: --spacing(3);
     min-height: --spacing(8);
-    padding-inline: --spacing(4) --spacing(3);
+    padding-inline: --spacing(4) 0;
     font-size: var(--text-sm);
     cursor: pointer;
 }
@@ -100,6 +100,11 @@
 }
 .desk-line-toggle {
     flex: none;
+    /* Its hit area fills the line's height and reaches its end, so it is easy to hit however short its words. */
+    align-self: stretch;
+    min-width: --spacing(16);
+    padding-inline: --spacing(2) --spacing(3);
+    text-align: right;
     font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
     color: var(--color-fg-muted);

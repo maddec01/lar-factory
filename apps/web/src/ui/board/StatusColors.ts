@@ -50,8 +50,9 @@ export const boardColor = {
     empty: 'var(--color-track)',
 } as const;
 
-/** Where a slice stands. `waiting` is a slice not started yet (word it "Queued"); `blocked` one held up by another. */
-export type SliceProgress = 'done' | 'active' | 'blocked' | 'unknown' | 'waiting';
+/** Where a slice (or a reviewer, which the board draws the same way) stands. `waiting` is one not started yet (word a
+ *  slice's "Queued"); `blocked` one held up by another; `failed` a reviewer that failed or asked for changes. */
+export type SliceProgress = 'done' | 'active' | 'blocked' | 'unknown' | 'waiting' | 'failed';
 
 /** What each slice progress means, which fixes its colour: blocked by other work and not started are off (grey), as
  *  amber is kept for what waits on you. */
@@ -61,6 +62,7 @@ export const sliceProgressState = {
     blocked: 'off',
     unknown: 'off',
     waiting: 'off',
+    failed: 'failed',
 } as const satisfies Record<SliceProgress, StatusState>;
 
 /** The word a slice row shows when the caller gives none. */
@@ -70,6 +72,7 @@ export const sliceProgressLabel: Record<SliceProgress, string> = {
     blocked: 'Blocked',
     unknown: 'Unknown',
     waiting: 'Queued',
+    failed: 'Failed',
 };
 
 /** What each tone means, which fixes its light (the one state map): your turn is waiting (amber), a decision being

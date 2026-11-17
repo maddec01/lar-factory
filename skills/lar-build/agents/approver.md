@@ -63,7 +63,8 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    Generate reproducible numbered Test steps with expected results for every PR.
    Use `lar-work pr-body --file <draft> --test-steps <numbered-checks>
    --to <body-file>` for every create/update. The command owns the Test steps
-   heading. These steps add no human wait beyond the approved Verify decision.
+   heading. These steps are covered by PR review for new builds and add no
+   separate wait beyond the saved Verify requirement for legacy builds.
 
    On Azure Repos, open it with `az repos pr create --repository <repo>
    --source-branch <branch> --target-branch "$base_branch" --title "<title>"
@@ -80,9 +81,11 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    **Ready to merge** after required checks pass. The brief's human checks go in
    the PR's numbered Test steps; human approval of that head covers them.
    There is no separate board Verify gate for these runs.
-   Otherwise preserve the approved legacy brief's saved Verify decision, including a negative decision omitted from the brief prose:
-   - **Verify** only when it says yes. Generate numbered checks with observable results.
-   - **Ready to merge** when it says no. A reviewer recommendation is a note, never another human wait.
+   Otherwise read the gate's saved `required` value from `lar-work verification
+   <work ID>`; an approved negative decision needs no published Verify section.
+   Legacy yes/no sections remain binding.
+   - **Verify** only when `required` is true. Generate numbered checks with observable results.
+   - **Ready to merge** when `required` is false. A reviewer recommendation is a note, never another human wait.
    Browser checks use T3 preview only; serve local static output on a free HTTP
    port and stop that server afterward; never launch another browser or import tools from other checkouts.
    Changing Verify requires a brief amendment through Doubt and a board gate before proceeding.

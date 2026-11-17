@@ -1,16 +1,16 @@
-// The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
-// the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
-// a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
-// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures.
+// The board's one work row, in Queue, Shaping, Ready to build and Build alike: one line in columns that line up down the
+// whole board, one button that opens the item's details with the row's action beside it. Its state cell is a mark and a
+// short word, never wrapping, with the detail in its tooltip; its progress cell a tick meter and a count, which unfolds
+// its slices, or its reviewers while a review round runs, under the row.
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import {
     blockedText,
     canRetryBuild,
     currentBuildThread,
+    humanWait,
     itemActivityThread,
     itemName,
     openBlockers,
-    placementOf,
 } from '@lar-factory/shared';
 import { useState } from 'react';
 
@@ -20,9 +20,10 @@ import { Figures } from './Columns';
 import { ChecksProgress } from './RowChecks';
 import { figuresOf, opensItem, sliceCounts, sliceNote } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
+import { ReviewerList, ReviewersProgress } from './RowReviewers';
 import type { StageRow as Row } from './StageRows';
-import { YOURS, threadText } from './StageStatus';
-import { useActivityState, useActivityStill } from './useActivityState';
+import { YOURS, failedVerifyNote, reviewing, stateMark, threadText } from './StageStatus';
+import { useActivityAction, useActivityState, useActivityStill } from './useActivityState';
 import { workLabel } from './WorkLabel';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
@@ -62,7 +63,6 @@ import {
     RowTitle,
     RowTitleCell,
     StageRowItem,
-    VerifyEvidence,
     WaitWord,
     RowCount,
 } from '@/ui/board';
@@ -112,12 +112,10 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
     const isPicked = useItemDialogStore((state) => state.itemId === item.id);
     const disconnected = useBoardStore((state) => !!state.clientError);
     const unavailable = useActivityUnavailable();
-    // A row whose item is on Your desk waits on you, wherever it sits on the board.
-    const yours = placementOf(item, {
-        starts: data.startProgress?.[item.id],
-        unavailable,
-        all: data.items,
-    }).sections.includes('desk');
+    // A row whose item is on Your desk waits on you, wherever it sits on the board: the desk's own decision and words.
+    const wait = humanWait(item, unavailable, data.items);
+    const yours = !!wait;
+    const action = useActivityAction(item);
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const note = sliceNote(item);
     const blocked = blockedText(item);
@@ -129,6 +127,9 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             ? ''
             : shown.word;
     const still = useActivityStill(item);
+    const failedVerify = failedVerifyNote(item);
+    // While a review round runs, its reviewers take the progress cell and unfold under the row as slices do.
+    const reviewers = n === undefined && reviewing(item);
     const showsActivity =
         !yours &&
         n === undefined &&
@@ -174,17 +175,31 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                 <RowMeta onClick={opensItem(item)}>
                     {/* What is going on, in one column: what its thread does now, else its state, else what holds it,
                         else its first blocked or working slice. */}
-                    {showsActivity && !shown.prStatus ? (
-                        <ActivityLine item={item} />
-                    ) : endState && yours ? (
-                        // What waits on you reads in the desk's amber here too, so it catches the eye on any lane.
-                        <RowState title={endState}>
-                            <WaitWord>{endState}</WaitWord>
-                            {activity === 'working' && <ActivityLine item={item} />}
+                    {wait ? (
+                        // What the desk asks of you leads, in its amber and words, over a thread still at work (a
+                        // brief gate while its shaping thread writes on), which its tooltip says.
+                        <RowState
+                            title={[wait.label, shown.prStatus !== wait.label && shown.prStatus, action, failedVerify]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            mark="waiting"
+                        >
+                            <WaitWord>{wait.label}</WaitWord>
                         </RowState>
+                    ) : showsActivity ? (
+                        <ActivityLine
+                            item={item}
+                            word={shown.prStatus ?? (failedVerify && 'Fixing failed Verify')}
+                            detail={failedVerify}
+                        />
                     ) : endState ? (
                         <RowState
-                            title={[(shown.light || shown.blocked) && shown.recorded, threadText(item, shown.working)]
+                            mark={stateMark(activity)}
+                            title={[
+                                (shown.light || shown.blocked) && shown.recorded,
+                                threadText(item, shown.working),
+                                failedVerify,
+                            ]
                                 .filter(Boolean)
                                 .join(' · ')}
                         >
@@ -201,7 +216,14 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                             />
                         )
                     )}
-                    {checks ? (
+                    {reviewers ? (
+                        <ReviewersProgress
+                            item={item}
+                            open={slices}
+                            onToggle={() => setSlices(!slices)}
+                            still={still}
+                        />
+                    ) : checks ? (
                         // An open PR's checks are what move, so they take the slices' place.
                         <ChecksProgress {...checks} still={still} />
                     ) : item.slices.length > 0 ? (
@@ -246,16 +268,8 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                     <Side item={item} data={data} />
                 </RowSide>
             </RowFirst>
-            {shown.prStatus && showsActivity && (
-                <RowFoot>
-                    <ActivityLine item={item} />
-                </RowFoot>
-            )}
             {['Queued', 'Ready', 'In progress'].includes(item.status) && (
                 <RowFoot>
-                    {item.status === 'In progress' && item.verification?.latest?.result === 'fail' && (
-                        <VerifyEvidence>Fixing failed Verify: {item.verification.latest.note}</VerifyEvidence>
-                    )}
                     <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />
                     <StartAfterError item={item} data={data} />
                     <AutoBuildNote item={item} data={data} />
@@ -263,7 +277,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             )}
             {slices && (
                 <RowSlices>
-                    <SliceList item={item} still={still} />
+                    {reviewers ? <ReviewerList item={item} still={still} /> : <SliceList item={item} still={still} />}
                 </RowSlices>
             )}
         </StageRowItem>

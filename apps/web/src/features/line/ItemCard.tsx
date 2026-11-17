@@ -23,11 +23,12 @@ import { statusStateColors } from '@lar-works/design-system';
 import { ActivityLine } from './ActivityLine';
 import type { Part } from './DossierParts';
 import { isDone } from './DossierParts';
-import { cardChecks, LANES, NextStep, usePartState } from './ItemCardParts';
+import { CardProgress, cardChecks, LANES, NextStep, usePartState } from './ItemCardParts';
 import { GATE_WORDS } from './MapCardFacts';
 import { PartAction } from './PartAction';
 import { PartTitle } from './PartTitle';
 import { RowKindMark, RowSource } from './RowIdentity';
+import { reviewCount, reviewing } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { workLabel } from './WorkLabel';
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -36,8 +37,6 @@ import {
     CardActions,
     HumanWaitAction,
     ItemTitle,
-    SliceBar,
-    WorkingBar,
     STATUS_COLOR,
     stepName,
     useActivityUnavailable,
@@ -50,7 +49,6 @@ import {
     CardActivity,
     CardBriefs,
     CardChecks,
-    CardMeter,
     CardPartOf,
     CardQuestion,
     DeskDependencyProof,
@@ -130,9 +128,13 @@ export function ItemCard({
         complete || quiet
             ? undefined
             : workLabel(item, activityState === 'working' || activityState === 'quiet', waiting);
-    const sliceCount = item.slices.length
-        ? `${item.slices.filter((slice) => slice.progress === 'done').length}/${item.slices.length} slices`
-        : '';
+    // While a review round runs, its reviewers are what the card counts and ticks, as a row's progress cell does.
+    const reviewers = !complete && reviewing(item);
+    const count = reviewers
+        ? reviewCount(item)
+        : item.slices.length
+          ? `${item.slices.filter((slice) => slice.progress === 'done').length}/${item.slices.length} slices`
+          : '';
     // The wait in the same words everywhere it shows: the card's foot, the dialog's Status and search.
     const status =
         !asks && shown.prStatus
@@ -144,8 +146,8 @@ export function ItemCard({
                     ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}`
                     : wait.label
               : atWork
-                ? [atWork, sliceCount].filter(Boolean).join(' · ')
-                : (idle?.status ?? '');
+                ? [atWork, count].filter(Boolean).join(' · ')
+                : [idle?.status, reviewers && count].filter(Boolean).join(' · ');
     const action = asks ? (
         <HumanWaitAction item={item} data={data} quiet />
     ) : (
@@ -262,19 +264,17 @@ export function ItemCard({
                     action
                 ))
             }
-            // Under the foot, its progress as its row draws it: its slices, else one bar while it runs; an open PR's checks
-            // take the head's track instead.
+            // Under the foot, its progress as its row draws it: its reviewers while a round runs (each named in the
+            // ticks' tooltip), else its slices, else one bar while it runs; an open PR's checks take the head's track.
             bottom={
-                !checks &&
-                (item.slices.length > 0 || atWork) && (
-                    <CardMeter>
-                        {item.slices.length > 0 ? (
-                            <SliceBar item={item} still={still} />
-                        ) : (
-                            <WorkingBar label={atWork!} still={still} waiting={waiting} />
-                        )}
-                    </CardMeter>
-                )
+                <CardProgress
+                    item={item}
+                    still={still}
+                    reviewers={reviewers}
+                    hidden={!!checks}
+                    atWork={atWork}
+                    waiting={waiting}
+                />
             }
         />
     );

@@ -90,8 +90,17 @@ export function ItemAgents({ item }: { item: Item }) {
     );
 }
 
-/** `item`'s line; nothing when it has none. */
-export function ActivityLine({ item }: { item: Item }) {
+/** `item`'s line; nothing when it has none. A `word`, such as "Fixing review feedback", leads it in place of the
+ *  thread's action, which its tooltip then says with any `detail`. */
+export function ActivityLine({
+    item,
+    word,
+    detail,
+}: {
+    item: Item;
+    word?: string | undefined;
+    detail?: string | undefined;
+}) {
     const disconnected = useBoardStore((state) => !!state.clientError);
 
     // Keep checking every second, including the quiet/stale deadlines, but render only when the shown words change.
@@ -122,6 +131,8 @@ export function ActivityLine({ item }: { item: Item }) {
         <DesignActivityLine
             state={line.state}
             action={line.action}
+            word={word || undefined}
+            detail={detail}
             age={line.state !== 'quiet' && line.ageMs !== undefined ? shortAge(line.ageMs) : undefined}
             agents={line.agents > 0 ? plural(line.agents, 'agent') : undefined}
             agentList={listed && <AgentList agents={listed} />}

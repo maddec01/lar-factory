@@ -73,7 +73,7 @@ export {
     PullRequestState,
     ReadinessDetails,
 } from './PullRequests';
-export { SliceBar, SliceList, SliceRow, WorkingBar } from './Slices';
+export { SliceBar, SliceList, SliceRow, WorkingBar, type SliceProgress } from './Slices';
 export { SourceIcon } from './SourceIcon';
 export { BuildLimit, ReadyBuildControls, HeaderSwitch, StageList, StagePane, StageSections } from './StagePane';
 export {

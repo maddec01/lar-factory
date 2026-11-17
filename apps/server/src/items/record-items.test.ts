@@ -25,6 +25,7 @@ import { afterEach, test } from 'vite-plus/test';
 import { completeBrief } from '../../test/complete-brief.ts';
 import shapingHold from '../../test/fixtures/s07-shaping-hold.json' with { type: 'json' };
 import { legacyApprovalNotice } from '../../test/legacy-notice.ts';
+import { sampleReviewControls } from '../sample/sample-review-controls.ts';
 import { archivedItems, recordItems, recordItemsReader } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
@@ -216,6 +217,19 @@ test('finished work retention hides leaves the board for Archive, and set-aside 
         ),
         ['Finished', 'Aside'],
     );
+});
+
+test("a build's row carries the reviewers chosen for its current round, without the skipped ones", async () => {
+    const records = await open();
+    const repo = 'lar-factory-sample/greeting';
+    const { reviewId } = sampleReviewControls(records).seed(repo);
+
+    const item = recordItems(records, [], [repo]).find((i) => i.id === reviewId)!;
+
+    assert.deepEqual(item.reviewers, [
+        { id: 'code', name: 'Code', status: 'Running' },
+        { id: 'security', name: 'Security', status: 'Completed' },
+    ]);
 });
 
 test("a record's structure, blockers and slices come from records", async () => {

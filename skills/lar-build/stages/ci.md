@@ -11,9 +11,17 @@ with `configuration.isBlocking` true is a required check whose `status` is
 `approved` or `notApplicable` when green, `rejected` when failed, and `queued`
 or `running` while it runs. Then:
 
-- **Required checks green**: after failed Verify, return to **Verify** on this PR; only Pedro records the head-bound pass in the board. Status writes cannot replace it. Run `status.sh` now to set **Verify** or **Ready to merge** per the approved brief's Verify decision, never a recommendation. Change it only by amending through Doubt and a board gate,
-  `unwatch_pull_request`, end the turn. The board resumes this thread for
-  [Retro](retro.md) only after the delivery PR is confirmed merged and the record is **Done**.
+- **Required checks green**: show the UI reviewer's screenshots in this chat
+  beside the PR link, each with its caption and absolute path, when that
+  reviewer ran. Then run [Retro](retro.md) in this turn only when the runtime
+  block says `Frozen retro: on` and this is the build's first handback, so
+  `lar-work retro <work ID>` shows no saved suggestions. A handback after failed
+  Verify, or with `Frozen retro: off`, skips Retro. Then run `status.sh` to set
+  **Verify** or **Ready to merge** per the approved brief's Verify decision,
+  never a recommendation. After failed Verify, set **Verify** on this PR again;
+  only Pedro records the head-bound pass in the board, and Status writes cannot
+  replace it. Change the Verify decision only by amending through Doubt and a
+  board gate. Then `unwatch_pull_request` and end the turn.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with [CI fixer](../agents/ci-fixer.md), the build's work ID, repo path, PR URL,
   the failing check (or "merge conflict") and this thread's runtime block

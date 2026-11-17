@@ -55,11 +55,6 @@ export function prepareBuildClaim(records: WorkRecords, workId: string, input: B
 
     if (records.specState(workId).held) refuse('Resolve the changed ticket Spec before Start build.');
 
-    const review = records.doubtPackage(workId);
-
-    if (review.overlaps.some((overlap) => !overlap.ordered && overlap.files.length))
-        refuse('File overlap needs an ordering blocker before Start build.');
-
     let root = work;
 
     while (root.parentId) root = records.read(root.parentId);

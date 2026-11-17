@@ -243,3 +243,30 @@ test('Verify: its running row returns to the desk when the thread stops or the b
     expect(text(desk())).toContain(wait);
     expect(posted()).toEqual([]);
 });
+
+test('an idle unfinished build with an open PR shows as waiting on its PR, in its row and its details', async () => {
+    const pr = sample.items.find((i) => i.id === 'I_sample14')!.linkedPrs;
+    const idle: ItemThread = { ...thread('build', 'done'), purpose: 'build' };
+
+    await mountPage(
+        fresh(
+            withItem('I_sample13', {
+                parent: null,
+                parentId: null,
+                flow: 'single',
+                status: 'In progress',
+                buildPhase: 'Checks',
+                linkedPrs: pr,
+                slices: [],
+                blockers: [],
+                threads: [idle],
+            }),
+        ),
+    );
+
+    expect(text(meta('I_sample13'))).toContain('Waiting on its PR');
+    expect(text(meta('I_sample13'))).not.toContain('Activity unavailable');
+
+    await press(opener('I_sample13'));
+    expect(text(dialog())).toContain('Waiting on its PR');
+});

@@ -89,3 +89,18 @@ test('a running build owns activity even when a shaping thread still reports liv
     expect(itemActivityAgents(work, NOW)).not.toContainEqual(expect.objectContaining({ action: 'Shaping' }));
     expect(itemActivityThread({ ...work, threads: [shape, { ...build, state: 'done' }] })).toBeUndefined();
 });
+
+test('an idle build thread in Checks shows as idle, not unavailable', () => {
+    // The server reads activity only for threads at work, so an idle build owner arrives with none.
+    const idle = thread({ id: 'build', purpose: 'build', state: 'done' });
+    const checks = item([idle], { status: 'In progress', buildPhase: 'Checks' });
+
+    expect(itemActivityThread(checks)?.id).toBe('build');
+    expect(itemActivityLine(checks, NOW)).toBeUndefined();
+    expect(itemActivityAgents(checks, NOW)).toBeUndefined();
+    expect(itemActivityLine(checks, NOW, true)?.state, 'a page that lost the server').toBe('unavailable');
+    expect(
+        itemActivityLine(item([{ ...idle, activity: { available: false } }], { buildPhase: 'Checks' }), NOW)?.state,
+        'a failed read',
+    ).toBe('unavailable');
+});

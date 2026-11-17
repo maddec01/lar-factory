@@ -1,4 +1,4 @@
-import { retroWaits, type Retro, type RetroSuggestion } from '@lar-factory/shared';
+import type { Retro, RetroSuggestion } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
@@ -7,7 +7,6 @@ import type { WorkRecord } from './work-records.ts';
 
 export interface RetroRecords {
     retro(id: string): Retro | null;
-    retroPending(id: string): boolean;
     prepareRetro(id: string): Retro | null;
     proposeRetro(id: string, revision: number, suggestions: RetroSuggestion[]): Retro;
     chooseRetro(id: string, revision: number, selected: number[], by: string): Retro;
@@ -38,19 +37,26 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             id,
         );
     };
+    const prMerged = (id: string, pr: string | null) =>
+        !!pr &&
+        !!db
+            .prepare("SELECT 1 FROM observations WHERE work_id=? AND observed='pr' AND subject=? AND state='merged'")
+            .get(id, pr);
+    // A PR the board has not observed merged counts as open, so the build and the board settle Retro before merge.
+    const open = (id: string, revision: number, retro: Retro | null) => {
+        const record = read(id);
+
+        expectRevision(record, revision);
+
+        if (prMerged(id, retro?.pr ?? null) || prMerged(id, record.pullRequest))
+            invalid('The delivery PR is merged, so Retro follow-ups can no longer change.');
+
+        return record;
+    };
     const merged = (id: string) => {
         const record = read(id);
 
-        if (
-            record.status !== 'Done' ||
-            !record.finishedAt ||
-            !record.pullRequest ||
-            !db
-                .prepare(
-                    "SELECT 1 FROM observations WHERE work_id=? AND observed='pr' AND subject=? AND state='merged'",
-                )
-                .get(id, record.pullRequest)
-        )
+        if (record.status !== 'Done' || !record.finishedAt || !prMerged(id, record.pullRequest))
             invalid('Retro requires Done and a confirmed merge of the delivery PR.');
 
         return record;
@@ -58,20 +64,6 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
 
     return {
         retro: (id) => database.read(() => get(id)),
-        retroPending: (id) =>
-            database.read(() => {
-                const retro = get(id);
-
-                return retro
-                    ? retro.suggestions === null || retroWaits(retro)
-                    : read(id).status === 'Done' &&
-                          read(id).buildPhase === 'checks' &&
-                          !!db
-                              .prepare(
-                                  "SELECT 1 FROM threads WHERE work_id=? AND purpose='build' AND deleted_at IS NULL",
-                              )
-                              .get(id);
-            }),
         prepareRetro: (id) =>
             database.write(() => {
                 const record = merged(id);
@@ -110,9 +102,14 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             }),
         proposeRetro: (id, revision, suggestions) =>
             database.write(() => {
-                expectRevision(merged(id), revision);
-
-                const retro = get(id) ?? invalid('The board has not started this retro.');
+                const prior = get(id);
+                const record = open(id, revision, prior);
+                const retro: Retro = prior ?? {
+                    pr: record.pullRequest ?? invalid('Record the delivery PR before proposing Retro follow-ups.'),
+                    suggestions: null,
+                    choice: null,
+                    captures: [],
+                };
 
                 if (
                     !Array.isArray(suggestions) ||
@@ -136,8 +133,11 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
                     invalid('Retro suggestions are already recorded.');
                 }
 
-                retro.delivery.sent = true;
-                retro.delivery.error = null;
+                if (retro.delivery) {
+                    retro.delivery.sent = true;
+                    retro.delivery.error = null;
+                }
+
                 retro.suggestions = suggestions;
                 retro.captures = suggestions.map(() => ({
                     requestId: randomUUID(),
@@ -152,9 +152,9 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             }),
         chooseRetro: (id, revision, selected, by) =>
             database.write(() => {
-                expectRevision(merged(id), revision);
-
                 const retro = get(id) ?? invalid('No retro is awaiting a choice.');
+
+                open(id, revision, retro);
 
                 if (!retro.suggestions?.length || retro.choice) invalid('No retro is awaiting a choice.');
 
@@ -173,7 +173,7 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             }),
         saveRetro: (id, retro) =>
             database.write(() => {
-                merged(id);
+                read(id);
                 save(id, retro);
             }),
     };

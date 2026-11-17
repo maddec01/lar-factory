@@ -44,7 +44,7 @@ export function RetroChoices({
                     {retro.captures[index]?.error && <Alert tone="danger">{retro.captures[index]?.error}</Alert>}
                 </Stack>
             ))}
-            {(error || retro.delivery.error) && <Alert tone="danger">{error || retro.delivery.error}</Alert>}
+            {(error || retro.delivery?.error) && <Alert tone="danger">{error || retro.delivery?.error}</Alert>}
             <Inline wrap>
                 {retro.suggestions?.length && !retro.choice ? (
                     <>

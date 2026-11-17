@@ -1,4 +1,6 @@
-/** The post-merge retro and its board-only follow-up decision. */
+import type { Status } from './item-domain.ts';
+
+/** The build's retro, proposed at handback, and its board-only follow-up decision, settled before merge. */
 export interface RetroSuggestion {
     title: string;
     description: string;
@@ -16,11 +18,13 @@ export interface Retro {
         error: string | null;
         complete: boolean;
     }[];
-    delivery: { threadId: string; commandId: string; messageId: string; sent: boolean; error: string | null };
+    /** The post-merge thread message of builds handed back before Retro moved before merge; new records omit it. */
+    delivery?: { threadId: string; commandId: string; messageId: string; sent: boolean; error: string | null };
 }
 
-export const retroWaits = (retro: Retro | undefined | null): boolean =>
+/** A Done build merged its PR, so its unchosen or uncaptured follow-ups are dropped rather than awaited. */
+export const retroWaits = (retro: Retro | undefined | null, status: Status): boolean =>
     !!retro &&
+    status !== 'Done' &&
     ((!!retro.suggestions?.length && !retro.choice) ||
-        !!retro.delivery.error ||
         !!retro.choice?.selected.some((index) => !retro.captures[index]?.complete));

@@ -92,7 +92,7 @@ export function ItemCard({
     // approval holds it, until it is done.
     const asks = !inConcept || (!complete && !!humanWait(item, unavailable, data.items));
     const wait = deskWait(item, unavailable, data.items);
-    const followups = retroWaits(item.retro);
+    const followups = retroWaits(item.retro, item.status);
     const checks = cardChecks(item, data, disconnected);
     const idle = usePartState(item, asks ? undefined : part, data, !!checks);
     const record = part ? projectWorkMap([item]).nodes[0] : undefined;

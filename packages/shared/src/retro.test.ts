@@ -12,11 +12,10 @@ const retro: Retro = {
     suggestions: [{ title: 'Help', description: 'Clarify examples', repository: 'owner/repo', kind: 'improvement' }],
     choice: null,
     captures: [{ requestId: 'capture', ticketRequestId: 'ticket', workId: null, error: null, complete: false }],
-    delivery: { threadId: 'build', commandId: 'command', messageId: 'message', sent: true, error: null },
 };
 const item = {
     ...sample.items[0],
-    status: 'Done',
+    status: 'Ready to merge',
     threads: [],
     needsYou: undefined,
     parentId: null,
@@ -24,19 +23,31 @@ const item = {
     retro,
 } as unknown as Item;
 
-test('a Done retro has one desk wait even with no T3 pending request or disconnected activity', () => {
+test('a retro before merge has one desk wait even with no T3 pending request or disconnected activity', () => {
     expect(deskWait(item).label).toBe('Choose follow-ups');
     expect(humanWait(item, true)?.action).toEqual({ kind: 'details', label: 'Choose follow-ups' });
     expect(deskItems({ items: [item] }, false)).toEqual([item]);
     expect(deskItems({ items: [item] }, true)).toEqual([item]);
-    expect(retroWaits({ ...retro, suggestions: [] })).toBe(false);
-    expect(retroWaits({ ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } })).toBe(false);
-    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } })).toBe(true);
+    expect(retroWaits({ ...retro, suggestions: [] }, 'Ready to merge')).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } }, 'Ready to merge')).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } }, 'Ready to merge')).toBe(true);
     expect(
-        retroWaits({
-            ...retro,
-            choice: { selected: [0], by: 'Pedro', at: 'today' },
-            captures: [{ ...retro.captures[0]!, complete: true }],
-        }),
+        retroWaits(
+            {
+                ...retro,
+                choice: { selected: [0], by: 'Pedro', at: 'today' },
+                captures: [{ ...retro.captures[0]!, complete: true }],
+            },
+            'Ready to merge',
+        ),
     ).toBe(false);
+});
+
+test('a Done item shows no Choose follow-ups wait', () => {
+    const done = { ...item, status: 'Done' } as Item;
+
+    expect(retroWaits(retro, 'Done')).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } }, 'Done')).toBe(false);
+    expect(humanWait(done, true)).toBeNull();
+    expect(deskWait(done).label).not.toBe('Choose follow-ups');
 });

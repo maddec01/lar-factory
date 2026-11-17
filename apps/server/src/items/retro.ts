@@ -49,7 +49,7 @@ export function createRetro({
     const start = async (id: string, retry = false) => {
         const retro = records!.prepareRetro(id);
 
-        if (!retro || retro.delivery.sent) return;
+        if (!retro?.delivery || retro.delivery.sent) return;
 
         if (retry && retro.delivery.error) {
             // Rejected commands are permanent; an unconfirmed delivery retains its original IDs.
@@ -70,6 +70,8 @@ export function createRetro({
         });
         // The agent may have proposed suggestions while dispatch was in flight.
         const current = records!.retro(id)!;
+
+        if (!current.delivery) return;
 
         current.delivery.sent = current.suggestions !== null || result.outcome === 'accepted';
         current.delivery.error = current.delivery.sent ? null : result.outcome === 'accepted' ? null : result.reason;
@@ -160,7 +162,8 @@ export function createRetro({
 
                 const retro = records.retro(item.id);
 
-                if (retro?.delivery.sent || retro?.delivery.error) continue;
+                // A build that proposed its own retro before merge is never woken by the merge.
+                if (retro && (!retro.delivery || retro.delivery.sent || retro.delivery.error)) continue;
 
                 await run(item.id, () => start(item.id));
             }

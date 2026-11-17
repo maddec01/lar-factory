@@ -19,12 +19,11 @@ const retro: Retro = {
         complete: false,
     })),
     choice: null,
-    delivery: { threadId: 'build', commandId: 'command', messageId: 'message', sent: true, error: null },
 };
 const item = {
     ...sample.items[0]!,
-    status: 'Done' as const,
-    state: 'closed' as const,
+    status: 'Ready to merge' as const,
+    state: 'open' as const,
     parentId: null,
     flow: 'single' as const,
     threads: [],
@@ -40,7 +39,7 @@ const button = (label: string) => [...details().querySelectorAll('button')].find
 const openChoice = () =>
     settle(() => [...card().querySelectorAll('button')].find((node) => text(node) === 'Choose follow-ups')!.click());
 
-test('a compact Done card opens the full choice in details and creates only checked follow-ups', async () => {
+test('a compact card before merge opens the full choice in details and creates only checked follow-ups', async () => {
     fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: null })));
     await mountPage(board);
     expect(document.querySelectorAll('.desk-row')).toHaveLength(1);
@@ -50,6 +49,8 @@ test('a compact Done card opens the full choice in details and creates only chec
     expect(text(card())).not.toContain('Full description');
     expect(card().querySelectorAll('[data-col="side"] button')).toHaveLength(1);
     await openChoice();
+    expect(text(details())).toContain('Choose follow-ups before the pull request can merge.');
+    expect(text(details())).not.toContain('Review the pull request before it can merge.');
     expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
     for (let i = 1; i <= 6; i++) expect(text(details())).toContain(`Full description ${i}.`);
     expect(button('Create chosen follow-ups').disabled).toBe(true);

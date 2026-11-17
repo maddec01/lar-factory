@@ -1,4 +1,4 @@
-import { deskItems, type BoardData, type Item } from '@lar-factory/shared';
+import { deskItems, deskWait, type BoardData, type Item } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,6 +54,7 @@ async function setup() {
                     retro: records.retro(id),
                     updatedAt: work.updatedAt,
                     threads: [],
+                    linkedPrs: [],
                 } as unknown as Item,
             ],
         });
@@ -101,13 +102,12 @@ test('only confirmed merge and Done dispatch the same build retro, exactly once 
     expect(deskItems(s.board.snapshot(), false)).toEqual([]);
 });
 
-test('one desk wait lists all suggestions, creates only picks, and replay makes no duplicate', async () => {
+test('before merge, one desk wait lists all suggestions, creates only picks, and replay makes no duplicate', async () => {
     const s = await setup();
 
-    s.merge();
-    await s.commands.reconcileRetros();
     s.propose();
     expect(deskItems(s.board.snapshot(), false)).toHaveLength(1);
+    expect(deskWait(s.board.find(s.id)!).label).toBe('Choose follow-ups');
     expect(s.board.find(s.id)?.retro?.suggestions).toHaveLength(2);
 
     const result = await s.commands.chooseRetro(s.id, { revision: s.at(), selected: [1] });
@@ -115,17 +115,15 @@ test('one desk wait lists all suggestions, creates only picks, and replay makes 
     expect(result.status).toBe(200);
     expect(s.records.list({ status: 'List' }).map((r) => r.title)).toEqual(['Document a retry']);
     expect(s.records.retro(s.id)?.choice).toMatchObject({ selected: [1], by: 'Pedro' });
-    expect(deskItems(s.board.snapshot(), false)).toEqual([]);
+    expect(deskWait(s.board.find(s.id)!).label).not.toBe('Choose follow-ups');
     await s.commands.retryRetro(s.id);
     expect(s.records.list({ status: 'List' })).toHaveLength(1);
-    expect(s.records.read(s.id).status).toBe('Done');
+    expect(s.records.read(s.id).status).toBe('Ready to merge');
 });
 
 test('a failed ticket keeps its local record and desk retry, with no duplicate capture on retry', async () => {
     const s = await setup();
 
-    s.merge();
-    await s.commands.reconcileRetros();
     s.propose();
     s.board.update({
         repos: [{ repo: 'owner/repo', setup: { createIssuesFromRetro: true } }] as unknown as BoardData['repos'],
@@ -145,11 +143,11 @@ test('a failed ticket keeps its local record and desk retry, with no duplicate c
     expect(receipt.workId).toBeTruthy();
     expect(receipt.complete).toBe(false);
     expect(receipt.error).toBeTruthy();
-    expect(deskItems(s.board.snapshot(), false)).toHaveLength(1);
+    expect(deskWait(s.board.find(s.id)!).label).toBe('Choose follow-ups');
     await commands.retryRetro(s.id);
     expect(s.records.retro(s.id)!.captures[0]?.workId).toBe(receipt.workId);
     expect(s.records.list({ status: 'List' })).toHaveLength(1);
-    expect(s.records.read(s.id).status).toBe('Done');
+    expect(s.records.read(s.id).status).toBe('Ready to merge');
 });
 
 test('a missing build thread does not start a repeated refresh loop after merge', async () => {

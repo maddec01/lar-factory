@@ -30,7 +30,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
     if (
         !item.briefApproval &&
         !item.needsYou &&
-        !retroWaits(item.retro) &&
+        !retroWaits(item.retro, item.status) &&
         !pendingPedroReleaseStep(item.releasePlan) &&
         delegatedBriefApproval(item, all)
     )
@@ -42,7 +42,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
             Array.isArray(item.threads) &&
             item.threads.some((thread) => !thread.observedAt && supersededReleaseQuestion(item, thread))) ||
         outcomeNeedsPedro(item, all) ||
-        retroWaits(item.retro) ||
+        retroWaits(item.retro, item.status) ||
         !!pendingPedroReleaseStep(item.releasePlan) ||
         !!item.briefApproval ||
         item.status === 'Needs you' ||

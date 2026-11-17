@@ -1,7 +1,7 @@
 import type { RepoConfig } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
-/** Disposable, provider-confirmed merge fixtures; never dispatch a real T3 command. */
+/** Disposable builds handed back with Retro proposed before merge; never dispatch a real T3 command. */
 export function sampleRetro(
     records: WorkRecords,
     repos: () => RepoConfig[],
@@ -17,7 +17,7 @@ export function sampleRetro(
 
     let record = records.create({
         repository: repo,
-        title: 'Finished sample build',
+        title: 'Handed-back sample build',
         kind: 'bug',
         status: 'Ready to merge',
     });
@@ -26,14 +26,6 @@ export function sampleRetro(
     record = records.setPullRequest(id, record.revision, `${repo}#998`);
     record = records.addThread(id, record.revision, `sample-retro-${id}`, 'build');
     record = records.setBuildPhase(id, record.revision, 'checks');
-    record = records.observe(id, record.revision, { of: 'pr', state: 'merged' });
-    record = records.update(id, record.revision, { status: 'Done' });
-
-    const retro = records.prepareRetro(id)!;
-
-    retro.delivery.sent = true;
-    records.saveRetro(id, retro);
-    record = records.setBuildPhase(id, records.read(id).revision, 'retro');
     records.proposeRetro(
         id,
         record.revision,

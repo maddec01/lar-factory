@@ -26,7 +26,7 @@ export function RetroFollowups({ item }: { item: Item }) {
         setPending(false);
     };
 
-    if (!item.retro || !retroWaits(item.retro)) return null;
+    if (!item.retro || !retroWaits(item.retro, item.status)) return null;
 
     return (
         <Disclosure

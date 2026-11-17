@@ -141,6 +141,7 @@ export function ItemDialogContent({
                                     primary={noticeActs && <HumanWaitAction item={item} data={data} quiet />}
                                 />
                             )}
+                            {!item.setAside && <RetroFollowups item={item} />}
                             {!group && !item.setAside && <ItemProgress item={item} />}
                             {/* What its agents do now, right after where the work stands, before the ticket's own facts. */}
                             <ItemAgents item={item} />
@@ -148,12 +149,7 @@ export function ItemDialogContent({
                             {item.shapingCleanupProblem && (
                                 <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                             )}
-                            {!item.setAside && (
-                                <>
-                                    <VerifyBuild item={item} />
-                                    <RetroFollowups item={item} />
-                                </>
-                            )}
+                            {!item.setAside && <VerifyBuild item={item} />}
                             {/* A group leads with where its work stands, its parts and then its builds; its map, the long
                                 read, follows them. */}
                             {group && reviewFirst && groupRecord}

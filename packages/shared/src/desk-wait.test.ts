@@ -148,3 +148,30 @@ test('S05 dependency acceptance waits require proof and delivery, and vanish whe
         expect(placementOf(cleared, { all: [cleared], unavailable: false }).sections).not.toContain('desk');
     }
 });
+
+test('a build waits on its own failed checks, conflicts and Verify before Choose follow-ups, then on merging', () => {
+    const retro = {
+        pr: 'owner/repo#1',
+        suggestions: [
+            { title: 'Help', description: 'Clarify', repository: 'owner/repo', kind: 'improvement' as const },
+        ],
+        choice: null,
+        captures: [{ requestId: 'capture', ticketRequestId: 'ticket', workId: null, error: null, complete: false }],
+    };
+    const ready = item({ status: 'Ready to merge', retro });
+    const pr = ready.linkedPrs[0]!;
+
+    expect(deskWait(ready).label).toBe('Choose follow-ups');
+    expect(deskWait(item({ status: 'Ready to merge' })).label).not.toBe('Choose follow-ups');
+    expect(deskWait(item({ status: 'Verify', retro })).label).toBe('Verify build');
+    expect(
+        deskWait({
+            ...ready,
+            linkedPrs: [{ ...pr, checks: { passed: 0, failed: 1, running: 0, total: 1, since: null } }],
+        }).label,
+    ).toBe('Checks failed');
+    expect(deskWait({ ...ready, linkedPrs: [{ ...pr, mergeState: 'conflicts' }] }).label).toBe('Resolve conflicts');
+    expect(deskWait(item({ status: 'Done', linkedPrs: [{ ...pr, state: 'merged' }], retro })).label).not.toBe(
+        'Choose follow-ups',
+    );
+});

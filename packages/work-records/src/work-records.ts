@@ -2576,11 +2576,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         hidden: (retention, now = new Date()) => {
             const days = checkDays(retention?.hideAfterDays, 'days before hiding');
 
-            return database.read(() =>
-                dueRows(retiredRows.all() as unknown as Row[], days, now)
-                    .filter((row) => !records.retroPending(row.work_id))
-                    .map(fromRow),
-            );
+            return database.read(() => dueRows(retiredRows.all() as unknown as Row[], days, now).map(fromRow));
         },
         deleteExpired: (retention, now = new Date()) => {
             if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
@@ -2592,13 +2588,6 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     dueRows(retiredRows.all() as unknown as Row[], days, now).map((row) => [row.work_id, row]),
                 );
                 const kept: Expired['kept'] = [];
-
-                for (const [id] of due) {
-                    if (records.retroPending(id)) {
-                        due.delete(id);
-                        kept.push({ workId: id, reason: 'The post-merge retro is unfinished.' });
-                    }
-                }
 
                 const journals = db
                     .prepare('SELECT plan_id, work_id, content, superseded_by FROM publication_plans')

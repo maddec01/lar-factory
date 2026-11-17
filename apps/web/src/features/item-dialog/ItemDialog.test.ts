@@ -58,7 +58,7 @@ const withThreads = (itemId: string, threads: Item['threads'], data: BoardData =
     items: data.items.map((i) => (i.id === itemId ? { ...i, threads } : i)),
 });
 
-test('Shape opens the model menu, and picking a model starts the item and tags it Started', async () => {
+test('Shape’s chevron opens the model menu, and picking a model starts the item and tags it Started', async () => {
     const withChoices: BoardData = {
         ...sample,
         capture: { session: 's1', enabled: true },
@@ -68,7 +68,7 @@ test('Shape opens the model menu, and picking a model starts the item and tags i
     holdPosts(withChoices);
     await mountPage(withChoices);
     await openItem('I_sample05');
-    await pressMenu(button('start', 'I_sample05'));
+    await pressMenu(button('start-model', 'I_sample05'));
     await settle(() => vi.advanceTimersByTime(20));
     expect($$('[role="menu"] [role="menuitemradio"]').map(text)).toEqual(['Project default in T3', 'GPT-5.5']);
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[1]!.click());
@@ -102,10 +102,8 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     holdPosts(readyBuild);
     await mountPage(readyBuild);
     await openItem('I_sample13');
-    expect(footerControls()).toEqual(['Open thread', 'Build']);
-    await pressMenu(button('start', 'I_sample13'));
-    await settle(() => vi.advanceTimersByTime(20));
-    await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+    expect(footerControls()).toEqual(['Open thread', 'Build', '']);
+    await press(button('start', 'I_sample13'));
     expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
 
     const thread = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };

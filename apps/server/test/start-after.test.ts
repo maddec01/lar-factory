@@ -58,6 +58,46 @@ const arm = (board: Board, itemId: string, model?: unknown) => board.postSession
 const armedPath = (home: string) => join(home, 'Library/Application Support/Lar Factory/armed-starts.json');
 const armedFile = (home: string) => JSON.parse(readFileSync(armedPath(home), 'utf8'));
 
+test('with Auto-build off, a Ready build can be armed at capacity and starts once when a PR frees the slot', async (t) => {
+    const { board } = await armableBoard(t, [build, rawIssue('I_13', 13, 'Ready', ['build'])]);
+
+    assert.equal((await board.postSession({ limit: 1 }, '/api/build-limit')).status, 200);
+    assert.equal((await board.postSession({ on: false }, '/api/auto-build')).status, 200);
+    assert.equal((await board.postSession({ itemId: board.id(12) }, '/api/start-build')).status, 200);
+    await until(board, (data) => !!data.items.find((item) => item.id === board.id(12))?.buildReserved);
+
+    assert.equal((await arm(board, board.id(13), OPUS)).status, 200);
+
+    const waiting = await read(board);
+
+    assert.equal(waiting.autoBuild?.on, false);
+    assert.deepEqual(waiting.armed?.[board.id(13)], { model: OPUS });
+    assert.deepEqual(waiting.armedErrors, {});
+    assert.equal((await board.t3Calls()).length, 1);
+
+    await changeRecords(
+        board,
+        (records) => {
+            const id = board.id(12);
+
+            records.setPullRequest(id, records.read(id).revision, 'maddec01/lar-factory#90');
+            records.observe(id, records.read(id).revision, { of: 'pr', state: 'open' });
+        },
+        board.id(12),
+        (item) => !item.buildReserved,
+    );
+
+    const started = await until(board, (data) => !!data.startedBuilds?.[board.id(13)] && !data.armed?.[board.id(13)]);
+
+    assert.deepEqual(started.armedErrors, {});
+    await read(board);
+
+    const calls = await board.t3Calls();
+
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1]![3], { ...OPUS, options: [] });
+});
+
 /** Asks for a read and waits until it lands. */
 async function read(board: Board): Promise<BoardData> {
     const before = ((await board.board()) as BoardData).fetchedAt;

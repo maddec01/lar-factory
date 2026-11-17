@@ -126,7 +126,7 @@ test('a blocked Ready row offers no Build and says what it starts after; its dia
 test('Start build sends the build with the chosen model, then shows the thread it started in a tag and a toast', async () => {
     holdPosts(unblocked());
     await mountPage(unblocked());
-    await pressMenu(startBuild());
+    await pressMenu($('[data-start-model="I_sample13"]')!);
     expect(dialog(), 'the menu opens without the dialog').toBeNull();
     expect(entries().map(text)).toEqual(['Project default in T3', 'GPT-5.5']);
     await press(entries()[1]!);
@@ -156,8 +156,7 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
 
     holdPosts(data);
     await mountPage(data);
-    await pressMenu(startBuild());
-    await press(entries()[0]!);
+    await press(startBuild());
 
     const started = { threadId: 'stopped-build', title: 'Build maddec01/lar-server#140' };
 
@@ -193,8 +192,7 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
 
     expect(text(again)).toBe('Start again');
     expect(text(dialog()!.querySelector('[data-start]'))).toBe('Start again');
-    await pressMenu(again);
-    await press(entries()[0]!);
+    await press(again);
     expect(posted()).toHaveLength(2);
     expect(text(startBuild())).toBe('Starting…');
     await answer({

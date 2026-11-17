@@ -1,12 +1,13 @@
-// Start after, in place of a blocked item's Start: its menu arms the start on a model choice, so the board server
-// starts the item once every issue it's blocked by closes. It reads "Starts after #n ✓" until then, and pressing it
-// again disarms it. Only an armed one says it starts by itself. A start the server ran by itself and that failed leaves its error on the item. StartOrAfter is
-// the item's Start wherever a start can be blocked: Start after alone while it's blocked.
+// Start after arms a blocked item's start on a model choice. At capacity, Build arms the same start with its saved
+// model; the chevron can choose another model or explicitly start over the limit. The server starts armed work
+// once its prerequisites and capacity allow it. Pressing an armed start again disarms it; a failed start leaves
+// its error on the item. StartOrAfter supplies this behavior wherever work starts.
 
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import {
     startActionChoice,
     blockerGroups,
+    buildWaitsForSlot,
     itemName,
     openBlockerRefs,
     openBlockers,
@@ -24,9 +25,10 @@ import { writeState } from './ActionAvailability';
 import { ICON } from './ButtonIcons';
 import { opensOnChecked } from './ModelMenuFocus';
 import { useOnRow } from './RowContext';
-import { StartControl, StartEntries } from './StartControl';
+import { StartControl } from './StartControl';
+import { StartEntries } from './StartEntries';
 import type { StartKind } from './StartStore';
-import { closeKeepingFocus, notify } from '@/features/notices';
+import { closeKeepingFocus, notify, refocus } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { ActionError, StartAfterButton, StartLine, StartHold, useButtonKind } from '@/ui/board';
@@ -57,6 +59,7 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
 
         if (result.error) notify({ verb: 'Failed', item, message: result.error });
     });
+    refocus([`[data-start-after="${CSS.escape(item.id)}"]`, `[data-start="${CSS.escape(item.id)}"]`]);
 }
 
 /** Start after #n (or Part n, or Start when unblocked), or Starts after #n ✓ while armed, a Start. */
@@ -65,21 +68,27 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
     const onRow = useOnRow();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
+    const inFlight = useRef(false);
     const after = startsAfter(item);
-
-    if (!after) return null;
+    const slot = !openBlockers(item).length && kind === 'build';
 
     const armed = !!data.armed?.[item.id];
     // The button names it shortly (#n, Part n, or when unblocked); its tooltip names every blocker in full.
-    const { label } = startActionChoice(item, kind, { prerequisite: startAfterRef(item, data.items), armed });
+    const label = slot
+        ? 'Starts after a slot frees'
+        : startActionChoice(item, kind, { prerequisite: startAfterRef(item, data.items), armed }).label;
     const writes = pending ? { 'aria-disabled': true as const } : writeState(data);
     const held = Boolean(writes['aria-disabled']);
     const run = async (choice: ModelChoice | undefined | null) => {
+        if (inFlight.current) return;
+
+        inFlight.current = true;
         setPending(true);
 
         try {
             await setArmed(item, choice);
         } finally {
+            inFlight.current = false;
             setPending(false);
         }
     };
@@ -93,7 +102,7 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
                 data-start-after={item.id}
                 aria-pressed
                 aria-label={`${label} for ${itemName(item)}`}
-                title={`Starts by itself once ${waitsFor(item)}. Pressing it again disarms it`}
+                title={`Starts by itself once ${slot ? 'a build slot frees' : waitsFor(item)}. Pressing it again disarms it`}
                 {...writes}
                 onClick={() => !held && void run(null)}
             >
@@ -101,6 +110,10 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
             </StartAfterButton>
         );
     }
+
+    if (slot) return <StartControl item={item} data={data} kind={kind} afterSlot={{ pending, arm: run }} />;
+
+    if (!after) return null;
 
     const pick = (choice: ModelChoice | undefined) => {
         flushSync(() => setOpen(false));
@@ -136,9 +149,12 @@ function StartAfter({ item, data, kind }: { item: Item; data: BoardData; kind: S
     );
 }
 
-/** Whether StartOrAfter shows Start after: a blocker is open, and its repository holds no start or one is armed. */
-const showsStartAfter = (item: Item, data: BoardData): boolean =>
-    openBlockers(item).length > 0 && (!startHold(data, item.repo) || !!data.armed?.[item.id]);
+/** Keep armed starts visible through capacity changes, so they can still be disarmed. */
+const showsStartAfter = (item: Item, data: BoardData, kind: StartKind): boolean =>
+    (openBlockers(item).length > 0 ||
+        (kind === 'build' &&
+            (buildWaitsForSlot(item, data) || (item.status === 'Ready' && !!data.armed?.[item.id])))) &&
+    (!startHold(data, item.repo) || !!data.armed?.[item.id]);
 
 /**
  * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does its
@@ -168,7 +184,7 @@ export function StartOrAfter({
 
     const { label } = startActionChoice(item, kind);
 
-    if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} kind={kind} />;
+    if (showsStartAfter(item, data, kind)) return <StartAfter item={item} data={data} kind={kind} />;
 
     const hold = startHold(data, item.repo);
 

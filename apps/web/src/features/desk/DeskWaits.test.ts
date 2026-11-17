@@ -47,7 +47,7 @@ test('a stopped build reaches the desk, keeps its Build row and offers the retry
     const retry = card().querySelector('[data-start]')!;
 
     expect(text(retry)).toBe('Retry start');
-    await pressMenu(retry);
+    await pressMenu(card().querySelector('[data-start-model]')!);
     expect($('[role="menu"]')).not.toBeNull();
     expect(text($('[role="menu"]'))).toContain('Project default');
 

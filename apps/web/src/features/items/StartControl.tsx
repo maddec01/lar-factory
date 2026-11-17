@@ -1,12 +1,9 @@
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-// Start on a Queued item, or Start build on a Ready one, as a menu button: Start opens a menu on
-// the highlighted entry, arrow keys move, Enter or a click picks and starts, and Escape, Tab or a
-// click outside closes it.
+// Start uses the remembered model, or Project default in T3. The adjacent chevron opens the model
+// menu on that choice; picking an entry starts with it, while Escape, Tab or a click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 import {
     startActionChoice,
-    buildsAtWork,
-    limitNumber,
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
@@ -14,10 +11,9 @@ import {
     highlightedChoice,
     itemName,
     ref,
-    repositoryT3Default,
     startProgressOf,
 } from '@lar-factory/shared';
-import { Button, DropdownMenu } from '@lar-works/design-system';
+import { Button, DropdownMenu, Inline } from '@lar-works/design-system';
 import { ChevronDownIcon } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -25,10 +21,10 @@ import { flushSync } from 'react-dom';
 import { writeState } from './ActionAvailability';
 import { useItemAction } from './ActionStore';
 import { ICON } from './ButtonIcons';
-import { ModelEntries } from './ModelEntries';
 import { opensOnChecked } from './ModelMenuFocus';
 import { OpenThread } from './OpenThread';
 import { useOnRow } from './RowContext';
+import { StartEntries } from './StartEntries';
 import { startItem } from './StartItem';
 import type { StartKind } from './StartStore';
 import { PURPOSE, useStart, useStartStore } from './StartStore';
@@ -37,34 +33,6 @@ import { closeKeepingFocus, notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { ActionError, StartGroup, StartLine, StartNote, StartTag, useButtonKind } from '@/ui/board';
-
-/** "Project default in T3", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
-export function StartEntries({
-    item,
-    data,
-    onPick,
-    requireModel = false,
-}: {
-    item: Item;
-    data: BoardData;
-    requireModel?: boolean;
-    onPick: (choice: ModelChoice | undefined) => void;
-}) {
-    const lastChoice = useStartStore((state) => state.lastChoice);
-
-    return (
-        <ModelEntries
-            groups={data.modelChoices}
-            t3Default={repositoryT3Default(data, item.repo)}
-            selected={highlightedChoice(data.modelChoices, lastChoice)}
-            heading="Start with"
-            held={data.capture?.enabled === false ? 'Disabled in sample mode' : undefined}
-            defaultHeld={requireModel ? 'Choose a model to continue in the existing worktree.' : undefined}
-            itemId={item.id}
-            onPick={onPick}
-        />
-    );
-}
 
 /**
  * Start, a Start button named `label`, or the tag that took its place. `linkedBeside` names a thread Open thread
@@ -75,19 +43,27 @@ export function StartControl({
     data,
     kind = 'refine',
     linkedBeside,
+    afterSlot,
 }: {
     item: Item;
     data: BoardData;
     kind?: StartKind;
     linkedBeside?: string | undefined;
+    /** Reuses Start after's authorization while capacity is full. Menu models arm; the explicit override starts now. */
+    afterSlot?: { pending: boolean; arm: (choice: ModelChoice | undefined) => Promise<void> };
 }) {
     const { label } = startActionChoice(item, kind);
     const kindOf = useButtonKind();
     const onRow = useOnRow();
-    const { pending, uncertain, error } = useShownStart(item, data, kind);
+    const shown = useShownStart(item, data, kind);
+    const { uncertain, error } = shown;
+    const pending = shown.pending || !!afterSlot?.pending;
     const closed = useStart(item.id, kind)?.phase === 'closed';
     const action = useItemAction(item.id);
+    const lastChoice = useStartStore((state) => state.lastChoice);
     const [open, setOpen] = useState(false);
+    const primary = useRef<HTMLButtonElement>(null);
+    const picked = useRef(false);
     const thread = startedThread(item, data, kind);
     const threads = Array.isArray(item.threads) ? item.threads : [];
     // An unrecorded shaping thread can explain refining, but never a build that hasn't started.
@@ -139,22 +115,37 @@ export function StartControl({
     }
 
     const retry = kind === 'build' && canRetryBuild(item);
-    // A build that links a PR holds no slot, so restarting it never goes over the limit.
-    const exceedsLimit =
-        kind === 'build' &&
-        data.buildLimit &&
-        !item.linkedPrs?.length &&
-        !buildsAtWork({ items: [item] }).length &&
-        buildsAtWork(data).length >= limitNumber(data.buildLimit);
-    const verb = pending ? 'Starting…' : error || retry ? 'Retry start' : stopped && !resume ? 'Start again' : label;
-    // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
-    const state =
-        data.capture?.enabled === false ? {} : pending ? { 'aria-disabled': true as const } : writeState(data, action);
-    const held = Boolean(state['aria-disabled']);
-    const pick = (choice: ModelChoice | undefined) => {
-        // Close first, so focus is back on Start before it relabels.
+    const verb = pending
+        ? afterSlot
+            ? 'Arming…'
+            : 'Starting…'
+        : error || retry
+          ? 'Retry start'
+          : stopped && !resume
+            ? 'Start again'
+            : label;
+    const state = pending ? { 'aria-disabled': true as const } : writeState(data, action);
+    // Sample mode keeps the chevron open-able, so the model choices can be seen; Start and the entries start nothing.
+    const menuState = data.capture?.enabled === false ? {} : state;
+    const held = Boolean(menuState['aria-disabled']);
+    const pick = (choice: ModelChoice | undefined, now = false) => {
+        if (state.disabled || state['aria-disabled']) return;
+
+        // Menu selection returns focus to the main action before it relabels. Dismissal returns to the chevron.
+        picked.current = open;
         flushSync(() => setOpen(false));
-        void startItem(item.id, choice, kind);
+
+        if (afterSlot && !now) void afterSlot.arm(choice);
+        else void startItem(item.id, choice, kind);
+    };
+    const returnAfterPick = {
+        onCloseAutoFocus: (event: Event) => {
+            if (!picked.current) return;
+
+            picked.current = false;
+            event.preventDefault();
+            primary.current?.focus({ preventScroll: true });
+        },
     };
 
     return (
@@ -170,31 +161,63 @@ export function StartControl({
                           )}
                       </>
                   )}
-            <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-                <DropdownMenu.Trigger asChild>
-                    <Button
-                        {...kindOf(onRow ? 'start' : 'main')}
-                        busy={pending}
-                        leftIcon={!retry && ICON.play}
-                        rightIcon={!pending && <ChevronDownIcon />}
-                        data-start={item.id}
-                        aria-label={`${verb} ${itemName(item)}`}
-                        {...state}
-                    >
-                        {verb}
-                    </Button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content
-                    width="md"
-                    height="capped"
-                    align="end"
-                    aria-label={`Start ${ref(item)} with`}
-                    {...opensOnChecked}
+            <Inline
+                as="span"
+                inline
+                align="center"
+                space="tight"
+                role="group"
+                aria-label={`${label} ${itemName(item)}`}
+            >
+                <Button
+                    ref={primary}
+                    {...kindOf(onRow ? 'start' : 'main')}
+                    busy={pending}
+                    leftIcon={!retry && ICON.play}
+                    data-start={item.id}
+                    aria-label={`${verb} ${itemName(item)}`}
+                    title={afterSlot ? 'Start after a slot frees' : undefined}
+                    {...state}
+                    onClick={() => pick(highlightedChoice(data.modelChoices, lastChoice))}
                 >
-                    <StartEntries item={item} data={data} onPick={pick} />
-                </DropdownMenu.Content>
-            </DropdownMenu>
-            {exceedsLimit && !pending && <StartNote>Starting now will go over the limit.</StartNote>}
+                    {verb}
+                </Button>
+                <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
+                    <DropdownMenu.Trigger asChild>
+                        <Button
+                            {...kindOf(onRow ? 'start' : 'main')}
+                            iconOnly
+                            leftIcon={<ChevronDownIcon />}
+                            data-start-model={item.id}
+                            aria-label={`Choose ${afterSlot ? 'start options' : 'model'} for ${itemName(item)}`}
+                            {...menuState}
+                        />
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content
+                        width="md"
+                        height="capped"
+                        align="end"
+                        aria-label={`Start ${ref(item)} with`}
+                        {...opensOnChecked}
+                        {...returnAfterPick}
+                    >
+                        {afterSlot && (
+                            <>
+                                <DropdownMenu.Item
+                                    disabled={data.capture?.enabled === false}
+                                    onSelect={() => pick(highlightedChoice(data.modelChoices, lastChoice), true)}
+                                >
+                                    Start now (over the limit)
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Separator />
+                                <DropdownMenu.Label>Start after a slot frees</DropdownMenu.Label>
+                            </>
+                        )}
+                        <StartEntries item={item} data={data} onPick={(choice) => pick(choice)} />
+                    </DropdownMenu.Content>
+                </DropdownMenu>
+            </Inline>
+            {afterSlot && !pending && <StartNote>Start after a slot frees.</StartNote>}
         </StartGroup>
     );
 }

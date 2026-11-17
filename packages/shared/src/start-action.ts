@@ -1,8 +1,17 @@
-import { decisionType } from './board-domain.ts';
+import { decisionType, limitNumber, type BoardData } from './board-domain.ts';
 import type { Item } from './item-domain.ts';
 import { openBlockers } from './item-domain.ts';
 import { blockerRef } from './presentation.ts';
-import { canResumeShaping } from './thread-domain.ts';
+import { buildsAtWork, canResumeShaping } from './thread-domain.ts';
+
+/** A new Ready delivery waits for capacity; resuming a reserved build or one with a PR needs no new slot. */
+export const buildWaitsForSlot = (item: Item, data: BoardData): boolean =>
+    item.status === 'Ready' &&
+    item.kind !== 'concept' &&
+    !!data.buildLimit &&
+    !item.linkedPrs?.length &&
+    !buildsAtWork({ items: [item] }).length &&
+    buildsAtWork(data).length >= limitNumber(data.buildLimit);
 
 /** Local kinds win; legacy unrecorded tickets may still carry a decision-method label. */
 export const isDecisionWork = (item: Item): boolean =>

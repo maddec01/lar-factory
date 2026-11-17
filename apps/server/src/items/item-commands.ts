@@ -49,6 +49,7 @@ import { executionMismatch } from '@lar-factory/shared/execution-target';
 import { unseenMerge } from '@lar-factory/shared/group-reconciliation';
 import type { BuildMethod, ExecutionSettings } from '@lar-factory/shared/run-settings';
 import {
+    readAutoBuild,
     readShapingThreadCleanup,
     WorkRecordError,
     type BuildPreparation,
@@ -463,6 +464,7 @@ export function createItemCommands({
     const contextFor = (release: string | undefined): FactoryThreadContext => ({
         ...environment,
         ...skillEntries(release, environment.dataDir),
+        autoBuild: readAutoBuild(environment.dataDir).on,
     });
 
     /** Saves only this ticket, retaining its text while a closed-ticket persistence failure is retried. */
@@ -885,10 +887,17 @@ export function createItemCommands({
         };
         // An intent recorded before thread names carried a phase started its thread with the earlier message; one with
         // no run may have started either runtime block.
-        const messages = (snapshot ? [context] : [context, { ...context, earlier: true }]).flatMap((form) =>
+        // Auto-build is a live setting, not a frozen run choice. Recovery also matches either launch-time value
+        // and prompts from before the switch was supplied.
+        const contexts =
             intent.purpose === PURPOSES.startedBuilds
-                ? [buildMessage(item, form), earlierBuildMessage(item, form)]
-                : [workMessage(item, form), earlierWorkMessage(item, form), reconcileMessage(item, form)],
+                ? [context]
+                : [context, { ...context, autoBuild: !context.autoBuild }, { ...context, autoBuild: undefined }];
+        const messages = (snapshot ? contexts : contexts.flatMap((form) => [form, { ...form, earlier: true }])).flatMap(
+            (form) =>
+                intent.purpose === PURPOSES.startedBuilds
+                    ? [buildMessage(item, form), earlierBuildMessage(item, form)]
+                    : [workMessage(item, form), earlierWorkMessage(item, form), reconcileMessage(item, form)],
         );
 
         let rereadStarted = () => {};

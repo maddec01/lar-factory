@@ -2,8 +2,9 @@ Ported from mattpocock/skills (skills/engineering/diagnosing-bugs); see UPSTREAM
 
 # Diagnose bugs
 
-Input: confirmed failing behavior and repository. Output: cause, evidence,
-open questions and a failing regression test to write. Stop before fixing the
+Input: reported failing behavior and repository. Output: cause, evidence,
+open questions and a failing regression test to write, or evidence that the
+symptom does not reproduce on the current default revision. Stop before fixing the
 product. Read relevant glossary/ADRs. Skip phases only with explicit reasons.
 
 Redact every secret as `<REDACTED>` before showing commands or artifacts.
@@ -28,8 +29,14 @@ rate. A rare flake is not enough.
 Before forming a theory, name one command already run, with redacted invocation
 and output, that exercises the actual bug path, can detect this symptom, runs
 in seconds and is agent-runnable. Human steps require the structured script.
-Without this loop, stop and list attempts; request the reproducing environment,
-a redacted capture or permission for temporary production instrumentation.
+When the reported symptom does not reproduce on the freshly fetched default
+revision, return that result and the exact path exercised to the shaping owner.
+Do not require a failing test or reproduction details for a symptom that current
+code already handles. The owner follows Size up's already-fixed question before
+any further diagnosis.
+
+Otherwise, without this loop, stop and list attempts; request the reproducing
+environment, a redacted capture or permission for temporary production instrumentation.
 
 ## 2. Reproduce and minimise
 

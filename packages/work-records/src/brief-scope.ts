@@ -12,6 +12,7 @@ export interface BriefScope {
     behaviour: string[];
     excluded: string[];
     size: 'Small' | 'Larger' | null;
+    /** Human judgment or access the agent lacks; an ordinary UI change alone does not require Verify. */
     verify: { required: boolean; visibleUi: string | null };
 }
 interface ScopeDifference {
@@ -28,7 +29,7 @@ export interface ScopeCheck {
 const invalid = (): never => {
     throw new WorkRecordError(
         'invalid',
-        'Scope needs {tests:[],behaviour:[],excluded:[],size:"Small"|"Larger"|null,verify:{required:boolean,visibleUi:string|null}}; Verify is only for visible UI behaviour a person must check.',
+        'Scope needs {tests:[],behaviour:[],excluded:[],size:"Small"|"Larger"|null,verify:{required:boolean,visibleUi:string|null}}; Verify is only for acceptance needing human judgment or access the agent lacks. An ordinary UI change alone does not require it.',
     );
 };
 const object = (value: unknown, keys: string[]): Record<string, unknown> => {

@@ -53,7 +53,7 @@ The list in Settings of work that has left the board, including work set aside b
 _Avoid_: trash, deleted items.
 
 **Spec**:
-The refined brief as it appears as a ticket's main description after shaping.
+The refined brief as it appears as a ticket's main description after shaping. Its Confirmed section holds product decisions only and is omitted when empty. The final brief gate is its approval; settled work can take its scope from the submitted request, including each repository's named role in a linked outcome, without a separate confirmation question. Repository involvement left open by the request still needs an answer.
 _Avoid_: refined ticket.
 
 **Original**:

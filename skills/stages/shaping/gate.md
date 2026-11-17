@@ -19,7 +19,8 @@ and board approval, or its generated board wait.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
 4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
-   verbatim; ask Pedro to use Approve brief in the board, then stop.
+   verbatim. Explain approval's Auto-build behavior as below; ask Pedro to use
+   Approve brief in the board, then stop.
    The gate generates its wait; never save a Needs you duplicate. Feedback
    returns to Shaping and Doubt. Reshape always requires renewed approval. Keep approval in gate evidence, never Confirmed.
    For grouped work, inspect `lar-work gate-batch --file ids.json`: complete briefs,
@@ -35,7 +36,15 @@ and board approval, or its generated board wait.
    affected briefs and save the map. Rerun Doubt and approval for changed packages.
 5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.
-   Starting later follows [Start build](start-build.md); a gate alone launches nothing.
+   In the handback, say what approval will do using the runtime block's saved
+   Auto-build setting: **on** means the board automatically starts eligible
+   approved builds as capacity and blockers allow (and after group refinement);
+   **off** means they wait for a board start unless their group is already
+   authorized to run. If the setting is absent or may have changed, direct
+   Pedro to the board's displayed Auto-build setting rather than
+   guessing. Apply this to single and grouped approval and resumed Ready work.
+   Never say approval requires a separate Build action when Auto-build is on.
+   The board owns every launch per [Start build](start-build.md).
 
 After group scope changes or board approval (single/batch), resume
 [Reconcile group](shared/reconcile-group.md).

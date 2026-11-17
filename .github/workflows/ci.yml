@@ -149,6 +149,10 @@ jobs:
               if: ${{ !cancelled() && steps.install.outcome == 'success' }}
               run: bash skills/shared/scripts/repo-config.test.sh
 
+            - name: Shaping default revision tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: bash skills/shared/scripts/shaping-base.test.sh
+
     macos:
         name: macOS tests
         # The desktop tests need macOS, and the worktree setup test reads file times

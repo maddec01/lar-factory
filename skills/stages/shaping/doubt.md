@@ -10,6 +10,11 @@ Run `lar-work brief-scope-check <work ID>` first; missing confirmation or drift
 is an incomplete finding. Check destination, current answers, siblings,
 contracts, blockers, Dependencies and release constraints together. Challenge
 endpoint, hosting, redirect and CORS assumptions against code in every affected repo.
+Use the exact repository/ref/revision evidence from [Explore](pick-up.md#explore),
+reading code at those revisions rather than the project's working files. Missing
+revision evidence needs Explore first; after a related merge, refresh the affected
+repository and check the brief against it. Return the revisions checked in local
+review evidence.
 
 Normally run no suite, build, typecheck or lint. Run only the smallest command
 needed to resolve a named uncertainty reading cannot settle. Follow the supplied
@@ -23,7 +28,9 @@ Check every category:
 - Incomplete: cover error, empty, slow, cancelled and permission states; every
   affected platform; migrations, deployment, existing data and choices otherwise
   left to the builder.
-- Assumption: every relied-on assumption appears in Confirmed.
+- Assumption: product decisions appear in Confirmed; routine engineering defaults
+  are explicit in Notes for the builder. Resolve missing storage/error defaults
+  with the simplest safe behaviour, without unrequested UI or a user question.
 - Repository: changes outside this repo belong to an authorized build there or
   the owning team's Dependency, named in Notes for the builder.
 - Provider writes: reject progress in ticket bodies, comments, labels, tags or

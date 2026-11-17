@@ -27,6 +27,23 @@ Send it through Gate again with new final confirmation before marking it Ready. 
 
 ## Explore
 
+For each repository whose code or contracts inform this work, run
+`bash <this skill>/shared/scripts/shaping-base.sh <checkout>` first. It discovers
+origin's advertised default, fetches it and returns its ref and exact revision;
+the project's local branch, origin/HEAD and working files may be stale. If this
+fails, resolve the access/fetch problem before making code or scope claims;
+never fall back to local main. Repeat on resumed shaping before new claims.
+
+Read the returned revision with `git -C <checkout> show <revision>:<path>`,
+`git -C <checkout> grep <pattern> <revision> -- <paths>` and `git ls-tree`,
+not files from the current checkout. If tools need working files, use a detached
+scratch worktree at that revision. Leave the project's branch and edits alone.
+Read repository glossary/ADRs at that same revision; machine-local domain docs
+stay at their configured paths. Save each repository, ref and full revision with
+the findings in local thread evidence and carry them in handoffs and delegated
+reports, never in the team-facing Spec. Refresh affected repositories after a
+related merge before settling a contract or correcting a brief.
+
 Follow project instructions already supplied. Do not search for repository guidance or config files
 in the checkout or its parents. Read neighboring code, the glossary and relevant ADRs
 at paths supplied from local Project settings,

@@ -43,9 +43,9 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 (r) => records.update(id, r, patch),
             ),
         retitle: (id, rev, title) => apply(id, rev, ['title'], (r) => records.retitle(id, r, title)),
-        confirmScope: (id, rev, scope, by, response) =>
+        confirmScope: (id, rev, scope, by, response, source) =>
             apply(id, rev, [...active, 'title', 'confirmedScope', 'gate'], (r) =>
-                records.confirmScope(id, r, scope, by, response),
+                records.confirmScope(id, r, scope, by, response, source),
             ),
         recordKindAnswer: (id, rev, answer) =>
             apply(id, rev, ['kind', 'kindAnswer', 'ticket'], (r) => records.recordKindAnswer(id, r, answer)),

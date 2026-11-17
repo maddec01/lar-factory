@@ -12,7 +12,7 @@ import type {
     Status,
 } from '@lar-factory/shared';
 import type { RunSettings } from '@lar-factory/shared/run-settings';
-import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { openWorkRecords, writeAutoBuild, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -2116,6 +2116,35 @@ for (const kind of ['issue', 'build'] as const)
         assert.doesNotMatch(message, /LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)/);
         assert.ok(!message.includes(JSON.stringify(runs[0]!.roles)), 'role targets reach children through role-launch');
         assert.doesNotMatch(message, /Default every delegated role/);
+    });
+
+for (const on of [true, false])
+    test(`shaping receives saved Auto-build ${on ? 'on' : 'off'} and recovers after the switch changes`, async () => {
+        const board = await runBoard('issue');
+
+        writeAutoBuild({ on }, board.dir);
+        board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+        await board.start();
+
+        const sent = board.t3.started[0]!;
+
+        assert.match(runtimeBlocks(sent)[0]!, new RegExp(`^Saved Auto-build at launch: ${on ? 'on' : 'off'};`, 'm'));
+        assert.match(sent, /the board starts eligible approved builds through Auto-build or a user start/);
+        assert.doesNotMatch(sent, /unless the user later chooses Start build/);
+
+        writeAutoBuild({ on: !on }, board.dir);
+        await board.start();
+
+        assert.ok(board.t3.recovered[0]!.includes(sent), 'recovery retains the launch-time setting');
+        assert.ok(
+            board.t3.recovered[0]!.some(
+                (message) =>
+                    !message.includes('Saved Auto-build') &&
+                    message.includes('unless the user later chooses Start build'),
+            ),
+            'recovery still recognizes shaping prompts sent before Auto-build was supplied',
+        );
+        assert.equal(board.t3.started.length, 1, 'an uncertain launch is not duplicated');
     });
 
 for (const kind of ['issue', 'build'] as const) {

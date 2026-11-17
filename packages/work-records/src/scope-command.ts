@@ -20,6 +20,7 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
                 file: { type: 'string' },
                 identity: { type: 'string' },
                 evidence: { type: 'string' },
+                source: { type: 'string' },
                 markdown: { type: 'boolean' },
             },
         });
@@ -33,8 +34,15 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
         records = agentWrites(await openWorkRecords(workRecordsPath(values['data-dir'])));
 
         if (command === 'confirm-scope') {
-            if (!values.file || !values.revision || !values.identity || !values.evidence)
-                throw new Error('Use --revision N --file F --identity person --evidence "explicit response".');
+            const source = values.source ?? 'user-response';
+
+            if (source !== 'submitted-request' && source !== 'user-response')
+                throw new Error('--source must be submitted-request or user-response.');
+
+            if (!values.file || !values.revision)
+                throw new Error(
+                    'Use --revision N --file F with --source submitted-request, or --identity person --evidence "explicit response".',
+                );
 
             records.confirmScope(
                 id,
@@ -42,6 +50,7 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
                 JSON.parse(readFileSync(values.file === '-' ? 0 : values.file, 'utf8')),
                 values.identity,
                 values.evidence,
+                source,
             );
         }
 
@@ -53,7 +62,10 @@ export async function scopeCommand(command: string, args: string[]): Promise<num
                   ? records.chooseStructure(id)
                   : confirmed;
 
-        if (!result) throw new Error('No confirmed scope. Run confirm-scope at understanding confirmation.');
+        if (!result)
+            throw new Error(
+                'No confirmed scope. Run confirm-scope with the submitted request or an explicit response as its source.',
+            );
 
         if (
             command === 'brief-scope-check' &&

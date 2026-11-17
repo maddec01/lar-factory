@@ -11,6 +11,12 @@ Leave product changes for Build; keep prototypes on their branch. Never merge
 or push the default branch. Follow project commit rules and
 [cross-repository citations](shared/cross-repo-citations.md).
 
+Before making code, scope or contract claims, follow [Explore](pick-up.md#explore)
+against each affected repository's freshly fetched default revision, including
+on resumed shaping and decisions. Keep the explored revisions in local thread
+evidence. Ask only about unresolved user-visible product behaviour; choose the
+simplest safe engineering defaults and state them in the brief.
+
 - New or resumed work: [Pick up](pick-up.md), then its selected route.
 - Fresh shaping: [Size up](size-up.md); settled questions go to
   [Brief](brief.md), then [Gate](gate.md). Shaping ends at Ready.

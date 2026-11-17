@@ -20,6 +20,8 @@ import {
     isLiveThread,
     isOnboarding,
     kindCanChange,
+    reconcileGroupWaits,
+    reconcileMessage,
     sameRepo,
     workMessage,
     runSettingsMessage,
@@ -45,6 +47,7 @@ import type {
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { executionMismatch } from '@lar-factory/shared/execution-target';
+import { unseenMerge } from '@lar-factory/shared/group-reconciliation';
 import type { BuildMethod } from '@lar-factory/shared/run-settings';
 import {
     readShapingThreadCleanup,
@@ -861,7 +864,7 @@ export function createItemCommands({
         const messages = (
             intent.purpose === PURPOSES.startedBuilds
                 ? [buildMessage(item, context), earlierBuildMessage(item, context)]
-                : [workMessage(item, context), earlierWorkMessage(item, context)]
+                : [workMessage(item, context), earlierWorkMessage(item, context), reconcileMessage(item, context)]
         ).map((message) => (snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message));
 
         return track(
@@ -1409,6 +1412,36 @@ export function createItemCommands({
         return observedOnly && records!.dependency(dependencyId).revision === range.to ? range.to : revision;
     }
 
+    /**
+     * After a part's PR merges, saves its group's checklist and resolves the items whose only changes are lifecycle fields.
+     * Only a group whose refreshed checklist shows an unseen merge-shaped part with a merged PR is read again.
+     */
+    function reconcileMergedGroups() {
+        if (!records) return;
+
+        let changed = false;
+
+        const merged = (workId: string) => !!board.find(workId)?.linkedPrs.some((pr) => pr.state === 'merged');
+
+        for (const item of board.snapshot().items) {
+            if (
+                item.recorded === false ||
+                item.parentId ||
+                !item.reconciliation ||
+                !unseenMerge(item.reconciliation, merged)
+            )
+                continue;
+
+            try {
+                changed = !!records.reconcileAfterMerge(item.id) || changed;
+            } catch {
+                /* A group unread this refresh reconciles on the next. */
+            }
+        }
+
+        if (changed) reread();
+    }
+
     /** Moves the item's parent record to In progress, unless it's a build or there already: the error to show, else null. */
     function parentInProgress({ parentId }: Item): string | null {
         showObservations();
@@ -1439,6 +1472,7 @@ export function createItemCommands({
             await verifying.reconcileVerificationFixes();
             await releases.reconcileReleaseContinuations();
             await outcomes.reconcileOutcomeChecks();
+            reconcileMergedGroups();
 
             const warnings = { ...board.snapshot().startCheckFailures };
 
@@ -1708,9 +1742,12 @@ export function createItemCommands({
                             error: "A thread already owns this item's shaping stage. Open thread to continue.",
                         });
 
-                    if (item.status !== 'Queued' && !canResumeShaping(item))
+                    // A group past shaping starts its parent's thread only to settle a Reconcile group wait.
+                    const reconciling = !['Queued', 'Shaping'].includes(item.status) && reconcileGroupWaits(item);
+
+                    if (item.status !== 'Queued' && !canResumeShaping(item) && !reconciling)
                         return reply(409, {
-                            error: `Only Queued items or stopped shaping sessions can be started; this one is in ${item.status}.`,
+                            error: `Only Queued items, stopped shaping sessions or groups waiting on Reconcile group can be started; this one is in ${item.status}.`,
                         });
 
                     const busy = busyReason(itemId, 'start');
@@ -1752,7 +1789,8 @@ export function createItemCommands({
                             current,
                             'started',
                             repoProject.projectId,
-                            (context) => workMessage(current, context),
+                            (context) =>
+                                reconciling ? reconcileMessage(current, context) : workMessage(current, context),
                             choice,
                             (text, selection, context) =>
                                 startIn(

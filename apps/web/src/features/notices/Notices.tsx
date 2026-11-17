@@ -19,8 +19,8 @@ export type Notice =
     | { verb: 'Abandoned'; item: Item }
     /** The ticket of work Abandon set aside closed. */
     | { verb: 'Closed'; item: Item }
-    /** A Queued card's Move to List (`to`), Abandon, or the ticket close after it (`ticket`) failed. */
-    | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; message: string }
+    /** A Queued card's Move to List (`to`), Abandon, the ticket close after it (`ticket`) or a Reconcile group start (`reconcile`) failed. */
+    | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; reconcile?: true; message: string }
     | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
 /** The destination by the board's proper name, the List as "the List" in a sentence. */
@@ -43,7 +43,11 @@ function toastOf(notice: Notice): Toast {
                 body: (
                     <>
                         Couldn’t{' '}
-                        {notice.startError ? (
+                        {notice.reconcile ? (
+                            <>
+                                start reconciling <TitleLink item={item} />
+                            </>
+                        ) : notice.startError ? (
                             <>
                                 clear the start error of <TitleLink item={item} />
                             </>
@@ -65,7 +69,7 @@ function toastOf(notice: Notice): Toast {
                 ),
                 // Back to the button that failed.
                 focusAfter: [
-                    `[data-${notice.startError ? 'start' : notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`,
+                    `[data-${notice.reconcile ? 'reconcile-group' : notice.startError ? 'start' : notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`,
                 ],
             };
         case 'Started': {

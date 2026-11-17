@@ -175,3 +175,48 @@ test('a build waits on its own failed checks, conflicts and Verify before Choose
         'Choose follow-ups',
     );
 });
+
+const pending = (key: string, changes: string[], requiresFix = false) =>
+    ({ key, digest: key, kind: 'map', workId: 'part', summary: key, changes, requiresFix }) as const;
+const group = (items: ReturnType<typeof pending>[], patch: Partial<Item> = {}) =>
+    item({
+        flow: 'linked',
+        linkedPrs: [],
+        reconciliation: { groupId: 'group', digest: 'd', items, completed: [], pending: items },
+        ...patch,
+    });
+
+test('a group parent waits on Reconcile group only for saved items a thread must judge', () => {
+    const reconcile = { label: 'Reconcile group', action: { kind: 'reconcile-group', label: 'Reconcile group' } };
+
+    expect(
+        deskWait(group([pending('map:part', ['status', 'finishedAt']), pending('map:sibling', ['status'])])),
+    ).not.toEqual(reconcile);
+    expect(deskWait(group([pending('map:part', ['brief', 'status'])]))).toEqual(reconcile);
+    expect(
+        deskWait(
+            group([
+                pending('release-evidence:ship', ['part'], true),
+                pending('outcome:group', [], true),
+                pending('release:ship', ['evidence']),
+                pending('release-outcome:group', ['result', 'evidence']),
+            ]),
+        ),
+    ).not.toEqual(reconcile);
+    expect(
+        deskWait(
+            group([pending('map:part', ['brief'])], { threads: [{ ...stopped, purpose: 'shape', state: 'running' }] }),
+        ),
+    ).not.toEqual(reconcile);
+});
+
+test('a pending release step at the last merge shows Release step, not Reconcile group', () => {
+    const work = group([pending('map:part', ['brief'])], {
+        releasePlan: {
+            steps: [{ id: 'activate', who: 'Pedro', what: 'Activate', shipsWith: [], done: null }],
+            outcomeCheck: { what: 'Check', result: 'pending', evidence: null },
+        } as unknown as Item['releasePlan'],
+    });
+
+    expect(deskWait(work).label).toBe('Release step');
+});

@@ -1,3 +1,4 @@
+import { reconcileWaitItems } from './group-reconciliation.ts';
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
 import { prReadiness } from './model.ts';
@@ -5,7 +6,13 @@ import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './
 import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
-import { canResumeShaping, canRetryBuild, openQuestionThread, stoppedRunThread } from './thread-domain.ts';
+import {
+    canResumeShaping,
+    canRetryBuild,
+    isLiveThread,
+    openQuestionThread,
+    stoppedRunThread,
+} from './thread-domain.ts';
 
 /** Closure alone is insufficient: evidence must be available for Pedro to inspect and accept. */
 export const dependencyProofs = (item: Item) =>
@@ -22,6 +29,12 @@ export const dependencyProofs = (item: Item) =>
                   ? [d]
                   : [];
           });
+
+/** Saved group checklist items that need a thread, while no thread owns the group. */
+export const reconcileGroupWaits = (item: Item): boolean =>
+    !item.parentId &&
+    reconcileWaitItems(item.reconciliation).length > 0 &&
+    !(Array.isArray(item.threads) && item.threads.some((thread) => isLiveThread(thread) || thread.hasRunningChildren));
 
 /**
  * What holds a PR at Verify or Ready to merge before anything else: a failed check, then a conflict with main. The wait
@@ -107,6 +120,9 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
     if (releaseContinuationReady(item, all))
         return { label: 'Release', action: { kind: 'details' as const, label: 'Resume release' } };
+
+    if (reconcileGroupWaits(item))
+        return { label: 'Reconcile group', action: { kind: 'reconcile-group' as const, label: 'Reconcile group' } };
 
     if (stopped)
         return {

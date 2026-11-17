@@ -1,4 +1,9 @@
-import type { ReconcileItem, ReconcileReport } from '@lar-factory/shared/group-reconciliation';
+import {
+    lifecycleOnly,
+    mergeShaped,
+    type ReconcileItem,
+    type ReconcileReport,
+} from '@lar-factory/shared/group-reconciliation';
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
@@ -21,6 +26,11 @@ export interface ReconciliationRecords {
     reconciliation(groupId: string): ReconcileReport;
     reconcile(groupId: string): ReconcileReport;
     resolveReconcile(groupId: string, key: string, digest: string, evidence: string): ReconcileReport;
+    /**
+     * The board's pass after a part's merged PR observation: saves the checklist and resolves every lifecycle-only item,
+     * citing the merge. Null when no merge is new since the last saved checklist.
+     */
+    reconcileAfterMerge(groupId: string): ReconcileReport | null;
 }
 
 export function reconciliationRecords(database: Database, get: () => WorkRecords): ReconciliationRecords {
@@ -152,6 +162,19 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
 
         return { snapshot, report: { groupId: id, digest: hash(items), items, completed: state.completed } };
     };
+    /** Each part whose merged PR observation the saved checklist has not seen, cited as its title, ID and PR. */
+    const merges = (state: ReturnType<typeof saved>, current: ReturnType<typeof report>): string[] => {
+        const records = get();
+
+        return current.report.items.flatMap((item) => {
+            const pr = mergeShaped(item)
+                ? records.observations(item.workId).find((o) => o.of === 'pr' && o.state === 'merged')
+                : undefined;
+            const known = state.pending.some((old) => old.key === item.key && old.digest === item.digest);
+
+            return pr && !known ? [`${records.read(item.workId).title} (${item.workId}) merged ${pr.subject}`] : [];
+        });
+    };
     const persist = (id: string, baseline: Snapshot, completed: Done, pending: ReconcileItem[]) =>
         db
             .prepare(
@@ -180,17 +203,50 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
         reconciliation: (id) =>
             database.read(() => {
                 // Join the caller's transaction, or pin all live board reads to one SQLite snapshot.
-                if (db.isTransaction) return report(id).report;
+                const live = () => ({ ...report(id).report, pending: saved(id).pending });
+
+                if (db.isTransaction) return live();
 
                 db.exec('BEGIN');
 
                 try {
-                    return report(id).report;
+                    return live();
                 } finally {
                     db.exec('ROLLBACK');
                 }
             }),
         reconcile: (id) => database.write(() => finish(id)),
+        reconcileAfterMerge: (id) => {
+            // A read first, so a pass with no new merge commits nothing and moves no change mark.
+            if (!database.read(() => merges(saved(id), report(id)).length)) return null;
+
+            return database.write(() => {
+                const state = saved(id),
+                    current = report(id),
+                    merged = merges(state, current);
+
+                if (!merged.length) return null;
+
+                const settled = current.report.items.filter(lifecycleOnly);
+                const items = current.report.items.filter((item) => !settled.includes(item));
+
+                return finish(
+                    id,
+                    { ...current, report: { ...current.report, items, digest: hash(items) } },
+                    {
+                        ...state,
+                        completed: [
+                            ...state.completed,
+                            ...settled.map(({ key, digest, workId, changes }) => ({
+                                key,
+                                digest,
+                                evidence: `Board reconcile after ${merged.join('; ')}: the records of ${workId} changed only ${changes.join(', ')}.`,
+                            })),
+                        ],
+                    },
+                );
+            });
+        },
         resolveReconcile: (id, key, digest, evidence) =>
             database.write(() => {
                 const current = report(id);

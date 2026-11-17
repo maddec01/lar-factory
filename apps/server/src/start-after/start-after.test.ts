@@ -201,6 +201,7 @@ test('Start after retains authorization across a capacity hold and launches once
     board.applyRead(recordItems(records, [], [REPO]), board.revision(), (items) => items);
     await startAfter.startUnblocked();
     assert.ok(board.snapshot().armed?.[build.workId]);
+    assert.deepEqual(board.snapshot().armedErrors, {}, 'a capacity hold is waiting, not a failed start');
     await startAfter.startUnblocked();
     await startAfter.startUnblocked();
     assert.equal(attempts, 2);

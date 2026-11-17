@@ -129,7 +129,7 @@ Permission to run one heavy command. The heavy command limit is the number of sl
 _Avoid_: lease, token.
 
 **Build limit**:
-How many builds may work at once on one machine. A build whose PR is open is waiting on its PR and doesn't count, even while it fixes CI or review feedback. Auto-build starts builds only up to this number.
+How many builds may work at once on one machine. A build whose PR is open is waiting on its PR and doesn't count, even while it fixes CI or review feedback. At capacity, Build arms Start after a slot frees, even with Auto-build off; its chevron offers Start now (over the limit). Auto-build starts builds only up to this number.
 _Avoid_: build slot, concurrency setting.
 
 **Auto-build**:
@@ -145,7 +145,7 @@ The build's look back at its own work, run at handback, which proposes follow-up
 _Avoid_: retrospective, post-merge retro.
 
 **Model choice**:
-The provider instance and model the board starts a thread on, or Project default in T3. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
+The provider instance and model the board starts a thread on, or Project default in T3. Shape, Build and Decide start with the last used choice while it is still offered, otherwise Project default in T3; their adjacent chevron opens the model menu. When the choice names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.
 
 **Release folder**:

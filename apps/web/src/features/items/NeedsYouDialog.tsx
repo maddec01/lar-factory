@@ -11,7 +11,7 @@ import { useActionStore, useItemAction } from './ActionStore';
 import type { RecoveryInspection } from './CardActions';
 import { inspectRecovery, resolveNeedsYou, startAgain } from './CardActions';
 import { CleanupChoices } from './CleanupChoices';
-import { StartEntries } from './StartControl';
+import { StartEntries } from './StartEntries';
 import { executeCleanup, inspectCleanup, offersCleanup, useCleanupChoices } from './useCleanupChoices';
 import type { ActionResult } from '@/services/board/board.service';
 import { buttonKind } from '@/ui/board';

@@ -1,4 +1,4 @@
-// Start ▾'s menu on a Queued card: what picking an entry posts, and which choice it remembers.
+// Start and its model menu: what a start posts, and which choice it remembers.
 
 import { offers } from './model.ts';
 import type { ModelChoice, ModelGroup, StartResult } from './model.ts';
@@ -36,7 +36,7 @@ export function readChoice(raw: string | null): ModelChoice | undefined {
     }
 }
 
-/** The entry the menu highlights: the remembered choice while it is still offered, else none ("Project default in T3"). */
+/** The primary start's choice and the menu's highlighted entry: the remembered choice while offered, else "Project default in T3". */
 export function highlightedChoice(groups: ModelGroup[], remembered: ModelChoice | undefined): ModelChoice | undefined {
     return remembered && offers(groups, remembered) ? remembered : undefined;
 }

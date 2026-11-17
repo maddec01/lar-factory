@@ -26,10 +26,10 @@ const press = async (el: HTMLElement) => {
 
 beforeEach(() => localStorage.clear());
 
-test('Shape opens its menu without opening the dialog, and starts its row’s item with the picked model', async () => {
+test('Shape’s chevron opens its menu without opening the dialog, and starts its row’s item with the picked model', async () => {
     holdPosts(withChoices);
     await mountPage(withChoices);
-    await pressMenu(start('I_sample06'));
+    await pressMenu(row('I_sample06').querySelector('[data-start-model]')!);
     expect(entries().map(text)).toEqual(['Project default in T3', 'GPT-5.5', 'Opus 5.5']);
     await press(entries()[2]!);
     expect(dialog(), 'neither the button nor the menu opens the dialog').toBeNull();

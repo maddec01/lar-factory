@@ -93,7 +93,7 @@ export function Counters() {
                     foot={
                         reading
                             ? undefined
-                            : "A build with an open PR doesn't count toward this limit. At capacity, you can start an item over the limit; automatic starts wait for a slot."
+                            : "A build with an open PR doesn't count toward this limit. At capacity, Build waits for a slot; its chevron offers Start now (over the limit)."
                     }
                 >
                     {listOf(building, 'Nothing building right now.')}

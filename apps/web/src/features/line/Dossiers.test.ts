@@ -152,8 +152,8 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
     expect(text(ready.querySelector('[data-row-open]'))).toContain('#140 Owner accounts');
     expect(dossier().querySelector('[data-attention-row="ready"]'), 'no Ready to start row repeats it').toBeNull();
     expect(dossier().querySelector('[data-attention-row="waiting"]'), 'nothing waits').toBeNull();
-    await pressMenu(startIn(ready)!);
-    expect(dialogTitle(), 'Start opens its menu, not the dialog').toBe('');
+    await pressMenu(ready.querySelector('[data-start-model]')!);
+    expect(dialogTitle(), 'the model chevron opens its menu without the dialog').toBe('');
     await press(entries()[1]!);
     expect(posted()).toEqual([
         ['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }],

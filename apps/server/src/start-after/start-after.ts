@@ -1,10 +1,9 @@
-import { isOnboarding, isRecord, openBlockers, sameRepo, startHold } from '@lar-factory/shared';
+import { buildWaitsForSlot, isOnboarding, isRecord, openBlockers, sameRepo, startHold } from '@lar-factory/shared';
 import type { ArmedStart, Item, ModelGroup } from '@lar-factory/shared';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
-// Start after: the blocked parts whose start is armed, kept in a JSON file in the board server's data folder so they
-// survive a restart. After each read, and each local change to the work records, the board starts every armed part
-// whose blockers have all completed, on the model choice it was armed with: Start build for a Ready build, today's
-// Start for a Queued item. A part whose repository is still onboarding waits for onboarding to finish.
+// Start after: work authorized to start once its prerequisites and capacity allow it, persisted in the board's
+// data folder across restarts. After reads and local changes, the board tries Start build for a Ready build or
+// Start for a Queued item on its armed model. Capacity and prerequisite holds retain that authorization.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -16,8 +15,7 @@ import { findModelChoice } from '../t3/model-choices.ts';
 
 export interface StartAfter {
     /**
-     * Arms a blocked Ready or Queued item's start on `model`, the model choice its menu picked, once T3 has its
-     * repository's project.
+     * Arms a blocked Ready or Queued item's start, or a Ready build waiting for capacity, on `model`.
      */
     arm(itemId: string, model: unknown): Reply;
     /** Disarms the item's start and clears the error its last one left. */
@@ -107,7 +105,7 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
         return null;
     }
 
-    /** Disarms the part, then runs its start and keeps the error a failed one gives. */
+    /** Runs an authorized start, retaining holds and disarming successes or failures. */
     async function startNow(item: Item, { model }: ArmedStart): Promise<void> {
         const { body } = await (item.status === 'Ready'
             ? commands.startBuild(item.id, model, true, { automatic: true })
@@ -119,9 +117,11 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
 
         if (failed) return log(failed);
 
-        if (!error) return log(`started #${item.number} after its blockers completed`);
+        if (hold) return;
 
-        log(`could not start #${item.number} after its blockers completed: ${error}`);
+        if (!error) return log(`started #${item.number} after its wait cleared`);
+
+        log(`could not start #${item.number} after its wait cleared: ${error}`);
         board.update({ armedErrors: { ...errors(), [item.id]: error } });
         board.push();
     }
@@ -138,7 +138,8 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
                 });
             }
 
-            if (!isOpen(item)) return withBoard(409, { error: 'Nothing blocks this item now. Start it instead.' });
+            if (!isOpen(item) && !buildWaitsForSlot(item, board.snapshot()))
+                return withBoard(409, { error: 'Nothing blocks this item now. Start it instead.' });
 
             // Its start would fail while its repository is onboarding or has no T3 project, so the hold shows now, not once its blockers complete.
             const hold = startHold(board.snapshot(), item.repo);

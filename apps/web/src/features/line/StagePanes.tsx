@@ -86,7 +86,7 @@ function BuildLimit() {
             over={builds.limit === undefined ? 0 : Math.max(0, builds.items.length - builds.limit)}
             building={builds.items.length}
             limit={builds.limit}
-            title={`${builds.text}. ${BUILD_LIMIT_NOTE} At capacity, you can start an item over the limit; automatic starts wait for a slot.`}
+            title={`${builds.text}. ${BUILD_LIMIT_NOTE} At capacity, Build waits for a slot; its chevron offers Start now (over the limit).`}
         >
             {builds.limit !== undefined && builds.items.length > builds.limit
                 ? `${builds.items.length} building${builds.waiting.length ? ` · ${builds.waiting.length} waiting on their PR` : ''}`

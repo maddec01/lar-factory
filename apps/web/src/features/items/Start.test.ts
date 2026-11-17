@@ -170,3 +170,39 @@ test('Ready offers manual Start build at capacity and warns that it will go over
     await press(entries()[0]!);
     expect(posted()[0]?.[0]).toBe('/api/start-build');
 });
+
+test('restarting a stopped build whose PR is open at capacity does not warn about the limit', async () => {
+    const openPr = withChoices.items.find((item) => item.id === 'I_sample14')!.linkedPrs;
+    const data = {
+        ...withChoices,
+        buildLimit: { limit: 1, automatic: 1 },
+        items: withChoices.items.map((item) =>
+            item.id === 'I_sample13'
+                ? {
+                      ...item,
+                      status: 'In progress' as const,
+                      parentId: null,
+                      blockers: [],
+                      linkedPrs: openPr,
+                      slices: [],
+                      buildReserved: false,
+                      threads: [
+                          {
+                              id: 'stopped-build',
+                              title: 'Build',
+                              purpose: 'build' as const,
+                              state: 'stopped' as const,
+                              updated: '2026-10-21T09:00:00.000Z',
+                          },
+                      ],
+                  }
+                : item.id === 'I_sample22'
+                  ? { ...item, buildReserved: true }
+                  : item,
+        ),
+    };
+
+    await mountItem(data, 'I_sample13');
+    expect(text(start('I_sample13'))).toBe('Retry start');
+    expect(text(card())).not.toContain('over the limit');
+});

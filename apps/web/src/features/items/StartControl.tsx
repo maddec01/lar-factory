@@ -139,9 +139,11 @@ export function StartControl({
     }
 
     const retry = kind === 'build' && canRetryBuild(item);
+    // A build that links a PR holds no slot, so restarting it never goes over the limit.
     const exceedsLimit =
         kind === 'build' &&
         data.buildLimit &&
+        !item.linkedPrs?.length &&
         !buildsAtWork({ items: [item] }).length &&
         buildsAtWork(data).length >= limitNumber(data.buildLimit);
     const verb = pending ? 'Starting…' : error || retry ? 'Retry start' : stopped && !resume ? 'Start again' : label;

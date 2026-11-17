@@ -1,8 +1,10 @@
 import { executionTarget } from '@lar-factory/shared/execution-target';
 import {
+    azureReadOnlyLines,
     frozenBuildMethodLine,
     frozenRetroLine,
     type RoleRunInput,
+    type RunLaunch,
     type RunSettings,
 } from '@lar-factory/shared/run-settings';
 import { randomUUID } from 'node:crypto';
@@ -18,25 +20,47 @@ import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-recor
 const shellPath = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 const json = (path: string) => JSON.parse(readFileSync(path === '-' ? 0 : path, 'utf8')) as unknown;
 
-/** Use only the parent's supplied installation; a missing entry never falls back to global skills. */
-function preamble(snapshot: RunSettings, role: string, dataDir: string): string {
-    const bin = process.env.LAR_FACTORY_BIN;
-    const shape = process.env.LAR_FACTORY_SHAPE_SKILL;
-    const build = process.env.LAR_FACTORY_BUILD_SKILL;
+/**
+ * The skill entries and CLI folder a role launch names: the run's most recent recorded launch, else the parent's
+ * environment. A missing path holds and never falls back to global skills.
+ */
+function launchPaths(recorded: RunLaunch | undefined) {
+    const paths = recorded
+        ? { bin: recorded.bin, shape: recorded.skillEntries['lar-shape'], build: recorded.skillEntries['lar-build'] }
+        : {
+              bin: process.env.LAR_FACTORY_BIN,
+              shape: process.env.LAR_FACTORY_SHAPE_SKILL,
+              build: process.env.LAR_FACTORY_BUILD_SKILL,
+          };
 
     for (const [name, path] of Object.entries({
-        LAR_FACTORY_BIN: bin,
-        LAR_FACTORY_SHAPE_SKILL: shape,
-        LAR_FACTORY_BUILD_SKILL: build,
+        LAR_FACTORY_BIN: paths.bin,
+        LAR_FACTORY_SHAPE_SKILL: paths.shape,
+        LAR_FACTORY_BUILD_SKILL: paths.build,
     })) {
-        if (!path || !isAbsolute(path)) throw new Error(`${name} must carry the parent's absolute path.`);
+        if (!path || !isAbsolute(path))
+            throw new Error(
+                recorded
+                    ? `The run's recorded launch has no absolute ${name} path.`
+                    : `${name} must carry the parent's absolute path.`,
+            );
 
         accessSync(path);
     }
 
-    const cli = join(bin!, 'lar-work');
+    const cli = join(paths.bin!, 'lar-work');
 
     accessSync(cli);
+
+    return { bin: paths.bin!, shape: paths.shape!, build: paths.build!, cli };
+}
+
+/** A run saved before launches were recorded keeps the earlier preamble with its exports, role targets and contract. */
+function preamble(records: WorkRecords, snapshot: RunSettings, role: string, dataDir: string): string {
+    const { newRun, launches } = records.runLaunches(snapshot.workId, snapshot.runId);
+    const { bin, shape, build, cli } = launchPaths(launches.at(-1));
+    const earlier = !newRun;
+    const azure = azureReadOnlyLines(process.env.LAR_FACTORY_AZURE_READ_ONLY === '1');
 
     return [
         '<!-- factory-runtime:start -->',
@@ -47,24 +71,27 @@ function preamble(snapshot: RunSettings, role: string, dataDir: string): string 
         'Before factory commands, set this environment in that command shell:',
         `export LAR_FACTORY_RUN_ID=${shellPath(snapshot.runId)}`,
         `export LAR_FACTORY_DATA_DIR=${shellPath(dataDir)}`,
-        `export PATH=${shellPath(bin!)}:"$PATH"`,
-        `export LAR_FACTORY_BIN=${shellPath(bin!)}`,
-        `export LAR_FACTORY_SHAPE_SKILL=${shellPath(shape!)}`,
-        `export LAR_FACTORY_BUILD_SKILL=${shellPath(build!)}`,
-        ...(process.env.LAR_FACTORY_AZURE_READ_ONLY === '1'
+        `export PATH=${shellPath(bin)}:"$PATH"`,
+        ...(earlier
             ? [
-                  "export LAR_FACTORY_AZURE_READ_ONLY='1'",
-                  'All Azure DevOps organizations are read-only. Never launch Azure implementation or write through another tool.',
+                  `export LAR_FACTORY_BIN=${shellPath(bin)}`,
+                  `export LAR_FACTORY_SHAPE_SKILL=${shellPath(shape)}`,
+                  `export LAR_FACTORY_BUILD_SKILL=${shellPath(build)}`,
+                  ...azure,
+                  `Use ${shellPath(cli)} for work records. Carry these exact skill entries and CLI/data environment in every handoff.`,
+                  `Frozen role settings: ${JSON.stringify(snapshot.roles)}`,
               ]
-            : []),
-        `Use ${shellPath(cli)} for work records. Carry these exact skill entries and CLI/data environment in every handoff.`,
-        `Frozen role settings: ${JSON.stringify(snapshot.roles)}`,
+            : [...azure, `Use ${shellPath(cli)} for work records.`]),
         `Frozen test runtime: ${JSON.stringify(snapshot.testRuntime)}`,
         `Frozen project skills: ${JSON.stringify(snapshot.skills)}`,
         frozenBuildMethodLine(snapshot),
         frozenRetroLine(snapshot),
-        `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. Stop if either command exits non-zero; cancel a mismatched active child.`,
-        `Select reviewers with --run-id ${snapshot.runId}; carry runId and selection evidence into review records.`,
+        ...(earlier
+            ? [
+                  `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. Stop if either command exits non-zero; cancel a mismatched active child.`,
+                  `Select reviewers with --run-id ${snapshot.runId}; carry runId and selection evidence into review records.`,
+              ]
+            : []),
         'Apply the supplied skill shared/orchestration.md, including its wait rules. Final report: at most 300 words; no whole files, logs or screenshots.',
         ...snapshot.reviewers
             .filter((reviewer) => role === `reviewer:${reviewer.id}`)
@@ -171,7 +198,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
             // T3's explicit delegate title is limited to 512 UTF-16 code units.
             const title =
                 fullTitle.length > 512 ? `${fullTitle.slice(0, 511).replace(/[\uD800-\uDBFF]$/u, '')}…` : fullTitle;
-            const task = `${title}\n\n${preamble(snapshot, role, dirname(databasePath))}\n\n${readFileSync(values.task!, 'utf8')}`;
+            const task = `${title}\n\n${preamble(records, snapshot, role, dirname(databasePath))}\n\n${readFileSync(values.task!, 'utf8')}`;
 
             attempt = records.startRoleRun(workId, revision(), { ...identity, launchOptions: selection.options });
 

@@ -5,9 +5,8 @@ import {
     readBuilds,
     refKey,
     workMessage,
-    runSettingsMessage,
 } from '@lar-factory/shared';
-import type { BoardData, Item, RawItem } from '@lar-factory/shared';
+import type { BoardData, FactoryThreadContext, Item, RawItem } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import { execFile, execFileSync, spawn } from 'node:child_process';
@@ -640,14 +639,21 @@ export const testFactoryContext = (home: string) => ({
     ...skillEntries(undefined, boardDataDir(home, {}), {}),
     azureReadOnly: process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
 });
-export async function withRunPrompt(dataDir: string, id: string, message: string) {
+/** The first message a board sends for the work's latest run, built by `message` from that run. */
+export async function withRunPrompt(
+    dataDir: string,
+    id: string,
+    message: (run: Pick<FactoryThreadContext, 'run' | 'earlier'>) => string,
+) {
     const records = await openWorkRecords(workRecordsPath(dataDir));
 
     try {
         const snapshot = records.runSettings(id).runs.at(-1);
 
         const input = snapshot?.kind === 'build' ? records.launchIntents({ workId: id }).at(-1)?.buildInput : undefined;
-        const settings = snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message;
+        const settings = message(
+            snapshot ? { run: snapshot, earlier: !records.runLaunches(id, snapshot.runId).newRun } : {},
+        );
 
         return input
             ? `${settings}\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(input)}`
@@ -657,8 +663,9 @@ export async function withRunPrompt(dataDir: string, id: string, message: string
     }
 }
 export const shapePrompt = (board: Board, title: string, id: string) =>
-    withRunPrompt(
-        board.dataDir,
-        id,
-        workMessage({ id, title, number: 0 } as Item, testFactoryContext(dirname(dirname(dirname(board.dataDir))))),
+    withRunPrompt(board.dataDir, id, (run) =>
+        workMessage({ id, title, number: 0 } as Item, {
+            ...testFactoryContext(dirname(dirname(dirname(board.dataDir)))),
+            ...run,
+        }),
     );

@@ -1,8 +1,9 @@
 import { defaultFactorySettings } from '@lar-factory/shared/factory-settings';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
 import { readFactorySettings, writeFactorySettings } from './factory-settings.ts';
@@ -18,7 +19,7 @@ afterEach(() => {
     }
 });
 
-async function fixture(instanceId = 'codex', effort: string | null = 'high') {
+async function fixture(instanceId = 'codex', effort: string | null = 'high', { earlier = false } = {}) {
     const dir = mkdtempSync(join(tmpdir(), "lar-role-O'Brien-"));
     const records = await openWorkRecords(workRecordsPath(dir));
 
@@ -47,6 +48,14 @@ async function fixture(instanceId = 'codex', effort: string | null = 'high') {
             reviewers: { code: 'Frozen Code', security: 'Security', ui: 'UI', performance: 'Performance' },
         },
     });
+
+    // A run saved before launches were recorded has no new-run mark.
+    if (earlier) {
+        const db = new DatabaseSync(workRecordsPath(dir));
+
+        db.prepare('DELETE FROM new_runs WHERE work_id=?').run(workId);
+        db.close();
+    }
 
     const shape = join(dir, 'shape.md');
     const build = join(dir, 'build.md');
@@ -159,80 +168,101 @@ async function fixture(instanceId = 'codex', effort: string | null = 'high') {
     return { dir, records, workId, shape, build, capabilities, task, launch, finish, processCli };
 }
 
-it('prints exact targets for every claude role using advertised effort, frozen instructions and paths', async () => {
-    const f = await fixture('claude');
+it.each([
+    ['saved before launches were recorded', true],
+    ['with no recorded launch', false],
+])(
+    'prints exact targets for every claude role of a run %s, using advertised effort, frozen instructions and the environment paths',
+    async (_name, earlier) => {
+        const f = await fixture('claude', 'high', { earlier });
 
-    // Later Settings must not affect any role launched in this run.
-    const changed = readFactorySettings(f.dir).settings;
+        // Later Settings must not affect any role launched in this run.
+        const changed = readFactorySettings(f.dir).settings;
 
-    changed.threadKinds.build = { model: { instanceId: 'later', model: 'later' }, effort: 'low' };
-    changed.reviewers.find((reviewer) => reviewer.id === 'custom')!.name = 'Later name';
-    writeFactorySettings(changed, f.dir);
+        changed.threadKinds.build = { model: { instanceId: 'later', model: 'later' }, effort: 'low' };
+        changed.reviewers.find((reviewer) => reviewer.id === 'custom')!.name = 'Later name';
+        writeFactorySettings(changed, f.dir);
 
-    for (const [role, label] of Object.entries({
-        thread: 'Build',
-        explore: 'Explore',
-        diagnose: 'Diagnose',
-        research: 'Research',
-        prototype: 'Prototype',
-        planner: 'Planner',
-        implementer: 'Implementer',
-        checks: 'Checks',
-        'domain-docs': 'Domain docs',
-        fixer: 'Fixer',
-        approver: 'Approver',
-        'ci-fixer': 'Ci fixer',
-        doubt: 'Doubt',
-        'reviewer:code': 'Code review',
-        'reviewer:security': 'Security review',
-        'reviewer:ui': 'UI review',
-        'reviewer:performance': 'Performance review',
-        'reviewer:custom': 'Custom review',
-    })) {
-        const result = await f.launch(role);
+        for (const [role, label] of Object.entries({
+            thread: 'Build',
+            explore: 'Explore',
+            diagnose: 'Diagnose',
+            research: 'Research',
+            prototype: 'Prototype',
+            planner: 'Planner',
+            implementer: 'Implementer',
+            checks: 'Checks',
+            'domain-docs': 'Domain docs',
+            fixer: 'Fixer',
+            approver: 'Approver',
+            'ci-fixer': 'Ci fixer',
+            doubt: 'Doubt',
+            'reviewer:code': 'Code review',
+            'reviewer:security': 'Security review',
+            'reviewer:ui': 'UI review',
+            'reviewer:performance': 'Performance review',
+            'reviewer:custom': 'Custom review',
+        })) {
+            const result = await f.launch(role);
 
-        expect(result.stderr).toBe('');
-        expect(result.status).toBe(0);
+            expect(result.stderr).toBe('');
+            expect(result.status).toBe(0);
 
-        const args = JSON.parse(result.stdout);
-        const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
+            const args = JSON.parse(result.stdout);
+            const attempt = f.records.runSettings(f.workId).roleRuns.at(-1)!;
 
-        expect(args.target).toEqual({
-            providerInstanceId: 'claude',
-            model: 'configured',
-            options: { effort: 'high' },
-        });
+            expect(args.target).toEqual({
+                providerInstanceId: 'claude',
+                model: 'configured',
+                options: { effort: 'high' },
+            });
 
-        const title = `${label} · Role command fixture`;
+            const title = `${label} · Role command fixture`;
 
-        expect(args.title).toBe(title);
-        expect(args.task.split('\n')[0]).toBe(title);
-        expect(args.task).toContain('\n\n<!-- factory-runtime:start -->\n');
-        expect(args.task).toContain('<!-- factory-runtime:end -->');
-        expect(args.runtimeMode).toBe('inherit');
-        expect(args.clientRequestId).toBe(attempt.executionId);
-        expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
-        expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);
-        expect(args.task).toContain(`Read ${f.build} first`);
-        expect(args.task).toContain(JSON.stringify({ 'lar-shape': f.shape, 'lar-build': f.build }));
-        expect(args.task).toContain("'\\''");
-        expect(args.task).toContain('export LAR_FACTORY_DATA_DIR=');
-        expect(args.task).toContain('export LAR_FACTORY_BIN=');
-        expect(args.task).toContain('export LAR_FACTORY_SHAPE_SKILL=');
-        expect(args.task).toContain('export LAR_FACTORY_BUILD_SKILL=');
-        expect(args.task).toContain("export LAR_FACTORY_AZURE_READ_ONLY='1'");
-        expect(args.task).toContain(
-            'Frozen project skills: []\nFrozen build method: TDD\nFrozen retro: on\nFor every child role',
-        );
-        expect(args.task).toContain('role-launch');
-        expect(args.task).toContain('role-finish');
-        expect(args.task).toContain('Implement the brief.');
+            expect(args.title).toBe(title);
+            expect(args.task.split('\n')[0]).toBe(title);
+            expect(args.task).toContain('\n\n<!-- factory-runtime:start -->\n');
+            expect(args.task).toContain('<!-- factory-runtime:end -->');
+            expect(args.runtimeMode).toBe('inherit');
+            expect(args.clientRequestId).toBe(attempt.executionId);
+            expect(args.isolation).toBe(['implementer', 'prototype'].includes(role) ? 'worktree' : 'shared');
+            expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);
+            expect(args.task).toContain(`Read ${f.build} first`);
+            expect(args.task).toContain(JSON.stringify({ 'lar-shape': f.shape, 'lar-build': f.build }));
+            expect(args.task).toContain("'\\''");
+            expect(args.task).toContain('export LAR_FACTORY_DATA_DIR=');
+            expect(args.task).toContain(`export PATH='${f.dir.replaceAll("'", "'\\''")}':"$PATH"`);
+            expect(args.task).toContain("export LAR_FACTORY_RUN_ID='frozen-run'");
+            expect(args.task).toContain("export LAR_FACTORY_AZURE_READ_ONLY='1'");
+            expect(args.task).toContain('All Azure DevOps organizations are read-only.');
+            expect(args.task).toContain(`Use '${join(f.dir, 'lar-work').replaceAll("'", "'\\''")}' for work records.`);
+            expect(args.task).toContain('Frozen project skills: []\nFrozen build method: TDD\nFrozen retro: on\n');
+            expect(args.task).toContain('shared/orchestration.md');
+            expect(args.task).toContain('Implement the brief.');
 
-        if (role === 'reviewer:custom') expect(args.task).toContain('Frozen custom instructions');
+            if (earlier) {
+                expect(args.task).toContain('export LAR_FACTORY_BIN=');
+                expect(args.task).toContain('export LAR_FACTORY_SHAPE_SKILL=');
+                expect(args.task).toContain('export LAR_FACTORY_BUILD_SKILL=');
+                expect(args.task).toContain('Frozen role settings: ');
+                expect(args.task).toContain('Frozen retro: on\nFor every child role');
+                expect(args.task).toContain('role-finish');
+                expect(args.task).toContain('Select reviewers with --run-id frozen-run');
+            } else {
+                expect(args.task).not.toMatch(/LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)/);
+                expect(args.task).not.toContain('Frozen role settings');
+                expect(args.task).not.toContain('role-finish');
+                expect(args.task).not.toContain('Select reviewers');
+                expect(args.task.match(/"lar-shape"/g)).toHaveLength(1);
+            }
 
-        if (role === 'reviewer:code') expect(args.task).toContain('Frozen Code');
-    }
-}, 30_000);
+            if (role === 'reviewer:custom') expect(args.task).toContain('Frozen custom instructions');
+
+            if (role === 'reviewer:code') expect(args.task).toContain('Frozen Code');
+        }
+    },
+    30_000,
+);
 
 it('prints explicit empty options and reuses an execution ID for launch recovery', async () => {
     const f = await fixture('codex', null);
@@ -264,6 +294,75 @@ it('records capability and missing-entry holds without printing delegate argumen
     expect(missing.status).toBe(1);
     expect(missing.stdout).toBe('');
     expect(g.records.read(g.workId).needsYou).toContain('missing.md');
+});
+
+it("reads the run's most recent recorded launch instead of the environment paths", async () => {
+    const f = await fixture();
+    const recorded = mkdtempSync(join(tmpdir(), 'lar-launch-'));
+    const entries = {
+        'lar-shape': join(recorded, 'lar-shape/SKILL.md'),
+        'lar-build': join(recorded, 'lar-build/SKILL.md'),
+    };
+
+    fixtures.push({ dir: recorded, records: { close() {} } as WorkRecords });
+    mkdirSync(join(recorded, 'lar-shape'));
+    mkdirSync(join(recorded, 'lar-build'));
+    mkdirSync(join(recorded, 'bin'));
+
+    for (const path of [...Object.values(entries), join(recorded, 'bin/lar-work')]) writeFileSync(path, 'fixture');
+
+    f.records.recordRunLaunch(f.workId, {
+        runId: 'frozen-run',
+        executionId: 'first-launch',
+        skillEntries: { 'lar-shape': f.shape, 'lar-build': f.build },
+        bin: f.dir,
+    });
+    f.records.recordRunLaunch(f.workId, {
+        runId: 'frozen-run',
+        executionId: 'retry',
+        skillEntries: entries,
+        bin: join(recorded, 'bin'),
+    });
+
+    const unset = {
+        LAR_FACTORY_BIN: undefined,
+        LAR_FACTORY_SHAPE_SKILL: undefined,
+        LAR_FACTORY_BUILD_SKILL: undefined,
+    };
+    const result = await f.launch('implementer', [], unset);
+
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+
+    const { task } = JSON.parse(result.stdout);
+
+    expect(task).toContain(`Read ${entries['lar-build']} first`);
+    expect(task).toContain(`Factory skill entries: ${JSON.stringify(entries)}`);
+    expect(task).toContain(`export PATH='${join(recorded, 'bin')}':"$PATH"`);
+    expect(task).toContain(`Use '${join(recorded, 'bin/lar-work')}' for work records.`);
+    expect(task).not.toContain(f.build);
+
+    // A recorded path that no longer exists holds, as a missing environment path does.
+    rmSync(entries['lar-shape']);
+
+    const moved = await f.launch('approver', [], unset);
+
+    expect(moved.status).toBe(1);
+    expect(moved.stdout).toBe('');
+    expect(f.records.read(f.workId).needsYou).toContain(entries['lar-shape']);
+});
+
+it.each([
+    ['saved before launches were recorded', true],
+    ['made with snapshot-run', false],
+])('holds a run %s with no recorded launch when the environment paths are missing', async (_name, earlier) => {
+    const f = await fixture('codex', 'high', { earlier });
+    const missing = await f.launch('planner', [], { LAR_FACTORY_BIN: undefined });
+
+    expect(missing.status).toBe(1);
+    expect(missing.stdout).toBe('');
+    expect(missing.stderr).toContain('LAR_FACTORY_BIN');
+    expect(f.records.read(f.workId).needsYou).toContain('LAR_FACTORY_BIN');
 });
 
 const reported = (overrides: Record<string, unknown> = {}) => ({

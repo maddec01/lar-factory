@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { reduceBlockers } from './blocker-graph.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
@@ -57,7 +58,8 @@ it('drops redundant blockers recorded before the rule so later writes succeed', 
     legacy
         .prepare('INSERT INTO blockers(work_id, blocker_id) VALUES (?, ?), (?, ?)')
         .run(a.workId, c.workId, a.workId, b.workId);
-    legacy.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+    // Rerun the blocker rule's migration, and the ones after it, as an older database would.
+    legacy.exec(`PRAGMA user_version = ${MIGRATIONS.lastIndexOf(reduceBlockers)}`);
     legacy.close();
     records = await openWorkRecords(join(dir, 'work.db'));
 

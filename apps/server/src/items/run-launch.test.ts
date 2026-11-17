@@ -73,7 +73,7 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
             options: [{ id: 'effort', value: 'low' }],
         });
         expect(result.snapshot).toMatchObject({ kind, skills: ['testing'], buildMethod: 'prove-it' });
-        expect(result.message).toContain('\nFrozen build method: Prove it\n');
+        expect(result.earlier).toBe(false);
 
         if (kind === 'build')
             expect(result.snapshot).toMatchObject({
@@ -89,9 +89,6 @@ for (const kind of THREAD_KINDS.filter((threadKind): boolean => threadKind === '
                 model: { instanceId: 'claude', model: 'opus' },
                 effort: role === 'doubt' ? 'high' : 'low',
             });
-        expect(result.message).toContain(JSON.stringify(result.snapshot.roles));
-        expect(result.message).toContain('delegate_task');
-        expect(result.message).toContain(result.snapshot.runId);
 
         settings.threadKinds[kind] = { effort: 'high' };
         writeFactorySettings(settings, dir);

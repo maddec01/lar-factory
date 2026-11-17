@@ -1,4 +1,5 @@
 import { workMessage, type Item } from '@lar-factory/shared';
+import type { RunSettings } from '@lar-factory/shared/run-settings';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +13,24 @@ const handoff = workMessage({ id: 'fake', title: 'Choose timezone', number: 0, k
     shapeSkill: '/fake/shape/SKILL.md',
     buildSkill: '/fake/build/SKILL.md',
 });
+
+const runHandoff = workMessage({ id: 'fake', title: 'Choose timezone', number: 0, kind: 'decision' } as Item, {
+    dataDir: '/fake/data',
+    bin: '/fake/bin',
+    shapeSkill: '/fake/shape/SKILL.md',
+    buildSkill: '/fake/build/SKILL.md',
+    run: {
+        workId: 'fake',
+        runId: 'fake-run',
+        thread: { model: null, effort: null, options: [] },
+        settings: {},
+    } as unknown as RunSettings,
+});
+const unmarked = (message: string) =>
+    message
+        .split('\n')
+        .filter((line) => !line.startsWith('<!--'))
+        .join('\n');
 
 test('record writes refuse launch environment and frozen settings without changing product records', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'product-content-'));
@@ -31,9 +50,23 @@ test('record writes refuse launch environment and frozen settings without changi
 
         const before = records.read(d.workId);
 
-        expect(() => records.setBody(d.workId, before.revision, 'answer', `Use UTC.\n\n${handoff}`)).toThrow(
-            /product content.*run.settings/i,
-        );
+        for (const block of [handoff, runHandoff, unmarked(runHandoff)])
+            expect(() => records.setBody(d.workId, before.revision, 'answer', `Use UTC.\n\n${block}`)).toThrow(
+                /product content.*run.settings/i,
+            );
+
+        // The runtime block's exports alone, without its markers or other lines, are still a copied handoff.
+        expect(() =>
+            records.setBody(
+                d.workId,
+                before.revision,
+                'answer',
+                runHandoff
+                    .split('\n')
+                    .filter((line) => line.startsWith('export '))
+                    .join('\n'),
+            ),
+        ).toThrow(/product content/i);
         expect(records.read(d.workId)).toEqual(before);
 
         const saved =

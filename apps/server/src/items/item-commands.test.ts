@@ -3,17 +3,21 @@ import type {
     BoardData,
     Item,
     ItemThread,
+    ModelSelection,
     NeedsYouCause,
     OperationAccess,
     ShapingThreadCleanup,
     StartResult,
     Status,
 } from '@lar-factory/shared';
+import type { RunSettings } from '@lar-factory/shared/run-settings';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { afterEach, test, vi } from 'vite-plus/test';
 
@@ -759,7 +763,9 @@ function recordedCommands(
         resumeLaunch,
         clearedFailuresFile = null,
         outcomeSend,
+        deps = {},
     }: {
+        deps?: Partial<ItemCommandsDeps>;
         outcomeSend?: NonNullable<ItemCommandsDeps['briefApprovalDeps']>['send'];
         clearedFailuresFile?: string | null;
         cleanupChoice?: () => ShapingThreadCleanup;
@@ -825,6 +831,7 @@ function recordedCommands(
 
             return { thread: { threadId: `thread-${started.length}`, title: 't' }, error: null };
         },
+        ...deps,
     });
 
     return { board, commands, started, reread };
@@ -1357,15 +1364,11 @@ for (const kind of ['build'] as ('issue' | 'concept' | 'decision' | 'build')[])
         const message = start.mock.calls[0]![1];
 
         assert.equal(message.split('\n')[0], `${kind === 'build' ? 'Build' : 'Shaping'} #5 Configured`);
-        assert.equal(message.match(/<!-- factory-runtime:start -->/g)?.length, 2);
-        assert.equal(message.match(/<!-- factory-runtime:end -->/g)?.length, 2);
+        assert.equal(message.match(/<!-- factory-runtime:start -->/g)?.length, 1);
+        assert.equal(message.match(/<!-- factory-runtime:end -->/g)?.length, 1);
         assert.equal(message.match(/^Frozen build method: TDD$/gm)?.length, 1);
         assert.equal(message.match(/^Frozen retro: on$/gm)?.length, 1);
         assert.match(start.mock.calls[0]![1], new RegExp(runs[0]!.runId));
-        assert.ok(
-            start.mock.calls[0]![1].includes(JSON.stringify(runs[0]!.roles)),
-            'all frozen roles reach the thread',
-        );
         assert.equal(runs[0]!.roles.planner.effort, 'low');
         assert.equal(runs[0]!.runId, runId);
         assert.equal(roleRuns[0]!.result, 'failed');
@@ -1455,7 +1458,7 @@ test("a run keeps reading its release's lar-build after the app moves to another
     const { prompt, dir } = await promptAfterUpdate('1.0.0', '2.0.0', ['1.0.0', '2.0.0']);
 
     assert.ok(prompt.includes(`Read ${join(dir, 'bundles/1.0.0/skills/lar-build')}/agents/builder.md`), prompt);
-    assert.ok(prompt.includes(`LAR_FACTORY_SHAPE_SKILL='${join(dir, 'bundles/1.0.0/skills/lar-shape/SKILL.md')}'`));
+    assert.ok(prompt.includes(`"lar-shape":"${join(dir, 'bundles/1.0.0/skills/lar-shape/SKILL.md')}"`));
     assert.ok(!prompt.includes('2.0.0'));
 });
 
@@ -1851,3 +1854,429 @@ test('a group past Shaping is refused a start with nothing waiting in its checkl
     assert.equal((await live.commands.start(id, undefined)).status, 409, 'its thread is live');
     assert.deepEqual(live.started, []);
 });
+
+/** The lar-work command a thread's roles run. */
+const LAR_WORK = fileURLToPath(new URL('../../../../packages/work-records/src/cli.ts', import.meta.url));
+
+const shellQuoted = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+
+/** The two runtime blocks boards sent before launches were recorded, copied as they were, which runs saved then keep. */
+function preChangeRuntime(
+    context: {
+        dataDir: string;
+        bin: string;
+        shapeSkill: string;
+        buildSkill: string;
+        azureReadOnly?: boolean;
+        delegationModel?: ModelSelection;
+    },
+    run: RunSettings,
+): string {
+    return [
+        '<!-- factory-runtime:start -->',
+        'Runtime instructions belong only in thread prompts/handoffs; never copy this block into product records (brief, map, decision, answer or domain drafts). Read frozen choices from run-settings records.',
+        'Use the factory installation and data folder below for this thread and every subagent.',
+        'Before running any factory command, set this environment in that command shell:',
+        `export LAR_FACTORY_DATA_DIR=${shellQuoted(context.dataDir)}`,
+        `export PATH=${shellQuoted(context.bin)}:"$PATH"`,
+        `export LAR_FACTORY_BIN=${shellQuoted(context.bin)}`,
+        `export LAR_FACTORY_SHAPE_SKILL=${shellQuoted(context.shapeSkill)}`,
+        `export LAR_FACTORY_BUILD_SKILL=${shellQuoted(context.buildSkill)}`,
+        ...(context.azureReadOnly
+            ? [
+                  "export LAR_FACTORY_AZURE_READ_ONLY='1'",
+                  'All Azure DevOps organizations are read-only. Never launch Azure implementation or write through another tool.',
+              ]
+            : []),
+        `Use ${shellQuoted(`${context.bin}/lar-work`)} for work records. Never use another data folder or command installation.`,
+        `Factory skill entries: ${JSON.stringify({ 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill })}`,
+        'Pass these exact skill entries and the CLI/data environment above verbatim in every child task prompt and handoff, including Explore and Approver. Children must read the supplied entry for their role first and resolve its relative files from that entry; never discover skills independently or read a global installation first. If a supplied entry is unavailable, hold and report its exact path.',
+        'The target repository needs no factory files or factory instructions in AGENTS.md or CLAUDE.md.',
+        ...(context.delegationModel
+            ? [
+                  `Default every delegated role to this T3 target unless this run explicitly supplies a role override: ${JSON.stringify({ providerInstanceId: context.delegationModel.instanceId, model: context.delegationModel.model, options: Object.fromEntries(context.delegationModel.options?.map(({ id, value }) => [id, value]) ?? []) })}. Pass this default to every delegated task.`,
+              ]
+            : []),
+        '<!-- factory-runtime:end -->',
+        '',
+        '<!-- factory-runtime:start -->',
+        'Runtime contract only: never copy into product records; read run-settings for execution choices.',
+        'Factory run contract: read shared/orchestration.md in the supplied factory skill before doing work.',
+        `Run settings (pass this exact block and the factory environment to every child and handoff): ${JSON.stringify({ workId: run.workId, runId: run.runId, kind: run.kind, testRuntime: run.testRuntime, thread: run.thread, roles: run.roles })}`,
+        `Frozen build method: ${run.buildMethod === 'prove-it' ? 'Prove it' : 'TDD'}`,
+        `Frozen retro: ${run.settings.retro === false ? 'off' : 'on'}`,
+        `Before work, export LAR_FACTORY_RUN_ID=${run.runId}; carry it to every child and handoff so run-test uses this frozen runtime.`,
+        'Verify this thread with t3_thread_configure before work; hold on a model/option mismatch. Every role uses delegate_task and the frozen role target, including inherited targets.',
+        'Read lar-work run-settings WORK_ID --run-id RUN_ID for frozen reviewer instructions. select-reviewers must use --run-id RUN_ID; record-review-round must carry runId and selection evidence.',
+        '<!-- factory-runtime:end -->',
+    ].join('\n');
+}
+
+/** A thread message up to its runtime blocks, without the build input a build launch adds after them. */
+const instructionsOf = (message: string) => message.slice(0, message.indexOf('\n\n<!-- factory-runtime:start -->'));
+/** The message boards sent before thread names carried a phase: Shape's first line had no `Shaping`, Build's had none. */
+const beforePhaseNames = (message: string) =>
+    message.startsWith('Shaping ') ? message.replace('Shaping ', '') : message.slice(message.indexOf('\n') + 1);
+const withoutBuildInput = (message: string) => message.split('\n\nUse this frozen, approved build input')[0]!;
+const runtimeBlocks = (message: string) =>
+    message.match(/<!-- factory-runtime:start -->[\s\S]*?<!-- factory-runtime:end -->/g) ?? [];
+
+/** Marks the work's runs as saved before launches were recorded, as runs from before the migration are. */
+function markEarlier(records: WorkRecords, workId: string) {
+    const db = new DatabaseSync(join(opened.find((o) => o.records === records)!.dir, 'work-records.db'));
+
+    db.prepare('DELETE FROM new_runs WHERE work_id=?').run(workId);
+    db.close();
+}
+
+/**
+ * A board whose launches save run settings and read lar-shape and lar-build from the data folder's release folders
+ * 1.0.0 and 2.0.0, on app release 1.0.0. T3 answers each start with `answer`, and recovery reads no thread.
+ */
+async function runBoard(kind: 'issue' | 'build', records?: WorkRecords) {
+    const { defaultFactorySettings } = await import('@lar-factory/shared/factory-settings');
+    const { writeFactorySettings } = await import('@lar-factory/work-records/factory-settings');
+    const { executionSettingsOf } = await import('@lar-factory/shared/execution-target');
+
+    records ??= await openRecords();
+
+    const dir = opened.find((o) => o.records === records)!.dir;
+    const settings = defaultFactorySettings();
+
+    for (const threadKind of ['shaping', 'build'] as const)
+        settings.threadKinds[threadKind] = { model: { instanceId: 'claude', model: 'opus' }, effort: 'high' };
+    writeFactorySettings(settings, dir);
+
+    const bin = join(dir, "O'Brien bin");
+
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'lar-work'), '');
+    for (const release of ['1.0.0', '2.0.0'])
+        for (const skill of ['lar-shape', 'lar-build']) {
+            mkdirSync(join(dir, 'bundles', release, 'skills', skill), { recursive: true });
+            writeFileSync(join(dir, 'bundles', release, 'skills', skill, 'SKILL.md'), skill);
+        }
+    vi.stubEnv('BOARD_DEV_SKILLS_DIR', undefined);
+    vi.stubEnv('BOARD_BUNDLE_DIR', '/app/bundle');
+    vi.stubEnv('BOARD_APP_VERSION', '1.0.0');
+
+    const t3 = {
+        available: true,
+        answer: (selection: ModelSelection): StartResult => ({
+            thread: { threadId: `thread-${t3.started.length}`, title: 't' },
+            error: null,
+            executionReport: { source: 't3', reference: 't', actual: executionSettingsOf(selection) },
+        }),
+        started: [] as string[],
+        recovered: [] as string[][],
+    };
+    const context = {
+        dataDir: dir,
+        bin,
+        azureReadOnly: true,
+        delegationModel: { instanceId: 'codex', model: 'delegate', options: [] },
+    };
+    const deps: Partial<ItemCommandsDeps> = {
+        factoryContext: context,
+        skillsOf: () => [],
+        runLaunchDeps: {
+            defaults: () => ({ selection: null, runtimeMode: 'full-access' }),
+            models: async () =>
+                t3.available
+                    ? [{ instanceId: 'claude', model: 'opus', options: [{ id: 'effort', values: ['high'] }] }]
+                    : [],
+            packaged: () => ({
+                version: 'fixture',
+                reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+            }),
+            release: () => process.env.BOARD_APP_VERSION || undefined,
+        },
+        startThread: async (_project, message, selection) => {
+            t3.started.push(message);
+
+            return t3.answer(selection!);
+        },
+        recoverThread: async (_project, messages) => {
+            t3.recovered.push([...messages]);
+
+            return 'absent';
+        },
+    };
+    const entries = (release: string) => ({
+        'lar-shape': join(dir, 'bundles', release, 'skills/lar-shape/SKILL.md'),
+        'lar-build': join(dir, 'bundles', release, 'skills/lar-build/SKILL.md'),
+    });
+    const work =
+        kind === 'build'
+            ? records.importTicket({ title: 'Configured', repository: WEB, kind, status: 'Ready', ticket: `${WEB}#5` })
+                  .record
+            : records.importTicket({ title: 'Configured', repository: WEB, kind, status: 'Queued', ticket: `${WEB}#5` })
+                  .record;
+
+    if (kind === 'build') approveBuild(records, work.workId);
+
+    const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, deps);
+    const start = () =>
+        kind === 'build' ? commands.startBuild(work.workId, undefined) : commands.start(work.workId, undefined);
+    /** Settles the unresolved launch as T3 confirming it started nothing, so the next Start retries the run. */
+    const startedNothing = () => {
+        const intent = records.launchIntents({ workId: work.workId, unresolved: true })[0]!;
+
+        records.resolveLaunchIntent(work.workId, records.read(work.workId).revision, intent.intentId, {
+            failure: 'T3 started nothing.',
+        });
+        records.finishRoleRun(work.workId, records.read(work.workId).revision, {
+            executionId: intent.intentId,
+            report: null,
+            result: 'failed',
+            failure: 'T3 started nothing.',
+        });
+    };
+
+    return { records, dir, bin, context, deps, t3, entries, workId: work.workId, start, startedNothing };
+}
+
+for (const kind of ['issue', 'build'] as const)
+    test(`a ${kind === 'build' ? 'Build' : 'Shape'} launch prompt has one short runtime block naming each skill entry once`, async () => {
+        const board = await runBoard(kind);
+
+        assert.equal((await board.start()).status, 200);
+
+        const [message] = board.t3.started as [string];
+        const { runs } = board.records.runSettings(board.workId);
+        const blocks = runtimeBlocks(message);
+        const entries = board.entries('1.0.0');
+
+        assert.equal(blocks.length, 1, message);
+        assert.equal(message.match(/<!-- factory-runtime:(?:start|end) -->/g)!.length, 2);
+
+        const [block] = blocks as [string];
+
+        for (const entry of Object.values(entries)) assert.equal(block.split(entry).length - 1, 1, entry);
+        // Shape's Read line names its lar-shape entry; Build's names agents/builder.md.
+        assert.equal(message.split(entries['lar-shape']).length - 1, kind === 'build' ? 1 : 2);
+        assert.equal(message.split(entries['lar-build']).length - 1, 1);
+        assert.ok(block.includes(`export PATH=${shellQuoted(board.bin)}:"$PATH"`));
+        assert.ok(block.includes(`export LAR_FACTORY_DATA_DIR=${shellQuoted(board.dir)}`));
+        assert.ok(block.includes(`export LAR_FACTORY_RUN_ID='${runs[0]!.runId}'`));
+        assert.ok(block.includes("export LAR_FACTORY_AZURE_READ_ONLY='1'"));
+        assert.ok(block.includes('All Azure DevOps organizations are read-only.'));
+        assert.ok(block.includes(`Use ${shellQuoted(`${board.bin}/lar-work`)} for work records.`));
+        assert.ok(block.includes(JSON.stringify(runs[0]!.thread)), 'the thread verifies its own target');
+        assert.match(block, /^Frozen build method: TDD$/m);
+        assert.match(block, /^Frozen retro: on$/m);
+        assert.doesNotMatch(message, /verbatim/);
+        assert.doesNotMatch(message, /LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)/);
+        assert.ok(!message.includes(JSON.stringify(runs[0]!.roles)), 'role targets reach children through role-launch');
+        assert.doesNotMatch(message, /Default every delegated role/);
+    });
+
+for (const kind of ['issue', 'build'] as const) {
+    const name = kind === 'build' ? 'Build' : 'Shape';
+
+    test(`${name} launch recovery matches the message before phase names and the current one for a new run`, async () => {
+        const board = await runBoard(kind);
+
+        board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+        await board.start();
+        await board.start();
+
+        const sent = withoutBuildInput(board.t3.started[0]!);
+        const [messages] = board.t3.recovered as [string[]];
+
+        assert.equal(runtimeBlocks(sent).length, 1);
+        assert.ok(messages.includes(sent), 'the message this board sent');
+        assert.ok(messages.includes(beforePhaseNames(sent)), 'the message before phase names');
+        assert.equal(board.t3.started.length, 1);
+    });
+
+    test(`a ${name} run saved before this change gets the pre-change message on retry, and recovery matches it`, async () => {
+        const board = await runBoard(kind);
+
+        // The first start saves the run and holds on the model check, before T3.
+        board.t3.available = false;
+        assert.equal(((await board.start()).body as StartResult).hold, true);
+        markEarlier(board.records, board.workId);
+        board.t3.available = true;
+        board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+        await board.start();
+
+        const sent = withoutBuildInput(board.t3.started[0]!);
+        const run = board.records.runSettings(board.workId).runs[0]!;
+        const entries = board.entries('1.0.0');
+
+        assert.equal(
+            sent,
+            `${instructionsOf(sent)}\n\n${preChangeRuntime({ ...board.context, shapeSkill: entries['lar-shape'], buildSkill: entries['lar-build'] }, run)}`,
+        );
+        assert.deepEqual(board.records.runLaunches(board.workId, run.runId), { newRun: false, launches: [] });
+
+        await board.start();
+
+        const [messages] = board.t3.recovered as [string[]];
+
+        assert.ok(messages.includes(sent), 'the pre-change message');
+        assert.ok(messages.includes(beforePhaseNames(sent)), 'the message before phase names');
+    });
+}
+
+test('a retry of a new run whose first launch failed the model check gets the new message', async () => {
+    const board = await runBoard('build');
+
+    board.t3.available = false;
+    assert.equal(((await board.start()).body as StartResult).hold, true);
+    board.t3.available = true;
+    assert.equal((await board.start()).status, 200);
+    assert.equal(runtimeBlocks(board.t3.started[0]!).length, 1);
+    assert.doesNotMatch(board.t3.started[0]!, /LAR_FACTORY_BIN/);
+});
+
+test('a retry after the skill location moves records and sends the new entries, which role-launch then prints', async () => {
+    const board = await runBoard('build');
+    const answer = board.t3.answer;
+
+    board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+    await board.start();
+
+    const { runId } = board.records.runSettings(board.workId).runs[0]!;
+    const first = board.entries('1.0.0');
+    const moved = board.entries('2.0.0');
+
+    // The app moves to release 2.0.0 and the run's 1.0.0 folder goes.
+    vi.stubEnv('BOARD_APP_VERSION', '2.0.0');
+    rmSync(join(board.dir, 'bundles/1.0.0'), { recursive: true });
+    await board.start();
+
+    const [recovered] = board.t3.recovered as [string[]];
+
+    assert.ok(recovered.includes(withoutBuildInput(board.t3.started[0]!)), 'recovery matches its own recorded entries');
+    assert.ok(recovered.every((message) => !message.includes(moved['lar-build'])));
+    assert.deepEqual(
+        board.records.runLaunches(board.workId, runId).launches.map((launch) => launch.skillEntries),
+        [first],
+        'recovery records nothing',
+    );
+
+    board.startedNothing();
+    board.t3.answer = answer;
+    assert.equal((await board.start()).status, 200);
+
+    const retry = board.t3.started[1]!;
+
+    assert.ok(retry.includes(`Factory skill entries: ${JSON.stringify(moved)}`), retry);
+    assert.ok(!retry.includes(first['lar-build']));
+    assert.deepEqual(
+        board.records.runLaunches(board.workId, runId).launches.map((launch) => launch.skillEntries),
+        [first, moved],
+    );
+
+    const capabilities = join(board.dir, 'capabilities.json');
+    const task = join(board.dir, 'task.md');
+
+    writeFileSync(task, 'Implement the brief.');
+    writeFileSync(
+        capabilities,
+        JSON.stringify({
+            providers: [
+                {
+                    providerInstanceId: 'claude',
+                    canRunChildTask: true,
+                    models: [{ id: 'opus', options: [{ id: 'effort', values: ['high'] }] }],
+                },
+            ],
+        }),
+    );
+
+    const launched = spawnSync(
+        process.execPath,
+        [
+            '--disable-warning=ExperimentalWarning',
+            LAR_WORK,
+            'role-launch',
+            board.workId,
+            '--run-id',
+            runId,
+            '--role',
+            'planner',
+            '--capabilities',
+            capabilities,
+            '--task',
+            task,
+            '--data-dir',
+            board.dir,
+        ],
+        {
+            encoding: 'utf8',
+            timeout: 20_000,
+            env: {
+                ...process.env,
+                LAR_FACTORY_BIN: undefined,
+                LAR_FACTORY_SHAPE_SKILL: undefined,
+                LAR_FACTORY_BUILD_SKILL: undefined,
+            },
+        },
+    );
+
+    assert.equal(launched.stderr, '');
+    assert.equal(launched.status, 0);
+    assert.ok(
+        (JSON.parse(launched.stdout) as { task: string }).task.includes(
+            `Factory skill entries: ${JSON.stringify(moved)}`,
+        ),
+    );
+}, 30_000);
+
+for (const earlier of [false, true])
+    test(`a Reconcile group launch of a ${earlier ? 'run saved before this change keeps the pre-change message' : 'new run has one short runtime block'}, and recovery matches it`, async () => {
+        const { records, id, first, second, at } = await reconciledGroup();
+        const board = await runBoard('issue', records);
+        const s = recordedCommands(records, {
+            shown: (ids) => ids.map((tid) => ({ id: tid, title: 't', state: 'done', updated: '2026-11-17T00:00:00Z' })),
+            deps: board.deps,
+        });
+
+        records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+        records.observe(first, at(first), { of: 'pr', state: 'merged' });
+        s.reread();
+        await s.commands.reconcileStarts(s.board.snapshot().items);
+
+        if (earlier) {
+            board.t3.available = false;
+            assert.equal(((await s.commands.start(id, undefined)).body as StartResult).hold, true);
+            markEarlier(records, id);
+            board.t3.available = true;
+        }
+
+        board.t3.answer = () => ({ thread: null, error: 'T3 may have started it.', uncertain: true });
+        await s.commands.start(id, undefined);
+
+        const [sent] = board.t3.started as [string];
+        const run = records.runSettings(id).runs[0]!;
+        const entries = board.entries('1.0.0');
+
+        assert.match(sent, /^Reconciling Group\nReconcile group /);
+        // Its Read line names lar-shape's shared/reconcile-group.md, not a skill entry.
+        assert.ok(sent.includes(join(board.dir, 'bundles/1.0.0/skills/lar-shape/shared/reconcile-group.md')));
+
+        if (earlier)
+            assert.equal(
+                sent,
+                `${instructionsOf(sent)}\n\n${preChangeRuntime({ ...board.context, shapeSkill: entries['lar-shape'], buildSkill: entries['lar-build'] }, run)}`,
+            );
+        else {
+            const blocks = runtimeBlocks(sent);
+
+            assert.equal(blocks.length, 1);
+            for (const entry of Object.values(entries)) assert.equal(sent.split(entry).length - 1, 1, entry);
+            assert.ok(blocks[0]!.includes(`export PATH=${shellQuoted(board.bin)}:"$PATH"`));
+            assert.ok(blocks[0]!.includes(`export LAR_FACTORY_DATA_DIR=${shellQuoted(board.dir)}`));
+            assert.ok(blocks[0]!.includes(`export LAR_FACTORY_RUN_ID='${run.runId}'`));
+            assert.doesNotMatch(sent, /verbatim/);
+            assert.doesNotMatch(sent, /LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)/);
+            assert.ok(!sent.includes(JSON.stringify(run.roles)));
+        }
+
+        await s.commands.start(id, undefined);
+        assert.ok((board.t3.recovered[0] ?? []).includes(sent), 'recovery matches the message it sent');
+        assert.equal(board.t3.started.length, 1);
+    });

@@ -73,12 +73,11 @@ const originTip = (home: string) =>
     }).trim();
 
 const message = (home: string, workId: string, dataDir?: string) =>
-    withRunPrompt(
-        dataDir ?? testFactoryContext(home).dataDir,
-        workId,
+    withRunPrompt(dataDir ?? testFactoryContext(home).dataDir, workId, (run) =>
         buildMessage({ id: workId, number: 12, title: 'Issue 12' } as Item, {
             ...testFactoryContext(home),
             ...(dataDir ? { dataDir } : {}),
+            ...run,
         }),
     );
 

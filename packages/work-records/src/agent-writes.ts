@@ -166,6 +166,10 @@ export function agentWrites(records: WorkRecords): WorkRecords {
             ),
         finishRoleRun: (id, rev, input) =>
             apply(id, rev, [...build, `roleRuns.${input.executionId}`], (r) => records.finishRoleRun(id, r, input)),
+        // Only the board server names a launch's skill entries and CLI.
+        recordRunLaunch: () => {
+            throw new Error('Only the board records a launch.');
+        },
         updateDependency: (id, rev, patch) =>
             apply(
                 id,

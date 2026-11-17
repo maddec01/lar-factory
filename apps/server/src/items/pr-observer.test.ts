@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { prUrl } from '../config/pr-host.ts';
 import { createPrObserver } from './pr-observer.ts';
 
 const repo = 'owner/repo';
@@ -17,23 +18,23 @@ afterEach(() => {
     }
 });
 
-async function fixture() {
+async function fixture(repository = repo) {
     const dir = mkdtempSync(join(tmpdir(), 'pr-observer-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
 
     opened.push({ records, dir });
 
     const created = records.create({
-        repository: repo,
+        repository,
         title: 'Work without an issue',
         kind: 'build',
         status: 'Review',
     });
-    const record = records.setPullRequest(created.workId, created.revision, `${repo}#4`);
+    const record = records.setPullRequest(created.workId, created.revision, `${repository}#4`);
     const read = vi.fn<(repo: string, number: number) => Promise<PullRequestState | LinkedPr>>(async () => 'open');
     const changed = vi.fn();
     const hidden = new Set<string>();
-    const options = { repositories: () => [repo], hidden: () => hidden, waits: () => false, read, changed };
+    const options = { repositories: () => [repository], hidden: () => hidden, waits: () => false, read, changed };
 
     return { records, record, read, changed, hidden, options };
 }
@@ -94,4 +95,52 @@ test('a merge confirmation refreshes the saved ticket before publishing Done', a
     await observer.poll(0);
     expect(readTicket).toHaveBeenCalledWith(repo, 12);
     expect(records.read(record.workId)).toMatchObject({ status: 'Done', needsYouCauses: [] });
+});
+
+test('a failed Azure check read keeps the last known check counts, marked stale', async () => {
+    const azure = 'org/project/repo';
+    const { records, record, options, read } = await fixture(azure);
+    const url = prUrl(azure, 4);
+    const checks = { passed: 3, failed: 1, running: 0, total: 4 };
+    const pr: LinkedPr = {
+        number: 4,
+        url,
+        state: 'open',
+        isDraft: false,
+        sourceRevision: 'abc123',
+        mergeState: 'blocked',
+        checks,
+        checkProgress: { state: 'current', coverage: 'all' },
+    };
+    const observer = createPrObserver(records, options);
+    const shown = () =>
+        observer.project([{ id: record.workId, recorded: false, linkedPrs: [{ ...pr, checks: null }] } as Item])[0]!
+            .linkedPrs[0]!;
+
+    read.mockResolvedValueOnce(pr);
+    await observer.poll(0);
+    // The Azure read finds the PR but not its checks, as `readObservedPr` reports a failed check read.
+    read.mockResolvedValueOnce({ ...pr, checks: null, mergeState: 'checking', checkProgress: { state: 'unavailable' } });
+    await observer.poll(300_000);
+    expect(shown()).toMatchObject({ checks, checkProgress: { state: 'stale' } });
+    read.mockRejectedValueOnce(new Error('Azure PR progress unavailable.'));
+    await observer.poll(600_000);
+    expect(shown()).toMatchObject({ checks, checkProgress: { state: 'stale' } });
+});
+
+test('a failed read with no known check counts says checks are unavailable, never stale with no checks', async () => {
+    const { records, record, options, read } = await fixture();
+
+    read.mockRejectedValueOnce(new Error('Provider unavailable'));
+    await createPrObserver(records, options).poll(0);
+
+    // A restarted board keeps the failed observation but none of the counts the earlier observer read.
+    const [shown] = createPrObserver(records, options).project([
+        {
+            id: record.workId,
+            linkedPrs: [{ number: 4, url: prUrl(repo, 4), state: 'open', isDraft: false, checks: null }],
+        } as unknown as Item,
+    ])[0]!.linkedPrs;
+
+    expect(shown).toMatchObject({ checks: null, checkProgress: { state: 'unavailable' } });
 });

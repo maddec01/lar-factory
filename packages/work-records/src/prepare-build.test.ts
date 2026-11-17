@@ -94,6 +94,23 @@ it('holds missing/stale gates, unmet blockers and a concept with an open pre-tas
     expect(records.launchIntents({})).toEqual([]);
 });
 
+it('starts a build whose brief names the same files as another active item without a blocker between them', async () => {
+    const { records, rev, ready } = await fixture();
+    const build = ready('Links');
+    const other = ready('Other links');
+
+    records.setBody(other, rev(other), 'brief', 'Files: `src/links.ts`');
+    records.setBody(build, rev(build), 'brief', 'Files: `src/links.ts`');
+    records.recordGate(build, rev(build), {
+        briefDigest: records.gate(build).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes',
+    });
+    records.update(build, rev(build), { status: 'Ready' });
+
+    expect(records.prepareBuild(build, rev(build), capacity).intent.workId).toBe(build);
+});
+
 it('S08 F01: Pedro waits retain the original slot across answers, amendments, handoff and reopen', async () => {
     const { records, other, rev, ready } = await fixture();
     const a = ready('SA');

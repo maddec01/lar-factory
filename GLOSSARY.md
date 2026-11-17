@@ -129,7 +129,7 @@ Permission to run one heavy command. The heavy command limit is the number of sl
 _Avoid_: lease, token.
 
 **Build limit**:
-How many builds may work at once on one machine. Auto-build starts builds only up to this number.
+How many builds may work at once on one machine. A build whose PR is open is waiting on its PR and doesn't count, even while it fixes CI or review feedback. Auto-build starts builds only up to this number.
 _Avoid_: build slot, concurrency setting.
 
 **Auto-build**:

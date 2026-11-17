@@ -194,3 +194,67 @@ test('a Dependency whose ticket closed still holds Start and Start after until t
 
     assert.deepEqual(started.armed, {});
 });
+
+test('Shape authorizes follow-on decisions on the concept model, including blocked decisions, with Auto-build off', async (t) => {
+    const { board } = await armableBoard(t, [rawIssue('I_30', 30, 'Queued', ['feature'])]);
+    const parent = board.id(30);
+    const shaped = await board.postSession({ itemId: parent, model: OPUS }, '/api/start');
+
+    assert.equal(shaped.status, 200, JSON.stringify(await shaped.json()));
+
+    let first = '';
+    let second = '';
+    let research = '';
+
+    await changeRecords(
+        board,
+        (records) => {
+            records.update(parent, records.read(parent).revision, { kind: 'concept' });
+
+            const part = (method: 'grill' | 'task' | 'research', blockerIds: string[] = []) =>
+                records.createPart({
+                    parentId: parent,
+                    parentRevision: records.read(parent).revision,
+                    title: `${method} decision`,
+                    repository: 'maddec01/lar-factory',
+                    kind: 'decision',
+                    body: `Method: ${method}\nChoose the contract.`,
+                    blockerIds,
+                }).workId;
+
+            first = part('grill');
+            second = part('task', [first]);
+            research = part('research');
+        },
+        parent,
+        (item) => item.subIssues.total === 3,
+    );
+
+    const started = await until(board, (d) => !!d.started?.[first] && !!d.armed?.[second]);
+
+    assert.equal(started.autoBuild?.on, false);
+    assert.equal(started.started?.[second], undefined);
+    assert.equal(started.started?.[research], undefined);
+    assert.deepEqual(started.armed?.[second], { model: OPUS });
+
+    await changeRecords(
+        board,
+        (records) => {
+            records.setBody(first, records.read(first).revision, 'answer', 'Use the chosen contract.');
+            records.setBody(first, records.read(first).revision, 'domain-drafts', 'none');
+            records.setBody(parent, records.read(parent).revision, 'map', '## Destination\nSettled contract.');
+        },
+        second,
+        (item) => item.blockers.every((blocker) => blocker.state === 'closed'),
+    );
+    await until(board, (d) => !!d.started?.[second] && !d.armed?.[second]);
+    await read(board);
+
+    const calls = (await board.t3Calls()) as unknown as unknown[][];
+
+    assert.equal(calls.length, 3, 'one concept and two decisions, with no duplicate launches');
+    assert.deepEqual(
+        calls.map((call) => call[3]),
+        Array(3).fill({ ...OPUS, options: [] }),
+    );
+});

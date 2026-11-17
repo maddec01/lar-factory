@@ -1,4 +1,5 @@
-// One scheduler for Auto-build and explicitly running concepts. Eligible gates share the machine capacity,
+// One scheduler for Auto-build and explicitly running concepts. Follow-on decisions use Start after,
+// independently of this switch or build capacity. Eligible gates share the machine capacity,
 // ordered by gate age then work ID. A concept remains authorized with Auto-build off, until Pause or a scope change.
 // Holds retry; definite failures pause the item until a manual start succeeds or a new gate passes. Unknown launches
 // retain their durable intent and slot. One board owns automatic scheduling for the data folder.

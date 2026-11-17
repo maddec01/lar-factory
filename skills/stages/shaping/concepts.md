@@ -47,13 +47,14 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
    then its question. Name its repository; route remaining Fog per Reconcile group.
 3. Start each research decision now, in the background, with the
    [research](research-question.md) step.
-4. Keep the concept in Shaping while decisions are open. Each grill,
-   [prototype](prototype-question.md) or task decision waits in Queued for the
-   board's Start, which opens its **decision thread** in its repository
-   project's root with `/lar-shape <work ID>`. A blocked one starts only once
-   each of its blockers is complete, by hand or through the board's Start
-   after. Research decisions get no thread. Tell the user in chat which
-   decisions wait on which; this shaping thread is done.
+4. Keep the concept in Shaping while decisions are open. The board automatically
+   arms each grill, [prototype](prototype-question.md) or task decision through
+   Start after, using this concept's model choice. Starting Shape already
+   authorized this refinement; no separate Start decision is needed. Once its
+   blockers complete, the board opens its **decision thread** in its repository
+   project's root with `/lar-shape <work ID>`, even with Auto-build off.
+   Research decisions get no thread. Tell the user which decisions wait on
+   which; this shaping thread is done.
 
 After group changes, follow [Reconcile group](shared/reconcile-group.md) before ending.
 

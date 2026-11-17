@@ -31,10 +31,15 @@ export const dependencyProofs = (item: Item) =>
           });
 
 /** Saved group checklist items that need a thread, while no thread owns the group. */
-export const reconcileGroupWaits = (item: Item): boolean =>
+export const reconcileGroupWaits = (item: Item, all: readonly Item[] = []): boolean =>
     !item.parentId &&
+    !item.setAside &&
     reconcileWaitItems(item.reconciliation).length > 0 &&
-    !(Array.isArray(item.threads) && item.threads.some((thread) => isLiveThread(thread) || thread.hasRunningChildren));
+    ![item, ...all.filter((part) => part.parentId === item.id)].some(
+        (owner) =>
+            Array.isArray(owner.threads) &&
+            owner.threads.some((thread) => thread.observedAt || isLiveThread(thread) || thread.hasRunningChildren),
+    );
 
 /**
  * What holds a PR at Verify or Ready to merge before anything else: a failed check, then a conflict with main. The wait
@@ -120,9 +125,6 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
 
     if (releaseContinuationReady(item, all))
         return { label: 'Release', action: { kind: 'details' as const, label: 'Resume release' } };
-
-    if (reconcileGroupWaits(item))
-        return { label: 'Reconcile group', action: { kind: 'reconcile-group' as const, label: 'Reconcile group' } };
 
     if (stopped)
         return {

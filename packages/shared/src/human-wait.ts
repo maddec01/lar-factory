@@ -1,4 +1,4 @@
-import { dependencyProofs, deskWait, reconcileGroupWaits } from './desk-wait.ts';
+import { dependencyProofs, deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
 import { prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
@@ -42,7 +42,6 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
             Array.isArray(item.threads) &&
             item.threads.some((thread) => !thread.observedAt && supersededReleaseQuestion(item, thread))) ||
         outcomeNeedsPedro(item, all) ||
-        reconcileGroupWaits(item) ||
         retroWaits(item.retro, item.status) ||
         !!pendingPedroReleaseStep(item.releasePlan) ||
         !!item.briefApproval ||

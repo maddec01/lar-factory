@@ -6,8 +6,11 @@ After every group change (answers, scope/contracts, set-aside, merge-build,
 single/batch board gates), run `lar-work reconcile GROUP_ID` on its concept or
 linked-work parent. After a part's PR merges, the board runs that pass itself
 and resolves items whose only changes are Status, queue order or finish time.
-Any other item gives the parent a **Reconcile group** wait; run this file for a
-merge only from a thread that wait's action started. Review the checklist's `before`/`after`
+When other items remain, the board continues one existing group owner, or
+launches one through its durable launch path when none remains. It waits while
+the parent or any part has live work; no Reconcile group desk action is needed.
+For a merge, follow the board's dispatched continuation in that owner.
+Review the checklist's `before`/`after`
 sources; repair and repeat until `items` is empty. Commands own mechanical checks,
 invalidation and graph projection.
 

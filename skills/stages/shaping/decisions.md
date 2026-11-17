@@ -40,7 +40,8 @@ If this answer supersedes another, use `supersede-answer` per
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision with [Research](research-question.md);
-other decisions stay Queued for Start decision. After these changes, follow
+the board automatically arms other concept decisions on the concept's model
+choice and starts them when their blockers complete. After these changes, follow
 [Reconcile group](shared/reconcile-group.md), including the saved map. A proposed build
 starts Queued; changed drafts stay Shaping until [Gate](gate.md) makes them Ready.
 Ask only for expanded scope, new decisions or changes to active builds. Changed

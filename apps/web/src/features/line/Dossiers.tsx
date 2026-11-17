@@ -8,7 +8,7 @@
 // start, Dependencies and fog) or says nothing holds it up, then each part with what it asks next, its stage track, figures,
 // thread and slices, the done parts folded away. The browser remembers which dossiers are expanded and which view each shows.
 
-import { itemName, repoKey } from '@lar-factory/shared';
+import { groupProgress, itemName, repoKey } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
 import type { MouseEvent } from 'react';
@@ -25,7 +25,7 @@ import { PartsList } from './PartsList';
 import { OPEN, VIEW, useStored } from './useStored';
 import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
-import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync } from '@/features/items';
+import { ConceptBuild, ItemStatusGlyph, OpenThread, StructureSync, useActivityUnavailable } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
     conceptIcons,
@@ -61,6 +61,7 @@ function DossierBody({
     const missing = unreadParts(parent, parts);
     // The line's own label says the planning is local; a spec waiting to save still speaks up here.
     const { sync: _, ...unsynced } = parent;
+    const progress = groupProgress(parent, data.items, useActivityUnavailable());
 
     return (
         <Body tools={<ViewToggle view={view} onView={onView} />}>
@@ -87,11 +88,13 @@ function DossierBody({
             )}
             <StructureSync item={unsynced} />
             <GroupUpkeep
+                progress={progress === 'Checking Outcome' ? undefined : progress}
                 report={parent.reconciliation}
                 parts={parts.filter((part) => !part.item.setAside).map((part) => part.item.id)}
                 name={(id) => data.items.find((item) => item.id === id)?.title ?? id}
             />
             <ReleaseProgress
+                checkingOutcome={progress === 'Checking Outcome'}
                 plan={parent.releasePlan}
                 remaining={parent.completion?.reasons}
                 name={(id) => data.items.find((item) => item.id === id)?.title ?? id}

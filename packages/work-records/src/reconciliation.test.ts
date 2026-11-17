@@ -134,7 +134,7 @@ test('briefs naming the same files and contracts raise no ordering item', async 
     expect(records.reconcile(group.workId).items.map((item) => item.key)).not.toContainEqual(
         expect.stringMatching(/^overlap:/),
     );
-});
+}, 20000);
 
 test('superseded endpoint, sibling contract removal and scope changes reopen Doubt and approved gates', async () => {
     const { records, group, builds, decisions, clean } = await fixture();

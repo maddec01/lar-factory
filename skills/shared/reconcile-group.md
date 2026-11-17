@@ -3,8 +3,11 @@
 Input: changed/overlapping work. Output: coherent product contracts and records.
 
 After every group change (answers, scope/contracts, set-aside, merge-build,
-single/batch board gates, observed PR merges), run `lar-work reconcile GROUP_ID`
-on its concept or linked-work parent. Review the checklist's `before`/`after`
+single/batch board gates), run `lar-work reconcile GROUP_ID` on its concept or
+linked-work parent. After a part's PR merges, the board runs that pass itself
+and resolves items whose only changes are Status, queue order or finish time.
+Any other item gives the parent a **Reconcile group** wait; run this file for a
+merge only from a thread that wait's action started. Review the checklist's `before`/`after`
 sources; repair and repeat until `items` is empty. Commands own mechanical checks,
 invalidation and graph projection.
 

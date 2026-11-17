@@ -11,7 +11,8 @@ When a decision or gate replaces an answer, run
 It retains old text, links the replacement and invalidates affected gates atomically.
 Save the map after reconciliation to incorporate exact answer versions and references.
 A decision completes with its domain drafts and current incorporation.
-After group answer changes or observed PR merges, follow [Reconcile group](../reconcile-group.md).
+After group answer changes, follow [Reconcile group](../reconcile-group.md).
+The board reconciles a group itself after a part's PR merges.
 Concept delivery is complete once its Fog is recorded gone (`lar-work set-fog`)
 and every decision and build it owns is complete. A Status, a closed ticket or an ended thread completes nothing, and no
 step changes Azure State to record local completion. A delivery PR uses the

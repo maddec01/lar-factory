@@ -97,7 +97,7 @@ Parent release records, local only
   record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof [--input-digest digest]
                                     Record the final observable check after release steps.
 
-Retro, settled before merge
+Retro, optional picks remain available after merge
   retro <work-id>                  Read suggestions, the board choice and capture receipts.
   propose-retro <work-id> --revision N --file F
                                     At handback, before merge, save [{title,description,

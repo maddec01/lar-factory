@@ -154,7 +154,7 @@ How the agent works inside a build's steps: TDD (test first) or Prove it (build,
 _Avoid_: testing mode, build style.
 
 **Retro**:
-The build's look back at its own work, run when its PR opens before waiting for CI, which proposes follow-up items for you to choose on the board. A factory-wide switch, on by default, turns it off, and a run keeps the choice it started with.
+The build's look back at its own work, run when its PR opens before waiting for CI, which proposes useful excluded product work, deferred reviewer findings and improvements to future runs for you to choose on the board. Follow-ups never hold delivery or a build slot. An unanswered pick stays on the desk and in the Done item until you choose or dismiss it; retention keeps it visible and saved until then. A factory-wide switch, on by default, turns it off, and a run keeps the choice it started with.
 _Avoid_: retrospective, post-merge retro.
 
 **Model choice**:

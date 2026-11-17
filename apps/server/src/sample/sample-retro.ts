@@ -8,8 +8,8 @@ export function sampleRetro(
     refresh: () => void,
     input: Record<string, unknown>,
 ) {
-    if (!['seed', 'empty'].includes(String(input.change)))
-        return { status: 400, body: { error: 'Choose seed or empty.' } };
+    if (!['seed', 'empty', 'merged'].includes(String(input.change)))
+        return { status: 400, body: { error: 'Choose seed, empty or merged.' } };
 
     const repo = repos().find((r) => r.repo.startsWith('lar-factory-sample/'))?.repo;
 
@@ -48,6 +48,12 @@ export function sampleRetro(
                   },
               ],
     );
+
+    if (input.change === 'merged') {
+        records.observe(id, records.read(id).revision, { of: 'pr', state: 'merged' });
+        records.update(id, records.read(id).revision, { status: 'Done' });
+    }
+
     refresh();
 
     return { status: 200, body: { error: null, workId: id } };

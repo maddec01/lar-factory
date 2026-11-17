@@ -43,6 +43,10 @@ export const reconcileGroupWaits = (item: Item, all: readonly Item[] = []): bool
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
+    // A completed build can keep an optional pick, even if its last thread or gate still carries an old wait.
+    if (item.status === 'Done' && retroWaits(item.retro))
+        return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
+
     if (item.ticketEditHeld)
         return { label: 'Ticket edit', action: { kind: 'details' as const, label: 'Review ticket edit' } };
 
@@ -148,7 +152,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.status === 'Verify' && (!pr || pr.state === 'open'))
         return { label: 'Review PR', action: { kind: 'pr' as const, label: 'Review PR' } };
 
-    if (retroWaits(item.retro, item.status))
+    if (retroWaits(item.retro))
         return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
 
     if (item.status === 'Ready to merge' && (!pr || pr.state === 'open'))

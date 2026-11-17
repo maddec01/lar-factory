@@ -1,46 +1,16 @@
 import { retroWaits, type Item } from '@lar-factory/shared';
 import { Disclosure } from '@lar-works/design-system';
 import { useState } from 'react';
-import { flushSync } from 'react-dom';
 
-import { showToast } from '@/features/notices';
-import { postAction, receive } from '@/services/board/board.service';
+import { useRetroChoice } from '@/features/items';
 import { RetroChoices } from '@/ui/board';
 
-/** The pre-merge pick lives in details; the desk only opens it. A refused pick or failed follow-up is a toast. */
+/** The optional pick stays in details after merge; the desk can open or dismiss it. A refused pick or failed follow-up is a toast. */
 export function RetroFollowups({ item }: { item: Item }) {
     const [selected, setSelected] = useState<number[]>([]);
-    const [pending, setPending] = useState(false);
-    const choose = async (selection: number[]) => {
-        if (pending) return;
+    const { pending, choose } = useRetroChoice(item);
 
-        setPending(true);
-
-        const answer = await postAction('/api/choose-retro', {
-            itemId: item.id,
-            revision: item.revision,
-            selected: selection,
-        });
-
-        flushSync(() => {
-            receive(answer);
-            setPending(false);
-
-            if (answer.error)
-                showToast({
-                    slot: `retro-${item.id}`,
-                    failed: true,
-                    what: 'Follow-ups',
-                    body: (
-                        <>
-                            <b>Follow-ups</b> {answer.error}
-                        </>
-                    ),
-                });
-        });
-    };
-
-    if (!item.retro || !retroWaits(item.retro, item.status)) return null;
+    if (!item.retro || !retroWaits(item.retro)) return null;
 
     return (
         <Disclosure

@@ -36,7 +36,10 @@ export function NextStep({ item, waitLabel, checksShown }: { item: Item; waitLab
 
     if (group) return group.word === waitLabel ? null : <DeskHint>{group.word}</DeskHint>;
 
-    if (retroWaits(item.retro, item.status)) return null;
+    if (retroWaits(item.retro))
+        return (
+            <DeskHint>{item.status === 'Done' ? 'Optional · Build done' : 'Optional · Delivery continues'}</DeskHint>
+        );
 
     if (item.briefApproval) return <DeskHint>{item.briefApproval.reason}</DeskHint>;
 

@@ -12,6 +12,8 @@ export interface FactoryThreadContext {
     buildSkill: string;
     azureReadOnly?: boolean;
     delegationModel?: ModelSelection;
+    /** This machine's saved Auto-build switch at launch; absent in older shaping prompts. */
+    autoBuild?: boolean;
     /** The run the thread starts for, whose IDs and frozen choices its runtime block names. */
     run?: RunSettings;
     /** A run saved before launches were recorded keeps the earlier two runtime blocks, so retries and recovery match. */
@@ -47,7 +49,7 @@ function earlierFactoryEnvironment(context: FactoryThreadContext): string {
 }
 
 /** The one runtime block of a thread's first message: only what the thread can't read from its skills or records. */
-function factoryEnvironment(context: FactoryThreadContext): string {
+function factoryEnvironment(context: FactoryThreadContext, shaping = false): string {
     const { run } = context;
 
     if (context.earlier)
@@ -56,6 +58,11 @@ function factoryEnvironment(context: FactoryThreadContext): string {
     return [
         '<!-- factory-runtime:start -->',
         'Runtime instructions only: keep them in thread prompts and handoffs, never in product records.',
+        ...(shaping && context.autoBuild !== undefined
+            ? [
+                  `Saved Auto-build at launch: ${context.autoBuild ? 'on' : 'off'}; the board displays the current setting if it changes before approval.`,
+              ]
+            : []),
         ...(run ? [`Work ID ${run.workId}; run ID ${run.runId}.`] : []),
         `Factory skill entries: ${JSON.stringify({ 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill })}`,
         'Before factory commands, set this environment in that command shell:',
@@ -82,7 +89,12 @@ function shapeInstructions(item: Item, context: FactoryThreadContext): string {
             ? '\nDecision-authored builds are drafts: Brief → code evidence → Doubt → gate → Ready. Record blockers and Dependencies; do not implement during shaping.'
             : '';
 
-    return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.${decision}\n\n${factoryEnvironment(context)}`;
+    const start =
+        context.earlier || context.autoBuild === undefined
+            ? 'Shaping is independent of implementation. Do not build unless the user later chooses Start build.'
+            : 'Shaping ends at the brief gate. Do not build here; the board starts eligible approved builds through Auto-build or a user start.';
+
+    return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\n${start}${decision}\n\n${factoryEnvironment(context, true)}`;
 }
 
 /** The work message. Line 1, which T3 titles the thread from, is `Shaping` and the item's name in a sentence; then come its instructions, with its work ID. */
@@ -94,7 +106,7 @@ export function workMessage(item: Item, context: FactoryThreadContext): string {
 export function reconcileMessage(item: Item, context: FactoryThreadContext): string {
     const larShape = context.shapeSkill.replace(/\/SKILL\.md$/, '');
 
-    return `Reconciling ${itemName(item)}\nReconcile group ${item.id}. Read ${shellPath(`${larShape}/shared/reconcile-group.md`)} and follow it: run lar-work reconcile ${item.id}, then repair or resolve its items. The board already resolved items whose only changes are Status, queue order or finish time. Do not build.\n\n${factoryEnvironment(context)}`;
+    return `Reconciling ${itemName(item)}\nReconcile group ${item.id}. Read ${shellPath(`${larShape}/shared/reconcile-group.md`)} and follow it: run lar-work reconcile ${item.id}, then repair or resolve its items. The board already resolved items whose only changes are Status, queue order or finish time. Do not build.\n\n${factoryEnvironment(context, true)}`;
 }
 
 /** The work message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */

@@ -8,7 +8,7 @@ import {
 } from '@lar-factory/shared';
 import type { BoardData, FactoryThreadContext, Item, RawItem } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
-import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
+import { openWorkRecords, readAutoBuild, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs';
@@ -667,5 +667,6 @@ export const shapePrompt = (board: Board, title: string, id: string) =>
         workMessage({ id, title, number: 0 } as Item, {
             ...testFactoryContext(dirname(dirname(dirname(board.dataDir)))),
             ...run,
+            autoBuild: readAutoBuild(board.dataDir).on,
         }),
     );

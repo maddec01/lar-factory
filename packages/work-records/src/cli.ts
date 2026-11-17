@@ -62,20 +62,27 @@ PR description
 
 Confirmed scope, local only
   confirm-scope <work-id> --revision N --file F --identity person --evidence response
-                                    Save the scope shown at understanding confirmation:
+                                    Save scope from an explicit answer (source user-response).
+  confirm-scope <work-id> --revision N --file F --source submitted-request
+                                    Save scope from the submitted title/context, without a reply;
+                                    only for settled work following that request, including named repository roles.
+                                    Choose linked structure for a requested cross-repository outcome;
+                                    ask when other repositories' involvement is left open.
+                                    Scope schema:
                                     {repositories:["owner/repo"],openDecisions:[],
                                      tests:[],behaviour:[],excluded:[],
                                      size:"Small"|"Larger"|null,
                                      verify:{required:boolean,visibleUi:string|null}}.
-                                    Verify only for visible UI behaviour a person must check.
+                                    Verify only for acceptance needing human judgment or access
+                                    the agent lacks; ordinary UI changes alone do not require it.
                                     Empty lists/null size mean unspecified; never invent scope.
   confirmed-scope <work-id> [--markdown]
-                                    Read the confirmation, or render the brief's authoritative
+                                    Read the scope and its source, or render the brief's authoritative
                                     Done when, Scope and Verify sections without re-deriving them.
   choose-structure <work-id>       Read confirmed repositories/openDecisions; return single,
                                     linked or concept with its reason. Missing fields refuse.
   brief-scope-check <work-id>       Compare those sections; report missing/extra claims, exit 1
-                                    on mismatch or absent confirmation. Other prose needs Doubt.
+                                    on mismatch or absent scope. Other prose needs Doubt.
 
 Parent release records, local only
   release-plan <work-id>           Read ordered release steps and the Outcome check.

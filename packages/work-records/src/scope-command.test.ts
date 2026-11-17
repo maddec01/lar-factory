@@ -106,6 +106,97 @@ it('saves a scope without files when confirm-scope gets an old files key', async
     expect(f.records.confirmedScope(f.id)?.scope).not.toHaveProperty('files');
 }, 15000);
 
+it('takes settled scope from the submitted request through completeness, scope checking and the final gate', async () => {
+    const f = await fixture();
+    const submitted = { ...scope, repositories: ['example/product'], openDecisions: [] };
+    const capture = () =>
+        f.cli(
+            'confirm-scope',
+            f.id,
+            '--revision',
+            String(f.records.read(f.id).revision),
+            '--file',
+            f.file,
+            '--source',
+            'submitted-request',
+        );
+
+    writeFileSync(f.file, JSON.stringify(submitted));
+
+    const captured = await capture();
+
+    expect(captured.code).toBe(0);
+    expect(JSON.parse(captured.stdout)).toMatchObject({
+        source: 'submitted-request',
+        title: 'CLI greeting',
+        context: 'Only cli.js and test/cli.test.js. Small.',
+        confirmedBy: null,
+        response: null,
+    });
+    expect((await f.cli('confirmed-scope', f.id)).stdout).toBe(captured.stdout);
+    expect((await capture()).stdout).toBe(captured.stdout);
+    expect(JSON.parse((await f.cli('choose-structure', f.id)).stdout).structure).toBe('single');
+
+    f.records.setBody(f.id, f.records.read(f.id).revision, 'brief', scopeMarkdown({ ...submitted, tests: [] }));
+    expect((await f.cli('brief-scope-check', f.id)).code).toBe(1);
+    expect((await f.cli('gate', f.id)).code).toBe(1);
+
+    f.records.setBody(f.id, f.records.read(f.id).revision, 'brief', scopeMarkdown(submitted));
+    expect((await f.cli('brief-scope-check', f.id)).code).toBe(0);
+    expect((await f.cli('gate', f.id)).code).toBe(0);
+    expect(f.records.gate(f.id).current).toBe(false);
+
+    const review = f.records.doubtPackage(f.id);
+
+    f.records.recordDoubt(f.id, review.packageDigest, 'Doubt', 'Submitted constraints match the code and brief.');
+
+    const display = JSON.parse((await f.cli('gate', f.id)).stdout).display;
+
+    expect(display.brief).not.toContain('## Confirmed');
+    f.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved brief in board.');
+    expect(f.records.gate(f.id).current).toBe(true);
+
+    writeFileSync(f.file, JSON.stringify({ ...submitted, behaviour: ['Expand the greeting API.'] }));
+    expect((await capture()).code).toBe(1);
+    expect(f.records.gate(f.id).current).toBe(true);
+    expect(f.records.confirmedScope(f.id)?.scope).toEqual(submitted);
+
+    expect((await f.confirm()).code).toBe(0);
+    expect(f.records.confirmedScope(f.id)).toMatchObject({
+        source: 'user-response',
+        response: 'Yes, that exact scope.',
+    });
+    expect(f.records.gate(f.id).current).toBe(false);
+}, 15000);
+
+it('requires real answers for unresolved scope and refuses invented replies on submitted requests', async () => {
+    const f = await fixture();
+    const settled = { ...scope, repositories: ['example/product'], openDecisions: [] };
+
+    for (const unresolved of [
+        scope,
+        { ...settled, openDecisions: ['Choose casing rules.'] },
+        { ...settled, repositories: ['example/product', 'example/client'], openDecisions: ['Show ungrouped badges?'] },
+        { ...settled, repositories: ['example/client'] },
+    ]) {
+        expect(() => f.records.confirmScope(f.id, 1, unresolved, undefined, undefined, 'submitted-request')).toThrow(
+            'record a user-response',
+        );
+    }
+    expect(() => f.records.confirmScope(f.id, 1, settled, 'Pedro', 'Confirmed', 'submitted-request')).toThrow(
+        'no confirmation identity or reply',
+    );
+    expect(() => f.records.confirmScope(f.id, 1, settled)).toThrow('explicit understanding response');
+    expect(f.records.read(f.id).revision).toBe(1);
+    expect(f.records.confirmedScope(f.id)).toBeNull();
+
+    const concept = f.records.create({ title: 'Explore greetings', repository: 'example/product', kind: 'concept' });
+
+    expect(() => f.records.confirmScope(concept.workId, 1, settled, undefined, undefined, 'submitted-request')).toThrow(
+        'record a user-response',
+    );
+});
+
 it('fails closed without confirmation and reports missing/extra scope with a failing exit code', async () => {
     const f = await fixture();
 

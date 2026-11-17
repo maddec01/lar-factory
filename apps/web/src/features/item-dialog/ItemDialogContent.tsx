@@ -1,7 +1,7 @@
 // The item dialog's content: its summary and progress, then the work record and ticket description with the sidebar,
 // followed by access, metadata, earlier threads and comments. Actions stay in its footer.
 
-import { itemName, sameRepo, writeAccessProblem } from '@lar-factory/shared';
+import { groupProgress, itemName, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Modal } from '@lar-works/design-system';
 
@@ -36,6 +36,7 @@ import {
     VerifyBuild,
     StartAfterError,
     StartMessage,
+    useActivityUnavailable,
 } from '@/features/items';
 import { ItemAgents, isDone, partRef, partsOf } from '@/features/line';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
@@ -74,6 +75,7 @@ export function ItemDialogContent({
     openPart,
 }: ContentProps) {
     const group = isGroupParent(item, data.items);
+    const progress = groupProgress(item, data.items, useActivityUnavailable());
     const builds = group
         ? partsOf(item, data.items).filter((part) => part.kind === 'build' && !part.item.setAside)
         : [];
@@ -158,6 +160,7 @@ export function ItemDialogContent({
                                 <ConceptBuild item={item} />
                             )}
                             <ReleaseProgress
+                                checkingOutcome={progress === 'Checking Outcome'}
                                 outcomeControls={
                                     !item.setAside && (
                                         <RecordOutcome

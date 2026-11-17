@@ -3,6 +3,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import {
     humanWait,
+    groupProgress,
     itemFog,
     itemName,
     needsAnswer,
@@ -26,6 +27,7 @@ type Slice = Item['slices'][number];
 /** A dossier's reading for its header: parts done and counted, and the parts each chip and "what's next" name.
  *  `needsYou` holds the parts in Needs you; `yours` adds those in Verify or Ready to merge. */
 export interface Moving {
+    progress: ReturnType<typeof groupProgress>;
     parentWait: ReturnType<typeof humanWait>;
     parts: Part[];
     done: number;
@@ -47,6 +49,7 @@ export function moving(parent: Item, parts: Part[], unavailable: boolean): Movin
     const all = [parent, ...parts.map((part) => part.item)];
 
     return {
+        progress: groupProgress(parent, all, unavailable),
         parentWait: humanWait(parent, unavailable, all),
         parts,
         done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
@@ -140,11 +143,11 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         n ? [{ words: `${n} ${word}`, tone, icon }] : [];
 
     return [
-        ...(parent.reconciliation?.items.length
+        ...(m.progress
             ? [
                   {
-                      words: 'Concept map needs updating',
-                      tone: 'warning' as const,
+                      words: m.progress,
+                      tone: 'neutral' as const,
                   },
               ]
             : []),

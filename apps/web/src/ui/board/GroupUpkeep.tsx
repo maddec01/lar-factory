@@ -18,17 +18,17 @@ function category(item: ReconcileItem): [string, string] {
     return labels[item.kind];
 }
 
-/** "Concept map needs updating · 25 parts and 3 other records affected": the current parts it touches, then the rest
+/** "Reconciling · 25 parts and 3 other records affected": the current parts it touches, then the rest
  *  (the concept itself, set-aside and retired work), so the count agrees with the row's parts count. */
-function upkeepLabel(report: ReconcileReport, parts?: readonly string[]): string {
+function upkeepLabel(progress: string, report: ReconcileReport, parts?: readonly string[]): string {
     const ids = new Set(report.items.map((item) => item.workId));
 
-    if (!parts) return `Concept map needs updating · ${plural(ids.size, 'record')} affected`;
+    if (!parts) return `${progress} · ${plural(ids.size, 'record')} affected`;
 
     const current = [...ids].filter((id) => parts.includes(id)).length;
     const other = ids.size - current;
 
-    return `Concept map needs updating · ${[current && plural(current, 'part'), other && plural(other, 'other record')]
+    return `${progress} · ${[current && plural(current, 'part'), other && plural(other, 'other record')]
         .filter(Boolean)
         .join(' and ')} affected`;
 }
@@ -39,13 +39,15 @@ export function GroupUpkeep({
     report,
     name,
     parts,
+    progress,
 }: {
+    progress?: 'Updating map' | 'Reconciling';
     report?: ReconcileReport;
     name: (id: string) => string;
     /** The concept's current parts, so the count says how many of them it touches and how many other records. */
     parts?: readonly string[];
 }) {
-    if (!report?.items.length) return null;
+    if (!progress || !report?.items.length) return null;
 
     const groups = new Map<string, { label: string; names: Map<string, string> }>();
 
@@ -60,7 +62,7 @@ export function GroupUpkeep({
     }
 
     return (
-        <Disclosure label={upkeepLabel(report, parts)} presentation="section" data-reconciliation="">
+        <Disclosure label={upkeepLabel(progress, report, parts)} presentation="section" data-reconciliation="">
             <Stack space="tight">
                 {[...groups].map(([key, group]) => (
                     <div key={key} className="grid gap-1">

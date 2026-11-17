@@ -231,6 +231,104 @@ const mapOpen = async (data: BoardData) => {
     return dossier().querySelector<HTMLElement>('[data-work-map]')!;
 };
 
+test('concept upkeep reads as live progress and stays quiet while builds run without a map owner', async () => {
+    const pending = {
+        key: 'map:part',
+        digest: 'part-change',
+        kind: 'map' as const,
+        workId: 'part',
+        summary: 'Changed answer',
+        changes: ['answer'],
+        requiresFix: true,
+    };
+    const owner = {
+        id: 'map-owner',
+        title: 'Shape',
+        purpose: 'shape',
+        state: 'running' as const,
+        updated: '2026-11-17T17:00:00Z',
+    };
+    const data = conceptOf([workPart('part', { status: 'In progress' })], {
+        needsYou: undefined,
+        completion: { complete: false, reasons: [] },
+        threads: [],
+        reconciliation: { groupId: C200, digest: 'changed', items: [pending], pending: [pending], completed: [] },
+    });
+
+    await mountOpen(data);
+    expect(text(dossier())).not.toContain('Concept map needs updating');
+    expect(dossier().querySelector('[data-reconciliation]')).toBeNull();
+
+    await receive(withItem(C200, { threads: [owner] }, data));
+    expect(text(header())).toContain('Reconciling');
+    expect(text(dossier().querySelector('[data-reconciliation]'))).toContain('Reconciling · 1 part affected');
+
+    await receive(
+        withItem(
+            C200,
+            {
+                threads: [owner],
+                reconciliation: { ...data.items[0]!.reconciliation!, pending: [] },
+            },
+            data,
+        ),
+    );
+    expect(text(header())).toContain('Updating map');
+
+    for (const thread of [
+        { ...owner, state: 'done' as const },
+        { ...owner, observedAt: owner.updated },
+        { ...owner, archived: true as const },
+    ]) {
+        await receive(withItem(C200, { threads: [thread] }, data));
+        expect(text(header())).not.toContain('Reconciling');
+        expect(dossier().querySelector('[data-reconciliation]')).toBeNull();
+    }
+});
+
+test('an automatic Outcome dispatch reads Checking Outcome in the group and open dialog only while its owner works', async () => {
+    const owner = {
+        id: 'outcome-owner',
+        title: 'Shape',
+        purpose: 'shape',
+        state: 'running' as const,
+        updated: '2026-11-17T17:00:00Z',
+    };
+    const data = conceptOf([workPart('part', { status: 'Done', completion: { complete: true, reasons: [] } })], {
+        needsYou: undefined,
+        threads: [owner],
+        subIssues: { total: 1, completed: 1 },
+        completion: { complete: false, reasons: ['Outcome check pending: Check composition'] },
+        releasePlan: { steps: [], outcomeCheck: { what: 'Check composition', result: 'pending', evidence: null } },
+        outcomeCheck: {
+            ready: true,
+            digest: 'delivered',
+            run: {
+                digest: 'delivered',
+                ownerWorkId: C200,
+                threadId: owner.id,
+                commandId: 'check',
+                messageId: 'check',
+                requestedAt: owner.updated,
+                sent: true,
+                error: null,
+            },
+        },
+    });
+
+    await mountOpen(data);
+    expect(text(header())).toContain('Checking Outcome');
+    expect(text(dossier().querySelector('[data-release-progress]'))).not.toContain('pending');
+    await press(header().querySelector('[data-title]')!);
+    expect(text($('[data-item-dialog] [data-release-progress]'))).toContain('Checking Outcome');
+    expect(text($('[data-item-dialog] [data-release-progress]'))).not.toContain('pending');
+
+    await receive(withItem(C200, { threads: [{ ...owner, state: 'done' }] }, data));
+    expect(text(dossier())).not.toContain('Checking Outcome');
+    expect(text($('[data-item-dialog] [data-release-progress]'))).not.toContain('Checking Outcome');
+    expect(text($('[data-item-dialog] [data-release-progress]'))).toContain('pending');
+});
+
 test('queued empty concepts and parts with off-board parents stay in the dock and keep their desk waits', async () => {
     const concept = { ...c200, status: 'Queued' as const, subIssues: { total: 0, completed: 0 } };
     const part = sample.items.find((item) => item.number === 23)!;

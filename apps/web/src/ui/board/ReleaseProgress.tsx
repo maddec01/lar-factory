@@ -37,11 +37,13 @@ export function ReleaseProgress({
     remaining,
     outcomeControls,
     name = (id) => id,
+    checkingOutcome = false,
 }: {
     plan: ReleasePlan | null | undefined;
     remaining?: string[];
     outcomeControls?: ReactNode;
     name?: (id: string) => string;
+    checkingOutcome?: boolean;
 }) {
     if (!plan) return null;
 
@@ -54,7 +56,9 @@ export function ReleaseProgress({
 
             if (step) return `${step.what} · ${step.who}`;
 
-            return workHoldReason(reason);
+            return checkingOutcome && reason.startsWith('Outcome check pending:')
+                ? 'Checking Outcome'
+                : workHoldReason(reason);
         })
         .map((reason) => reason.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, name));
     const partNames = unfinished.map((reason) =>
@@ -106,7 +110,7 @@ export function ReleaseProgress({
             <div className="grid min-w-0 gap-1" data-outcome-check>
                 <DetailFact label="Outcome check">
                     <Text as="span" breaks>
-                        <MetaLine parts={[outcome.what, outcome.result]} />
+                        <MetaLine parts={[outcome.what, checkingOutcome ? 'Checking Outcome' : outcome.result]} />
                     </Text>
                 </DetailFact>
                 {outcome.evidence && (

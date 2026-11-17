@@ -1829,35 +1829,87 @@ async function reconciledGroup() {
     return { records, id, first, second, at };
 }
 
-test('after a part merges, the board reconciles its group and a remaining change starts the parent thread', async () => {
+test('a merge automatically continues one group owner, coalesces live sibling work and retries durably', async () => {
     const { records, id, first, second, at } = await reconciledGroup();
+
+    records.addThread(second, at(second), 'part-owner', 'build');
+
+    let siblingLive = true;
+    const sent: Parameters<typeof sendThreadCommand>[0][] = [];
+    let accepted = false;
+    const options = {
+        shown: (ids: string[]) =>
+            ids.map((tid) => ({
+                id: tid,
+                title: 't',
+                state: siblingLive && tid === 'part-owner' ? ('running' as const) : ('done' as const),
+                updated: '2026-11-17T00:00:00Z',
+            })),
+        deps: {
+            reconcileDeps: {
+                send: async (command: Parameters<typeof sendThreadCommand>[0]) => {
+                    sent.push(command);
+
+                    return accepted
+                        ? { outcome: 'accepted' as const, sequence: 1 }
+                        : { outcome: 'unconfirmed' as const, reason: 'Lost response' };
+                },
+            },
+        },
+    };
+    const s = recordedCommands(records, options);
+
+    s.board.update({ t3Availability: { availability: 'available' } } as Partial<BoardData>);
+    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
+    records.observe(first, at(first), { of: 'pr', state: 'merged' });
+    s.reread();
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+    assert.equal(sent.length, 0, 'live sibling owns group work');
+    assert.notEqual(deskWait(s.board.find(id)!, false, s.board.snapshot().items).label, 'Reconcile group');
+
+    siblingLive = false;
+    s.reread();
+    await Promise.all([
+        s.commands.reconcileStarts(s.board.snapshot().items),
+        s.commands.reconcileStarts(s.board.snapshot().items),
+    ]);
+    assert.equal(sent.length, 1, 'overlapping refreshes dispatch one owner');
+    assert.equal(sent[0]!.threadId, 'group-owner');
+    assert.match((sent[0] as { text: string }).text, /^Reconciling Group\nReconcile group /);
+    assert.deepEqual(s.started, [], 'continues the retained owner');
+
+    accepted = true;
+
+    const restarted = recordedCommands(records, options);
+
+    restarted.board.update({ t3Availability: { availability: 'available' } } as Partial<BoardData>);
+    await restarted.commands.reconcileStarts(restarted.board.snapshot().items);
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1]!.commandId, sent[0]!.commandId, 'restart retries the same dispatch');
+    assert.equal((sent[1] as { messageId: string }).messageId, (sent[0] as { messageId: string }).messageId);
+    await restarted.commands.reconcileStarts(restarted.board.snapshot().items);
+    assert.equal(sent.length, 2, 'an accepted dispatch never repeats');
+});
+
+test('merge reconciliation launches one durable owner when the previous owner was deleted', async () => {
+    const { records, id, first, second, at } = await reconciledGroup();
+
+    records.confirmThreadDeleted(id, at(), 'group-owner');
+    records.setBody(second, at(second), 'brief', '## What\nChanged contract.\nBlocked by: none');
+    records.observe(first, at(first), { of: 'pr', state: 'merged' });
 
     const s = recordedCommands(records, {
         shown: (ids) => ids.map((tid) => ({ id: tid, title: 't', state: 'done', updated: '2026-11-17T00:00:00Z' })),
     });
-    const wait = () => deskWait(s.board.find(id)!, false, s.board.snapshot().items).label;
 
-    const passes: string[] = [];
-    const reconcileAfterMerge = records.reconcileAfterMerge.bind(records);
-
-    records.reconcileAfterMerge = (group) => (passes.push(group), reconcileAfterMerge(group));
-    records.setBody(second, at(second), 'brief', '## What\nPart 2, changed.\nBlocked by: none');
-    s.reread();
+    s.board.update({ t3Availability: { availability: 'available' } } as Partial<BoardData>);
     await s.commands.reconcileStarts(s.board.snapshot().items);
-    assert.deepEqual(passes, [], 'a refresh with no new merge reads no group again');
-    records.observe(first, at(first), { of: 'pr', state: 'merged' });
-    s.reread();
-    assert.notEqual(wait(), 'Reconcile group', 'nothing waits before the board pass saves the checklist');
+    assert.equal(s.started.length, 1);
+    assert.match(s.started[0]!, /^Reconciling Group/);
+    assert.equal(records.launchIntents({ workId: id }).length, 1);
+    assert.equal(records.prepareReconcileContinuation(id).run?.sent, true);
     await s.commands.reconcileStarts(s.board.snapshot().items);
-    assert.deepEqual(passes, [id]);
-    s.reread();
-    await s.commands.reconcileStarts(s.board.snapshot().items);
-    assert.deepEqual(passes, [id], 'the saved merge is not passed again');
-
-    assert.ok(records.reconciliation(id).completed.some((done) => done.key === `map:${first}`));
-    assert.equal(wait(), 'Reconcile group');
-    assert.equal((await s.commands.start(id, undefined)).status, 200);
-    assert.match(s.started[0]!, /^Reconciling Group\nReconcile group /);
+    assert.equal(s.started.length, 1);
 });
 
 test('a group past Shaping is refused a start with nothing waiting in its checklist, or while its thread is live', async () => {

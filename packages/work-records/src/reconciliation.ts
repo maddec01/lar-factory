@@ -1,12 +1,15 @@
+import type { OutcomeCheckRun } from '@lar-factory/shared';
 import {
     lifecycleOnly,
     mergeShaped,
+    reconcileWaitItems,
     type ReconcileItem,
     type ReconcileReport,
 } from '@lar-factory/shared/group-reconciliation';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { gateOwner } from './gate-resume.ts';
 import { reconciliationChecks } from './reconciliation-checks.ts';
 import type { WorkRecords } from './work-records.ts';
 
@@ -31,10 +34,32 @@ export interface ReconciliationRecords {
      * citing the merge. Null when no merge is new since the last saved checklist.
      */
     reconcileAfterMerge(groupId: string): ReconcileReport | null;
+    /** Durable merge-authorized dispatch to the group's existing owner, with stable T3 IDs on retry. */
+    prepareReconcileContinuation(groupId: string): { ready: boolean; run: OutcomeCheckRun | null };
+    reconcileContinuationDelivered(
+        groupId: string,
+        commandId: string,
+        result: 'accepted' | 'unconfirmed' | 'rejected',
+        error?: string,
+    ): void;
 }
 
 export function reconciliationRecords(database: Database, get: () => WorkRecords): ReconciliationRecords {
     const { db } = database;
+
+    type Continuation = { digest: string; knownThreads: string[]; run: OutcomeCheckRun | null };
+
+    const continuation = (id: string): Continuation | null => {
+        const row = db.prepare('SELECT content FROM reconcile_continuations WHERE work_id=?').get(id);
+
+        return row ? JSON.parse(String(row.content)) : null;
+    };
+    const saveContinuation = (id: string, value: Continuation) =>
+        db
+            .prepare(
+                'INSERT INTO reconcile_continuations VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET content=excluded.content',
+            )
+            .run(id, JSON.stringify(value));
     const saved = (id: string): { baseline: Snapshot; completed: Done; pending: ReconcileItem[] } => {
         const row = db
             .prepare('SELECT baseline, completed, pending FROM group_reconciliation WHERE work_id = ?')
@@ -196,6 +221,9 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
 
         persist(id, current.report.items.length ? state.baseline : current.snapshot, completed, current.report.items);
 
+        if (!reconcileWaitItems({ ...current.report, pending: current.report.items }).length)
+            db.prepare('DELETE FROM reconcile_continuations WHERE work_id=?').run(id);
+
         return { ...current.report, completed };
     };
 
@@ -230,7 +258,7 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
                 const settled = current.report.items.filter(lifecycleOnly);
                 const items = current.report.items.filter((item) => !settled.includes(item));
 
-                return finish(
+                const result = finish(
                     id,
                     { ...current, report: { ...current.report, items, digest: hash(items) } },
                     {
@@ -245,8 +273,98 @@ export function reconciliationRecords(database: Database, get: () => WorkRecords
                         ],
                     },
                 );
+                const pending = reconcileWaitItems({ ...result, pending: result.items });
+
+                if (pending.length)
+                    saveContinuation(id, {
+                        digest: hash(pending),
+                        knownThreads: [
+                            id,
+                            ...get()
+                                .children(id)
+                                .map((part) => part.workId),
+                        ].flatMap((workId) =>
+                            get()
+                                .threads(workId)
+                                .map((thread) => thread.threadId),
+                        ),
+                        run: null,
+                    });
+
+                return result;
             });
         },
+        prepareReconcileContinuation: (id) =>
+            database.write(() => {
+                const saved = continuation(id);
+                const record = get().read(id);
+                const current = report(id).report;
+                const pending = reconcileWaitItems({ ...current, pending: current.items });
+
+                if (!saved || !pending.length || record.setAside || record.needsYou || record.needsYouCauses.length)
+                    return { ready: false, run: null };
+
+                // Delivery continuations already own the group until release and Outcome settle.
+                if (get().releaseContinuation(id).ready || get().outcomeCheck(id).ready)
+                    return { ready: false, run: null };
+
+                if (
+                    saved.run &&
+                    get()
+                        .threads(saved.run.ownerWorkId)
+                        .some((thread) => thread.threadId === saved.run!.threadId && !thread.deletedAt)
+                )
+                    return { ready: true, run: saved.run };
+
+                const records = get();
+                const owner =
+                    gateOwner(database, record) ??
+                    records
+                        .children(id)
+                        .filter((part) => part.kind === 'decision' && !part.setAside)
+                        .map((part) => gateOwner(database, part))
+                        .find(Boolean);
+
+                if (!owner) return { ready: true, run: null };
+
+                const run: OutcomeCheckRun = {
+                    digest: saved.digest,
+                    ownerWorkId: owner.workId,
+                    threadId: owner.threadId,
+                    commandId: randomUUID(),
+                    messageId: randomUUID(),
+                    requestedAt: new Date().toISOString(),
+                    sent: records
+                        .launchIntents({ workId: owner.workId })
+                        .some(
+                            (intent) =>
+                                intent.threadId === owner.threadId &&
+                                !saved.knownThreads.includes(owner.threadId) &&
+                                intent.request?.text.startsWith('Reconciling '),
+                        ),
+                    error: null,
+                };
+
+                saveContinuation(id, { ...saved, run });
+
+                return { ready: true, run };
+            }),
+        reconcileContinuationDelivered: (id, commandId, result, error) =>
+            database.write(() => {
+                const saved = continuation(id);
+
+                if (!saved?.run || saved.run.commandId !== commandId) return;
+
+                saveContinuation(id, {
+                    ...saved,
+                    run: {
+                        ...saved.run,
+                        sent: result === 'accepted',
+                        rejected: result === 'rejected',
+                        error: result === 'accepted' ? null : (error ?? 'Reconcile continuation is unconfirmed.'),
+                    },
+                });
+            }),
         resolveReconcile: (id, key, digest, evidence) =>
             database.write(() => {
                 const current = report(id);

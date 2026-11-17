@@ -26,6 +26,8 @@ export interface StartAfter {
 
 export interface StartAfterDeps {
     board: BoardState;
+    /** Concept Shape authorizes its follow-on decisions, independently of Auto-build. */
+    records?: WorkRecords | null;
     /** Start after passes `quiet`, as it shows a failure itself. */
     commands: Pick<ItemCommands, 'start' | 'startBuild'>;
     /** Reads the model choices T3 offers now into the board data. */
@@ -79,11 +81,19 @@ function readArmed(file: string | null): Record<string, ArmedStart> {
     return Object.fromEntries(entries);
 }
 
-export function createStartAfter({ board, commands, offerModelChoices, file, gone }: StartAfterDeps): StartAfter {
+export function createStartAfter({
+    board,
+    records,
+    commands,
+    offerModelChoices,
+    file,
+    gone,
+}: StartAfterDeps): StartAfter {
     if (file) board.update({ armed: readArmed(file), armedErrors: {} });
 
     const armed = () => board.snapshot().armed ?? {};
     const errors = () => board.snapshot().armedErrors ?? {};
+    const starting = new Set<string>();
     const without = <T>(record: Record<string, T>, key: string) =>
         Object.fromEntries(Object.entries(record).filter(([k]) => k !== key));
     const withBoard = (status: number, body: object): Reply => ({ status, body: { ...body, board: board.snapshot() } });
@@ -107,23 +117,77 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
 
     /** Runs an authorized start, retaining holds and disarming successes or failures. */
     async function startNow(item: Item, { model }: ArmedStart): Promise<void> {
-        const { body } = await (item.status === 'Ready'
-            ? commands.startBuild(item.id, model, true, { automatic: true })
-            : commands.start(item.id, model, true));
-        const { error, hold } = body as { error?: string | null; hold?: boolean };
+        starting.add(item.id);
 
-        // A capacity or prerequisite hold keeps the person's authorization for the next pass.
-        const failed = save(hold ? armed() : without(armed(), item.id), errors());
+        try {
+            const { body } = await (item.status === 'Ready'
+                ? commands.startBuild(item.id, model, true, { automatic: true })
+                : commands.start(item.id, model, true));
+            const { error, hold } = body as { error?: string | null; hold?: boolean };
 
-        if (failed) return log(failed);
+            // A capacity or prerequisite hold keeps the person's authorization for the next pass.
+            const failed = save(hold ? armed() : without(armed(), item.id), errors());
 
-        if (hold) return;
+            if (failed) return log(failed);
 
-        if (!error) return log(`started #${item.number} after its wait cleared`);
+            if (hold) return;
 
-        log(`could not start #${item.number} after its wait cleared: ${error}`);
-        board.update({ armedErrors: { ...errors(), [item.id]: error } });
-        board.push();
+            if (!error) return log(`started #${item.number} after its wait cleared`);
+
+            log(`could not start #${item.number} after its wait cleared: ${error}`);
+            board.update({ armedErrors: { ...errors(), [item.id]: error } });
+            board.push();
+        } finally {
+            starting.delete(item.id);
+        }
+    }
+
+    function armConceptDecisions(): void {
+        if (!records || !file) return;
+
+        const next = { ...armed() };
+
+        for (const item of board.snapshot().items) {
+            if (
+                item.kind !== 'decision' ||
+                item.decisionMethod === 'research' ||
+                item.status !== 'Queued' ||
+                !item.parentId ||
+                item.setAside ||
+                item.needsYou ||
+                next[item.id] ||
+                errors()[item.id]
+            )
+                continue;
+
+            try {
+                const parent = records.read(item.parentId);
+
+                if (
+                    parent.kind !== 'concept' ||
+                    parent.setAside ||
+                    !records.threads(parent.workId).some((thread) => thread.purpose === 'shape') ||
+                    records.threads(item.id).length ||
+                    records.launchIntents({ workId: item.id }).length
+                )
+                    continue;
+
+                const run = records
+                    .runSettings(parent.workId)
+                    .runs.findLast((run) => run.kind === 'concept' || run.kind === 'shaping');
+                const model = run?.thread.model;
+
+                next[item.id] = model ? { model } : {};
+            } catch {
+                // An unreadable parent proves no authorization; try again after the next read.
+            }
+        }
+
+        if (JSON.stringify(next) !== JSON.stringify(armed())) {
+            const error = save(next, errors());
+
+            if (error) log(error);
+        }
     }
 
     return {
@@ -168,6 +232,8 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
         },
 
         async startUnblocked() {
+            armConceptDecisions();
+
             const runs = Object.entries(armed()).flatMap(([itemId, entry]) => {
                 const item = board.find(itemId);
 
@@ -186,7 +252,12 @@ export function createStartAfter({ board, commands, offerModelChoices, file, gon
                 if (!item) return [];
 
                 // A part whose repository is still onboarding stays armed until onboarding finishes.
-                return isOpen(item) || isOnboarding(board.snapshot(), item.repo) ? [] : [startNow(item, entry)];
+                return starting.has(item.id) ||
+                    isOpen(item) ||
+                    isOnboarding(board.snapshot(), item.repo) ||
+                    startHold(board.snapshot(), item.repo)
+                    ? []
+                    : [startNow(item, entry)];
             });
 
             await Promise.all(runs);

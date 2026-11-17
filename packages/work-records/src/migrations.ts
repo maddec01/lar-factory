@@ -668,4 +668,8 @@ export const MIGRATIONS: readonly Migration[] = [
           INSERT INTO write_dirty VALUES ('work',NEW.work_id,'deliveryKind') ON CONFLICT DO NOTHING;
         END;
     `),
+    (db) =>
+        db.exec(
+            'CREATE TABLE reconcile_continuations(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
+        ),
 ];

@@ -84,6 +84,7 @@ import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { startStep, timeStart } from '../t3/start-steps.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
+import { sendThreadCommand } from '../t3/thread-commands.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { fetchBaseCommit } from './base-commit.ts';
 import { createBriefApproval } from './brief-approval.ts';
@@ -234,6 +235,7 @@ export interface ItemCommandsDeps {
     resumeLaunch?: typeof resumeLaunch;
     outcomeDeps?: Pick<Parameters<typeof createOutcomeCheck>[0], 'send'>;
     releaseDeps?: Pick<Parameters<typeof createReleaseStep>[0], 'send' | 'readProjection'>;
+    reconcileDeps?: { send: typeof sendThreadCommand };
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
@@ -416,6 +418,7 @@ export function createItemCommands({
     retroDeps,
     outcomeDeps,
     releaseDeps,
+    reconcileDeps,
     readRoleProjection,
     verifyRecoveredExecution: verifyRecovered = verifyRecoveredExecution,
     reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)),
@@ -1503,7 +1506,9 @@ export function createItemCommands({
      * After a part's PR merges, saves its group's checklist and resolves the items whose only changes are lifecycle fields.
      * Only a group whose refreshed checklist shows an unseen merge-shaped part with a merged PR is read again.
      */
-    function reconcileMergedGroups() {
+    const reconcilingGroups = new Set<string>();
+
+    async function reconcileMergedGroups(start: ItemCommands['start']) {
         if (!records) return;
 
         let changed = false;
@@ -1527,6 +1532,90 @@ export function createItemCommands({
         }
 
         if (changed) reread();
+
+        for (const item of board.snapshot().items) {
+            if (
+                item.recorded === false ||
+                !reconcileGroupWaits(item, board.snapshot().items) ||
+                reconcilingGroups.has(item.id) ||
+                board.snapshot().t3Availability?.availability !== 'available'
+            )
+                continue;
+
+            reconcilingGroups.add(item.id);
+
+            try {
+                const groupIds = new Set([item.id, ...records.children(item.id).map((part) => part.workId)]);
+
+                if (records.launchIntents({ unresolved: true }).some((intent) => groupIds.has(intent.workId))) continue;
+
+                if (
+                    [...groupIds].some((workId) =>
+                        records.threads(workId).some((recorded) => {
+                            if (recorded.deletedAt) return false;
+
+                            const owner = board.find(workId);
+
+                            return (
+                                !Array.isArray(owner?.threads) ||
+                                !owner.threads.some((thread) => thread.id === recorded.threadId)
+                            );
+                        }),
+                    )
+                )
+                    continue;
+
+                let { ready, run } = records.prepareReconcileContinuation(item.id);
+
+                if (!ready || run?.sent || run?.rejected) continue;
+
+                if (!run) {
+                    // A group with no retained owner uses the ordinary durable launch-intent path.
+                    const result = await start(item.id, undefined);
+
+                    if (!(result.body as StartResult).thread) continue;
+
+                    run = records.prepareReconcileContinuation(item.id).run;
+
+                    if (run) records.reconcileContinuationDelivered(item.id, run.commandId, 'accepted');
+
+                    continue;
+                }
+
+                const owner = board.find(run.ownerWorkId);
+                const thread = Array.isArray(owner?.threads) ? owner.threads.find((t) => t.id === run.threadId) : null;
+
+                // Missing or stale activity cannot prove the existing owner is idle.
+                if (!thread || thread.observedAt || isLiveThread(thread) || thread.hasRunningChildren) continue;
+
+                const snapshot = records.runSettings(run.ownerWorkId).runs.at(-1);
+                const result = await (reconcileDeps?.send ?? sendThreadCommand)({
+                    type: 'message.dispatch',
+                    commandId: run.commandId,
+                    messageId: run.messageId,
+                    threadId: run.threadId,
+                    createdBy: 'user',
+                    creationSource: 'web',
+                    attachments: [],
+                    dispatchMode: { type: 'queue_after_active' },
+                    text: reconcileMessage(item, {
+                        ...contextFor(snapshot?.release),
+                        ...(snapshot && { run: snapshot }),
+                    }),
+                });
+
+                records.reconcileContinuationDelivered(
+                    item.id,
+                    run.commandId,
+                    result.outcome,
+                    result.outcome === 'accepted' ? undefined : result.reason,
+                );
+            } catch (error) {
+                log(`could not continue reconciliation of ${item.id}: ${(error as Error).message}`);
+            } finally {
+                reconcilingGroups.delete(item.id);
+            }
+        }
     }
 
     /** Moves the item's parent record to In progress, unless it's a build or there already: the error to show, else null. */
@@ -1559,7 +1648,7 @@ export function createItemCommands({
             await verifying.reconcileVerificationFixes();
             await releases.reconcileReleaseContinuations();
             await outcomes.reconcileOutcomeChecks();
-            reconcileMergedGroups();
+            await reconcileMergedGroups((...args) => this.start(...args));
 
             const warnings = { ...board.snapshot().startCheckFailures };
 
@@ -1820,8 +1909,9 @@ export function createItemCommands({
                         item = board.find(itemId) ?? item;
                     }
 
+                    const reconciling = reconcileGroupWaits(item, board.snapshot().items);
                     const held =
-                        records && ['Queued', 'Shaping'].includes(item.status)
+                        records && !reconciling && ['Queued', 'Shaping'].includes(item.status)
                             ? heldThread(item, PURPOSES.started)
                             : null;
 
@@ -1832,8 +1922,6 @@ export function createItemCommands({
                         });
 
                     // A group past shaping starts its parent's thread only to settle a Reconcile group wait.
-                    const reconciling = !['Queued', 'Shaping'].includes(item.status) && reconcileGroupWaits(item);
-
                     if (item.status !== 'Queued' && !canResumeShaping(item) && !reconciling)
                         return reply(409, {
                             error: `Only Queued items, stopped shaping sessions or groups waiting on Reconcile group can be started; this one is in ${item.status}.`,

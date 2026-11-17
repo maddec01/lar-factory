@@ -15,7 +15,7 @@ export interface ReconcileReport {
     digest: string;
     items: ReconcileItem[];
     completed: { key: string; digest: string; evidence: string }[];
-    /** The checklist the last `reconcile` or `resolveReconcile` saved; the Reconcile group wait reads it. */
+    /** The checklist the last `reconcile` or `resolveReconcile` saved; automatic reconciliation reads it. */
     pending?: ReconcileItem[];
 }
 

@@ -21,8 +21,12 @@ Only concepts and their parts, and work whose parent and parts span more than on
 _Avoid_: moving grouped parts into single-issue stages.
 
 **Refinement**:
-The work of settling a concept's open questions and recording the resulting understanding in its map. Completed refinement does not mean the proposed work has shipped.
+The work of settling a concept's open questions and recording the resulting understanding in its map. Starting Shape authorizes the board to start follow-on decisions with the concept's model choice when their blockers complete, independently of Auto-build. Completed refinement does not mean the proposed work has shipped.
 _Avoid_: delivery completion.
+
+**Group reconciliation**:
+Keeping a group's map, answers, briefs and blockers coherent after changes. After a part merges, the board settles lifecycle changes and dispatches remaining judgement to one agent owner once the parent and part threads are idle. The board shows “Updating map” or “Reconciling” only while an owner is working; an outstanding checklist alone shows no maintenance warning. Only product questions or approvals wait on Pedro's desk.
+_Avoid_: a manual Reconcile group gate.
 
 **List**:
 The place for work that has not been queued, shown in the List modal. Capitalise List in actions and prose, including “Move to List” and “Added to List”.
@@ -173,7 +177,7 @@ A decision explored by asking focused questions. Its stored method remains `gril
 _Avoid_: Grill as a visible method name.
 
 **Outcome check**:
-The final check that the concept’s proposed work achieves its intended outcome.
+The final check that the concept’s proposed work achieves its intended outcome. While its dispatched owner is working, the board says “Checking Outcome”.
 _Avoid_: end-to-end check as a visible map label.
 
 **Start shaping**, **Start decision**, **Start build**:

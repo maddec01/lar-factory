@@ -1,11 +1,48 @@
 import type { BoardData } from './board-domain.ts';
 import { plural } from './format.ts';
+import { reconcileWaitItems } from './group-reconciliation.ts';
 import { humanWait } from './human-wait.ts';
 import type { Item } from './item-domain.ts';
 import { releaseHolds } from './release-plan.ts';
-import { buildsAtWork, ownerThreads } from './thread-domain.ts';
+import { buildsAtWork, ownerThreads, type ItemThread } from './thread-domain.ts';
 
 type GroupData = Pick<BoardData, 'items' | 'startProgress'>;
+
+const ownerAtWork = (thread: ItemThread) =>
+    !thread.observedAt &&
+    !thread.archived &&
+    thread.state !== 'needs you' &&
+    (thread.state === 'running' || thread.currentRunning || thread.hasRunningChildren);
+
+/** Maintenance is progress only while a current owner is working; the checklist alone asks nothing of Pedro. */
+export function groupProgress(parent: Item, all: readonly Item[], unavailable = false) {
+    if (unavailable || parent.paused || parent.setAside || complete(parent)) return undefined;
+
+    const outcome = parent.outcomeCheck;
+    const run = outcome?.run;
+    const owner = all.find((item) => item.id === run?.ownerWorkId);
+
+    if (
+        parent.releasePlan?.outcomeCheck.result === 'pending' &&
+        outcome?.ready &&
+        run?.sent &&
+        !run.error &&
+        !run.rejected &&
+        run.digest === outcome.digest &&
+        Array.isArray(owner?.threads) &&
+        owner.threads.some((thread) => thread.id === run.threadId && ownerAtWork(thread))
+    )
+        return 'Checking Outcome';
+
+    if (
+        !parent.reconciliation?.items.length ||
+        humanWait(parent, unavailable, all) ||
+        !ownerThreads(parent).some((thread) => thread.purpose !== 'build' && ownerAtWork(thread))
+    )
+        return undefined;
+
+    return reconcileWaitItems(parent.reconciliation).length ? 'Reconciling' : 'Updating map';
+}
 
 const complete = (item: Item) => item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
 
@@ -88,6 +125,7 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
     const waiting = humanWait(parent, unavailable, data.items);
     const run = parent.conceptBuild?.run;
     const running = !complete(parent) && progress.building > 0;
+    const activity = groupProgress(parent, data.items, unavailable);
     const buildWord = running
         ? `${plural(progress.building, 'build')} running${progress.waiting ? ` · ${progress.waiting} waiting` : ''}`
         : null;
@@ -97,7 +135,8 @@ export function groupState(parent: Item, data: GroupData, unavailable = false) {
           ? 'Group paused'
           : run?.state === 'paused' && (progress.waiting || pending.length)
             ? `Concept builds paused${buildWord ? ` · ${buildWord}` : ''}`
-            : (buildWord ??
+            : (activity ??
+              buildWord ??
               (waiting && waiting.label !== 'Release step'
                   ? waiting.label
                   : delivery && !pending.length && parent.releasePlan?.steps.some((step) => !step.done)

@@ -2,7 +2,7 @@ import { expect, test } from 'vite-plus/test';
 
 import sample from '../test/sample.json' with { type: 'json' };
 import { placementOf } from './board-view.ts';
-import { deskWait } from './desk-wait.ts';
+import { deskWait, reconcileGroupWaits } from './desk-wait.ts';
 import { nextAction } from './item-next-action.ts';
 import type { Item, ItemThread } from './model.ts';
 
@@ -186,28 +186,21 @@ const group = (items: ReturnType<typeof pending>[], patch: Partial<Item> = {}) =
         ...patch,
     });
 
-test('a group parent waits on Reconcile group only for saved items a thread must judge', () => {
-    const reconcile = { label: 'Reconcile group', action: { kind: 'reconcile-group', label: 'Reconcile group' } };
+test('group reconciliation stays off the desk and waits for live part owners', () => {
+    const work = group([pending('map:part', ['brief', 'status'])], { id: 'group' });
+    const part = item({ id: 'part', parentId: work.id, threads: [{ ...stopped, state: 'running' }] });
 
-    expect(
-        deskWait(group([pending('map:part', ['status', 'finishedAt']), pending('map:sibling', ['status'])])),
-    ).not.toEqual(reconcile);
-    expect(deskWait(group([pending('map:part', ['brief', 'status'])]))).toEqual(reconcile);
-    expect(
-        deskWait(
-            group([
-                pending('release-evidence:ship', ['part'], true),
-                pending('outcome:group', [], true),
-                pending('release:ship', ['evidence']),
-                pending('release-outcome:group', ['result', 'evidence']),
-            ]),
-        ),
-    ).not.toEqual(reconcile);
-    expect(
-        deskWait(
-            group([pending('map:part', ['brief'])], { threads: [{ ...stopped, purpose: 'shape', state: 'running' }] }),
-        ),
-    ).not.toEqual(reconcile);
+    expect(reconcileGroupWaits(work)).toBe(true);
+    expect(placementOf(work, { all: [work], unavailable: false }).sections).not.toContain('desk');
+    expect(reconcileGroupWaits(work, [work, part])).toBe(false);
+    part.threads = [{ ...stopped, state: 'done', hasRunningChildren: true }];
+    expect(reconcileGroupWaits(work, [work, part])).toBe(false);
+    part.threads = [{ ...stopped, state: 'done', observedAt: '2026-11-17' }];
+    expect(reconcileGroupWaits(work, [work, part])).toBe(false);
+    part.threads = [{ ...stopped, state: 'done' }];
+    expect(reconcileGroupWaits(work, [work, part])).toBe(true);
+    expect(reconcileGroupWaits(group([pending('map:part', ['status', 'finishedAt'])]))).toBe(false);
+    expect(reconcileGroupWaits(group([pending('outcome:group', [], true)]))).toBe(false);
 });
 
 test('a pending release step at the last merge shows Release step, not Reconcile group', () => {

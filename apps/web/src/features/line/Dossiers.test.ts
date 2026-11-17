@@ -329,6 +329,74 @@ test('an automatic Outcome dispatch reads Checking Outcome in the group and open
     expect(text($('[data-item-dialog] [data-release-progress]'))).toContain('pending');
 });
 
+test.each(['list'])(
+    'direct feedback work overrides pending comments on the desk, parent and %s child',
+    async (view) => {
+        const owner = {
+            id: 'owner',
+            purpose: 'build',
+            title: 'Build',
+            state: 'done' as const,
+            updated: sample.fetchedAt!,
+        };
+        const part = workPart('W_feedback', {
+            status: 'Review',
+            verification: { required: false, head: null, latest: null, resume: null, prReview: true },
+            threads: [owner],
+            linkedPrs: cleanPrs.map((pr) => ({
+                ...pr,
+                review: {
+                    required: 'green',
+                    comments: [
+                        { id: 'inline:1', author: 'Pedro', body: 'Use two letters.', url: `${pr.url}#discussion_r1` },
+                    ],
+                },
+            })),
+        });
+
+        if (view === 'map') await mapOpen(conceptOf([part]));
+        else await mountOpen(conceptOf([part]));
+
+        expect(text(header())).toContain('New comment on PR #150');
+        expect(text($('.desk-row'))).toContain('New comment on PR #150');
+
+        for (const active of [
+            { threads: [{ ...owner, currentRunning: true }] },
+            { threads: [{ ...owner, hasLiveChildren: true }] },
+            {
+                slices: [
+                    { number: 1, title: 'Review fix', url: '', repo: part.repo!, state: 'open', progress: 'active' },
+                ],
+            },
+        ] satisfies Partial<Item>[]) {
+            await receive(conceptOf([{ ...part, ...active }]));
+            expect($('.desk-row')).toBeNull();
+            expect(text(header())).toContain('Fixing review feedback');
+            expect(
+                text(dossier().querySelector(`[data-${view === 'map' ? 'map-part' : 'part'}="${part.id}"]`)),
+            ).toContain('Fixing review feedback');
+            expect(text(document.body)).not.toContain('New comment on PR');
+            expect(text(document.body)).not.toContain('Address it');
+        }
+
+        await receive(
+            conceptOf([
+                {
+                    ...part,
+                    linkedPrs: part.linkedPrs.map((pr) => ({
+                        ...pr,
+                        mergeState: 'blocked',
+                        review: { required: 'green', unresolvedThreads: 1 },
+                    })),
+                },
+            ]),
+        );
+        expect(text($('.desk-row'))).toContain('1 review thread unresolved');
+        expect(text(dossier())).toContain('1 review thread unresolved');
+        expect(text(document.body)).not.toContain('New comment on PR');
+    },
+);
+
 test('queued empty concepts and parts with off-board parents stay in the dock and keep their desk waits', async () => {
     const concept = { ...c200, status: 'Queued' as const, subIssues: { total: 0, completed: 0 } };
     const part = sample.items.find((item) => item.number === 23)!;

@@ -37,6 +37,8 @@ export function verificationRecords(database: Database, read: (id: string) => Wo
 
         return {
             required: !!row?.required,
+            prReview: !!row?.pr_review,
+            prReviewHandedBack: !!row?.pr_review_handed_back,
             invalidated: !!row?.invalidated,
             head: (row?.head as string | null) ?? null,
             latest: row?.latest ? JSON.parse(String(row.latest)) : null,

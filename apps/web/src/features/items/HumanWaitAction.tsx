@@ -3,7 +3,8 @@ import { Button } from '@lar-works/design-system';
 
 import { StartAgain } from './NeedsYou';
 import { OpenThread } from './OpenThread';
-import { PrAction } from './PrLink';
+import { PrFeedback } from './PrFeedback';
+import { PrLink } from './PrLink';
 import { StartOrAfter } from './StartAfter';
 import { StartBuild } from './StartBuild';
 import { useActivityUnavailable } from './useActivityFeedback';
@@ -15,8 +16,10 @@ import { buttonKind } from '@/ui/board';
 export function HumanWaitAction({ item, data, quiet = false }: { item: Item; data: BoardData; quiet?: boolean }) {
     const wait = deskWait(item, useActivityUnavailable(), data.items);
     const { action } = wait;
-    // A required verification is done in the dialog, unless a failed check or a conflict comes first.
-    const verifies = wait.label === 'Verify build' && !!item.verification?.required;
+
+    if (!action) return null;
+
+    if (action?.kind === 'pr-feedback') return <PrFeedback item={item} data={data} />;
 
     if (action?.kind === 'start-again') return <StartAgain item={item} data={data} />;
 
@@ -24,13 +27,13 @@ export function HumanWaitAction({ item, data, quiet = false }: { item: Item; dat
 
     if (action?.kind === 'resume-shaping') return <StartOrAfter item={item} data={data} />;
 
-    if (verifies || action?.kind === 'details')
+    if (action?.kind === 'details')
         return (
             <Button
                 {...buttonKind(quiet ? 'open' : 'next')}
                 onClick={() => useItemDialogStore.getState().open(item.id)}
             >
-                {action?.kind === 'details' ? action.label : 'Verify build'}
+                {action.label}
             </Button>
         );
 
@@ -38,7 +41,7 @@ export function HumanWaitAction({ item, data, quiet = false }: { item: Item; dat
         <OpenThread item={item} data={data} threadId={action.threadId} label={action.label} next={!quiet} />
     ) : (
         <>
-            <PrAction item={item} label={action?.label ?? 'Open PR'} next={!quiet} />
+            <PrLink item={item} label={action?.label ?? 'Open PR'} next={!quiet} />
             <OpenThread item={item} data={data} iconOnly />
         </>
     );

@@ -149,7 +149,7 @@ test('S05 dependency acceptance waits require proof and delivery, and vanish whe
     }
 });
 
-test('a build waits on its own failed checks, conflicts and Verify before Choose follow-ups, then on merging', () => {
+test('PR review is one desk wait through checks, conflicts and legacy Verify', () => {
     const retro = {
         pr: 'owner/repo#1',
         suggestions: [
@@ -163,14 +163,17 @@ test('a build waits on its own failed checks, conflicts and Verify before Choose
 
     expect(deskWait(ready).label).toBe('Choose follow-ups');
     expect(deskWait(item({ status: 'Ready to merge' })).label).not.toBe('Choose follow-ups');
-    expect(deskWait(item({ status: 'Verify', retro })).label).toBe('Verify build');
+    expect(deskWait(item({ status: 'Verify', retro })).label).toBe('Review PR');
     expect(
         deskWait({
             ...ready,
+            retro: undefined,
             linkedPrs: [{ ...pr, checks: { passed: 0, failed: 1, running: 0, total: 1, since: null } }],
         }).label,
-    ).toBe('Checks failed');
-    expect(deskWait({ ...ready, linkedPrs: [{ ...pr, mergeState: 'conflicts' }] }).label).toBe('Resolve conflicts');
+    ).toBe('Review PR');
+    expect(deskWait({ ...ready, retro: undefined, linkedPrs: [{ ...pr, mergeState: 'conflicts' }] }).label).toBe(
+        'Review PR',
+    );
     expect(deskWait(item({ status: 'Done', linkedPrs: [{ ...pr, state: 'merged' }], retro })).label).not.toBe(
         'Choose follow-ups',
     );
@@ -212,4 +215,58 @@ test('a pending release step at the last merge shows Release step, not Reconcile
     });
 
     expect(deskWait(work).label).toBe('Release step');
+});
+
+test('new PR runs leave CI failures and conflicts with T3 unless it raises a human notice', () => {
+    const work = item({
+        status: 'Ready to merge',
+        verification: { prReview: true, required: false, head: null, latest: null, resume: null },
+    });
+
+    for (const pr of [
+        {
+            ...work.linkedPrs[0]!,
+            mergeState: 'blocked' as const,
+            checks: { passed: 0, failed: 1, running: 0, total: 1, since: null },
+        },
+        { ...work.linkedPrs[0]!, mergeState: 'conflicts' as const },
+    ]) {
+        const fixing = { ...work, linkedPrs: [pr] };
+
+        expect(placementOf(fixing, { all: [fixing], unavailable: false }).sections).not.toContain('desk');
+    }
+
+    expect(
+        placementOf(
+            {
+                ...work,
+                linkedPrs: [
+                    {
+                        ...work.linkedPrs[0]!,
+                        checks: { passed: 1, failed: 1, running: 0, total: 2, since: null },
+                        mergeState: 'can merge',
+                    },
+                ],
+            },
+            { all: [work], unavailable: false },
+        ).sections,
+    ).toContain('desk');
+
+    const gaveUp = {
+        ...work,
+        needsYou: { reason: 'CI fixer could not repair the job.', offers: [], causes: [], ticketOpen: true },
+    } as Item;
+
+    expect(placementOf(gaveUp, { all: [gaveUp], unavailable: false }).sections).toContain('desk');
+});
+
+test('a terminal PR never creates a review task from a stale workflow status', () => {
+    for (const status of ['Verify', 'Ready to merge'] as const) {
+        for (const state of ['merged', 'closed'] as const) {
+            const work = item({ status });
+
+            work.linkedPrs = [{ ...work.linkedPrs[0]!, state }];
+            expect(placementOf(work, { all: [work], unavailable: false }).sections).not.toContain('desk');
+        }
+    }
 });

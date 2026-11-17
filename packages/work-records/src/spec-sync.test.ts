@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { blockerDeclarations } from './blocker-declarations.ts';
 import { consumptionTests } from './consumption-tests.ts';
 import { contractReferences } from './contract-references.ts';
+import { beginPrAmendment, approvePrAmendment } from './pr-amendment.ts';
 import { refreshSpecs, resolveSpecEdit, syncSpecs } from './spec-sync.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -604,3 +606,87 @@ test.each(['example/widget', 'example/Project/widget'])(
         );
     },
 );
+
+test('linked amendment holds every published Spec through Doubt and publishes all corrected receipts without warnings', async () => {
+    const f = await fixture();
+    const records = f.records;
+    const producer = f.record.workId;
+    const parent = records.create({ title: 'Group', repository: setup.repo, kind: 'concept' }).workId;
+    const consumerRepo = 'example/display';
+    const consumer = records.create({
+        title: 'Display',
+        repository: consumerRepo,
+        kind: 'build',
+        ticket: `${consumerRepo}#9`,
+    }).workId;
+    const rev = (id: string) => records.read(id).revision;
+
+    records.update(producer, rev(producer), { kind: 'build' });
+    for (const id of [producer, consumer]) records.setParent(id, rev(id), parent);
+    records.setPullRequest(producer, rev(producer), `${setup.repo}#8`);
+    records.setBody(consumer, rev(consumer), 'brief', completeBrief('Click to greet.'));
+    records.recordGate(consumer, rev(consumer), {
+        briefDigest: records.gate(consumer).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Original approval.',
+    });
+
+    const tickets = new Map([
+        [setup.repo, f.remote()],
+        [
+            consumerRepo,
+            {
+                ...f.remote(),
+                repository: consumerRepo,
+                number: 9,
+                title: 'Display',
+            },
+        ],
+    ]);
+    const writes: string[] = [];
+    const provider = {
+        readSpec: async (repo: string) => ({ ...tickets.get(repo)! }),
+        replaceSpec: async (ticket: StructureTicket, body: string) => {
+            writes.push(body);
+
+            const next = { ...ticket, body, version: String(Number(ticket.version) + 1) };
+
+            tickets.set(ticket.repository, next);
+
+            return next;
+        },
+    } as unknown as StructureProvider;
+    const options = { provider, setups: [setup, { ...setup, repo: consumerRepo }] };
+
+    await syncSpecs(records, options);
+
+    const original = [...tickets.values()].map((ticket) => ticket.body);
+    const url = `https://github.com/${setup.repo}/pull/8#issuecomment-23`;
+    const read = async (path: string) =>
+        path.includes('collaborators')
+            ? { permission: 'write' }
+            : path.includes('comments')
+              ? { html_url: url, user: { login: 'Pedro', type: 'User' }, body: 'Support Enter too.' }
+              : { html_url: `https://github.com/${setup.repo}/pull/8`, state: 'open', merged: false };
+
+    await beginPrAmendment(records, producer, url, read, [consumer]);
+    for (const id of [producer, consumer]) records.setBody(id, rev(id), 'brief', completeBrief('Support Enter too.'));
+    await syncSpecs(records, options);
+    expect([...tickets.values()].map((ticket) => ticket.body)).toEqual(original);
+    for (const id of [producer, consumer])
+        records.recordDoubt(id, records.doubtPackage(id).packageDigest, 'Doubt', 'Consistent.');
+    await syncSpecs(records, options);
+    expect([...tickets.values()].map((ticket) => ticket.body)).toEqual(original);
+
+    const display = records.displayPrAmendment(producer);
+
+    await approvePrAmendment(records, producer, display, display.digest, url, read);
+    await syncSpecs(records, options);
+    expect(writes).toHaveLength(4);
+    expect(writes.every((body) => !body.includes('Out-of-date Spec'))).toBe(true);
+    for (const id of [producer, consumer]) {
+        expect(records.gate(id).current).toBe(true);
+        expect(records.specState(id)).toMatchObject({ active: true, pending: null, error: null });
+    }
+    expect([...tickets.values()].every((ticket) => ticket.body.includes('Support Enter too.'))).toBe(true);
+});

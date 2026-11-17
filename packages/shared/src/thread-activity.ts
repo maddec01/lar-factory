@@ -108,6 +108,9 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
             ? UNAVAILABLE
             : undefined;
 
+    if (!thread.currentRunning && thread.watchingPrs?.length && !agents.length)
+        return { state: 'working', action: 'Watching PR', agents: 0 };
+
     if (thread.queued && !agents.length)
         return { state: 'working', action: 'Queued', ageMs: ageOf(thread.updated, now), agents: 0 };
 

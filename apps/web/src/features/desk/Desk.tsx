@@ -32,7 +32,14 @@ function latestOf(items: Item[], data: BoardData, unavailable: boolean): DeskLat
     return {
         title: <ItemTitle item={item} />,
         name: itemName(item),
-        detail: [deskWait(item, unavailable, data.items).label, question ?? (parent && `in ${parent}`)]
+        detail: [
+            deskWait(item, unavailable, data.items).label,
+            question ??
+                item.linkedPrs[0]?.review?.comments
+                    ?.map((c) => c.body.slice(0, 240) || 'Changes requested')
+                    .join(' · ') ??
+                (parent && `in ${parent}`),
+        ]
             .filter(Boolean)
             .join(' · '),
         action: <HumanWaitAction item={item} data={data} quiet />,

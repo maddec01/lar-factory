@@ -3,7 +3,7 @@
 `<lar-build>` is this file’s parent folder’s parent.
 
 You open the PR for one reviewed lar change. The approved brief decides whether
-it needs Verify or goes straight to Ready to merge. You get the build's
+its human Test steps belong in PR review, or in legacy Verify. You get the build's
 work ID, `project-rules.md`, the repo path, the reviewers' final results, the builder's
 rejected findings, the findings still open after review round 2, its list
 of unreviewed fixes, its **Domain docs added by the build** list and its
@@ -76,11 +76,13 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    relationships. Report any unresolved link with the PR result. A PR without
    a ticket still has the complete outcome, decisions and reasons above. Its
    recorded merge makes the build Done.
-3. After required checks pass, read `lar-work verification <work ID>` for the
-   gate's saved Verify requirement. New briefs omit a negative Verify section;
-   its decision stays in the approved scope record. Legacy yes/no sections remain binding.
-   - **Verify** only when `required` is true. Generate numbered checks with observable results.
-   - **Ready to merge** when `required` is false. A reviewer recommendation is a note, never another human wait.
+3. Read `lar-work verification <work ID>`. When `prReview` is true, recommend
+   **Ready to merge** after required checks pass. The brief's human checks go in
+   the PR's numbered Test steps; human approval of that head covers them.
+   There is no separate board Verify gate for these runs.
+   Otherwise preserve the approved legacy brief's saved Verify decision, including a negative decision omitted from the brief prose:
+   - **Verify** only when it says yes. Generate numbered checks with observable results.
+   - **Ready to merge** when it says no. A reviewer recommendation is a note, never another human wait.
    Browser checks use T3 preview only; serve local static output on a free HTTP
    port and stop that server afterward; never launch another browser or import tools from other checkouts.
    Changing Verify requires a brief amendment through Doubt and a board gate before proceeding.
@@ -94,8 +96,12 @@ required checks are green.
 Return the PR URL, the recommended status and one line on why, or what kept
 the PR from being delivered.
 
-When the builder requests reassessment after a CI fix or conflict resolution,
-assess every listed check against the new final tree using step 1's rules.
-Record your own reuse reasons or rerun only checks you cannot justify.
-Return the updated assessment and status recommendation without restarting
-reviews or opening another PR. The CI fixer updates its Evidence section.
+When the builder requests reassessment for an existing PR after human feedback,
+a CI fix or conflict resolution, assess every listed check against the new final
+tree using step 1's rules. For human feedback, require the selected reviewers'
+final results from the fresh feedback cycle before publishing. Record your own
+reuse reasons or rerun only checks you cannot justify. Finish the assessment
+before step 1's push; a failure returns to the builder without pushing.
+Update the existing PR rather than opening another one. Return the updated
+assessment and status recommendation without restarting reviews. The CI fixer
+updates its Evidence section after a CI fix.

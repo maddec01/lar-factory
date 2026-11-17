@@ -891,3 +891,74 @@ test.each([{ structure: 'linked', openDecisions: [], kind: 'build' }] as const)(
         assert.equal(records.read(r.workId).deliveryKind, null);
     },
 );
+
+test('a linked PR amendment shows no duplicate gate before or after fresh Doubt, but retains a real question', async () => {
+    const records = await open();
+    let work = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'In progress' });
+
+    work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Original scope.'));
+    records.recordGate(work.workId, work.revision, {
+        briefDigest: records.gate(work.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Approved.',
+    });
+
+    const id = work.workId;
+    const rev = () => records.read(id).revision;
+
+    records.setPullRequest(id, rev(), `${REPO}#4`);
+
+    const state = records.prLoop(id);
+
+    state.amendment = {
+        source: 'https://github.com/example/repo/pull/4#issuecomment-1',
+        by: 'Pedro',
+        evidence: 'Enter too.',
+    };
+    records.savePrLoop(id, state);
+
+    const parent = records.create({ title: 'Group', repository: REPO, kind: 'concept' }).workId;
+    let consumer = records.create({ title: 'Consumer', repository: OTHER_REPO, kind: 'build', status: 'Ready' });
+
+    records.setParent(id, rev(), parent);
+    consumer = records.setParent(consumer.workId, consumer.revision, parent);
+    consumer = records.setBody(consumer.workId, consumer.revision, 'brief', completeBrief('Original scope.'));
+    records.recordGate(consumer.workId, consumer.revision, {
+        briefDigest: records.gate(consumer.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Approved.',
+    });
+    records.beginLinkedPrAmendment(id, state.amendment, [consumer.workId]);
+    records.setBody(id, rev(), 'brief', completeBrief('Enter too.'));
+    records.setBody(consumer.workId, records.read(consumer.workId).revision, 'brief', completeBrief('Enter too.'));
+
+    const all = () => recordItems(records, [], [REPO, OTHER_REPO]);
+    const shown = () => all().find((item) => item.id === id)!;
+    const noConsumerGate = () => {
+        const item = all().find((item) => item.id === consumer.workId)!;
+
+        assert.equal(item.briefApproval, undefined);
+        assert.equal(item.staleGate, undefined);
+        assert.equal(item.needsYou, undefined);
+        assert.equal(
+            deskItems({ items: all() }, false).some((item) => item.id === consumer.workId),
+            false,
+        );
+    };
+
+    noConsumerGate();
+
+    assert.equal(shown().briefApproval, undefined);
+    assert.equal(shown().needsYou, undefined);
+
+    const input = records.doubtPackage(id);
+
+    records.recordDoubt(id, input.packageDigest, 'Doubt', 'No conflict.');
+    records.recordDoubt(consumer.workId, records.doubtPackage(consumer.workId).packageDigest, 'Doubt', 'No conflict.');
+    noConsumerGate();
+    assert.equal(shown().briefApproval, undefined);
+    assert.equal(shown().staleGate, undefined);
+    assert.equal(shown().needsYou, undefined);
+    records.setNeedsYou(id, rev(), 'Should Enter submit while a menu is open?');
+    assert.match(shown().needsYou!.reason, /menu is open/);
+});

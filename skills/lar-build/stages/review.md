@@ -3,13 +3,15 @@
 Input: integrated branch and passing validation record. Output: `review-rounds`,
 fixed/rejected/open findings, unreviewed fixes and UI process ownership.
 
-At most two rounds per cycle; Verify rejection starts a fresh cycle.
+At most two rounds per cycle; Verify rejection or trusted human PR feedback starts a fresh cycle.
 
 Round 1: in the build checkout, pin `head=$(git rev-parse HEAD)` and
 `base=$(git merge-base origin/$base_branch "$head")`, then run
 `lar-work select-reviewers <work ID> --base "$base" --head "$head"`.
 Add `--run-id RUN_ID` when supplied. After Verify rejection, select again;
 use the returned base/head delta and reasons, then always run Approve.
+For PR feedback, add `--feedback-head <reviewed SHA>` to the selection instead;
+this uses the same fresh cycle and returned delta without inventing a Verify result.
 Use returned decisions, including uncertainty; report skips. In parallel, start each
 selected reviewer with its returned instruction path (under installed lar-build)
 or frozen text, work ID, repo path, `<lar-build>/project-rules.md`, saved domain-doc

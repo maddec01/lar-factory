@@ -58,7 +58,11 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
         proposeRetro: (id, revision, suggestions) =>
             database.write(() => {
                 const prior = get(id);
-                const record = open(id, revision, prior);
+                // CI starts Retro on PR open; a fast human merge must not discard its in-flight result.
+                const record = read(id);
+
+                expectRevision(record, revision);
+
                 const retro: Retro = prior ?? {
                     pr: record.pullRequest ?? invalid('Record the delivery PR before proposing Retro follow-ups.'),
                     suggestions: null,

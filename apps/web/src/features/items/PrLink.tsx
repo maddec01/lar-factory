@@ -10,7 +10,7 @@ import { MergePr } from './MergePr';
 import { useButtonKind } from '@/ui/board';
 
 /** `next` draws it as a desk card's next step, tinted. */
-function PrLink({
+export function PrLink({
     item,
     label,
     primary = false,
@@ -55,7 +55,7 @@ function PrLink({
     );
 }
 
-/** Ready to merge opens an in-board confirmation; Open PR remains a separate link. */
+/** The item dialog alone offers the fallback merge, beside the PR review link. */
 export function PrAction({
     item,
     label,
@@ -70,11 +70,17 @@ export function PrAction({
     if (item.linkedPrs[0]?.mergeState === 'behind' || mergeStageProblem(item))
         return <PrLink item={item} label={label === 'Merge PR' ? 'Open PR' : label} primary={primary} next={next} />;
 
-    const openPr = <PrLink item={item} label="Open PR" />;
+    const openPr = <PrLink item={item} label="Review PR" primary={primary} next={next} />;
 
     return (
         <>
-            <MergePr item={item} label={label} primary={primary} next={next} openPr={openPr} />
+            <MergePr
+                item={item}
+                label="Merge PR"
+                primary={false}
+                next={false}
+                openPr={<PrLink item={item} label="Open PR" />}
+            />
             {openPr}
         </>
     );

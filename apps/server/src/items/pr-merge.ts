@@ -6,7 +6,6 @@ import {
     onAzure,
     sameRepo,
     type MergeConfirmation,
-    type MergeMethod,
 } from '@lar-factory/shared';
 import { assertAzureWriteAllowed } from '@lar-factory/shared/azure-safety';
 import type { WorkRecords } from '@lar-factory/work-records';
@@ -207,10 +206,11 @@ export function createPrMerge({ board, records, reread, busy, readTicket, provid
                         error: 'The PR source revision changed. Review and confirm the new revision.',
                     });
 
-                const method = input.method as MergeMethod;
+                // Ignore old clients' method choices; the provider default is authoritative.
+                const method = evidence.defaultMethod ?? evidence.methods[0];
                 const blockers = [...mergePrProblems(evidence.pr), ...evidence.blockers];
 
-                if (!confirmation.methods.includes(method) || !evidence.methods.includes(method))
+                if (!method || !confirmation.methods.includes(method) || !evidence.methods.includes(method))
                     blockers.push('That merge method is no longer permitted.');
 
                 if (blockers.length) return reply(409, { error: blockers.join(' ') });
@@ -223,7 +223,7 @@ export function createPrMerge({ board, records, reread, busy, readTicket, provid
                 submitted = true;
 
                 try {
-                    await provider(repo).merge(repo, number, confirmation.sourceRevision, method);
+                    await provider(repo).merge(repo, number, confirmation.sourceRevision, method!);
                 } catch {
                     failed = true;
                 }

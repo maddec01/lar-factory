@@ -52,6 +52,16 @@ export interface CheckProgress {
 }
 
 export interface LinkedPr extends Pipeline {
+    /** Unresolved trusted human feedback and required checks observed by the board. */
+    review?: {
+        required: 'green' | 'pending' | 'failed' | 'unknown';
+        /** All unresolved conversations, including addressed or dismissed comments. */
+        unresolvedThreads?: number;
+        reviewDecision?: string;
+        comments?: { id: string; body: string; url: string; author: string }[];
+        /** Dispatched feedback still belongs to the build owner until its turn and reviewers hand back. */
+        handlingFeedback?: boolean;
+    };
     checkProgress?: CheckProgress;
     /** Source commit observed with this PR. */
     sourceRevision?: string;

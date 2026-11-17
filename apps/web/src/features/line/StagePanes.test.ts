@@ -227,8 +227,8 @@ test('Verify: its running row returns to the desk when the thread stops or the b
         't3code://threads/sample-environment/build',
     ]);
 
-    // Verify waits on you to verify the build.
-    const wait = 'Verify build';
+    // Legacy Verify also opens the single PR review action on the desk.
+    const wait = 'Review PR';
 
     await receive(at(threads('done'), { slices: [] }));
     expect(text(desk())).toContain(wait);
@@ -398,4 +398,62 @@ test('an approved shaping owner keeps Publishing Spec until Build is available, 
     );
     expect(text(row(item.id))).not.toContain('Publishing Spec');
     expect(text(startBuild(item.id))).toBe('Build');
+});
+
+test.each([
+    [{ required: 'green', handlingFeedback: true }, 'Fixing review feedback'],
+    [{ required: 'green', handlingFeedback: true }, 'Fixing review feedback'],
+    [{ required: 'pending', handlingFeedback: true }, 'Fixing review feedback'],
+] as const)('PR intent leads an active row, with the command action below it: %s', async (review, label) => {
+    const now = '2026-10-21T10:00:00.000Z';
+    const pr = sample.items.find((i) => i.id === 'I_sample14')!.linkedPrs[0]!;
+
+    await mountPage(
+        fresh(
+            withItem(
+                'I_sample13',
+                {
+                    parent: null,
+                    parentId: null,
+                    flow: 'single',
+                    status: 'Review',
+                    blockers: [],
+                    slices: [],
+                    verification: {
+                        required: false,
+                        invalidated: false,
+                        prReview: true,
+                        prReviewHandedBack: false,
+                        head: null,
+                        latest: null,
+                        resume: null,
+                    },
+                    linkedPrs: [{ ...pr, state: 'open', isDraft: false, review }],
+                    threads: [
+                        {
+                            id: 'owner',
+                            title: 'Build',
+                            purpose: 'build',
+                            state: 'running',
+                            updated: now,
+                            currentRunning: true,
+                            activity: {
+                                available: true,
+                                readAt: now,
+                                action: 'Running a command',
+                                actionAt: now,
+                                toolRunning: true,
+                                agents: [],
+                            },
+                        },
+                    ],
+                },
+                loose,
+            ),
+        ),
+    );
+    expect(text(meta('I_sample13'))).toMatch(new RegExp(`^${label}`));
+    expect(text(row('I_sample13'))).toContain('Running a command');
+    expect(text(meta('I_sample13'))).not.toContain('Running a command');
+    expect($('.desk-row[data-item="I_sample13"]')).toBeNull();
 });

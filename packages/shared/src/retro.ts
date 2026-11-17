@@ -1,6 +1,6 @@
 import type { Status } from './item-domain.ts';
 
-/** The build's retro, proposed at handback, and its board-only follow-up decision, settled before merge. */
+/** The build's Retro, proposed when its PR opens, and its board-only follow-up decision. */
 export interface RetroSuggestion {
     title: string;
     description: string;

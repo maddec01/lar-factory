@@ -362,6 +362,14 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 }
             }
 
+            if (input.action === 'pr-loop') {
+                const workIds = delivery.reviewLoop(repos()[0]!.repo);
+
+                reread();
+
+                return { status: 200, body: { workIds, error: null } };
+            }
+
             if (input.action === 'retro') return sampleRetro(records, repos, reread, input);
 
             if (input.action !== 'verification') return sampleControls(tracker, refresh)(input);

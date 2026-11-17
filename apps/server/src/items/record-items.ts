@@ -246,8 +246,9 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         const gate = records.gate(record.workId);
         const lastChangeRequest = records.briefChangeRequests(record.workId).at(-1);
         const changesRequested = record.status === 'Shaping' && lastChangeRequest?.briefDigest === gate.briefDigest;
+        const amending = !!records.activePrAmendment(record.workId) && !done;
         const staleGate =
-            !changesRequested && !group && !done && !gate.current && gate.evidence.length > 0
+            !amending && !changesRequested && !group && !done && !gate.current && gate.evidence.length > 0
                 ? gate.evidence.at(-1)!.briefDigest !== gate.briefDigest
                     ? ('brief' as const)
                     : gate.evidence.at(-1)!.reviewDigest &&
@@ -265,6 +266,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const matchesScope = !records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok;
         let briefApproval =
+            !amending &&
             !changesRequested &&
             !group &&
             !done &&
@@ -290,6 +292,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         }
 
         const briefReviewing =
+            !amending &&
             !changesRequested &&
             !group &&
             !done &&

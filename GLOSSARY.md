@@ -33,7 +33,7 @@ The place for work that has not been queued, shown in the List modal. Capitalise
 _Avoid_: inbox, backlog as a name for this place.
 
 **Your desk**:
-The board's row of all work waiting on Pedro: questions, tool approvals, brief gate approvals, verification, PRs to merge and failed starts or stopped runs needing a human retry, whatever its Kind or stage. Each card names its wait and action, Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
+The board's row of all work waiting on Pedro: questions, tool approvals, brief gate approvals, PR review and failed starts or stopped runs needing a human retry, whatever its Kind or stage. Each card names its wait and action, Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
 _Avoid_: inbox, needs-you list.
 
 **Open question**:
@@ -60,6 +60,10 @@ _Avoid_: trash, deleted items.
 **Spec**:
 The refined brief as it appears as a ticket's main description after shaping. Its Confirmed section holds product decisions only and is omitted when empty. The final brief gate is its approval; settled work can take its scope from the submitted request, including each repository's named role in a linked outcome, without a separate confirmation question. Repository involvement left open by the request still needs an answer.
 Linked-work graph and consumption declarations remain in the local brief, outside the published prose.
+A human PR change request Pedro chooses to address can amend affected linked
+Specs, the parent map and Outcome together. The producer owns that amendment;
+consumers need no PR or repeated brief approval. Its receipt binds the corrected
+content and authorizing comment.
 _Avoid_: refined ticket.
 
 **Original**:
@@ -150,7 +154,7 @@ How the agent works inside a build's steps: TDD (test first) or Prove it (build,
 _Avoid_: testing mode, build style.
 
 **Retro**:
-The build's look back at its own work, run at handback, which proposes follow-up items for you to choose on the board. A factory-wide switch, on by default, turns it off, and a run keeps the choice it started with.
+The build's look back at its own work, run when its PR opens before waiting for CI, which proposes follow-up items for you to choose on the board. A factory-wide switch, on by default, turns it off, and a run keeps the choice it started with.
 _Avoid_: retrospective, post-merge retro.
 
 **Model choice**:
@@ -187,3 +191,51 @@ _Avoid_: end-to-end check as a visible map label.
 
 **Start shaping**, **Start decision**, **Start build**:
 The action names the work it begins on every row, map node and item detail. A deferred action also names its prerequisite (for example, “Start build after #42”); armed work reads “Starts build after #42”.
+
+**PR review**:
+
+The single human review of a delivered build, including its PR's Test steps.
+Humans merge. The factory's reviewers run before the PR opens and finish the
+fresh feedback review cycle before a review fix is pushed. Approver reassessment
+also finishes on the final tree before that push. The build thread
+hands back when the open delivery PR has green required checks and no selected
+feedback in hand. Its part is done: the row says Ready to merge and the desk says
+Review PR #n. It holds no build slot, never merges, and never parses comments or
+reviews as merge approval. The item dialog retains an explicit human-operated
+merge fallback using the provider's policies and expected-head guard.
+
+The board's PR observer automatically wakes the idle build owner once per new
+required-check failure or conflict, with durable delivery receipts. Human feedback
+instead puts one New comment on PR #n card on that item, with its gist and Address
+it, Open thread and Dismiss. Multiple new comments collapse into one card. Address
+it immediately shows Sending…, then sends the chosen current unresolved comments through the existing dispatch path;
+Open thread opens T3 for a direct conversation; Dismiss permanently retires the
+shown comments. Only unresolved GitHub inline review threads (reviewThreads
+isResolved, isOutdated and comments) or active Azure threads count. Resolved/fixed/
+closed threads leave the card, including at the fresh Address it read, and are
+never sent. Outdated alone is not resolved. GitHub top-level comments and review
+summaries cannot be resolved and remain until addressed or dismissed. A fix push
+during direct owner work retires the comments present when that work began; later
+comments stay pending. A recorded agent reply to an inline comment handles that
+comment without resolving its conversation. Idle pushes and unrelated replies do
+not retire feedback. Bots and recorded agent replies do
+not become human feedback.
+
+Whenever the build owner or its reviewers work on the PR again, including after
+Pedro starts work directly in T3, the row says Fixing review feedback and no PR
+desk card appears; an optional Retro card can remain with the working headline
+and Choose follow-ups (optional) as secondary text. Optional picks never outrank
+active owner work. Handback with
+green required checks restores unhandled feedback or review readiness. The row
+and card name observed merge blockers instead of claiming Ready to merge.
+Merged PRs never request review. A merge by anyone records Done automatically;
+the board retries existing guarded branch/worktree cleanup once active work ends,
+without waking the build owner. Closed unmerged PRs keep a clear notice and their
+unmerged work. Retro picks after Done are independent.
+
+A trusted PR request Pedro chooses to address can amend the Spec without a new
+human gate. Record begin-pr-amendment before scope or brief writes. While fresh
+Doubt and the correction are in hand, suppress the duplicate gate and retain the
+tracker's last published Spec. approve-pr-amendment records the exact corrected
+gate and retires the marker together, then publishes the corrected Spec. Only a
+real unresolved conflict becomes a desk question.

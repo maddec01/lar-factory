@@ -18,6 +18,7 @@ const pr = {
 };
 const repo = {
     viewerPermission: 'WRITE',
+    viewerDefaultMergeMethod: 'SQUASH',
     mergeCommitAllowed: true,
     squashMergeAllowed: true,
     rebaseMergeAllowed: false,
@@ -34,7 +35,7 @@ test('GitHub reads effective method rules, permission and queues; mutation uses 
     const run = fake({}, [{ type: 'pull_request', parameters: { allowed_merge_methods: ['squash'] } }]);
     const provider = githubMerge(run);
 
-    expect((await provider.read('o/r', 8)).methods).toEqual(['squash']);
+    expect(await provider.read('o/r', 8)).toMatchObject({ methods: ['squash'], defaultMethod: 'squash' });
     await provider.merge('o/r', 8, 'abc', 'squash');
     expect(run.mock.calls.at(-1)![0]).toContain('head=abc');
     expect(run.mock.calls.at(-1)![0].join(' ')).toContain('expectedHeadOid: $head');

@@ -7,7 +7,11 @@ const WORKFLOW_STEPS = ['Queue', 'Shaping', 'Ready to build', 'Build', 'Review',
 const DECISION_STEPS = ['Queue', 'Working', 'Outcome'] as const;
 
 export const workflowSteps = (item: Item): readonly string[] =>
-    isDecisionWork(item) ? DECISION_STEPS : WORKFLOW_STEPS;
+    isDecisionWork(item)
+        ? DECISION_STEPS
+        : item.verification?.prReview
+          ? WORKFLOW_STEPS.map((step) => (step === 'Verify' ? 'Review PR' : step))
+          : WORKFLOW_STEPS;
 
 /** A step's name on a card's mini track: a decision's "Working" step reads "Deciding", so a step is never mistaken for
  *  the state beside it. */

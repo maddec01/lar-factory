@@ -92,10 +92,12 @@ import { createBriefApproval } from './brief-approval.ts';
 import { buildPreparation, type BuildStartSource } from './build-preparation.ts';
 import { importPickedTicket } from './import-ticket.ts';
 import type { ItemSource } from './item-source.ts';
+import { createMergedCleanup } from './merged-cleanup.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 import { observeWork } from './observe-records.ts';
 import { createOutcomeCheck } from './outcome-check.ts';
 import { reconcileOwnerActivity } from './owner-reconciliation.ts';
+import { createPrLoop, type PrLoopOptions } from './pr-loop.ts';
 import { createPrMerge } from './pr-merge.ts';
 import { createReleaseStep } from './release-step.ts';
 import { createRetro } from './retro.ts';
@@ -121,6 +123,7 @@ export interface ItemCommands {
     requestBriefChanges(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryBriefChanges(itemId: string): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    prFeedback(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     inspectVerification(itemId: string): Promise<Reply>;
     recordVerification(itemId: string, input: Record<string, unknown>): Promise<Reply>;
@@ -238,6 +241,7 @@ export interface ItemCommandsDeps {
     releaseDeps?: Pick<Parameters<typeof createReleaseStep>[0], 'send' | 'readProjection'>;
     reconcileDeps?: { send: typeof sendThreadCommand };
     retroDeps?: Pick<Parameters<typeof createRetro>[0], 'identity' | 'capture'>;
+    prFeedbackDeps?: PrLoopOptions;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
     briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity' | 'send'>;
@@ -414,6 +418,7 @@ export function createItemCommands({
     factoryContext = currentFactoryContext(),
     runLaunchDeps,
     verificationDeps,
+    prFeedbackDeps,
     briefApprovalDeps,
     shapingControlDeps,
     retroDeps,
@@ -1349,6 +1354,27 @@ export function createItemCommands({
             .filter((name) => slices.some((slice) => name.startsWith(`slice/${slice.workId.slice(0, 8)}-`)));
     }
 
+    const cleanupMergedDeliveries = createMergedCleanup(records, {
+        async context(item) {
+            const project = await projectOf(item.repo);
+
+            if (project.error !== undefined) throw new Error(project.error);
+
+            const livePaths = liveWorktreePaths();
+
+            if (!livePaths) throw new Error('T3 worktree activity is unavailable.');
+
+            return {
+                checkout: await checkoutOf(project.projectId),
+                defaultBranch: await baseOf(item.repo),
+                liveWorktreePaths: livePaths,
+                writable:
+                    !writeAccessProblem(item.repo, 'push-branch', buildAccessOf(item.repo)) &&
+                    process.env.LAR_FACTORY_AZURE_READ_ONLY !== '1',
+            };
+        },
+    });
+
     const cleanupTokens = new Map<string, { itemId: string; plans: CleanupPlan[]; expiresAt: number }>();
 
     function pruneCleanupTokens(itemId?: string) {
@@ -1636,6 +1662,54 @@ export function createItemCommands({
         ...createShapingControl({ board, records, reread, ...shapingControlDeps }),
         ...releases,
         ...verifying,
+        async prFeedback(itemId, input) {
+            const item = board.find(itemId);
+
+            if (!records || !item || item.recorded === false)
+                return { status: 404, body: { error: 'Work not found.' } };
+
+            const { action, events } = input;
+
+            if (
+                (action !== 'address' && action !== 'dismiss') ||
+                !Array.isArray(events) ||
+                !events.length ||
+                events.length > 1000 ||
+                events.some((id) => typeof id !== 'string' || id.length > 300)
+            )
+                return { status: 400, body: { error: 'Choose Address it or Dismiss for the shown comments.' } };
+
+            const record = records.read(itemId);
+            const pr = item.linkedPrs[0];
+
+            if (
+                !pr ||
+                pr.state !== 'open' ||
+                !record.pullRequest ||
+                record.finishedAt ||
+                record.setAside ||
+                !records.verification(itemId).prReview ||
+                pr.url !== prUrl(record.repository, pr.number)
+            )
+                return { status: 409, body: { error: 'The delivery PR is no longer open.' } };
+
+            try {
+                await createPrLoop(records, { currentItems: () => board.snapshot().items, ...prFeedbackDeps }).decide(
+                    record,
+                    pr,
+                    action,
+                    events as string[],
+                );
+                reread();
+
+                return { status: 200, body: { board: board.snapshot() } };
+            } catch {
+                return {
+                    status: 409,
+                    body: { error: 'Current PR feedback could not be read. Refresh and try again.' },
+                };
+            }
+        },
         chooseRetro: retros.chooseRetro,
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
@@ -1646,6 +1720,7 @@ export function createItemCommands({
             pushStarts();
             await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
+            await cleanupMergedDeliveries(currentItems);
             await releases.reconcileReleaseContinuations();
             await outcomes.reconcileOutcomeChecks();
             await reconcileMergedGroups((...args) => this.start(...args));

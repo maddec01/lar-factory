@@ -31,6 +31,13 @@ export interface GateRecords {
         approvedBy: string,
         evidence: string,
     ): GateEvidence;
+    recordPrAmendmentGate(
+        display: GateDisplay,
+        approvalDigest: string,
+        approvedBy: string,
+        evidence: string,
+        source: string,
+    ): GateEvidence;
     recordGate(workId: string, revision: number, evidence: GateApproval): GateEvidence;
 }
 
@@ -190,7 +197,7 @@ export function gateRecords(
 
         if (verify)
             db.prepare(
-                'INSERT INTO verification(work_id,required) VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET required=excluded.required',
+                'INSERT INTO verification(work_id,required) VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET required=CASE WHEN verification.pr_review=1 THEN 0 ELSE excluded.required END',
             ).run(workId, Number(verify.required));
 
         if (record.ticket) queueTicketSpec(database, workId, record.ticket, body(workId, 'brief')!);
@@ -251,7 +258,7 @@ export function gateRecords(
             }),
         );
 
-    return {
+    const api: GateRecords = {
         gate: (workId) => database.read(() => gate(workId)),
         // Hold one SQLite snapshot for every displayed member, just as approval does.
         gateBatch: (ids) => database.write(() => gateBatch(ids)),
@@ -319,17 +326,51 @@ export function gateRecords(
                     gates,
                 };
             }),
+        recordPrAmendmentGate: (display, approvalDigest, approvedBy, evidence, source) =>
+            database.write(() => {
+                const row = db.prepare('SELECT content FROM pr_loop WHERE work_id=?').get(display.workId);
+                const state = row ? JSON.parse(String(row.content)) : undefined;
+
+                if (
+                    state?.amendment &&
+                    (state.pr !== find(display.workId).pullRequest || state.amendment.source !== source)
+                )
+                    invalid('The authorized PR amendment changed. Read its request again.');
+
+                const result = api.recordDisplayedGate(display, approvalDigest, approvedBy, evidence);
+
+                if (state?.amendment) {
+                    delete state.amendment;
+                    db.prepare('UPDATE pr_loop SET content=? WHERE work_id=?').run(
+                        JSON.stringify(state),
+                        display.workId,
+                    );
+                }
+
+                return result;
+            }),
         recordGate: (workId, revision, value) => database.write(() => saveGate(workId, revision, value)),
         displayGate: (workId) => database.read(() => displayGate(workId)),
         recordDisplayedGate: (display, approvalDigest, approvedBy, evidence) =>
             database.write(() => {
-                verifyGateDisplay(display, approvalDigest, displayGate(display.workId));
+                const revision = agentRevision(database, display.workId, display.sourceRevision, [
+                    'kind',
+                    'setAsideAt',
+                    'finishedAt',
+                    'body.brief',
+                    'gate',
+                    'ticket',
+                    'confirmedScope',
+                ]);
+                const current = displayGate(display.workId);
+
+                verifyGateDisplay(display, approvalDigest, { ...current, sourceRevision: display.sourceRevision });
 
                 const review = reviews.currentDoubt(display.workId);
 
                 if (!review) invalid('Run Doubt on the current doubt-package and record-doubt before approval.');
 
-                const result = saveGate(display.workId, display.sourceRevision, {
+                const result = saveGate(display.workId, revision, {
                     briefDigest: display.briefDigest,
                     approvedBy,
                     evidence,
@@ -347,4 +388,6 @@ export function gateRecords(
                 return result;
             }),
     };
+
+    return api;
 }

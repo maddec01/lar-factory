@@ -411,7 +411,7 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                           .map((r) => r.workId),
                   ]),
               ]) {
-            if (!records.specEligible(workId)) continue;
+            if (!records.specEligible(workId) || records.activePrAmendment(workId)) continue;
 
             let state = records.specState(workId);
 
@@ -479,7 +479,8 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
 
                 await lease.assertOwned();
 
-                if (records.specState(workId).generation !== state.generation) continue;
+                if (records.specState(workId).generation !== state.generation || records.activePrAmendment(workId))
+                    continue;
 
                 if (
                     !save(records, workId, { ...state, sent: { body, title: ticket.title ?? '', spec: publishedSpec } })

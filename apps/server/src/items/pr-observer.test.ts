@@ -62,6 +62,20 @@ test('a newly read linked PR finishes its record without a provider call', async
     expect(read).not.toHaveBeenCalled();
 });
 
+test('a confirmed merge stays Done through late handback and review phases', async () => {
+    const { records, record, options } = await fixture();
+
+    records.observe(record.workId, record.revision, { of: 'pr', state: 'merged' });
+    records.update(record.workId, records.read(record.workId).revision, { status: 'Ready to merge' });
+    records.setBuildPhase(record.workId, records.read(record.workId).revision, 'review');
+    expect(records.read(record.workId)).toMatchObject({ status: 'Done', finishedAt: expect.any(String) });
+
+    const observer = createPrObserver(records, options);
+
+    await observer.poll(0);
+    expect(records.read(record.workId)).toMatchObject({ status: 'Done', finishedAt: expect.any(String) });
+});
+
 test('a failed conditional read keeps the last state and waits before retrying', async () => {
     const { records, record, options, read } = await fixture();
     const observer = createPrObserver(records, options);

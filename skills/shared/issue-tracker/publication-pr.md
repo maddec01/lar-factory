@@ -15,4 +15,6 @@ Open the PR through its provider and record the reference immediately with
 `lar-work set-pr <work ID> --revision N --pr <repository#n>`. Link the PR to the
 thread. If creation loses its response, inspect PRs for the branch before trying
 again. If a link is refused, report it and retain the recorded PR for local
-completion; do not start a comment-publication workflow. The user merges every PR.
+completion; do not start a comment-publication workflow. The build thread hands
+back when required checks pass. Humans review and merge; the board observes the
+result and cleans up after merge. Follow lar-build CI for selected human feedback.

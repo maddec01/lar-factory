@@ -1,11 +1,5 @@
-import {
-    MERGE_METHODS,
-    mergeStageProblem,
-    type Item,
-    type MergeConfirmation,
-    type MergeMethod,
-} from '@lar-factory/shared';
-import { Alert, Button, ConfirmDialog, Loading, RadioGroup, RadioGroupItem, Stack } from '@lar-works/design-system';
+import { mergeStageProblem, type Item, type MergeConfirmation } from '@lar-factory/shared';
+import { Alert, Button, ConfirmDialog, Loading, Stack } from '@lar-works/design-system';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -16,7 +10,7 @@ import type { ActionResult } from '@/services/board/board.service';
 import { postAction, receive } from '@/services/board/board.service';
 import { useButtonKind } from '@/ui/board';
 
-/** The same confirmed merge action on the desk and in item details, in browser and desktop. */
+/** A fallback merge in item details, using the repository default method. */
 export function MergePr({
     item,
     label,
@@ -37,7 +31,6 @@ export function MergePr({
         request: string;
         result: ActionResult & { confirmation?: MergeConfirmation };
     }>();
-    const [choice, setChoice] = useState<{ token: string; method: MergeMethod }>();
     const [mergeError, setMergeError] = useState<string>();
     const [consumedAttempt, setConsumedAttempt] = useState<number>();
     const action = useItemAction(item.id);
@@ -55,7 +48,6 @@ export function MergePr({
     const stale = inspected?.request !== request;
     const reading = open && !problem && !disconnected && stale;
     const confirmation = !stale && consumedAttempt !== attempt ? inspected?.result.confirmation : undefined;
-    const method = choice?.token === confirmation?.token ? choice?.method : confirmation?.methods[0];
     const error =
         problem ??
         (disconnected
@@ -86,7 +78,7 @@ export function MergePr({
     }, [open, item.id, request, problem, disconnected]);
 
     const confirm = async () => {
-        if (!confirmation || !method || pending || reading || problem || disconnected) return;
+        if (!confirmation || pending || reading || problem || disconnected) return;
 
         const actions = useActionStore.getState();
 
@@ -97,7 +89,6 @@ export function MergePr({
         const result = await postAction<{ merged: boolean }>('/api/merge-pr', {
             itemId: item.id,
             token: confirmation.token,
-            method,
         });
 
         receive(result);
@@ -137,7 +128,7 @@ export function MergePr({
                     }
                     intent="default"
                     confirmLabel="Merge PR"
-                    confirmDisabled={!confirmation || !method || reading || !!problem || !!disconnected}
+                    confirmDisabled={!confirmation || reading || !!problem || !!disconnected}
                     busy={pending}
                     onCancel={() => setOpen(false)}
                     onConfirm={() => void confirm()}
@@ -148,20 +139,6 @@ export function MergePr({
                             <Loading presentation="status" label="Loading current permissions and merge policies…" />
                         )}
                         {error && <Alert tone="danger">{error}</Alert>}
-                        {confirmation && (
-                            <RadioGroup
-                                aria-label="Merge method"
-                                value={method}
-                                onValueChange={(value) =>
-                                    setChoice({ token: confirmation.token, method: value as MergeMethod })
-                                }
-                                disabled={pending}
-                            >
-                                {confirmation.methods.map((choice) => (
-                                    <RadioGroupItem key={choice} value={choice} label={MERGE_METHODS[choice]} />
-                                ))}
-                            </RadioGroup>
-                        )}
                         {!reading && !confirmation && (
                             <Button
                                 {...kindOf('other')}

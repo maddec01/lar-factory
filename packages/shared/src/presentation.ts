@@ -189,7 +189,9 @@ export function prReadiness(
     // Until the PR's evidence is read it is still your turn to review it, so it waits on you rather than reads as idle.
     if (!pr || pr.pipelineUnread) return { word: review, action: review, state: 'waiting' };
 
-    if (pr.state === 'merged') return { word: 'Merged', action: 'Review PR', state: 'ready' };
+    if (pr.state === 'merged') return { word: 'Merged', action: 'Open PR', state: 'ready' };
+
+    if (pr.state === 'closed') return { word: 'Closed', action: 'Open PR', state: 'off' };
 
     if (pr.checkProgress && pr.checkProgress.state !== 'current')
         return { word: review, action: review, state: 'waiting' };
@@ -297,6 +299,63 @@ export const publishingSpec = (item: Item): boolean =>
     !item.specSync?.error &&
     !item.specSync?.warning;
 
+/** One PR decision drives the row, desk selection and handback copy, including optional Retro cards. */
+export function deliveryPrStatus(item: Item, stale = false) {
+    const pr = item.linkedPrs?.[0];
+
+    if (
+        !item.verification?.prReview ||
+        item.status === 'Done' ||
+        pr?.state !== 'open' ||
+        pr.isDraft ||
+        stale ||
+        item.paused ||
+        item.archived ||
+        item.needsYou
+    )
+        return null;
+
+    const owner = currentBuildThread(item);
+    const busy =
+        owner?.currentRunning ||
+        owner?.queued ||
+        owner?.hasLiveChildren ||
+        item.slices?.some((slice) => slice.progress === 'active');
+
+    if (pr.review?.handlingFeedback || (busy && (item.verification.prReviewHandedBack || pr.review?.comments?.length)))
+        return { label: 'Fixing review feedback', running: true, handback: false, feedback: false };
+
+    if (busy) return null;
+
+    let label: string;
+
+    if (pr.review?.required === 'failed') label = 'Required checks failed';
+    else if (pr.mergeState === 'conflicts') label = 'Resolve conflicts';
+    else if (pr.review?.required !== 'green')
+        label = pr.review?.required === 'pending' ? 'Waiting for required checks' : 'Required checks unknown';
+    else if (pr.mergeState === 'behind') label = 'Behind main · needs rebase';
+    else if (pr.mergeState === 'checking') label = 'Checking mergeability';
+    else if (pr.mergeState === 'blocked')
+        label = pr.review.unresolvedThreads
+            ? `${pr.review.unresolvedThreads} review thread${pr.review.unresolvedThreads === 1 ? '' : 's'} unresolved`
+            : pr.review.reviewDecision === 'REVIEW_REQUIRED'
+              ? 'Needs approval'
+              : pr.review.reviewDecision === 'CHANGES_REQUESTED'
+                ? 'Changes requested'
+                : 'Ready for review · Merge blocked';
+    else label = 'Ready to merge';
+
+    const feedback = !!pr.review?.comments?.length;
+
+    return {
+        label: feedback ? `New comment on PR #${pr.number}` : label,
+        reason: label,
+        running: false,
+        handback: label === 'Ready to merge',
+        feedback,
+    };
+}
+
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
     if (item.briefReviewing) {
         const running =
@@ -328,6 +387,10 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
                     : 'Starting',
             running: false,
         };
+
+    const delivery = deliveryPrStatus(item, stale);
+
+    if (delivery) return { label: delivery.label, running: delivery.running };
 
     if (workingAgain(item, stale)) return { label: 'Working', running: true };
 

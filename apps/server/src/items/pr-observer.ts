@@ -4,12 +4,13 @@ import type { PullRequestState, WorkRecord, WorkRecords } from '@lar-factory/wor
 
 import { prUrl } from '../config/pr-host.ts';
 import { observePullRequest, type ObserveReads } from './observe-records.ts';
+import { createPrLoop, type PrLoopOptions } from './pr-loop.ts';
 import { createPrProgressReader } from './pr-progress.ts';
 
 const PR_READ_MS = 15_000;
 const IDLE_READ_MS = 5 * 60_000;
 
-interface PrObserverOptions {
+interface PrObserverOptions extends PrLoopOptions {
     repositories(): readonly string[];
     hidden(): ReadonlySet<string>;
     waits(repo: string): boolean;
@@ -26,6 +27,7 @@ const failedRead = (pr: Pick<LinkedPr, 'checks' | 'pipelineUnread' | 'checkProgr
 /** A low-cost PR pass independent of the five-minute ticket and dependency safety read. */
 export function createPrObserver(records: WorkRecords, options: PrObserverOptions) {
     const readMany = createPrProgressReader();
+    const loop = createPrLoop(records, options);
     const progress = new Map<string, LinkedPr>();
     const checkedAt = new Map<string, number>();
     const stable = new Set<string>();
@@ -59,7 +61,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
             .filter(
                 (record) =>
                     record.pullRequest &&
-                    !record.finishedAt &&
+                    (!record.finishedAt || record.status !== 'Done') &&
                     !record.setAside &&
                     !hidden.has(record.workId) &&
                     repos.some((repo) => sameRepo(repo, record.repository)) &&
@@ -90,6 +92,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                     previous
                         ? {
                               ...previous,
+                              review: previous.review ? { required: 'unknown' } : undefined,
                               checkProgress: {
                                   ...previous.checkProgress,
                                   state: failedRead(previous),
@@ -99,6 +102,9 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                               number,
                               url,
                               state: 'open',
+                              review: records.verification(record.workId).prReview
+                                  ? { required: 'unknown' }
+                                  : undefined,
                               isDraft: false,
                               checks: null,
                               mergeState: 'checking',
@@ -116,6 +122,8 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
             if (records.observations(record.workId).some((o) => o.of === 'pr' && o.state === 'merged')) return 'merged';
 
             if (typeof next === 'string') return next;
+
+            next = await loop.observe(record, next);
 
             // A replaced delivery PR cannot publish a late answer onto its replacement.
             if (records.read(record.workId).pullRequest === record.pullRequest) {
@@ -150,20 +158,40 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                 ...item,
                 linkedPrs: item.linkedPrs.map((pr) => {
                     let observed = progress.get(pr.url.toLowerCase());
+                    const owner = currentBuildThread(item);
                     const observation =
                         item.recorded !== false && records.observations(item.id).find((o) => o.of === 'pr');
                     const failed = observation && observation.failure;
 
                     // Merge commands confirm completion directly. Finished records are no longer polled.
-                    if (observation && observation.state === 'merged') {
+                    if (observation && (observation.state === 'merged' || observation.state === 'closed')) {
                         const record = records.read(item.id);
                         const { repo, number } = reference(record);
 
                         if (pr.url.toLowerCase() === prUrl(repo, number).toLowerCase()) {
-                            observed = { ...(observed ?? pr), state: 'merged' };
+                            observed = { ...(observed ?? pr), state: observation.state };
                             progress.set(pr.url.toLowerCase(), observed);
                         }
                     }
+
+                    const saved = item.recorded !== false ? records.prLoop(item.id) : undefined;
+
+                    if (observed?.review?.comments && saved?.pending)
+                        observed = { ...observed, review: { ...observed.review, comments: saved.pending } };
+
+                    const handlingFeedback =
+                        item.recorded !== false &&
+                        (!!saved?.feedback || !!owner?.currentRunning || !!owner?.queued || !!owner?.hasLiveChildren);
+
+                    if (item.verification?.prReview && (observed ?? pr).state === 'open')
+                        observed = {
+                            ...(observed ?? pr),
+                            review: {
+                                ...observed?.review,
+                                required: observed?.review?.required ?? 'unknown',
+                                handlingFeedback,
+                            },
+                        };
 
                     if (!observed)
                         return failed
@@ -186,6 +214,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                         state,
                         isDraft,
                         pipelineUnread: observed.pipelineUnread,
+                        review: observed.review,
                         checkProgress: {
                             ...observed.checkProgress,
                             state: failed ? failedRead(observed) : (observed.checkProgress?.state ?? 'unavailable'),
@@ -220,7 +249,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                     );
                 }
 
-                if (pr.checkProgress?.state === 'current') {
+                if (pr.checkProgress?.state === 'current' && !records.verification(record.workId).prReview) {
                     progress.set(pr.url.toLowerCase(), pr);
                     checkedAt.set(record.pullRequest!.toLowerCase(), now);
                 }
@@ -230,7 +259,12 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
 
                 const previous = records.observations(record.workId).find((observation) => observation.of === 'pr');
 
-                if (previous?.state === pr.state && !previous.failure) continue;
+                if (
+                    previous?.state === pr.state &&
+                    !previous.failure &&
+                    (pr.state !== 'merged' || records.read(record.workId).status === 'Done')
+                )
+                    continue;
 
                 await apply(record, async () => pr.state);
             }
@@ -251,6 +285,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                     const url = prUrl(repo, number).toLowerCase();
                     const pr = progress.get(url);
                     const busy =
+                        records.verification(record.workId).prReview ||
                         working.has(record.workId) ||
                         ((!pr || pr.checkProgress?.state !== 'current' || pr.mergeState === 'checking') &&
                             !stable.has(url)) ||

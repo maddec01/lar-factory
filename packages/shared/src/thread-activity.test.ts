@@ -33,12 +33,14 @@ test('a working thread shows its newest action, its age and its agents', () => {
                 activity: activity({
                     action: 'Read a.ts',
                     actionAt: ago(2),
-                    agents: [{ title: 'Review', actionAt: ago(1), action: 'pnpm test' }],
+                    agents: [
+                        { title: 'Review', actionAt: ago(1), action: 'Running tests', actionDetail: 'CI=1 pnpm test' },
+                    ],
                 }),
             }),
             NOW,
         ),
-    ).toEqual({ state: 'working', action: 'pnpm test', ageMs: 60_000, agents: 1 });
+    ).toEqual({ state: 'working', action: 'Running tests', actionDetail: 'CI=1 pnpm test', ageMs: 60_000, agents: 1 });
     expect(
         threadActivityLine(
             thread({
@@ -53,13 +55,16 @@ test('a working thread shows its newest action, its age and its agents', () => {
     ).toEqual({ state: 'working', action: 'Read a.ts', ageMs: 120_000, agents: 1 });
 });
 
-test('a failed or stale read says unavailable, never an old action', () => {
+test('a failed or stale read says unavailable after the brief retention window', () => {
     const unavailable = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
 
     expect(threadActivityLine(thread({ activity: { available: false } }), NOW)).toEqual(unavailable);
     expect(
         threadActivityLine(
-            thread({ observedAt: ago(1), activity: activity({ action: 'Read a.ts', actionAt: ago(1) }) }),
+            thread({
+                observedAt: ago(1),
+                activity: activity({ readAt: ago(1), action: 'Read a.ts', actionAt: ago(1) }),
+            }),
             NOW,
         ),
     ).toEqual(unavailable);

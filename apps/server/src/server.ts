@@ -62,6 +62,7 @@ import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './ite
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
 import { createLimitSettings } from './items/limit-setting.ts';
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
+import { reconcileOwnerQuestion } from './items/owner-reconciliation.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './items/record-items.ts';
 import { createRetention } from './items/retention.ts';
@@ -574,7 +575,12 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
     pruneShownStats(new Set(items.map((item) => item.id)));
 
     // One open database and one read per thread however many times this pass asks for a thread.
-    const activity = activityReads(activityDatabase.open, protocolActivityFamilies, activityDatabase.release);
+    const activity = activityReads(
+        activityDatabase.open,
+        protocolActivityFamilies,
+        activityDatabase.release,
+        board.snapshot().items.flatMap((item) => (Array.isArray(item.threads) ? item.threads : [])),
+    );
     const withActivity = (found: ReturnType<typeof threads>) =>
         Array.isArray(found) ? found.map(activity.read) : found;
 
@@ -635,7 +641,7 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
                 shown.shapingCleanupProblem = cleanupProblems?.get(item.id);
             }
 
-            return shown;
+            return records && !fixture ? reconcileOwnerQuestion(records, shown) : shown;
         });
     } finally {
         activity.close();
@@ -812,8 +818,8 @@ function showT3Availability(): void {
 }
 
 async function refreshLocalNow(recordsChanged: boolean) {
-    if (refreshing && !recordsChanged) return false;
-
+    // T3 request changes must keep reaching the desk while a remote tracker read is in flight.
+    // showInTurns already protects a newer publication from an overlapping read.
     const before = board.snapshot().items;
 
     if (board.snapshot().fetchedAt !== null || before.length) await showRecordsInTurns();

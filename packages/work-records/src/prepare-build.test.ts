@@ -178,12 +178,12 @@ it('S08 F04: exact T3 wait observation survives a new connection and later scope
     const id = ready('SA scope');
 
     records.waitForUser(id, rev(id), 'Gold or amber?');
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'scope-q', running: false });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'scope-q' });
     records.setBody(id, rev(id), 'brief', 'Gold scope saved after the exact T3 answer');
-    other.reconcileUserWait(id, { threadId: 'owner', running: true });
+    other.reconcileUserWait(id, { threadId: 'owner' });
     expect(records.read(id)).toMatchObject({ needsYou: null, status: 'Shaping' });
     records.waitForUser(id, rev(id), 'New question still needs an answer');
-    other.reconcileUserWait(id, { threadId: 'owner', running: true });
+    other.reconcileUserWait(id, { threadId: 'owner' });
     expect(records.read(id).needsYou).toBe('New question still needs an answer');
 });
 

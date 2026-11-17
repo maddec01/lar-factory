@@ -42,7 +42,7 @@ export function SpecNotice({
                 spec.outdated || spec.error || spec.warning || spec.pending
                     ? spec.outdated
                         ? 'The brief changed. The ticket keeps the last approved Spec until you approve the new brief.'
-                        : (spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.')
+                        : (spec.warning ?? spec.error ?? 'Publishing Spec…')
                     : undefined
             }
             error={error}
@@ -65,7 +65,7 @@ export function SpecNotice({
                     </Inline>
                 </>
             ) : (
-                (spec.pending || spec.error) && (
+                spec.error && (
                     <Button {...buttonKind('other')} loading={busy} onClick={() => void act('retry')}>
                         Retry Spec sync
                     </Button>

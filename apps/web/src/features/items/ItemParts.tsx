@@ -149,7 +149,7 @@ export function StructureSync({ item, localNote = true }: { item: Item; localNot
         <>
             {item.specSync && (
                 <Text as="span" variant="caption" tone="muted" data-spec-sync role="status">
-                    {item.specSync.warning ?? item.specSync.error ?? 'Spec waiting to save to tracker'}
+                    {item.specSync.warning ?? item.specSync.error ?? 'Publishing Spec…'}
                 </Text>
             )}
             {localNote && item.sync && item.sync.state !== 'saved' && (

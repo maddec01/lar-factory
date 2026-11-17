@@ -244,7 +244,7 @@ export function createItemDetails(
 
         const item = ticketOf(work);
         const read = !item
-            ? NO_DETAILS
+            ? { ...NO_DETAILS, body: work.number ? (record?.context ?? '') : '' }
             : readTicketDetails
               ? await readTicketDetails(item)
               : azure(item)

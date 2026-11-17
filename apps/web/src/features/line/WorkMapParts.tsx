@@ -33,7 +33,7 @@ export function MapRepo({ repo, data }: { repo: string; data: BoardData }) {
 }
 
 /** A finished part as one row of the expanded history group: its kind, title, what it followed, PR and thread when it has them. */
-export function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
+export function HistoryRow({ part, after, data }: { part: Part; after: Part[]; data: BoardData }) {
     const { item } = part;
     const picked = useItemDialogStore((state) => state.itemId === item.id);
 
@@ -51,7 +51,7 @@ export function HistoryRow({ part, after, data, home }: { part: Part; after: Par
             side={
                 <>
                     {retiredPartLabel(item)}
-                    {repoKey(item) !== home && <MapRepo repo={repoKey(item)} data={data} />}
+                    <MapRepo repo={repoKey(item)} data={data} />
                     {item.linkedPrs.map((pr) => (
                         <PullRequestRef key={pr.number} label={prLabel(pr)} />
                     ))}

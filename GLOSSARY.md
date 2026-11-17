@@ -38,10 +38,11 @@ _Avoid_: inbox, needs-you list.
 
 **Open question**:
 A request from a thread, such as a question or tool approval, that T3 holds until the user answers it. A question written in chat text is not one.
+T3's pending request puts it on Your desk and removes it when answered; an ordinary question does not also save a Needs you notice or change the work's Status.
 _Avoid_: pending input.
 
 **Needs you notice**:
-The reason work waits on the user, shown with the actions that resolve it.
+The reason work waits on the user, shown with the actions that resolve it. A question’s notice clears as soon as a current T3 read shows that request gone; unrelated notices remain.
 _Avoid_: notification, alert.
 
 **Project icon**:
@@ -82,6 +83,8 @@ _Avoid_: thread tree, thread group.
 
 **Thread activity**:
 What a thread and its agents are doing now, as T3 reports it: the newest action, its age and the working agents.
+During a failed read, the board keeps the last action for up to 15 seconds from its original read time. Cached thread
+state stays marked as cached and cannot establish that work is running or a human wait has cleared.
 _Avoid_: live status, thread progress.
 
 **Agent**:
@@ -134,6 +137,7 @@ _Avoid_: lease, token.
 
 **Build limit**:
 How many builds may work at once on one machine. A build whose PR is open is waiting on its PR and doesn't count, even while it fixes CI or review feedback. At capacity, Build arms Start after a slot frees, even with Auto-build off; its chevron offers Start now (over the limit). Auto-build starts builds only up to this number.
+Its occupancy includes builds inside Concepts and linked work. The Single-issue builds section counts only its own rows; grouped builds stay in their groups, where every project lane names its project.
 _Avoid_: build slot, concurrency setting.
 
 **Auto-build**:

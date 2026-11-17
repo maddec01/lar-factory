@@ -50,6 +50,30 @@ const reply = (
     response: Response = detailsReply(itemId),
 ) => settle(() => held.get(itemId)!(response));
 
+test('Spec publication offers Retry only after an actual failure', async () => {
+    const held = holdReads();
+
+    await mountPage();
+    await openItem('I_sample13');
+
+    const details = (await detailsReply('I_sample13').json()).details;
+    const spec = { generation: 1, pending: true, error: null, warning: null, outdated: false, held: null };
+
+    await reply(held, 'I_sample13', new Response(JSON.stringify({ details: { ...details, spec } })));
+    expect(text(inDialog('[data-spec-sync]'))).toContain('Publishing Spec…');
+    expect(text(inDialog('[data-spec-sync]'))).not.toContain('Retry Spec sync');
+    await closeItem();
+    (await import('@/services/items/items.hooks')).forgetItemDetails('I_sample13');
+    await openItem('I_sample13');
+    await reply(
+        held,
+        'I_sample13',
+        new Response(JSON.stringify({ details: { ...details, spec: { ...spec, error: 'Write failed' } } })),
+    );
+    expect(text(inDialog('[data-spec-sync]'))).toContain('Write failed');
+    expect(text(inDialog('[data-spec-sync]'))).toContain('Retry Spec sync');
+});
+
 test('a failed detail read can retry in place and recover without closing the item', async () => {
     const held = holdReads();
 
@@ -127,4 +151,44 @@ test('a reply for an item that is no longer open is ignored', async () => {
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain('Bump FFmpeg');
     expect(text(description())).toContain('Bumps FFmpeg');
     expect(text(description())).not.toContain('Owner accounts');
+});
+
+test('a merge refreshes an open item and a later completion announces Done once', async () => {
+    await mountPage();
+    await openItem('I_sample13');
+
+    const updated = (status: 'Ready to merge' | 'Done', state: 'open' | 'merged'): BoardData => ({
+        ...sample,
+        items: sample.items.map((i) =>
+            i.id === 'I_sample13'
+                ? {
+                      ...i,
+                      status,
+                      linkedPrs: [
+                          {
+                              number: 99,
+                              url: 'https://github.com/team/app/pull/99',
+                              state,
+                              isDraft: false,
+                              checks: null,
+                              mergeState: 'can merge',
+                          },
+                      ],
+                  }
+                : i,
+        ),
+    });
+
+    await push(updated('Ready to merge', 'open'));
+
+    const before = reads().length;
+
+    await push(updated('Ready to merge', 'merged'));
+    expect(reads().length).toBeGreaterThan(before);
+    expect(text(document.body)).toContain('Merged: #140');
+    await push(updated('Done', 'merged'));
+    expect(text(document.body)).toContain('Done: #140');
+    await settle(() => document.querySelector<HTMLButtonElement>('[aria-label="Dismiss: Done: #140"]')!.click());
+    await push(updated('Done', 'merged'));
+    expect(text(document.body)).not.toContain('Done: #140');
 });

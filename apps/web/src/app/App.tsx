@@ -16,7 +16,7 @@ import { useShownScope } from '@/features/filters';
 import { ItemDialog } from '@/features/item-dialog';
 import { AbandonDialog } from '@/features/items';
 import { StageLayout } from '@/features/line';
-import { T3Missing, Warnings } from '@/features/notices';
+import { CompletionNotices, T3Missing, Warnings } from '@/features/notices';
 import { EmptyState, OnboardingCards, WizardDialog } from '@/features/onboarding';
 import { SettingsDialog } from '@/features/settings';
 import { RestartConfirmation } from '@/features/updates';
@@ -61,6 +61,7 @@ export function App() {
                     {/* The design system's one toast system on every screen, above every dialog. It portals outside
                         the board, which is inert while the loading screen covers it. */}
                     <Notifications />
+                    <CompletionNotices />
                     <ItemDialog />
                     <SettingsDialog />
                     <RestartConfirmation />

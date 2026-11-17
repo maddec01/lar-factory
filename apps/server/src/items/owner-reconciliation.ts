@@ -4,6 +4,33 @@ import type { WorkRecords } from '@lar-factory/work-records';
 import { readExecutionProjection } from '../t3/execution-capabilities.ts';
 import { readRoleResult } from '../t3/role-result.ts';
 
+/** Resolve the question before publishing its request-free thread, so no stale desk card appears between reads. */
+export function reconcileOwnerQuestion(records: WorkRecords, item: Item): Item {
+    const current = ownerThreads(item)[0];
+
+    if (!current || current.observedAt || current.pendingRequest?.kind === 'brief-approval') return item;
+
+    const before = records.read(item.id);
+
+    records.reconcileUserWait(item.id, {
+        threadId: current.id,
+        ...(current.pendingRequest && { requestId: current.pendingRequest.id }),
+    });
+
+    const record = records.read(item.id);
+
+    return record.revision === before.revision
+        ? item
+        : {
+              ...item,
+              status: record.status,
+              statuses: [record.status],
+              revision: record.revision,
+              updatedAt: record.updatedAt,
+              needsYou: item.needsYou?.reason === before.needsYou ? undefined : item.needsYou,
+          };
+}
+
 /** Current T3 facts clear an old question notice; unavailable/cached activity never proves resolution. */
 export async function reconcileOwnerActivity(
     records: WorkRecords,
@@ -12,17 +39,11 @@ export async function reconcileOwnerActivity(
 ): Promise<void> {
     if (!Array.isArray(item.threads)) return;
 
-    const owners = ownerThreads(item);
-    const current = owners[0];
+    const current = ownerThreads(item)[0];
 
     if (!current || current.observedAt) return;
 
-    if (current.pendingRequest?.kind !== 'brief-approval')
-        records.reconcileUserWait(item.id, {
-            threadId: current.id,
-            ...(current.pendingRequest && { requestId: current.pendingRequest.id }),
-            running: !!current.currentRunning && !current.pendingRequest && !current.childNeedsYou,
-        });
+    reconcileOwnerQuestion(records, item);
 
     // An owner ending its turn is proof only when the entire observed family has settled.
     const ownerEnded = item.threads.every(

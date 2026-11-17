@@ -20,11 +20,13 @@ import { DependencyStatus } from './DependencyStatus';
 import { exportMarkdown } from './ExportRecord';
 import { isGroupParent } from './group-parent';
 import { SavedRunSettings } from './SavedRunSettings';
+import { SelectedReviewers } from './SelectedReviewers';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import { ActionError, buttonKind, DetailFact, FactList, InlineList, MainSection, SectionHeader } from '@/ui/board';
 
 const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Concept map', decision: 'Decision' };
+const VERDICT: Record<string, string> = { approve: 'Approved', changes: 'Changes requested', skipped: 'Not needed' };
 
 export type Exported =
     | { state: 'idle' | 'exporting' }
@@ -91,9 +93,12 @@ export function RecordText({
               )
               .map((part) => part.id)
         : [];
-    const reviewing = item.briefReviewing
-        ? item
-        : items.find((part) => pendingBriefs.includes(part.id) && part.briefReviewing);
+    const reviewing =
+        item.status === 'Done'
+            ? undefined
+            : item.briefReviewing
+              ? item
+              : items.find((part) => pendingBriefs.includes(part.id) && part.briefReviewing);
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
         record.bodyKind === 'map'
@@ -101,8 +106,16 @@ export function RecordText({
             : record.bodyKind === 'decision' && record.body && parseDecisionMethod(record.body)
               ? record.body.split('\n').slice(1).join('\n').trimStart()
               : record.body;
-    const buildPhase = item.buildPhase === undefined ? record.buildPhase : item.buildPhase;
-    const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
+    const finished = item.status === 'Done';
+    const buildPhase = finished ? null : item.buildPhase === undefined ? record.buildPhase : item.buildPhase;
+    const linkedMap = item.kind !== 'concept' && item.flow === 'linked' && record.bodyKind === 'map';
+    const plannedLinkedMap =
+        linkedMap &&
+        (item.subIssues.total > 0 ||
+            items.some((part) => part.parentId === item.id) ||
+            !!item.conceptBuild?.members.length ||
+            !!item.releasePlan);
+    const title = spec ? 'Work record' : answer ? 'Outcome' : linkedMap ? 'Linked work' : TITLE[record.bodyKind];
     // A single item's own brief waiting for approval.
     const approvable =
         !group &&
@@ -115,6 +128,7 @@ export function RecordText({
         item.status !== 'Done';
     // What the record holds besides its text: a Spec's record shows only these, under the Spec's own heading row.
     const extras =
+        finished ||
         Boolean(record.briefChangeRequests) ||
         Boolean(reviewing) ||
         (!item.setAside && pendingBriefs.length > 0) ||
@@ -143,9 +157,13 @@ export function RecordText({
                     <SectionHeader
                         heading={title}
                         empty={
-                            record.bodyKind === 'brief'
-                                ? 'No brief yet. Shaping writes it.'
-                                : `No ${title.toLowerCase()} yet.`
+                            plannedLinkedMap
+                                ? undefined
+                                : linkedMap
+                                  ? 'No delivery plan yet. Shaping writes it.'
+                                  : record.bodyKind === 'brief'
+                                    ? 'No brief yet. Shaping writes it.'
+                                    : `No ${title.toLowerCase()} yet.`
                         }
                         prose
                     />
@@ -172,19 +190,10 @@ export function RecordText({
                     <MarkdownDiagrams text={body} />
                 </Disclosure>
             )}
-            {record.reviewers && (
-                <FactList data-selected-reviewers>
-                    {record.reviewers.map((reviewer) => (
-                        <DetailFact
-                            key={reviewer.id}
-                            label={`${reviewer.name} · ${reviewer.status}`}
-                            presentation="record"
-                        >
-                            <Text>{reviewer.reason}</Text>
-                            {reviewer.result && <Text>{reviewer.result}</Text>}
-                        </DetailFact>
-                    ))}
-                </FactList>
+            {finished && (
+                <DetailFact label="Result" presentation="record" data-record-result>
+                    {item.linkedPrs.some((pr) => pr.state === 'merged') ? 'Merged' : 'Done'}
+                </DetailFact>
             )}
             {record.runSettings && <SavedRunSettings runs={record.runSettings} />}
             {buildPhase && (
@@ -192,19 +201,14 @@ export function RecordText({
                     {buildPhaseLabel(buildPhase)}
                 </DetailFact>
             )}
-            {record.reviewRounds.length > 0 && (
-                <FactList data-review-rounds>
-                    {record.reviewRounds.map((r) => (
-                        <DetailFact key={r.round} label={`Review round ${r.round}`} presentation="record">
-                            <InlineList
-                                items={r.reviewers.map(
-                                    (v) =>
-                                        `${v.axis}: ${v.verdict}${v.open > 0 ? `, ${v.open} of ${v.findings} findings open` : ''}`,
-                                )}
-                            />
-                        </DetailFact>
-                    ))}
-                </FactList>
+            {finished ? (
+                (Boolean(record.reviewers?.length) || record.reviewRounds.length > 0) && (
+                    <Disclosure label="Review history" presentation="section">
+                        <ReviewHistory record={record} />
+                    </Disclosure>
+                )
+            ) : (
+                <ReviewHistory record={record} />
             )}
             {!spec && record.context && (
                 <Disclosure label="Initial context" presentation="section">
@@ -212,5 +216,28 @@ export function RecordText({
                 </Disclosure>
             )}
         </MainSection>
+    );
+}
+
+/** Old verdicts stay inspectable after completion, without reading as unfinished work. */
+function ReviewHistory({ record }: { record: RecordDetails }) {
+    return (
+        <>
+            {record.reviewers && <SelectedReviewers reviewers={record.reviewers} />}
+            {record.reviewRounds.length > 0 && (
+                <FactList data-review-rounds>
+                    {record.reviewRounds.map((r) => (
+                        <DetailFact key={r.round} label={`Review round ${r.round}`} presentation="record">
+                            <InlineList
+                                items={r.reviewers.map(
+                                    (v) =>
+                                        `${record.reviewers?.find((reviewer) => reviewer.id === v.axis)?.name ?? v.axis}: ${VERDICT[v.verdict] ?? 'Result unavailable'}${v.open > 0 ? `, ${v.open} of ${v.findings} findings open` : ''}`,
+                                )}
+                            />
+                        </DetailFact>
+                    ))}
+                </FactList>
+            )}
+        </>
     );
 }

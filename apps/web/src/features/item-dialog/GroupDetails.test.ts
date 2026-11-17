@@ -52,7 +52,7 @@ function group(kind: 'feature' | 'concept', done: boolean): BoardData {
     return { ...sample, items: [root, ...parts] };
 }
 
-async function show(data: BoardData, body = '') {
+async function show(data: BoardData, body = '', bodyKind: 'brief' | 'map' = 'brief') {
     fetchMock.mockImplementation(async (url: string) => {
         const id = detailsRead(url);
 
@@ -60,7 +60,7 @@ async function show(data: BoardData, body = '') {
 
         const reply = await detailsReply(id).json();
 
-        reply.details.record = { bodyKind: 'brief', body, context: '', buildPhase: null, reviewRounds: [] };
+        reply.details.record = { bodyKind, body, context: '', buildPhase: null, reviewRounds: [] };
         reply.details.subTickets = [];
 
         return new Response(JSON.stringify(reply));
@@ -80,4 +80,24 @@ test('merged parts do not make a parent Delivered while a release step remains',
     expect(groupStatus()).toContain('Waiting on release step');
     expect(text($('[data-release-progress]'))).toContain('Activation pending.');
     expect(text($('[data-release-progress]'))).toContain('Pending');
+});
+
+test('a linked parent with a plan follows delivery in its Status even while its record still says Shaping', async () => {
+    const data = group('feature', false);
+    const root = data.items[0]!;
+
+    root.status = 'Shaping';
+    root.subIssues = { total: 2, completed: 1 };
+    data.items[1] = {
+        ...data.items[1]!,
+        status: 'Review',
+        state: 'open',
+        completion: { complete: false, reasons: ['PR review pending.'] },
+    };
+    await show(data, '', 'map');
+
+    expect(groupStatus()).toContain('1/2 parts done');
+    expect(groupStatus()).not.toContain('Shaping');
+    expect(text($('[data-item-dialog]'))).not.toContain('No delivery plan yet');
+    expect(text($('[data-release-progress]'))).toContain('Activation pending.');
 });

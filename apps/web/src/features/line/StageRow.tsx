@@ -151,7 +151,12 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
             : shown.word;
     const still = useActivityStill(item);
     const showsActivity =
-        n === undefined && activity && activity !== 'unavailable' && activity !== 'stopped' && activity !== 'waiting';
+        !yours &&
+        n === undefined &&
+        activity &&
+        activity !== 'unavailable' &&
+        activity !== 'stopped' &&
+        activity !== 'waiting';
     const figures = figuresOf(item, data);
     const checks = prChecks(item, data, disconnected);
     // A row at work names what runs, so its bar says something is going on even with no slices to count.
@@ -196,6 +201,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                         // What waits on you reads in the desk's amber here too, so it catches the eye on any lane.
                         <RowState title={endState}>
                             <WaitWord>{endState}</WaitWord>
+                            {activity === 'working' && <ActivityLine item={item} />}
                         </RowState>
                     ) : endState ? (
                         <RowState

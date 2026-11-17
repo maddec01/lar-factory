@@ -1,14 +1,17 @@
-import type { BoardData } from '@lar-factory/shared';
+import { deskItems, type BoardData } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
+import { join } from 'node:path';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
-import { startBoard } from './server-support.ts';
+import { changeRecords, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
+import { statsDb } from './stats-db.ts';
 
 /** An open event stream: its response and a wait for the next pushed board that passes a check. */
 async function openStream(t: TestContext, board: Board) {
@@ -74,4 +77,51 @@ test('the stream refuses a foreign Host', async (t) => {
 
     res.resume();
     assert.equal(res.statusCode, 421);
+});
+
+test('an answered T3 question leaves the desk while the tracker read is still held', { timeout: 30_000 }, async (t) => {
+    const db = statsDb(t, [{ id: 'owner', turns: [{ id: 'turn', startedAt: new Date().toISOString() }] }]);
+    const options = {
+        items: [boardIssue(12, 'Shaping')],
+        threads: { 'maddec01/lar-factory#12': ['owner'] },
+    };
+    const board = await startBoard(t, options, false, true, { T3_STATE_DB: db });
+
+    await until(board, (data) => data.firstRead.settled);
+
+    const id = board.id(12);
+
+    await changeRecords(
+        board,
+        (records) => {
+            records.waitForUser(id, records.read(id).revision, 'Which greeting?');
+        },
+        id,
+        (item) => !!item.needsYou,
+    );
+    writeFileSync(db + '.requests.json', JSON.stringify([{ turnId: 'turn', createdAt: new Date().toISOString() }]));
+    await until(board, (data) => {
+        const threads = data.items.find((item) => item.id === id)?.threads;
+
+        return Array.isArray(threads) && threads[0]?.pendingRequest?.id === 'request-0';
+    });
+
+    const release = join(board.dataDir, 'release-read');
+
+    t.onTestFinished(() => writeFileSync(release, 'release'));
+    await board.update({ ...options, readHold: release });
+    await board.untilCalled((args) => args[0] === 'read-held');
+    writeFileSync(db + '.requests.json', '[]');
+
+    const answered = await until(board, (data) => {
+        const item = data.items.find((item) => item.id === id);
+
+        return item?.status === 'Shaping' && !item.needsYou && !deskItems(data, false).some((wait) => wait.id === id);
+    });
+
+    const threads = answered.items.find((item) => item.id === id)?.threads;
+
+    assert.ok(Array.isArray(threads));
+    assert.equal(threads[0]?.pendingRequest, undefined);
+    writeFileSync(release, 'release');
 });

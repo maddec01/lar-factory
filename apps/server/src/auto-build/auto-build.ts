@@ -9,6 +9,7 @@ import {
     buildsAtWork,
     isRecord,
     ref,
+    sameRepo,
     type AutoBuildPass,
     type AutoBuildState,
     type Item,
@@ -96,7 +97,9 @@ export function createAutoBuild({
     let running: Promise<void> | null = null;
     let again = false;
     /** The builds Start build held, with why and when Auto-build may try each again. */
-    const held = new Map<string, { error: string; retryAt: number }>();
+    const held = new Map<string, { error: string; retryAt: number; access: string }>();
+    const accessOf = (item: Item) =>
+        JSON.stringify(board.snapshot().repos.find((repo) => sameRepo(repo.repo, item.repo))?.setup?.access ?? {});
 
     /** The work's current passing gate, or null when its brief has none. */
     const passingGate = (workId: string) => records!.gate(workId).passing;
@@ -297,7 +300,7 @@ export function createAutoBuild({
 
             const retry = held.get(item.id);
 
-            if (retry && retry.retryAt > now()) {
+            if (retry && retry.retryAt > now() && retry.access === accessOf(item)) {
                 buildHold ??= retry.error;
                 continue;
             }
@@ -321,6 +324,7 @@ export function createAutoBuild({
                 continue;
             }
 
+            const startAccess = accessOf(item);
             const { body } = await commands.startBuild(item.id, choice, true, {
                 automatic: !concept?.explicit,
                 ...(concept && { conceptId: concept.id }),
@@ -336,7 +340,7 @@ export function createAutoBuild({
 
             if (passes && error) {
                 log(`Auto-build held ${ref(item)}: ${error}`);
-                held.set(item.id, { error, retryAt: now() + HOLD_RETRY_MS });
+                held.set(item.id, { error, retryAt: now() + HOLD_RETRY_MS, access: startAccess });
                 buildHold ??= error;
                 continue;
             }

@@ -2,15 +2,15 @@ import type { Database } from './database.ts';
 import type { WorkRecords } from './work-records.ts';
 
 export interface UserWaitRecords {
-    reconcileUserWait(workId: string, observation: { threadId: string; requestId?: string; running: boolean }): void;
+    reconcileUserWait(workId: string, observation: { threadId: string; requestId?: string }): void;
 }
 
-/** Retain the exact observed request across restarts; ordinary activity alone cannot answer a question. */
+/** Only an authoritative observation with the same owner and no request clears that question's notice. */
 export function userWaitRecords(database: Database, get: () => WorkRecords): UserWaitRecords {
     const { db } = database;
 
     return {
-        reconcileUserWait: (workId, { threadId, requestId, running }) =>
+        reconcileUserWait: (workId, { threadId, requestId }) =>
             database.write(() => {
                 const records = get();
                 const record = records.read(workId);
@@ -18,12 +18,12 @@ export function userWaitRecords(database: Database, get: () => WorkRecords): Use
                 if (record.setAside || record.finishedAt) return;
 
                 const wait = db.prepare('SELECT * FROM owner_waits WHERE work_id=?').get(workId);
-                // A row without a request holds the Needs you the board saw while no question was open. Answering a
-                // later question must leave that one, so a question owns only a Needs you that differs from it.
-                const earlier = wait?.request_id === '' ? wait.notice : null;
 
                 if (requestId) {
-                    if (earlier !== null && record.needsYou === earlier) return;
+                    // Older question instructions saved the notice before opening T3's UI. Bind that notice
+                    // when the request appears, too; observing it one poll earlier does not make it unrelated.
+                    if (record.needsYouCauses.length || /approve.*brief|brief.*approval/i.test(record.needsYou ?? ''))
+                        return;
 
                     db.prepare(
                         'INSERT INTO owner_waits VALUES (?,?,?,?) ON CONFLICT(work_id) DO UPDATE SET thread_id=excluded.thread_id,request_id=excluded.request_id,notice=excluded.notice WHERE owner_waits.thread_id<>excluded.thread_id OR owner_waits.request_id<>excluded.request_id OR owner_waits.notice IS NOT excluded.notice',
@@ -33,17 +33,12 @@ export function userWaitRecords(database: Database, get: () => WorkRecords): Use
                 }
 
                 if (!wait || wait.request_id === '') {
-                    if (record.needsYou === null) {
-                        if (wait) db.prepare('DELETE FROM owner_waits WHERE work_id=?').run(workId);
-                    } else if (earlier !== record.needsYou)
-                        db.prepare(
-                            "INSERT INTO owner_waits VALUES (?,?,'',?) ON CONFLICT(work_id) DO UPDATE SET thread_id=excluded.thread_id,request_id='',notice=excluded.notice",
-                        ).run(workId, threadId, record.needsYou);
+                    if (wait) db.prepare('DELETE FROM owner_waits WHERE work_id=?').run(workId);
 
                     return;
                 }
 
-                if (!running || wait.thread_id !== threadId) return;
+                if (wait.thread_id !== threadId) return;
 
                 db.prepare('DELETE FROM owner_waits WHERE work_id=?').run(workId);
 

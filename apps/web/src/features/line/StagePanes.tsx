@@ -102,15 +102,15 @@ export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
     return (
         <Pane
             id="build"
-            title="Build"
+            title="Single-issue builds"
             status="In progress"
             running={rows.some((row) => running(row.item))}
             count={rows.length}
             right={<BuildLimit />}
             empty={
                 !rows.length && (
-                    <PaneEmpty filtered={build.length > 0} none="Nothing in build.">
-                        Nothing in build matches.
+                    <PaneEmpty filtered={build.length > 0} none="No single-issue builds.">
+                        No single-issue builds match.
                     </PaneEmpty>
                 )
             }

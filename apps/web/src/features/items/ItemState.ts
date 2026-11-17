@@ -8,9 +8,7 @@ import {
     buildsAtWork,
     limitNumber,
     groupState,
-    deskWait,
-    needsAnswer,
-    stoppedRunThread,
+    humanWait,
     activityLost,
     activityUnavailable,
     blockerRef,
@@ -24,6 +22,7 @@ import {
     startAfterRef,
     prReadiness,
     workingAgain,
+    publishingSpec,
 } from '@lar-factory/shared';
 import type { BoardData, Item, Status, ThreadActivityState } from '@lar-factory/shared';
 import type { StatusState } from '@lar-works/design-system';
@@ -182,8 +181,9 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
     const execution = executionOf(item, inputs);
     const stale = staleFor(inputs);
     const atWork = execution === 'working' || execution === 'quiet';
+    const human = humanWait(item, stale, inputs.all);
     const stageReadiness = prReadiness(item);
-    const readiness = atWork ? null : stageReadiness;
+    const readiness = atWork || (!human && stageReadiness?.state === 'waiting') ? null : stageReadiness;
     // The pull request merged while the record still holds an earlier stage.
     const prMerged =
         (item.status === 'In progress' || item.status === 'Review') && item.linkedPrs[0]?.state === 'merged';
@@ -201,16 +201,13 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
     const blockedWord = blockers.every((blocker) => blocker.number || blocker.dependency)
         ? `Blocked · starts after ${blockers.map((blocker) => blockerRef(item, blocker)).join(', ')}`
         : `Blocked · starts after ${(blockers.length === 1 && startAfterRef(item, inputs.all)) || plural(blockers.length, 'part')}`;
-    const stageWord = blockers.length ? blockedWord : (stageReadiness?.word ?? (prMerged ? MERGED : statusWord));
+    const stageWord = blockers.length
+        ? blockedWord
+        : (human?.label ?? readiness?.word ?? (prMerged ? MERGED : statusWord));
     const said = execution && execution !== 'starting' && execution !== 'unavailable' ? execution : undefined;
     const wait =
-        !inputs.starting &&
-        !atWork &&
-        (needsAnswer(item) ||
-            item.needsYou ||
-            (!stale && stoppedRunThread(item)) ||
-            (!readiness && ['Verify', 'Ready to merge'].includes(item.status)))
-            ? deskWait(item, stale, inputs.all).label
+        !inputs.starting && (!atWork || human?.label === 'Approve brief' || human?.label === 'Approve briefs')
+            ? human?.label
             : undefined;
     const group = groupState(
         item,
@@ -234,6 +231,7 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         item.linkedPrs[0]?.state === 'open' &&
         itemActivityThread(item)?.purpose === 'build';
     const word =
+        (publishingSpec(item) ? 'Publishing Spec…' : undefined) ??
         (slotWait ? SLOT_WAIT : undefined) ??
         (item.briefReviewing && !wait ? buildActivity(item, stale).label : undefined) ??
         group?.word ??
@@ -253,15 +251,18 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                           ? PR_WAIT
                           : statusWord)));
     // Blocked by other work is not your turn: it reads off (grey), as amber is kept for what waits on you.
-    const state: StatusState | undefined = blockers.length
-        ? 'off'
-        : said === 'waiting'
-          ? 'waiting'
-          : said === 'stopped'
-            ? 'off'
-            : atWork
-              ? undefined
-              : (readiness?.state ?? (merged ? 'ready' : undefined));
+    const state: StatusState | undefined =
+        wait && !readiness
+            ? 'waiting'
+            : blockers.length
+              ? 'off'
+              : said === 'waiting'
+                ? 'waiting'
+                : said === 'stopped'
+                  ? 'off'
+                  : atWork
+                    ? undefined
+                    : (readiness?.state ?? (merged ? 'ready' : undefined));
 
     return {
         stage: item.status,
@@ -305,7 +306,8 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         progressState: stageReadiness?.state ?? state,
         execution,
         pr: readiness,
-        word,
+        // A PR's readiness alone cannot ask for review while the desk's wait still belongs to its owner.
+        word: word.startsWith('Review PR') && !human ? PR_WAIT : word,
         stageWord,
         state,
         // At work again, its glyph and colour are a build's.

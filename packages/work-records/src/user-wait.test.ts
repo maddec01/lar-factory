@@ -23,25 +23,37 @@ async function shaping() {
 
 const earlier = 'Which tracker holds the design notes?';
 
-it('keeps a Needs you the board saw before a question appeared, with its Status, after the answer', async () => {
+it('keeps a standalone failure, a changed notice, a brief approval and another owner’s wait', async () => {
     const id = await shaping();
 
-    records.waitForUser(id, records.read(id).revision, earlier);
-    records.reconcileUserWait(id, { threadId: 'owner', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'unrelated', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', running: true });
+    records.waitForUser(id, records.read(id).revision, 'The launch failed.');
+    records.reconcileUserWait(id, { threadId: 'owner' });
+    expect(records.read(id).needsYou).toBe('The launch failed.');
 
-    expect(records.read(id)).toMatchObject({ needsYou: earlier, status: 'Needs you' });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
+    records.waitForUser(id, records.read(id).revision, 'A new failure needs attention.');
+    records.reconcileUserWait(id, { threadId: 'owner' });
+    expect(records.read(id).needsYou).toBe('A new failure needs attention.');
+
+    records.waitForUser(id, records.read(id).revision, 'Approve the brief.');
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
+    records.reconcileUserWait(id, { threadId: 'owner' });
+    expect(records.read(id).needsYou).toBe('Approve the brief.');
+
+    records.waitForUser(id, records.read(id).revision, earlier);
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
+    records.reconcileUserWait(id, { threadId: 'replacement' });
+    expect(records.read(id).needsYou).toBe(earlier);
 });
 
 it('clears a Needs you set while the question is open when that question is answered', async () => {
     const id = await shaping();
 
-    records.reconcileUserWait(id, { threadId: 'owner', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question', running: false });
+    records.reconcileUserWait(id, { threadId: 'owner' });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
     records.waitForUser(id, records.read(id).revision, 'Gold or amber?');
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', running: true });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
+    records.reconcileUserWait(id, { threadId: 'owner' });
 
     expect(records.read(id)).toMatchObject({ needsYou: null, status: 'Shaping' });
 });
@@ -50,11 +62,11 @@ it('clears a Needs you set after an earlier one while the question is open', asy
     const id = await shaping();
 
     records.waitForUser(id, records.read(id).revision, earlier);
-    records.reconcileUserWait(id, { threadId: 'owner', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question', running: false });
+    records.reconcileUserWait(id, { threadId: 'owner' });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
     records.waitForUser(id, records.read(id).revision, 'Gold or amber?');
-    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question', running: false });
-    records.reconcileUserWait(id, { threadId: 'owner', running: true });
+    records.reconcileUserWait(id, { threadId: 'owner', requestId: 'question' });
+    records.reconcileUserWait(id, { threadId: 'owner' });
 
     expect(records.read(id)).toMatchObject({ needsYou: null, status: 'Shaping' });
 });

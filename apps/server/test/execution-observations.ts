@@ -24,9 +24,12 @@ export function protocolItemThreads(threadIds: readonly string[]) {
                 parentThreadId: thread.parentThreadId ?? thread.rootThreadId,
                 rootThreadId: thread.rootThreadId,
             },
-            pendingRuntimeRequest: requests.some(
-                (request) => !request.resolvedAt && thread.turns?.some((turn) => turn.id === request.turnId),
-            ),
+            pendingRuntimeRequest:
+                requests.flatMap((request, index) =>
+                    !request.resolvedAt && thread.turns?.some((turn) => turn.id === request.turnId)
+                        ? [{ id: `request-${index}`, kind: 'user-input' }]
+                        : [],
+                )[0] ?? null,
             status: thread.turns?.some((turn) => !turn.completedAt)
                 ? 'running'
                 : (thread.turns?.at(-1)?.status ?? 'completed'),

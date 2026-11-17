@@ -476,7 +476,8 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Read subtitle-preparation.ts",
+                        "action": "Reading subtitle-preparation.ts",
+                        "actionDetail": "Read subtitle-preparation.ts",
                         "actionAt": "2026-10-21T09:58:00.000Z",
                         "toolRunning": true,
                         "agents": []
@@ -531,7 +532,8 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Edit ContinueWatchingRow.swift",
+                        "action": "Editing ContinueWatchingRow.swift",
+                        "actionDetail": "Edit ContinueWatchingRow.swift",
                         "actionAt": "2026-10-21T09:57:00.000Z",
                         "toolRunning": true,
                         "agents": []
@@ -633,7 +635,8 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Read direct-connection-options.md",
+                        "action": "Reading direct-connection-options.md",
+                        "actionDetail": "Read direct-connection-options.md",
                         "actionAt": "2026-10-21T09:48:00.000Z",
                         "toolRunning": false,
                         "agents": []
@@ -743,7 +746,8 @@
                         "agents": [
                             {
                                 "title": "Subagent",
-                                "action": "Read sign-in.tsx",
+                                "action": "Reading sign-in.tsx",
+                                "actionDetail": "Read sign-in.tsx",
                                 "actionAt": "2026-10-21T09:56:00.000Z"
                             }
                         ]
@@ -991,20 +995,23 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Read direct-connection.ts",
+                        "action": "Reading direct-connection.ts",
+                        "actionDetail": "Read direct-connection.ts",
                         "actionAt": "2026-10-21T09:57:00.000Z",
                         "toolRunning": true,
                         "agents": [
                             {
                                 "title": "Slice: direct connection negotiation",
                                 "model": "claude-opus-5-5",
-                                "action": "pnpm test",
+                                "action": "Running tests",
+                                "actionDetail": "pnpm test",
                                 "actionAt": "2026-10-21T10:00:00.000Z"
                             },
                             {
                                 "title": "Explore",
                                 "model": "claude-haiku-5-5",
-                                "action": "Read turn-server.ts",
+                                "action": "Reading turn-server.ts",
+                                "actionDetail": "Read turn-server.ts",
                                 "actionAt": "2026-10-21T09:59:00.000Z"
                             },
                             {
@@ -1120,7 +1127,8 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Edit scrubber.tsx",
+                        "action": "Editing scrubber.tsx",
+                        "actionDetail": "Edit scrubber.tsx",
                         "actionAt": "2026-10-21T09:59:00.000Z",
                         "toolRunning": true,
                         "agents": []
@@ -1260,7 +1268,8 @@
                     "activity": {
                         "available": true,
                         "readAt": "2100-01-01T00:00:00.000Z",
-                        "action": "Edit transcoder-cancel.ts",
+                        "action": "Editing transcoder-cancel.ts",
+                        "actionDetail": "Edit transcoder-cancel.ts",
                         "actionAt": "2026-10-21T09:40:00.000Z",
                         "toolRunning": false,
                         "agents": []

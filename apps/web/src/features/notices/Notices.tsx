@@ -2,6 +2,7 @@ import type { Item, StartedThread, Status } from '@lar-factory/shared';
 import { abandonPrompt, closeTicketPrompt, ref, threadLink } from '@lar-factory/shared';
 import { ButtonLink } from '@lar-works/design-system';
 
+import { ActionToast } from './ActionToast';
 import { AddedNotice, ViewButton } from './AddedNotice';
 import { SLOT } from './notice-slot';
 import { showToast } from './ToastActions';
@@ -19,6 +20,7 @@ export type Notice =
     | { verb: 'Abandoned'; item: Item }
     /** The ticket of work Abandon set aside closed. */
     | { verb: 'Closed'; item: Item }
+    | { verb: 'Merged' | 'Done'; item: Item }
     /** A Queued card's Move to List (`to`), Abandon, the ticket close after it (`ticket`) or a Reconcile group start (`reconcile`) failed. */
     | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; reconcile?: true; message: string }
     | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
@@ -72,6 +74,17 @@ function toastOf(notice: Notice): Toast {
                     `[data-${notice.reconcile ? 'reconcile-group' : notice.startError ? 'start' : notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`,
                 ],
             };
+        case 'Merged':
+        case 'Done':
+            return {
+                slot: `completion-${item.id}`,
+                what: `${notice.verb}: ${ref(item)}`,
+                body: (
+                    <ActionToast>
+                        {notice.verb}: <TitleLink item={item} />. <ViewButton item={item} />
+                    </ActionToast>
+                ),
+            };
         case 'Started': {
             const environment = useBoardStore.getState().data.t3EnvironmentId;
 
@@ -79,14 +92,14 @@ function toastOf(notice: Notice): Toast {
                 slot: SLOT,
                 what: `started ${ref(item)}`,
                 body: (
-                    <>
+                    <ActionToast>
                         {notice.kind === 'build' ? 'Build' : 'Refining'} started for {ref(item)}.{' '}
                         {environment && (
                             <ButtonLink {...buttonKind('open')} href={threadLink(environment, notice.thread.threadId)}>
                                 Open thread
                             </ButtonLink>
                         )}
-                    </>
+                    </ActionToast>
                 ),
             };
         }
@@ -98,10 +111,10 @@ function toastOf(notice: Notice): Toast {
                 slot: SLOT,
                 what: `${notice.verb} ${ref(item)}`,
                 body: (
-                    <>
+                    <ActionToast>
                         {notice.verb} <TitleLink item={item} /> to {destination(notice.to)}.{' '}
                         {<ViewButton item={item} />}
-                    </>
+                    </ActionToast>
                 ),
             };
     }

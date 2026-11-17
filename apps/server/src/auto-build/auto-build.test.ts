@@ -306,3 +306,23 @@ test('two boards sharing a data folder start a build once', async () => {
     await other.pass();
     assert.ok(other.started.includes(next), 'a board that stopped hands Auto-build over');
 });
+
+test('successful access recheck ends a cached access hold before its retry delay', async () => {
+    const s = await setUp();
+    const id = ready(s.records, 'Access recovery');
+
+    s.reread();
+    s.answers.set(id, { status: 409, body: { hold: true, error: 'push-branch access is unchecked. Recheck access.' } });
+    await s.pass();
+    assert.match(pass(s)!.hold!, /unchecked/);
+    s.answers.delete(id);
+    s.board.update({
+        repos: [
+            { repo: REPO, setup: { access: { 'push-branch': 'allowed', 'open-pr': 'allowed' } } },
+        ] as BoardData['repos'],
+    });
+    await s.pass();
+    assert.equal(pass(s)!.hold, undefined);
+    assert.equal(s.records.read(id).status, 'In progress');
+    await s.stop();
+});

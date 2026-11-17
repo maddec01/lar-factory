@@ -22,7 +22,7 @@ afterEach(() => {
 async function fixture(
     instanceId = 'codex',
     effort: string | null = 'high',
-    { earlier = false, kind = 'build' as 'shaping' | 'build' } = {},
+    { earlier = false, kind = 'build' }: { earlier?: boolean; kind?: 'build' | 'shaping' } = {},
 ) {
     const dir = mkdtempSync(join(tmpdir(), "lar-role-O'Brien-"));
     const records = await openWorkRecords(workRecordsPath(dir));
@@ -41,7 +41,11 @@ async function fixture(
     });
     writeFactorySettings(settings, dir);
 
-    const { workId } = records.create({ title: 'Role command fixture', repository: 'test/repo', kind: 'build' });
+    const { workId } = records.create({
+        title: 'Role command fixture',
+        repository: 'test/repo',
+        kind: kind === 'shaping' ? 'concept' : 'build',
+    });
 
     records.snapshotRun(workId, records.read(workId).revision, {
         runId: 'frozen-run',
@@ -379,6 +383,86 @@ const reported = (overrides: Record<string, unknown> = {}) => ({
     hasPendingChildRuns: false,
     ...overrides,
 });
+
+it('recovers a grouped brief review on the shaping run owner while keeping each child review separate', async () => {
+    const f = await fixture('codex', 'high', { kind: 'shaping' });
+    const children = ['producer', 'consumer'].map((name) =>
+        f.records.createPart({
+            parentId: f.workId,
+            parentRevision: f.records.read(f.workId).revision,
+            title: name,
+            repository: `test/${name}`,
+            kind: 'build',
+            body: `## What\nDeliver the ${name} part.`,
+            blockerIds: [],
+        }),
+    );
+    const child = children[0]!;
+    const before = f.records.read(child.workId);
+    const input = join(f.dir, 'attempt.json');
+
+    writeFileSync(input, JSON.stringify({ runId: 'frozen-run', executionId: 'wrong-owner', role: 'doubt' }));
+
+    // Both public launch paths reject a parent's run paired with a child work ID.
+    const refused = [
+        f.processCli([
+            'role-launch',
+            child.workId,
+            '--run-id',
+            'frozen-run',
+            '--role',
+            'doubt',
+            '--capabilities',
+            f.capabilities,
+            '--task',
+            f.task,
+        ]),
+        f.processCli(['start-role-run', child.workId, '--revision', String(before.revision), '--file', input]),
+    ];
+
+    for (const result of refused) {
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toContain(`No run frozen-run belongs to ${child.workId}.`);
+    }
+    expect(f.records.read(child.workId)).toEqual(before);
+    expect(f.records.runSettings(f.workId).roleRuns).toEqual([]);
+
+    // Retry with the supplied runtime's owner, carrying both exact review packages.
+    const packages = children.map(({ workId }) => f.records.doubtPackage(workId));
+
+    writeFileSync(f.task, JSON.stringify(packages));
+
+    const launched = await f.launch('doubt');
+
+    expect(launched.status).toBe(0);
+
+    const args = JSON.parse(launched.stdout);
+
+    expect(args.task).toContain(`work ID ${f.workId}; run ID frozen-run`);
+    expect(args.task).toContain(`Read ${f.shape} first`);
+    expect(args.task).toContain(JSON.stringify(packages));
+    expect(args.target).toEqual({
+        providerInstanceId: 'codex',
+        model: 'configured',
+        options: { reasoningEffort: 'high' },
+    });
+    expect((await f.finish(args.clientRequestId, reported())).status).toBe(0);
+    expect(f.records.runSettings(f.workId).roleRuns).toEqual([
+        expect.objectContaining({ workId: f.workId, runId: 'frozen-run', role: 'doubt', result: 'completed' }),
+    ]);
+
+    for (const pack of packages) {
+        f.records.recordDoubt(pack.workId, pack.packageDigest, args.clientRequestId, 'Clean fixture review.');
+        expect(f.records.currentDoubt(pack.workId)).toMatchObject({
+            identity: args.clientRequestId,
+            packageDigest: pack.packageDigest,
+        });
+        expect(f.records.runSettings(pack.workId)).toEqual({ workId: pack.workId, runs: [], roleRuns: [] });
+        expect(f.records.read(pack.workId).needsYou).toBeNull();
+    }
+    expect(f.records.read(f.workId).needsYou).toBeNull();
+}, 30_000);
 
 it('configured child roles preserve the skill stage owner', async () => {
     const f = await fixture();

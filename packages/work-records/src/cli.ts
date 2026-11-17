@@ -88,11 +88,12 @@ Parent release records, local only
   record-outcome-check <work-id> --revision N --result passed|failed --identity person --evidence proof [--input-digest digest]
                                     Record the final observable check after release steps.
 
-Post-merge retro
+Retro, settled before merge
   retro <work-id>                  Read suggestions, the board choice and capture receipts.
   propose-retro <work-id> --revision N --file F
-                                    After confirmed merge/Done, save [{title,description,
+                                    At handback, before merge, save [{title,description,
                                     repository,kind}] (bug/feature/improvement), or [].
+                                    Refused once the delivery PR is observed merged.
                                     Only board buttons choose and create follow-ups.
 
 Validation records, local only and requiring no revision

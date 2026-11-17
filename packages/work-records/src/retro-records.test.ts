@@ -54,23 +54,21 @@ test('retro requires both Done and confirmation of the recorded delivery PR merg
         expect(() => s.records.prepareRetro(s.id)).toThrow(/confirmed merge/);
     }
     s.merge();
-    expect(s.records.prepareRetro(s.id)?.delivery.threadId).toBe('build-thread');
+    expect(s.records.prepareRetro(s.id)?.delivery?.threadId).toBe('build-thread');
     expect(s.records.setBuildPhase(s.id, s.at(), 'retro').status).toBe('Done');
 });
 
-test('one complete proposal and board choice persist across connections with stable capture IDs', async () => {
+test('a build proposes its own retro before merge and the board takes the choice before merge', async () => {
     const s = await setup();
 
-    s.merge();
-
-    const prepared = s.records.prepareRetro(s.id)!;
-
-    expect(s.records.read(s.id)).toMatchObject({ status: 'Done', buildPhase: 'retro' });
-
-    expect(s.records.prepareRetro(s.id)).toEqual(prepared);
+    s.records.observe(s.id, s.at(), { of: 'pr', state: 'open' });
 
     const proposal = s.records.proposeRetro(s.id, s.at(), suggestions);
 
+    expect(proposal).toMatchObject({ pr: 'owner/repo#1', suggestions, choice: null });
+    expect(proposal.delivery).toBeUndefined();
+    expect(s.records.read(s.id).status).toBe('Ready to merge');
+    expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toEqual(proposal);
     expect(() => s.records.chooseRetro(s.id, s.at() - 1, [], 'Pedro')).toThrow(/revision|changed/i);
     for (const invalid of [[-1], [1], [0, 0], ['0']])
         expect(() => s.records.chooseRetro(s.id, s.at(), invalid as number[], 'Pedro')).toThrow(/listed/);
@@ -79,33 +77,57 @@ test('one complete proposal and board choice persist across connections with sta
     expect(() => s.records.chooseRetro(s.id, s.at(), [], 'Pedro')).toThrow(/awaiting/);
     expect(() => s.records.proposeRetro(s.id, s.at(), [])).toThrow(/already recorded/);
 
+    const captured = s.records.retro(s.id)!;
+
+    captured.captures[0]!.complete = true;
+    s.records.saveRetro(s.id, captured);
+
     const reopened = await openWorkRecords(join(s.dir, 'work.db'));
 
     try {
         expect(reopened.retro(s.id)).toMatchObject({
             suggestions,
-            captures: proposal.captures,
+            captures: [{ ...proposal.captures[0], complete: true }],
             choice: { selected: [0], by: 'Pedro' },
         });
-        expect(reopened.read(s.id).status).toBe('Done');
     } finally {
         reopened.close();
     }
 });
 
-test('retention cannot hide or delete an unanswered retro choice', async () => {
+test('propose and choose refuse once the delivery PR is observed merged', async () => {
     const s = await setup();
 
-    s.merge();
-
-    const retention = { hideAfterDays: 0, deleteAfterDays: 0 };
-    const later = new Date(Date.now() + 86400000);
-
-    expect(s.records.hidden(retention, later)).toEqual([]);
-    s.records.prepareRetro(s.id);
     s.records.proposeRetro(s.id, s.at(), suggestions);
-    expect(s.records.hidden(retention, later)).toEqual([]);
-    expect(s.records.deleteExpired(retention, later)).toMatchObject({ deleted: [], kept: [{ workId: s.id }] });
-    s.records.chooseRetro(s.id, s.at(), [], 'Pedro');
-    expect(s.records.hidden(retention, later).map((r) => r.workId)).toEqual([s.id]);
+    s.merge();
+    expect(() => s.records.chooseRetro(s.id, s.at(), [0], 'Pedro')).toThrow(/merged/);
+
+    const late = await setup();
+
+    late.merge();
+    expect(() => late.records.proposeRetro(late.id, late.at(), suggestions)).toThrow(/merged/);
+    expect(late.records.retro(late.id)).toBeNull();
+
+    const moved = await setup();
+
+    moved.records.proposeRetro(moved.id, moved.at(), suggestions);
+    moved.records.setPullRequest(moved.id, moved.at(), 'owner/repo#2');
+    moved.records.observe(moved.id, moved.at(), { of: 'pr', state: 'merged' });
+    expect(moved.records.retro(moved.id)?.pr).toBe('owner/repo#1');
+    expect(() => moved.records.chooseRetro(moved.id, moved.at(), [0], 'Pedro')).toThrow(/merged/);
+});
+
+test('a stored retro that still carries its thread delivery keeps parsing and takes a proposal', async () => {
+    const s = await setup();
+    const legacy = {
+        pr: 'owner/repo#1',
+        suggestions: null,
+        choice: null,
+        captures: [],
+        delivery: { threadId: 'build-thread', commandId: 'command', messageId: 'message', sent: true, error: null },
+    };
+
+    s.records.saveRetro(s.id, legacy);
+    expect(s.records.retro(s.id)).toEqual(legacy);
+    expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toMatchObject({ suggestions, delivery: legacy.delivery });
 });

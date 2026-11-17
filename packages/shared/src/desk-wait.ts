@@ -86,9 +86,6 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.briefApproval && !inBatch)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
 
-    if (retroWaits(item.retro))
-        return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
-
     if (pendingPedroReleaseStep(item.releasePlan))
         return { label: 'Release step', action: { kind: 'details' as const, label: 'Mark release step done' } };
 
@@ -130,6 +127,9 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (blocker) return blocker;
 
     if (item.status === 'Verify') return { label: 'Verify build', action: nextAction(item) };
+
+    if (retroWaits(item.retro, item.status))
+        return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
 
     // Until its PR can merge, the wait is the review its button opens, in the row's words.
     if (item.status === 'Ready to merge')

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vite-plus/test';
 import { checkBriefScope, scopeMarkdown, type BriefScope } from './brief-scope.ts';
 
 const scope: BriefScope = {
-    files: ['cli.js', 'test/cli.test.js'],
     tests: ['Named/default/padded input, ignored extras: exact subprocess stdout, stderr and exit status.'],
     behaviour: ['Greet the first argument with the existing API; default to world.'],
     excluded: ['No README examples, dependencies or follow-ups.'],
@@ -15,7 +14,7 @@ describe('brief scope comparison', () => {
     it('preserves exact scope while allowing ordinary handover prose and harmless formatting', () => {
         const brief = `## What\nCLI greeting\n${scopeMarkdown(scope)}\n## Confirmed\nThe API stays unchanged.\n## Domain docs\nnone\n`;
 
-        expect(checkBriefScope(scope, brief.replace('- cli.js', '* cli.js'))).toMatchObject({
+        expect(checkBriefScope(scope, brief.replace('- No README', '* No README'))).toMatchObject({
             ok: true,
             missing: [],
             extra: [],
@@ -32,8 +31,6 @@ describe('brief scope comparison', () => {
         expect(result.ok).toBe(false);
         expect(result.missing).toEqual(
             expect.arrayContaining([
-                { field: 'scope.files', value: 'cli.js' },
-                { field: 'scope.files', value: 'test/cli.test.js' },
                 { field: 'scope.size', value: 'Small' },
                 { field: 'done when.tests', value: scope.tests[0] },
                 { field: 'verify', value: 'no' },
@@ -45,13 +42,11 @@ describe('brief scope comparison', () => {
         ]);
     });
 
-    it('counts explicit file declarations elsewhere in the brief as scope too', () => {
-        const brief = `${scopeMarkdown(scope)}\n## Notes for the builder\nFiles: \`README.md\``;
+    it('renders no Files heading and passes an older brief that still lists files', () => {
+        const rendered = scopeMarkdown(scope);
+        const older = `${rendered.replace('## Scope\n', '## Scope\n### Files\n- cli.js\n')}\n## Notes for the builder\nFiles: \`README.md\``;
 
-        expect(checkBriefScope(scope, brief)).toMatchObject({
-            ok: false,
-            missing: [],
-            extra: [{ field: 'scope.files', value: 'README.md' }],
-        });
+        expect(rendered).not.toContain('### Files');
+        expect(checkBriefScope(scope, older)).toMatchObject({ ok: true, missing: [], extra: [] });
     });
 });

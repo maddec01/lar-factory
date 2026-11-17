@@ -61,7 +61,6 @@ test('S05 R2-002: a mismatched brief stays held until its replacement has curren
         work.workId,
         records.read(work.workId).revision,
         {
-            files: [],
             tests: [],
             behaviour: ['Read v2.'],
             excluded: [],

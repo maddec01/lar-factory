@@ -18,7 +18,6 @@ afterEach(() => {
 });
 
 const scopeFor = (index: number): BriefScope => ({
-    files: [`src/part-${index}.ts`],
     tests: [],
     behaviour: [`Complete brief ${index}.`],
     excluded: [],

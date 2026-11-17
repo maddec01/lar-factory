@@ -179,6 +179,16 @@ it('keeps the gate of a brief approved before the upgrade with ordering reasons 
         review.reviewId,
     );
     db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=?').run(v3, client);
+
+    // A confirmation saved before shaping stopped recording files.
+    const confirmed = JSON.parse(
+        String(db.prepare('SELECT content FROM confirmed_scopes WHERE work_id=?').get(client)!.content),
+    );
+
+    db.prepare('UPDATE confirmed_scopes SET content=? WHERE work_id=?').run(
+        JSON.stringify({ ...confirmed, scope }),
+        client,
+    );
     db.close();
 
     const upgraded = await openWorkRecords(path);
@@ -186,6 +196,7 @@ it('keeps the gate of a brief approved before the upgrade with ordering reasons 
     opened.push({ records: upgraded, dir });
     expect(upgraded.currentDoubt(client)).toMatchObject({ dependencyVersion: 4, evidence: 'Clean.' });
     expect(upgraded.gate(client).current).toBe(true);
+    expect(upgraded.confirmedScope(client)?.scope).not.toHaveProperty('files');
 });
 
 it('marks a stale review from before version 4 checked, keeping it and its gate stale', async () => {

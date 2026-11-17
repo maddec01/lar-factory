@@ -4,7 +4,6 @@ import { parseBriefScope } from './brief-scope.ts';
 import { chooseStructure } from './choose-structure.ts';
 
 const base = {
-    files: [],
     tests: [],
     behaviour: ['Deliver the greeting.'],
     excluded: [],

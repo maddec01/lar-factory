@@ -11,7 +11,6 @@ import { openWorkRecords, type WorkRecords } from './work-records.ts';
 const dirs: string[] = [];
 const stores: WorkRecords[] = [];
 const scope: BriefScope = {
-    files: ['cli.js', 'test/cli.test.js'],
     tests: ['`test/cli.test.js`: Named/default/trimmed input and ignored extras.'],
     behaviour: ['Use greet(argv[2]); preserve the existing API.'],
     excluded: ['No README examples or dependencies.'],
@@ -98,6 +97,15 @@ it('captures understanding once, persists across CLI runs and renders without re
     expect((await f.cli('confirmed-scope', f.id, '--markdown')).stdout).toBe(scopeMarkdown(scope));
 }, 15000);
 
+it('saves a scope without files when confirm-scope gets an old files key', async () => {
+    const f = await fixture();
+
+    writeFileSync(f.file, JSON.stringify({ files: ['cli.js'], ...scope }));
+    expect((await f.confirm()).code).toBe(0);
+    expect(f.records.confirmedScope(f.id)?.scope).toEqual(scope);
+    expect(f.records.confirmedScope(f.id)?.scope).not.toHaveProperty('files');
+}, 15000);
+
 it('fails closed without confirmation and reports missing/extra scope with a failing exit code', async () => {
     const f = await fixture();
 
@@ -179,7 +187,7 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
         evidence: 'yes',
     });
     expect(f.records.gate(f.id).current).toBe(true);
-    writeFileSync(f.file, JSON.stringify({ ...scope, files: [...scope.files, 'README.md'] }));
+    writeFileSync(f.file, JSON.stringify({ ...scope, excluded: [...scope.excluded, 'No new flags.'] }));
 
     const reviewed = f.records.doubtPackage(f.id);
 
@@ -193,7 +201,7 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
     expect(f.records.gate(f.id)).toMatchObject({ current: false, evidence: [expect.any(Object)] });
     expect(f.records.currentDoubt(f.id)).toBeNull();
     expect(f.records.doubtPackage(f.id).packageDigest).not.toBe(reviewed.packageDigest);
-    expect(f.records.briefScopeCheck(f.id).missing).toContainEqual({ field: 'scope.files', value: 'README.md' });
+    expect(f.records.briefScopeCheck(f.id).missing).toContainEqual({ field: 'scope.excluded', value: 'No new flags.' });
     expect(() => f.records.writeRevision(f.id, before, ['confirmedScope'])).toThrow(
         'conflicting fields: confirmedScope',
     );

@@ -3,7 +3,7 @@
 import type { ModelSelection } from './board-domain.ts';
 import { type Item } from './domain.ts';
 import { itemName } from './presentation.ts';
-import { frozenBuildMethodLine, type RunSettings } from './run-settings.ts';
+import { frozenBuildMethodLine, frozenRetroLine, type RunSettings } from './run-settings.ts';
 
 export interface FactoryThreadContext {
     dataDir: string;
@@ -106,6 +106,7 @@ export function runSettingsMessage(run: RunSettings): string {
         'Factory run contract: read shared/orchestration.md in the supplied factory skill before doing work.',
         `Run settings (pass this exact block and the factory environment to every child and handoff): ${JSON.stringify({ workId: run.workId, runId: run.runId, kind: run.kind, testRuntime: run.testRuntime, thread: run.thread, roles: run.roles })}`,
         frozenBuildMethodLine(run),
+        frozenRetroLine(run),
         `Before work, export LAR_FACTORY_RUN_ID=${run.runId}; carry it to every child and handoff so run-test uses this frozen runtime.`,
         'Verify this thread with t3_thread_configure before work; hold on a model/option mismatch. Every role uses delegate_task and the frozen role target, including inherited targets.',
         'Read lar-work run-settings WORK_ID --run-id RUN_ID for frozen reviewer instructions. select-reviewers must use --run-id RUN_ID; record-review-round must carry runId and selection evidence.',

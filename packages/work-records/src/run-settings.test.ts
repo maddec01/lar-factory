@@ -1,5 +1,10 @@
 import { defaultFactorySettings, FACTORY_ROLES, type FactorySettings } from '@lar-factory/shared/factory-settings';
-import { frozenBuildMethodLine, type RoleRunFinish, type SnapshotRunInput } from '@lar-factory/shared/run-settings';
+import {
+    frozenBuildMethodLine,
+    frozenRetroLine,
+    type RoleRunFinish,
+    type SnapshotRunInput,
+} from '@lar-factory/shared/run-settings';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -159,6 +164,34 @@ it('prints Prove it for a run frozen with it, and TDD for a run saved before Bui
     expect(
         frozenBuildMethodLine(records.snapshotRun(workId, revision(), { ...input('run-2'), buildMethod: 'prove-it' })),
     ).toBe('Frozen build method: Prove it');
+});
+
+it('freezes the factory-wide Retro setting, on by default, and keeps it after the setting changes', async () => {
+    const { dir, records, workId, revision } = await fixture();
+    const on = records.snapshotRun(workId, revision(), input('run-1'));
+
+    expect(frozenRetroLine(on)).toBe('Frozen retro: on');
+    writeFactorySettings({ ...defaultFactorySettings(), retro: false }, dir);
+    expect(frozenRetroLine(records.snapshotRun(workId, revision(), input('run-1')))).toBe('Frozen retro: on');
+    expect(frozenRetroLine(records.snapshotRun(workId, revision(), input('run-2')))).toBe('Frozen retro: off');
+});
+
+it('reads a run saved before the Retro setting as on', async () => {
+    const { dir, records, workId, revision } = await fixture();
+    const saved = records.snapshotRun(workId, revision(), input('run-1'));
+    const { retro: _, ...settings } = saved.settings;
+    const database = await openDatabase(workRecordsPath(dir));
+
+    try {
+        database.db
+            .prepare('INSERT INTO run_settings(work_id,run_id,content) VALUES (?,?,?)')
+            .run(workId, 'legacy', JSON.stringify({ ...saved, runId: 'legacy', settings }));
+    } finally {
+        database.close();
+    }
+
+    expect(records.runSettings(workId, 'legacy').runs[0]!.settings).not.toHaveProperty('retro');
+    expect(frozenRetroLine(records.runSettings(workId, 'legacy').runs[0]!)).toBe('Frozen retro: on');
 });
 
 it('captures only once; later edits, retry, handoff and reopening keep the snapshot, while the next run sees edits', async () => {

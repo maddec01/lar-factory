@@ -640,4 +640,24 @@ export const MIGRATIONS: readonly Migration[] = [
             "ALTER TABLE dependencies ADD COLUMN proof_state TEXT NOT NULL DEFAULT 'pending' CHECK(proof_state IN ('pending','submitted','insufficient'))",
         ),
     reduceBlockers,
+    // Runs inserted from here on are new: their threads get one runtime block and their launches record skill entries.
+    (db) =>
+        db.exec(`
+    CREATE TABLE IF NOT EXISTS new_runs (
+      work_id TEXT NOT NULL, run_id TEXT NOT NULL,
+      PRIMARY KEY(work_id, run_id),
+      FOREIGN KEY(work_id, run_id) REFERENCES run_settings(work_id, run_id) ON DELETE CASCADE
+    ) STRICT;
+    CREATE TRIGGER IF NOT EXISTS mark_new_run AFTER INSERT ON run_settings BEGIN
+      INSERT INTO new_runs(work_id, run_id) VALUES (NEW.work_id, NEW.run_id);
+    END;
+    CREATE TABLE IF NOT EXISTS run_launches (
+      work_id TEXT NOT NULL, run_id TEXT NOT NULL, execution_id TEXT NOT NULL, content TEXT NOT NULL,
+      PRIMARY KEY(work_id, execution_id),
+      FOREIGN KEY(work_id, run_id) REFERENCES run_settings(work_id, run_id) ON DELETE CASCADE
+    ) STRICT;
+    CREATE TRIGGER IF NOT EXISTS immutable_run_launches BEFORE UPDATE ON run_launches BEGIN
+      SELECT RAISE(ABORT, 'Run launches are immutable');
+    END;
+  `),
 ];

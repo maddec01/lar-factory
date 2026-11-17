@@ -35,6 +35,15 @@ export const frozenBuildMethodLine = (run: Pick<RunSettings, 'buildMethod'>): st
 export const frozenRetroLine = (run: Pick<RunSettings, 'settings'>): string =>
     `Frozen retro: ${run.settings.retro === false ? 'off' : 'on'}`;
 
+/** The runtime blocks' Azure read-only export and notice, when every Azure DevOps organization is read-only. */
+export const azureReadOnlyLines = (readOnly: boolean | undefined): string[] =>
+    readOnly
+        ? [
+              "export LAR_FACTORY_AZURE_READ_ONLY='1'",
+              'All Azure DevOps organizations are read-only. Never launch Azure implementation or write through another tool.',
+          ]
+        : [];
+
 export interface SnapshotRunInput {
     /** Stable across retries and handoff; use a new ID only for a new logical run. */
     runId: string;
@@ -81,6 +90,30 @@ export interface RunSettings {
     release?: string;
     /** The project's Build method the run started with; absent on runs saved before Build methods, which are TDD. */
     buildMethod?: BuildMethod;
+}
+
+/** The skill entries a launch sends, by skill name. */
+export interface SkillEntries {
+    'lar-shape': string;
+    'lar-build': string;
+}
+
+/**
+ * What one launch of a run resolved and sent its thread, keyed by the thread's execution. Only the board server records
+ * it; no agent command input can name these paths.
+ */
+export interface RunLaunch {
+    runId: string;
+    executionId: string;
+    skillEntries: SkillEntries;
+    /** The folder holding the launch's `lar-work`. */
+    bin: string;
+}
+
+/** A run's recorded launches, oldest first. `newRun` is false for runs saved before launches were recorded. */
+export interface RunLaunches {
+    newRun: boolean;
+    launches: RunLaunch[];
 }
 
 export interface RoleRunInput {

@@ -146,7 +146,8 @@ Run settings, local only
                                     Record the attempt and print delegate_task arguments.
                                     F is T3 orchestrator_capabilities JSON (search omitted
                                     models first); task is the role's brief as text.
-                                    Uses the supplied LAR_FACTORY_{BIN,SHAPE_SKILL,BUILD_SKILL}
+                                    Names the skill entries and CLI of the run's latest board
+                                    launch, else of the LAR_FACTORY_{BIN,SHAPE_SKILL,BUILD_SKILL}
                                     environment. Optional --execution-id reuses an attempt;
                                     --isolation shared|worktree overrides the role default.
   role-finish <work-id> --execution-id ID [--file F]

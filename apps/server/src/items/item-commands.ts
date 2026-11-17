@@ -24,7 +24,6 @@ import {
     reconcileMessage,
     sameRepo,
     workMessage,
-    runSettingsMessage,
 } from '@lar-factory/shared';
 import type {
     BoardData,
@@ -858,14 +857,25 @@ export function createItemCommands({
 
         const evidence = records!.runSettings(item.id).roleRuns.find((run) => run.executionId === intent.intentId);
         const snapshot = evidence && records!.runSettings(item.id, evidence.runId).runs[0]!;
-        // The launch built its message from the run's release, so recovery rebuilds it the same way.
-        const context = contextFor(snapshot?.release);
-        // An intent recorded before thread names carried a phase started its thread with the earlier message.
-        const messages = (
+        const launches = snapshot && records!.runLaunches(item.id, snapshot.runId);
+        const recorded = launches?.launches.find((launch) => launch.executionId === intent.intentId);
+        // The launch built its message from the paths it recorded, else from the run's release, so recovery rebuilds it the same way.
+        const context: FactoryThreadContext = {
+            ...contextFor(snapshot?.release),
+            ...(recorded && {
+                bin: recorded.bin,
+                shapeSkill: recorded.skillEntries['lar-shape'],
+                buildSkill: recorded.skillEntries['lar-build'],
+            }),
+            ...(snapshot && { run: snapshot, earlier: !launches!.newRun }),
+        };
+        // An intent recorded before thread names carried a phase started its thread with the earlier message; one with
+        // no run may have started either runtime block.
+        const messages = (snapshot ? [context] : [context, { ...context, earlier: true }]).flatMap((form) =>
             intent.purpose === PURPOSES.startedBuilds
-                ? [buildMessage(item, context), earlierBuildMessage(item, context)]
-                : [workMessage(item, context), earlierWorkMessage(item, context), reconcileMessage(item, context)]
-        ).map((message) => (snapshot ? `${message}\n\n${runSettingsMessage(snapshot)}` : message));
+                ? [buildMessage(item, form), earlierBuildMessage(item, form)]
+                : [workMessage(item, form), earlierWorkMessage(item, form), reconcileMessage(item, form)],
+        );
 
         return track(
             settling,
@@ -1074,6 +1084,7 @@ export function createItemCommands({
         }
 
         let run: Awaited<ReturnType<typeof prepareRunLaunch>> | undefined;
+        let context: FactoryThreadContext;
         let message: string;
 
         // The message is built after the run is saved, so it reads the skills of the release the run froze.
@@ -1094,9 +1105,8 @@ export function createItemCommands({
                     runLaunchDeps,
                 );
 
-            message = messageFor(contextFor(run?.snapshot.release));
-
-            if (run) message += `\n\n${run.message}`;
+            context = { ...contextFor(run?.snapshot.release), ...(run && { run: run.snapshot, earlier: run.earlier }) };
+            message = messageFor(context);
 
             if (stagedRecovery) stagedRecovery = { ...stagedRecovery, message };
         } catch (error) {
@@ -1135,12 +1145,22 @@ export function createItemCommands({
         if (intent.buildInput)
             message += `\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(intent.buildInput)}`;
 
-        if (run)
+        if (run) {
             records.startRoleRun(item.id, records.read(item.id).revision, {
                 runId: run.snapshot.runId,
                 executionId: intent.intentId,
                 role: 'thread',
             });
+
+            // Role launches read the latest launch's paths, so its thread and their children name the same skills.
+            if (!run.earlier)
+                records.recordRunLaunch(item.id, {
+                    runId: run.snapshot.runId,
+                    executionId: intent.intentId,
+                    skillEntries: { 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill },
+                    bin: context.bin,
+                });
+        }
 
         asking.add(intent.intentId);
 

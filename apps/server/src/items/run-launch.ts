@@ -1,4 +1,4 @@
-import { runSettingsMessage, type FactoryThreadContext, type Item, type ModelChoice } from '@lar-factory/shared';
+import type { FactoryThreadContext, Item, ModelChoice } from '@lar-factory/shared';
 import { executionTarget, type ExecutionModel } from '@lar-factory/shared/execution-target';
 import { BUILTIN_REVIEWERS } from '@lar-factory/shared/factory-settings';
 import type { BuildMethod, SnapshotRunInput } from '@lar-factory/shared/run-settings';
@@ -71,7 +71,8 @@ export async function prepareRunLaunch(
     try {
         const selection = executionTarget(snapshot.thread, await deps.models());
 
-        return { snapshot, selection, message: runSettingsMessage(snapshot) };
+        // A run saved before launches were recorded keeps its earlier thread message on every retry.
+        return { snapshot, selection, earlier: !records.runLaunches(item.id, snapshot.runId).newRun };
     } catch (error) {
         const failure = (error as Error).message;
         const executionId = randomUUID();

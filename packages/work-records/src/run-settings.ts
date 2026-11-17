@@ -4,6 +4,8 @@ import type {
     RoleRun,
     RoleRunFinish,
     RoleRunInput,
+    RunLaunch,
+    RunLaunches,
     RunSettings,
     SnapshotRunInput,
 } from '@lar-factory/shared/run-settings';
@@ -24,6 +26,9 @@ export interface RunSettingsRecords {
     runSettings(workId: string, runId?: string): { workId: string; runs: RunSettings[]; roleRuns: RoleRun[] };
     startRoleRun(workId: string, revision: number, input: RoleRunInput): RoleRun;
     finishRoleRun(workId: string, revision: number, input: RoleRunFinish): RoleRun;
+    /** The board server's record of what one launch sent its thread; no agent command reaches it. */
+    recordRunLaunch(workId: string, launch: RunLaunch): RunLaunch;
+    runLaunches(workId: string, runId: string): RunLaunches;
 }
 
 /** Used inside the caller's read/write transaction; a run ID never resolves across work records. */
@@ -68,6 +73,44 @@ export function runSettingsRecords(
     };
 
     return {
+        recordRunLaunch: (workId, launch) =>
+            database.write(() => {
+                read(workId);
+
+                const input = runObject(launch, ['runId', 'executionId', 'skillEntries', 'bin']);
+                const entries = runObject(input.skillEntries, ['lar-shape', 'lar-build']);
+                const saved: RunLaunch = {
+                    runId: savedRun(database, workId, runText(input.runId)).runId,
+                    executionId: runText(input.executionId),
+                    skillEntries: {
+                        'lar-shape': runText(entries['lar-shape']),
+                        'lar-build': runText(entries['lar-build']),
+                    },
+                    bin: runText(input.bin),
+                };
+
+                db.prepare('INSERT INTO run_launches(work_id,run_id,execution_id,content) VALUES (?,?,?,?)').run(
+                    workId,
+                    saved.runId,
+                    saved.executionId,
+                    JSON.stringify(saved),
+                );
+
+                return saved;
+            }),
+        runLaunches: (workId, runId) =>
+            database.read(() => {
+                read(workId);
+                savedRun(database, workId, runId);
+
+                return {
+                    newRun: !!db.prepare('SELECT 1 FROM new_runs WHERE work_id=? AND run_id=?').get(workId, runId),
+                    launches: db
+                        .prepare('SELECT content FROM run_launches WHERE work_id=? AND run_id=? ORDER BY rowid')
+                        .all(workId, runId)
+                        .map((row) => JSON.parse(String(row.content)) as RunLaunch),
+                };
+            }),
         reconcileRoleRuns: (workId, { ownerEnded, executionIds, holds }) =>
             database.write(() => {
                 if (!ownerEnded && !holds) return;

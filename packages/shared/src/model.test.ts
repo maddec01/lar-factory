@@ -342,37 +342,41 @@ test('Add item refuses an unlisted repository, an unknown kind and a blank title
     }
 });
 
-test('thread handoffs carry an explicit isolated factory environment and absolute skills to every subagent', () => {
+test('a thread message carries one runtime block with the isolated factory environment and absolute skill entries', () => {
     const context = {
         dataDir: "/tmp/O'Brien $(literal)/data",
         bin: '/tmp/factory home/.local/bin',
         shapeSkill: '/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md',
         buildSkill: '/tmp/factory home/data/bundles/2.0.0/skills/lar-build/SKILL.md',
         azureReadOnly: true,
+        delegationModel: { instanceId: 'codex', model: 'delegate', options: [] },
     };
     const work = item('Queued', [], { id: 'w-safe' });
     const message = workMessage(work, context);
 
     assert.ok(message.includes("Read '/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md'"));
     assert.ok(message.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
-    assert.ok(message.includes('export PATH='));
-    assert.ok(message.includes("export LAR_FACTORY_BIN='/tmp/factory home/.local/bin'"));
+    assert.ok(message.includes(`export PATH='/tmp/factory home/.local/bin':"$PATH"`));
+    assert.ok(message.includes("Use '/tmp/factory home/.local/bin/lar-work' for work records."));
     assert.ok(
         message.includes(
-            "export LAR_FACTORY_SHAPE_SKILL='/tmp/factory home/data/bundles/2.0.0/skills/lar-shape/SKILL.md'",
-        ),
-    );
-    assert.ok(
-        message.includes(
-            "export LAR_FACTORY_BUILD_SKILL='/tmp/factory home/data/bundles/2.0.0/skills/lar-build/SKILL.md'",
+            `Factory skill entries: ${JSON.stringify({ 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill })}`,
         ),
     );
     assert.ok(message.includes("export LAR_FACTORY_AZURE_READ_ONLY='1'"));
-    assert.ok(message.includes('every child task prompt'));
+    assert.equal(message.match(/<!-- factory-runtime:start -->/g)?.length, 1);
+    assert.doesNotMatch(message, /LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)|verbatim|Default every delegated role/);
     assert.ok(message.includes('Do not build'));
     assert.equal(workMessage(work, context), message, 'recovery uses a stable first message');
 
     const build = buildMessage(work, context);
 
     assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
+
+    // A run saved before launches were recorded keeps the earlier block, which told threads to pass it on verbatim.
+    const earlier = workMessage(work, { ...context, earlier: true });
+
+    assert.ok(earlier.includes("export LAR_FACTORY_BIN='/tmp/factory home/.local/bin'"));
+    assert.ok(earlier.includes('every child task prompt'));
+    assert.ok(earlier.includes('Default every delegated role'));
 });

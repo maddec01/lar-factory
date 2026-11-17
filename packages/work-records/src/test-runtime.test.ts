@@ -60,30 +60,38 @@ test('a build role runs the runtime frozen at run start despite the shell and la
             JSON.stringify({ 'fake/app': { node: '/missing/node', version: process.version } }),
         );
 
-        const result = spawnSync(
-            process.execPath,
-            [
-                '--disable-warning=ExperimentalWarning',
-                join(import.meta.dirname, 'cli.ts'),
-                'run-test',
-                work.workId,
-                '--role',
-                'implementer',
-                '--',
-                'node',
-                '-p',
-                'process.version',
-            ],
-            {
-                cwd: dir,
-                encoding: 'utf8',
-                env: { ...process.env, PATH: `${wrongBin}:${process.env.PATH}`, LAR_FACTORY_DATA_DIR: dir },
-            },
-        );
+        // Without --run-id, run-test reads the run the thread prompt exports, or the latest run when none is exported.
+        for (const runId of ['build-1', undefined]) {
+            const result = spawnSync(
+                process.execPath,
+                [
+                    '--disable-warning=ExperimentalWarning',
+                    join(import.meta.dirname, 'cli.ts'),
+                    'run-test',
+                    work.workId,
+                    '--role',
+                    'implementer',
+                    '--',
+                    'node',
+                    '-p',
+                    'process.version',
+                ],
+                {
+                    cwd: dir,
+                    encoding: 'utf8',
+                    env: {
+                        ...process.env,
+                        PATH: `${wrongBin}:${process.env.PATH}`,
+                        LAR_FACTORY_DATA_DIR: dir,
+                        LAR_FACTORY_RUN_ID: runId,
+                    },
+                },
+            );
 
-        expect(result.stderr).toBe('');
-        expect(result.status).toBe(0);
-        expect(result.stdout).toBe(`${process.version}\n`);
+            expect(result.stderr).toBe('');
+            expect(result.status).toBe(0);
+            expect(result.stdout).toBe(`${process.version}\n`);
+        }
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

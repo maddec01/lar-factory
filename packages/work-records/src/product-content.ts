@@ -5,7 +5,7 @@ import { WorkRecordError } from './database.ts';
 /** Reject copied launch contracts before any body/history/digest changes, including legacy unmarked prompts. */
 export function assertProductContent(markdown: string): void {
     const exports = new Set(
-        [...markdown.matchAll(/^\s*export\s+(LAR_FACTORY_(?:DATA_DIR|BIN|SHAPE_SKILL|BUILD_SKILL))=/gm)].map(
+        [...markdown.matchAll(/^\s*export\s+(LAR_FACTORY_(?:DATA_DIR|BIN|SHAPE_SKILL|BUILD_SKILL|RUN_ID))=/gm)].map(
             (m) => m[1],
         ),
     );

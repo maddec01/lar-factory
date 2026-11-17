@@ -3,7 +3,7 @@
 import type { ModelSelection } from './board-domain.ts';
 import { type Item } from './domain.ts';
 import { itemName } from './presentation.ts';
-import { frozenBuildMethodLine, frozenRetroLine, type RunSettings } from './run-settings.ts';
+import { azureReadOnlyLines, frozenBuildMethodLine, frozenRetroLine, type RunSettings } from './run-settings.ts';
 
 export interface FactoryThreadContext {
     dataDir: string;
@@ -12,11 +12,16 @@ export interface FactoryThreadContext {
     buildSkill: string;
     azureReadOnly?: boolean;
     delegationModel?: ModelSelection;
+    /** The run the thread starts for, whose IDs and frozen choices its runtime block names. */
+    run?: RunSettings;
+    /** A run saved before launches were recorded keeps the earlier two runtime blocks, so retries and recovery match. */
+    earlier?: boolean;
 }
 
 const shellPath = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
-function factoryEnvironment(context: FactoryThreadContext): string {
+/** The board's first runtime block before runs recorded their launches. */
+function earlierFactoryEnvironment(context: FactoryThreadContext): string {
     return [
         '<!-- factory-runtime:start -->',
         'Runtime instructions belong only in thread prompts/handoffs; never copy this block into product records (brief, map, decision, answer or domain drafts). Read frozen choices from run-settings records.',
@@ -27,12 +32,7 @@ function factoryEnvironment(context: FactoryThreadContext): string {
         `export LAR_FACTORY_BIN=${shellPath(context.bin)}`,
         `export LAR_FACTORY_SHAPE_SKILL=${shellPath(context.shapeSkill)}`,
         `export LAR_FACTORY_BUILD_SKILL=${shellPath(context.buildSkill)}`,
-        ...(context.azureReadOnly
-            ? [
-                  "export LAR_FACTORY_AZURE_READ_ONLY='1'",
-                  'All Azure DevOps organizations are read-only. Never launch Azure implementation or write through another tool.',
-              ]
-            : []),
+        ...azureReadOnlyLines(context.azureReadOnly),
         `Use ${shellPath(`${context.bin}/lar-work`)} for work records. Never use another data folder or command installation.`,
         `Factory skill entries: ${JSON.stringify({ 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill })}`,
         'Pass these exact skill entries and the CLI/data environment above verbatim in every child task prompt and handoff, including Explore and Approver. Children must read the supplied entry for their role first and resolve its relative files from that entry; never discover skills independently or read a global installation first. If a supplied entry is unavailable, hold and report its exact path.',
@@ -40,6 +40,36 @@ function factoryEnvironment(context: FactoryThreadContext): string {
         ...(context.delegationModel
             ? [
                   `Default every delegated role to this T3 target unless this run explicitly supplies a role override: ${JSON.stringify({ providerInstanceId: context.delegationModel.instanceId, model: context.delegationModel.model, options: Object.fromEntries(context.delegationModel.options?.map(({ id, value }) => [id, value]) ?? []) })}. Pass this default to every delegated task.`,
+              ]
+            : []),
+        '<!-- factory-runtime:end -->',
+    ].join('\n');
+}
+
+/** The one runtime block of a thread's first message: only what the thread can't read from its skills or records. */
+function factoryEnvironment(context: FactoryThreadContext): string {
+    const { run } = context;
+
+    if (context.earlier)
+        return `${earlierFactoryEnvironment(context)}${run ? `\n\n${earlierRunSettingsMessage(run)}` : ''}`;
+
+    return [
+        '<!-- factory-runtime:start -->',
+        'Runtime instructions only: keep them in thread prompts and handoffs, never in product records.',
+        ...(run ? [`Work ID ${run.workId}; run ID ${run.runId}.`] : []),
+        `Factory skill entries: ${JSON.stringify({ 'lar-shape': context.shapeSkill, 'lar-build': context.buildSkill })}`,
+        'Before factory commands, set this environment in that command shell:',
+        `export LAR_FACTORY_DATA_DIR=${shellPath(context.dataDir)}`,
+        `export PATH=${shellPath(context.bin)}:"$PATH"`,
+        ...(run ? [`export LAR_FACTORY_RUN_ID=${shellPath(run.runId)}`] : []),
+        ...azureReadOnlyLines(context.azureReadOnly),
+        `Use ${shellPath(`${context.bin}/lar-work`)} for work records.`,
+        ...(run
+            ? [
+                  'Factory run contract: read shared/orchestration.md in the supplied factory skill before doing work; lar-work role-launch gives each role its frozen target and runtime.',
+                  `Verify this thread with t3_thread_configure before work and hold on a model or option mismatch: ${JSON.stringify(run.thread)}`,
+                  frozenBuildMethodLine(run),
+                  frozenRetroLine(run),
               ]
             : []),
         '<!-- factory-runtime:end -->',
@@ -105,8 +135,8 @@ export function buildMessage(item: Item, context: FactoryThreadContext): string 
     return `Build ${itemName(item)}\n${earlierBuildMessage(item, context)}`;
 }
 
-/** The snapshot is authoritative across compaction, retries and handoff; no live Settings are consulted by roles. */
-export function runSettingsMessage(run: RunSettings): string {
+/** The board's second runtime block before runs recorded their launches. */
+function earlierRunSettingsMessage(run: RunSettings): string {
     return [
         '<!-- factory-runtime:start -->',
         'Runtime contract only: never copy into product records; read run-settings for execution choices.',

@@ -148,6 +148,9 @@ export function itemActivityLine(item: Item, now: number, unreadable = false): T
     if (unreadable) return UNAVAILABLE;
 
     if (thread.state === 'done' && !isLiveThread(thread) && !thread.hasRunningChildren) {
+        // The server reads activity only for threads at work, so an idle owner with none is idle, not unreadable.
+        if (!thread.activity) return undefined;
+
         const line = threadActivityLine({ ...thread, state: 'running' }, now);
 
         return line?.state === 'quiet' || line?.state === 'unavailable' ? line : undefined;

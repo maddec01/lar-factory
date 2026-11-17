@@ -53,6 +53,9 @@ const EXECUTION_WORD: Record<Exclude<Execution, 'starting'>, string> = {
 /** What a Ready item says while every build slot is taken. */
 export const SLOT_WAIT = 'Waiting for a build slot';
 
+/** An unfinished build whose thread sits idle with its pull request open: it waits on the PR's checks or review. */
+const PR_WAIT = 'Waiting on its PR';
+
 /** A merged pull request's word while the recorded stage hasn't caught up with it. */
 const MERGED = 'PR merged';
 
@@ -222,6 +225,14 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         !inputs.starting &&
         !buildsAtWork({ items: [item] }).length &&
         inputs.capacityFull;
+    // An unfinished build's idle owner has no line, as the server reads activity only for threads at work.
+    const prWait =
+        item.status === 'In progress' &&
+        !execution &&
+        !stale &&
+        !blockers.length &&
+        item.linkedPrs[0]?.state === 'open' &&
+        itemActivityThread(item)?.purpose === 'build';
     const word =
         (slotWait ? SLOT_WAIT : undefined) ??
         (item.briefReviewing && !wait ? buildActivity(item, stale).label : undefined) ??
@@ -234,7 +245,13 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
               : said
                 ? EXECUTION_WORD[said]
                 : (readiness?.word ??
-                  (merged ? MERGED : execution === 'unavailable' ? EXECUTION_WORD.unavailable : statusWord)));
+                  (merged
+                      ? MERGED
+                      : execution === 'unavailable'
+                        ? EXECUTION_WORD.unavailable
+                        : prWait
+                          ? PR_WAIT
+                          : statusWord)));
     // Blocked by other work is not your turn: it reads off (grey), as amber is kept for what waits on you.
     const state: StatusState | undefined = blockers.length
         ? 'off'
@@ -299,8 +316,14 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
               : workingAgain(item, stale)
                 ? 'In progress'
                 : item.status,
+        // Waiting on a PR's checks or review is not your turn either, so it reads off (grey), not amber.
         glyphState:
-            said === 'stopped' ? 'off' : blockers.length || (!atWork && openBlockers(item).length) ? 'off' : undefined,
+            said === 'stopped' ||
+            blockers.length ||
+            (!atWork && openBlockers(item).length) ||
+            (prWait && word === PR_WAIT)
+                ? 'off'
+                : undefined,
         light: Boolean(readiness || merged),
         // A read the board can't trust stills the motion, while a thread's own fresh line still names what it does.
         running: group ? group.running && !inputs.unavailable : atWork && !inputs.unavailable && !blockers.length,

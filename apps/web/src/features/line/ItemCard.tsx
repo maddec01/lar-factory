@@ -3,6 +3,7 @@
 // leaves out what the concept already says: its project, the concept it belongs to and the Concepts lane.
 
 import {
+    deliveryPrStatus,
     dependencyProofs,
     deskParentName,
     deskWait,
@@ -92,6 +93,8 @@ export function ItemCard({
     // approval holds it, until it is done.
     const asks = !inConcept || (!complete && !!humanWait(item, unavailable, data.items));
     const wait = deskWait(item, unavailable, data.items);
+    const delivery = deliveryPrStatus(item, unavailable);
+    const comments = wait.action?.kind === 'pr-feedback' ? item.linkedPrs[0]?.review?.comments : undefined;
     const followups = retroWaits(item.retro, item.status);
     const checks = cardChecks(item, data, disconnected);
     const idle = usePartState(item, asks ? undefined : part, data, !!checks);
@@ -131,13 +134,18 @@ export function ItemCard({
         ? `${item.slices.filter((slice) => slice.progress === 'done').length}/${item.slices.length} slices`
         : '';
     // The wait in the same words everywhere it shows: the card's foot, the dialog's Status and search.
-    const status = asks
-        ? followups
-            ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}`
-            : wait.label
-        : atWork
-          ? [atWork, sliceCount].filter(Boolean).join(' · ')
-          : (idle?.status ?? '');
+    const status =
+        !asks && shown.prStatus
+            ? shown.prStatus
+            : asks
+              ? comments?.length
+                  ? `${wait.label} · ${comments.length} comment${comments.length === 1 ? '' : 's'}`
+                  : wait.label === 'Choose follow-ups'
+                    ? `${wait.label} · ${item.retro?.suggestions?.length ?? 0}`
+                    : wait.label
+              : atWork
+                ? [atWork, sliceCount].filter(Boolean).join(' · ')
+                : (idle?.status ?? '');
     const action = asks ? (
         <HumanWaitAction item={item} data={data} quiet />
     ) : (
@@ -212,6 +220,22 @@ export function ItemCard({
             }
             sub={
                 <>
+                    {wait.action?.kind === 'pr-feedback' &&
+                        comments?.map((comment) => (
+                            <CardQuestion
+                                key={comment.id}
+                            >{`${comment.author}: ${comment.body.slice(0, 240) || 'Changes requested'}`}</CardQuestion>
+                        ))}
+                    {delivery && !delivery.running && !delivery.feedback && (
+                        <CardQuestion>
+                            {delivery.handback
+                                ? 'The factory’s part is done. Review and merge the PR.'
+                                : (delivery.reason ?? delivery.label)}
+                        </CardQuestion>
+                    )}
+                    {followups && wait.label !== 'Choose follow-ups' && (
+                        <CardQuestion>{`Choose follow-ups (optional) · ${item.retro?.suggestions?.length ?? 0}`}</CardQuestion>
+                    )}
                     {requestOwner?.questionSummary && <CardQuestion>{requestOwner.questionSummary}</CardQuestion>}
                     {parentName && <CardPartOf name={parentName} />}
                     {(asks || !complete) && <NextStep item={item} waitLabel={wait.label} checksShown={!!checks} />}

@@ -20,6 +20,7 @@ interface MergePr {
 }
 interface Repository {
     viewerPermission: string;
+    viewerDefaultMergeMethod: string;
     mergeCommitAllowed: boolean;
     squashMergeAllowed: boolean;
     rebaseMergeAllowed: boolean;
@@ -41,6 +42,7 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
                     query ($owner: String!, $name: String!, $number: Int!) {
                         repository(owner: $owner, name: $name) {
                             viewerPermission
+                            viewerDefaultMergeMethod
                             mergeCommitAllowed
                             squashMergeAllowed
                             rebaseMergeAllowed
@@ -181,7 +183,12 @@ export function githubMerge(run: (args: string[]) => Promise<string> = gh): Merg
                             : 'blocked',
             };
 
-            return { pr: linked, methods, blockers };
+            const preferred = repository.viewerDefaultMergeMethod?.toLowerCase() as MergeMethod | undefined;
+
+            // If a branch rule disallows the preference, use its first permitted method.
+            const defaultMethod = preferred && methods.includes(preferred) ? preferred : methods[0];
+
+            return { pr: linked, methods, defaultMethod, blockers };
         },
         async merge(repo, number, revision, method) {
             // Resolve the node from the server's repository/number. Never accept a client-supplied node ID.

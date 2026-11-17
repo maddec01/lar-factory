@@ -49,9 +49,11 @@ import { readFactorySettings } from './factory-settings.ts';
 import { gateRecords, type GateRecords } from './gate-records.ts';
 import { gateResumeRecords } from './gate-resume.ts';
 import { groupProjectionRecords, saveProjection } from './group-projections.ts';
+import { linkedPrAmendmentRecords } from './linked-pr-amendment.ts';
 import { projectMapParts } from './map-parts.ts';
 import { mergeBuildRecords, type MergeBuildRecords } from './merge-build.ts';
 import { outcomeRecords } from './outcome-records.ts';
+import { prLoopRecords, type PrLoopRecords } from './pr-loop.ts';
 import { prepareBuildClaim, type BuildInput, type BuildPreparation } from './prepare-build.ts';
 import { assertProductContent, assertBriefContent, productContent } from './product-content.ts';
 import { requireProductQuestion } from './product-question.ts';
@@ -78,6 +80,8 @@ import { userWaitRecords, type UserWaitRecords } from './user-wait.ts';
 import { validationRecords, type ValidationRecords } from './validation-records.ts';
 import { verificationRecords, type VerificationRecords } from './verification-records.ts';
 import { briefVerify } from './verify-requirement.ts';
+
+export type { PrLoopState } from './pr-loop.ts';
 
 export type { BuildInput, BuildPreparation } from './prepare-build.ts';
 export type { NewPart } from './create-part.ts';
@@ -416,6 +420,8 @@ export interface WorkRecords
         MergeBuildRecords,
         SetAsideRecords,
         VerificationRecords,
+        PrLoopRecords,
+        ReturnType<typeof linkedPrAmendmentRecords>,
         RunSettingsRecords,
         UserWaitRecords,
         ValidationRecords,
@@ -1350,6 +1356,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...partBatchRecords(database, () => records, dataDir),
         ...reviewSelectionRecords(database, () => records),
         ...gateResumeRecords(database),
+        ...linkedPrAmendmentRecords(database, () => records),
         ...outcomeRecords(database, () => records),
         ...releaseContinuationRecords(database, () => records),
         ...blockerDeclarationRecords(database, () => records),
@@ -1384,6 +1391,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         ...reconciliationRecords(database, () => records),
         ...scopeRecords(database, (id) => fromRow(find(id))),
         ...verificationRecords(database, (id) => fromRow(find(id))),
+        ...prLoopRecords(database, (id) => fromRow(find(id))),
         ...retroRecords(database, (id) => fromRow(find(id))),
         ...conceptRunRecords(database, () => records),
         ...validationRecords(database, (id) => fromRow(find(id))),
@@ -1652,19 +1660,34 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 )
                     throw invalid('Changed approved drafts stay Shaping until their gate.');
 
-                const moved = nextStatus ?? row.status;
+                // A late owner handback cannot reopen delivery already confirmed merged.
+                const merged =
+                    row.pull_request &&
+                    db
+                        .prepare(
+                            "SELECT 1 FROM observations WHERE work_id=? AND observed='pr' AND subject=? AND state='merged'",
+                        )
+                        .get(workId, row.pull_request);
+                const moved = merged ? 'Done' : (nextStatus ?? row.status);
 
+                const prReview = records.verification(workId).prReview;
                 const verify = ['Verify', 'Ready to merge'].includes(moved) ? briefVerify(database, workId) : null;
+
+                if (moved === 'Verify' && prReview)
+                    throw invalid('Human testing belongs in PR review for this build. Use Ready to merge.');
 
                 if (verify && (!verify.approved || !gates.gate(workId).current))
                     throw invalid('A changed Verify decision needs Doubt and an approved brief gate.');
+
+                if (moved === 'Ready to merge' && prReview)
+                    db.prepare('UPDATE verification SET pr_review_handed_back=1 WHERE work_id=?').run(workId);
 
                 if (moved === 'Verify' && verify?.required === false)
                     throw invalid(
                         'The approved brief says Verify: no. Recommendations are notes; amend through Doubt and a gate to change it.',
                     );
 
-                if (moved === 'Ready to merge' && verify?.required !== false) {
+                if (moved === 'Ready to merge' && !prReview && verify?.required !== false) {
                     const evidence = db
                         .prepare('SELECT head, latest, invalidated FROM verification WHERE work_id=? AND required=1')
                         .get(workId);
@@ -2022,7 +2045,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
                 return {
                     build_phase: checked,
-                    ...(checked === 'review' ? { status: 'Review', queue_order: null } : {}),
+                    ...(checked === 'review' && !row.finished_at ? { status: 'Review', queue_order: null } : {}),
                 };
             });
         },
@@ -2070,8 +2093,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 writeObservation.run(workId, of, reference, state, who, now);
 
                 // Refresh observation freshness without making unchanged work look newly edited on every poll.
-                return state === 'merged' && !row.finished_at
-                    ? { finished_at: now }
+                return of === 'pr' && state === 'merged' && (!row.finished_at || row.status !== 'Done')
+                    ? { finished_at: row.finished_at ?? now, status: 'Done' }
                     : unchanged
                       ? { updated_at: row.updated_at }
                       : {};
@@ -2418,6 +2441,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 const buildInput = preparation ? prepareBuildClaim(records, workId, preparation) : undefined;
 
                 insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
+
+                // Recovery retains the original lifecycle, including a legacy human Verify gate.
+                if (buildInput && !preparation?.recovery && !work.pull_request)
+                    db.prepare(
+                        'INSERT INTO verification(work_id,required,pr_review) VALUES (?,0,1) ON CONFLICT(work_id) DO UPDATE SET required=0,pr_review=1',
+                    ).run(workId);
 
                 if (buildInput)
                     db.prepare('UPDATE launch_intents SET build_input=? WHERE intent_id=?').run(

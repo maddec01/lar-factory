@@ -11,6 +11,9 @@ export interface VerificationResult {
     testSteps: string;
 }
 export interface Verification {
+    /** New builds fold human testing into PR review; absent on legacy runs. */
+    prReview?: boolean;
+    prReviewHandedBack?: boolean;
     required: boolean;
     head: string | null;
     invalidated?: boolean;

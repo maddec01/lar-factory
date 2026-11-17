@@ -20,6 +20,7 @@ import { gateWorkIds } from './gate-batch.ts';
 import { groupCommand } from './group-command.ts';
 import { heavyCommand } from './heavy-command.ts';
 import { requireHumanAction } from './human-action.ts';
+import { prAmendmentCommand } from './pr-amendment.ts';
 import { publicationBodyCommand } from './publication-body.ts';
 import { releaseCommand } from './release-command.ts';
 import { retroCommand } from './retro-command.ts';
@@ -57,6 +58,8 @@ Reads and changes the factory's work records in the work-record database, which
 it opens directly. It works from any folder, with or without the board app.
 
 PR description
+  pr-agent-comment <work-id> --url URL
+                                    Exclude an agent-authored PR reply from human evidence.
   pr-body --file BODY --to OUTPUT [--test-steps STEPS]
                                     Generate the canonical Test steps section for create/update.
 
@@ -398,6 +401,11 @@ Brief gate
   gate-batch --file work-ids.json   Print complete briefs, Doubt results and the batch digest.
   record-gate-batch --file manifest.json --digest H --identity I --evidence E
                                     Refused for agents: ask Pedro to Approve briefs in the board.
+  begin-pr-amendment <work-id> --feedback URL|verify:RESULT_ID [--affected work-ids.json]
+                                    Verify and record the human decision before changing scope or brief.
+  pr-amendment <work-id>            Display all corrected linked content and gates as one digest.
+  approve-pr-amendment <work-id> --file display.json --digest H --feedback URL|verify:RESULT_ID
+                                    Approve the exact scope correction requested by a write-access human.
   record-gate <work-id> --file display.json --digest H --identity I --evidence E
                                     Refused for agents: ask Pedro to Approve brief in the board.
                                     Use its board wait; never save a generic Needs you duplicate.
@@ -1164,6 +1172,12 @@ async function run(
 }
 
 async function main(args: string[]): Promise<number> {
+    if (args[0] === 'begin-pr-amendment') return prAmendmentCommand(args.slice(1), 'begin');
+
+    if (args[0] === 'pr-amendment') return prAmendmentCommand(args.slice(1), 'display');
+
+    if (args[0] === 'approve-pr-amendment') return prAmendmentCommand(args.slice(1), 'approve');
+
     if (args[0] === 'pr-body') return publicationBodyCommand(args.slice(1));
 
     if (['create-parts', 'sync-blockers', 'refresh-projections', 'sync-part-tickets'].includes(args[0] ?? ''))
@@ -1182,7 +1196,7 @@ async function main(args: string[]): Promise<number> {
 
     if (['retro', 'propose-retro'].includes(args[0]!)) return retroCommand(args[0]!, args.slice(1));
 
-    if (['verification', 'verification-head', 'record-verification'].includes(args[0]!))
+    if (['verification', 'verification-head', 'record-verification', 'pr-agent-comment'].includes(args[0]!))
         return verificationCommand(args[0]!, args.slice(1));
 
     if (['release-plan', 'set-release-plan', 'complete-release-step', 'record-outcome-check'].includes(args[0]!))

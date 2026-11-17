@@ -4,11 +4,13 @@
 // surface names the same item differently.
 
 import {
+    deliveryPrStatus,
     isDecisionWork,
     buildsAtWork,
     limitNumber,
     groupState,
     humanWait,
+    needsAnswer,
     activityLost,
     activityUnavailable,
     blockerRef,
@@ -69,6 +71,8 @@ export interface ItemState {
     pr: ReturnType<typeof prReadiness>;
     /** What every surface says the item is doing now. */
     word: string;
+    /** PR intent leads the row; tool activity remains secondary. */
+    prStatus: string | undefined;
     /** What the stage and pull request say, leaving out what its thread does, for a surface that names that beside it,
      *  such as a Work map node's activity. */
     stageWord: string;
@@ -230,8 +234,10 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
         !blockers.length &&
         item.linkedPrs[0]?.state === 'open' &&
         itemActivityThread(item)?.purpose === 'build';
+    const prStatus = !needsAnswer(item) ? deliveryPrStatus(item, stale)?.label : undefined;
     const word =
         (publishingSpec(item) ? 'Publishing Spec…' : undefined) ??
+        prStatus ??
         (slotWait ? SLOT_WAIT : undefined) ??
         (item.briefReviewing && !wait ? buildActivity(item, stale).label : undefined) ??
         group?.word ??
@@ -274,40 +280,43 @@ export function itemState(item: Item, inputs: ItemStateInputs): ItemState {
                       ? 'List'
                       : 'Queue'
                   : 'Working'
-            : (item.briefApproval || item.briefReviewing) &&
-                (item.buildPhase ||
-                    item.linkedPrs.length ||
-                    (Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build')))
-              ? 'Build'
-              : prMerged || stageReadiness?.word === 'Merged'
-                ? 'Merge'
-                : stageReadiness?.state === 'failed'
-                  ? 'Verify'
-                  : (
-                        {
-                            List: 'List',
-                            Queued: 'Queue',
-                            Shaping: 'Shaping',
-                            'Needs you': ['review', 'approve', 'checks', 'retro'].includes(item.buildPhase ?? '')
-                                ? 'Review'
-                                : item.buildPhase ||
-                                    (Array.isArray(item.threads) &&
-                                        item.threads.some((thread) => thread.purpose === 'build'))
-                                  ? 'Build'
-                                  : 'Shaping',
-                            Ready: 'Ready to build',
-                            'In progress': 'Build',
-                            Review: 'Review',
-                            Verify: 'Verify',
-                            'Ready to merge': 'Merge',
-                            Done: 'Merge',
-                        } as const
-                    )[item.status],
+            : item.verification?.prReview && item.status === 'Ready to merge'
+              ? 'Review PR'
+              : (item.briefApproval || item.briefReviewing) &&
+                  (item.buildPhase ||
+                      item.linkedPrs.length ||
+                      (Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build')))
+                ? 'Build'
+                : prMerged || stageReadiness?.word === 'Merged'
+                  ? 'Merge'
+                  : stageReadiness?.state === 'failed'
+                    ? 'Verify'
+                    : (
+                          {
+                              List: 'List',
+                              Queued: 'Queue',
+                              Shaping: 'Shaping',
+                              'Needs you': ['review', 'approve', 'checks', 'retro'].includes(item.buildPhase ?? '')
+                                  ? 'Review'
+                                  : item.buildPhase ||
+                                      (Array.isArray(item.threads) &&
+                                          item.threads.some((thread) => thread.purpose === 'build'))
+                                    ? 'Build'
+                                    : 'Shaping',
+                              Ready: 'Ready to build',
+                              'In progress': 'Build',
+                              Review: 'Review',
+                              Verify: 'Verify',
+                              'Ready to merge': 'Merge',
+                              Done: 'Merge',
+                          } as const
+                      )[item.status],
         progressState: stageReadiness?.state ?? state,
         execution,
         pr: readiness,
         // A PR's readiness alone cannot ask for review while the desk's wait still belongs to its owner.
         word: word.startsWith('Review PR') && !human ? PR_WAIT : word,
+        prStatus,
         stageWord,
         state,
         // At work again, its glyph and colour are a build's.

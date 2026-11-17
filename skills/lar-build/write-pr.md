@@ -2,6 +2,9 @@ Ported from mattpocock/skills, `skills/engineering/pr/SKILL.md`. See [UPSTREAM.m
 
 # Write a PR
 
+In PR bodies, updates and replies, abbreviate commit IDs to 7–12 characters;
+never print a full 40-character SHA. Link the commit when useful.
+
 Follow the repository's PR template and required links. Otherwise use Summary,
 Test steps, Evidence and a one-line Risk. Lead with the concrete result and
 only the product decisions a reviewer needs to understand it. A short before

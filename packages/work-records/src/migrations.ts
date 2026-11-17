@@ -672,4 +672,26 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'CREATE TABLE reconcile_continuations(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT',
         ),
+    // Preserve legacy Verify runs; only newly prepared builds opt into PR review.
+    (db) => {
+        const columns = db
+            .prepare('PRAGMA table_info(verification)')
+            .all()
+            .map((row) => row.name);
+
+        if (!columns.includes('pr_review'))
+            db.exec(
+                'ALTER TABLE verification ADD COLUMN pr_review INTEGER NOT NULL DEFAULT 0 CHECK(pr_review IN (0,1))',
+            );
+
+        if (!columns.includes('pr_review_handed_back'))
+            db.exec(
+                'ALTER TABLE verification ADD COLUMN pr_review_handed_back INTEGER NOT NULL DEFAULT 0 CHECK(pr_review_handed_back IN (0,1))',
+            );
+    },
+    (db) =>
+        db.exec(`CREATE TABLE IF NOT EXISTS pr_loop (
+        work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,
+        content TEXT NOT NULL
+    ) STRICT`),
 ];

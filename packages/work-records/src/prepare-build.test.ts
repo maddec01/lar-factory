@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vite-plus/test';
 
+import { completeBrief } from '../test/complete-brief.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const opened: WorkRecords[] = [];
@@ -160,7 +161,7 @@ it('S08 F01: Pedro waits retain the original slot across answers, amendments, ha
     const intent = records.prepareBuild(a, rev(a), capacity).intent;
 
     records.resolveLaunchIntent(a, rev(a), intent.intentId, { threadId: 'sa-owner' });
-    for (const status of ['Needs you', 'Shaping', 'Verify'] as const) {
+    for (const status of ['Needs you', 'Shaping', 'Ready to merge'] as const) {
         records.update(a, rev(a), { status });
         expect(() => other.prepareBuild(b, rev(b), capacity)).toThrow(/capacity/);
         expect(() => other.buildReadiness(b, { ...capacity, recovery: true })).toThrow(/capacity/);
@@ -309,4 +310,46 @@ it('a build whose PR is open frees its slot and restarts even when the limit is 
 
     records.update(a, rev(a), { status: 'Review' });
     expect(other.buildReadiness(a, { ...limit, recovery: true }).capacity).toMatchObject({ manualOverride: false });
+});
+
+it('new builds fold human Verify into PR review, while recovery keeps legacy Verify', async () => {
+    const { records, path, rev, ready } = await fixture();
+    const id = ready('New PR review');
+
+    records.setBody(
+        id,
+        rev(id),
+        'brief',
+        completeBrief('## What\nDeliver the greeting.\n## Verify\nyes: Judge the greeting layout.'),
+    );
+    records.recordGate(id, rev(id), {
+        briefDigest: records.gate(id).briefDigest!,
+        approvedBy: 'Human',
+        evidence: 'Approved human Test steps',
+    });
+    records.update(id, rev(id), { status: 'Ready' });
+    expect(records.verification(id).required).toBe(true);
+    records.prepareBuild(id, rev(id), capacity);
+    expect(records.verification(id)).toMatchObject({ required: false, prReview: true });
+    records.recordGate(id, rev(id), {
+        briefDigest: records.gate(id).briefDigest!,
+        approvedBy: 'Human',
+        evidence: 'Retained approval',
+    });
+    expect(records.verification(id).required).toBe(false);
+    records.update(id, rev(id), { status: 'Ready to merge' });
+    expect(() => records.update(id, rev(id), { status: 'Verify' })).toThrow('PR review');
+
+    const reopened = await openWorkRecords(path);
+
+    opened.push(reopened);
+    expect(reopened.verification(id)).toMatchObject({ required: false, prReview: true });
+
+    const legacy = ready('Legacy Verify');
+
+    records.update(legacy, rev(legacy), { status: 'Verify' });
+    records.setPullRequest(legacy, rev(legacy), 'example/a#4');
+    records.prepareBuild(legacy, rev(legacy), { ...capacity, recovery: true });
+    expect(records.verification(legacy)).toMatchObject({ required: true, prReview: false });
+    expect(() => records.update(legacy, rev(legacy), { status: 'Ready to merge' })).toThrow('Pass Verify');
 });

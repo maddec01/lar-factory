@@ -359,6 +359,12 @@ export function createBoardServer({
             what: 'the follow-up choice',
             run: forItem('Name the build.', (id, input) => commands.chooseRetro(id, input)),
         },
+        '/api/pr-feedback': {
+            sampleWrite: 'refuse',
+            what: 'the PR feedback choice',
+            disabled: 'PR feedback is disabled in sample mode.',
+            run: forItem('Name the delivery item.', (id, input) => commands.prFeedback(id, input)),
+        },
         '/api/inspect-verification': {
             sampleWrite: 'fake',
             what: 'the recorded Verify head',

@@ -3,6 +3,17 @@
 Input: saved brief, confirmed scope and affected work. Output: current Doubt
 and board approval, or its generated board wait.
 
+For a scope correction explicitly requested during delivery PR review, use
+lar-build's `stages/recovery.md#human-pr-scope-amendments`. Its
+`approve-pr-amendment` command rereads the human's request and write permission
+(or the saved legacy Verify failure), then binds it to the fresh corrected gate.
+The producer's authorization covers consistent corrections to affected linked
+briefs, parent map and Outcome, without a consumer PR. Begin the whole amendment
+before edits and commit its exact content and gate receipts as one batch; do not
+ask for propagation confirmation or fall back to Approve briefs. That exact
+correction needs no repeated human question. All ordinary initial
+gates, Reshape and unresolved choices still follow the board approval below.
+
 1. Run `lar-work gate <work ID>`. Resolve held edits in `specSync`; report read
    failures and warnings. Review its refreshed `display.brief` against code.
 2. Read the [domain-doc setting](shared/domain-docs-setting.md) for Doubt.

@@ -6,7 +6,7 @@ import { expect, it } from 'vite-plus/test';
 import { completeBrief } from '../test/complete-brief.ts';
 import { openWorkRecords } from './work-records.ts';
 
-it('binds the displayed text and source revision to durable approval evidence', async () => {
+it('binds approval to the displayed product through unrelated lifecycle progress', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gate-display-'));
     const records = await openWorkRecords(join(dir, 'records.db'));
 
@@ -28,17 +28,20 @@ it('binds the displayed text and source revision to durable approval evidence', 
         expect(records.gate(work.workId).evidence).toEqual([]);
         records.update(work.workId, work.revision, { status: 'Shaping' });
         expect(records.displayGate(work.workId).approvalDigest).toBe(display.approvalDigest);
-        expect(() => approve()).toThrow(/revision/);
+
+        const approvedRevision = records.read(work.workId).revision;
+
+        expect(() => approve()).not.toThrow();
 
         const fresh = records.displayGate(work.workId);
-        const evidence = approve(fresh, fresh.approvalDigest);
+        const evidence = records.gate(work.workId).passing!;
 
-        expect(evidence).toMatchObject({ sourceRevision: fresh.sourceRevision, approvalDigest: fresh.approvalDigest });
+        expect(evidence).toMatchObject({ sourceRevision: approvedRevision, approvalDigest: fresh.approvalDigest });
         expect(records.gate(work.workId).passing).toMatchObject(evidence);
         work = records.read(work.workId);
         records.setBody(work.workId, work.revision, 'brief', completeBrief('Find shared searches.'));
         expect(records.gate(work.workId).current).toBe(false);
-        expect(() => approve(fresh, fresh.approvalDigest)).toThrow(/displayed brief/);
+        expect(() => approve(fresh, fresh.approvalDigest)).toThrow(/body.brief|displayed brief/);
     } finally {
         records.close();
         rmSync(dir, { recursive: true, force: true });

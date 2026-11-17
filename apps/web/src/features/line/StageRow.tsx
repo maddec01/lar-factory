@@ -1,4 +1,3 @@
-import { placementOf } from '@lar-factory/shared';
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
@@ -11,6 +10,7 @@ import {
     itemActivityThread,
     itemName,
     openBlockers,
+    placementOf,
 } from '@lar-factory/shared';
 import { useState } from 'react';
 
@@ -18,7 +18,7 @@ import { ActivityLine } from './ActivityLine';
 import { AutoBuildNote } from './AutoBuildNote';
 import { Figures } from './Columns';
 import { ChecksProgress } from './RowChecks';
-import { figuresOf, opensItem } from './RowDetails';
+import { figuresOf, opensItem, sliceCounts, sliceNote } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
 import { YOURS, threadText } from './StageStatus';
@@ -101,27 +101,6 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
     }
 }
 
-/** The blocked slices, then the active ones. */
-const sliceNote = (item: Item) => {
-    const b = item.slices.filter((s) => s.progress === 'blocked');
-    const a = item.slices.filter((s) => s.progress === 'active');
-
-    return [
-        ...b.map((s) => ({ s, word: 'blocked', tone: 'blocked' as const })),
-        ...a.map((s) => ({ s, word: 'working', tone: 'active' as const })),
-    ];
-};
-
-/** The slice note: the first blocked slice by name, so the row says what's stuck, then how many more are blocked and
- *  how many work, in counts that can't be misread ("Bandwidth probe blocked · 2 working"); every name in the tooltip. */
-const sliceCounts = (note: ReturnType<typeof sliceNote>) => {
-    const blocked = note.filter((n) => n.tone === 'blocked').length;
-    const working = note.length - blocked;
-    const rest = [blocked > 1 && `${blocked - 1} more blocked`, working > 0 && `${working} working`].filter(Boolean);
-
-    return { name: note[0]!.s.title, more: rest.length ? ` · ${rest.join(' · ')}` : undefined };
-};
-
 /** The stages a board section is named for: Shaping, Ready to build and Build. */
 const NAMED_BY_SECTION: readonly Status[] = ['Shaping', 'Ready', 'In progress'];
 
@@ -195,7 +174,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                 <RowMeta onClick={opensItem(item)}>
                     {/* What is going on, in one column: what its thread does now, else its state, else what holds it,
                         else its first blocked or working slice. */}
-                    {showsActivity ? (
+                    {showsActivity && !shown.prStatus ? (
                         <ActivityLine item={item} />
                     ) : endState && yours ? (
                         // What waits on you reads in the desk's amber here too, so it catches the eye on any lane.
@@ -267,6 +246,11 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                     <Side item={item} data={data} />
                 </RowSide>
             </RowFirst>
+            {shown.prStatus && showsActivity && (
+                <RowFoot>
+                    <ActivityLine item={item} />
+                </RowFoot>
+            )}
             {['Queued', 'Ready', 'In progress'].includes(item.status) && (
                 <RowFoot>
                     {item.status === 'In progress' && item.verification?.latest?.result === 'fail' && (

@@ -92,7 +92,7 @@ test('a build proposes its own retro before merge and the board takes the choice
     }
 });
 
-test('propose and choose refuse once the delivery PR is observed merged', async () => {
+test('a Retro started on PR open can finish after merge; choices retain their existing guard', async () => {
     const s = await setup();
 
     s.records.proposeRetro(s.id, s.at(), suggestions);
@@ -102,8 +102,13 @@ test('propose and choose refuse once the delivery PR is observed merged', async 
     const late = await setup();
 
     late.merge();
-    expect(() => late.records.proposeRetro(late.id, late.at(), suggestions)).toThrow(/merged/);
-    expect(late.records.retro(late.id)).toBeNull();
+    expect(() => late.records.proposeRetro(late.id, late.at() - 1, suggestions)).toThrow(/revision|changed/i);
+    expect(late.records.proposeRetro(late.id, late.at(), suggestions)).toMatchObject({
+        suggestions,
+        pr: 'owner/repo#1',
+    });
+    expect(late.records.read(late.id).status).toBe('Done');
+    expect(() => late.records.proposeRetro(late.id, late.at(), [])).toThrow(/already recorded/);
 
     const moved = await setup();
 

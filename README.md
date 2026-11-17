@@ -20,19 +20,20 @@
 </p>
 
 Lar Factory lets AI agents turn your issues and ideas into reviewed pull requests. Shape the work on a
-board, start a build when it's ready, and merge every pull request yourself.
+board, start a build when it's ready, and review the resulting pull request.
 
 ## What you get
 
 - **One board for all the work.** Items are grouped by stage, and your desk on top shows the questions
-  agents need answered and the changes waiting for you to verify.
+  agents need answered and pull requests waiting for your review.
 - **Shaping before building.** Factory reads the issue and the code, and asks you only what it can't
   decide. Small changes end in a Ready brief; bigger ideas become a concept map of research, decisions and
   builds.
 - **Builds in isolation.** Start build opens a fresh worktree from your latest default branch, then plans,
   builds, runs your checks and reviews the change before opening a pull request.
-- **You keep the merge button.** Visible or risky changes come with steps to verify, and every build ends
-  as a pull request you merge.
+- **Review the result once.** Human checks travel with the pull request. The factory hands back a good PR with green required
+  checks for you or a teammate to merge. Human comments wait on your desk: address them in T3 or dismiss
+  them. Failed required checks and conflicts go back to the build thread automatically.
 - **Your tracker stays the source of truth.** Works with GitHub Issues and Azure DevOps through your
   existing login, and writes the agreed brief back to the issue.
 - **Nothing to install in your repositories.** Builds follow your scripts, manifests, CI and tests.

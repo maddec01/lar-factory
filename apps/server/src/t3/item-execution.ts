@@ -177,6 +177,13 @@ export function executionItemThreads(shells: Record<string, unknown>[], requests
             ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}),
             ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}),
             ...(shell.archivedAt ? { archived: true as const } : {}),
+            ...(Array.isArray(shell.pullRequests)
+                ? {
+                      watchingPrs: shell.pullRequests.flatMap((pr: unknown) =>
+                          isRecord(pr) && pr.watch && typeof pr.url === 'string' ? [pr.url] : [],
+                      ),
+                  }
+                : {}),
             updated: shell.updatedAt as string,
             ...(runningChildren.has(id) ? { hasRunningChildren: true } : {}),
             ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}),
@@ -824,7 +831,8 @@ export function liveBindings(
         if (
             shell.deletedAt ||
             (!shell.pendingRuntimeRequest &&
-                !['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)))
+                !['preparing', 'starting', 'running', 'waiting'].includes(statusOf(shell)) &&
+                !hasHiddenWork(shell))
         )
             continue;
 

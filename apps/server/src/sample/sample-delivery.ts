@@ -1,13 +1,119 @@
-import type { Item, ItemThread } from '@lar-factory/shared';
+import type { Item, ItemThread, LinkedPr } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
 /** Explicit fake delivery evidence for checking Auto-build views without any real T3 or provider writes. */
 export function sampleDelivery(records: WorkRecords) {
     const threads = new Map<string, ItemThread[]>();
+    const reviews = new Map<string, NonNullable<LinkedPr['review']>>();
     let groupId: string | undefined;
     let manualId: string | undefined;
 
     return {
+        reviewLoop(repository: string) {
+            if (!repository.startsWith('lar-factory-sample/')) throw Error('Only fake sample work is supported.');
+
+            if (reviews.size) return [...reviews.keys()];
+
+            for (const [index, review] of (
+                [
+                    { required: 'green' },
+                    {
+                        required: 'green',
+                        comments: [
+                            {
+                                id: 'sample-comment',
+                                author: 'Sample teammate',
+                                body: 'Please remember the selected language between visits.',
+                                url: 'https://github.com/lar-factory-sample/demo/pull/992#issuecomment-1',
+                            },
+                            {
+                                id: 'sample-comment-2',
+                                author: 'Sample teammate',
+                                body: 'Support Enter to greet too.',
+                                url: 'https://github.com/lar-factory-sample/demo/pull/992#issuecomment-2',
+                            },
+                        ],
+                    },
+                    { required: 'pending' },
+                    {
+                        required: 'green',
+                        comments: [
+                            {
+                                id: 'sample-direct-comment',
+                                author: 'Sample teammate',
+                                body: 'Use two letters for the badge.',
+                                url: 'https://github.com/lar-factory-sample/demo/pull/994#discussion_r1',
+                            },
+                        ],
+                    },
+                    { required: 'green', unresolvedThreads: 1 },
+                ] satisfies NonNullable<LinkedPr['review']>[]
+            ).entries()) {
+                let work = records.create({
+                    repository,
+                    title: [
+                        'Sample PR awaiting human review',
+                        'Sample PR with new feedback',
+                        'Sample PR waiting for checks',
+                        'Sample PR fixing review feedback',
+                        'Sample PR awaiting conversation resolution',
+                    ][index]!,
+                    kind: 'build',
+                    status: 'Review',
+                });
+
+                work = records.setPullRequest(work.workId, work.revision, `${repository}#${991 + index}`);
+                work = records.addThread(work.workId, work.revision, `sample-pr-owner-${index}`, 'build');
+
+                if (index === 3) {
+                    const parent = records.create({
+                        repository,
+                        title: 'Sample linked feedback correction',
+                        kind: 'concept',
+                        status: 'Review',
+                    });
+
+                    work = records.setParent(work.workId, work.revision, parent.workId);
+                }
+
+                if (index === 1)
+                    records.proposeRetro(work.workId, work.revision, [
+                        {
+                            title: 'Support more greeting languages',
+                            description: 'Add more languages in a later build.',
+                            repository,
+                            kind: 'feature',
+                        },
+                    ]);
+
+                threads.set(work.workId, [
+                    {
+                        id: `sample-pr-owner-${index}`,
+                        title: index === 3 ? 'Sample active PR owner' : 'Sample idle PR owner',
+                        purpose: 'build',
+                        state: index === 3 ? 'running' : 'done',
+                        ...(index === 3
+                            ? {
+                                  currentRunning: true,
+                                  activity: {
+                                      available: true as const,
+                                      readAt: new Date().toISOString(),
+                                      action: 'Running a command',
+                                      actionAt: new Date().toISOString(),
+                                      toolRunning: true,
+                                      agents: [],
+                                  },
+                              }
+                            : {}),
+                        watchingPrs: [],
+                        updated: new Date().toISOString(),
+                    },
+                ]);
+                reviews.set(work.workId, review);
+            }
+
+            return [...reviews.keys()];
+        },
         manualOverride(repository: string, capacity: { limit: number }) {
             if (!repository.startsWith('lar-factory-sample/')) throw Error('Only fake sample work is supported.');
 
@@ -57,6 +163,20 @@ export function sampleDelivery(records: WorkRecords) {
         },
         project(item: Item): Item {
             const owned = threads.get(item.id);
+            const review = reviews.get(item.id);
+
+            if (review)
+                item = {
+                    ...item,
+                    verification: { ...item.verification!, required: false, prReview: true },
+                    linkedPrs: item.linkedPrs.map((pr) => ({
+                        ...pr,
+                        pipelineUnread: undefined,
+                        review,
+                        mergeState: review.unresolvedThreads ? 'blocked' : 'can merge',
+                        checkProgress: { state: 'current' },
+                    })),
+                };
 
             return owned
                 ? {

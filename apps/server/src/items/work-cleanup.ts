@@ -2,6 +2,7 @@ import { buildBranch, type Item } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, readlink, realpath } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join, dirname, parse, relative, isAbsolute } from 'node:path';
 
 import { prHost } from '../config/pr-host.ts';
@@ -21,6 +22,8 @@ export interface CleanupPlan {
     warning?: string;
     fingerprint?: string;
     remoteHead?: string | null;
+    /** Provider-confirmed merged delivery head; permits deleting this exact squash/rebase branch. */
+    mergedHead?: string;
 }
 
 /** How many branches one cleanup inspects at once. */
@@ -40,6 +43,7 @@ type CleanupInput = {
     sliceIds: string[];
     liveWorktreePaths: string[];
     defaultBranch: string;
+    mergedHead?: string;
     writable: boolean;
     provider?: Pick<ReturnType<typeof prHost>, 'branchExists' | 'openPrByHead'>;
     git?: typeof runTool;
@@ -161,7 +165,11 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
         input.defaultBranch;
 
     for (const ref of localBranches) {
-        state.push(await read(input.checkout, ['rev-parse', `refs/heads/${ref}`]));
+        const head = (await read(input.checkout, ['rev-parse', `refs/heads/${ref}`])).trim();
+
+        state.push(head);
+
+        if (input.mergedHead && ref === branch && head === input.mergedHead) continue;
 
         const upstream = await read(input.checkout, [
             'for-each-ref',
@@ -223,6 +231,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
 
     return {
         remoteHead,
+        ...(input.mergedHead ? { mergedHead: input.mergedHead } : {}),
         fingerprint: createHash('sha256').update(JSON.stringify(state)).digest('hex'),
         branch,
         localBranches,
@@ -269,6 +278,9 @@ export async function executeCleanup(input: {
         for (const path of plan.worktreePaths) {
             await validateWorktreeRemoval(input.checkout, path, plan.localBranches, git);
 
+            if (plan.mergedHead && (await readGit(git, path, ['rev-parse', 'HEAD'])).trim() !== plan.mergedHead)
+                throw new Error('Merged worktree head changed. Cleanup retained it.');
+
             const result = await git(
                 'git',
                 ['-C', input.checkout, 'worktree', 'remove', ...(input.confirmedLoss ? ['--force'] : []), '--', path],
@@ -278,9 +290,28 @@ export async function executeCleanup(input: {
             if (result.code !== 0) errors.push(`Could not remove worktree ${path}`);
         }
         for (const branch of plan.localBranches) {
+            if (plan.mergedHead) {
+                const head = await readGit(git, input.checkout, ['rev-parse', `refs/heads/${branch}`]);
+
+                if (branch !== plan.branch || head.trim() !== plan.mergedHead)
+                    throw new Error('Merged branch head changed. Cleanup retained it.');
+            }
+
+            if (
+                plan.mergedHead &&
+                (await readGit(git, input.checkout, ['worktree', 'list', '--porcelain']))
+                    .split('\n')
+                    .includes(`branch refs/heads/${branch}`)
+            ) {
+                errors.push(`Could not delete checked-out branch ${branch}`);
+                continue;
+            }
+
             const result = await git(
                 'git',
-                ['-C', input.checkout, 'branch', input.confirmedLoss ? '-D' : '-d', '--', branch],
+                plan.mergedHead
+                    ? ['-C', input.checkout, 'update-ref', '-d', `refs/heads/${branch}`, plan.mergedHead]
+                    : ['-C', input.checkout, 'branch', input.confirmedLoss ? '-D' : '-d', '--', branch],
                 { timeout: 10_000 },
             );
 
@@ -324,7 +355,7 @@ async function validateWorktreeRemoval(
         throw new Error('Unsafe worktree path');
 
     // T3 creates worktrees beside the project or under its .t3 worktree root.
-    const roots = [dirname(root), join(root, '.t3', 'worktrees')];
+    const roots = [dirname(root), join(root, '.t3', 'worktrees'), join(homedir(), '.t3', 'worktrees')];
 
     if (
         !roots.some((parent) => {

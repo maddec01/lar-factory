@@ -46,6 +46,8 @@ export function prepareBuildClaim(records: WorkRecords, workId: string, input: B
     if (!statuses.includes(work.status))
         refuse(`Only Ready builds or stopped builds can start; status is ${work.status}.`);
 
+    if (records.activePrAmendment(workId)) refuse('The linked Spec amendment is still being corrected.');
+
     if (!gate) refuse('This build needs a current passing gate before Start build.');
 
     if (input.expectedGateId && gate?.gateId !== input.expectedGateId)

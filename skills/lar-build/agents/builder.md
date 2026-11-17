@@ -3,7 +3,7 @@
 Deliver one approved build from its brief in the existing build worktree, never
 from the shaping conversation. `<lar-build>` is this file's parent's parent.
 Read [entry rules](../SKILL.md), [project rules](../project-rules.md) and
-[work records](../shared/issue-tracker/work-records.md) once. The user merges.
+[work records](../shared/issue-tracker/work-records.md) once. Hand back the recorded PR with green required checks per CI. Humans merge.
 Every Needs you stop uses `lar-work set-needs-you ID --revision N --reason X`;
 save the current Status and resume with `lar-work clear-needs-you ID --revision N
 --status "<saved Status>"`.
@@ -28,8 +28,8 @@ Load only its file; completed phases stay completed:
 | `approve` | [Approve](../stages/approve.md) | recorded PR and recommendation |
 | `checks` | [CI](../stages/ci.md) | required checks, Retro suggestions and handback Status |
 
-Retro runs inside CI at the first handback; the board collects picks before
-merge. New builds never enter the `retro` phase.
+Retro runs inside CI at the first handback; the board collects optional picks alongside
+PR review. New builds never enter the `retro` phase.
 
 ## Delegation and exceptions
 
@@ -60,7 +60,7 @@ Selected/frozen reviewer instructions take precedence; shaping roles use
 | `reviewer:<custom>` | selected frozen text |
 
 Accepted findings or failed checks load [Fixer](fixer.md).
-Wrong scope, conflicts, another repository or failed Verify load
+Human PR feedback, wrong scope, conflicts, another repository or failed Verify load
 [Recovery](../stages/recovery.md). Questions load
 [Questions](../shared/questions.md). Past about 150k tokens load
 [Build handoff](../stages/handoff.md). After integrating slices and before pushing,

@@ -220,3 +220,19 @@ test('Azure read-only sessions allow eligibility reads but refuse writes before 
     });
     expect(s.merge).not.toHaveBeenCalled();
 });
+
+test('fallback merge uses the freshly read repository default, ignoring a legacy client method', async () => {
+    const s = await setup();
+
+    s.read.mockImplementation(async () => ({
+        pr: { ...s.pr },
+        methods: ['merge', 'squash'],
+        defaultMethod: 'squash',
+        blockers: [],
+    }));
+
+    const { confirmation } = await s.inspect();
+
+    expect((await s.mergePr(s.item.id, { token: confirmation.token, method: 'merge' })).status).toBe(200);
+    expect(s.merge).toHaveBeenCalledWith('owner/repo', 8, 'abc', 'squash');
+});

@@ -1,7 +1,7 @@
 // A dossier's one line in the dock: its identity, first chip and Start, then its parts bar, what's next and figures.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { deskParentName, itemActivityStill, itemName } from '@lar-factory/shared';
+import { deliveryPrStatus, deskParentName, itemActivityStill, itemName } from '@lar-factory/shared';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { ActivityLine } from './ActivityLine';
@@ -92,7 +92,13 @@ function Chips({ chips }: { chips: Chip[] }) {
 /** Next, as a sentence. */
 function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
     const shown = useShownStatus(n.part?.item ?? parent);
-    const word = { you: n.waitLabel ?? shown.word, start: 'Next', moving: 'Moving', none: '' }[n.tone];
+    const delivery = deliveryPrStatus(n.part?.item ?? parent, useActivityUnavailable());
+    const word = {
+        you: n.waitLabel ?? shown.word,
+        start: 'Next',
+        moving: delivery?.running ? delivery.label : 'Moving',
+        none: '',
+    }[n.tone];
 
     // "Next" shows, quietly, so the part the owner can start reads as the concept's next step.
     return <DossierNext word={word} yours={n.tone === 'you'} strong={n.tone === 'start'} text={n.text} />;

@@ -21,6 +21,7 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
                 'data-dir': { type: 'string' },
                 escalations: { type: 'string' },
                 'run-id': { type: 'string' },
+                'feedback-head': { type: 'string' },
             },
         });
 
@@ -60,10 +61,17 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
         const rounds = records.reviewRounds(workId).filter((round) => !runId || round.runId === runId);
         const previous = records.reviewerSelection(workId);
         const reviewed = rounds.at(-1)?.base;
+        const feedbackHead = parsed.values['feedback-head'];
+
+        if (feedbackHead && (!/^[a-f0-9]{40,64}$/.test(feedbackHead) || !records.read(workId).pullRequest))
+            throw new Error('Review feedback requires a recorded PR and its full reviewed head SHA.');
+
         const verifyReturn =
-            verification.latest?.result === 'fail' && reviewed && head !== verification.latest.head
-                ? { rejectedHead: verification.latest.head }
-                : undefined;
+            feedbackHead && reviewed && head !== feedbackHead
+                ? { rejectedHead: feedbackHead }
+                : verification.latest?.result === 'fail' && reviewed && head !== verification.latest.head
+                  ? { rejectedHead: verification.latest.head }
+                  : undefined;
 
         if (verifyReturn)
             base =
@@ -80,7 +88,7 @@ export async function selectReviewersCommand(args: string[]): Promise<number> {
                 ? {
                       ...reviewer,
                       triggerVersion: 2 as const,
-                      reason: `Verify rejection; delta ${base}..${head}; approver required. ${reviewer.reason}`,
+                      reason: `${feedbackHead ? 'PR review feedback' : 'Verify rejection'}; delta ${base}..${head}; approver required. ${reviewer.reason}`,
                   }
                 : reviewer;
 

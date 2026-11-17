@@ -18,6 +18,7 @@ export async function verificationCommand(command: string, args: string[]): Prom
                 file: { type: 'string' },
                 pr: { type: 'string' },
                 head: { type: 'string' },
+                url: { type: 'string' },
             },
         });
 
@@ -26,6 +27,12 @@ export async function verificationCommand(command: string, args: string[]): Prom
         const id = positionals[0]!;
 
         records = await openWorkRecords(workRecordsPath(values['data-dir']));
+
+        if (command === 'pr-agent-comment') {
+            if (!values.url) throw new Error('Use --url with the agent-authored PR comment URL.');
+
+            records.recordPrAgentComment(id, values.url);
+        }
 
         if (command === 'record-verification') requireHumanAction('Record Verify');
         else if (command === 'verification-head') {

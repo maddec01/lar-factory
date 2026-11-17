@@ -4,7 +4,10 @@ import { azureMerge } from '../azure/azure-merge.ts';
 import { githubMerge } from '../github/github-merge.ts';
 
 export interface MergeProvider {
-    read(repo: string, number: number): Promise<{ pr: LinkedPr; methods: readonly MergeMethod[]; blockers: string[] }>;
+    read(
+        repo: string,
+        number: number,
+    ): Promise<{ pr: LinkedPr; methods: readonly MergeMethod[]; defaultMethod?: MergeMethod; blockers: string[] }>;
     merge(repo: string, number: number, revision: string, method: MergeMethod): Promise<void>;
 }
 

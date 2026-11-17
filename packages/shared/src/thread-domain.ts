@@ -68,6 +68,8 @@ export interface ItemThread {
     /** A running, waiting or queued descendant still belongs to this thread's work. */
     hasLiveChildren?: true;
     currentRunning?: true;
+    /** Current T3 PR watches by URL; absent when the server did not expose them. */
+    watchingPrs?: string[];
     /** A current descendant execution titled by role-launch, not merely a missing review result. */
     doubtRunning?: true;
     /** T3 has queued this thread's next turn. Its state stays `done`. */

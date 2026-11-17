@@ -103,7 +103,7 @@ export function PartRow({
                 <RowMeta onClick={opensItem(item, onOpen)}>
                     {/* What is going on, in one column, as a lane row reads: what its thread does, else what it asks of
                         you, else its state, else what holds it. */}
-                    {showsActivity ? (
+                    {showsActivity && !shown.prStatus ? (
                         <ActivityLine item={item} />
                     ) : asksYou ? (
                         <RowState title={word}>
@@ -149,6 +149,11 @@ export function PartRow({
                     <PartAction part={part} data={data} />
                 </RowSide>
             </RowFirst>
+            {shown.prStatus && showsActivity && (
+                <RowFoot>
+                    <ActivityLine item={item} />
+                </RowFoot>
+            )}
             {!done && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
                 <RowFoot>
                     <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />

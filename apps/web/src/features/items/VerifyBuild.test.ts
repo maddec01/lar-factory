@@ -50,11 +50,13 @@ function api(after?: BoardData, error?: string) {
 }
 
 async function openVerify() {
-    await settle(() => [...card().querySelectorAll('button')].find((node) => text(node) === 'Verify build')!.click());
+    const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
     await settle();
 }
 
-test('the compact desk action opens Verify details; only Fail asks for a note and submits the inspected revision', async () => {
+test('legacy Verify remains available in the item dialog; only Fail asks for a note and submits the inspected revision', async () => {
     api();
     await mountPage(board);
     await settle();

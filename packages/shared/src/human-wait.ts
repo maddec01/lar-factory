@@ -1,6 +1,6 @@
 import { dependencyProofs, deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
-import { prReadiness } from './presentation.ts';
+import { deliveryPrStatus, prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
 import { releaseNeedsPedro, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
@@ -36,7 +36,21 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
     )
         return null;
 
+    const pr = item.linkedPrs?.[0];
+    const observedReview = item.verification?.prReview && pr?.state === 'open' && pr.review;
+    const delivery = deliveryPrStatus(item, unavailable);
+    const reviewWait =
+        delivery &&
+        !delivery.running &&
+        (delivery.feedback || delivery.handback || (pr?.review?.required === 'green' && pr.mergeState !== 'conflicts'));
+
+    const automaticRepair =
+        item.verification?.prReview &&
+        pr?.state === 'open' &&
+        ((pr.review ? pr.review.required === 'failed' : !!pr.checks?.failed && pr.mergeState !== 'can merge') ||
+            pr.mergeState === 'conflicts');
     const waiting =
+        reviewWait ||
         releaseNeedsPedro(item, all) ||
         (item.status !== 'Done' &&
             Array.isArray(item.threads) &&
@@ -52,9 +66,12 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         (item.status !== 'Done' &&
             Array.isArray(item.threads) &&
             item.threads.some((thread) => thread.childNeedsYou && !thread.observedAt)) ||
-        ((item.status === 'Verify' || item.status === 'Ready to merge') &&
+        (!observedReview &&
+            (!pr || pr.state === 'open') &&
+            (item.status === 'Verify' || item.status === 'Ready to merge') &&
+            !automaticRepair &&
             !workingAgain(item, unavailable) &&
-            prReadiness(item)?.state !== 'active');
+            (item.verification?.prReview || prReadiness(item)?.state !== 'active'));
 
     return waiting ? deskWait(item, unavailable, all) : null;
 }

@@ -1,7 +1,7 @@
 import { reconcileWaitItems } from './group-reconciliation.ts';
 import type { Item } from './item-domain.ts';
 import { nextAction } from './item-next-action.ts';
-import { prReadiness } from './model.ts';
+import { deliveryPrStatus } from './presentation.ts';
 import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
 import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
 import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
@@ -40,31 +40,6 @@ export const reconcileGroupWaits = (item: Item, all: readonly Item[] = []): bool
             Array.isArray(owner.threads) &&
             owner.threads.some((thread) => thread.observedAt || isLiveThread(thread) || thread.hasRunningChildren),
     );
-
-/**
- * What holds a PR at Verify or Ready to merge before anything else: a failed check, then a conflict with main. The wait
- * says what is wrong and its button where it is put right, so the card's foot and its button never say the same words.
- */
-function prBlocker(item: Item) {
-    if (item.status !== 'Verify' && item.status !== 'Ready to merge') return null;
-
-    if (nextAction(item)?.kind !== 'pr') return null;
-
-    const pr = item.linkedPrs[0];
-
-    if (!pr || pr.state !== 'open' || pr.pipelineUnread) return null;
-
-    if (prReadiness(item)?.state === 'failed')
-        return {
-            label: 'Checks failed',
-            action: { kind: 'pr' as const, label: 'Review failed checks', threadId: undefined },
-        };
-
-    if (pr.mergeState === 'conflicts')
-        return { label: 'Resolve conflicts', action: { kind: 'pr' as const, label: 'Open PR', threadId: undefined } };
-
-    return null;
-}
 
 /** The desk names the human wait independently of the recorded workflow stage. */
 export function deskWait(item: Item, unavailable = false, all: readonly Item[] = []) {
@@ -139,22 +114,45 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.needsYou?.offers.includes('start-again'))
         return { label: 'Start failed', action: { kind: 'start-again' as const, label: 'Start again' } };
 
-    // A failed check or a conflict holds the PR whatever its step, so the wait and its button both name it first.
-    const blocker = prBlocker(item);
+    const pr = item.linkedPrs?.[0];
 
-    if (blocker) return blocker;
+    if (item.needsYou)
+        return { label: 'Decision needed', action: { kind: 'details' as const, label: 'Review notice' } };
 
-    if (item.status === 'Verify') return { label: 'Verify build', action: nextAction(item) };
+    const delivery = deliveryPrStatus(item, unavailable);
+
+    if (
+        item.verification?.prReview &&
+        pr?.state === 'open' &&
+        (!delivery ||
+            delivery.running ||
+            (!delivery.feedback &&
+                !delivery.handback &&
+                (pr.mergeState === 'conflicts' || pr.review?.required !== 'green')))
+    ) {
+        return { label: delivery?.label ?? 'Working on PR', action: undefined };
+    }
+
+    if (delivery?.feedback)
+        return {
+            label: delivery.label,
+            action: { kind: 'pr-feedback' as const, label: 'Address it' },
+        };
+
+    if (delivery)
+        return {
+            label: delivery.handback ? `Review PR #${pr!.number}` : delivery.label,
+            action: { kind: 'pr' as const, label: 'Review PR' },
+        };
+
+    if (item.status === 'Verify' && (!pr || pr.state === 'open'))
+        return { label: 'Review PR', action: { kind: 'pr' as const, label: 'Review PR' } };
 
     if (retroWaits(item.retro, item.status))
         return { label: 'Choose follow-ups', action: { kind: 'details' as const, label: 'Choose follow-ups' } };
 
-    // Until its PR can merge, the wait is the review its button opens, in the row's words.
-    if (item.status === 'Ready to merge')
-        return { label: prReadiness(item)?.word ?? 'Merge PR', action: nextAction(item) };
-
-    if (item.needsYou)
-        return { label: 'Decision needed', action: { kind: 'details' as const, label: 'Review notice' } };
+    if (item.status === 'Ready to merge' && (!pr || pr.state === 'open'))
+        return { label: 'Review PR', action: { kind: 'pr' as const, label: 'Review PR' } };
 
     return {
         label:

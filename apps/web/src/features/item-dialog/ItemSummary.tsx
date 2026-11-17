@@ -49,15 +49,21 @@ export function ItemSummary({ item, openPart }: { item: Item; openPart?: ((itemI
                     {/* Blocked by other work isn't your turn, so it keeps the item's own glyph, not the amber light. */}
                     <SummaryStatus
                         title={
-                            held
-                                ? (blockedText(item) ?? shown.word)
-                                : item.setAside
-                                  ? `Last status: ${shown.recorded}`
-                                  : shown.recorded
+                            item.closeReason
+                                ? `Closed ${item.closeReason}`
+                                : held
+                                  ? (blockedText(item) ?? shown.word)
+                                  : item.setAside
+                                    ? `Last status: ${shown.recorded}`
+                                    : shown.recorded
                         }
                     >
                         {/* What holds it in short, as its row says it ("Blocked by Part 15"), the tooltip in full. */}
-                        {held ? (partWait(item, data) ?? 'Blocked') : (retiredPartLabel(item) ?? word)}
+                        {item.closeReason
+                            ? `Closed ${item.closeReason}`
+                            : held
+                              ? (partWait(item, data) ?? 'Blocked')
+                              : (retiredPartLabel(item) ?? word)}
                     </SummaryStatus>
                     {!item.setAside && item.staleGate && (
                         <SummaryBlocked title={staleGateReason(item) ?? undefined}>Approval out of date</SummaryBlocked>

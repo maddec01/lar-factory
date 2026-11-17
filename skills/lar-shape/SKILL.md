@@ -25,6 +25,7 @@ simplest safe engineering defaults and state them in the brief.
 - Gate-only with a resolved work ID and saved brief: [Gate](gate.md) directly.
 - Build-time correction uses the same Brief and Gate, then returns to the
   paused build's recorded phase; it starts no second build.
+- User chooses to close without a build: [Close during shaping](close.md).
 - Implementation requested later: [Start build](start-build.md).
 
 When asking, read [Questions](shared/questions.md). When delegating, read

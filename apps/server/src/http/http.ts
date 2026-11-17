@@ -1052,7 +1052,8 @@ export function createBoardServer({
         const items = board.snapshot().items;
         const item =
             items.find((i) => i.id === itemId) ??
-            items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId);
+            items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId) ??
+            archive().find((i) => i.id === itemId);
 
         if (!item) return json(res, 404, { error: 'That item is not on the board.' });
 
@@ -1095,9 +1096,9 @@ export function createBoardServer({
 
         if (!before) return json(res, 400, { error: 'Name where the older comments start.' });
 
-        const item = board.snapshot().items.find((i) => i.id === itemId);
+        const item = board.snapshot().items.find((i) => i.id === itemId) ?? archive().find((i) => i.id === itemId);
 
-        if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+        if (!item) return json(res, 404, { error: 'That item is not on the board or in Archive.' });
 
         try {
             const read = await itemDetails.olderComments(item, before);

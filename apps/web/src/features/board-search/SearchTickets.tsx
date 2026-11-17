@@ -63,7 +63,11 @@ function ticketOption(
         // An item on Your desk says its stage, then what it waits for in the desk's words.
         meta: [
             repoName(repoKey(item), data.repos),
-            item.status !== 'List' && (yours ? laneOf(item, data, word) : word),
+            item.closeReason
+                ? `Closed ${item.closeReason}`
+                : item.archived
+                  ? 'Archived'
+                  : item.status !== 'List' && (yours ? laneOf(item, data, word) : word),
             yours && deskWait(item, false, data.items).label,
         ]
             .filter((word, i, words) => word && words.indexOf(word) === i)
@@ -78,10 +82,12 @@ export function ticketOptions(input: SearchInput, { leave, widen }: SearchHandle
     const words = wordsOf(query);
     const shows = rowFilter(filters, data.repos);
     const kept = (item: Item) => (!scope || inRepo(item, scope)) && shows(item);
-    const hits = data.items
+    const archived = input.archived ?? [];
+    const onBoard = new Set(data.items.map((item) => item.id));
+    const hits = [...data.items, ...archived.filter((item) => !onBoard.has(item.id))]
         .filter(
             (item) =>
-                (item.status !== 'Done' || isRecentlyDone(item, now)) &&
+                (item.archived || item.status !== 'Done' || isRecentlyDone(item, now)) &&
                 words.every((word) => matchesSearch(item, word)),
         )
         .sort(byFlowOrder);
@@ -114,11 +120,18 @@ export function ticketOptions(input: SearchInput, { leave, widen }: SearchHandle
 
 /** The tickets in three groups: the work on the board, then the List's, then what finished recently (done, merged or set
  *  aside), so a query lands on open work first; Search all tickets at the end. */
-export function ticketGroups(tickets: SearchOption[], data: BoardData): SearchGroup[] {
+export function ticketGroups(tickets: SearchOption[], data: BoardData, archived: Item[] = []): SearchGroup[] {
+    const archivedIds = new Set(
+        archived.filter((item) => !data.items.some((live) => live.id === item.id)).map(ticketValue),
+    );
     const listed = new Set(data.items.filter((item) => item.status === 'List').map(ticketValue));
     const finished = new Set(data.items.filter((item) => item.status !== 'List' && isDone(item)).map(ticketValue));
     const board = tickets.filter(
-        (option) => !listed.has(option.value) && !finished.has(option.value) && option.value !== 'tickets:all',
+        (option) =>
+            !listed.has(option.value) &&
+            !finished.has(option.value) &&
+            !archivedIds.has(option.value) &&
+            option.value !== 'tickets:all',
     );
     const list = tickets.filter((option) => listed.has(option.value));
     const done = tickets.filter((option) => finished.has(option.value));
@@ -127,6 +140,7 @@ export function ticketGroups(tickets: SearchOption[], data: BoardData): SearchGr
         { label: 'On the board', options: board },
         { label: 'List', options: list },
         { label: 'Recently finished', options: done },
+        { label: 'Archive', options: tickets.filter((option) => archivedIds.has(option.value)) },
     ].filter((group) => group.options.length > 0);
 
     // Search all tickets closes the last group, or stands alone when every match is hidden.

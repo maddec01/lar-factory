@@ -22,7 +22,7 @@ stages=Path('skills/stages/shaping')
 assert {p.name for p in stages.iterdir()} == {
  'concepts.md', 'diagnose-bug.md', 'grilling-with-docs.md',
  'prototype-logic.md', 'prototype-question.md', 'prototype-ui.md',
- 'research-question.md', 'start-build.md',
+ 'research-question.md', 'start-build.md', 'close.md',
  'pick-up.md', 'size-up.md', 'brief.md', 'gate.md', 'doubt.md', 'decisions.md',
 }
 pick_up=(stages/'pick-up.md').read_text()

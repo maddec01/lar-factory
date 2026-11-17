@@ -271,10 +271,11 @@ Changes
   merge-build <work-id> --revision N --file F
                                     F: {into,revisions:{ID:N},dependencyRevisions?:{ID:N}}
                                     Revisions cover survivor, edge endpoints and parent.
-  set-aside <work-id> --revision N [--file F]
+  set-aside <work-id> --revision N [--file F] [--reason X]
                                     Resolve every dependent atomically. F is JSON:
                                     [{workId,revision,action,reason,blockerId?,blockerRevision?}]
                                     action: replace, remove or hold.
+                                    --reason retains one line explaining a shaping close.
   set-aside-history <work-id>        Read the retained dependent dispositions.
   restore <work-id> --revision N    Bring a set-aside record back.
   set-needs-you <work-id> --revision N --reason X
@@ -1004,6 +1005,7 @@ async function run(
                 values.file === undefined
                     ? []
                     : (readJson(values, 'dependent resolutions') as import('./set-aside.ts').DependentResolution[]),
+                values.reason,
             );
         case 'set-aside-history':
             return records.setAsideHistory(workId!);

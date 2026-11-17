@@ -325,7 +325,10 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             ...(parent && {
                 partOrder: childrenOf(parent.workId).findIndex((child) => child.workId === record.workId) + 1,
             }),
-            ...(record.setAside && { setAside: true }),
+            ...(record.setAside && {
+                setAside: true,
+                closeReason: records.setAsideHistory(record.workId).at(-1)?.reason,
+            }),
             ...(record.supersededBy && {
                 supersededBy: { ...ref(records.read(record.supersededBy)), workId: record.supersededBy },
             }),

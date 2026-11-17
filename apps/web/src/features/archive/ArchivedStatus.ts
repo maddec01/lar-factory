@@ -12,6 +12,8 @@ export const archiveSection = (item: Item): ArchiveSection => (item.archived?.se
 /** What Archive says of where the work stands beyond its section's heading: the work set-aside work merged into, or
  *  the day finished work closed; nothing when the heading says it all. */
 export function archivedAs(item: Item): string | undefined {
+    if (item.closeReason) return `Closed ${item.closeReason}`;
+
     const retired = retiredPartLabel(item);
 
     if (retired && retired !== 'Set aside') return retired;

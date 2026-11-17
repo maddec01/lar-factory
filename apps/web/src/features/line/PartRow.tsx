@@ -1,5 +1,5 @@
 // One part of a concept as a lane row, the same in the board's parts box and in the concept's dialog: what it is,
-// what holds it or what its thread does, its checks or slices, its cost or state, and what it asks next.
+// what holds it or what its thread does, its reviewers, checks or slices, its cost or state, and what it asks next.
 
 import type { BoardData } from '@lar-factory/shared';
 import { humanWait } from '@lar-factory/shared';
@@ -15,8 +15,9 @@ import { PartIdentity } from './PartIdentity';
 import { partState } from './PartState';
 import { ChecksProgress } from './RowChecks';
 import { figuresOf, opensItem } from './RowDetails';
-import { threadText } from './StageStatus';
-import { useActivityState, useActivityStill } from './useActivityState';
+import { ReviewerList, ReviewersProgress } from './RowReviewers';
+import { reviewing, stateMark, threadText } from './StageStatus';
+import { useActivityAction, useActivityState, useActivityStill } from './useActivityState';
 import { workLabel } from './WorkLabel';
 import {
     Age,
@@ -26,8 +27,8 @@ import {
     SliceList,
     StartAfterError,
     StartMessage,
-    useShownStatus,
     useActivityUnavailable,
+    useShownStatus,
 } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import {
@@ -49,7 +50,7 @@ import {
 
 /** One part of a concept, on the board and in the concept's dialog alike, as a lane row reads: its state glyph, kind
  *  and source marks, its number and title and its project on one line; then what holds it or what its thread does now,
- *  its checks or slices bar and count (which unfold its slices), and its cost or state at the end, with what it asks
+ *  its reviewers', checks' or slices' bar and count (which unfold its reviewers or slices), and its cost or state at the end, with what it asks
  *  next over them on hover. `home` is the concept's own repository, which a part in it names quietly. */
 export function PartRow({
     part,
@@ -73,20 +74,24 @@ export function PartRow({
     const shown = useShownStatus(item);
     const unavailable = useActivityUnavailable();
     const activity = useActivityState(item);
+    const action = useActivityAction(item);
     const still = useActivityStill(item);
     const [unfolded, setUnfolded] = useState(false);
     const done = isDone(item);
     const word = shown.word;
     // A part whose word already counts its parts shows that one count, not its slices too.
     const partsCounted = word.endsWith(' parts done');
-    // A part that waits on you says so in amber, as its desk card does.
-    const asksYou = !done && !!humanWait(item, unavailable, data.items);
+    // A part that waits on you says so in amber and in its desk card's words, over a thread still at work.
+    const wait = done ? null : humanWait(item, unavailable, data.items);
+    const asksYou = !!wait;
     // What holds a part reads where its activity would, as a lane row's blocker does: "Blocked by #139".
     const held = !done && openWaits(part).length > 0;
     const state = partState(item, data, word);
     const showsActivity = !asksYou && !held && activity && !['unavailable', 'stopped', 'waiting'].includes(activity);
     const figures = figuresOf(item, data);
     const checks = prChecks(item, data, disconnected);
+    // While a review round runs, its reviewers take the progress cell and unfold under the row, as on a lane row.
+    const reviewers = !done && reviewing(item);
     const slices = item.slices.length;
     const sliceCount = item.slices.filter((x) => x.progress === 'done').length;
     // A part at work names what runs, so its bar says something is going on even with no slices to count.
@@ -101,21 +106,34 @@ export function PartRow({
                     <PartIdentity item={item} home={home} />
                 </RowOpen>
                 <RowMeta onClick={opensItem(item, onOpen)}>
-                    {/* What is going on, in one column, as a lane row reads: what its thread does, else what it asks of
-                        you, else its state, else what holds it. */}
-                    {showsActivity && !shown.prStatus ? (
-                        <ActivityLine item={item} />
-                    ) : asksYou ? (
-                        <RowState title={word}>
-                            <WaitWord>{word}</WaitWord>
-                            {activity === 'working' && <ActivityLine item={item} />}
+                    {/* What is going on, in one column, as a lane row reads: what it asks of you (its thread's action
+                        then in the tooltip), else what its thread does, else what holds it, else its state. */}
+                    {wait ? (
+                        <RowState
+                            title={[wait.label, shown.prStatus !== wait.label && shown.prStatus, action]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            mark="waiting"
+                        >
+                            <WaitWord>{wait.label}</WaitWord>
                         </RowState>
+                    ) : showsActivity ? (
+                        <ActivityLine item={item} word={shown.prStatus} />
                     ) : held ? (
                         <RowBlocked>{state}</RowBlocked>
                     ) : (
-                        <RowState title={threadText(item, shown.working)}>{state}</RowState>
+                        <RowState title={threadText(item, shown.working)} mark={stateMark(activity)}>
+                            {state}
+                        </RowState>
                     )}
-                    {checks ? (
+                    {reviewers ? (
+                        <ReviewersProgress
+                            item={item}
+                            open={unfolded}
+                            onToggle={() => setUnfolded(!unfolded)}
+                            still={still}
+                        />
+                    ) : checks ? (
                         <ChecksProgress {...checks} still={still} />
                     ) : slices > 0 && !partsCounted ? (
                         <RowProgress
@@ -149,11 +167,6 @@ export function PartRow({
                     <PartAction part={part} data={data} />
                 </RowSide>
             </RowFirst>
-            {shown.prStatus && showsActivity && (
-                <RowFoot>
-                    <ActivityLine item={item} />
-                </RowFoot>
-            )}
             {!done && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
                 <RowFoot>
                     <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />
@@ -162,7 +175,7 @@ export function PartRow({
             )}
             {unfolded && (
                 <RowSlices>
-                    <SliceList item={item} still={still} />
+                    {reviewers ? <ReviewerList item={item} still={still} /> : <SliceList item={item} still={still} />}
                 </RowSlices>
             )}
         </StageRowItem>

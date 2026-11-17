@@ -1,4 +1,4 @@
-import type { RecordDetails } from '@lar-factory/shared';
+import type { ItemReviewer, RecordDetails, ReviewerStatus } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
 /** Selection is visible before launches; only terminal evidence supplies a result. */
@@ -26,7 +26,7 @@ export function reviewerProgress(records: WorkRecords, id: string): RecordDetail
             name: reviewer.name,
             reason: reviewer.reason,
             status: !reviewer.run
-                ? 'Skipped'
+                ? ('Skipped' as const)
                 : verdict
                   ? verdict.verdict === 'approve'
                       ? 'Approved'
@@ -49,4 +49,13 @@ export function reviewerProgress(records: WorkRecords, id: string): RecordDetail
                     : {}),
         };
     });
+}
+
+/** The reviewers a row shows for its build's current round: the ones chosen to run, with where each stands. */
+export function itemReviewers(records: WorkRecords, id: string): ItemReviewer[] | undefined {
+    const shown = reviewerProgress(records, id)?.flatMap(({ id, name, status }) =>
+        status === 'Skipped' ? [] : [{ id, name, status: status as ReviewerStatus }],
+    );
+
+    return shown?.length ? shown : undefined;
 }

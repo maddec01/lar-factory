@@ -16,6 +16,7 @@ import { PartStart } from './PartStart';
 import { figuresOf } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
 import { stageOf } from './StageStatus';
+import { useActivityAction } from './useActivityState';
 import {
     Age,
     ConceptBuild,
@@ -89,8 +90,8 @@ function Chips({ chips }: { chips: Chip[] }) {
     return <DossierChips first={first} more={rest.map((c) => c.words)} />;
 }
 
-/** Next, as a sentence. */
-function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
+/** Next, as a sentence; `detail`, such as what the parent's thread does meanwhile, is its tooltip's. */
+function Next({ n, parent, detail }: { n: ReturnType<typeof nextOf>; parent: Item; detail?: string | undefined }) {
     const shown = useShownStatus(n.part?.item ?? parent);
     const delivery = deliveryPrStatus(n.part?.item ?? parent, useActivityUnavailable());
     const word = {
@@ -101,7 +102,9 @@ function Next({ n, parent }: { n: ReturnType<typeof nextOf>; parent: Item }) {
     }[n.tone];
 
     // "Next" shows, quietly, so the part the owner can start reads as the concept's next step.
-    return <DossierNext word={word} yours={n.tone === 'you'} strong={n.tone === 'start'} text={n.text} />;
+    return (
+        <DossierNext word={word} yours={n.tone === 'you'} strong={n.tone === 'start'} text={n.text} detail={detail} />
+    );
 }
 
 /** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, `note` follows its title, and `tools`, an expanded dossier's view controls, sit in the action slot beside any Start. */
@@ -129,6 +132,7 @@ export function DossierLine({
     const n = nextOf(m, parent);
     // The parent's own thread at work says what it does where its next step would be, as a lane row's does.
     const acts = useDossierActivity(parent);
+    const action = useActivityAction(parent);
     const repos = otherRepos(parent, m, data);
     const partOf = deskParentName(parent, data.items);
     const hasParent = !!(parent.parentId || parent.parent);
@@ -168,9 +172,12 @@ export function DossierLine({
                     </DossierTitleCell>
                 </RowCells>
                 <RowMeta>
-                    {/* What is going on, in one column: what its thread does, else what it belongs to, else its next
-                        step, else a held run, else its state. */}
-                    {acts ? (
+                    {/* What is going on, in one column: what waits on you, as Your desk asks it (with what its thread
+                        does in the tooltip), else what its thread does, else what it belongs to, else its next step,
+                        else a held run, else its state. */}
+                    {n.tone === 'you' ? (
+                        <Next n={n} parent={parent} detail={action} />
+                    ) : acts ? (
                         <ActivityLine item={parent} />
                     ) : parentContext ? (
                         <DossierParentContext>{parentContext}</DossierParentContext>

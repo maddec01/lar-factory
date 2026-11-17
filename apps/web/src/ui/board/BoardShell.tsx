@@ -42,14 +42,19 @@ export function BoardShell({
 }
 
 /** Everything under the title bar, which scrolls with the main area as one page, on the bar's 16px gutter; nothing in
- *  it shrinks to fit. */
+ *  it shrinks to fit. A page that ends in Your desk leaves no room under it, so the desk always stands on the window's
+ *  floor, scrolled to the end or not, and never floats over an empty strip. */
 export function BoardContent({
     children,
 }: {
     /** Everything under the title bar. */
     children: ReactNode;
 }) {
-    return <div className="px-gutter-app flex w-full flex-1 flex-col gap-6 pt-6 pb-10 *:shrink-0">{children}</div>;
+    return (
+        <div className="px-gutter-app flex w-full flex-1 flex-col gap-6 pt-6 pb-10 *:shrink-0 has-[>.desk]:pb-0">
+            {children}
+        </div>
+    );
 }
 
 /** A line that stands in for content the board is still reading, centred in its area, in the loader's own look. */

@@ -2,7 +2,7 @@
 // with each slice's mark.
 
 import { ambientMotion, statusStateColors, TickMeter } from '@lar-works/design-system';
-import { CheckIcon } from '@lar-works/design-system/icons';
+import { CheckIcon, XIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { COMPACT_ROW } from './RowStyles';
@@ -15,28 +15,32 @@ const SLICE_COLOR = Object.fromEntries(
 ) as Record<SliceProgress, string>;
 
 /** A segment for each slice in its state's colour, named for screen readers and, all together, by the bar's tooltip;
- *  an active one breathes unless `still`. `size` is `sm` (4px) on a row and `md` (6px) in the item dialog. */
+ *  an active one breathes unless `still`. `size` is `sm` (4px) on a row and `md` (6px) in the item dialog. A row's
+ *  reviewers draw the same bar, with their `noun` and each one's own `word`. */
 export function SliceBar({
     slices,
     still = false,
     size = 'sm',
+    noun = 'Slices',
 }: {
-    /** The slices, each with its name and state. */
-    slices: { name: string; progress: SliceProgress }[];
+    /** The slices, each with its name, state and any word for that state in place of the slice's. */
+    slices: { name: string; progress: SliceProgress; word?: string | undefined }[];
     /** Keeps an active segment from pulsing. */
     still?: boolean;
     /** `sm` on a row (the default), `md` in a dialog. */
     size?: 'sm' | 'md';
+    /** What the segments are, for screen readers: Slices unless given. */
+    noun?: string;
 }) {
     if (!slices.length) return null;
 
-    const done = slices.filter((s) => s.progress === 'done').length;
-    const named = slices.map((s) => `${s.name}: ${sliceProgressLabel[s.progress]}`);
+    const done = slices.filter((s) => s.progress === 'done' || s.progress === 'failed').length;
+    const named = slices.map((s) => `${s.name}: ${s.word ?? sliceProgressLabel[s.progress]}`);
 
     return (
         <div className="min-w-0" title={named.join('\n')} data-slice-bar>
             <TickMeter
-                label={`Slices, ${done} of ${slices.length} done`}
+                label={`${noun}, ${done} of ${slices.length} done`}
                 size={size}
                 // Done slices fill in the success colour and the active one in the accent, over the grey of what's to come and
                 // what's held, as the slice's own row and its grey state say; amber stays for what waits on you.
@@ -73,8 +77,8 @@ export function WorkingBar({
     );
 }
 
-/** A slice's state as a ring: ticked when done, a question mark when unknown, a dot pulsing unless `still` while
- *  active, dashed while held by another slice, so blocked never reads as queued. */
+/** A slice's state as a ring: ticked when done, crossed when failed, a question mark when unknown, a dot pulsing unless
+ *  `still` while active, dashed while held by another slice, so blocked never reads as queued. */
 function SliceMark({
     progress,
     still = false,
@@ -89,11 +93,12 @@ function SliceMark({
             className={`grid size-4 shrink-0 place-items-center rounded-full ${MARK_STROKE} ${progress === 'blocked' ? 'border-dashed' : ''}`}
             style={{
                 borderColor: SLICE_COLOR[progress],
-                background: progress === 'done' ? SLICE_COLOR.done : 'transparent',
+                background: progress === 'done' || progress === 'failed' ? SLICE_COLOR[progress] : 'transparent',
             }}
         >
             {progress === 'unknown' && <span className="text-xs leading-none font-semibold">?</span>}
             {progress === 'done' && <CheckIcon className="size-2.5 text-white" strokeWidth={3} />}
+            {progress === 'failed' && <XIcon className="size-2.5 text-white" strokeWidth={3} />}
             {progress === 'active' && (
                 <span
                     ref={still ? undefined : ambientMotion}

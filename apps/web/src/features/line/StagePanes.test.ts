@@ -304,7 +304,7 @@ test('a brief gate leads the shaping row while its owner finishes a command', as
     await mountPage(data);
     expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('Approve brief');
     expect(text(meta('I_sample13'))).toMatch(/^Approve brief/);
-    expect(text(meta('I_sample13'))).toContain('Running a command');
+    expect(text(meta('I_sample13'))).not.toContain('Running a command');
 });
 
 test('a PR row and its desk review wait change together when the owner hands back', async () => {
@@ -402,9 +402,9 @@ test('an approved shaping owner keeps Publishing Spec until Build is available, 
 
 test.each([
     [{ required: 'green', handlingFeedback: true }, 'Fixing review feedback'],
-    [{ required: 'green', handlingFeedback: true }, 'Fixing review feedback'],
+    [{ required: 'failed', handlingFeedback: true }, 'Fixing review feedback'],
     [{ required: 'pending', handlingFeedback: true }, 'Fixing review feedback'],
-] as const)('PR intent leads an active row, with the command action below it: %s', async (review, label) => {
+] as const)('PR intent leads an active row, with the command action in its tooltip: %s', async (review, label) => {
     const now = '2026-10-21T10:00:00.000Z';
     const pr = sample.items.find((i) => i.id === 'I_sample14')!.linkedPrs[0]!;
 
@@ -453,7 +453,70 @@ test.each([
         ),
     );
     expect(text(meta('I_sample13'))).toMatch(new RegExp(`^${label}`));
-    expect(text(row('I_sample13'))).toContain('Running a command');
+    expect(text(row('I_sample13'))).not.toContain('Running a command');
+    expect(meta('I_sample13').querySelector('[title*="Running a command"]')).not.toBeNull();
     expect(text(meta('I_sample13'))).not.toContain('Running a command');
     expect($('.desk-row[data-item="I_sample13"]')).toBeNull();
+});
+
+test('while a review round runs, its reviewers take the row’s progress and unfold under it as slices do', async () => {
+    await mountPage(
+        fresh(
+            withItem('I_sample13', {
+                parent: null,
+                parentId: null,
+                flow: 'single',
+                status: 'Review',
+                linkedPrs: [],
+                blockers: [],
+                reviewers: [
+                    { id: 'code', name: 'Code', status: 'Running' },
+                    { id: 'security', name: 'Security', status: 'Changes requested' },
+                ],
+            }),
+        ),
+    );
+
+    expect(text(col('I_sample13', 'progress'))).toContain('1/2 reviews');
+
+    await press(row('I_sample13').querySelector('[data-col="progress"] button')!);
+    expect(text(row('I_sample13').querySelector('[data-slices]'))).toBe(
+        'Code reviewRunningSecurity reviewChanges requested',
+    );
+});
+
+test('a build fixing a failed Verify says so in its state cell, with Verify’s note in its tooltip, on one line', async () => {
+    const note = 'Greeting shows the old name';
+
+    await mountPage(
+        fresh(
+            withItem('I_sample13', {
+                parent: null,
+                parentId: null,
+                flow: 'single',
+                status: 'In progress',
+                blockers: [],
+                verification: {
+                    required: true,
+                    head: 'b2',
+                    latest: {
+                        id: 'v1',
+                        pr: '#40',
+                        head: 'b1',
+                        result: 'fail',
+                        by: 'Pedro',
+                        at: '',
+                        note,
+                        testSteps: '',
+                    },
+                    resume: null,
+                },
+            }),
+        ),
+    );
+
+    const state = meta('I_sample13').querySelector<HTMLElement>('[title*="Failed Verify"]');
+
+    expect(state?.title).toContain(note);
+    expect(text(row('I_sample13'))).not.toContain(note);
 });

@@ -1,7 +1,7 @@
 // The active stages and their statuses, with the words a row uses for its thread and last read.
 
 import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
-import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
+import type { Item, ItemStats, ItemThread, Status, ThreadActivityState, ThreadState } from '@lar-factory/shared';
 
 const STAGES: { name: string; statuses: Status[] }[] = [
     { name: 'Refining', statuses: ['Shaping', 'Needs you'] },
@@ -54,3 +54,27 @@ export const lastSeen = (thread: ItemThread): string =>
 
 export const statsOf = (item: Item): ItemStats | null =>
     item.stats && item.stats !== 'unavailable' ? item.stats : null;
+
+/** The mark a row's state cell leads with when it says a state in words, not its thread's activity: the thread's own
+ *  mark while it waits, is quiet, stopped or unread, else none, which keeps the mark's room. */
+export const stateMark = (activity: ThreadActivityState | undefined) =>
+    activity && activity !== 'working' ? activity : ('none' as const);
+
+/** Whether `item`'s review round still runs: a chosen reviewer waits to start or is at work. While it does, its
+ *  reviewers take the row's progress column. */
+export const reviewing = (item: Item): boolean =>
+    !!item.reviewers?.some((r) => r.status === 'Waiting' || r.status === 'Running');
+
+/** How many of the round's reviewers have finished, "1/2 reviews", as a row's count and a map card's foot say it. */
+export function reviewCount(item: Item): string {
+    const reviewers = item.reviewers ?? [];
+    const finished = reviewers.filter((r) => r.status !== 'Waiting' && r.status !== 'Running').length;
+
+    return `${finished}/${reviewers.length} reviews`;
+}
+
+/** A build fixing a failed Verify: Verify's note, which the row's state cell keeps in its tooltip. */
+export const failedVerifyNote = (item: Item): string | undefined =>
+    item.status === 'In progress' && item.verification?.latest?.result === 'fail'
+        ? `Failed Verify: ${item.verification.latest.note}`
+        : undefined;

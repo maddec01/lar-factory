@@ -1,7 +1,8 @@
-// What a row says its T3 thread is doing, in its second line's text slot: a status mark, then the newest action, its
-// age and the agents at work; and the list of agents at work, in its tooltip and the item dialog.
+// What a row says its T3 thread is doing, in its state cell: a status mark, then the newest action (or the state's own
+// word) and its age, on one line; the agents at work in its tooltip and the item dialog. Every other state a row's cell
+// shows leads with the same mark (StateMark), so the cell reads the same down every list.
 
-import { Tooltip, TooltipTrigger } from '@lar-works/design-system';
+import { statusStateColors, Tooltip, TooltipTrigger } from '@lar-works/design-system';
 import { TooltipPopupBase } from '@lar-works/design-system/primitives';
 import type { ReactNode } from 'react';
 
@@ -20,6 +21,19 @@ const MARK: Record<ActivityState, string> = {
     stopped: 'rounded-xs bg-board-idle',
     unavailable: `rounded-full ${MARK_STROKE} border-board-idle`,
 };
+
+/** A row state cell's mark: a thread's activity state, `blocked` (red) for what holds it, or `none`, which keeps the
+ *  mark's room so every state's words start at the same place down a list. */
+export function StateMark({ state }: { state: ActivityState | 'blocked' | 'none' }) {
+    return (
+        <span
+            data-mark={state}
+            aria-hidden="true"
+            className={`inline-block size-2 shrink-0 ${state === 'none' ? '' : state === 'blocked' ? 'rounded-full' : MARK[state]}`}
+            style={state === 'blocked' ? { background: statusStateColors.failed } : undefined}
+        />
+    );
+}
 
 /** A path in the line's words as its file's name, such as "bitmap.ts"; the line's tooltip keeps the path. */
 const short = (words: ReactNode) =>
@@ -64,16 +78,23 @@ function Words({ state, children: words }: { state: ActivityState; children: Rea
 }
 
 /**
- * A thread's activity: its state's mark, its `action`, then its `age` and how many `agents` work, each after a dot. With
- * `agentList`, the line takes focus and its tooltip lists the agents at work.
+ * A thread's activity on one line: its state's mark, its `action` (or, given, the state's `word`, such as "Fixing review
+ * feedback"), then its `age` after a dot. Its tooltip says the action, its age, how many `agents` work and any `detail`
+ * in full; with `agentList`, the line takes focus and its tooltip lists the agents at work.
  */
 export function ActivityLine({
     state,
     action,
+    word,
+    detail,
     age,
     agents,
     agentList,
 }: {
+    /** The state in a short word, shown in place of the action, which then reads in the tooltip. */
+    word?: string | undefined;
+    /** More on the state, such as a failed Verify's note, in the tooltip. */
+    detail?: string | undefined;
     /** The thread's state, which picks its mark: `working`, `quiet`, `waiting`, `stopped` or `unavailable`. */
     state: ActivityState;
     /** What the thread is doing, such as its last tool call. */
@@ -85,23 +106,25 @@ export function ActivityLine({
     /** The agents at work, an AgentList, shown in a tooltip as the line takes focus. */
     agentList?: ReactNode;
 }) {
+    const said = [word, typeof action === 'string' && action, age, agents].filter(Boolean).join(' · ');
     const shown = (
         <span
             data-activity={state}
-            title={[typeof action === 'string' && action, age, agents].filter(Boolean).join(' · ')}
+            title={[said, detail].filter(Boolean).join('\n')}
             tabIndex={agentList ? 0 : undefined}
-            className="focus-ring flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-xs"
+            className="focus-ring flex max-w-full min-w-0 flex-nowrap items-center gap-1.5 rounded-xs whitespace-nowrap"
         >
-            <span data-mark className={`inline-block size-2 shrink-0 ${MARK[state]}`} />
-            <Words state={state}>{action}</Words>
+            <StateMark state={state} />
+            {word ? (
+                <span data-action data-word className="text-fg min-w-0 truncate font-medium">
+                    {word}
+                </span>
+            ) : (
+                <Words state={state}>{action}</Words>
+            )}
             {age !== undefined && (
                 <span data-age className="shrink-0 tabular-nums">
                     <MetaDot /> {age}
-                </span>
-            )}
-            {agents && (
-                <span data-agents className="shrink-0 tabular-nums">
-                    <MetaDot /> {agents}
                 </span>
             )}
         </span>

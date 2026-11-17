@@ -22,3 +22,17 @@ export function useActivityStill(item: Item): boolean {
 
     return useClock((now) => itemActivityStill(item, now, disconnected));
 }
+
+/** What `item`'s thread does now, such as "Writing", for a row whose state says a wait on you first; undefined with
+ *  no line to read. */
+export function useActivityAction(item: Item): string | undefined {
+    const disconnected = useBoardStore((state) => !!state.clientError);
+
+    return useClock((now) => {
+        const line = itemActivityLine(item, now, disconnected);
+
+        return line && line.state !== 'unavailable' && line.state !== 'stopped' && line.action
+            ? `Thread: ${line.action}`
+            : undefined;
+    });
+}

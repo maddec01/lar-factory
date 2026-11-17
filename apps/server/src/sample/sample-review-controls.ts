@@ -5,8 +5,59 @@ import type { WorkRecords } from '@lar-factory/work-records';
 export function sampleReviewControls(records: WorkRecords) {
     let shapeId: string | undefined;
     let reviewId: string | undefined;
+    let partId: string | undefined;
     let stopped = false;
     const threadId = 'sample-active-shaping-owner';
+
+    /** A review round on `workId`: `reviewers` chosen, the ones that run started, the last of them finished. */
+    const reviewRound = (
+        workId: string,
+        runId: string,
+        reviewers: { id: string; name: string; run: boolean; reason: string }[],
+    ) => {
+        records.snapshotRun(workId, records.read(workId).revision, {
+            runId,
+            kind: 'build',
+            packaged: {
+                version: 'sample',
+                reviewers: {
+                    code: 'Fake code review.',
+                    security: 'Fake security review.',
+                    ui: 'Fake UI review.',
+                    performance: 'Fake performance review.',
+                },
+            },
+            skills: [],
+        });
+        records.saveReviewerSelection(workId, {
+            workId,
+            runId,
+            base: 'a'.repeat(40),
+            head: 'b'.repeat(40),
+            reviewers: reviewers.map((reviewer) => ({
+                ...reviewer,
+                triggerVersion: 1 as const,
+                outcome: reviewer.run ? ('matched' as const) : ('unmatched' as const),
+                rule: 'fixture',
+                evidence: reviewer.reason,
+            })),
+        });
+
+        const running = reviewers.filter((reviewer) => reviewer.run);
+
+        for (const { id } of running)
+            records.startRoleRun(workId, records.read(workId).revision, {
+                runId,
+                executionId: `${runId}-${id}`,
+                role: `reviewer:${id}`,
+            });
+        records.finishRoleRun(workId, records.read(workId).revision, {
+            executionId: `${runId}-${running.at(-1)!.id}`,
+            report: null,
+            result: 'completed',
+            summary: 'Approve: boundary inputs are validated; no findings.',
+        });
+    };
 
     return {
         stop(owner: string) {
@@ -26,12 +77,15 @@ export function sampleReviewControls(records: WorkRecords) {
 
             return { ...item, threads: [thread] };
         },
-        seed(repository: string) {
-            if (!repository.startsWith('lar-factory-sample/')) throw new Error('Only fake sample work is supported.');
+        /** A shaping item with a stoppable owner and a single build mid-review; given a `partner` repository too, a
+         *  linked-work part mid-review under a parent spanning both, as a live linked run has its producer. */
+        seed(repository: string, partner?: string) {
+            if (![repository, partner ?? repository].every((repo) => repo.startsWith('lar-factory-sample/')))
+                throw new Error('Only fake sample work is supported.');
 
-            if (shapeId && reviewId) return { shapeId, reviewId };
+            if (shapeId && reviewId) return { shapeId, reviewId, ...(partId && { partId }) };
 
-            let shape = records.create({
+            const shape = records.create({
                 repository,
                 kind: 'feature',
                 title: 'Sample active shaping controls',
@@ -41,7 +95,7 @@ export function sampleReviewControls(records: WorkRecords) {
             shapeId = shape.workId;
             records.addThread(shapeId, shape.revision, threadId, 'shape');
 
-            let review = records.create({
+            const review = records.create({
                 repository,
                 kind: 'bug',
                 title: 'Sample selected reviewers',
@@ -49,59 +103,52 @@ export function sampleReviewControls(records: WorkRecords) {
             });
 
             reviewId = review.workId;
-
-            const runId = 'sample-review-settings';
-
-            records.snapshotRun(reviewId, review.revision, {
-                runId,
-                kind: 'build',
-                packaged: {
-                    version: 'sample',
-                    reviewers: {
-                        code: 'Fake code review.',
-                        security: 'Fake security review.',
-                        ui: 'Fake UI review.',
-                        performance: 'Fake performance review.',
-                    },
+            reviewRound(reviewId, 'sample-review-settings', [
+                { id: 'code', name: 'Code', run: true, reason: 'Always: every build receives Code review.' },
+                {
+                    id: 'security',
+                    name: 'Security',
+                    run: true,
+                    reason: 'Matched input validation changes in src/greeting.js.',
                 },
-                skills: [],
-            });
-            records.saveReviewerSelection(reviewId, {
-                workId: reviewId,
-                runId,
-                base: 'a'.repeat(40),
-                head: 'b'.repeat(40),
-                reviewers: [
-                    { id: 'code', name: 'Code', run: true, reason: 'Always: every build receives Code review.' },
-                    {
-                        id: 'security',
-                        name: 'Security',
-                        run: true,
-                        reason: 'Matched input validation changes in src/greeting.js.',
-                    },
-                    { id: 'ui', name: 'UI', run: false, reason: 'No visible UI changes in this diff.' },
-                ].map((reviewer) => ({
-                    ...reviewer,
-                    triggerVersion: 1 as const,
-                    outcome: reviewer.run ? ('matched' as const) : ('unmatched' as const),
-                    rule: 'fixture',
-                    evidence: reviewer.reason,
-                })),
-            });
-            for (const role of ['code', 'security'] as const)
-                records.startRoleRun(reviewId, records.read(reviewId).revision, {
-                    runId,
-                    executionId: `sample-${role}`,
-                    role: `reviewer:${role}`,
-                });
-            records.finishRoleRun(reviewId, records.read(reviewId).revision, {
-                executionId: 'sample-security',
-                report: null,
-                result: 'completed',
-                summary: 'Approve: boundary inputs are validated; no findings.',
-            });
+                { id: 'ui', name: 'UI', run: false, reason: 'No visible UI changes in this diff.' },
+            ]);
 
-            return { shapeId, reviewId };
+            if (partner && partner !== repository) {
+                const parent = records.create({
+                    repository,
+                    kind: 'feature',
+                    title: 'Sample linked work in review',
+                    status: 'Shaping',
+                });
+                const part = records.createPart({
+                    parentId: parent.workId,
+                    parentRevision: parent.revision,
+                    title: 'Publish the greeting contract',
+                    kind: 'build',
+                    repository,
+                    body: '## Goal\nPublish the greeting contract.',
+                    blockerIds: [],
+                });
+
+                records.createPart({
+                    parentId: parent.workId,
+                    parentRevision: records.read(parent.workId).revision,
+                    title: 'Show the greeting from the contract',
+                    kind: 'build',
+                    repository: partner,
+                    body: '## Goal\nShow the greeting from the contract.',
+                    blockerIds: [part.workId],
+                });
+                partId = part.workId;
+                records.update(partId, records.read(partId).revision, { status: 'Review' });
+                reviewRound(partId, 'sample-linked-review', [
+                    { id: 'code', name: 'Code', run: true, reason: 'Always: every build receives Code review.' },
+                    { id: 'performance', name: 'Performance', run: true, reason: 'Matched the contract fixtures.' },
+                ]);
+            }
+
+            return { shapeId, reviewId, ...(partId && { partId }) };
         },
     };
 }

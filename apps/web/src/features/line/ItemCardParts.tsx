@@ -19,10 +19,18 @@ import type { Part } from './DossierParts';
 import { isDone, openWaits, partActivity } from './DossierParts';
 import { ACTIVITY_WORD, partDetail, RUNS } from './MapCardFacts';
 import { partState } from './PartState';
+import { ReviewersBar } from './RowReviewers';
 import { lastSeen } from './StageStatus';
-import { checksStale, checksWord, useActivityUnavailable, useShownStatus } from '@/features/items';
+import {
+    checksStale,
+    checksWord,
+    SliceBar,
+    useActivityUnavailable,
+    useShownStatus,
+    WorkingBar,
+} from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { type CardCheckState, DeskHint } from '@/ui/board';
+import { type CardCheckState, CardMeter, DeskHint } from '@/ui/board';
 
 /**
  * The line under the title that says what comes next: nothing when the card's action answers it, else the merge state
@@ -155,4 +163,43 @@ export function usePartState(item: Item, part: Part | undefined, data: BoardData
                 : undefined,
         held,
     };
+}
+
+/**
+ * Under a card's foot, its progress as its row draws it: its reviewers while a round runs (each named in the ticks'
+ * tooltip), else its slices, else one bar while it runs. An open PR's checks take the head's track instead (hidden).
+ */
+export function CardProgress({
+    item,
+    still,
+    reviewers,
+    hidden,
+    atWork,
+    waiting,
+}: {
+    item: Item;
+    still: boolean;
+    reviewers: boolean;
+    hidden: boolean;
+    atWork: string | undefined;
+    waiting: boolean;
+}) {
+    if (reviewers)
+        return (
+            <CardMeter>
+                <ReviewersBar item={item} still={still} />
+            </CardMeter>
+        );
+
+    if (hidden || (!item.slices.length && !atWork)) return null;
+
+    return (
+        <CardMeter>
+            {item.slices.length > 0 ? (
+                <SliceBar item={item} still={still} />
+            ) : (
+                <WorkingBar label={atWork!} still={still} waiting={waiting} />
+            )}
+        </CardMeter>
+    );
 }

@@ -236,6 +236,7 @@ export function DossierNext({
     unseen = false,
     strong = false,
     text,
+    detail,
 }: {
     /** What's next is the owner's to start: its text reads at the row's full strength. */
     strong?: boolean;
@@ -247,9 +248,13 @@ export function DossierNext({
     unseen?: boolean;
     /** What's next, as a sentence. */
     text: string;
+    /** More on it for the tooltip, such as what a thread does meanwhile. */
+    detail?: string | undefined;
 }) {
+    const title = [word && !unseen ? `${word}: ${text}` : text, detail].filter(Boolean).join(' · ');
+
     return (
-        <span className="min-w-0" data-next>
+        <span className="min-w-0" data-next title={detail ? title : undefined}>
             <span className="flex min-w-0 items-center gap-2">
                 {yours && !unseen && <span aria-hidden="true" className="bg-warning size-2 shrink-0 rounded-full" />}
                 {word && (
@@ -259,7 +264,7 @@ export function DossierNext({
                         {word}
                     </span>
                 )}
-                <span className={`min-w-0 truncate ${strong ? 'text-fg' : ''}`} title={text}>
+                <span className={`min-w-0 truncate ${strong ? 'text-fg' : ''}`} title={detail ? title : text}>
                     {text}
                 </span>
             </span>

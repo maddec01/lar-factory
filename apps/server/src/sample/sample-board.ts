@@ -309,7 +309,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
             }
 
             if (input.action === 'review-controls') {
-                const ids = reviewControls.seed(repos()[0]!.repo);
+                const ids = reviewControls.seed(repos()[0]!.repo, repos()[1]?.repo);
 
                 reread();
 

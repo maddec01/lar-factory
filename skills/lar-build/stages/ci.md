@@ -113,7 +113,10 @@ restart one to monitor review comments or approvals.
 At the first handback show UI evidence beside the PR link when available.
 Read `lar-work verification <work ID>`: `prReview: true` sets **Ready to merge**,
 with human checks in the PR's Test steps. Legacy runs retain **Verify** when
-required and their head-bound board pass.
+required and their head-bound board pass. The gate’s saved negative Verify decision
+needs no published section. After failed legacy Verify, return to **Verify** on
+the current PR head: only Pedro records its head-bound board pass; Status writes
+cannot replace it. Change that decision only through Doubt and a board gate.
 
 When anyone merges, the board observes it, records **Done** and runs guarded
 branch/worktree cleanup after active work ends. No build-thread wake or human

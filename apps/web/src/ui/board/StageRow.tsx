@@ -6,11 +6,11 @@ import { Loading } from '@lar-works/design-system';
 import { GitPullRequest } from '@lar-works/design-system/icons';
 import { type MouseEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 
+import { type ActivityState, StateMark } from './ActivityLine';
 import { useArrival } from './BoardLife';
 import { FoldToggle } from './FoldToggle';
 import { pickedRow, ROW_ACTION, ROW_BOX, ROW_OPENS } from './RowStyles';
 import { OneLineAction } from './StartAfterButton';
-import { StateWord } from './StateWord';
 
 /** A stage row, a line on its section's card: `item` names it as `data-item`, `picked` marks the item the dialog
  *  shows, and `attention` marks one that waits on you: its state reads in the warning colour, as Your desk above carries
@@ -180,19 +180,31 @@ export function RowTitle({
     );
 }
 
-/** The row's state in words; `title` says more. */
+/** The row's state in words; `title` says more. In a row's state cell it leads with a `mark`, as its thread's activity
+ *  does, so every state there reads as a mark and a word on one line; `none` keeps the mark's room. */
 export function RowState({
     title,
+    mark,
     children,
 }: {
     /** More on the state, as its tooltip. */
     title?: string;
+    /** The mark before the words, in a row's state cell. */
+    mark?: ActivityState | 'blocked' | 'none' | undefined;
     /** The state in words. */
     children: ReactNode;
 }) {
+    if (!mark)
+        return (
+            <span className="max-w-full min-w-0 truncate" title={title} data-state>
+                {children}
+            </span>
+        );
+
     return (
-        <span className="max-w-full min-w-0 truncate" title={title} data-state>
-            {children}
+        <span className="flex max-w-full min-w-0 items-center gap-1.5 whitespace-nowrap" title={title} data-state>
+            <StateMark state={mark} />
+            <span className="min-w-0 truncate">{children}</span>
         </span>
     );
 }
@@ -335,7 +347,7 @@ export function RowSliceToggle({
     );
 }
 
-/** A dependency holding the row, in its second line: the waiting light and what it waits on. */
+/** A dependency holding the row, in its state cell: a red mark and what it waits on. */
 export function RowBlocked({
     children,
 }: {
@@ -343,10 +355,11 @@ export function RowBlocked({
     children: string;
 }) {
     return (
-        // A red light marks what's stuck at a glance on any list; its words stay quiet.
-        <StateWord state="failed" title={children} data-blocked>
-            <span className="text-fg-muted font-normal">{children}</span>
-        </StateWord>
+        // A red mark says what's stuck at a glance on any list; its words stay quiet.
+        <span data-blocked className="flex max-w-full min-w-0 items-center gap-1.5 whitespace-nowrap" title={children}>
+            <StateMark state="blocked" />
+            <span className="text-fg-muted min-w-0 truncate">{children}</span>
+        </span>
     );
 }
 
@@ -370,15 +383,18 @@ export function RowSliceNote({
     after?: string | undefined;
 }) {
     return (
-        <span data-note className="min-w-0 truncate" title={title}>
-            {first && (
-                <>
-                    <span className={`font-medium ${SLICE_TONE[first.tone]}`}>{first.word}</span>{' '}
-                    <span className="text-fg">{first.title}</span>
-                    {more}
-                </>
-            )}
-            {after && <span>{after}</span>}
+        <span data-note className="flex max-w-full min-w-0 items-center gap-1.5 whitespace-nowrap" title={title}>
+            {first && <StateMark state={first.tone === 'blocked' ? 'blocked' : 'working'} />}
+            <span className="min-w-0 truncate">
+                {first && (
+                    <>
+                        <span className={`font-medium ${SLICE_TONE[first.tone]}`}>{first.word}</span>{' '}
+                        <span className="text-fg">{first.title}</span>
+                        {more}
+                    </>
+                )}
+                {after && <span>{after}</span>}
+            </span>
         </span>
     );
 }

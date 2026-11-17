@@ -152,6 +152,16 @@ export interface DependencyHold {
     } | null;
 }
 
+/** Where a reviewer chosen for a review round stands, in the words the item dialog shows. */
+export type ReviewerStatus = 'Waiting' | 'Running' | 'Completed' | 'Approved' | 'Changes requested' | 'Failed';
+
+/** A reviewer chosen for an item's current review round, such as Code or Security. */
+export interface ItemReviewer {
+    id: string;
+    name: string;
+    status: ReviewerStatus;
+}
+
 /**
  * Work blocking an item: closed once its work record's local facts complete it. A record's blocker names its work ID and
  * title; its number is 0 without a ticket. A Dependency's blocker carries `dependency` and is closed once marked met.
@@ -434,6 +444,9 @@ export interface Item {
      * and the board never saw one of them.
      */
     buildPhase?: string | null;
+    /** The reviewers chosen for its build's current review round, with where each stands; absent outside a build or
+     *  before any are chosen, and without the ones the selection skipped. */
+    reviewers?: ItemReviewer[];
     threads?: ItemThread[] | 'unavailable';
     /**
      * Why it waits for its repository's changed item source or domain-doc location to be accepted in Settings, which

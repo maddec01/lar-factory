@@ -132,6 +132,27 @@ test('live status changes keep linked work in its group with details, thread and
     expect($('[data-item-dialog] a[href="https://github.com/maddec01/lar-server/pull/150"]')).not.toBeNull();
 });
 
+test('a part in a review round shows its reviewers’ count, which unfolds them, as a lane row does', async () => {
+    await mountOpen(
+        withItem('I_sample13', {
+            status: 'Review',
+            blockers: [],
+            slices: [],
+            linkedPrs: [],
+            reviewers: [
+                { id: 'code', name: 'Code', status: 'Completed' },
+                { id: 'ui', name: 'UI', status: 'Running' },
+            ],
+        }),
+    );
+
+    const progress = step('I_sample13').querySelector<HTMLElement>('[data-col="progress"]')!;
+
+    expect(text(progress)).toContain('1/2 reviews');
+    await press(progress.querySelector('button')!);
+    expect(text(step('I_sample13').querySelector('[data-slices]'))).toBe('Code reviewCompletedUI reviewRunning');
+});
+
 test('a board push updates an expanded dossier in place, and one that leaves the board comes back as it was', async () => {
     await mountOpen();
     await receive(withItem('I_sample10', { title: 'Relay, renamed' }));
@@ -408,8 +429,8 @@ test('queued empty concepts and parts with off-board parents stay in the dock an
     expect($(`[data-stage]:not([data-stage="dock"]) li[data-item="${concept.id}"]`)).toBeNull();
     expect($(`section.desk [data-item="${part.id}"]`)).not.toBeNull();
     expect(text(header(concept.id))).toContain('No parts yet');
-    // Its thread's wait reads where its parent would, on the row's one line.
-    expect(text(header(part.id))).toContain('Needs you');
+    // Its thread's wait reads where its parent would, on the row's one line, in its desk card's words.
+    expect(text(header(part.id))).toContain('Question');
     expect(text(header(part.id))).not.toContain('0/0 parts');
     expect(text(header(part.id))).not.toContain('Linked work');
     expect(opener(part.id)).toBeNull();
@@ -453,3 +474,94 @@ test('the live map follows recorded parts, blockers and gate changes while prose
     await receive(conceptOf([{ ...first, status: 'Ready', passingBrief: true }], change));
     expect(map.querySelector('[data-map-part="W_next"]')).toBeNull();
 });
+
+test('a linked part in a review round counts its reviewers on its Work map card, each named in its ticks', async () => {
+    // Shaped as a live linked-work producer was mid-review: its owner thread running a command, its Code review
+    // finished and its Performance one running, its consumer held behind it.
+    const producer = workPart('W_producer', {
+        status: 'Review',
+        statuses: ['Review'],
+        flow: 'linked',
+        buildPhase: 'review',
+        buildReserved: true,
+        buildStarted: true,
+        passingBrief: true,
+        reviewers: [
+            { id: 'code', name: 'Code', status: 'Completed' },
+            { id: 'performance', name: 'Performance', status: 'Running' },
+        ],
+        threads: [
+            {
+                id: 'thread:build',
+                title: 'Build Part W_producer',
+                state: 'running',
+                currentRunning: true,
+                updated: '2026-10-21T09:59:50.000Z',
+                purpose: 'build',
+                activity: {
+                    available: true,
+                    readAt: '2026-10-21T09:59:55.000Z',
+                    action: 'Running a command',
+                    actionAt: '2026-10-21T09:59:30.000Z',
+                    toolRunning: false,
+                    agents: [],
+                },
+            },
+        ],
+    });
+    const consumer = workPart('W_consumer', {
+        status: 'Ready',
+        flow: 'linked',
+        blockers: [{ workId: producer.id, number: 0, repo: producer.repo, state: 'open' }],
+    });
+    const map = await mapOpen(conceptOf([producer, consumer], { flow: 'linked', status: 'Shaping' }));
+    const card = map.querySelector<HTMLElement>('[data-map-part="W_producer"]')!;
+
+    expect(text(card)).toContain('1/2 reviews');
+    expect(card.querySelector('[data-slice-bar]')!.getAttribute('title')).toBe('Code: Completed\nPerformance: Running');
+    expect(text(map.querySelector('[data-map-part="W_consumer"]'))).not.toContain('reviews');
+});
+
+test.each([
+    ['can merge', 'green', undefined, undefined, 'Review PR #150', true],
+    ['can merge', 'pending', undefined, undefined, 'Waiting for required checks', false],
+    ['blocked', 'green', 2, undefined, '2 review threads unresolved', true],
+] as const)(
+    'PR state stays in one cell on both rows and agrees with the desk: %s / %s / %s / %s',
+    async (mergeState, required, unresolvedThreads, reviewDecision, label, asks) => {
+        const data = withItem('I_sample13', {
+            status: 'Ready to merge',
+            blockers: [],
+            slices: [],
+            threads: [],
+            verification: {
+                required: false,
+                head: null,
+                latest: null,
+                resume: null,
+                prReview: true,
+                prReviewHandedBack: true,
+            },
+            linkedPrs: cleanPrs.map((pr) => ({
+                ...pr,
+                mergeState,
+                review: { required, unresolvedThreads, reviewDecision },
+            })),
+        });
+        const part = data.items.find((item) => item.id === 'I_sample13')!;
+        const single = { ...part, id: 'I_single_pr', parentId: null, parent: null, flow: 'single' as const };
+
+        await mountOpen(fresh({ ...data, items: [...data.items, single] }));
+
+        for (const row of [step(part.id), $(`[data-stage="build"] li[data-item="${single.id}"]`)!]) {
+            const cells = row.querySelectorAll('[data-row-meta] [data-state]');
+
+            expect(cells).toHaveLength(1);
+            expect(text(cells[0]!)).toBe(label);
+            expect(row.querySelectorAll('[data-row-foot] [data-activity]')).toHaveLength(0);
+            expect(!!$(`.desk-row[data-item="${row.getAttribute('data-item')}"]`)).toBe(asks);
+
+            if (asks) expect(text($(`.desk-row[data-item="${row.getAttribute('data-item')}"]`))).toContain(label);
+        }
+    },
+);

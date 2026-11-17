@@ -31,6 +31,10 @@ export const isBuildMethod = (value: unknown): value is BuildMethod => BUILD_MET
 export const frozenBuildMethodLine = (run: Pick<RunSettings, 'buildMethod'>): string =>
     `Frozen build method: ${run.buildMethod === 'prove-it' ? 'Prove it' : 'TDD'}`;
 
+/** The runtime blocks' line saying whether a run's frozen factory settings end its build with a Retro. */
+export const frozenRetroLine = (run: Pick<RunSettings, 'settings'>): string =>
+    `Frozen retro: ${run.settings.retro === false ? 'off' : 'on'}`;
+
 export interface SnapshotRunInput {
     /** Stable across retries and handoff; use a new ID only for a new logical run. */
     runId: string;

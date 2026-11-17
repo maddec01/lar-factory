@@ -119,3 +119,11 @@ describe('invalid settings are refused instead of silently changing the selected
         expect(() => resolveFactorySettings(defaults, 'build', 'unknown' as never)).toThrow('Unknown factory role');
     });
 });
+
+it('reads saved settings without Retro as on, keeps it off once saved, and rejects a non-switch value', () => {
+    const { retro: _, ...saved } = defaultFactorySettings();
+
+    expect(parseFactorySettings(saved).retro).toBe(true);
+    expect(parseFactorySettings({ ...saved, retro: false }).retro).toBe(false);
+    expect(() => parseFactorySettings({ ...saved, retro: 'off' })).toThrow('Invalid factory settings');
+});

@@ -68,6 +68,8 @@ export interface FactorySettings {
     threadKinds: Partial<Record<ThreadKind, ExecutionOverride>>;
     roles: Partial<Record<FactoryRole, ExecutionOverride>>;
     reviewers: ReviewerDefinition[];
+    /** Whether builds end with a Retro; settings saved before the switch, and runs that froze them, read as on. */
+    retro?: boolean;
 }
 
 export type FactoryModelGroup = ModelGroup;
@@ -96,5 +98,6 @@ export function defaultFactorySettings(): FactorySettings {
                     : { kind: 'on-trigger', trigger: { version: 1, kind: 'policy', policy: id } },
             instructions: { kind: 'builtin', reviewer: id },
         })),
+        retro: true,
     };
 }

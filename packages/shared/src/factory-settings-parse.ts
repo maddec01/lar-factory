@@ -165,8 +165,9 @@ export function parseFactorySettings(value: unknown): FactorySettings {
 
     if (
         !isRecord(value) ||
-        !keys(value, ['version', 'threadKinds', 'roles', 'reviewers']) ||
-        (value.version !== 1 && value.version !== 2)
+        !keys(value, ['version', 'threadKinds', 'roles', 'reviewers', 'retro']) ||
+        (value.version !== 1 && value.version !== 2) ||
+        (value.retro !== undefined && typeof value.retro !== 'boolean')
     )
         throw invalid();
 
@@ -199,7 +200,13 @@ export function parseFactorySettings(value: unknown): FactorySettings {
 
     if (!keys(roles, roleNames) || !Object.values(roles).every(override)) throw invalid();
 
-    const settings = structuredClone({ version: 2, threadKinds: kinds, roles, reviewers }) as FactorySettings;
+    const settings = structuredClone({
+        version: 2,
+        threadKinds: kinds,
+        roles,
+        reviewers,
+        retro: value.retro ?? true,
+    }) as FactorySettings;
 
     return value.version === 1 ? migrateReviewerEdits(settings) : settings;
 }

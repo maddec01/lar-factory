@@ -1,6 +1,6 @@
 # Reconcile affected work
 
-Input: changed/overlapping work. Output: coherent product contracts and records.
+Input: changed or related work. Output: coherent product contracts and records.
 
 After every group change (answers, scope/contracts, set-aside, merge-build,
 single/batch board gates), run `lar-work reconcile GROUP_ID` on its concept or
@@ -19,9 +19,8 @@ Keep their frozen input; pause affected builds for a fresh gate. Preserve histor
 and unaffected approvals. Ungated scope stays local; the last approved ticket
 Spec stays visibly out of date until re-gated.
 
-Use `build-overlap` and `doubt-package`; record ordering or Doubt's current reason
-for each overlap. After source edits, rerun Doubt and [Gate](../gate.md) for
-affected briefs needing approval. Stop for Pedro's board approval, without a generic Needs you duplicate;
+After source edits, run `doubt-package`, then rerun Doubt and [Gate](../gate.md)
+for affected briefs needing approval. Stop for Pedro's board approval, without a generic Needs you duplicate;
 then resume reconciliation.
 
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use

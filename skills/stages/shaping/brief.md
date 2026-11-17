@@ -6,7 +6,7 @@ a saved `brief` and its digest, ready for Gate.
 Write the brief to a file, then save it in the record with
 `lar-work set-body <work ID> --revision N --body brief --file <file>`. The
 user's original text stays in the record's initial context.
-Use `lar-work confirmed-scope <work ID> --markdown` for Done when, Scope and Verify below; keep scope claims there. Run `lar-work brief-scope-check <work ID>` after saving and fix every missing/extra claim before Gate.
+Use `lar-work confirmed-scope <work ID> --markdown` for Done when, Scope and Verify below; keep scope claims there. Tests describe the cases to cover, not test files. Run `lar-work brief-scope-check <work ID>` after saving and fix every missing/extra claim before Gate.
 
 `lar-work gate` checks required sections by Kind and names omissions; fix them before Doubt.
 The brief is the builder's handover. Editing it invalidates prior gate evidence.
@@ -20,7 +20,7 @@ acceptance criteria. Keep facts once. Confirmed holds product decisions. Depende
 belongs only in Dependency records, generated beside the brief/Spec. Keep
 approvals, delegation, factory IDs and workflow mechanics in records. Notes for the builder holds only constraints
 or references that cannot be rediscovered from the code, such as a chosen
-prototype branch; name affected files and shared contracts for overlap checks; omit line numbers
+prototype branch, and the shared contracts the work uses; omit line numbers
 and step-by-step implementation recipes. Omit empty optional sections. A routine brief should fit on one screen;
 add detail only when it changes what a reviewer must accept.
 

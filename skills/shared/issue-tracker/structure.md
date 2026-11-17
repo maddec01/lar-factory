@@ -16,8 +16,9 @@ Declare `Blocked by:` with backtick unique work titles or `none` in each brief.
 Keep work IDs in local map declarations. Settings supply build ticket requests.
 `lar-work sync-blockers PARENT --file F` derives the graph; F is
 `{revisions:{ID:N}}` for the parent, declared members and edge endpoints.
-Declare shared contract ownership with `Produces:` and consuming work with `Consumes:`
-(backtick contract names and work titles). `Contracts:` names used contracts.
+Declare consuming work with `Consumes:` and the contract's owner with `Produces:`
+(backtick contract names and work titles); `Produces:` is needed only so a
+`Consumes:` resolves to one build. `Contracts:` names used contracts.
 `sync-blockers` also derives cited output prerequisites; ambiguous sources hold.
 An independent consumer records ``No ordering needed: `reference`: reason`` in its brief.
 Normalize legacy declarations; never edit delivery edges by hand. Use Dependencies for other teams.

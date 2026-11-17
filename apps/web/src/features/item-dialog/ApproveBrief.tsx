@@ -1,8 +1,9 @@
 import { Alert, Button, Disclosure, Inline, RichText, Stack, Text } from '@lar-works/design-system';
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
 import { forgetItemDetails } from '@/services/items/items.hooks';
+import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 import { BriefApprovalDetails, BriefChanges, buttonKind } from '@/ui/board';
 
 interface Approval {
@@ -11,101 +12,151 @@ interface Approval {
     briefs: { workId: string; title: string; brief: string; approvalDigest: string }[];
 }
 
-/** Approval is a separate human action after the board displays the complete current brief. */
+/**
+ * Requests approval as it opens and shows the brief the server returned, which its request ID and digest cover, so one
+ * click approves the displayed text. A group shows its parts' briefs; a single item shows its brief in place of the
+ * record body, given as `body` for while the request loads or after it fails.
+ */
 export function ApproveBrief({
     itemId,
     workIds,
+    body,
     onApproved,
 }: {
     itemId: string;
     workIds?: string[];
+    body?: ReactNode;
     onApproved?: () => Promise<unknown>;
 }) {
     const [approval, setApproval] = useState<Approval>();
+    const [loadError, setLoadError] = useState<string | null>();
     const [requesting, setRequesting] = useState(false);
     const [note, setNote] = useState('');
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>();
-    const act = async () => {
-        setPending(true);
+    // Only the latest request's response is shown, so a superseded one never replaces the request ID and digest.
+    const latest = useRef(0);
 
-        const result = approval
-            ? await postAction('/api/approve-brief', { itemId, requestId: approval.requestId, digest: approval.digest })
-            : await postAction<{ approval: Approval }>('/api/inspect-brief', { itemId, ...(workIds && { workIds }) });
+    async function inspect() {
+        const request = ++latest.current;
+
+        // A new request starts unspent, even after an earlier one was accepted.
+        setPending(false);
+        setApproval(undefined);
+        setLoadError(null);
+
+        const result = await postAction<{ approval: Approval }>('/api/inspect-brief', {
+            itemId,
+            ...(workIds && { workIds }),
+        });
+
+        if (request !== latest.current) return;
 
         receive(result);
-        setError(result.error);
+        setLoadError(result.error);
+        setApproval(result.approval);
+    }
 
-        if (approval) {
-            setApproval(undefined);
+    // The parts array is rebuilt on every render; their sorted IDs change only when the set does.
+    const shown = workIds ? workIds.toSorted().join(' ') : itemId;
+    // StrictMode starts an effect twice, and one request answers for both.
+    const opened = useRef<string | null>(null);
 
-            if (!result.error) {
-                for (const id of workIds ?? [itemId]) forgetItemDetails(id);
-                await onApproved?.();
-            }
-        } else setApproval('approval' in result ? (result.approval as Approval) : undefined);
+    const inspectOpened = useEffectEvent(() => {
+        if (opened.current === shown) return;
 
-        setPending(false);
-    };
+        opened.current = shown;
+        void inspect();
+    });
 
-    const requestChanges = async () => {
-        if (!approval || pending || !note.trim()) return;
+    useEffect(() => {
+        // oxlint-disable-next-line react/set-state-in-effect -- another item or set of parts clears the last approval as its request starts
+        inspectOpened();
+    }, [shown]);
+
+    /** A rejected request ID or digest is spent, so a rejection fetches a new approval request with the current brief. */
+    const send = async (path: string, extra: object = {}) => {
+        if (!approval) return;
 
         setPending(true);
+        setError(null);
 
-        const result = await postAction('/api/request-brief-changes', {
+        const result = await postAction(path, {
             itemId,
             requestId: approval.requestId,
             digest: approval.digest,
-            note,
+            ...extra,
         });
 
         receive(result);
         setError(result.error);
 
-        if (!result.error) {
-            setApproval(undefined);
-            setRequesting(false);
-            setNote('');
-            for (const id of workIds ?? [itemId]) forgetItemDetails(id);
-            await onApproved?.();
-        }
+        if (result.error) return void inspect();
 
-        setPending(false);
+        // The request is spent: the controls stay disabled until the refresh replaces this dialog's record.
+        setRequesting(false);
+        setNote('');
+        for (const id of workIds ?? [itemId]) forgetItemDetails(id);
+        await onApproved?.();
     };
+
+    const ready = Boolean(approval) && !pending;
 
     return (
         <Stack space="tight">
             {error && <Alert tone="danger">{error}</Alert>}
-            <Inline wrap>
-                <Button {...buttonKind('main')} disabled={pending} onClick={() => void act()}>
-                    {approval
-                        ? 'Approve displayed brief'
-                        : workIds && workIds.length > 1
-                          ? 'Approve briefs'
-                          : 'Approve brief'}
-                </Button>
-                {approval && (
-                    <Button {...buttonKind('other')} disabled={pending} onClick={() => setRequesting(!requesting)}>
-                        Request changes
-                    </Button>
-                )}
-            </Inline>
-            {approval && requesting && (
-                <BriefChanges note={note} onNote={setNote} pending={pending} onSubmit={() => void requestChanges()} />
+            {loadError && (
+                <Alert tone="danger">
+                    <Stack space="tight">
+                        <Text>{loadError}</Text>
+                        <Inline wrap>
+                            <Button {...buttonKind('other')} onClick={() => void inspect()}>
+                                Retry
+                            </Button>
+                        </Inline>
+                    </Stack>
+                </Alert>
             )}
-            {approval && (
-                <>
-                    <Disclosure label="Brief to approve" presentation="section" defaultOpen>
-                        {approval.briefs.map((brief) => (
+            <Inline wrap>
+                <Button {...buttonKind('main')} disabled={!ready} onClick={() => void send('/api/approve-brief')}>
+                    {workIds && workIds.length > 1 ? 'Approve briefs' : 'Approve brief'}
+                </Button>
+                <Button {...buttonKind('other')} disabled={!ready} onClick={() => setRequesting(!requesting)}>
+                    Request changes
+                </Button>
+            </Inline>
+            {requesting && (
+                <BriefChanges
+                    note={note}
+                    onNote={setNote}
+                    pending={!ready}
+                    onSubmit={() => void send('/api/request-brief-changes', { note })}
+                />
+            )}
+            {approval ? (
+                <Disclosure label="Brief to approve" presentation="section" defaultOpen>
+                    {approval.briefs.map((brief) =>
+                        workIds ? (
                             <Stack key={brief.workId} space="tight">
                                 <Text>{brief.title}</Text>
                                 <RichText text={brief.brief} format="markdown" />
                             </Stack>
-                        ))}
-                    </Disclosure>
-                    <BriefApprovalDetails briefs={approval.briefs} digest={approval.digest} />
-                </>
+                        ) : (
+                            <MarkdownDiagrams key={brief.workId} text={brief.brief} />
+                        ),
+                    )}
+                </Disclosure>
+            ) : (
+                body
+            )}
+            {approval ? (
+                <BriefApprovalDetails briefs={approval.briefs} digest={approval.digest} />
+            ) : (
+                !loadError && (
+                    <Text variant="caption" tone="muted" role="status">
+                        Fetching the brief to approve.
+                    </Text>
+                )
             )}
         </Stack>
     );

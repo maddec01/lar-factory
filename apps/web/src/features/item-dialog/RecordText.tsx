@@ -125,6 +125,12 @@ export function RecordText({
         record.reviewRounds.length > 0;
     // No text yet: one quiet line says who writes it, with no heading or Export over nothing.
     const unwritten = !spec && !answer && !body;
+    // An approvable brief shows the text its approval request returned in place of this body.
+    const recordBody = !spec && !unwritten && (
+        <div data-record-body>
+            <MarkdownDiagrams text={answer || body!} />
+        </div>
+    );
 
     // With a Spec, the Spec's heading row carries Export, so a record with nothing else to show adds nothing.
     if (spec && !extras && !(record.bodyKind === 'brief' && item.blockers.some((b) => b.dependency))) return null;
@@ -160,12 +166,7 @@ export function RecordText({
             {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
-            {approvable && <ApproveBrief itemId={item.id} onApproved={refresh} />}
-            {!spec && !unwritten && (
-                <div data-record-body>
-                    <MarkdownDiagrams text={answer || body!} />
-                </div>
-            )}
+            {approvable ? <ApproveBrief itemId={item.id} body={recordBody} onApproved={refresh} /> : recordBody}
             {!spec && answer && body && (
                 <Disclosure label="Original question" presentation="section">
                     <MarkdownDiagrams text={body} />

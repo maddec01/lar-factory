@@ -107,7 +107,7 @@ export function blockerDeclarations(records: WorkRecords, id: string) {
 
     if (contracts.unresolved.length)
         invalid(
-            `Normalize contract source declarations (Produces or No ordering needed): ${contracts.unresolved.map((r) => `${r.workId}: ${r.contract}`).join(', ')}.`,
+            `Name one active build in each Consumes line or record No ordering needed: ${contracts.unresolved.map((r) => `${r.workId}: Consumes: ${r.reference}`).join(', ')}.`,
         );
 
     for (const [workId, refs] of contracts.references) {

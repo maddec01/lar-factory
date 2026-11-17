@@ -39,22 +39,16 @@ async function fixture() {
     return { records, dir, g, part, write, revisions };
 }
 
-test('S06 A01: matching declarations cannot hide unresolved shared contract sources', async () => {
+test('S06 A01: a shared Contracts name orders nothing until one brief declares Produces', async () => {
     const { records, g, part, write, revisions } = await fixture();
     const producer = part('b02 producer', 'Contracts: `greeting-message-v1`\nBlocked by: none');
     const x = part('x envelope', 'Blocked by: none');
     const consumer = part('b09 fixture', `Contracts: \`greeting-message-v1\`\nBlocked by: \`${x.workId}\``);
 
     records.addBlocker(consumer.workId, records.read(consumer.workId).revision, x.workId);
-    expect(records.reconcile(g.workId).items).toContainEqual(
-        expect.objectContaining({
-            workId: consumer.workId,
-            kind: 'blocker',
-            requiresFix: true,
-            changes: expect.arrayContaining([producer.workId]),
-        }),
-    );
-    expect(() => records.syncBlockers(g.workId, revisions())).toThrow(/contract.*source/i);
+    expect(records.reconcile(g.workId).items.filter((i) => i.kind === 'blocker')).toEqual([]);
+    records.syncBlockers(g.workId, revisions());
+    expect(records.blockers(consumer.workId).map((r) => r.workId)).toEqual([x.workId]);
     write(
         producer.workId,
         'brief',
@@ -68,6 +62,21 @@ test('S06 A01: matching declarations cannot hide unresolved shared contract sour
             .sort(),
     ).toEqual([x.workId, producer.workId].sort());
     expect(records.reconcile(g.workId).items.filter((i) => i.kind === 'blocker')).toEqual([]);
+});
+
+test('S06 A01: a Consumes line naming no single build holds reconciliation and sync-blockers', async () => {
+    const { records, g, part, revisions } = await fixture();
+    const consumer = part('b09 fixture', 'Consumes: `missing producer`\nBlocked by: none');
+
+    expect(records.reconcile(g.workId).items).toContainEqual(
+        expect.objectContaining({
+            key: `contract-source:${consumer.workId}:Consumes: missing producer`,
+            workId: consumer.workId,
+            kind: 'blocker',
+            requiresFix: true,
+        }),
+    );
+    expect(() => records.syncBlockers(g.workId, revisions())).toThrow(/Consumes: missing producer/);
 });
 
 test('S06 A04: stale exact answer quotes are holds even after a freshness attestation', async () => {

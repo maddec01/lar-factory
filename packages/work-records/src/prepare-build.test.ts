@@ -111,6 +111,48 @@ it('starts a build whose brief names the same files as another active item witho
     expect(records.prepareBuild(build, rev(build), capacity).intent.workId).toBe(build);
 });
 
+it('starts a build sharing a Contracts name with another active build when neither declares Produces', async () => {
+    const { records, rev, ready } = await fixture();
+    const build = ready('Greeting reader');
+    const other = ready('Greeting writer');
+    const brief = (id: string, text: string) => {
+        records.setBody(id, rev(id), 'brief', text);
+        records.recordGate(id, rev(id), {
+            briefDigest: records.gate(id).briefDigest!,
+            approvedBy: 'Pedro',
+            evidence: 'Yes',
+        });
+        records.update(id, rev(id), { status: 'Ready' });
+    };
+
+    records.setBody(other, rev(other), 'brief', 'Contracts: `greeting-v1`');
+    brief(build, 'Contracts: `greeting-v1`');
+
+    expect(records.prepareBuild(build, rev(build), capacity).intent.workId).toBe(build);
+});
+
+it('refuses a Consumes line that resolves to no build and a consumer without a blocker path to its producer', async () => {
+    const { records, rev, ready } = await fixture();
+    const build = ready('Greeting reader');
+    const brief = (text: string) => {
+        records.setBody(build, rev(build), 'brief', text);
+        records.recordGate(build, rev(build), {
+            briefDigest: records.gate(build).briefDigest!,
+            approvedBy: 'Pedro',
+            evidence: 'Yes',
+        });
+        records.update(build, rev(build), { status: 'Ready' });
+    };
+
+    ready('Greeting writer');
+    brief('Consumes: `Missing writer`');
+    expect(() => records.prepareBuild(build, rev(build), capacity)).toThrow('contract sources');
+    brief('Consumes: `Greeting writer`');
+    expect(() => records.prepareBuild(build, rev(build), capacity)).toThrow('consumer blockers');
+    brief('Consumes: `Missing writer`\nNo ordering needed: `Missing writer`: reads a fixture copy.');
+    expect(records.prepareBuild(build, rev(build), capacity).intent.workId).toBe(build);
+});
+
 it('S08 F01: Pedro waits retain the original slot across answers, amendments, handoff and reopen', async () => {
     const { records, other, rev, ready } = await fixture();
     const a = ready('SA');

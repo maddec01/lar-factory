@@ -1,7 +1,9 @@
 // The builds that count toward the build limit and what each is doing, from the one item-state presenter, so the Build
 // heading, the title bar's Building counter and the rows under them say the same, in numbers a reader can add up.
 // Capacity and execution are different: recorded builds count toward the shared limit even while idle, and a build at
-// work the records don't hold takes no slot, so the count names it apart ("0 of 2 build slots · 2 more working").
+// work the records don't hold takes no slot, so the count names it apart ("0 of 2 build slots · 2 more working"). A
+// build with an open PR waits on that PR and holds no slot, idle or fixing CI, so the count names it apart too
+// ("1 of 2 build slots · 2 waiting on their PR").
 
 import { buildsAtWork, limitNumber, plural } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
@@ -11,7 +13,7 @@ import type { ItemState } from './ItemState';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 export const BUILD_LIMIT_NOTE =
-    'The limit counts pending starts and reserves a slot for every started build, including questions, approval waits, Verify and Merge. A slot releases when its PR closes or merges, on completion or set-aside. The limit holds automatic starts; you can override it with Start build on an item.';
+    "The limit counts pending starts and reserves a slot for every started build, including questions and approval waits, until its PR opens, completion or set-aside. A build with an open PR doesn't count, even while it fixes CI or review feedback. The limit holds automatic starts; you can override it with Start build on an item.";
 
 /** A state's word inside a sentence: "working", "stopped", "PR merged", "in review", "starting". */
 const inSentence = ({ word, stage, execution }: ItemState): string =>
@@ -42,6 +44,8 @@ export function useBuilds(): {
     items: Item[];
     running: number;
     limit: number | undefined;
+    /** Builds with an open PR: they wait on it and hold no slot, so the count names them apart. */
+    waiting: Item[];
     text: string;
     occupancy: string;
 } {
@@ -55,16 +59,19 @@ export function useBuilds(): {
     // so "0 of 2 build slots" never sits over rows that say Working with nothing to explain it.
     const counted = new Set(items.map((item) => item.id));
     const atWork = (state: ItemState) => state.running || state.execution === 'working' || state.word === 'Working';
-    const unslotted = data.items.filter(
-        (item) => !counted.has(item.id) && BUILD_STATUSES.includes(item.status) && atWork(states(item)),
-    ).length;
-    const more = unslotted ? ` · ${unslotted} more working` : '';
+    const uncounted = data.items.filter((item) => !counted.has(item.id) && BUILD_STATUSES.includes(item.status));
+    const waiting = uncounted.filter(
+        (item) => item.recorded !== false && !item.setAside && !item.archived && item.linkedPrs[0]?.state === 'open',
+    );
+    const unslotted = uncounted.filter((item) => !waiting.includes(item) && atWork(states(item))).length;
+    const more = `${unslotted ? ` · ${unslotted} more working` : ''}${waiting.length ? ` · ${waiting.length} waiting on their PR` : ''}`;
 
     return {
         items,
         running: shown.filter((state) => state.running).length,
         limit,
-        text: `${buildsAgainstLimit(shown, limit)}${unslotted ? `; ${plural(unslotted, 'more build')} working without a slot, which the board's records don't hold` : ''}`,
+        waiting,
+        text: `${buildsAgainstLimit(shown, limit)}${unslotted ? `; ${plural(unslotted, 'more build')} working without a slot, which the board's records don't hold` : ''}${waiting.length ? `; ${plural(waiting.length, 'build')} waiting on their PR, which ${waiting.length === 1 ? "doesn't" : "don't"} count` : ''}`,
         occupancy:
             limit === undefined
                 ? `${items.length} building${more}`

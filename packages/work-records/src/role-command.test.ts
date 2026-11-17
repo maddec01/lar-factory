@@ -19,7 +19,11 @@ afterEach(() => {
     }
 });
 
-async function fixture(instanceId = 'codex', effort: string | null = 'high', { earlier = false } = {}) {
+async function fixture(
+    instanceId = 'codex',
+    effort: string | null = 'high',
+    { earlier = false, kind = 'build' as 'shaping' | 'build' } = {},
+) {
     const dir = mkdtempSync(join(tmpdir(), "lar-role-O'Brien-"));
     const records = await openWorkRecords(workRecordsPath(dir));
 
@@ -27,7 +31,7 @@ async function fixture(instanceId = 'codex', effort: string | null = 'high', { e
 
     const settings = defaultFactorySettings();
 
-    settings.threadKinds.build = { model: { instanceId, model: 'configured' }, ...(effort && { effort }) };
+    settings.threadKinds[kind] = { model: { instanceId, model: 'configured' }, ...(effort && { effort }) };
     settings.reviewers.push({
         id: 'custom',
         name: 'Custom',
@@ -41,7 +45,7 @@ async function fixture(instanceId = 'codex', effort: string | null = 'high', { e
 
     records.snapshotRun(workId, records.read(workId).revision, {
         runId: 'frozen-run',
-        kind: 'build',
+        kind,
         skills: [],
         packaged: {
             version: 'fixture',

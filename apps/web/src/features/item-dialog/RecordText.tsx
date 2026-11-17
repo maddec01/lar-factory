@@ -6,6 +6,7 @@
 import {
     buildActivity,
     buildPhaseLabel,
+    briefProse,
     conceptMapProse,
     parseDecisionMethod,
     type Item,
@@ -105,7 +106,9 @@ export function RecordText({
             ? conceptMapProse(record.body ?? '')
             : record.bodyKind === 'decision' && record.body && parseDecisionMethod(record.body)
               ? record.body.split('\n').slice(1).join('\n').trimStart()
-              : record.body;
+              : record.bodyKind === 'brief' && record.body
+                ? briefProse(record.body)
+                : record.body;
     const finished = item.status === 'Done';
     const buildPhase = finished ? null : item.buildPhase === undefined ? record.buildPhase : item.buildPhase;
     const linkedMap = item.kind !== 'concept' && item.flow === 'linked' && record.bodyKind === 'map';

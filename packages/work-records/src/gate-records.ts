@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { agentRevision } from './agent-revision.ts';
 import { requireCompleteBrief } from './brief-completeness.ts';
-import type { BriefReviewRecords } from './brief-review.ts';
+import type { BriefReviewRecords, DoubtReview } from './brief-review.ts';
 import { checkBriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import {
@@ -62,7 +62,7 @@ const now = () => new Date().toISOString();
 export function gateRecords(
     database: Database,
     readRecord: (workId: string) => WorkRecord,
-    reviews: Pick<BriefReviewRecords, 'currentDoubt' | 'doubtPackage'>,
+    reviews: Pick<BriefReviewRecords, 'currentDoubt' | 'doubtPackage' | 'approvalUnchanged'>,
 ): GateRecords {
     const { db } = database;
     const find = (workId: string) => readRecord(workId);
@@ -113,13 +113,17 @@ export function gateRecords(
             }));
         const passed = db
             .prepare(
-                "SELECT gate_id, review_digest FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1",
+                "SELECT gate_id, review_digest, doubt_review_id FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1",
             )
             .get(workId, briefDigest);
         const scope = storedScope(database, workId);
         const matchesScope = !scope || checkBriefScope(scope.scope, brief ?? null).ok;
+        const review = passed?.review_digest ? reviews.currentDoubt(workId) : null;
         const matchesReview =
-            !passed?.review_digest || reviews.currentDoubt(workId)?.packageDigest === passed.review_digest;
+            !passed?.review_digest ||
+            (!!review &&
+                (review.packageDigest === passed.review_digest ||
+                    reviews.approvalUnchanged(workId, String(passed.doubt_review_id))));
         const passing =
             !parent(workId) && matchesScope && matchesReview
                 ? (evidence.find((item) => item.gateId === passed?.gate_id) ?? null)
@@ -208,7 +212,19 @@ export function gateRecords(
 
         requireCompleteBrief(record.kind, brief!);
 
-        return makeGateDisplay(workId, record.revision, brief!, reviews.doubtPackage(workId).packageDigest);
+        const prior = db
+            .prepare(
+                "SELECT g.brief_digest, d.content FROM brief_gates g LEFT JOIN doubt_reviews d ON d.review_id=g.doubt_review_id AND d.work_id=g.work_id WHERE g.work_id=? AND g.source IN ('gate','user') ORDER BY g.rowid DESC LIMIT 1",
+            )
+            .get(workId);
+        const previousBrief = prior?.content && (JSON.parse(String(prior.content)) as DoubtReview).productInputs?.brief;
+
+        return {
+            ...makeGateDisplay(workId, record.revision, brief!, reviews.doubtPackage(workId).packageDigest),
+            ...(previousBrief &&
+                digest(previousBrief) === prior?.brief_digest &&
+                previousBrief !== brief && { previousBrief }),
+        };
     };
 
     const gateBatch = (workIds: string[]): GateManifest =>
@@ -263,12 +279,10 @@ export function gateRecords(
                 const compared = gateManifest(
                     current.members.map((member, index) => ({
                         ...member,
-                        display: makeGateDisplay(
-                            member.display.workId,
-                            displayed.members[index]!.display.sourceRevision,
-                            member.display.brief,
-                            member.display.reviewDigest,
-                        ),
+                        display: {
+                            ...member.display,
+                            sourceRevision: displayed.members[index]!.display.sourceRevision,
+                        },
                     })),
                 );
 

@@ -23,7 +23,7 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 - <what this won't do>
 
 ## Domain docs
-- <each glossary entry and ADR draft settled so far, with its decision's title>, or "none"
+- <each glossary entry and ADR draft settled so far, with its decision's title; omit the section when empty>
 ```
 
 Commands generate Parts, status, Spec/gate state, phase and graph from records.
@@ -31,7 +31,7 @@ Write only narrative and destination; never per-part state in map prose.
 
 The user's original text stays in the record's initial context. Follow the local
 [domain-doc setting](shared/domain-docs-setting.md). With it OFF,
-write "none" under Domain docs and in decision domain-drafts, without drafting entries.
+omit Domain docs and keep "none" in decision domain-drafts, without drafting entries.
 
 1. Grill the user ([Grilling with docs](grilling-with-docs.md))
    only on the destination and the out-of-scope list.

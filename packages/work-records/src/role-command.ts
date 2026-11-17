@@ -84,8 +84,7 @@ function preamble(records: WorkRecords, snapshot: RunSettings, role: string, dat
             : [...azure, `Use ${shellPath(cli)} for work records.`]),
         `Frozen test runtime: ${JSON.stringify(snapshot.testRuntime)}`,
         `Frozen project skills: ${JSON.stringify(snapshot.skills)}`,
-        frozenBuildMethodLine(snapshot),
-        frozenRetroLine(snapshot),
+        ...(earlier || snapshot.kind === 'build' ? [frozenBuildMethodLine(snapshot), frozenRetroLine(snapshot)] : []),
         ...(earlier
             ? [
                   `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. Stop if either command exits non-zero; cancel a mismatched active child.`,

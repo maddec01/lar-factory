@@ -33,7 +33,6 @@ describe('brief scope comparison', () => {
             expect.arrayContaining([
                 { field: 'scope.size', value: 'Small' },
                 { field: 'done when.tests', value: scope.tests[0] },
-                { field: 'verify', value: 'no' },
             ]),
         );
         expect(result.extra).toEqual([
@@ -47,6 +46,8 @@ describe('brief scope comparison', () => {
         const older = `${rendered.replace('## Scope\n', '## Scope\n### Files\n- cli.js\n')}\n## Notes for the builder\nFiles: \`README.md\``;
 
         expect(rendered).not.toContain('### Files');
+        expect(rendered).not.toContain('## Verify');
+        expect(checkBriefScope(scope, `${older}\n## Verify\nno\n`).ok).toBe(true);
         expect(checkBriefScope(scope, older)).toMatchObject({ ok: true, missing: [], extra: [] });
     });
 });

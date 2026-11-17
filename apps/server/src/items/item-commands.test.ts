@@ -2162,12 +2162,30 @@ for (const kind of ['issue', 'build'] as const)
         assert.ok(block.includes('All Azure DevOps organizations are read-only.'));
         assert.ok(block.includes(`Use ${shellQuoted(`${board.bin}/lar-work`)} for work records.`));
         assert.ok(block.includes(JSON.stringify(runs[0]!.thread)), 'the thread verifies its own target');
-        assert.match(block, /^Frozen build method: TDD$/m);
-        assert.match(block, /^Frozen retro: on$/m);
+
+        if (kind === 'build') {
+            assert.match(block, /^Frozen build method: TDD$/m);
+            assert.match(block, /^Frozen retro: on$/m);
+        } else assert.doesNotMatch(block, /^Frozen (?:build method|retro):/m);
+
         assert.doesNotMatch(message, /verbatim/);
         assert.doesNotMatch(message, /LAR_FACTORY_(?:BIN|SHAPE_SKILL|BUILD_SKILL)/);
         assert.ok(!message.includes(JSON.stringify(runs[0]!.roles)), 'role targets reach children through role-launch');
         assert.doesNotMatch(message, /Default every delegated role/);
+
+        if (kind === 'build') {
+            const input = board.records.launchIntents({ workId: board.workId })[0]!.buildInput!;
+            const supplied = JSON.parse(message.slice(message.lastIndexOf('\n') + 1));
+
+            assert.deepEqual(supplied, {
+                context: input.context,
+                brief: input.brief,
+                revision: input.revision,
+                blockers: input.blockers,
+            });
+            assert.ok(input.gate.gateId, 'gate evidence remains in the durable launch');
+            assert.ok(input.capacity, 'capacity evidence remains in the durable launch');
+        }
     });
 
 for (const on of [true, false])

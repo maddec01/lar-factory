@@ -40,6 +40,8 @@ export interface DoubtReview {
     reviewId: string;
     dependencyVersion?: 1 | 2 | 3 | 4;
     productInputs?: ProductInputs;
+    /** Own approved inputs, excluding producer contracts that compatibility review may refresh. */
+    approvalInputsDigest?: string;
     packageDigest: string;
     identity: string;
     evidence: string;
@@ -87,6 +89,7 @@ export interface BriefReviewRecords {
     recordDoubt(workId: string, packageDigest: string, identity: string, evidence: string): DoubtReview;
     currentDoubt(workId: string): DoubtReview | null;
     doubtChanges(workId: string, reviewId?: string): string[];
+    approvalUnchanged(workId: string, reviewId: string): boolean;
 }
 
 export function briefReviewRecords(
@@ -128,7 +131,10 @@ export function briefReviewRecords(
             dependencies: dependencies.dependencies(record.workId),
         };
     };
-    const buildPackage = (workId: string, earlier?: Earlier): DoubtPackage & { productInputs: ProductInputs } => {
+    const buildPackage = (
+        workId: string,
+        earlier?: Earlier,
+    ): DoubtPackage & { productInputs: ProductInputs; approvalInputsDigest: string } => {
         const { legacy = false, overlapDependencies = false, raw = false } = earlier ?? {};
         const sources = new Map<string, ReviewSource>();
         const sourceOf = (record: WorkRecord): ReviewSource => {
@@ -311,6 +317,7 @@ export function briefReviewRecords(
         return {
             ...content,
             packageDigest: digest(legacy ? old : reviewed),
+            approvalInputsDigest: digest({ ...reviewed, contracts: undefined }),
             productInputs: {
                 brief: brief!,
                 decisions: reviewed.decisions.map((item) => ({
@@ -390,14 +397,48 @@ export function briefReviewRecords(
             }
         });
 
+    // Enrich old evidence only while its entire reviewed package is still proven current.
+    // A stale package cannot establish which own inputs were approved.
+    database.write(() => {
+        for (const row of db.prepare('SELECT review_id,work_id,content FROM doubt_reviews').all()) {
+            const review = JSON.parse(String(row.content)) as DoubtReview;
+
+            if (review.approvalInputsDigest) continue;
+
+            const id = String(row.work_id);
+
+            if (!bodies.all(id).some((b) => b.body === 'brief' && String(b.markdown).trim())) continue;
+
+            const input = buildPackage(id);
+
+            if (review.packageDigest === input.packageDigest)
+                db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
+                    JSON.stringify({ ...review, approvalInputsDigest: input.approvalInputsDigest }),
+                    String(row.review_id),
+                );
+        }
+    });
+
     return {
         doubtPackage: (id) =>
             database.read(() => {
-                const { productInputs: _, ...input } = buildPackage(id);
+                const { productInputs: _, approvalInputsDigest: __, ...input } = buildPackage(id);
 
                 return input;
             }),
         currentDoubt: (id) => database.read(() => current(id)),
+        approvalUnchanged: (id, reviewId) =>
+            database.read(() => {
+                const row = db
+                    .prepare('SELECT content FROM doubt_reviews WHERE work_id=? AND review_id=?')
+                    .get(id, reviewId);
+                const review = row && (JSON.parse(String(row.content)) as DoubtReview);
+
+                return (
+                    !!review?.approvalInputsDigest &&
+                    review.approvalInputsDigest === buildPackage(id).approvalInputsDigest
+                );
+            }),
         doubtChanges: (id, reviewId) =>
             database.read(() => {
                 const row = reviewId
@@ -424,6 +465,7 @@ export function briefReviewRecords(
                     reviewId: randomUUID(),
                     dependencyVersion: 4 as const,
                     productInputs: input.productInputs,
+                    approvalInputsDigest: input.approvalInputsDigest,
                     packageDigest,
                     identity: text(identity),
                     evidence: text(evidence),

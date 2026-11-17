@@ -1,6 +1,8 @@
+import { briefProse } from '@lar-factory/shared';
 import { Alert, Button, Disclosure, Inline, RichText, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 
+import { BriefRevision } from './BriefRevision';
 import { postAction, receive } from '@/services/board/board.service';
 import { forgetItemDetails } from '@/services/items/items.hooks';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
@@ -9,7 +11,7 @@ import { BriefApprovalDetails, BriefChanges, buttonKind } from '@/ui/board';
 interface Approval {
     requestId: string;
     digest: string;
-    briefs: { workId: string; title: string; brief: string; approvalDigest: string }[];
+    briefs: { workId: string; title: string; brief: string; previousBrief?: string; approvalDigest: string }[];
 }
 
 /**
@@ -135,16 +137,18 @@ export function ApproveBrief({
             )}
             {approval ? (
                 <Disclosure label="Brief to approve" presentation="section" defaultOpen>
-                    {approval.briefs.map((brief) =>
-                        workIds ? (
-                            <Stack key={brief.workId} space="tight">
-                                <Text>{brief.title}</Text>
-                                <RichText text={brief.brief} format="markdown" />
-                            </Stack>
-                        ) : (
-                            <MarkdownDiagrams key={brief.workId} text={brief.brief} />
-                        ),
-                    )}
+                    {approval.briefs.map((brief) => (
+                        <Stack key={brief.workId} space="tight">
+                            {workIds && <Text>{brief.title}</Text>}
+                            {brief.previousBrief && <BriefRevision before={brief.previousBrief} after={brief.brief} />}
+                            {brief.previousBrief && <Text>Complete proposed brief</Text>}
+                            {workIds ? (
+                                <RichText text={briefProse(brief.brief)} format="markdown" />
+                            ) : (
+                                <MarkdownDiagrams text={briefProse(brief.brief)} />
+                            )}
+                        </Stack>
+                    ))}
                 </Disclosure>
             ) : (
                 body

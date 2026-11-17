@@ -17,7 +17,8 @@ or `running` while it runs. Then:
   block says `Frozen retro: on` and this is the build's first handback, so
   `lar-work retro <work ID>` prints `null`. A handback after failed
   Verify, or with `Frozen retro: off`, skips Retro. Then run `status.sh` to set
-  **Verify** or **Ready to merge** per the approved brief's Verify decision,
+  **Verify** or **Ready to merge** per the gate's saved requirement from
+  `lar-work verification <work ID>` (a negative decision needs no brief section),
   never a recommendation. After failed Verify, set **Verify** on this PR again;
   only Pedro records the head-bound pass in the board, and Status writes cannot
   replace it. Change the Verify decision only by amending through Doubt and a
@@ -29,7 +30,7 @@ or `running` while it runs. Then:
   obtain an updated Approver assessment of every listed check against that
   tree before handback. It records its own reuse reasons or reruns only checks
   it cannot justify, without restarting reviews or repeating unaffected checks.
-  Then have the CI fixer update the PR's Checks section from the record and
+  Then have the CI fixer update the PR's Evidence section from the record and
   retain the approved Verify decision. Then restart **Checks**.
 - **Anything else** (checks running, a comment or review, a non-required check
   failing, a run cancelled by a newer run on the same head):

@@ -1,7 +1,7 @@
 // Ticket description, Spec sync notice and description editor.
 
 import type { TextFormat } from '@lar-factory/shared';
-import { onAzure } from '@lar-factory/shared';
+import { briefProse, onAzure } from '@lar-factory/shared';
 import { Button, Disclosure, MarkdownEditor, RichText } from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
@@ -233,7 +233,11 @@ export function ItemDescription({
                 />
             ) : (
                 proseOf(body) &&
-                (format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />)
+                (format === 'markdown' ? (
+                    <MarkdownDiagrams text={read.details.spec ? briefProse(body) : body} />
+                ) : (
+                    <RichText text={body} format={format} />
+                ))
             )}
             {read.details.spec?.original && (
                 <Disclosure label="Original" presentation="section">

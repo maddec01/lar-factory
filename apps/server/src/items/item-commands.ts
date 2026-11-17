@@ -12,6 +12,7 @@ import {
     writeAccessProblem,
     buildBranch,
     buildMessage,
+    frozenBuildInputMessage,
     canAbandon,
     canResumeShaping,
     canRetryBuild,
@@ -1189,8 +1190,7 @@ export function createItemCommands({
             return { thread: null, error: (error as Error).message, refused: true, hold: true };
         }
 
-        if (intent.buildInput)
-            message += `\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(intent.buildInput)}`;
+        if (intent.buildInput) message += `\n\n${frozenBuildInputMessage(intent.buildInput)}`;
 
         if (run) {
             records.startRoleRun(item.id, records.read(item.id).revision, {

@@ -17,6 +17,7 @@ export async function sampleBriefApproval(
 
     work = records.addThread(id, work.revision, 'sample-brief-shaping', 'shape');
     work = records.setBody(id, work.revision, 'brief', '## Approved D1\nKeep the greeting on one line.' + scope);
+    records.recordDoubt(id, records.doubtPackage(id).packageDigest, 'Sample Doubt', 'Fake approved brief reviewed.');
     records.recordGate(id, work.revision, {
         briefDigest: records.gate(id).briefDigest!,
         approvedBy: 'Sample Pedro',

@@ -235,3 +235,24 @@ test('Request changes saves Pedro’s note for every displayed member, keeps gat
     });
     expect((await commands.approveBrief(s.ids[0]!, approval)).status).toBe(409);
 });
+
+test('a changed brief request includes the exact previously approved consumer text and can be approved', async () => {
+    const s = await setup();
+    const id = s.ids[0]!;
+    const first = await s.inspect();
+
+    expect((await s.commands.approveBrief(id, first)).status).toBe(200);
+
+    const before = s.records.body(id, 'brief')!;
+    const after = before.replace('Complete brief 0.', 'Use the compatible producer output.');
+
+    s.records.setBody(id, s.records.read(id).revision, 'brief', after);
+    s.records.recordDoubt(id, s.records.doubtPackage(id).packageDigest, 'Doubt', 'Changed consumer reviewed.');
+    expect(s.records.gate(id).current).toBe(false);
+
+    const changed = await s.inspect();
+
+    expect(changed.briefs[0]).toMatchObject({ brief: after, previousBrief: before });
+    expect((await s.commands.approveBrief(id, changed)).status).toBe(200);
+    expect(s.records.gate(id).current).toBe(true);
+});

@@ -11,7 +11,8 @@ Read the [domain-doc setting](../shared/domain-docs-setting.md). With it ON, a
    build PR, never a work ID or local path. Its prompt carries
    `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
    With domain docs OFF, this step does nothing, creates no drafts and leaves
-   the brief's Domain docs as "none". A saved private value also means OFF.
+   the brief's Domain docs omitted. Accept legacy "none" sections. A saved
+   private value also means OFF.
    With domain docs ON, add a new term or ADR-worthy decision settled during
    the build the same way, using the fixer during review without stopping.
    Each ADR must meet all three conditions in the domain-doc guide.

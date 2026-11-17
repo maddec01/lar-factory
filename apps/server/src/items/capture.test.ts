@@ -1,5 +1,6 @@
 import type { BoardData, Item, PickedTicket, RepoConfig } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import type { StructureTicket } from '@lar-factory/work-records/tracker-sync';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -157,16 +158,21 @@ test('attaching a ticket to captured work keeps its work ID, and a ticket anothe
 test('ticket capture imports original text once and replays after the handler restarts', async () => {
     const { records, board } = await captureOn();
     let creates = 0;
+    let created!: StructureTicket;
     const provider = {
         create: async (repository: string, title: string, body: string) => {
             creates++;
 
-            return { repository, number: 81, title, body, version: '1' };
+            created = { repository, number: 81, title, body, version: '1' };
+
+            return created;
         },
+        readSpec: async () => created,
+        replaceSpec: async (_before: StructureTicket, body: string) => (created = { ...created, body }),
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
     const repo = {
         ...REPOS[0]!,
-        setup: { repo: WEB, access: { 'publish-ticket': 'allowed' }, vocabulary: {} },
+        setup: { repo: WEB, access: { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }, vocabulary: {} },
     } as RepoConfig;
     const restart = () =>
         createCapture({
@@ -189,6 +195,7 @@ test('ticket capture imports original text once and replays after the handler re
     assert.equal(records.initialContext(item.id), draft.description);
     assert.equal(itemOf((await restart().capture({ requestId: REQUEST, draft })).body).id, item.id);
     assert.equal(creates, 1);
+    assert.equal(created.body, draft.description);
     assert.equal(records.list({}).length, 1);
 });
 
@@ -203,8 +210,13 @@ test('uncertain creates reconcile by marker and never create again across a data
             throw Error('Response lost');
         },
         find: async () => (created ? [created] : []),
+        readSpec: async () => created!,
+        replaceSpec: async (_before: StructureTicket, body: string) => (created = { ...created!, body }),
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
-    const repo = { ...REPOS[0]!, setup: { access: { 'publish-ticket': 'allowed' }, vocabulary: {} } } as RepoConfig;
+    const repo = {
+        ...REPOS[0]!,
+        setup: { access: { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }, vocabulary: {} },
+    } as RepoConfig;
     const handler = (store: WorkRecords) =>
         createCapture({
             board,
@@ -230,6 +242,7 @@ test('uncertain creates reconcile by marker and never create again across a data
     assert.equal(result.status, 200);
     assert.equal(handle.records.read(itemOf(result.body).id).ticket, `${WEB}#91`);
     assert.equal(writes, 1);
+    assert.equal(created!.body, draft.description);
 });
 
 test('a refused publish-ticket access writes no ticket and leaves List empty', async () => {
@@ -268,16 +281,26 @@ test('converting local work preserves its ID and context even with Add item crea
     const { records, board } = await captureOn();
     const local = records.create({ repository: WEB, kind: 'bug', title: 'Local failure', context: 'Steps.' });
     const writes: unknown[][] = [];
+    let created!: StructureTicket;
     const provider = {
         create: async (...args: unknown[]) => {
             writes.push(args);
 
-            return { number: 11 };
+            created = { repository: WEB, number: 11, title: String(args[1]), body: String(args[2]), version: '1' };
+
+            return created;
         },
+        readSpec: async () => created,
+        replaceSpec: async (_before: StructureTicket, body: string) => (created = { ...created, body }),
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
     const repo = {
         ...REPOS[0]!,
-        setup: { repo: WEB, createIssuesFromAddItem: false, access: { 'publish-ticket': 'allowed' }, vocabulary: {} },
+        setup: {
+            repo: WEB,
+            createIssuesFromAddItem: false,
+            access: { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' },
+            vocabulary: {},
+        },
     } as RepoConfig;
     const reread = () => board.update({ items: recordItems(records, [], [WEB]) });
 

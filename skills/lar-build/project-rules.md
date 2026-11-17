@@ -11,8 +11,8 @@ sources with a concrete option through [Questions](shared/questions.md).
 Do not repeat approval already given. Read existing glossary/ADRs for context.
 Planner and implementer leave the brief's domain drafts to the builder's docs
 role. Domain authors load [Domain modeling](shared/domain-docs.md) and its setting.
-Reviewers get the saved setting/paths: OFF requires "none"; ON requires consistent
-terms and ADRs only for hard-to-reverse, surprising, real trade-offs. Load
+Reviewers get the saved setting/paths: OFF requires no drafts and an omitted
+Domain docs section; legacy "none" is accepted. ON requires consistent terms and ADRs only for hard-to-reverse, surprising, real trade-offs. Load
 [glossary](shared/glossary-format.md) or [ADR](shared/adr-format.md) formats only
 when checking those drafts.
 

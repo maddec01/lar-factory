@@ -12,8 +12,8 @@ names the glossary file and ADR folder. Use the configured paths in place of the
 examples below. Builds include the relevant entries and ADRs in their build PR.
 
 `{"kind": "off"}` means write no domain drafts or glossary or ADR files. Read
-existing domain docs for context and write "none" in the brief's or map's Domain
-docs and a decision's domain-drafts body. Offer no later publication. When ON,
+existing domain docs for context. Omit the brief's or map's Domain docs and keep
+"none" in a decision's domain-drafts body. Offer no later publication. When ON,
 shaping drafts entries in work records, the whole gated brief includes them in
 the ticket Spec when enabled, and the builder writes them in the build PR.
 Shaping alone writes no repository files in either mode.

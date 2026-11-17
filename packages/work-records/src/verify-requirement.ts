@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
+import { storedScope } from './scope-records.ts';
 
 /** An explicit Verify section belongs to the approved product brief, never an approver recommendation. */
 export function parseBriefVerify(brief: string): boolean | null {
@@ -42,7 +43,9 @@ export function briefVerify(database: Database, id: string): { required: boolean
     if (!row) return null;
 
     const brief = String(row.markdown);
-    const required = parseBriefVerify(brief);
+    // New briefs omit a negative Verify section. Retain legacy waits when no scope decision exists.
+    const required =
+        parseBriefVerify(brief) ?? (storedScope(database, id)?.scope.verify.required === false ? false : null);
 
     if (required === null) return null;
 

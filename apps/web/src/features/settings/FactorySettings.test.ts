@@ -126,3 +126,15 @@ test('keeps failed drafts and saves kind/role choices with independent inheritan
     await save();
     expect(state.settings.roles['ci-fixer']).toEqual({});
 });
+
+test('shows Retro on by default and saves it off', async () => {
+    await open();
+
+    const retro = () => $<HTMLButtonElement>('[role="switch"][aria-label="Retro"]')!;
+
+    expect(retro().getAttribute('aria-checked')).toBe('true');
+    await settle(() => retro().click());
+    await save();
+    expect(state.settings.retro).toBe(false);
+    expect(retro().getAttribute('aria-checked')).toBe('false');
+});

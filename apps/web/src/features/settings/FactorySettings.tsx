@@ -15,7 +15,14 @@ import { instructionText, prepareFactoryDraft } from './FactoryDraft';
 import { FactoryExecution } from './FactoryExecution';
 import { FactoryReviewer } from './FactoryReviewer';
 import { readFactorySettings, saveFactorySettings, unreadable } from '@/services/settings/settings.service';
-import { FactoryAction, FactoryModelTable, FactorySettingsGroup, FactorySettingsLayout, LoadFailed } from '@/ui/board';
+import {
+    FactoryAction,
+    FactoryModelTable,
+    FactorySettingsGroup,
+    FactorySettingsLayout,
+    FactorySwitch,
+    LoadFailed,
+} from '@/ui/board';
 
 const labels: Record<ThreadKind | (typeof FACTORY_ROLES)[number], string> = {
     shaping: 'Shaping',
@@ -74,6 +81,14 @@ function FactoryEditor({ initial }: { initial: FactorySettingsState }) {
 
     return (
         <FactorySettingsLayout busy={saving} problem={error ?? saved.problem}>
+            <FactorySettingsGroup title="Builds" description="Saved changes apply to future build runs.">
+                <FactorySwitch
+                    label="Retro"
+                    description="Run a Retro when a build is handed back."
+                    on={draft.retro !== false}
+                    onChange={(retro) => setDraft({ ...draft, retro })}
+                />
+            </FactorySettingsGroup>
             <FactorySettingsGroup
                 title="Reviewers"
                 description="Code always runs by default. Security, UI and Performance run on trigger. Doubt and the approver remain required."

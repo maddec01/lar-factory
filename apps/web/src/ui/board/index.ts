@@ -196,6 +196,7 @@ export { DossierParentContext, DossierStates } from './DossierContext';
 export {
     FactorySettingsLayout,
     FactorySettingsGroup,
+    FactorySwitch,
     FactoryChoice,
     FactoryText,
     FactoryAction,

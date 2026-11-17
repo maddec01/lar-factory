@@ -7,6 +7,7 @@ import {
     SWAP_KINDS,
     visibleKind,
     type SwapKind,
+    retroWaits,
     releaseHolds,
     parseDecisionMethod,
     type Item,
@@ -622,7 +623,7 @@ export interface WorkRecords
     hidden(retention: Retention, now?: Date): WorkRecord[];
     /** Deletes the finished and set-aside records `retention` deletes at `now`, with their bodies, review rounds, threads,
      * launch intents, replaced PRs, observations and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
-     * record waits on it, and while it holds a Dependency or one blocks it; the kept parent and blockers of a deleted record are bumped. */
+     * record waits on it, while it holds a Dependency or one blocks it, or while a Retro pick is unanswered; the kept parent and blockers of a deleted record are bumped. */
     deleteExpired(retention: Retention, now?: Date): Expired;
     /** The records it owns, in the order they were made. */
     children(workId: string): WorkRecord[];
@@ -2632,7 +2633,11 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         hidden: (retention, now = new Date()) => {
             const days = checkDays(retention?.hideAfterDays, 'days before hiding');
 
-            return database.read(() => dueRows(retiredRows.all() as unknown as Row[], days, now).map(fromRow));
+            return database.read(() =>
+                dueRows(retiredRows.all() as unknown as Row[], days, now)
+                    .filter((row) => !retroWaits(records.retro(row.work_id)))
+                    .map(fromRow),
+            );
         },
         deleteExpired: (retention, now = new Date()) => {
             if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
@@ -2686,13 +2691,15 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                             );
                         });
                         const dependency = retentionReason(workId, (id) => due.has(id));
+                        const retro = retroWaits(records.retro(workId));
 
-                        if (!child && !waiting && !journal && !dependency) continue;
+                        if (!child && !waiting && !journal && !dependency && !retro) continue;
 
                         due.delete(workId);
                         kept.push({
                             workId,
                             reason:
+                                (retro ? 'Its optional Retro follow-ups have not been chosen or dismissed.' : null) ??
                                 dependency ??
                                 (journal
                                     ? `Its publication journal still needs recovery evidence or a kept source.`

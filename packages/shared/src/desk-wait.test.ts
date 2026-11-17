@@ -174,7 +174,7 @@ test('PR review is one desk wait through checks, conflicts and legacy Verify', (
     expect(deskWait({ ...ready, retro: undefined, linkedPrs: [{ ...pr, mergeState: 'conflicts' }] }).label).toBe(
         'Review PR',
     );
-    expect(deskWait(item({ status: 'Done', linkedPrs: [{ ...pr, state: 'merged' }], retro })).label).not.toBe(
+    expect(deskWait(item({ status: 'Done', linkedPrs: [{ ...pr, state: 'merged' }], retro })).label).toBe(
         'Choose follow-ups',
     );
 });

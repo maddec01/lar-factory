@@ -36,22 +36,6 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             id,
         );
     };
-    const prMerged = (id: string, pr: string | null) =>
-        !!pr &&
-        !!db
-            .prepare("SELECT 1 FROM observations WHERE work_id=? AND observed='pr' AND subject=? AND state='merged'")
-            .get(id, pr);
-    // A PR the board has not observed merged counts as open, so the build and the board settle Retro before merge.
-    const open = (id: string, revision: number, retro: Retro | null) => {
-        const record = read(id);
-
-        expectRevision(record, revision);
-
-        if (prMerged(id, retro?.pr ?? null) || prMerged(id, record.pullRequest))
-            invalid('The delivery PR is merged, so Retro follow-ups can no longer change.');
-
-        return record;
-    };
 
     return {
         retro: (id) => database.read(() => get(id)),
@@ -107,7 +91,7 @@ export function retroRecords(database: Database, read: (id: string) => WorkRecor
             database.write(() => {
                 const retro = get(id) ?? invalid('No retro is awaiting a choice.');
 
-                open(id, revision, retro);
+                expectRevision(read(id), revision);
 
                 if (!retro.suggestions?.length || retro.choice) invalid('No retro is awaiting a choice.');
 

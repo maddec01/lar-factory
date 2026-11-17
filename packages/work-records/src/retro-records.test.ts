@@ -92,12 +92,12 @@ test('a build proposes its own retro before merge and the board takes the choice
     }
 });
 
-test('a Retro started on PR open can finish after merge; choices retain their existing guard', async () => {
+test('Retro proposals and saved picks survive merge with revision and delivery guards', async () => {
     const s = await setup();
 
     s.records.proposeRetro(s.id, s.at(), suggestions);
     s.merge();
-    expect(() => s.records.chooseRetro(s.id, s.at(), [0], 'Pedro')).toThrow(/merged/);
+    expect(s.records.chooseRetro(s.id, s.at(), [0], 'Pedro').choice?.selected).toEqual([0]);
 
     const late = await setup();
 
@@ -116,7 +116,7 @@ test('a Retro started on PR open can finish after merge; choices retain their ex
     moved.records.setPullRequest(moved.id, moved.at(), 'owner/repo#2');
     moved.records.observe(moved.id, moved.at(), { of: 'pr', state: 'merged' });
     expect(moved.records.retro(moved.id)?.pr).toBe('owner/repo#1');
-    expect(() => moved.records.chooseRetro(moved.id, moved.at(), [0], 'Pedro')).toThrow(/merged/);
+    expect(moved.records.chooseRetro(moved.id, moved.at(), [], 'Pedro').choice?.selected).toEqual([]);
 });
 
 test('a stored retro that still carries its thread delivery keeps parsing and takes a proposal', async () => {
@@ -132,4 +132,33 @@ test('a stored retro that still carries its thread delivery keeps parsing and ta
     s.records.saveRetro(s.id, legacy);
     expect(s.records.retro(s.id)).toEqual(legacy);
     expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toMatchObject({ suggestions });
+});
+
+test('retention preserves an unanswered Done pick until dismissed, without holding completion or blockers', async () => {
+    const s = await setup();
+
+    s.records.proposeRetro(s.id, s.at(), suggestions);
+
+    const dependent = s.records.create({ title: 'Next build', repository: 'owner/repo', kind: 'build' });
+
+    s.records.addBlocker(dependent.workId, dependent.revision, s.id);
+    s.merge();
+
+    const retention = { hideAfterDays: 0, deleteAfterDays: 0 };
+    const later = new Date(Date.now() + 30 * 86_400_000);
+
+    expect(s.records.completion(s.id).complete).toBe(true);
+    expect(s.records.buildReservations()).not.toContain(s.id);
+    expect(s.records.waitingOn(dependent.workId)).toEqual([]);
+    expect(s.records.hidden(retention, later)).toEqual([]);
+    expect(s.records.deleteExpired(retention, later)).toMatchObject({
+        deleted: [],
+        kept: [{ workId: s.id, reason: expect.stringContaining('Retro') }],
+    });
+    expect(s.records.retro(s.id)?.choice).toBeNull();
+    s.records.chooseRetro(s.id, s.at(), [], 'Pedro');
+    expect(s.records.hidden(retention, later).map((record) => record.workId)).toEqual([s.id]);
+    // The active dependent still keeps its blocker record. Once it is retired too, retention deletes both.
+    s.records.setAside(dependent.workId, s.records.read(dependent.workId).revision);
+    expect(s.records.deleteExpired(retention, later).deleted).toEqual([s.id, dependent.workId]);
 });

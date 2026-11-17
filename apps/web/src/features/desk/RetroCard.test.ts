@@ -58,10 +58,10 @@ test('a compact card before merge opens the full choice in details and creates o
     expect(text(card())).toContain(item.title);
     expect(card().querySelector('input[type=checkbox]')).toBeNull();
     expect(text(card())).not.toContain('Full description');
-    expect(card().querySelectorAll('[data-col="side"] button')).toHaveLength(1);
+    expect(card().querySelectorAll('[data-col="side"] button')).toHaveLength(2);
     await openChoice();
-    expect(text(details())).toContain('Choose follow-ups before the pull request can merge.');
-    expect(text(details())).not.toContain('Review the pull request before it can merge.');
+    expect(text(details())).toContain('Optional. Choose after merge if you like, or dismiss these follow-ups.');
+    expect(text(details())).not.toContain('Choose follow-ups before the pull request can merge.');
     expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
     for (let i = 1; i <= 6; i++) expect(text(details())).toContain(`Full description ${i}.`);
     expect(button('Create chosen follow-ups').disabled).toBe(true);
@@ -95,4 +95,35 @@ test('a pick whose follow-up creation failed stops waiting and shows a toast nam
     expect([...document.querySelectorAll('.desk-row')].some((row) => text(row).includes('Choose follow-ups'))).toBe(
         false,
     );
+});
+
+test('a Done pick survives on the desk, opens in details, and dismisses in one click', async () => {
+    const done = { ...item, status: 'Done' as const };
+    const board = fresh({ ...sample, items: [done] });
+
+    holdPosts(board);
+    await mountPage(board);
+    expect(text(card())).toContain('Choose follow-ups · 6');
+    expect(text(card())).toContain('Optional · Build done');
+    await openChoice();
+    expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
+    await settle(() =>
+        [...details().querySelectorAll<HTMLButtonElement>('button')]
+            .find((node) => node.getAttribute('aria-label') === 'Close')!
+            .click(),
+    );
+    await settle(() => [...card().querySelectorAll('button')].find((node) => text(node) === 'Dismiss')!.click());
+    expect(posted()).toContainEqual(['/api/choose-retro', { itemId: item.id, revision: 7, selected: [] }]);
+    expect($('[data-item-dialog]')).toBeNull();
+    expect(
+        [...card().querySelectorAll('button')].find((node) => text(node) === 'Dismiss')?.getAttribute('aria-busy'),
+    ).toBe('true');
+    await answer({
+        error: null,
+        board: fresh({
+            ...sample,
+            items: [{ ...done, retro: { ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } } }],
+        }),
+    });
+    expect($('.desk-row')).toBeNull();
 });

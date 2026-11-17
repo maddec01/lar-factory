@@ -13,7 +13,7 @@ interface Dependencies {
     capture?: Pick<TicketCaptureDeps, 'provider' | 'labels' | 'discoverOptions'>;
 }
 
-/** The board records the pick before merge and creates the chosen follow-ups at once; a failed capture is only reported. */
+/** The board records the optional pick, including after merge, and creates the chosen follow-ups at once; a failed capture is only reported. */
 export function createRetro({ board, records, reread, identity = () => userInfo().username, capture }: Dependencies) {
     const pending = new Set<string>();
     const run = async (id: string, action: () => Promise<void>): Promise<Reply> => {

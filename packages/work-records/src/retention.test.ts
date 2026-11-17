@@ -23,7 +23,7 @@ it('refuses a malformed setting and leaves the saved one as it was', () => {
     }
 });
 
-it('hides and deletes a merged Done build on schedule whatever its Retro record holds', async () => {
+it('hides and deletes a merged Done build after its pick even if follow-up capture is incomplete', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'retention-'));
     const records = await openWorkRecords(join(dir, 'work.db'));
     const retention = { hideAfterDays: 0, deleteAfterDays: 0 };
@@ -47,6 +47,7 @@ it('hides and deletes a merged Done build on schedule whatever its Retro record 
         record = records.observe(id, records.read(id).revision, { of: 'pr', state: 'merged' });
         records.update(id, record.revision, { status: 'Done' });
 
+        records.chooseRetro(id, records.read(id).revision, [0], 'Pedro');
         expect(records.hidden(retention, later).map((r) => r.workId)).toEqual([id]);
         expect(records.deleteExpired(retention, later)).toMatchObject({ deleted: [id], kept: [] });
     } finally {

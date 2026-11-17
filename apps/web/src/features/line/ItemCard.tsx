@@ -95,7 +95,7 @@ export function ItemCard({
     const wait = deskWait(item, unavailable, data.items);
     const delivery = deliveryPrStatus(item, unavailable);
     const comments = wait.action?.kind === 'pr-feedback' ? item.linkedPrs[0]?.review?.comments : undefined;
-    const followups = retroWaits(item.retro, item.status);
+    const followups = retroWaits(item.retro);
     const checks = cardChecks(item, data, disconnected);
     const idle = usePartState(item, asks ? undefined : part, data, !!checks);
     const record = part ? projectWorkMap([item]).nodes[0] : undefined;

@@ -27,6 +27,9 @@ export function RetroChoices({
 
     return (
         <Stack space="tight" onClick={(event) => event.stopPropagation()}>
+            <Text variant="caption" tone="muted">
+                Optional. Choose after merge if you like, or dismiss these follow-ups.
+            </Text>
             {retro.suggestions?.map((suggestion, index) => (
                 <Stack space="tight" key={index}>
                     <label className="flex items-start gap-2 text-sm">

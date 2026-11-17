@@ -1,5 +1,3 @@
-import type { Status } from './item-domain.ts';
-
 /** The build's Retro, proposed when its PR opens, and its board-only follow-up decision. */
 export interface RetroSuggestion {
     title: string;
@@ -19,6 +17,6 @@ export interface Retro {
     }[];
 }
 
-/** Only an unmade pick waits: a failed capture is reported once, and a Done build drops its unchosen follow-ups. */
-export const retroWaits = (retro: Retro | undefined | null, status: Status): boolean =>
-    !!retro && status !== 'Done' && !!retro.suggestions?.length && !retro.choice;
+/** An unanswered optional pick survives merge; choosing none dismisses it. Failed captures no longer wait. */
+export const retroWaits = (retro: Retro | undefined | null): boolean =>
+    !!retro && !!retro.suggestions?.length && !retro.choice;

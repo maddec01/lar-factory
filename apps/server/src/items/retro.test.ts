@@ -145,3 +145,25 @@ test('the board never sends a Retro message into the build thread after its deli
     expect(s.records.retro(s.id)).toBeNull();
     expect(s.records.read(s.id).buildPhase).toBe('checks');
 });
+
+test.each([[[1]]])('after merge, choosing %j settles the optional card without changing Done', async (selected) => {
+    const s = await setup();
+
+    s.propose();
+    s.merge();
+    expect(deskWait(s.board.find(s.id)!).label).toBe('Choose follow-ups');
+    expect(deskItems(s.board.snapshot(), false)).toHaveLength(1);
+    expect((await s.commands.chooseRetro(s.id, { revision: s.at() - 1, selected })).status).toBe(409);
+    expect(s.records.retro(s.id)?.choice).toBeNull();
+
+    const result = await s.commands.chooseRetro(s.id, { revision: s.at(), selected });
+
+    expect(result.status).toBe(200);
+    expect(s.records.read(s.id).status).toBe('Done');
+    expect(s.records.completion(s.id).complete).toBe(true);
+    expect(s.records.list({ status: 'List' }).map((record) => record.title)).toEqual(
+        selected.length ? ['Document a retry'] : [],
+    );
+    expect(deskItems(s.board.snapshot(), false)).toEqual([]);
+    expect((await s.commands.chooseRetro(s.id, { revision: s.at(), selected })).status).toBe(409);
+});

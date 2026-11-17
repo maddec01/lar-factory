@@ -5,7 +5,6 @@ import {
     needsAnswer,
     prReadiness,
     questionWaitReason,
-    retroWaits,
     supersededReleaseQuestion,
 } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
@@ -102,21 +101,11 @@ export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData;
             );
         }
 
-        // A build at Verify or Ready to merge whose pull request waits on you says so, as a question does; while its
-        // Retro follow-ups wait to be chosen, the notice asks for them first, as the desk does.
+        // A build at Verify or Ready to merge whose pull request waits on you says so; Retro is optional.
         const review = needsAnswer(item) ? null : prReadiness(item);
 
         if (review && (review.state === 'waiting' || review.state === 'failed') && !cleanupResult)
-            return (
-                <NeedsYouNotice
-                    reason={
-                        retroWaits(item.retro, item.status)
-                            ? 'Choose follow-ups before the pull request can merge.'
-                            : (REVIEW_ASKS[review.word] ?? `${review.word}.`)
-                    }
-                    actions={primary}
-                />
-            );
+            return <NeedsYouNotice reason={REVIEW_ASKS[review.word] ?? `${review.word}.`} actions={primary} />;
 
         return needsAnswer(item) ? (
             <NeedsYouNotice reason={questionWaitReason(item)} actions={primary}>

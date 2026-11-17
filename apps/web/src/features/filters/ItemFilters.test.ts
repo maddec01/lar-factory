@@ -55,3 +55,11 @@ test('List and the board keep separate filters, and filters write nothing to the
     expect(saved(LIST_KEY)).toEqual({ kinds: [], labels: [] });
     expect(saved(BOARD_KEY), 'clearing List leaves the board alone').toEqual({ kinds: ['bug'], labels: [] });
 });
+
+test('shaped builds match their retained Kind while unclassified builds match No kind', () => {
+    const bug = item('b', { kind: 'build', deliveryKind: 'bug' });
+    const build = item('p', { kind: 'build' });
+
+    expect([bug, build].filter(rowFilter({ kinds: ['bug'], labels: [] }, [])).map((i) => i.id)).toEqual(['b']);
+    expect([bug, build].filter(rowFilter({ kinds: ['no-kind'], labels: [] }, [])).map((i) => i.id)).toEqual(['p']);
+});

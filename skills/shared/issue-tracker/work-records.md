@@ -11,6 +11,16 @@ Stage-event contract is unavailable: `record-stage ID --revision N --file F`.
 Keep stage inputs, outputs and wait/resume evidence in bodies/thread references
 until implemented.
 
+## Kind
+
+Single-flow shaping retains Bug, Feature or Improvement as `deliveryKind` while
+`kind: build` controls the workflow. Use the retained Kind for branch prefixes
+(`fix/` for Bug, `feat/` for Feature or Improvement), conventional PR titles
+(`fix:` or `feat:`) and user-facing classification. A build without a saved Kind
+has none; do not infer one from an empty tracker label set. Concept and linked
+structure still follow `kind` and repository membership. Keep a branch already
+recorded in `buildBranch` when resuming, even if its Kind later changes.
+
 ## Picking
 
 Resolve a work ID or GitHub/Azure ticket reference with

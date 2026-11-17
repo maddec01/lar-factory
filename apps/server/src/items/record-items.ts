@@ -378,6 +378,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }),
             status: derivedStatus,
             statuses: done ? [] : [derivedStatus],
+            deliveryKind: record.deliveryKind,
             kind: record.kind === 'slice' ? 'issue' : record.kind,
             flow:
                 parent?.kind === 'concept' || ticket?.flow === 'linked'

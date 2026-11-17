@@ -1,7 +1,7 @@
 // The Kind and Labels filters, which List and the board each keep on this machine. A filter only hides rows: it writes nothing
 // to the tracker and matches what a row shows, so a managed label or one mapped to the row's kind never matches.
 
-import { labelsOnRow, sameLabel, trackerCapabilities } from '@lar-factory/shared';
+import { visibleKind, labelsOnRow, sameLabel, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, RepoConfig } from '@lar-factory/shared';
 import type { LabelChoice } from '@lar-works/design-system';
 import { useState } from 'react';
@@ -60,7 +60,11 @@ export const headingOf = (rows: readonly Item[]): string => {
 };
 
 /** The kind filter a row counts under. An item with no kind badge counts as No kind. */
-const kindFilterOf = (item: Pick<Item, 'kind'>): KindFilter => (isKindFilter(item.kind) ? item.kind : 'no-kind');
+const kindFilterOf = (item: Pick<Item, 'kind' | 'deliveryKind'>): KindFilter => {
+    const kind = visibleKind(item);
+
+    return isKindFilter(kind) ? kind : 'no-kind';
+};
 
 /** Whether a row stays: it matches any chosen kind and any chosen label. */
 export const rowFilter =

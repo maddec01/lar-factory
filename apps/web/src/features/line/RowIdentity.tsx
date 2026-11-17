@@ -1,7 +1,7 @@
 // What names an item wherever it shows: where its ticket is saved and its repository, and its kind, as a quiet mark on
 // stage rows, desk cards and dock rows and as a badge in its dialog.
 
-import { isBuild, onAzure } from '@lar-factory/shared';
+import { isBuild, onAzure, visibleKind } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { TicketIcon } from '@lar-works/design-system/icons';
 import { memo, type ReactNode } from 'react';
@@ -28,7 +28,7 @@ export const RowKindMark = memo(function RowKindMark({
     labelled?: boolean | 'fact';
     listed?: boolean;
 }) {
-    const kind = KIND_BADGES[item.kind];
+    const kind = KIND_BADGES[visibleKind(item)];
 
     if (!(listed && kind) && item.kind !== 'concept' && item.flow === 'linked' && !item.parentId && !item.parent)
         return (

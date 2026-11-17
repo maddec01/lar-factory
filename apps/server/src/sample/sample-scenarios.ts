@@ -152,6 +152,7 @@ export function withScenarios(fixture: BoardData, now = Date.now()): BoardData {
     local('0c0a0000-0000-4000-8000-000000000002', {
         title: 'Health endpoint for the household registry',
         kind: 'build',
+        deliveryKind: 'feature',
         repo: PLATFORM,
         status: 'Ready',
         statuses: ['Ready'],

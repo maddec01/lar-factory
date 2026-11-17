@@ -120,7 +120,7 @@ export const kindMappingOffers = (repo: string, name: string): boolean =>
 
 /** The labels `item`'s row shows, under its repository's mappings and its tracker's managed labels. */
 export const labelsOnRow = (
-    item: Pick<Item, 'kind' | 'labels' | 'repo'>,
+    item: Pick<Item, 'kind' | 'deliveryKind' | 'labels' | 'repo'>,
     repos: readonly Pick<RepoConfig, 'repo' | 'setup'>[],
 ): string[] =>
     shownLabels(

@@ -1,7 +1,7 @@
 import type { AzureWorkItem, Item, Kind } from '@lar-factory/shared';
 // The bits every view draws for an item: its numbered title, title link, repository, kind badge and label chips. Slices,
 // pull requests, agent work and activity have files of their own.
-import { decisionMethodName, itemRepoNames, onAzure, ref, repoKey, shortAgo } from '@lar-factory/shared';
+import { visibleKind, decisionMethodName, itemRepoNames, onAzure, ref, repoKey, shortAgo } from '@lar-factory/shared';
 import { Inline, LabelChip, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
@@ -98,6 +98,7 @@ export function ItemKind({
     onRow?: boolean;
     summaryKind?: ReactNode;
 }) {
+    const shownKind = visibleKind(item);
     const inSummary = summaryKind !== undefined;
     const words: string[] = [];
     const method = decisionMethodName(item);
@@ -105,7 +106,7 @@ export function ItemKind({
     // In the summary, its kind names a decision's method and a build.
     if (!inSummary) {
         if (method) words.push(method);
-        else if (!onRow && !KIND_BADGES[item.kind]) words.push('Work');
+        else if (!onRow && !KIND_BADGES[shownKind]) words.push('Work');
     }
 
     const parentKind = useBoardStore(
@@ -128,7 +129,7 @@ export function ItemKind({
 
     if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Across Projects');
 
-    const kind = inSummary ? summaryKind : KIND_BADGES[item.kind] && <KindBadge kind={item.kind} />;
+    const kind = inSummary ? summaryKind : KIND_BADGES[shownKind] && <KindBadge kind={shownKind} />;
 
     return kind || words.length ? (
         <Inline as="span" inline wrap space="tight" data-item-kind>

@@ -2,6 +2,7 @@
 
 import type { ModelSelection } from './board-domain.ts';
 import { type Item } from './domain.ts';
+import { visibleKind } from './managed-labels.ts';
 import { itemName } from './presentation.ts';
 import { azureReadOnlyLines, frozenBuildMethodLine, frozenRetroLine, type RunSettings } from './run-settings.ts';
 
@@ -116,12 +117,12 @@ export function earlierWorkMessage(item: Item, context: FactoryThreadContext): s
 
 /**
  * The branch Start build's worktree takes: `<kind>/<n>-<slug>`, or `<kind>/<first 8 characters of the work ID>-<slug>`
- * for ticketless work, the kind `fix` for a bug,
+ * for ticketless work, using the retained delivery Kind when present: `fix` for a bug,
  * `feat` for a feature or improvement, else `chore`. The slug is up to five words of the
  * title, lowercase and hyphen-joined, accents dropped and anything but a-z and 0-9 left out.
  */
 export function buildBranch(item: Item): string {
-    const { kind } = item;
+    const kind = visibleKind(item);
     const prefix = kind === 'bug' ? 'fix' : kind === 'feature' || kind === 'improvement' ? 'feat' : 'chore';
     const words = item.title
         .normalize('NFKD')

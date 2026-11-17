@@ -660,4 +660,12 @@ export const MIGRATIONS: readonly Migration[] = [
       SELECT RAISE(ABORT, 'Run launches are immutable');
     END;
   `),
+    (db) =>
+        db.exec(`
+      ALTER TABLE work_records ADD COLUMN delivery_kind TEXT CHECK(delivery_kind IN ('bug','feature','improvement'));
+      CREATE TRIGGER journal_work_records_delivery_kind AFTER UPDATE OF delivery_kind ON work_records
+        WHEN OLD.delivery_kind IS NOT NEW.delivery_kind BEGIN
+          INSERT INTO write_dirty VALUES ('work',NEW.work_id,'deliveryKind') ON CONFLICT DO NOTHING;
+        END;
+    `),
 ];

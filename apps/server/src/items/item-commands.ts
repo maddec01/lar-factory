@@ -20,6 +20,7 @@ import {
     isLiveThread,
     isOnboarding,
     kindCanChange,
+    visibleKind,
     reconcileGroupWaits,
     reconcileMessage,
     sameRepo,
@@ -1733,7 +1734,7 @@ export function createItemCommands({
 
             if (!item) return refused(404, GONE);
 
-            if (!kindCanChange(item.kind)) return refused(422, 'Only an ordinary item can change kind here.');
+            if (!kindCanChange(visibleKind(item))) return refused(422, 'Only an ordinary item can change kind here.');
 
             if (!records) return refused(409, 'The board has no work records.');
 
@@ -1785,7 +1786,9 @@ export function createItemCommands({
                     records.recordKindAnswer(itemId, revision, { answer: 'keep', ticketKind: disagreement.ticketKind });
                 else if (answer === 'update-item' && disagreement.ticketKind)
                     records.update(itemId, revision, {
-                        kind: disagreement.ticketKind,
+                        ...(item.kind === 'build'
+                            ? { deliveryKind: disagreement.ticketKind }
+                            : { kind: disagreement.ticketKind }),
                         agreedTicketKind: disagreement.ticketKind,
                     });
                 else return withBoard(422, { error: 'Choose keep or update-item.' });

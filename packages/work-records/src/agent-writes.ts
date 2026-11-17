@@ -38,7 +38,9 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                     ...active,
                     ...Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined),
                     ...(patch.status === 'Review' ? ['buildPhase'] : []),
-                    ...(patch.kind ? ['kindAnswer', 'parentId', 'children', 'dependencies'] : []),
+                    ...(patch.kind || patch.deliveryKind !== undefined
+                        ? ['deliveryKind', 'kindAnswer', 'parentId', 'children', 'dependencies']
+                        : []),
                 ],
                 (r) => records.update(id, r, patch),
             ),
@@ -48,7 +50,9 @@ export function agentWrites(records: WorkRecords): WorkRecords {
                 records.confirmScope(id, r, scope, by, response, source),
             ),
         recordKindAnswer: (id, rev, answer) =>
-            apply(id, rev, ['kind', 'kindAnswer', 'ticket'], (r) => records.recordKindAnswer(id, r, answer)),
+            apply(id, rev, ['kind', 'deliveryKind', 'kindAnswer', 'ticket'], (r) =>
+                records.recordKindAnswer(id, r, answer),
+            ),
         attachTicket: (id, rev, ticket) => apply(id, rev, ['ticket'], (r) => records.attachTicket(id, r, ticket)),
         restore: (id, rev) => apply(id, rev, active, (r) => records.restore(id, r)),
         setNeedsYou: (id, rev, reason) =>

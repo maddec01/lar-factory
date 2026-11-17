@@ -101,7 +101,7 @@ Sending an item with a passing brief back to shaping, keeping the text and requi
 _Avoid_: reset, reopen.
 
 **Kind**:
-What a piece of work is: Bug, Feature, Improvement or Concept. Builds, decisions and tickets with no recognised kind show as having no kind on rows.
+What a piece of work is: Bug, Feature, Improvement or Concept. Single-flow shaping keeps Bug, Feature and Improvement alongside its internal build workflow. Builds with no saved Kind, decisions and tickets with no recognised kind show as having no kind on rows.
 _Avoid_: category, type, label.
 
 **Label**:

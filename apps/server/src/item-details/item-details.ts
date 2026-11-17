@@ -5,6 +5,7 @@
 
 import {
     rebaseSampleTimes,
+    visibleKind,
     onAzure,
     readTicketSpec,
     sameRepo,
@@ -223,7 +224,7 @@ export function createItemDetails(
 
             return check
                 ? {
-                      itemKind: record.kind as SwapKind,
+                      itemKind: visibleKind(record) as SwapKind,
                       ticketKind: check.ticketKind,
                       swap: check.swap,
                       note: check.note,

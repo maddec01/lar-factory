@@ -1,6 +1,6 @@
 // The item dialog's Kind control, and what the last kind change did.
 
-import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
+import { SWAP_KINDS, kindCanChange, visibleKind } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
 import { Alert, OptionSelect, Text } from '@lar-works/design-system';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -20,7 +20,8 @@ const KIND_CHOICES = SWAP_KINDS.map((value) => {
 
 /**
  * The control that changes an ordinary item's kind, and what the last change did: the line it answered with, or why it stopped,
- * what it changed on the ticket before that, and Retry for the same change. Concepts, decisions and builds don't have it.
+ * what it changed on the ticket before that, and Retry for the same change. Builds with a retained Kind keep it;
+ * concepts, decisions and unclassified builds have no control.
  * A write disables this control and takes away the button that answered, which drops focus to the page or the dialog, so it comes
  * back here when the write ends. A control the user has moved to since keeps it.
  */
@@ -45,7 +46,7 @@ export function ItemKindControl({ item, fallback }: { item: Item; fallback: Reac
 
     const { start } = useKindChangeStore.getState();
 
-    if (item.setAside || !kindCanChange(item.kind)) return fallback;
+    if (item.setAside || !kindCanChange(visibleKind(item))) return fallback;
 
     return (
         <span data-kind-control>
@@ -56,7 +57,7 @@ export function ItemKindControl({ item, fallback }: { item: Item; fallback: Reac
                 writesOnPick
                 label="Kind"
                 placeholder="No kind"
-                value={item.kind === 'issue' ? '' : item.kind}
+                value={visibleKind(item) === 'issue' ? '' : visibleKind(item)}
                 options={KIND_CHOICES}
                 disabled={change?.saving}
                 onChange={(kind) => void start(item.id, kind as SwapKind)}

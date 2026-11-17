@@ -61,7 +61,7 @@ test('every linked batch member is checked again while unrelated sibling progres
         for (const id of ids) {
             const input = records.doubtPackage(id);
 
-            records.recordDoubt(id, input.packageDigest, 'Doubt', 'Reviewed code and named regression.', []);
+            records.recordDoubt(id, input.packageDigest, 'Doubt', 'Reviewed code and named regression.');
         }
 
         const before = records.doubtPackage(ids[0]!).packageDigest;

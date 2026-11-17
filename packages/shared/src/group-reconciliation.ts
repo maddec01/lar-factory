@@ -2,7 +2,7 @@
 export interface ReconcileItem {
     key: string;
     digest: string;
-    kind: 'map' | 'brief' | 'gate' | 'overlap' | 'blocker' | 'ticket' | 'dependency' | 'release';
+    kind: 'map' | 'brief' | 'gate' | 'blocker' | 'ticket' | 'dependency' | 'release';
     workId: string;
     summary: string;
     changes: string[];

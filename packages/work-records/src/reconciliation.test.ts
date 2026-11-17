@@ -57,15 +57,7 @@ async function fixture() {
         for (const b of builds.filter((b) => !records.read(b.workId).setAside)) {
             const pkg = records.doubtPackage(b.workId);
 
-            records.recordDoubt(
-                b.workId,
-                pkg.packageDigest,
-                'Doubt',
-                'Code, answers and sibling contracts agree.',
-                pkg.overlaps
-                    .filter((o) => !o.ordered)
-                    .map((o) => ({ otherWorkId: o.otherWorkId, reason: 'Compatible changes; no ordering needed.' })),
-            );
+            records.recordDoubt(b.workId, pkg.packageDigest, 'Doubt', 'Code, answers and sibling contracts agree.');
         }
     };
     const clean = () => {
@@ -127,6 +119,22 @@ test('checklist is deterministic, live, persistent, exact-digest bound and retur
     expect(clean().items).toEqual([]);
     expect(records.reconcile(group.workId).completed.length).toBeGreaterThan(10);
 }, 20000);
+
+test('briefs naming the same files and contracts raise no ordering item', async () => {
+    const { records, group, builds, review } = await fixture();
+    const [first, second] = builds as [WorkRecord, WorkRecord];
+
+    records.setBody(
+        second.workId,
+        records.read(second.workId).revision,
+        'brief',
+        records.body(first.workId, 'brief')!.replace('Reconnect 0.', 'Reconnect again.'),
+    );
+    review();
+    expect(records.reconcile(group.workId).items.map((item) => item.key)).not.toContainEqual(
+        expect.stringMatching(/^overlap:/),
+    );
+});
 
 test('superseded endpoint, sibling contract removal and scope changes reopen Doubt and approved gates', async () => {
     const { records, group, builds, decisions, clean } = await fixture();
@@ -232,14 +240,7 @@ async function linked(release: 'step' | 'ships-with' | 'none' = 'none') {
         for (const id of [first, second]) {
             const pkg = records.doubtPackage(id);
 
-            if (!records.currentDoubt(id))
-                records.recordDoubt(
-                    id,
-                    pkg.packageDigest,
-                    'Doubt',
-                    'Briefs agree.',
-                    pkg.overlaps.map((o) => ({ otherWorkId: o.otherWorkId, reason: 'Independent parts.' })),
-                );
+            if (!records.currentDoubt(id)) records.recordDoubt(id, pkg.packageDigest, 'Doubt', 'Briefs agree.');
         }
 
         let report = records.reconcile(group);

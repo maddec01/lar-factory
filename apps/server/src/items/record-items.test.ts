@@ -654,7 +654,7 @@ test('a stale gate at Ready explains the hold and asks for renewed board approva
 
     const reviewed = records.doubtPackage(work.workId);
 
-    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.', []);
+    records.recordDoubt(work.workId, reviewed.packageDigest, 'Doubt', 'Clean.');
 
     const item = recordItems(records, [], [REPO]).find((entry) => entry.id === work.workId)!;
 
@@ -686,7 +686,7 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
 
     const review = records.doubtPackage(work.workId);
 
-    records.recordDoubt(work.workId, review.packageDigest, 'Doubt', 'Clean.', []);
+    records.recordDoubt(work.workId, review.packageDigest, 'Doubt', 'Clean.');
     assert.equal(shown().briefReviewing, undefined);
     assert.equal(shown().briefApproval!.digest, records.displayGate(work.workId).approvalDigest);
     work = records.setBody(work.workId, records.read(work.workId).revision, 'brief', completeBrief('Proposed D3.'));
@@ -756,7 +756,7 @@ test('stale approval names the changed cited answer, contract or brief', async (
     );
     const write = (id: string, body: 'brief' | 'answer', text: string) => records.setBody(id, revision(id), body, text);
     const approve = () => {
-        records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Checked.', []);
+        records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Checked.');
         records.recordGate(build, revision(build), {
             briefDigest: records.gate(build).briefDigest!,
             approvedBy: 'Pedro',
@@ -770,7 +770,7 @@ test('stale approval names the changed cited answer, contract or brief', async (
     approve();
     write(decision, 'answer', '## Product\nUse BLUE.');
     assert.equal(shown().staleGateDetail, 'Cited answer DEC changed.');
-    records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Rechecked.', []);
+    records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Rechecked.');
     assert.equal(
         shown().briefApproval?.reason,
         'Cited answer DEC changed. Review and approve the current product content.',

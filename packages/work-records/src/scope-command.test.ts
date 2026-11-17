@@ -140,9 +140,8 @@ it('fails closed without confirmation and reports missing/extra scope with a fai
 
     const review = f.records.doubtPackage(f.id);
 
-    expect(review.source.named.files).toEqual(['cli.js', 'test/cli.test.js']);
     expect(review.source.confirmedScope).toEqual(scope);
-    f.records.recordDoubt(f.id, review.packageDigest, 'Doubt', 'Confirmed scope and code checked.', []);
+    f.records.recordDoubt(f.id, review.packageDigest, 'Doubt', 'Confirmed scope and code checked.');
 
     const displayed = JSON.parse((await f.cli('gate', f.id)).stdout).display;
     const displayFile = join(f.dir, 'display.json');
@@ -184,7 +183,7 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
 
     const reviewed = f.records.doubtPackage(f.id);
 
-    f.records.recordDoubt(f.id, reviewed.packageDigest, 'Doubt', 'Scope checked.', []);
+    f.records.recordDoubt(f.id, reviewed.packageDigest, 'Doubt', 'Scope checked.');
 
     const before = f.records.read(f.id).revision;
 

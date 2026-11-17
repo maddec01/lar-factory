@@ -167,7 +167,7 @@ it('refuses agent approval even after a Needs you round trip and an alleged Pedr
     const { records, other, record, agent } = await fixture();
     const input = records.doubtPackage(record.workId);
 
-    records.recordDoubt(record.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+    records.recordDoubt(record.workId, input.packageDigest, 'Doubt', 'Clean.');
 
     const display = agent.displayGate(record.workId);
     const waiting = agent.waitForUser(record.workId, record.revision, 'Should search match whole words?');

@@ -1823,7 +1823,7 @@ async function reconciledGroup() {
     }) as [string, string];
 
     for (const part of [first, second])
-        records.recordDoubt(part, records.doubtPackage(part).packageDigest, 'Doubt', 'Briefs agree.', []);
+        records.recordDoubt(part, records.doubtPackage(part).packageDigest, 'Doubt', 'Briefs agree.');
     for (const item of records.reconcile(id).items) records.resolveReconcile(id, item.key, item.digest, 'Checked.');
 
     return { records, id, first, second, at };

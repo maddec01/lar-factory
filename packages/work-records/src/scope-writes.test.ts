@@ -72,7 +72,7 @@ it('upgrades main schema before capturing scope and recording a batch gate', asy
     const input = records.doubtPackage(work.workId);
 
     expect(input.source.confirmedScope).toEqual(scope);
-    records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Checked scope.', []);
+    records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Checked scope.');
 
     const manifest = records.gateBatch([work.workId]);
 

@@ -35,7 +35,7 @@ export async function sampleBriefApproval(
 
     const input = records.doubtPackage(id);
 
-    if (reviewed) records.recordDoubt(id, input.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.', []);
+    if (reviewed) records.recordDoubt(id, input.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.');
 
     // An independent scope question can coexist with the generated gate wait.
     records.waitForUser(id, work.revision, 'Should narrow layouts wrap the greeting or preserve one line?');

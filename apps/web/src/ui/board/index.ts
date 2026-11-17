@@ -232,6 +232,6 @@ export { BriefDependencyStatus } from './BriefDependencyStatus';
 
 export { DeskDependencyProof } from './DeskDependencyProof';
 export { TrackerLink } from './TrackerLink';
-export { CardChecks, ChecksBar, type CardCheckState } from './Checks';
+export { CardChecks, ChecksBar, StaleChecks, type CardCheckState } from './Checks';
 export { HeaderEmpty, LoadFailed, NoMatches } from './States';
 export { MetaLine, Moment } from './TextParts';

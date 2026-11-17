@@ -4,6 +4,7 @@
 import { TickMeter } from '@lar-works/design-system';
 import type { StatusState } from '@lar-works/design-system';
 import { GitPullRequest } from '@lar-works/design-system/icons';
+import type { ReactNode } from 'react';
 
 /** Counts over a PR's checks. */
 export interface CheckCounts {
@@ -59,6 +60,30 @@ export function ChecksBar({ checks, still = false }: { checks: CheckCounts; stil
     );
 }
 
+/** Checks the board can't vouch for, `stale`, dimmed with a tooltip that says so, unless `untitled` because the
+ *  checks' own tooltip already does; current checks show as they are. */
+export function StaleChecks({
+    stale,
+    untitled = false,
+    children,
+}: {
+    stale: boolean;
+    untitled?: boolean;
+    children: ReactNode;
+}) {
+    return stale ? (
+        <span
+            className="block min-w-0 opacity-50"
+            title={untitled ? undefined : 'Stale check observation'}
+            data-checks-stale
+        >
+            {children}
+        </span>
+    ) : (
+        children
+    );
+}
+
 /** What a card knows of its PR's checks: their counts (`stale` when the board can't vouch they are current), or that
  *  they are still loading, that the PR has none yet, or that the board can't read them. */
 export type CardCheckState = CheckCounts | 'loading' | 'none' | 'unavailable';
@@ -110,20 +135,18 @@ export function CardChecks({
             </span>
             {segments.length > 0 ? (
                 // One tick a check (the meter set to that many ticks); checks still loading sweep grey.
-                <span
-                    className={`inline-block ${stale ? 'opacity-50' : ''}`}
-                    style={{ width: segments.length * 7 - 3 }}
-                    data-checks-track
-                >
-                    <TickMeter
-                        label={label}
-                        segments={
-                            checks === 'loading'
-                                ? [{ label, color: 'var(--color-fg-muted)', sweep: true }]
-                                : segments.map(({ state, pulse }, i) => ({ label: `Check ${i + 1}`, state, pulse }))
-                        }
-                    />
-                </span>
+                <StaleChecks stale={stale} untitled>
+                    <span className="inline-block" style={{ width: segments.length * 7 - 3 }} data-checks-track>
+                        <TickMeter
+                            label={label}
+                            segments={
+                                checks === 'loading'
+                                    ? [{ label, color: 'var(--color-fg-muted)', sweep: true }]
+                                    : segments.map(({ state, pulse }, i) => ({ label: `Check ${i + 1}`, state, pulse }))
+                            }
+                        />
+                    </span>
+                </StaleChecks>
             ) : (
                 <span className="sr-only">{label}</span>
             )}

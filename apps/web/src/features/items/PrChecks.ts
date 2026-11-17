@@ -1,26 +1,42 @@
-// A build's pull request checks, once its work is in review: what its card and row show in place of its workflow and
-// slice tracks, so a PR whose checks all passed reads as ready to merge at a glance.
+// An open pull request's checks: what its card and row show in place of its workflow and slice tracks from the moment
+// the PR opens, so a PR whose checks all passed reads as ready to merge at a glance.
 
-import type { Checks, Item } from '@lar-factory/shared';
+import type { BoardData, Checks, Item, LinkedPr } from '@lar-factory/shared';
 
-/** The stages after the build, where the PR's pipeline is what moves. */
-const IN_REVIEW: readonly Item['status'][] = ['Review', 'Verify', 'Ready to merge'];
+/**
+ * Whether the board can't vouch that `pr`'s checks are current: the board lost its server, the latest read left the
+ * item's repository off, or the PR's observation went stale. Stale checks keep their last known counts, dimmed.
+ */
+export const checksStale = (
+    item: Pick<Item, 'repo'>,
+    pr: LinkedPr,
+    data: Pick<BoardData, 'itemSourceProblems'>,
+    disconnected: boolean,
+): boolean =>
+    disconnected ||
+    !!data.itemSourceProblems?.some((problem) => problem.repo === item.repo) ||
+    pr.checkProgress?.state === 'stale';
 
-/** The open PR's checks once the work is in review and they have been read; null otherwise. */
-export function prChecks(item: Pick<Item, 'status' | 'linkedPrs'>): Checks | null {
+/** The open PR's checks once read, and whether they are stale; null with no open PR or no checks to count. */
+export function prChecks(
+    item: Pick<Item, 'repo' | 'linkedPrs'>,
+    data: Pick<BoardData, 'itemSourceProblems'>,
+    disconnected: boolean,
+): { checks: Checks; stale: boolean } | null {
     const pr = item.linkedPrs[0];
 
-    // Checks the board can't vouch for (stale or unavailable) keep the counts in words with their warning instead.
+    // Checks the board can't read at all keep their warning in words instead.
     if (
-        !IN_REVIEW.includes(item.status) ||
         !pr ||
         pr.state !== 'open' ||
         pr.pipelineUnread ||
-        (pr.checkProgress && pr.checkProgress.state !== 'current')
+        pr.checkProgress?.state === 'unavailable' ||
+        !pr.checks ||
+        pr.checks.total === 0
     )
         return null;
 
-    return pr.checks && pr.checks.total > 0 ? pr.checks : null;
+    return { checks: pr.checks, stale: checksStale(item, pr, data, disconnected) };
 }
 
 /** The checks in a row's few words: how many passed while any run, a failure, or that all passed. */

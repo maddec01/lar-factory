@@ -13,14 +13,13 @@ import { isDone, openWaits } from './DossierParts';
 import { PartAction } from './PartAction';
 import { PartIdentity } from './PartIdentity';
 import { partState } from './PartState';
+import { ChecksProgress } from './RowChecks';
 import { figuresOf, opensItem } from './RowDetails';
 import { threadText } from './StageStatus';
 import { useActivityState, useActivityStill } from './useActivityState';
 import { workLabel } from './WorkLabel';
 import {
     Age,
-    checksCount,
-    checksWord,
     prChecks,
     SliceBar,
     WorkingBar,
@@ -29,8 +28,8 @@ import {
     StartMessage,
     useShownStatus,
 } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
 import {
-    ChecksBar,
     RowBlocked,
     RowCount,
     RowFirst,
@@ -69,6 +68,7 @@ export function PartRow({
     const { item } = part;
     const openPart = onOpen ?? (() => open(item));
     const isPicked = usePicked(item);
+    const disconnected = useBoardStore((state) => !!state.clientError);
     const shown = useShownStatus(item);
     const activity = useActivityState(item);
     const still = useActivityStill(item);
@@ -84,7 +84,7 @@ export function PartRow({
     const state = partState(item, data, word);
     const showsActivity = !held && activity && !['unavailable', 'stopped', 'waiting'].includes(activity);
     const figures = figuresOf(item, data);
-    const checks = prChecks(item);
+    const checks = prChecks(item, data, disconnected);
     const slices = item.slices.length;
     const sliceCount = item.slices.filter((x) => x.progress === 'done').length;
     // A part at work names what runs, so its bar says something is going on even with no slices to count.
@@ -113,14 +113,7 @@ export function PartRow({
                         <RowState title={threadText(item, shown.working)}>{state}</RowState>
                     )}
                     {checks ? (
-                        <RowProgress
-                            bar={<ChecksBar checks={checks} still={still} />}
-                            count={
-                                <RowCount pr title={checksCount(checks)}>
-                                    {checksWord(checks)}
-                                </RowCount>
-                            }
-                        />
+                        <ChecksProgress {...checks} still={still} />
                     ) : slices > 0 && !partsCounted ? (
                         <RowProgress
                             bar={<SliceBar item={item} still={still} />}

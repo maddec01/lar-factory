@@ -63,7 +63,7 @@ export function groupContractReferences(records: WorkRecords, members: WorkRecor
         .filter((r) => !r.setAside && r.kind === 'build')
         .map((r) => ({ workId: r.workId, title: r.title, brief: records.body(r.workId, 'brief') ?? '' }));
     const references = new Map<string, string[]>();
-    const unresolved: { workId: string; contract: string; candidates: string[] }[] = [];
+    const unresolved: { workId: string; reference: string }[] = [];
 
     for (const r of members.filter((r) => r.kind === 'build' && !r.setAside)) {
         const brief = records.body(r.workId, 'brief') ?? '';
@@ -72,19 +72,7 @@ export function groupContractReferences(records: WorkRecords, members: WorkRecor
         references.set(r.workId, contractReferences(brief, others));
         for (const ref of contractDeclarations(brief, 'Consumes'))
             if (!noOrdering(brief, ref) && others.filter((c) => c.workId === ref || c.title === ref).length !== 1)
-                unresolved.push({ workId: r.workId, contract: `Consumes: ${ref}`, candidates: [] });
-        for (const contract of contractDeclarations(brief, 'Contracts')) {
-            if (noOrdering(brief, contract) || contractDeclarations(brief, 'Produces').includes(contract)) continue;
-
-            const shared = others.filter((c) =>
-                [...contractDeclarations(c.brief, 'Contracts'), ...contractDeclarations(c.brief, 'Produces')].includes(
-                    contract,
-                ),
-            );
-
-            if (shared.length && !shared.some((c) => contractDeclarations(c.brief, 'Produces').includes(contract)))
-                unresolved.push({ workId: r.workId, contract, candidates: shared.map((c) => c.workId) });
-        }
+                unresolved.push({ workId: r.workId, reference: ref });
     }
 
     for (const [owner, refs] of mapContractReferences(

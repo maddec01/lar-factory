@@ -26,10 +26,10 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
     for (const ref of contracts.unresolved)
         add(
             'blocker',
-            `contract-source:${ref.workId}:${ref.contract}`,
+            `contract-source:${ref.workId}:Consumes: ${ref.reference}`,
             ref.workId,
-            `Unresolved contract source for ${ref.contract}; declare Produces on its producer or No ordering needed with a reason on the consuming brief.`,
-            ref.candidates,
+            `Consumes: ${ref.reference} names no single build; name one active build or record No ordering needed with a reason on the consuming brief.`,
+            [],
         );
     for (const [workId, refs] of contracts.references)
         for (const producer of refs)

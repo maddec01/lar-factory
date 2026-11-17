@@ -17,7 +17,14 @@ export function userWaitRecords(database: Database, get: () => WorkRecords): Use
 
                 if (record.setAside || record.finishedAt) return;
 
+                const wait = db.prepare('SELECT * FROM owner_waits WHERE work_id=?').get(workId);
+                // A row without a request holds the Needs you the board saw while no question was open. Answering a
+                // later question must leave that one, so a question owns only a Needs you that differs from it.
+                const earlier = wait?.request_id === '' ? wait.notice : null;
+
                 if (requestId) {
+                    if (earlier !== null && record.needsYou === earlier) return;
+
                     db.prepare(
                         'INSERT INTO owner_waits VALUES (?,?,?,?) ON CONFLICT(work_id) DO UPDATE SET thread_id=excluded.thread_id,request_id=excluded.request_id,notice=excluded.notice WHERE owner_waits.thread_id<>excluded.thread_id OR owner_waits.request_id<>excluded.request_id OR owner_waits.notice IS NOT excluded.notice',
                     ).run(workId, threadId, requestId, record.needsYou);
@@ -25,11 +32,18 @@ export function userWaitRecords(database: Database, get: () => WorkRecords): Use
                     return;
                 }
 
-                const wait = db
-                    .prepare('SELECT * FROM owner_waits WHERE work_id=? AND thread_id=?')
-                    .get(workId, threadId);
+                if (!wait || wait.request_id === '') {
+                    if (record.needsYou === null) {
+                        if (wait) db.prepare('DELETE FROM owner_waits WHERE work_id=?').run(workId);
+                    } else if (earlier !== record.needsYou)
+                        db.prepare(
+                            "INSERT INTO owner_waits VALUES (?,?,'',?) ON CONFLICT(work_id) DO UPDATE SET thread_id=excluded.thread_id,request_id='',notice=excluded.notice",
+                        ).run(workId, threadId, record.needsYou);
 
-                if (!running || !wait) return;
+                    return;
+                }
+
+                if (!running || wait.thread_id !== threadId) return;
 
                 db.prepare('DELETE FROM owner_waits WHERE work_id=?').run(workId);
 

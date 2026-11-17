@@ -39,7 +39,7 @@ async function setup() {
 
         const input = records.doubtPackage(work.workId);
 
-        records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+        records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Clean.');
 
         return work.workId;
     });
@@ -106,7 +106,7 @@ test('board batch approval is atomic and a stale brief refuses every member', as
 
     const input = s.records.doubtPackage(last.workId);
 
-    s.records.recordDoubt(last.workId, input.packageDigest, 'Doubt', 'Rechecked.', []);
+    s.records.recordDoubt(last.workId, input.packageDigest, 'Doubt', 'Rechecked.');
 
     const renewed = await s.inspect(s.ids);
 

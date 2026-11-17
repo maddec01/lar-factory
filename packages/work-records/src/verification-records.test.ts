@@ -222,7 +222,7 @@ test('S05 F3: an approved Verify controls the saved wait; recommendations cannot
     const approve = () => {
         const input = s.records.doubtPackage(id);
 
-        s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.', []);
+        s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.');
 
         const display = s.records.displayGate(id);
 

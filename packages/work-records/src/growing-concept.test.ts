@@ -38,15 +38,7 @@ async function fixture() {
     const approve = (id: string) => {
         const input = records.doubtPackage(id);
 
-        records.recordDoubt(
-            id,
-            input.packageDigest,
-            'Doubt',
-            'Checked current dependencies.',
-            input.overlaps
-                .filter((o) => !o.ordered)
-                .map((o) => ({ otherWorkId: o.otherWorkId, reason: 'Independent additive proofs.' })),
-        );
+        records.recordDoubt(id, input.packageDigest, 'Doubt', 'Checked current dependencies.');
 
         const manifest = records.gateBatch([id]);
 
@@ -69,7 +61,7 @@ test('S06: adding D1 and editing another build Notes preserve b01 approval and n
     for (const b of builds) {
         const input = records.doubtPackage(b.workId);
 
-        records.recordDoubt(b.workId, input.packageDigest, 'Doubt', 'Independent assertion checked.', []);
+        records.recordDoubt(b.workId, input.packageDigest, 'Doubt', 'Independent assertion checked.');
     }
 
     const batch = records.gateBatch(builds.map((b) => b.workId));
@@ -336,8 +328,28 @@ test('S06: upgrading a still-current legacy review preserves its approval throug
     approve(b01.workId);
 
     const { packageDigest: _digest, ...content } = records.doubtPackage(b01.workId);
+    const named = (item: (typeof content)['source']) => ({
+        ...item,
+        named: { files: [], contracts: item.named.contracts },
+    });
+    // Frozen version-1 serialization: the whole package, with named files and overlapping items.
     const legacy = createHash('sha256')
-        .update(JSON.stringify({ ...content, overlaps: undefined }))
+        .update(
+            JSON.stringify({
+                workId: content.workId,
+                brief: content.brief,
+                destination: content.destination,
+                releaseConstraints: content.releaseConstraints,
+                releasePlan: content.releasePlan,
+                concept: content.concept && named(content.concept),
+                decisions: content.decisions.map(named),
+                siblings: content.siblings.map(named),
+                overlapping: [],
+                source: named(content.source),
+                blockers: content.blockers.map(named),
+                dependencies: content.dependencies,
+            }),
+        )
         .digest('hex');
     const db = new DatabaseSync(join(dir, 'records.db'));
     const row = db

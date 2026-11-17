@@ -164,7 +164,7 @@ export function sampleDelivery(records: WorkRecords) {
 
             const review = records.doubtPackage(stale.workId);
 
-            records.recordDoubt(stale.workId, review.packageDigest, 'Sample Doubt', 'Revised brief reviewed.', []);
+            records.recordDoubt(stale.workId, review.packageDigest, 'Sample Doubt', 'Revised brief reviewed.');
 
             return groupId;
         },

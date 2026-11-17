@@ -112,7 +112,6 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
 
         return false;
     };
-    const pairs = new Set<string>();
 
     for (const r of [records.read(groupId), ...members].filter((member) => !member.setAside)) {
         const id = r.workId;
@@ -123,37 +122,14 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
             const review = brief?.trim() ? records.currentDoubt(id) : null;
 
             if (!brief?.trim()) add('brief', `brief:${id}`, id, `${r.title}: write the missing brief.`, ['brief']);
-            else {
-                const input = records.doubtPackage(id);
-
-                if (!review && !r.finishedAt)
-                    add(
-                        'brief',
-                        `doubt:${id}`,
-                        id,
-                        `${r.title}: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.`,
-                        [input.packageDigest],
-                    );
-
-                for (const overlap of input.overlaps.filter(
-                    (o) =>
-                        !o.ordered &&
-                        (o.files.length > 0 || !review?.ordering.some((o2) => o2.otherWorkId === o.otherWorkId)),
-                )) {
-                    const pair = [id, overlap.otherWorkId].sort().join(':');
-
-                    if (pairs.has(pair)) continue;
-
-                    pairs.add(pair);
-                    add(
-                        'overlap',
-                        `overlap:${pair}`,
-                        id,
-                        `${r.title}: record ordering with ${records.read(overlap.otherWorkId).title}, or a current Doubt explanation.`,
-                        [...overlap.files, ...overlap.contracts],
-                    );
-                }
-            }
+            else if (!review && !r.finishedAt)
+                add(
+                    'brief',
+                    `doubt:${id}`,
+                    id,
+                    `${r.title}: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.`,
+                    [records.doubtPackage(id).packageDigest],
+                );
 
             if (
                 (!gate.current || !review || gate.passing?.reviewDigest !== review.packageDigest) &&

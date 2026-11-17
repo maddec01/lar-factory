@@ -17,7 +17,7 @@ it('binds the displayed text and source revision to durable approval evidence', 
 
         const input = records.doubtPackage(work.workId);
 
-        records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Clean.', []);
+        records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Clean.');
 
         const display = records.displayGate(work.workId);
         const approve = (copy = display, digest = display.approvalDigest) =>

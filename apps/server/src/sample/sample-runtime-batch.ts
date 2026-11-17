@@ -75,7 +75,7 @@ export function sampleRuntimeBatch(records: WorkRecords) {
                 for (const part of parts) {
                     const input = records.doubtPackage(part.workId);
 
-                    records.recordDoubt(part.workId, input.packageDigest, 'Sample Doubt', 'Clean current brief.', []);
+                    records.recordDoubt(part.workId, input.packageDigest, 'Sample Doubt', 'Clean current brief.');
                 }
             }
 

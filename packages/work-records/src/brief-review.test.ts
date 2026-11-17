@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, it } from 'vite-plus/test';
 
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -86,39 +88,151 @@ it('packages destination, current answers, sibling contracts, release constraint
     );
     expect(input.siblings.map((item) => item.workId)).toEqual(expect.arrayContaining([api.workId, independent.workId]));
     expect(input.dependencies[0]?.contract).toBe('Allow client origin');
-    expect(input.overlaps).toEqual([
-        {
-            otherWorkId: api.workId,
-            files: [],
-            contracts: ['public-invite'],
-            ordered: false,
-            proposed: { workId: client.workId, blockerId: api.workId },
-        },
-    ]);
     expect(JSON.stringify(input)).not.toContain('initialContext');
 });
 
-it('proposes same-file ordering across concepts and standalone work, and requires edges or recorded reasons', async () => {
-    const { records, api } = await fixture();
+it('saves Doubt with no ordering reason when two briefs name the same files or contracts', async () => {
+    const { records, api, client } = await fixture();
     const standalone = records.create({ title: 'Other concept or standalone', repository: 'fake/api', kind: 'build' });
 
     records.setBody(standalone.workId, standalone.revision, 'brief', 'Files: `./src/links.ts`');
 
-    let input = records.doubtPackage(api.workId);
+    const input = records.doubtPackage(api.workId);
 
-    expect(input.overlaps.find((item) => item.otherWorkId === standalone.workId)).toMatchObject({
-        files: ['src/links.ts'],
-        proposed: { workId: api.workId, blockerId: standalone.workId },
-    });
-    expect(() => records.recordDoubt(api.workId, input.packageDigest, 'Doubt', 'Clean', [])).toThrow(
-        /ordering blocker/,
-    );
-    for (const overlap of input.overlaps)
-        records.addBlocker(api.workId, records.read(api.workId).revision, overlap.otherWorkId);
-    input = records.doubtPackage(api.workId);
-    expect(input.overlaps.every((item) => item.ordered)).toBe(true);
-    records.recordDoubt(api.workId, input.packageDigest, 'Doubt', 'Code evidence checked; ordering recorded.', []);
+    expect(input).not.toHaveProperty('overlaps');
+    expect(input).not.toHaveProperty('overlapping');
+    expect(input.siblings.map((item) => item.workId)).toContain(client.workId);
+    records.recordDoubt(api.workId, input.packageDigest, 'Doubt', 'Code evidence checked.');
     expect(records.currentDoubt(api.workId)?.identity).toBe('Doubt');
+});
+
+it('keeps the gate of a brief approved before the upgrade with ordering reasons and a files scope', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'brief-review-'));
+    const path = join(dir, 'records.db');
+    const records = await openWorkRecords(path);
+
+    opened.push({ records, dir });
+
+    const links = records.create({ title: 'Links API', repository: 'fake/api', kind: 'build' });
+    const linksBrief = 'Serve the links API.\nFiles: `src/links.ts`';
+
+    records.setBody(links.workId, links.revision, 'brief', linksBrief);
+
+    const client = records.create({ title: 'Link client', repository: 'fake/api', kind: 'build' }).workId;
+    const scope = {
+        files: ['src/links.ts'],
+        tests: [],
+        behaviour: ['Call the Links API.'],
+        excluded: [],
+        size: null,
+        verify: { required: false, visibleUi: null },
+    };
+    // The brief as confirmed scope rendered it before shaping stopped recording files.
+    const brief =
+        '## What\nCall the Links API.\n\n## Done when\n### Behaviour\n- Call the Links API.\n### Tests\n\n\n## Scope\n### Files\n- src/links.ts\n### Size\n\n### Excluded\n\n\n## Verify\nno\n';
+
+    records.confirmScope(client, records.read(client).revision, scope, 'Pedro', 'Yes.');
+    records.setBody(client, records.read(client).revision, 'brief', brief);
+    records.recordDoubt(client, records.doubtPackage(client).packageDigest, 'Doubt', 'Clean.');
+    records.recordGate(client, records.read(client).revision, {
+        briefDigest: records.gate(client).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes',
+    });
+
+    // Frozen version-3 serialization: the stored scope kept its files, and the overlapping Links API was a contract.
+    const v3 = createHash('sha256')
+        .update(
+            JSON.stringify({
+                workId: client,
+                source: {
+                    workId: client,
+                    repository: 'fake/api',
+                    kind: 'build',
+                    request: records.doubtPackage(client).source.request,
+                    brief,
+                    confirmedScope: scope,
+                    dependencies: [],
+                },
+                decisions: [],
+                contracts: [{ workId: links.workId, repository: 'fake/api', kind: 'build', brief: linksBrief }],
+                dependencies: [],
+                releaseContracts: [],
+            }),
+        )
+        .digest('hex');
+
+    expect(v3).not.toBe(records.doubtPackage(client).packageDigest);
+
+    const db = new DatabaseSync(path);
+    const review = JSON.parse(
+        String(db.prepare('SELECT content FROM doubt_reviews WHERE work_id=?').get(client)!.content),
+    );
+
+    db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
+        JSON.stringify({
+            ...review,
+            dependencyVersion: 3,
+            packageDigest: v3,
+            ordering: [{ otherWorkId: links.workId, reason: 'Same file, independent lines.' }],
+        }),
+        review.reviewId,
+    );
+    db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=?').run(v3, client);
+    db.close();
+
+    const upgraded = await openWorkRecords(path);
+
+    opened.push({ records: upgraded, dir });
+    expect(upgraded.currentDoubt(client)).toMatchObject({ dependencyVersion: 4, evidence: 'Clean.' });
+    expect(upgraded.gate(client).current).toBe(true);
+});
+
+it('marks a stale review from before version 4 checked, keeping it and its gate stale', async () => {
+    const { records, client } = await fixture();
+    const { dir } = opened.at(-1)!;
+    const path = join(dir, 'records.db');
+
+    records.recordDoubt(client.workId, records.doubtPackage(client.workId).packageDigest, 'Doubt', 'Clean.');
+    records.recordGate(client.workId, records.read(client.workId).revision, {
+        briefDigest: records.gate(client.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes',
+    });
+
+    const db = new DatabaseSync(path);
+    const content = () =>
+        JSON.parse(String(db.prepare('SELECT content FROM doubt_reviews WHERE work_id=?').get(client.workId)!.content));
+    const review = content();
+    const stale = 'f'.repeat(64);
+
+    db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(
+        JSON.stringify({ ...review, dependencyVersion: 3, packageDigest: stale }),
+        review.reviewId,
+    );
+    db.prepare('UPDATE brief_gates SET review_digest=? WHERE work_id=?').run(stale, client.workId);
+
+    const upgraded = await openWorkRecords(path);
+
+    opened.push({ records: upgraded, dir });
+    expect(content()).toEqual({ ...review, dependencyVersion: 4, packageDigest: stale });
+    expect(upgraded.currentDoubt(client.workId)).toBeNull();
+    expect(upgraded.gate(client.workId).current).toBe(false);
+    expect(db.prepare('SELECT review_digest FROM brief_gates WHERE work_id=?').get(client.workId)).toEqual({
+        review_digest: stale,
+    });
+
+    // Checking it again would refresh these inputs to the current package's.
+    const marked = JSON.stringify({
+        ...content(),
+        packageDigest: records.doubtPackage(client.workId).packageDigest,
+        productInputs: null,
+    });
+
+    db.prepare('UPDATE doubt_reviews SET content=? WHERE review_id=?').run(marked, review.reviewId);
+    opened.push({ records: await openWorkRecords(path), dir });
+    expect(JSON.stringify(content())).toBe(marked);
+    db.close();
 });
 
 it('invalidates Doubt and an earlier gate after a cited sibling contract changes, preserving the approved Spec', async () => {
@@ -133,9 +247,7 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
 
     const input = records.doubtPackage(api.workId);
 
-    records.recordDoubt(api.workId, input.packageDigest, 'Doubt', 'Separate compatible contract changes.', [
-        { otherWorkId: client.workId, reason: 'Additive compatible consumers; no shared file.' },
-    ]);
+    records.recordDoubt(api.workId, input.packageDigest, 'Doubt', 'Separate compatible contract changes.');
 
     let work = records.read(api.workId);
 
@@ -151,9 +263,7 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
 
     const reviewed = records.doubtPackage(api.workId);
 
-    records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Compatible.', [
-        { otherWorkId: client.workId, reason: 'Independent additive behavior.' },
-    ]);
+    records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Compatible.');
     records.recordGate(api.workId, records.read(api.workId).revision, {
         briefDigest: records.gate(api.workId).briefDigest!,
         approvedBy: 'Pedro',
@@ -194,7 +304,5 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
         }),
     ).toThrow(/package changed/);
     expect(records.specState(api.workId).pending).toBe(approvedSpec);
-    expect(() => records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Stale', [])).toThrow(
-        /package changed/,
-    );
+    expect(() => records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Stale')).toThrow(/package changed/);
 });

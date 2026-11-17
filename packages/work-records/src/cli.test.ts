@@ -85,6 +85,13 @@ describe('lar-work', { timeout: 30_000 }, () => {
         }
     });
 
+    it('has no build-overlap command', async () => {
+        const result = await larWork(tempDir(), 'build-overlap', 'work');
+
+        expect(result.code).not.toBe(0);
+        expect(result.stderr).toContain('Unknown command "build-overlap"');
+    });
+
     it('creates, reads and updates a record in a data folder with no board running', async () => {
         const data = join(tempDir(), 'Lar Factory');
         const created = await larWork(
@@ -164,7 +171,7 @@ it(
 
                 const input = records.doubtPackage(work.workId);
 
-                records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Code checked; clean.', []);
+                records.recordDoubt(work.workId, input.packageDigest, 'Doubt', 'Code checked; clean.');
                 ids.push(work.workId);
             }
 
@@ -205,7 +212,7 @@ it(
 
             const input = records.doubtPackage(last.workId);
 
-            records.recordDoubt(last.workId, input.packageDigest, 'Doubt', 'Rechecked; clean.', []);
+            records.recordDoubt(last.workId, input.packageDigest, 'Doubt', 'Rechecked; clean.');
 
             const renewed = await larWork(data, 'gate-batch', '--file', idsFile);
 

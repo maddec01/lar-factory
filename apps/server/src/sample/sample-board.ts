@@ -342,7 +342,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
                 if (input.change === 'doubt-ready') {
                     const review = records.doubtPackage(workId);
 
-                    records.recordDoubt(workId, review.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.', []);
+                    records.recordDoubt(workId, review.packageDigest, 'Sample Doubt', 'Fake code reviewed; clean.');
                 } else await sampleBriefApproval(records, workId, { provider, dir }, input.change !== 'doubt-pending');
 
                 await refresh();

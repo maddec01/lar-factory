@@ -56,7 +56,7 @@ test('S05 R2-002: shared Dependency evidence preserves B/C approvals, while a ch
     for (const r of [b, c]) {
         const input = records.doubtPackage(r.workId);
 
-        records.recordDoubt(r.workId, input.packageDigest, 'Doubt', 'Contracts agree.', []);
+        records.recordDoubt(r.workId, input.packageDigest, 'Doubt', 'Contracts agree.');
     }
 
     const manifest = records.gateBatch([b.workId, c.workId]);

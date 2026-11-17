@@ -9,7 +9,6 @@ function category(item: ReconcileItem): [string, string] {
         brief: ['brief', 'to update'],
         map: ['map entry', 'to update'],
         gate: ['approval', 'to renew'],
-        overlap: ['overlap', 'to order'],
         blocker: ['blocker', 'to update'],
         ticket: ['ticket', 'to sync'],
         dependency: ['dependency', 'to re-check'],

@@ -72,7 +72,6 @@ async function fixture(captured = false) {
                 input.packageDigest,
                 `Doubt ${id}`,
                 'All findings resolved; code evidence checked.',
-                [],
             );
         }
     };

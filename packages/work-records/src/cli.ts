@@ -13,7 +13,6 @@ import { parseArgs } from 'node:util';
 import { changeAgentKind, createAgentTicket } from './agent-tracker-writes.ts';
 import { agentWrites } from './agent-writes.ts';
 import { refreshBoards } from './board-refresh.ts';
-import type { OrderingReason } from './brief-review.ts';
 import { checkKind } from './change-kind.ts';
 import { checkCommand } from './check-runner.ts';
 import { exportMarkdown } from './export.ts';
@@ -387,9 +386,8 @@ Brief gate
                                     gate history and specSync warnings or held edits.
                                     Review the refreshed brief and revision before gating.
   doubt-package <work-id>           Print the exact brief and affected-work package for Doubt.
-  build-overlap <work-id>           Propose ordering for declared Files/Contracts overlap.
-  record-doubt <work-id> --digest H --identity I --evidence E [--file ordering.json]
-                                    Bind Doubt to its package; explain unordered overlaps.
+  record-doubt <work-id> --digest H --identity I --evidence E
+                                    Bind Doubt to its package.
   gate-batch --file work-ids.json   Print complete briefs, Doubt results and the batch digest.
   record-gate-batch --file manifest.json --digest H --identity I --evidence E
                                     Refused for agents: ask Pedro to Approve briefs in the board.
@@ -596,7 +594,6 @@ const TAKES_WORK_ID = [
     'gate',
     'record-gate',
     'doubt-package',
-    'build-overlap',
     'record-doubt',
     'add-dependency',
     'dependencies',
@@ -834,11 +831,6 @@ async function run(
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
 
             return records.doubtPackage(workId!);
-        case 'build-overlap': {
-            const input = records.doubtPackage(workId!);
-
-            return { packageDigest: input.packageDigest, overlaps: input.overlaps };
-        }
         case 'record-doubt':
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
 
@@ -847,7 +839,6 @@ async function run(
                 need(values, 'digest'),
                 need(values, 'identity'),
                 need(values, 'evidence'),
-                values.file === undefined ? [] : (readJson(values, 'ordering reasons') as OrderingReason[]),
             );
         case 'gate': {
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });

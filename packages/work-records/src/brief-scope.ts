@@ -8,7 +8,6 @@ export interface BriefScope {
     /** Absent on legacy confirmations; structure choice requires both fields. */
     repositories?: string[];
     openDecisions?: string[];
-    files: string[];
     tests: string[];
     behaviour: string[];
     excluded: string[];
@@ -29,7 +28,7 @@ export interface ScopeCheck {
 const invalid = (): never => {
     throw new WorkRecordError(
         'invalid',
-        'Scope needs {files:[],tests:[],behaviour:[],excluded:[],size:"Small"|"Larger"|null,verify:{required:boolean,visibleUi:string|null}}; Verify is only for visible UI behaviour a person must check.',
+        'Scope needs {tests:[],behaviour:[],excluded:[],size:"Small"|"Larger"|null,verify:{required:boolean,visibleUi:string|null}}; Verify is only for visible UI behaviour a person must check.',
     );
 };
 const object = (value: unknown, keys: string[]): Record<string, unknown> => {
@@ -49,8 +48,9 @@ const line = (value: unknown): string => {
 
 export function parseBriefScope(value: unknown): BriefScope {
     const hasStructure = !!value && typeof value === 'object' && ('repositories' in value || 'openDecisions' in value);
+    // Shaping no longer records files; an older confirmation's files list is ignored.
     const input = object(value, [
-        'files',
+        ...(value && typeof value === 'object' && 'files' in value ? ['files'] : []),
         'tests',
         'behaviour',
         'excluded',
@@ -80,7 +80,6 @@ export function parseBriefScope(value: unknown): BriefScope {
     if (input.size !== null && input.size !== 'Small' && input.size !== 'Larger') invalid();
 
     const scope: BriefScope = {
-        files: list('files'),
         tests: list('tests'),
         behaviour: list('behaviour'),
         excluded: list('excluded'),
@@ -109,7 +108,7 @@ export function parseBriefScope(value: unknown): BriefScope {
 export function scopeMarkdown(scope: BriefScope): string {
     const bullets = (values: string[]) => values.map((value) => `- ${value}`).join('\n');
 
-    return `## Done when\n### Behaviour\n${bullets(scope.behaviour)}\n### Tests\n${bullets(scope.tests)}\n\n## Scope\n### Files\n${bullets(scope.files)}\n### Size\n${scope.size ?? ''}\n### Excluded\n${bullets(scope.excluded)}\n\n## Verify\n${scope.verify.required ? `yes: ${scope.verify.visibleUi}` : 'no'}\n`;
+    return `## Done when\n### Behaviour\n${bullets(scope.behaviour)}\n### Tests\n${bullets(scope.tests)}\n\n## Scope\n### Size\n${scope.size ?? ''}\n### Excluded\n${bullets(scope.excluded)}\n\n## Verify\n${scope.verify.required ? `yes: ${scope.verify.visibleUi}` : 'no'}\n`;
 }
 
 export function briefScopeClaims(text: string): Map<string, string[]> {
@@ -123,6 +122,7 @@ export function briefScopeClaims(text: string): Map<string, string[]> {
 
         if (/^(```|~~~)/.test(value)) fenced = !fenced;
 
+        // Files claims stay readable for rebinding older reviews; checkBriefScope ignores them.
         const files = !fenced && /^(?:-\s*)?Files:\s*(.+)$/i.exec(value);
 
         if (files) {
@@ -147,14 +147,16 @@ export function briefScopeClaims(text: string): Map<string, string[]> {
     return result;
 }
 
-/** Compare claims, not keywords: a negated extra requirement is still a changed claim. */
+/** Compare claims, not keywords: a negated extra requirement is still a changed claim. Files are not compared. */
 export function checkBriefScope(scope: BriefScope, brief: string | null): ScopeCheck {
     const expected = briefScopeClaims(scopeMarkdown(scope));
     const actual = briefScopeClaims(brief ?? '');
 
+    // Confirmed scope has no files, so older briefs naming Files still pass.
+    actual.delete('scope.files');
+
     // No stated boundary is different from a confirmed empty delivery.
     for (const [field, open] of [
-        ['scope.files', !scope.files.length],
         ['done when.tests', !scope.tests.length],
         ['scope.excluded', !scope.excluded.length],
         ['scope.size', scope.size === null],

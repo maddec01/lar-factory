@@ -17,12 +17,18 @@ export interface ScopeRecords {
     briefScopeCheck(id: string): ScopeCheck;
 }
 
-export function storedScope(database: Database, id: string): ConfirmedScope | null {
+/** The latest confirmation. An older one's files list is left out unless `withFiles` asks for it to rebind old reviews. */
+export function storedScope(database: Database, id: string, withFiles = false): ConfirmedScope | null {
     const row = database.db
         .prepare('SELECT content FROM confirmed_scopes WHERE work_id=? ORDER BY revision DESC LIMIT 1')
         .get(id);
 
-    return row ? (JSON.parse(String(row.content)) as ConfirmedScope) : null;
+    if (!row) return null;
+
+    const confirmed = JSON.parse(String(row.content)) as ConfirmedScope & { scope: { files?: string[] } };
+    const { files: _, ...scope } = confirmed.scope;
+
+    return withFiles ? confirmed : { ...confirmed, scope };
 }
 
 export function scopeRecords(database: Database, read: (id: string) => WorkRecord): ScopeRecords {

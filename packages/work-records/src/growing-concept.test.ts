@@ -269,7 +269,6 @@ test('S06: an amended scope across repositories turns single work into a linked 
     const scope: BriefScope = {
         repositories: ['fake/a'],
         openDecisions: [],
-        files: [],
         tests: [],
         behaviour: ['Totals match.'],
         excluded: [],

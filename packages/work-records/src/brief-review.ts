@@ -122,7 +122,7 @@ export function briefReviewRecords(
             bodies: content,
             answer,
             releasePlan: storedRelease(database, record.workId),
-            confirmedScope: storedScope(database, record.workId)?.scope ?? null,
+            confirmedScope: storedScope(database, record.workId, earlier)?.scope ?? null,
             named: namedWork(content.find((body) => body.body === 'brief')?.markdown ?? '', earlier),
             blockers: edges.all(record.workId).map((row) => String(row.blocker_id)),
             dependencies: dependencies.dependencies(record.workId),

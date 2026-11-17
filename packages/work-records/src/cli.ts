@@ -64,7 +64,7 @@ Confirmed scope, local only
   confirm-scope <work-id> --revision N --file F --identity person --evidence response
                                     Save the scope shown at understanding confirmation:
                                     {repositories:["owner/repo"],openDecisions:[],
-                                     files:[],tests:[],behaviour:[],excluded:[],
+                                     tests:[],behaviour:[],excluded:[],
                                      size:"Small"|"Larger"|null,
                                      verify:{required:boolean,visibleUi:string|null}}.
                                     Verify only for visible UI behaviour a person must check.

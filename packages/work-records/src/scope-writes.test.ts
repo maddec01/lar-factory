@@ -12,7 +12,6 @@ import { openWorkRecords, type WorkRecords } from './work-records.ts';
 const dirs: string[] = [];
 const stores: WorkRecords[] = [];
 const scope: BriefScope = {
-    files: ['cli.js'],
     tests: ['`test/cli.test.js`: greets the first argument.'],
     behaviour: ['Greet the first argument.'],
     excluded: [],

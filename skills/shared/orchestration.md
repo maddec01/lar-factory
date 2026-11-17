@@ -2,11 +2,37 @@
 
 **Run contract.** With a board-supplied run ID, launch every role with
 `lar-work role-launch WORK_ID --run-id RUN_ID --role ROLE --capabilities F --task F`
-and pass its JSON to `delegate_task` unchanged. Save `orchestrator_capabilities`
+and pass its JSON to `delegate_task` unchanged. WORK_ID is the run owner's work
+ID from the supplied runtime. Verify the pair with
+`lar-work run-settings WORK_ID --run-id RUN_ID`. For grouped brief review, keep
+the parent shaping owner's pair even when reviewing a child's brief. Put the
+reviewed work IDs and their exact Doubt packages in the task; record each
+`record-doubt` result on its reviewed work ID. Launch and finish evidence stays
+on the run owner. Save `orchestrator_capabilities`
 JSON to F first (search omitted models); the task file holds the role's brief.
 When the child finishes, run `lar-work role-finish WORK_ID --execution-id ID`
-with T3's task result JSON on stdin (or `--file F`). If either command exits
-non-zero, stop; cancel a mismatched active child. Never substitute.
+with the same owner and T3's task result JSON on stdin (or `--file F`). A non-zero
+exit stops dispatch or acceptance of that result; follow **Recover a rejected
+role command** below. Cancel a mismatched active child. Never substitute.
+
+## Recover a rejected role command
+
+Read the diagnostic and the supplied runtime's owner/run pair. For "No run ...
+belongs to ...", verify that pair with `run-settings`, then retry `role-launch`
+on the owner, keeping the reviewed work IDs and packages in the task. Do not
+copy or snapshot a run onto a child to bypass the refusal. Use `run-settings`
+to inspect any saved attempt; reuse its execution ID only for the same running
+attempt. A finished attempt needs a new execution ID. An uncertain T3 dispatch
+needs its original result recovered before another launch.
+
+Repair command inputs and missing evidence through supported commands, then
+retry launch or finish and continue. Clear only a Needs you notice saved for
+that repaired failure with `clear-needs-you` and the saved resume Status. A
+bookkeeping mismatch requires no product decision or Pedro repair. If recovery
+remains blocked, report the concrete runtime failure and missing evidence;
+ask Pedro only for a real product choice or access only he can supply.
+
+## Delegating work
 
 T3's orchestration instructions take precedence. Without a run ID, use native subagents unless
 another provider, requested model options or an isolated worktree require

@@ -24,6 +24,9 @@ gates, Reshape and unresolved choices still follow the board approval below.
    Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
    gets that exact package, repository paths, resolved domain-doc setting/paths,
    [Doubt](doubt.md) and the orchestration guide's **Wait for delegated work**, no conversation.
+   Grouped review follows the guide's **Run contract**: launch and finish on the
+   shaping run owner; keep each reviewed work ID and package distinct in the task
+   and record a clean result for each on its own work ID below.
    Fix findings within the destination; ask for scope changes. Every amendment
    ends here: rerun Doubt after edits before ending the turn.
    Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>"`.

@@ -87,7 +87,7 @@ function preamble(records: WorkRecords, snapshot: RunSettings, role: string, dat
         ...(earlier || snapshot.kind === 'build' ? [frozenBuildMethodLine(snapshot), frozenRetroLine(snapshot)] : []),
         ...(earlier
             ? [
-                  `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. Stop if either command exits non-zero; cancel a mismatched active child.`,
+                  `For every child role, use lar-work role-launch ${snapshot.workId} --run-id ${snapshot.runId} --role ROLE --capabilities F --task F and pass its JSON to delegate_task unchanged. Call orchestrator_capabilities first (search omitted models) and save its JSON as the capabilities file. On completion, pass T3's task result JSON to lar-work role-finish ${snapshot.workId} --execution-id ID. On a non-zero exit, follow shared/orchestration.md#recover-a-rejected-role-command; cancel a mismatched active child.`,
                   `Select reviewers with --run-id ${snapshot.runId}; carry runId and selection evidence into review records.`,
               ]
             : []),

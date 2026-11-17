@@ -19,6 +19,10 @@ interface PrObserverOptions {
     read?: (repo: string, number: number) => Promise<PullRequestState | LinkedPr>;
 }
 
+/** A failed read keeps the last known counts as stale; with none to keep, the checks are unavailable, never "no checks". */
+const failedRead = (pr: Pick<LinkedPr, 'checks' | 'pipelineUnread' | 'checkProgress'>) =>
+    !pr.pipelineUnread && pr.checks && pr.checkProgress?.state !== 'unavailable' ? 'stale' : 'unavailable';
+
 /** A low-cost PR pass independent of the five-minute ticket and dependency safety read. */
 export function createPrObserver(records: WorkRecords, options: PrObserverOptions) {
     const readMany = createPrProgressReader();
@@ -88,7 +92,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                               ...previous,
                               checkProgress: {
                                   ...previous.checkProgress,
-                                  state: previous.checkProgress?.state === 'unavailable' ? 'unavailable' : 'stale',
+                                  state: failedRead(previous),
                               },
                           }
                         : {
@@ -167,7 +171,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                                   ...pr,
                                   checkProgress: {
                                       ...pr.checkProgress,
-                                      state: pr.pipelineUnread ? 'unavailable' : 'stale',
+                                      state: failedRead(pr),
                                   },
                               }
                             : pr;
@@ -184,7 +188,7 @@ export function createPrObserver(records: WorkRecords, options: PrObserverOption
                         pipelineUnread: observed.pipelineUnread,
                         checkProgress: {
                             ...observed.checkProgress,
-                            state: failed ? 'stale' : (observed.checkProgress?.state ?? 'unavailable'),
+                            state: failed ? failedRead(observed) : (observed.checkProgress?.state ?? 'unavailable'),
                         },
                     };
                 }),

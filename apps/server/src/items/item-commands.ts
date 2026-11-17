@@ -115,7 +115,6 @@ export interface ItemCommands {
     retryBriefChanges(itemId: string): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
-    retryRetro(itemId: string): Promise<Reply>;
     inspectVerification(itemId: string): Promise<Reply>;
     recordVerification(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryVerification(itemId: string): Promise<Reply>;
@@ -230,7 +229,7 @@ export interface ItemCommandsDeps {
     resumeLaunch?: typeof resumeLaunch;
     outcomeDeps?: Pick<Parameters<typeof createOutcomeCheck>[0], 'send'>;
     releaseDeps?: Pick<Parameters<typeof createReleaseStep>[0], 'send' | 'readProjection'>;
-    retroDeps?: Pick<Parameters<typeof createRetro>[0], 'send' | 'identity' | 'capture'>;
+    retroDeps?: Pick<Parameters<typeof createRetro>[0], 'identity' | 'capture'>;
     verificationDeps?: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'>;
     shapingControlDeps?: Pick<Parameters<typeof createShapingControl>[0], 'send' | 'projection'>;
     briefApprovalDeps?: Pick<Parameters<typeof createBriefApproval>[0], 'refresh' | 'sync' | 'identity' | 'send'>;
@@ -1429,7 +1428,6 @@ export function createItemCommands({
         ...releases,
         ...verifying,
         chooseRetro: retros.chooseRetro,
-        retryRetro: retros.retryRetro,
         inspectMerge: merging.inspectMerge,
         mergePr: merging.mergePr,
         async reconcileStarts(currentItems) {
@@ -1439,7 +1437,6 @@ export function createItemCommands({
             pushStarts();
             await gating.reconcileBriefApprovals();
             await verifying.reconcileVerificationFixes();
-            await retros.reconcileRetros();
             await releases.reconcileReleaseContinuations();
             await outcomes.reconcileOutcomeChecks();
 

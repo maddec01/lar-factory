@@ -11,7 +11,7 @@ const retro: Retro = {
     pr: 'owner/repo#1',
     suggestions: [{ title: 'Help', description: 'Clarify examples', repository: 'owner/repo', kind: 'improvement' }],
     choice: null,
-    captures: [{ requestId: 'capture', ticketRequestId: 'ticket', workId: null, error: null, complete: false }],
+    captures: [{ requestId: 'capture', ticketRequestId: 'ticket', workId: null, complete: false }],
 };
 const item = {
     ...sample.items[0],
@@ -30,17 +30,14 @@ test('a retro before merge has one desk wait even with no T3 pending request or 
     expect(deskItems({ items: [item] }, true)).toEqual([item]);
     expect(retroWaits({ ...retro, suggestions: [] }, 'Ready to merge')).toBe(false);
     expect(retroWaits({ ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } }, 'Ready to merge')).toBe(false);
-    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } }, 'Ready to merge')).toBe(true);
-    expect(
-        retroWaits(
-            {
-                ...retro,
-                choice: { selected: [0], by: 'Pedro', at: 'today' },
-                captures: [{ ...retro.captures[0]!, complete: true }],
-            },
-            'Ready to merge',
-        ),
-    ).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } }, 'Ready to merge')).toBe(false);
+});
+
+test('a pick whose follow-up creation failed no longer waits', () => {
+    const failed = { ...item, retro: { ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } } } as Item;
+
+    expect(deskWait(failed).label).not.toBe('Choose follow-ups');
+    expect(humanWait(failed, true)?.action).not.toEqual({ kind: 'details', label: 'Choose follow-ups' });
 });
 
 test('a Done item shows no Choose follow-ups wait', () => {

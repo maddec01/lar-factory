@@ -15,16 +15,10 @@ export interface Retro {
         requestId: string;
         ticketRequestId: string;
         workId: string | null;
-        error: string | null;
         complete: boolean;
     }[];
-    /** The post-merge thread message of builds handed back before Retro moved before merge; new records omit it. */
-    delivery?: { threadId: string; commandId: string; messageId: string; sent: boolean; error: string | null };
 }
 
-/** A Done build merged its PR, so its unchosen or uncaptured follow-ups are dropped rather than awaited. */
+/** Only an unmade pick waits: a failed capture is reported once, and a Done build drops its unchosen follow-ups. */
 export const retroWaits = (retro: Retro | undefined | null, status: Status): boolean =>
-    !!retro &&
-    status !== 'Done' &&
-    ((!!retro.suggestions?.length && !retro.choice) ||
-        !!retro.choice?.selected.some((index) => !retro.captures[index]?.complete));
+    !!retro && status !== 'Done' && !!retro.suggestions?.length && !retro.choice;

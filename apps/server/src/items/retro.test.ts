@@ -6,7 +6,14 @@ import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
 import { createBoardState } from '../board/board-state.ts';
+import { sendThreadCommand } from '../t3/thread-commands.ts';
+import { createItemCommands, type ItemCommandsDeps } from './item-commands.ts';
 import { createRetro } from './retro.ts';
+
+vi.mock('../t3/thread-commands.ts', async (original) => ({
+    ...(await original<typeof import('../t3/thread-commands.ts')>()),
+    sendThreadCommand: vi.fn(),
+}));
 
 const opened: { records: WorkRecords; dir: string }[] = [];
 
@@ -59,11 +66,7 @@ async function setup() {
             ],
         });
     };
-    const send = vi.fn<NonNullable<Parameters<typeof createRetro>[0]['send']>>(async () => ({
-        outcome: 'accepted' as const,
-        sequence: 1,
-    }));
-    const commands = createRetro({ board, records, reread, send, identity: () => 'Pedro' });
+    const commands = createRetro({ board, records, reread, identity: () => 'Pedro' });
 
     reread();
 
@@ -77,30 +80,8 @@ async function setup() {
         reread();
     };
 
-    return { board, records, id, at, reread, send, commands, merge, propose };
+    return { board, records, id, at, reread, commands, merge, propose };
 }
-
-test('only confirmed merge and Done dispatch the same build retro, exactly once across refreshes', async () => {
-    const s = await setup();
-
-    await s.commands.reconcileRetros();
-    expect(s.send).not.toHaveBeenCalled();
-    s.records.update(s.id, s.at(), { status: 'Done' });
-    s.reread();
-    await s.commands.reconcileRetros();
-    expect(s.send).not.toHaveBeenCalled();
-    s.merge();
-    await s.commands.reconcileRetros();
-    await s.commands.reconcileRetros();
-    expect(s.send).toHaveBeenCalledTimes(1);
-    expect(s.send.mock.calls[0]?.[0]).toMatchObject({
-        threadId: 'build-thread',
-        type: 'message.dispatch',
-        text: expect.stringContaining('confirmed merged'),
-    });
-    expect(s.records.read(s.id).status).toBe('Done');
-    expect(deskItems(s.board.snapshot(), false)).toEqual([]);
-});
 
 test('before merge, one desk wait lists all suggestions, creates only picks, and replay makes no duplicate', async () => {
     const s = await setup();
@@ -116,12 +97,12 @@ test('before merge, one desk wait lists all suggestions, creates only picks, and
     expect(s.records.list({ status: 'List' }).map((r) => r.title)).toEqual(['Document a retry']);
     expect(s.records.retro(s.id)?.choice).toMatchObject({ selected: [1], by: 'Pedro' });
     expect(deskWait(s.board.find(s.id)!).label).not.toBe('Choose follow-ups');
-    await s.commands.retryRetro(s.id);
+    expect((await s.commands.chooseRetro(s.id, { revision: s.at(), selected: [1] })).status).toBe(409);
     expect(s.records.list({ status: 'List' })).toHaveLength(1);
     expect(s.records.read(s.id).status).toBe('Ready to merge');
 });
 
-test('a failed ticket keeps its local record and desk retry, with no duplicate capture on retry', async () => {
+test('a failed follow-up is named in the reply, keeps its local record and no longer waits', async () => {
     const s = await setup();
 
     s.propose();
@@ -135,31 +116,32 @@ test('a failed ticket keeps its local record and desk retry, with no duplicate c
         }),
     } as unknown as NonNullable<NonNullable<Parameters<typeof createRetro>[0]['capture']>['provider']>;
     const commands = createRetro({ ...s, capture: { provider } });
+    const result = await commands.chooseRetro(s.id, { revision: s.at(), selected: [0] });
 
-    await commands.chooseRetro(s.id, { revision: s.at(), selected: [0] });
-
-    const receipt = s.records.retro(s.id)!.captures[0]!;
-
-    expect(receipt.workId).toBeTruthy();
-    expect(receipt.complete).toBe(false);
-    expect(receipt.error).toBeTruthy();
-    expect(deskWait(s.board.find(s.id)!).label).toBe('Choose follow-ups');
-    await commands.retryRetro(s.id);
-    expect(s.records.retro(s.id)!.captures[0]?.workId).toBe(receipt.workId);
-    expect(s.records.list({ status: 'List' })).toHaveLength(1);
+    expect(result.status).toBe(409);
+    expect((result.body as { error: string }).error).toMatch(/Improve help/);
+    expect(s.records.list({ status: 'List' }).map((r) => r.title)).toEqual(['Improve help']);
+    expect(deskWait(s.board.find(s.id)!).label).not.toBe('Choose follow-ups');
     expect(s.records.read(s.id).status).toBe('Ready to merge');
 });
 
-test('a missing build thread does not start a repeated refresh loop after merge', async () => {
+test('the board never sends a Retro message into the build thread after its delivery PR merges', async () => {
     const s = await setup();
+    const send = vi.mocked(sendThreadCommand);
+    const commands = createItemCommands({
+        board: s.board,
+        records: s.records,
+        reread: s.reread,
+        items: {} as ItemCommandsDeps['items'],
+        archive: () => [],
+        offerModelChoices: () => [],
+        factoryContext: null,
+    });
 
     s.merge();
-    s.records.markShapingThreadDeleted('build-thread');
-
-    const reread = vi.fn(s.reread);
-    const commands = createRetro({ ...s, reread });
-
-    await commands.reconcileRetros();
-    expect(s.send).not.toHaveBeenCalled();
-    expect(reread).not.toHaveBeenCalled();
+    await commands.reconcileStarts(s.board.snapshot().items);
+    await commands.reconcileStarts(s.board.snapshot().items);
+    expect(send).not.toHaveBeenCalled();
+    expect(s.records.retro(s.id)).toBeNull();
+    expect(s.records.read(s.id).buildPhase).toBe('checks');
 });

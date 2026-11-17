@@ -1,7 +1,7 @@
 // Everything the board search lists for a query, in list order: actions, then the filters, then tickets once there is a
 // query (SearchTickets.tsx), those on the board and then the List's, then Settings entries. Tokens narrow tickets alone,
 // and Search all tickets lists what they hide. Tickets are the board's items, Done's only within its 7-day window.
-// Archive stays off the board data, so nothing archived shows.
+// Archive is read separately when search opens and stays searchable after work leaves the board.
 
 import { readingScope, repoName, shownRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
@@ -24,6 +24,7 @@ import { conceptIcons } from '@/ui/board';
 
 export interface SearchInput {
     data: BoardData;
+    archived?: Item[];
     now: number;
     query: string;
     scope: string | null;
@@ -185,7 +186,7 @@ export function searchResults(
     return {
         groups: [
             ...matchingGroups([{ label: 'Actions', options: actions(input, handlers) }, ...filterGroups], query),
-            ...ticketGroups(tickets, data),
+            ...ticketGroups(tickets, data, input.archived),
             ...(settings.length ? [{ label: 'Settings', options: settings }] : []),
         ],
         reading: typed && readingScope(data, widened ? undefined : (scope ?? undefined)),

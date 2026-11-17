@@ -19,6 +19,7 @@ import { type ComponentProps, useEffect, useRef } from 'react';
 import { ItemDialogContent } from './ItemDialogContent';
 import { useItemDialogStore } from './ItemDialogStore';
 import { useDescriptionEdit } from './useDescriptionEdit';
+import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useItemDetails } from '@/services/items/items.hooks';
 import { useExpand } from '@/shared/dialogs/useExpand';
@@ -107,11 +108,13 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
 export function ItemDialog() {
     const { data, now } = useBoardStore();
     const { itemId, session, close } = useItemDialogStore();
+    const archived = useArchiveStore((state) => state.items);
     const item =
         data.items.find((i) => i.id === itemId) ??
-        data.items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId);
+        data.items.flatMap((parent) => parent.retiredParts ?? []).find((i) => i.id === itemId) ??
+        archived?.find((i) => i.id === itemId);
 
-    // An item that left the board closes the dialog for good, so a later read that brings it back doesn't reopen it.
+    // An item absent from both the board and Archive closes the dialog for good.
     useEffect(() => {
         if (itemId && !item) close();
     }, [itemId, item, close]);

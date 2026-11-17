@@ -56,6 +56,7 @@ own role purposes, rather than claiming the parent's shaping or build stage.
 Use `bash <this skill>/shared/scripts/status.sh ID "<Status>"` as directed by
 the reached stage; it refreshes the board. Completion owns Done. A PR has no
 workflow Status. Never write factory progress to tracker fields or comments.
+Closing an issue without a build may write one team-facing close reason; it is not a progress comment. Retain the same reason locally with `lar-work set-aside ID --revision N --reason "as already fixed on main @<SHA>"` after observing the close. This preserves Archive/search history without claiming delivery completion.
 Every wait uses `lar-work set-needs-you ID --revision N --reason X` to save reason
 and Needs you Status together. Save the current Status; resume atomically with
 `lar-work clear-needs-you ID --revision N --status "<saved Status>"`.

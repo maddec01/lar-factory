@@ -1,4 +1,6 @@
+import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { AddressInfo } from 'node:net';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
@@ -10,13 +12,17 @@ let close: (() => Promise<unknown>) | undefined;
 
 afterEach(() => close?.());
 
-async function serve(projectIcon: (projectId: string) => Promise<ProjectImage | undefined>) {
+async function serve(
+    projectIcon: (projectId: string) => Promise<ProjectImage | undefined>,
+    deps: Partial<HttpDeps> = {},
+) {
     const lookup = vi.fn(projectIcon);
     const { server } = createBoardServer({
         board: createBoardState({ repos: [], items: [] } as unknown as BoardData),
         page: { template: '<html></html>', assets: new Map() },
         ready: () => undefined,
         projectIcon: lookup,
+        ...deps,
     } as unknown as HttpDeps);
 
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -74,4 +80,42 @@ it('sample mode refuses merge writes before commands, including when it reads T3
         expect(await response.json()).toMatchObject({ error: 'Merging is disabled in sample mode.' });
     }
     expect(mergePr).not.toHaveBeenCalled();
+});
+
+it('reads archived ticket details and older close notes after work leaves the board', async () => {
+    const item = {
+        ...normalizeItems([boardIssue(47, 'Shaping')])[0]!,
+        setAside: true,
+        closeReason: 'as already fixed',
+    };
+    const { get } = await serve(async () => undefined, {
+        archive: () => [item],
+        itemDetails: {
+            details: async (kept) => ({
+                body: kept.closeReason!,
+                format: 'markdown',
+                author: null,
+                assignees: [],
+                createdAt: null,
+                subTickets: [],
+                comments: [],
+                hasOlderComments: false,
+                olderCursor: null,
+            }),
+            olderComments: async (kept) => ({ comments: [], hasOlderComments: false, olderCursor: kept.closeReason! }),
+            saveDescription: async () => null,
+            labels: async () => ({ labels: [] }),
+            changeLabels: async () => null,
+            exportMarkdown: async () => ({ paths: [] }),
+        },
+    });
+    const details = await get(`/api/item-details?itemId=${item.id}`);
+
+    expect(details.status).toBe(200);
+    expect(await details.json()).toMatchObject({ details: { body: 'as already fixed' } });
+
+    const comments = await get(`/api/item-comments?itemId=${item.id}&before=cursor`);
+
+    expect(comments.status).toBe(200);
+    expect(await comments.json()).toMatchObject({ page: { olderCursor: 'as already fixed' } });
 });

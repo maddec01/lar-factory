@@ -86,6 +86,7 @@ decision unresolved. Then:
   `choose-structure` and follow its result. Name each
   proposed build or recorded Dependency in the brief's **Notes for the
   builder**. This item is a build only if its own repository changes.
+- **User chooses to close without a build**: [Close during shaping](close.md).
 - **No open questions**: write the brief.
 - **Too big or unclear for one session**: [Concepts](concepts.md).
   Keep the command's cross-repository structure choice; size alone does not turn settled linked work into a concept.

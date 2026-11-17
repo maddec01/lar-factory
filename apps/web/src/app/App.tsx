@@ -16,7 +16,7 @@ import { useShownScope } from '@/features/filters';
 import { ItemDialog } from '@/features/item-dialog';
 import { AbandonDialog } from '@/features/items';
 import { StageLayout } from '@/features/line';
-import { CompletionNotices, T3Missing, Warnings } from '@/features/notices';
+import { CompletionNotices, T3Missing, Warnings, useClosureNotices } from '@/features/notices';
 import { EmptyState, OnboardingCards, WizardDialog } from '@/features/onboarding';
 import { SettingsDialog } from '@/features/settings';
 import { RestartConfirmation } from '@/features/updates';
@@ -43,6 +43,8 @@ function Content() {
 }
 
 export function App() {
+    useClosureNotices();
+
     const t3 = useBoardStore((state) => failedCheck(state.data.tools, 't3'));
     // T3 Code not running is a warning; only a missing t3 replaces the main area.
     const missing = t3?.result === 'missing' ? t3 : undefined;

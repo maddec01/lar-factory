@@ -54,7 +54,7 @@ Setting work aside on this machine. Closing its linked tracker ticket is a separ
 _Avoid_: delete work.
 
 **Archive**:
-The list in Settings of work that has left the board, including work set aside by Abandon.
+The list in Settings of work that has left the board, including work set aside by Abandon or closed during shaping. Work closed during shaping keeps its one-line reason and remains findable in Board search until the retention setting deletes it.
 _Avoid_: trash, deleted items.
 
 **Spec**:

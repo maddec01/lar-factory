@@ -11,21 +11,26 @@ import { clearToast } from './ToastActions';
 import { useActionToast } from './useActionToast';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { TitleLink, useActionStore, useItemAction } from '@/features/items';
+import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { buttonKind } from '@/ui/board';
 
 /** Opens the item, as it is in the latest data, in the item dialog. Does nothing once it's gone. */
-function viewItem(itemId: string): void {
-    if (!useBoardStore.getState().data.items.some((i) => i.id === itemId)) return;
+function viewItem(itemId: string, slot: string): void {
+    if (
+        !useBoardStore.getState().data.items.some((i) => i.id === itemId) &&
+        !useArchiveStore.getState().items?.some((i) => i.id === itemId)
+    )
+        return;
 
     // Its toast has done its job.
-    clearToast(SLOT);
+    clearToast(slot);
     useItemDialogStore.getState().open(itemId);
 }
 
-export const ViewButton = ({ item }: { item: Item }) => (
-    <Button {...buttonKind('other')} data-view-item onClick={() => viewItem(item.id)}>
+export const ViewButton = ({ item, slot = SLOT }: { item: Item; slot?: string }) => (
+    <Button {...buttonKind('other')} data-view-item onClick={() => viewItem(item.id, slot)}>
         View item
     </Button>
 );

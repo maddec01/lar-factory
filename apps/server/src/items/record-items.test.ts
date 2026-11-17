@@ -962,3 +962,34 @@ test('a linked PR amendment shows no duplicate gate before or after fresh Doubt,
     records.setNeedsYou(id, rev(), 'Should Enter submit while a menu is open?');
     assert.match(shown().needsYou!.reason, /menu is open/);
 });
+
+test('work closed during shaping keeps its reason and identity in Archive even without ticket context', async () => {
+    const records = await open();
+    let work = records.create({
+        title: 'Trim greeting',
+        repository: REPO,
+        kind: 'bug',
+        status: 'Shaping',
+        ticket: `${REPO}#47`,
+    });
+
+    work = records.observe(work.workId, work.revision, { of: 'ticket', state: 'closed' });
+    records.setAside(work.workId, work.revision, [], 'as already fixed on main @88490ab');
+
+    assert.equal(recordItems(records, [], [REPO]).length, 0);
+
+    const archived = archivedItems(records, [], [REPO], new Set());
+
+    assert.equal(archived.length, 1);
+    assert.equal(archived[0]?.id, work.workId);
+    assert.equal(archived[0]?.number, 47);
+    assert.equal(archived[0]?.closeReason, 'as already fixed on main @88490ab');
+    assert.equal(archived[0]?.completion?.complete, false);
+    assert.equal(archived[0]?.archived?.setAside, true);
+
+    const restored = records.restore(work.workId, records.read(work.workId).revision);
+
+    assert.equal(recordItems(records, [], [REPO])[0]?.closeReason, undefined);
+    records.setAside(work.workId, restored.revision);
+    assert.equal(archivedItems(records, [], [REPO], new Set())[0]?.closeReason, undefined);
+});

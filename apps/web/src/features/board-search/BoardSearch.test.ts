@@ -3,7 +3,7 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, mountPage, sample, settle, text } from '@/test/PageTest';
+import { $, $$, mountPage, sample, settle, text, fetchMock, toast } from '@/test/PageTest';
 
 const base = sample.items.find((i) => i.id === 'I_sample05')!;
 const item = (id: string, change: Partial<Item>): Item => ({ ...base, id, labels: [], labelColors: {}, ...change });
@@ -50,4 +50,50 @@ test('choosing a ticket closes the dialog and opens its item dialog, which retur
     await press('Escape');
     await returnFocus();
     expect(document.activeElement).toBe(field());
+});
+
+test('a shaping close announces its reason once and stays searchable and readable in Archive', async () => {
+    const shaping = item('closed-47', { number: 47, title: 'Trim greeting', status: 'Shaping' });
+    const closed = {
+        ...shaping,
+        setAside: true,
+        closeReason: 'as already fixed on main @88490ab',
+        archived: { setAside: true, hidden: false, ticketOpen: false },
+    };
+
+    await mountPage(withItems([shaping]));
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+    const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
+
+    let archiveAvailable = false;
+
+    fetchMock.mockImplementation(async (url: string) =>
+        url === '/api/archive' && !archiveAvailable
+            ? new Response('', { status: 503 })
+            : new Response(JSON.stringify(url === '/api/archive' ? { items: [closed] } : withItems([]))),
+    );
+    await settle(() => useBoardStore.getState().receive(withItems([])));
+    expect(toast()).toBeNull();
+    archiveAvailable = true;
+    // An identical snapshot retries the failed Archive read.
+    await settle(() => useBoardStore.getState().receive(withItems([])));
+    expect(text(toast())).toBe('Closed #47 as already fixed on main @88490ab. View item');
+    await settle(() => $<HTMLButtonElement>('[data-view-item]')!.click());
+    expect(useItemDialogStore.getState().itemId).toBe('closed-47');
+    expect(text($('[data-item-summary]'))).toContain('Closed as already fixed');
+    await settle(() => useItemDialogStore.getState().close());
+    await openDialog();
+    await type('#47');
+    expect(text(dialog())).toContain('Archive');
+    expect(text(dialog())).toContain('Closed as already fixed on main @88490ab');
+    await choose('#47 Trim greeting');
+    expect(useItemDialogStore.getState().itemId).toBe('closed-47');
+
+    // Repeated snapshots do not repeat the announcement.
+    const { clearToast } = await import('@/features/notices/ToastActions');
+
+    await settle(() => clearToast('closed:closed-47'));
+    await settle(() => useBoardStore.getState().receive(withItems([])));
+    expect(toast()).toBeNull();
 });

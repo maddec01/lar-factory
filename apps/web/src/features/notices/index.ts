@@ -5,3 +5,4 @@ export { closeKeepingFocus, refocus, showToast } from './ToastActions';
 export { T3Missing } from './ToolNotices';
 export { Warnings } from './Warnings';
 export { CompletionNotices } from './CompletionNotices';
+export { useClosureNotices } from './useClosureNotices';

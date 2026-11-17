@@ -317,6 +317,8 @@ export interface Item {
     /** Retired children stay inspectable within their group, outside the active board and scheduler. */
     retiredParts?: Item[];
     setAside?: boolean;
+    /** The retained one-line reason shaping closed this work without a build. */
+    closeReason?: string;
     supersededBy?: IssueRef & { workId: string };
     outcomeCheck?: { ready: boolean; digest: string; run: OutcomeCheckRun | null };
     releaseContinuation?: { ready: boolean; digest: string; run: OutcomeCheckRun | null };

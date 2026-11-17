@@ -22,9 +22,9 @@ export function agentConceptWrites(
     records: WorkRecords,
 ): Pick<WorkRecords, 'setAside' | 'mergeBuild' | 'supersedeAnswer'> {
     return {
-        setAside: (id, revision, resolutions = []) => {
+        setAside: (id, revision, resolutions = [], reason) => {
             if (!Array.isArray(resolutions) || resolutions.some((item) => !item))
-                return records.setAside(id, revision, resolutions);
+                return records.setAside(id, revision, resolutions, reason);
 
             const intents: AgentWriteIntent[] = [{ id, revision, fields: [...active, 'parentId', 'dependents'] }];
 
@@ -44,6 +44,7 @@ export function agentConceptWrites(
                         revision: latest(item.workId),
                         ...(item.action === 'replace' ? { blockerRevision: latest(item.blockerId) } : {}),
                     })),
+                    reason,
                 ),
             );
         },

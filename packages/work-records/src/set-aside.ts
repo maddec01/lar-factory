@@ -11,8 +11,13 @@ export type DependentResolution = {
     reason: string;
 } & ({ action: 'replace'; blockerId: string; blockerRevision: number } | { action: 'remove' | 'hold' });
 export interface SetAsideRecords {
-    setAside(workId: string, revision: number, dependents?: readonly DependentResolution[]): WorkRecord;
-    setAsideHistory(workId: string): { at: string; dependents: readonly DependentResolution[] }[];
+    setAside(
+        workId: string,
+        revision: number,
+        dependents?: readonly DependentResolution[],
+        reason?: string,
+    ): WorkRecord;
+    setAsideHistory(workId: string): { at: string; dependents: readonly DependentResolution[]; reason?: string }[];
 }
 
 /** Reviews every incoming edge and commits its disposition with the retirement. */
@@ -24,7 +29,7 @@ export function setAsideRecords(
     const { db } = database;
 
     return {
-        setAside: (workId, revision, resolutions = []) =>
+        setAside: (workId, revision, resolutions = [], reason) =>
             database.write(() => {
                 const record = read(workId);
 
@@ -32,6 +37,9 @@ export function setAsideRecords(
 
                 if (record.setAside)
                     throw new WorkRecordError('invalid', `The work record ${workId} is already set aside.`);
+
+                if (reason !== undefined && (typeof reason !== 'string' || !reason.trim() || /[\r\n]/.test(reason)))
+                    throw new WorkRecordError('invalid', 'The close reason must be one nonempty line.');
 
                 assertRetirementAllowed(database, record, answers);
 
@@ -114,7 +122,11 @@ export function setAsideRecords(
                 validateBlockers(db);
                 db.prepare('INSERT INTO set_aside_changes(work_id,content) VALUES (?,?)').run(
                     workId,
-                    JSON.stringify({ at, dependents: resolutions }),
+                    JSON.stringify({
+                        at,
+                        dependents: resolutions,
+                        ...(reason !== undefined && { reason: reason.trim() }),
+                    }),
                 );
                 db.prepare(
                     'UPDATE work_records SET set_aside_at = ?, revision = revision + 1, updated_at = ? WHERE work_id = ?',
@@ -134,7 +146,14 @@ export function setAsideRecords(
                 return db
                     .prepare('SELECT content FROM set_aside_changes WHERE work_id = ? ORDER BY rowid')
                     .all(workId)
-                    .map((row) => JSON.parse(String(row.content)) as { at: string; dependents: DependentResolution[] });
+                    .map(
+                        (row) =>
+                            JSON.parse(String(row.content)) as {
+                                at: string;
+                                dependents: DependentResolution[];
+                                reason?: string;
+                            },
+                    );
             }),
     };
 }

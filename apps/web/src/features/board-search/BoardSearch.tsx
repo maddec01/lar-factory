@@ -21,6 +21,7 @@ import { useFilterGroups, useFilterTokens } from './useFilterTokens';
 import { useScopeStore, useShownScope } from '@/features/filters';
 import { useItemStates } from '@/features/items';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
+import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { buttonKind, NoMatches } from '@/ui/board';
 
@@ -43,6 +44,12 @@ function Dialog({
     onClose: () => void;
 }) {
     const [query, setQuery] = useState('');
+    const archive = useArchiveStore();
+
+    useEffect(() => {
+        void useArchiveStore.getState().load();
+    }, []);
+
     // Whether Search all tickets was chosen for this query.
     const [widened, setWidened] = useState(false);
     // Whether More settings was chosen for this query.
@@ -56,6 +63,7 @@ function Dialog({
     const { groups, reading } = searchResults(
         {
             data,
+            archived: archive.items ?? [],
             now,
             query,
             scope: useShownScope(),
@@ -92,8 +100,12 @@ function Dialog({
                     </Button>
                 )
             }
-            options={options.map(({ value }) => value)}
-            onSelect={(value) => options.find((option) => option.value === value)?.select()}
+            options={[...options.map(({ value }) => value), ...(archive.problem ? ['archive:retry'] : [])]}
+            onSelect={(value) =>
+                value === 'archive:retry'
+                    ? void archive.load()
+                    : options.find((option) => option.value === value)?.select()
+            }
             onClose={onClose}
             listLabel="Search results"
             empty={
@@ -106,7 +118,7 @@ function Dialog({
                     }}
                 />
             }
-            busy={reading}
+            busy={reading || archive.loading}
             busyLabel={<Loading presentation="inline" label="Loading projects…" />}
         >
             {groups.map((group) => (
@@ -124,6 +136,11 @@ function Dialog({
                     ))}
                 </CommandPaletteGroup>
             ))}
+            {archive.problem && (
+                <CommandPaletteGroup label="Archive">
+                    <CommandPaletteOption value="archive:retry" icon={null} name="Couldn’t search Archive. Try again" />
+                </CommandPaletteGroup>
+            )}
         </CommandPalette>
     );
 }

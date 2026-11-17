@@ -123,3 +123,15 @@ test('a automatic deletion names the work it would delete and saves only on its 
     );
     expect(text($('[data-last-delete]'))).toContain('Kept W_done. It owns the slice W_slice, which is kept.');
 });
+
+test('Archive gives the reason shaping closed work without presenting it as delivered', async () => {
+    const closed = {
+        ...aside,
+        closeReason: 'as already fixed on main @88490ab',
+        archived: { setAside: true, hidden: false, ticketOpen: false },
+    };
+
+    await openArchive(withRetention(), {}, [closed]);
+    expect(text(row('archived-W_aside'))).toContain('Closed as already fixed on main @88490ab');
+    expect(text(row('archived-W_aside'))).toContain('Restore');
+});

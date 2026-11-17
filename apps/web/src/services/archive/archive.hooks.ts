@@ -9,6 +9,7 @@ interface ArchiveState {
     items: Item[] | null;
     /** Why the last read failed; null when it didn't. */
     problem: string | null;
+    loading: boolean;
     load: () => Promise<void>;
 }
 
@@ -21,8 +22,11 @@ let reads = 0;
 export const useArchiveStore = create<ArchiveState>()((set) => ({
     items: null,
     problem: null,
+    loading: false,
     async load() {
         const read = ++reads;
+
+        set({ loading: true });
 
         try {
             const response = await fetch('/api/archive', { cache: 'no-store' });
@@ -31,9 +35,10 @@ export const useArchiveStore = create<ArchiveState>()((set) => ({
 
             const { items } = (await response.json()) as { items: Item[] };
 
-            if (read === reads) set({ items, problem: null });
+            if (read === reads) set({ items, problem: null, loading: false });
         } catch (err) {
-            if (read === reads) set({ problem: `${sentence(err instanceof Error ? err.message : String(err))}.` });
+            if (read === reads)
+                set({ problem: `${sentence(err instanceof Error ? err.message : String(err))}.`, loading: false });
         }
     },
 }));

@@ -26,8 +26,10 @@ Load only its file; completed phases stay completed:
 | `full-checks` | [Full checks](../stages/full-checks.md) | validation record and pushed branch |
 | `review` | [Review](../stages/review.md) | at most two recorded rounds |
 | `approve` | [Approve](../stages/approve.md) | recorded PR and recommendation |
-| `checks` | [CI](../stages/ci.md) | required checks and handback Status |
-| `retro` | [Retro](../stages/retro.md) | saved suggestions; board collects picks after merge |
+| `checks` | [CI](../stages/ci.md) | required checks, Retro suggestions and handback Status |
+
+Retro runs inside CI at the first handback; the board collects picks before
+merge. New builds never enter the `retro` phase.
 
 ## Delegation and exceptions
 

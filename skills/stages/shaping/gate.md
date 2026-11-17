@@ -17,7 +17,11 @@ and board approval, or its generated board wait.
    ends here: rerun Doubt after edits before ending the turn.
    Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>"`.
 3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
-4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again. Save its `display`
+4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again.
+   When only a producer contract changed, fresh clean Doubt can retain the consumer's approval
+   if its own approved inputs are unchanged. If `gate.current` is true, continue without asking again.
+   Changed consumer content needs board approval; the request shows the changed passage.
+   Otherwise save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
    verbatim. Explain approval's Auto-build behavior as below; ask Pedro to use
    Approve brief in the board, then stop.
@@ -33,7 +37,7 @@ and board approval, or its generated board wait.
    an approver name or agent-written response reference never grants approval.
    If this gate supersedes an answer, run `lar-work supersede-answer` per
    [Completion](shared/issue-tracker/completion.md), reconcile
-   affected briefs and save the map. Rerun Doubt and approval for changed packages.
+   affected briefs and save the map. Rerun Doubt for changed packages and approval for changed approved content.
 5. Keep active builds in Build; set only unstarted gated builds **Ready**. Report `lar-work waiting-on` for each. Eligible
    approved briefs queue as Specs under saved settings; report pending failures.
    In the handback, say what approval will do using the runtime block's saved

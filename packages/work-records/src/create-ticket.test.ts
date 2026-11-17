@@ -56,11 +56,26 @@ async function setup() {
         },
     } as unknown as RepoConfig;
     const writes: unknown[][] = [];
+    let remote!: StructureTicket;
     const provider = {
         create: async (...args: unknown[]) => {
             writes.push(args);
 
-            return { repository: args[0], title: args[1], body: args[2], number: 13, version: '1' };
+            remote = {
+                repository: String(args[0]),
+                title: String(args[1]),
+                body: String(args[2]),
+                number: 13,
+                version: '1',
+            };
+
+            return remote;
+        },
+        readSpec: async () => ({ ...remote }),
+        replaceSpec: async (_ticket: StructureTicket, body: string) => {
+            remote = { ...remote, body, version: String(Number(remote.version) + 1) };
+
+            return remote;
         },
     } as unknown as StructureProvider;
     const deps = { records, repos: () => [repo], provider, discoverOptions: async () => options };
@@ -71,7 +86,7 @@ async function setup() {
             deps,
         );
 
-    return { records, local, repo, writes, deps, convert };
+    return { records, local, repo, writes, deps, convert, remote: () => remote };
 }
 
 test('conversion sends only the current passing brief as Spec when enabled, with description as Original', async () => {
@@ -115,7 +130,7 @@ test('refused creation leaves the work local, reports failure and permits a new 
     expect((await convert({ requestId: SECOND })).status).toBe(200);
 });
 
-test('an uncertain conversion survives reopening the database and blocks a second submission', async () => {
+test.each(['response'])('an uncertain create %s survives reopening and blocks a second submission', async (stage) => {
     const { records, local, deps, convert } = await setup();
     let ticket: StructureTicket | undefined;
     let writes = 0;
@@ -123,10 +138,22 @@ test('an uncertain conversion survives reopening the database and blocks a secon
     deps.provider.create = async (repository, title, body) => {
         writes++;
         ticket = { repository, title, body, number: 14, version: '1' };
-        throw Error('Response lost');
+
+        if (stage === 'response') throw Error('Response lost');
+
+        return ticket;
     };
+
+    if (stage === 'receipt')
+        records.saveCaptureTicket = () => {
+            throw Error('Disk full');
+        };
+
     deps.provider.find = async () => (ticket ? [ticket] : []);
+    deps.provider.readSpec = async () => ticket!;
+    deps.provider.replaceSpec = async (_before, body) => (ticket = { ...ticket!, body });
     expect((await convert()).body.uncertain).toBe(true);
+    expect(ticket!.body).toContain('lar-factory:create');
     expect((await convert({ requestId: SECOND })).body.error).toMatch(/already has a ticket creation submission/);
     expect(records.read(local.workId).ticket).toBeNull();
 
@@ -211,6 +238,7 @@ test.each([
         };
         deps.provider.find = async () => [remote];
         deps.provider.readSpec = async () => remote;
+        deps.provider.replaceSpec = async (_before, body) => (remote = { ...remote, body });
 
         const save = records.saveSpecState;
 
@@ -230,6 +258,8 @@ test.each([
             titleEditorWrite: editorWrite,
         };
 
+        const editedBody = remote.body;
+
         const handle = opened[0]!;
 
         records.close();
@@ -248,7 +278,7 @@ test.each([
             expect(recovered.body.record?.title).toBe('Fix export');
             expect(handle.records.body(local.workId, 'brief')).toBe('Gated Spec.');
             expect(handle.records.specState(local.workId)).toMatchObject({
-                held: { body: remote.body, title: 'Edited title' },
+                held: { body: editedBody, title: 'Edited title' },
                 base: { version: stage === 'response' ? '' : '1', body: expect.stringContaining('Gated Spec.') },
             });
             expect(handle.records.gate(local.workId).evidence.at(-1)?.source).toBe('gate');
@@ -396,4 +426,36 @@ test('S05-F4-003 the board’s exact freshly created Feature is not an unknown-p
     await refreshSpecs(records, { workId: id, provider, setups: [repo.setup!] });
     expect(records.specState(id).held).not.toBeNull();
     expect(records.initialContext(id)).toBe(description.trim());
+});
+
+test('a lost cleanup response recovers by durable ticket number after restart, preserving tracker edits', async () => {
+    const s = await setup();
+    const replace = s.deps.provider.replaceSpec!;
+    let remote: StructureTicket;
+
+    s.deps.provider.readSpec = async () => ({ ...s.remote(), body: s.remote().body + '\nTeam clarification.' });
+    s.deps.provider.replaceSpec = async (before, body) => {
+        // No marker is removed before its recovery identity is durable.
+        expect(s.records.captureSubmission(REQUEST)?.ticket).toBe(`${REPO}#13`);
+        remote = await replace(before, body);
+        throw Error('Cleanup response lost');
+    };
+    expect((await s.convert()).body.error).toContain('could not remove its temporary creation marker');
+    expect(remote!.body).toBe('Original request.\nTeam clarification.');
+
+    const handle = opened[0]!;
+
+    s.records.close();
+    handle.records = await openWorkRecords(join(handle.dir, 'work-records.db'));
+    s.deps.records = handle.records;
+    s.deps.provider.readSpec = async () => remote;
+    s.deps.provider.find = async () => {
+        throw Error('Marker search must not be used after the receipt');
+    };
+
+    const recovered = await createRecordTicket(s.local.workId, { requestId: REQUEST }, s.deps);
+
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.record?.ticket).toBe(`${REPO}#13`);
+    expect(s.writes).toHaveLength(1);
 });

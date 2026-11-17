@@ -1,6 +1,7 @@
 import {
     DONE_WINDOW_MS,
     REPOSITORY_OPERATIONS,
+    frozenBuildInputMessage,
     normalizeItems,
     readBuilds,
     refKey,
@@ -655,9 +656,7 @@ export async function withRunPrompt(
             snapshot ? { run: snapshot, earlier: !records.runLaunches(id, snapshot.runId).newRun } : {},
         );
 
-        return input
-            ? `${settings}\n\nUse this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify(input)}`
-            : settings;
+        return input ? `${settings}\n\n${frozenBuildInputMessage(input)}` : settings;
     } finally {
         records.close();
     }

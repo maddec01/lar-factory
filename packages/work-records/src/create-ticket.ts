@@ -92,8 +92,35 @@ export async function captureWork(
     }
 
     const { fresh, submission } = claim;
-    const body = `${draft.description}\n\n<!-- lar-factory:create {"identity":"${input.requestId}"} -->`;
+    const marker = `<!-- lar-factory:create {"identity":"${input.requestId}"} -->`;
+    const body = `${draft.description}\n\n${marker}`;
     let createdTicket = submission.createdTicket ?? undefined;
+    const cleanCreatedTicket = async (ticket: string) => {
+        try {
+            if (!provider.readSpec || !provider.replaceSpec) throw Error('The provider cannot update ticket text.');
+
+            const remote = await provider.readSpec(draft.repo, Number(ticket.split('#').at(-1)));
+
+            if (!remote.body.includes(marker)) return;
+
+            const setup = repoOf(draft.repo)?.setup;
+            const problem = writeAccessProblem(draft.repo, 'edit-ticket', setup?.access ?? {}, {
+                azureReadOnly: setup?.azureReadOnly,
+            });
+
+            if (problem) throw Error(problem);
+
+            // replaceSpec checks for concurrent edits. Remove only our marker from the latest body.
+            await provider.replaceSpec(
+                remote,
+                remote.body.replace(`\n\n${marker}`, '').replace(`\n${marker}`, '').replace(marker, ''),
+            );
+        } catch (error) {
+            throw Error(
+                `Created ${ticket}, but could not remove its temporary creation marker. Retry this submission. ${(error as Error).message}`,
+            );
+        }
+    };
     const finishSpec = async (workId: string) => {
         if (createdTicket && !readTicketSpec(draft.description).marked)
             rememberCreatedSpec(records, workId, createdTicket);
@@ -127,6 +154,8 @@ export async function captureWork(
 
     if (submission.workId) {
         try {
+            if (draft.createIssue && submission.ticket) await cleanCreatedTicket(submission.ticket);
+
             const record = await finishSpec(submission.workId);
 
             return reply(200, { record, error: null });
@@ -340,8 +369,18 @@ export async function captureWork(
         }
     }
 
+    let workId: string;
+
     try {
         records.saveCaptureTicket(input.requestId, `${draft.repo}#${number}`, createdTicket);
+
+        // Persist the recovery identity before cleanup. Failed cleanup leaves attachment pending for retry,
+        // including sync-part-tickets, which retries unattached requests.
+        try {
+            await cleanCreatedTicket(`${draft.repo}#${number}`);
+        } catch (error) {
+            return failed(error);
+        }
 
         const { record } = records.completeCapture(
             input.requestId,
@@ -355,7 +394,7 @@ export async function captureWork(
             target,
         );
 
-        return reply(200, { record: await finishSpec(record.workId), error: null });
+        workId = record.workId;
     } catch (error) {
         const conflict = error instanceof WorkRecordError && error.code === 'stale-revision' ? ` ${error.message}` : '';
 
@@ -363,6 +402,12 @@ export async function captureWork(
             uncertain: true,
             error: `Created ${draft.repo}#${number}, but could not save its record. Use Find a ticket to add it. This submission will not create another issue.${conflict}`,
         });
+    }
+
+    try {
+        return reply(200, { record: await finishSpec(workId), error: null });
+    } catch (error) {
+        return failed(error);
     }
 }
 

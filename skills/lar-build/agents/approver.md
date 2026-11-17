@@ -11,8 +11,8 @@ out-of-scope notes. Read the build's record (`lar-work read`) and brief
 (`lar-work body <work ID> --body brief`). Glossary and ADR edits
 from the brief's **Domain docs** are part of the change only when the local
 `domainDocs` setting is repository. With it OFF, including legacy private
-values, Domain docs is "none" and no drafts or glossary or ADR writes belong
-in this build.
+values, omit Domain docs and make no draft, glossary or ADR writes. Accept
+legacy "none" sections.
 
 Resolve and carry `base_branch` per `project-rules.md` before the commands below.
 
@@ -49,30 +49,21 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    report that rule to the builder. The body, written with the
    `<lar-build>/write-pr.md` skill inside any template the repository sets,
    holds:
-   - the outcome the brief's **What** describes and each decision's gist and
-     reason from its **Confirmed**, so a reader with no ticket knows what
-     changed and why;
-   - a text summary of the UI reviewer's checks and results, per
-     `../screenshots.md` (relative to this file);
-   - a `## Checks` section listing each applicable check as run or reused,
-     with its reuse reason, and every open failure by test name. Include no
-     log paths or other local paths;
-   - an `## Open findings` section when any finding is still open after
-     round 2: each finding, its severity and its reviewer;
-   - an `## Unreviewed fixes` section when the builder's list has any: for
-     each round-2 fix, the finding, its severity and its reviewer. Name
-     findings, not commits: autosquash rewrote the shas;
-   - the builder's **Domain docs added by the build** list when repository
-     mode produced entries for this PR;
-   - an `## Out of scope` section with the builder's notes on work another
-     repository needs, when any;
+   - Summary: the outcome and the product decisions needed to understand why;
+   - Evidence: each applicable check and its result, including every open failure
+     by test name, plus concise UI checks/results per `../screenshots.md`;
+     report outcomes without narrating who reused a run or why;
+   - a one-line Risk naming any material unchecked area, open finding or
+     unreviewed fix. Keep the full findings, reviewer selection, reuse reasons,
+     Door and Blast radius in local validation/review records;
    - this build's own closing reference when it has a ticket, alongside other
      links the repository requires and its attribution convention. A concept's
      parent ticket is separate from the build's closing target.
 
-   Generate the body with `lar-work pr-body --file <draft> --test-steps <numbered-checks>
-   --to <body-file>` (omit --test-steps for Verify: no); use that file for every
-   create/update. The command owns the Test steps heading.
+   Generate reproducible numbered Test steps with expected results for every PR.
+   Use `lar-work pr-body --file <draft> --test-steps <numbered-checks>
+   --to <body-file>` for every create/update. The command owns the Test steps
+   heading. These steps add no human wait beyond the approved Verify decision.
 
    On Azure Repos, open it with `az repos pr create --repository <repo>
    --source-branch <branch> --target-branch "$base_branch" --title "<title>"
@@ -85,13 +76,17 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    relationships. Report any unresolved link with the PR result. A PR without
    a ticket still has the complete outcome, decisions and reasons above. Its
    recorded merge makes the build Done.
-3. Use the approved brief's **Verify** decision after required checks pass:
-   - **Verify** only when it says yes. Generate numbered checks with observable results.
-   - **Ready to merge** when it says no. A reviewer recommendation is a note, never another human wait.
+3. After required checks pass, read `lar-work verification <work ID>` for the
+   gate's saved Verify requirement. New briefs omit a negative Verify section;
+   its decision stays in the approved scope record. Legacy yes/no sections remain binding.
+   - **Verify** only when `required` is true. Generate numbered checks with observable results.
+   - **Ready to merge** when `required` is false. A reviewer recommendation is a note, never another human wait.
    Browser checks use T3 preview only; serve local static output on a free HTTP
    port and stop that server afterward; never launch another browser or import tools from other checkouts.
    Changing Verify requires a brief amendment through Doubt and a board gate before proceeding.
-   Disclose skipped reviews, unchecked areas, open findings/failures and unreviewed fixes; they do not override that decision.
+   Keep skipped-review reasons in local records. Disclose material unchecked
+   areas, open findings/failures and unreviewed fixes concisely in Evidence or
+   Risk; they do not override that decision.
 
 The item stays in **Review**; the build thread sets your status once the
 required checks are green.
@@ -103,4 +98,4 @@ When the builder requests reassessment after a CI fix or conflict resolution,
 assess every listed check against the new final tree using step 1's rules.
 Record your own reuse reasons or rerun only checks you cannot justify.
 Return the updated assessment and status recommendation without restarting
-reviews or opening another PR. The CI fixer updates its Checks section.
+reviews or opening another PR. The CI fixer updates its Evidence section.

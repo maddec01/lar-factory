@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
 
 import { completeBrief } from '../test/complete-brief.ts';
+import { scopeMarkdown } from './brief-scope.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -238,6 +239,34 @@ test('S05 F3: an approved Verify controls the saved wait; recommendations cannot
     expect(s.records.verification(id).required).toBe(true);
     expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/Doubt|gate|approved/i);
     approve();
+    s.records.update(id, rev(), { status: 'Ready to merge' });
+    expect(s.records.verification(id).required).toBe(false);
+});
+
+test('an approved scope can omit Verify no without retaining an older human wait', async () => {
+    const s = await setup();
+    const id = s.id;
+    const rev = () => s.records.read(id).revision;
+    const scope = {
+        behaviour: ['The greeting fits.'],
+        tests: ['Greeting layout fits the viewport.'],
+        excluded: [],
+        size: null,
+        verify: { required: false, visibleUi: null },
+    };
+
+    s.records.confirmScope(id, rev(), scope, 'Pedro', 'Use the recorded checks.');
+    s.records.setBody(id, rev(), 'brief', completeBrief(`## What\nFit greeting.\n${scopeMarkdown(scope)}`));
+    expect(s.records.verification(id).required).toBe(true);
+    expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/gate|approved/i);
+
+    const input = s.records.doubtPackage(id);
+
+    s.records.recordDoubt(id, input.packageDigest, 'Doubt', 'Clean.');
+
+    const display = s.records.displayGate(id);
+
+    s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
     s.records.update(id, rev(), { status: 'Ready to merge' });
     expect(s.records.verification(id).required).toBe(false);
 });

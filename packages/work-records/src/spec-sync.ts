@@ -6,6 +6,8 @@ import {
     markSpecFreshness,
     withoutSpecFreshness,
     readTicketSpec,
+    retainBriefDeclarations,
+    withoutTicketCreationMarker,
     readTrackerStructure,
     stripTrackerStructure,
     writeTrackerStructure,
@@ -40,8 +42,7 @@ const azure = (repository: string) => repository.split('/').length !== 2;
 const toMarkdown = (text: string, repository: string) =>
     azure(repository) && /<\/?[a-z][^>]*>/i.test(text) ? markdown.turndown(text) : text;
 const normalizeRequest = (text: string) =>
-    text
-        .replace(/<!-- lar-factory:create [^\n]*? -->/g, '')
+    withoutTicketCreationMarker(text)
         .replace(/[ \t]+$/gm, '')
         .trimEnd();
 const checkpoint = (ticket: StructureTicket): SpecRemote => ({
@@ -323,7 +324,10 @@ async function readFresh(
             },
             {
                 text: bodyChanged
-                    ? toMarkdown(content(ticket).spec, record.repository)
+                    ? retainBriefDeclarations(
+                          toMarkdown(content(ticket).spec, record.repository),
+                          records.body(workId, 'brief') ?? '',
+                      )
                     : (records.body(workId, 'brief') ?? ''),
                 title: titleChanged ? ticket.title : record.title,
                 source: replaced ? 'conflict' : 'tracker',
@@ -591,7 +595,10 @@ export async function resolveSpecEdit(
                 ? {
                       text: contextOnly
                           ? context
-                          : toMarkdown(readTicketSpec(stripTrackerStructure(remote.body)).spec, record.repository),
+                          : retainBriefDeclarations(
+                                toMarkdown(readTicketSpec(stripTrackerStructure(remote.body)).spec, record.repository),
+                                records.body(workId, 'brief') ?? '',
+                            ),
                       contextOnly,
                       title: remote.title,
                       source: 'user',
@@ -638,6 +645,8 @@ export async function editSpec(
     const state = records.specState(workId);
 
     if (state.held) throw Error('Accept or reject the held GitHub edit before editing the Spec.');
+
+    text = retainBriefDeclarations(text, records.body(workId, 'brief') ?? '');
 
     if (
         !save(

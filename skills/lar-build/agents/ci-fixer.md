@@ -44,9 +44,11 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    run focused tests on the conflicted code. All checks must pass.
    Then `git push --force-with-lease` and report any final-tree change to the
    builder for Approver reassessment of every listed check.
-4. After the builder supplies that assessment, update the PR's `## Checks`
-   section from `lar-work checks`: each listed check as run or reused with its
-   reason, and every open failure by test name. Include no local or log paths.
+4. After the builder supplies that assessment, update the PR's `## Evidence`
+   section from `lar-work checks`: each listed check and its result, including
+   every open failure by test name. Keep reuse reasons in the local validation
+   record; do not narrate Approver reuse or reassessment in PR evidence.
+   Include no local or log paths.
 
 Return:
 

@@ -12,12 +12,99 @@ export const withoutSpecFreshness = (body: string): string => {
 export const markSpecFreshness = (body: string, stale: boolean): string =>
     (stale ? OUT_OF_DATE_SPEC : '') + withoutSpecFreshness(body);
 
+/** Creation metadata is temporary and never part of an authored request. */
+export const withoutTicketCreationMarker = (body: string): string =>
+    body.replace(/<!-- lar-factory:create [^\n]*? -->/g, '');
+
+const declaration =
+    /^\s*(?:-\s*)?(Blocked by|Consumes|Produces|Contracts|Parent contract|No ordering needed|Consumption test):/i;
+
+/** Local graph and test declarations stay in the brief, outside the team's Spec prose. */
+function splitBrief(brief: string): { prose: string; declarations: string[] } {
+    const declarations: string[] = [];
+    let fence: string | undefined;
+    const prose = brief
+        .split('\n')
+        .filter((line) => {
+            const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+
+            if (marker && (!fence || (marker[0] === fence[0] && marker.length >= fence.length)))
+                fence = fence ? undefined : marker;
+
+            if (fence || !declaration.test(line)) return true;
+
+            declarations.push(line);
+
+            return false;
+        })
+        .join('\n');
+
+    return { prose, declarations };
+}
+
+export function briefProse(brief: string): string {
+    let size = false;
+    let fence = '';
+    const prose = splitBrief(brief)
+        .prose.split('\n')
+        .filter((line) => {
+            const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+
+            if (marker && (!fence || (marker[0] === fence[0] && marker.length >= fence.length)))
+                fence = fence ? '' : marker;
+
+            if (!fence && !marker && /^#{1,3}\s/.test(line)) size = /^### Size[ \t]*$/.test(line);
+
+            return !size;
+        })
+        .join('\n');
+
+    return prose
+        .replace(/^## Tests[ \t]*$/gm, '### Tests')
+        .replace(/^## (?:Scope|Notes for the builder)[ \t]*(?:\n[ \t]*)*(?=^## |(?![\s\S]))/gm, '');
+}
+
+/** A tracker prose edit cannot remove the local declarations used by gates and graph readers. */
+export function retainBriefDeclarations(brief: string, local: string): string {
+    const size = /^### Size[ \t]*\n(?:Small|Larger)[ \t]*(?=\n|$)/m.exec(local)?.[0];
+
+    if (size && !/^### Size[ \t]*$/m.test(brief)) {
+        const scope = /^## Scope[ \t]*$/m;
+
+        brief = scope.test(brief)
+            ? brief.replace(scope, (heading) => `${heading}\n${size}\n`)
+            : `${brief.trimEnd()}\n\n## Scope\n${size}`;
+    }
+
+    const incoming = splitBrief(brief).declarations;
+    const retained = splitBrief(local).declarations.filter(
+        (line) =>
+            !incoming.some(
+                (other) => declaration.exec(other)![1]!.toLowerCase() === declaration.exec(line)![1]!.toLowerCase(),
+            ),
+    );
+
+    if (!retained.length) return brief;
+
+    const notes = /^## Notes for the builder[ \t]*$/m;
+
+    return notes.test(brief)
+        ? brief.replace(notes, (heading) => `${heading}\n${retained.join('\n')}\n`)
+        : `${brief.trimEnd()}\n\n## Notes for the builder\n${retained.join('\n')}`;
+}
+
 // Ticket text shared by local conversion and subsequent Spec writes.
 export function formatTicketSpec(
     spec: string,
     original: string,
     options?: { format: 'html'; originalFormat?: 'html' | 'markdown' },
 ): string {
+    spec = briefProse(spec);
+    original = withoutTicketCreationMarker(original);
+
+    if (!original.trim())
+        return `<!-- lar-factory:spec -->\n${options?.format === 'html' ? trackerMarkdownHtml(spec) : spec}\n\n<!-- lar-factory:original -->\n<!-- lar-factory:end -->`;
+
     if (options?.format === 'html') {
         const authored = options.originalFormat === 'html' ? original : trackerMarkdownHtml(original);
 
@@ -30,6 +117,13 @@ export function formatTicketSpec(
 /** Markerless descriptions are whole Specs. Metadata is kept separately by the writer. */
 export function readTicketSpec(body: string): { marked: boolean; spec: string; original: string | null } {
     body = withoutSpecFreshness(body);
+
+    const emptyOriginal =
+        /^<!-- lar-factory:spec -->\n([\s\S]*)\n\n<!-- lar-factory:original -->\n<!-- lar-factory:end -->\s*$/.exec(
+            body,
+        );
+
+    if (emptyOriginal) return { marked: true, spec: emptyOriginal[1]!, original: '' };
 
     const match =
         /^<!-- lar-factory:spec -->\n([\s\S]*)\n\n<!-- lar-factory:original -->\n<details>\n<summary>Original<\/summary>\n\n([\s\S]*)\n\n<\/details>\n<!-- lar-factory:end -->\s*$/.exec(

@@ -1,4 +1,4 @@
-import { readTicketSpec } from '@lar-factory/shared';
+import { formatTicketSpec, readTicketSpec, stripTrackerStructure } from '@lar-factory/shared';
 import type { ReconcileItem } from '@lar-factory/shared/group-reconciliation';
 
 import { staleAnswerQuotes } from './answer-quotes.ts';
@@ -132,7 +132,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
                 );
 
             if (
-                (!gate.current || !review || gate.passing?.reviewDigest !== review.packageDigest) &&
+                (!gate.current || !review) &&
                 gate.evidence.some((e) => ['gate', 'user'].includes(e.source ?? 'gate')) &&
                 !r.finishedAt
             )
@@ -140,7 +140,7 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
                     'gate',
                     `gate:${id}`,
                     id,
-                    `${r.title}: approved gate is stale; rerun Doubt and request approval on the board.`,
+                    `${r.title}: refresh Doubt for the current package. Request board approval only if the approved content changed.`,
                     [
                         gate.briefDigest ?? '',
                         records.body(id, 'brief') ? records.doubtPackage(id).packageDigest : 'missing brief',
@@ -163,7 +163,16 @@ export function reconciliationChecks(records: WorkRecords, groupId: string): Che
             if (
                 spec.base &&
                 (spec.base.title !== r.title ||
-                    (gate.current && spec.active && readTicketSpec(spec.base.body).spec !== records.body(id, 'brief')))
+                    (gate.current &&
+                        spec.active &&
+                        readTicketSpec(stripTrackerStructure(spec.base.body)).spec.trimEnd() !==
+                            readTicketSpec(
+                                formatTicketSpec(
+                                    records.body(id, 'brief') ?? '',
+                                    '',
+                                    r.repository.split('/').length === 2 ? undefined : { format: 'html' },
+                                ),
+                            ).spec.trimEnd()))
             )
                 add(
                     'ticket',

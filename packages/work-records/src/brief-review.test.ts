@@ -317,3 +317,84 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
     expect(records.specState(api.workId).pending).toBe(approvedSpec);
     expect(() => records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Stale')).toThrow(/package changed/);
 });
+
+it('retains unchanged consumer approval only after fresh compatibility review, across reopening', async () => {
+    const { records, api, client, concept } = await fixture();
+    const id = client.workId;
+    const brief = `${records.body(id, 'brief')}\nConsumes: \`${api.workId}\`\nBlocked by: \`${api.workId}\``;
+
+    records.setBody(id, records.read(id).revision, 'brief', brief);
+
+    const reviewed = records.doubtPackage(id);
+
+    records.recordDoubt(id, reviewed.packageDigest, 'Doubt', 'Compatible.');
+
+    const approval = records.recordGate(id, records.read(id).revision, {
+        briefDigest: records.gate(id).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Board approval.',
+    });
+
+    records.setBody(
+        api.workId,
+        records.read(api.workId).revision,
+        'brief',
+        `${records.body(api.workId, 'brief')}\n## Done when\n- Descriptions stay under 60 characters.`,
+    );
+    expect(records.currentDoubt(id)).toBeNull();
+    expect(records.gate(id).current).toBe(false);
+    expect(() => records.recordLaunchIntent(id, records.read(id).revision, 'build')).toThrow(/affected-work review/);
+    expect(() => records.recordDoubt(id, reviewed.packageDigest, 'Doubt', 'Old package.')).toThrow(/package changed/);
+    records.recordDoubt(id, records.doubtPackage(id).packageDigest, 'Fresh Doubt', 'Under-60 contract is compatible.');
+    expect(records.gate(id)).toMatchObject({ current: true, passing: approval, evidence: [approval] });
+    expect(records.reconcile(concept.workId).items.map((item) => item.key)).not.toContain(`gate:${id}`);
+
+    const { dir } = opened.at(-1)!;
+    const reopened = await openWorkRecords(join(dir, 'records.db'));
+
+    opened.push({ records: reopened, dir });
+    expect(reopened.gate(id)).toMatchObject({ current: true, passing: approval });
+    reopened.setBody(id, reopened.read(id).revision, 'brief', brief.replace('Fetch /old-invite', 'Fetch /invite'));
+    reopened.recordDoubt(id, reopened.doubtPackage(id).packageDigest, 'Doubt', 'Changed consumer reviewed.');
+    expect(reopened.gate(id).current).toBe(false);
+    reopened.setBody(id, reopened.read(id).revision, 'brief', brief);
+    reopened.recordDoubt(id, reopened.doubtPackage(id).packageDigest, 'Doubt', 'Restored consumer reviewed.');
+    expect(reopened.gate(id).current).toBe(true);
+    reopened.invalidateGate(id, reopened.read(id).revision);
+    reopened.recordDoubt(id, reopened.doubtPackage(id).packageDigest, 'Doubt', 'Reshape reviewed.');
+    expect(reopened.gate(id).current).toBe(false);
+});
+
+it('requires renewed approval when the consumer Dependency contract changes despite identical brief bytes', async () => {
+    const { records, concept, client } = await fixture();
+    const dependency = records.addDependency(concept.workId, {
+        need: 'CORS',
+        owner: 'hosting',
+        contract: 'Allow client origin',
+    });
+
+    records.addDependencyBlock(dependency.dependencyId, dependency.revision, client.workId);
+    records.recordDoubt(client.workId, records.doubtPackage(client.workId).packageDigest, 'Doubt', 'Compatible.');
+    records.recordGate(client.workId, records.read(client.workId).revision, {
+        briefDigest: records.gate(client.workId).briefDigest!,
+        approvedBy: 'Pedro',
+        evidence: 'Yes.',
+    });
+
+    const briefDigest = records.gate(client.workId).briefDigest;
+
+    const added = records.addDependency(concept.workId, {
+        need: 'New required proof',
+        owner: 'hosting',
+        contract: 'Serve a new origin',
+    });
+
+    records.addDependencyBlock(added.dependencyId, added.revision, client.workId);
+    records.recordDoubt(
+        client.workId,
+        records.doubtPackage(client.workId).packageDigest,
+        'Doubt',
+        'New contract reviewed.',
+    );
+    expect(records.gate(client.workId)).toMatchObject({ briefDigest, current: false });
+});

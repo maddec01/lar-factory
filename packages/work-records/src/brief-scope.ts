@@ -109,7 +109,18 @@ export function parseBriefScope(value: unknown): BriefScope {
 export function scopeMarkdown(scope: BriefScope): string {
     const bullets = (values: string[]) => values.map((value) => `- ${value}`).join('\n');
 
-    return `## Done when\n### Behaviour\n${bullets(scope.behaviour)}\n### Tests\n${bullets(scope.tests)}\n\n## Scope\n### Size\n${scope.size ?? ''}\n### Excluded\n${bullets(scope.excluded)}\n\n## Verify\n${scope.verify.required ? `yes: ${scope.verify.visibleUi}` : 'no'}\n`;
+    const boundaries = [
+        ...(scope.size ? [`### Size\n${scope.size}`] : []),
+        ...(scope.excluded.length ? [`### Excluded\n${bullets(scope.excluded)}`] : []),
+    ];
+
+    return [
+        `## Done when\n### Behaviour\n${bullets(scope.behaviour)}`,
+        ...(scope.tests.length ? [`### Tests\n${bullets(scope.tests)}`] : []),
+        ...(boundaries.length ? [`\n## Scope\n${boundaries.join('\n')}`] : []),
+        ...(scope.verify.required ? [`\n## Verify\nyes: ${scope.verify.visibleUi}`] : []),
+        '',
+    ].join('\n');
 }
 
 export function briefScopeClaims(text: string): Map<string, string[]> {
@@ -155,6 +166,10 @@ export function checkBriefScope(scope: BriefScope, brief: string | null): ScopeC
 
     // Confirmed scope has no files, so older briefs naming Files still pass.
     actual.delete('scope.files');
+
+    // Older briefs spell out the negative decision; new briefs keep it in the scope record.
+    if (!scope.verify.required && actual.get('verify')?.length === 1 && actual.get('verify')?.[0] === 'no')
+        actual.delete('verify');
 
     // No stated boundary is different from a confirmed empty delivery.
     for (const [field, open] of [

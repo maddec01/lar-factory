@@ -76,8 +76,7 @@ function factoryEnvironment(context: FactoryThreadContext, shaping = false): str
             ? [
                   'Factory run contract: read shared/orchestration.md in the supplied factory skill before doing work; lar-work role-launch gives each role its frozen target and runtime.',
                   `Verify this thread with t3_thread_configure before work and hold on a model or option mismatch: ${JSON.stringify(run.thread)}`,
-                  frozenBuildMethodLine(run),
-                  frozenRetroLine(run),
+                  ...(run.kind === 'build' ? [frozenBuildMethodLine(run), frozenRetroLine(run)] : []),
               ]
             : []),
         '<!-- factory-runtime:end -->',
@@ -146,6 +145,18 @@ export function earlierBuildMessage(item: Item, context: FactoryThreadContext): 
 /** Start build's message. Line 1, which T3 titles the thread from, is `Build` and the item's name in a sentence; then come the build's work ID and the builder agent of the lar-build whose entry the context names. */
 export function buildMessage(item: Item, context: FactoryThreadContext): string {
     return `Build ${itemName(item)}\n${earlierBuildMessage(item, context)}`;
+}
+
+/** Agent input only. The launch record retains the gate and scheduler evidence enforced by the server. */
+export function frozenBuildInputMessage(input: {
+    context?: string;
+    brief: string;
+    revision: number;
+    blockers: Record<string, number>;
+}): string {
+    const { context, brief, revision, blockers } = input;
+
+    return `Use this frozen, approved build input for this launch. If current scope changes, hold for a new gate; do not silently substitute another brief.\n${JSON.stringify({ context, brief, revision, blockers })}`;
 }
 
 /** The board's second runtime block before runs recorded their launches. */

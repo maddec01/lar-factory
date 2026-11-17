@@ -59,10 +59,11 @@ _Avoid_: trash, deleted items.
 
 **Spec**:
 The refined brief as it appears as a ticket's main description after shaping. Its Confirmed section holds product decisions only and is omitted when empty. The final brief gate is its approval; settled work can take its scope from the submitted request, including each repository's named role in a linked outcome, without a separate confirmation question. Repository involvement left open by the request still needs an answer.
+Linked-work graph and consumption declarations remain in the local brief, outside the published prose.
 _Avoid_: refined ticket.
 
 **Original**:
-The text a ticket had before its first Spec, kept collapsed in the ticket.
+The authored text a ticket had before its first Spec, kept collapsed in the ticket when nonempty. Temporary creation metadata is excluded.
 _Avoid_: initial ticket.
 
 **Slice**:

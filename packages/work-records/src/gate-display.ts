@@ -9,6 +9,7 @@ export interface GateDisplay {
     briefDigest: string;
     approvalDigest: string;
     reviewDigest?: string;
+    previousBrief?: string;
 }
 export interface GateApproval {
     batchDigest?: string;

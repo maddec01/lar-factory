@@ -23,7 +23,10 @@ and unaffected approvals. Ungated scope stays local; the last approved ticket
 Spec stays visibly out of date until re-gated.
 
 After source edits, run `doubt-package`, then rerun Doubt and [Gate](../gate.md)
-for affected briefs needing approval. Stop for Pedro's board approval, without a generic Needs you duplicate;
+for affected briefs. A compatible producer amendment retains a consumer's approval only when its own
+approved inputs are unchanged and fresh clean Doubt is recorded. Read `gate.current` after the review;
+continue when true. Changed approved content needs a new board approval with the changed passage shown.
+Stop for required board approval, without a generic Needs you duplicate;
 then resume reconciliation.
 
 Use `sync-blockers` for declarations. For stale current-answer/map sources, use

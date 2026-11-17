@@ -351,3 +351,31 @@ test('a linked parent keeps batch digests folded and approves the batch it reque
     expect(inspections()).toHaveLength(1);
     expect(text(dialog)).not.toContain('Fetching the brief to approve.');
 });
+
+test('a renewed consumer approval shows the changed passage beside its complete brief', async () => {
+    const unbuilt = { ...item, buildPhase: null, briefReviewing: undefined, briefDoubtHold: undefined };
+    const unbuiltBoard = fresh({ ...sample, items: [unbuilt] });
+    const brief = '## What\nUse the new label contract.\n## Verify\nno';
+    const previousBrief = brief.replace('new label contract', 'original label contract');
+
+    answerReads(unbuiltBoard, brief, () => ({
+        approval: {
+            ...approval,
+            briefs: [{ ...approval.briefs[0]!, brief, previousBrief }],
+        },
+    }));
+    await mountPage(unbuiltBoard);
+
+    const { useItemDialogStore } = await import('./ItemDialogStore');
+
+    await settle(() => useItemDialogStore.getState().open(item.id));
+
+    const dialog = $('[data-item-dialog]')!;
+
+    expect(text(dialog)).toContain('Changes since your approval');
+    expect(text(dialog)).toContain('Previously');
+    expect(text(dialog)).toContain('Use the original label contract.');
+    expect(text(dialog)).toContain('Now');
+    expect(text(dialog)).toContain('Use the new label contract.');
+    expect(buttons(dialog, 'Approve brief')[0]!.disabled).toBe(false);
+});

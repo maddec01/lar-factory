@@ -12,8 +12,10 @@ requests, all records, map and blockers commit together. Provider failures retai
 requests: retry `sync-part-tickets PARENT`. Ordinary captures stay in List;
 new parts are Queued for shaping, changed drafts are Shaping until their gate.
 
-Declare `Blocked by:` with backtick unique work titles or `none` in each brief.
-Keep work IDs in local map declarations. Settings supply build ticket requests.
+Declare nonempty `Blocked by:` with backtick unique work titles in the brief.
+For no blockers, omit that line and save ``Blocker: `consumer ID` <- none``
+in the owning map, using the standalone work's own map when it has no parent.
+Keep work IDs and empty declarations in local maps. Settings supply build ticket requests.
 `lar-work sync-blockers PARENT --file F` derives the graph; F is
 `{revisions:{ID:N}}` for the parent, declared members and edge endpoints.
 Declare consuming work with `Consumes:` and the contract's owner with `Produces:`
@@ -22,6 +24,9 @@ Declare consuming work with `Consumes:` and the contract's owner with `Produces:
 `sync-blockers` also derives cited output prerequisites; ambiguous sources hold.
 An independent consumer records ``No ordering needed: `reference`: reason`` in its brief.
 Normalize legacy declarations; never edit delivery edges by hand. Use Dependencies for other teams.
+These declarations stay in the local brief, where graph and consumption readers
+can parse them. Spec publication omits them; reading tracker prose edits back
+retains the local declarations. Describe compatibility requirements in team prose.
 
 Private implementation slices use `slice.sh` without `--kind` or `--repository`;
 they stay in their build's repository and never become delivery parts.

@@ -36,7 +36,8 @@ Check every category:
 - Provider writes: reject progress in ticket bodies, comments, labels, tags or
   Azure State. Only issue creation and whole gated Specs with Original follow
   saved settings and verified Access; structural publication remains suspended.
-- Domain docs: OFF requires "none" and no drafts. ON requires each used term to
+- Domain docs: OFF requires no drafts and an omitted Domain docs section; accept
+  legacy "none" sections. ON requires each used term to
   match existing language or be drafted with a canonical name, avoided synonyms
   and a one- or two-sentence project definition, without implementation details.
   ADRs state context, decision and reason and must be hard to reverse, surprising

@@ -19,7 +19,8 @@ and decision threads draft in work records, leaving the checkout unchanged.
 Save a decision's `domain-drafts` with `set-body`, then include them in the
 brief/map's Domain docs. Build writes them in its PR. Origin citations use a
 published ticket or the build PR, never a work ID or local path. With docs OFF,
-Domain docs and domain-drafts say "none"; create no drafts or files.
+omit Domain docs from briefs/maps and keep "none" in decision domain-drafts;
+create no drafts or files. Omit empty Domain docs sections with docs ON too.
 
 Glossaries define project language, not implementation details, specs or notes.
 Draft an ADR only for a decision that is hard to reverse, surprising without

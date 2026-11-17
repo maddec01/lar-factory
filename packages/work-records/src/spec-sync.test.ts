@@ -1,10 +1,13 @@
-import { formatTicketSpec, readTicketSpec, type RepositorySetup } from '@lar-factory/shared';
+import { briefProse, formatTicketSpec, readTicketSpec, type RepositorySetup } from '@lar-factory/shared';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 
+import { blockerDeclarations } from './blocker-declarations.ts';
+import { consumptionTests } from './consumption-tests.ts';
+import { contractReferences } from './contract-references.ts';
 import { refreshSpecs, resolveSpecEdit, syncSpecs } from './spec-sync.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -85,6 +88,60 @@ async function fixture(repository = setup.repo) {
         },
     };
 }
+
+test.each(['example/widget'])(
+    'a %s Spec prose edit retains parseable local consumption and blocker declarations',
+    async (repository) => {
+        const f = await fixture(repository);
+        const producer = f.records.create({ title: 'Producer', repository, kind: 'build' });
+        const consumer = f.records.create({ title: 'Consumer', repository, kind: 'build' });
+        const contract = {
+            source: 'Producer',
+            test: 'view.test.js: renderer accepts producer output',
+            output: 'producer fixture',
+            input: 'render(output)',
+        };
+        const declarations = `Blocked by: \`Producer\`\nConsumes: \`Producer\`\nContracts: \`Shared output\`\nConsumption test: ${JSON.stringify(contract)}`;
+
+        f.records.setBody(
+            f.record.workId,
+            f.record.revision,
+            'brief',
+            `## What\nBuild it.\n\n## Scope\n### Size\nSmall\n\n${declarations}`,
+        );
+        f.records.recordGate(f.record.workId, f.records.read(f.record.workId).revision, {
+            briefDigest: f.records.gate(f.record.workId).briefDigest!,
+            approvedBy: 'user',
+            evidence: 'Passed',
+        });
+
+        const options = { provider: f.provider, setups: [{ ...setup, repo: repository }] };
+
+        await syncSpecs(f.records, options);
+        expect(f.remote().body).not.toContain('Consumption test:');
+        expect(f.remote().body).not.toContain('### Size');
+        f.edit({
+            body: formatTicketSpec(
+                '## What\nBuild the revised renderer.',
+                'Authored request.',
+                repository === setup.repo ? undefined : { format: 'html' },
+            ),
+            version: '3',
+        });
+        await refreshSpecs(f.records, options);
+
+        const brief = f.records.body(f.record.workId, 'brief')!;
+
+        expect(brief).toContain('Build the revised renderer.');
+        expect(brief).toContain('### Size\nSmall');
+        expect(consumptionTests(brief)).toEqual([contract]);
+        expect(contractReferences(brief, [{ workId: producer.workId, title: producer.title, brief: '' }])).toEqual([
+            producer.workId,
+        ]);
+        f.records.setBody(consumer.workId, consumer.revision, 'brief', brief);
+        expect(blockerDeclarations(f.records, consumer.workId).get(consumer.workId)).toEqual([producer.workId]);
+    },
+);
 
 test('a failed gated Spec survives reopening and retries without moving Ready or losing Original', async () => {
     const f = await fixture();
@@ -507,7 +564,7 @@ test('S05-F2-002: generated dependency status supersedes legacy prose without ch
     expect(f.remote().body).toContain('Met by Pedro');
     expect(f.remote().body).toContain('Corrected proof verified');
     expect(f.remote().body).toContain('superseded');
-    expect(readTicketSpec(f.remote().body).spec).toBe(brief);
+    expect(readTicketSpec(f.remote().body).spec).toBe(briefProse(brief));
     expect(f.records.body(id, 'brief')).toBe(brief);
     expect(f.records.displayGate(id).approvalDigest).toBe(approval);
     expect(f.records.gate(id)).toMatchObject({ current: true, briefDigest: before.briefDigest });
@@ -517,3 +574,33 @@ test('S05-F2-002: generated dependency status supersedes legacy prose without ch
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     expect(f.remote().body).toContain('Unmet');
 });
+
+test.each(['example/widget', 'example/Project/widget'])(
+    'reconciliation compares the published %s Spec projection and still detects product drift',
+    async (repository) => {
+        const f = await fixture(repository);
+        const id = f.record.workId;
+        const brief =
+            '## What\nBuild it.\n## Scope\n### Size\nSmall\n### Excluded\n- Hosting\n## Notes for the builder\nUse the existing renderer.\nBlocked by: none\nContracts: `labels`\nConsumption test: {"source":"Producer","test":"renderer.test.js","input":"render(output)","output":"fixture"}';
+
+        f.records.setBody(id, f.records.read(id).revision, 'brief', brief);
+        f.records.recordGate(id, f.records.read(id).revision, {
+            briefDigest: f.records.gate(id).briefDigest!,
+            approvedBy: 'Pedro',
+            evidence: 'Yes.',
+        });
+        await syncSpecs(f.records, { provider: f.provider, setups: [{ ...setup, repo: repository }] });
+        expect(f.records.specState(id)).toMatchObject({ active: true, pending: null, error: null });
+        expect(f.records.reconcile(id).items.map((i) => i.key)).not.toContain(`projection:${id}`);
+
+        const state = f.records.specState(id);
+
+        f.records.saveSpecState(id, state.generation, {
+            ...state,
+            base: { ...state.base!, body: state.base!.body.replace('Build it.', 'Build something else.') },
+        });
+        expect(f.records.reconcile(id).items).toContainEqual(
+            expect.objectContaining({ key: `projection:${id}`, requiresFix: true }),
+        );
+    },
+);

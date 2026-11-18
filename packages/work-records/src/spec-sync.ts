@@ -94,7 +94,13 @@ function save(
     return records.saveSpecState(workId, state.generation, state, update);
 }
 
-const reading = new WeakMap<WorkRecords, Map<string, Promise<StructureTicket | null>>>();
+/** A Spec read in flight, and the ticket it read, which a caller sharing the read may use though the Spec isn't taken. */
+interface SpecRead {
+    task: Promise<StructureTicket | null>;
+    read?: StructureTicket;
+}
+
+const reading = new WeakMap<WorkRecords, Map<string, SpecRead>>();
 let activeReads = 0;
 const waitingReads: (() => void)[] = [];
 
@@ -115,12 +121,15 @@ async function limitedRead(read: () => Promise<StructureTicket>): Promise<Struct
     }
 }
 
-function readOne(
+const readOne = (records: WorkRecords, workId: string, options: SpecSyncOptions, provider: StructureProvider) =>
+    specRead(records, workId, options, provider).task;
+
+function specRead(
     records: WorkRecords,
     workId: string,
     options: SpecSyncOptions,
     provider: StructureProvider,
-): Promise<StructureTicket | null> {
+): SpecRead {
     let reads = reading.get(records);
 
     if (!reads) {
@@ -134,11 +143,14 @@ function readOne(
 
     if (prior) return prior;
 
-    const task = readFresh(records, workId, options, provider).finally(() => reads.delete(key));
+    const entry: SpecRead = { task: Promise.resolve(null) };
 
-    reads.set(key, task);
+    entry.task = readFresh(records, workId, options, provider, (ticket) => {
+        entry.read = ticket;
+    }).finally(() => reads.delete(key));
+    reads.set(key, entry);
 
-    return task;
+    return entry;
 }
 
 async function readFresh(
@@ -146,6 +158,7 @@ async function readFresh(
     workId: string,
     options: SpecSyncOptions,
     provider: StructureProvider,
+    readTicket: (ticket: StructureTicket) => void,
 ): Promise<StructureTicket | null> {
     const record = records.read(workId);
 
@@ -171,6 +184,9 @@ async function readFresh(
                 before.held ?? before.base ?? undefined,
             ),
         );
+
+        readTicket(ticket);
+
         const remote = checkpoint(ticket);
 
         if (records.specState(workId).generation !== before.generation) return null;
@@ -354,8 +370,11 @@ async function readFresh(
     }
 }
 
-/** Reread before later gates/builds, and during board ticket refreshes. A failed read keeps the last copy. */
-export async function refreshSpecs(records: WorkRecords, options: SpecSyncOptions = {}): Promise<void> {
+/**
+ * Reread before later gates/builds, and during board ticket refreshes. A failed read keeps the last copy. Returns the
+ * tickets read, which a caller can use instead of reading them again.
+ */
+export async function refreshSpecs(records: WorkRecords, options: SpecSyncOptions = {}): Promise<StructureTicket[]> {
     const provider = options.provider ?? structureProvider();
     const workIds = options.workId
         ? [options.workId]
@@ -370,7 +389,11 @@ export async function refreshSpecs(records: WorkRecords, options: SpecSyncOption
               .map((record) => record.workId));
 
     // Each read commits against its starting generation. Writes retain their cross-process lease.
-    await Promise.all(workIds.map((workId) => readOne(records, workId, options, provider)));
+    const reads = workIds.map((workId) => specRead(records, workId, options, provider));
+
+    await Promise.all(reads.map((read) => read.task));
+
+    return reads.flatMap((read) => (read.read ? [read.read] : []));
 }
 
 const running = new WeakMap<WorkRecords, Promise<void>>();

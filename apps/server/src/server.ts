@@ -51,7 +51,7 @@ import {
 } from './config/repository-config.ts';
 import { changeRepositoryLabels } from './config/repository-labels.ts';
 import { changeRepositorySettings, readOnboardedConfigs } from './config/repository-settings.ts';
-import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
+import { editPrBody, ghCooldown, ghQuotaLow, issueObservation, observeIssue, readPrBody } from './github/github.ts';
 import { prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemDetails } from './item-details/item-details.ts';
@@ -1374,18 +1374,30 @@ async function observeProviders(): Promise<void> {
         // While gh's quota runs low, GitHub repositories' reads wait and their records and Dependencies keep their last
         // observation; az reads go on. A GitHub ticket reads through gh whether or not its repository is onboarded, as a
         // Dependency's owner may not be.
-        await refreshSpecs(records, {
+        const specs = await refreshSpecs(records, {
             workIds: records
                 .list({})
                 .filter((record) => !quotaLow || onAzure(record.repository))
                 .map((record) => record.workId),
         });
+        // A GitHub Spec read just read the whole issue, so its record's observation needs no read of its own.
+        const specIssues = new Map(
+            specs.flatMap((ticket) =>
+                ticket.issue ? [[refKey(ticket.repository, ticket.number).toLowerCase(), ticket.issue] as const] : [],
+            ),
+        );
+
         await observeRecords(
             records,
             quotaLow ? repos.filter(onAzure) : repos,
             {
-                ticket: (repo, number) =>
-                    onAzure(repo) ? items.observeTicket(repo, number) : observeIssue(repo, number),
+                ticket: async (repo, number) => {
+                    const issue = specIssues.get(refKey(repo, number).toLowerCase());
+
+                    if (issue) return issueObservation(issue);
+
+                    return onAzure(repo) ? items.observeTicket(repo, number) : observeIssue(repo, number);
+                },
                 pr: (repo, number) => observePr(repo, number),
                 known: (repo, number) => knownTicket(repo, number),
                 waits: (repo) => quotaLow && !onAzure(repo),

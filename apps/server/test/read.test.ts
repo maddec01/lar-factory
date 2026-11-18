@@ -1,6 +1,7 @@
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { WorkRecordError } from '@lar-factory/work-records';
+import { openWorkRecords, WorkRecordError, workRecordsPath } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { test } from 'vite-plus/test';
 
 import { changeRecords, startBoard, until } from './server-support.ts';
@@ -88,4 +89,30 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
         ['ids[]=I_1', 'ids[]=I_3'],
         'it asks for the concept and the parent only',
     );
+});
+
+test("a provider pass reads each record's ticket once: its Spec read also gives the ticket's state and assignees", async (t) => {
+    // A board process on the fast cadence, since only a running board runs provider passes.
+    const board = await startBoard(
+        t,
+        { items: [boardIssue(12, 'Ready', 'maddec01/lar-factory', ['build'])] },
+        false,
+        true,
+    );
+    const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
+    t.onTestFinished(() => records.close());
+
+    while (!records.observations(board.id(12)).some((o) => o.of === 'ticket')) await sleep(20);
+
+    const reads = (await board.calls()).filter((args) =>
+        args.some((arg) => arg === 'repos/maddec01/lar-factory/issues/12' || arg === '12'),
+    );
+
+    assert.ok(reads.length > 0);
+    assert.deepEqual(
+        new Set(reads.map((args) => args.slice(0, 2).join(' '))),
+        new Set(['api repos/maddec01/lar-factory/issues/12']),
+    );
+    assert.equal(records.observations(board.id(12)).find((o) => o.of === 'ticket')?.state, 'open');
 });

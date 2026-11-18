@@ -37,6 +37,8 @@ export interface StructureTicket {
     bodyField?: 'System.Description' | 'Microsoft.VSTS.TCM.ReproSteps';
     editorWrite?: boolean;
     titleEditorWrite?: boolean;
+    /** A GitHub Spec read's issue state and assignees, which tell the board what the ticket shows without reading it again. */
+    issue?: { state: string; assignees: { login: string }[] };
 }
 export interface StructureProvider {
     readSpec?: (
@@ -340,7 +342,11 @@ export function structureProvider(): StructureProvider {
         }
 
         // Read the issue's own body, never the structure metadata projected from comments.
-        const ticket = asTicket(repository, await github(`repos/${repository}/issues/${number}`));
+        const raw = await github(`repos/${repository}/issues/${number}`);
+        const ticket: StructureTicket = {
+            ...asTicket(repository, raw),
+            issue: { state: String(raw.state), assignees: (raw.assignees as { login: string }[] | undefined) ?? [] },
+        };
 
         if (previous && ticket.body === previous.body && ticket.title === previous.title) return ticket;
 

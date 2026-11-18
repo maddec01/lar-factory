@@ -202,3 +202,80 @@ test('the request-free owner and its resolved notice are published together, inc
     expect(resolved.needsYou).toBeUndefined();
     expect(placementOf(resolved, { unavailable: false, all: [resolved] }).sections).not.toContain('desk');
 });
+
+test('an attempt found abandoned is reread only after its owner changes, recovering a late result', async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'ended-attempt-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    t.onTestFinished(() => {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    const { workId } = records.create({ title: 'Greeting', repository: 'fake/c', kind: 'build', status: 'Review' });
+    const rev = () => records.read(workId).revision;
+
+    records.addThread(workId, rev(), 'owner', 'build');
+    records.snapshotRun(workId, rev(), {
+        runId: 'build',
+        kind: 'build',
+        threadSelection: { instanceId: 'codex', model: 'gpt-6.1-sol', options: [] },
+        skills: [],
+        packaged: {
+            version: 'test',
+            reviewers: { code: 'Code', security: 'Security', ui: 'UI', performance: 'Performance' },
+        },
+    });
+    records.startRoleRun(workId, rev(), {
+        runId: 'build',
+        executionId: 'attempt',
+        role: 'approver',
+        launchOptions: [],
+    });
+
+    const item = recordItems(records, [], ['fake/c'])[0]!;
+
+    item.threads = [
+        { id: 'owner', purpose: 'build', title: 'Owner', state: 'done', updated: new Date().toISOString() },
+    ];
+
+    const selection = { instanceId: 'codex', model: 'gpt-6.1-sol', options: [] };
+    const taskId = 'node:delegated-task:command%3Amcp%3Afixture%3Adelegate-task%3Aattempt';
+    let subagents: unknown[] = [];
+    const read = vi.fn(async (id: string) =>
+        id === 'owner'
+            ? { thread: { id }, runs: [{ status: 'completed' }], subagents }
+            : { thread: { id }, runs: [{ status: 'completed', modelSelection: selection }], subagents: [] },
+    );
+
+    await reconcileOwnerActivity(records, item, read);
+    expect(records.runSettings(workId).roleRuns[0]).toMatchObject({ result: 'failed', inferredAbandonment: true });
+
+    read.mockClear();
+    await reconcileOwnerActivity(records, item, read);
+    expect(read).not.toHaveBeenCalled();
+
+    // The role's result lands in T3 later, and the owner thread's update reveals it.
+    subagents = [
+        {
+            id: taskId,
+            threadId: 'owner',
+            origin: 'app_owned',
+            childThreadId: 'child',
+            status: 'completed',
+            result: 'Approved.',
+        },
+    ];
+    item.threads[0]!.updated = new Date(Date.now() + 1000).toISOString();
+    // A read that fails is not taken as settled: the next pass reads again with the owner unchanged.
+    read.mockRejectedValueOnce(new Error('T3 unavailable'));
+    await reconcileOwnerActivity(records, item, read);
+    expect(records.runSettings(workId).roleRuns[0]).toMatchObject({ result: 'failed', inferredAbandonment: true });
+    await reconcileOwnerActivity(records, item, read);
+    expect(records.runSettings(workId).roleRuns[0]).toMatchObject({
+        result: 'completed',
+        inferredAbandonment: false,
+        summary: 'Approved.',
+        report: { reference: taskId },
+    });
+});

@@ -21,16 +21,25 @@ gates, Reshape and unresolved choices still follow the board approval below.
    Review declared Contracts and semantic conflicts with other concepts and
    standalone work. Record blockers in brief/map declarations and run
    `sync-blockers` on the parent or standalone ID.
-   Run `lar-work doubt-package <work ID>` after those edits. A **Doubt subagent**
-   gets that exact package, repository paths, resolved domain-doc setting/paths,
-   [Doubt](doubt.md) and the orchestration guide's **Wait for delegated work**, no conversation.
+   Run `lar-work doubt-package <work ID>` after those edits and keep its output
+   in this thread. A **Doubt subagent** gets that exact package, repository
+   paths, resolved domain-doc setting/paths, [Doubt](doubt.md) and the
+   orchestration guide's **Wait for delegated work**, no conversation. After a
+   round with findings, add those findings and the brief's `diff -u` since that
+   package, but only when the package changed solely through edits and answers
+   for them; anything else (first round, related merge, other scope change,
+   findings not in this thread) gets a full review.
    Grouped review follows the guide's **Run contract**: launch and finish on the
-   shaping run owner; keep each reviewed work ID and package distinct in the task
-   and record a clean result for each on its own work ID below.
-   Fix findings within the destination; ask for scope changes. Every amendment
-   ends here: rerun Doubt after edits before ending the turn.
-   Record its clean result with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>"`.
-3. Ask unresolved assumptions and findings through [Questions](shared/questions.md).
+   shaping run owner; keep each work ID's package, findings and diff distinct,
+   choose recheck or full review per work ID, and record a clean result for each
+   on its own work ID below.
+3. Make every `Fix:` edit yourself. Ask the round's `Decision:` findings, and
+   only those, as one batch through [Questions](shared/questions.md); a scope
+   change is a decision. Every amendment ends here: rerun Doubt before ending the
+   turn unless waiting for answers. Rounds have no limit. Record the clean result
+   for the exact final package with `lar-work record-doubt <work ID> --digest <packageDigest> --identity <Doubt identity> --evidence "<result and code evidence>"`.
+   A shaping [handoff](shared/handoff.md) copies open findings and the last
+   reviewed package verbatim.
 4. After the final edit, require `lar-work brief-scope-check <work ID>` to pass, then run `lar-work gate <work ID>` again.
    When only a producer contract changed, fresh clean Doubt can retain the consumer's approval
    if its own approved inputs are unchanged. If `gate.current` is true, continue without asking again.

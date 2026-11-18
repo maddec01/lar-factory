@@ -42,7 +42,8 @@ add detail only when it changes what a reviewer must accept.
 State the simplest safe engineering defaults chosen during shaping in Notes for
 the builder, including storage/error behaviour when relevant. These are constraints
 the final brief approval covers, not product answers for Confirmed. Keep them
-short and add no unrequested notices or warnings.
+short and add no unrequested notices or warnings. Leave other mechanics the
+code shows to the builder.
 
 Set `verify.required` only when acceptance needs Pedro's own judgment or access
 the agent lacks; name that need in `visibleUi` (the stored field name). An ordinary

@@ -5,9 +5,9 @@ const { dirname } = require('node:path');
 const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 
-options.delayedRepos ??= (
-    options.repositories ?? ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory']
-).filter((repo) => !(repo in (options.repoIssues ?? {})));
+options.delayedRepos ??= (options.repositories ?? ['acme/api', 'acme/ios', 'maddec01/lar-factory']).filter(
+    (repo) => !(repo in (options.repoIssues ?? {})),
+);
 for (const { content } of options.items ?? []) {
     if (!content || content.__typename !== 'Issue') continue;
 

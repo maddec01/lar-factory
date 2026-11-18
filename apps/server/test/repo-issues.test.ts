@@ -7,20 +7,20 @@ import { test } from 'vite-plus/test';
 import { startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
-const APPLE = 'maddec01/lar-apple';
+const APPLE = 'acme/ios';
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
-/** A lar-apple issue as the repository issues query returns it. */
+/** A ios issue as the repository issues query returns it. */
 const appleIssue = (number: number, extra: object = {}) => ({
     ...boardIssue(number, 'List', APPLE).content!,
     ...extra,
 });
 
-/** lar-apple's .lar-factory.json naming its issues, for the fake gh. */
+/** ios's .lar-factory.json naming its issues, for the fake gh. */
 const localSetups = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
 
-/** A lar-apple issue closed as completed `days` ago. */
+/** A ios issue closed as completed `days` ago. */
 const closedIssue = (number: number, days: number, extra: object = {}) =>
     appleIssue(number, {
         state: 'CLOSED',
@@ -30,7 +30,7 @@ const closedIssue = (number: number, days: number, extra: object = {}) =>
         ...extra,
     });
 
-/** A lar-apple issue as a parent or sub-issue reference. */
+/** A ios issue as a parent or sub-issue reference. */
 const appleRef = (number: number, state: 'OPEN' | 'CLOSED') => ({
     ...sliceRef(number, state),
     url: `https://github.com/${APPLE}/issues/${number}`,

@@ -8,7 +8,7 @@ import { test } from 'vite-plus/test';
 
 import { startBoard, until } from './server-support.ts';
 
-const repo = 'lar-factory-sample/lar-server';
+const repo = 'lar-factory-sample/api';
 const tree = (dir: string) =>
     Object.fromEntries(
         readdirSync(dir, { recursive: true, encoding: 'utf8' }).flatMap((name) => {
@@ -153,7 +153,7 @@ test('sample fake writes and failures stay isolated', async (t) => {
         assert.equal(response.status, 403, path);
     }
     await post('/api/repositories/settings', { repo, change: 'recheck' }, 403);
-    for (const real of ['maddec01/lar-server', 'lar-factory-sample/unknown']) {
+    for (const real of ['acme/api', 'lar-factory-sample/unknown']) {
         await post('/api/repositories/labels', { repo: real, change: 'create', name: 'unsafe' }, 403);
         await post('/api/items', { ...request, requestId: randomUUID(), draft: { ...request.draft, repo: real } }, 422);
     }

@@ -3,7 +3,7 @@ import { expect, test } from 'vite-plus/test';
 
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 
 function azure(items: WorkItem[], tags: string[] = [], fail?: (args: string[]) => Error | undefined) {
     const az = fakeAz({ items, tags, ...(fail && { fail }) });

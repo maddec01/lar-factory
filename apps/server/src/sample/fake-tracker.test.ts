@@ -5,7 +5,7 @@ import { test } from 'vite-plus/test';
 import { fakeItemSource } from './fake-item-source.ts';
 import { createFakeTracker } from './fake-tracker.ts';
 
-const REPO = 'lar-factory-sample/lar-server';
+const REPO = 'lar-factory-sample/api';
 const create = () => createFakeTracker({ mode: 'sample' });
 const draft = (identity: string) => ({
     identity,
@@ -57,7 +57,7 @@ test('every repository entry point fails closed, including relationship targets 
 
     assert.throws(() => createFakeTracker({ mode: 'live' as 'sample' }), /local sample/);
 
-    for (const repo of ['maddec01/lar-server', 'LAR-FACTORY-SAMPLE/lar-server']) {
+    for (const repo of ['acme/api', 'LAR-FACTORY-SAMPLE/api']) {
         const denied = { repo, number: 200 };
         const actions = [
             () => tracker.labels(repo),

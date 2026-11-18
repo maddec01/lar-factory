@@ -239,7 +239,7 @@ export function fakeAz({
             return JSON.stringify({
                 mergeStatus: 'succeeded',
                 ...pr,
-                repository: { name: 'lar-api', webUrl: REPO_URL },
+                repository: { name: 'api', webUrl: REPO_URL },
             });
         }
 
@@ -492,8 +492,8 @@ interface FakeChange {
     content?: string;
 }
 
-/** The fake repository's web URL, as az prints it for contoso/Fabrikam%20Fiber/lar-api. */
-export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api';
+/** The fake repository's web URL, as az prints it for contoso/Fabrikam%20Fiber/api. */
+export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/api';
 
 /**
  * A fake az for one Azure Repos repository whose default branch, `defaultBranch` or main, is at abc123 and holds `files`,
@@ -533,7 +533,7 @@ export function fakeAzRepos({
     const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
     const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
     const show = (pr: FakePr) =>
-        JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
+        JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'api', webUrl: REPO_URL } });
     const byId = (args: string[]) => {
         const pr = prs.find((p) => p.pullRequestId === Number(flag(args, '--id')));
 
@@ -688,7 +688,7 @@ export function fakeAzRepos({
         if (command === 'repos show --repository') {
             return JSON.stringify({
                 id: 'repo-1',
-                name: 'lar-api',
+                name: 'api',
                 defaultBranch: `refs/heads/${defaultBranch}`,
                 webUrl: REPO_URL,
                 project: { id: 'project-1', name: 'Fabrikam Fiber' },

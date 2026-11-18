@@ -35,9 +35,9 @@ const LEFT_OUT = new Set([
     'azure:contoso/6842',
 ]);
 
-const SERVER = 'maddec01/lar-server';
-const APPLE = 'maddec01/lar-apple';
-const PLATFORM = 'maddec01/lar-platform';
+const SERVER = 'acme/api';
+const APPLE = 'acme/ios';
+const PLATFORM = 'acme/platform';
 const MOBILE = 'contoso/Mobile%20App/mobile-app';
 const AZURE = 'https://dev.azure.com/contoso/Mobile%20App';
 
@@ -150,7 +150,7 @@ export function withScenarios(fixture: BoardData, now = Date.now()): BoardData {
         updatedAt: '2026-11-05T09:00:00.000Z',
     });
     local('0c0a0000-0000-4000-8000-000000000002', {
-        title: 'Health endpoint for the household registry',
+        title: 'Health endpoint for the workspace registry',
         kind: 'build',
         deliveryKind: 'feature',
         repo: PLATFORM,
@@ -250,7 +250,7 @@ export function withScenarios(fixture: BoardData, now = Date.now()): BoardData {
         updatedAt: minuteAgo,
         threads: [
             ...threadsOf(owners),
-            ...running('sample-thread-140-build', 'Build: owner accounts', 'Edit server/sessions.ts'),
+            ...running('sample-thread-140-build', 'Build: team accounts', 'Edit server/sessions.ts'),
         ],
     } as Partial<Item>);
     items.push({
@@ -258,7 +258,7 @@ export function withScenarios(fixture: BoardData, now = Date.now()): BoardData {
         id: 'I_sample13b',
         number: 141,
         url: `https://github.com/${SERVER}/issues/141`,
-        title: 'Discovery service that finds a household server on the local network',
+        title: 'Discovery service that finds a workspace server on the local network',
         slices: [],
         buildPhase: 'checks',
         threads: running('sample-thread-141', 'Build: discovery service', 'Run pnpm test'),

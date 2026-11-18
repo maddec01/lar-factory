@@ -30,7 +30,7 @@ Contracts: `accepted greeting text`
 Consumes: `Consume the v1 greeting envelope in B · S05 round 2 final repeat 4`
 Blocked by: `Consume the v1 greeting envelope in B · S05 round 2 final repeat 4`
 
-The consumer is maddec01/lar-factory-sim-891-s05-b#16. The static fixture uses an accepted greeting fixture. The parent's release plan owns combined sandbox activation and Outcome checks.
+The consumer is acme/sim-891-s05-b#16. The static fixture uses an accepted greeting fixture. The parent's release plan owns combined sandbox activation and Outcome checks.
 
 ## Domain docs
 none

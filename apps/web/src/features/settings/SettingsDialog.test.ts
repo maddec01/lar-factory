@@ -35,7 +35,7 @@ const button = (within: Element | null, label: string) =>
     [...(within?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => text(b) === label);
 
 test('a folder typed for a new T3 project is a draft Back asks about first', async () => {
-    serve(sample, [project('lar-web')]);
+    serve(sample, [project('web')]);
     await open('Projects');
     await settle(() => button(body(), 'Add project')!.click());
     await settle(() => pane()!.querySelector<HTMLInputElement>('[data-choice="new"] input[type="radio"]')!.click());

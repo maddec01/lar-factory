@@ -100,12 +100,12 @@ describe('lar-work', { timeout: 30_000 }, () => {
             '--title',
             'Work',
             '--repository',
-            'maddec01/lar',
+            'acme/core',
             '--kind',
             'feature',
         );
 
-        expect(created).toMatchObject({ code: 0, record: { repository: 'maddec01/lar', status: 'List', revision: 1 } });
+        expect(created).toMatchObject({ code: 0, record: { repository: 'acme/core', status: 'List', revision: 1 } });
 
         const { workId } = created.record;
 

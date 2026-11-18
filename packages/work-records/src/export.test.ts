@@ -28,8 +28,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const lar = (records: WorkRecords, kind: WorkKind) =>
-    records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'acme/core', kind });
 
 describe('markdown export', () => {
     it("writes a concept's map and its decisions with safe names for titles holding slashes and dots", async () => {

@@ -18,7 +18,7 @@ test(
         const home = mkdtempSync(join(tmpdir(), 'lar-boundary-home-'));
 
         t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-        checkouts(home, { 'lar-web': origin });
+        checkouts(home, { web: origin });
 
         const dir = join(home, 'Library/Application Support/Lar Factory');
 
@@ -27,19 +27,19 @@ test(
             join(dir, 'repository-settings.json'),
             JSON.stringify({
                 repositories: [
-                    { repo, onboarding: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } },
+                    { repo, onboarding: { step: 'setup', done: ['project'], answers: { projectId: 'web' } } },
                 ],
             }),
         );
 
-        const db = projectsDb(t, [{ id: 'lar-web', root: `${home}/Developer/lar/lar-web` }]);
+        const db = projectsDb(t, [{ id: 'web', root: `${home}/Developer/lar/web` }]);
         const board = await startBoard(t, { files, localSetups: { [repo]: null }, recorded: false }, false, true, {
             HOME: home,
             T3_STATE_DB: db,
         });
 
         const { detection } = (await (
-            await board.post({ repo, projectId: 'lar-web' }, board.url, '/api/onboarding/detect')
+            await board.post({ repo, projectId: 'web' }, board.url, '/api/onboarding/detect')
         ).json()) as { detection: SetupDetection };
 
         assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'off' } }, { found: [] }]);
@@ -47,7 +47,7 @@ test(
         const saved = await board.post(
             {
                 repo,
-                projectId: 'lar-web',
+                projectId: 'web',
                 role: 'Web client',
                 itemSource: { kind: 'issues' },
                 domainDocs: { kind: 'off' },
@@ -83,7 +83,7 @@ test(
 
         assert.deepEqual(start, [
             'launch',
-            'lar-web',
+            'web',
             await shapePrompt(board, 'Dark mode', created.workId),
             DEFAULT_SELECTION,
             { type: 'root' },

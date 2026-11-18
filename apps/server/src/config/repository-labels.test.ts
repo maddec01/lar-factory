@@ -19,7 +19,7 @@ import { saveOnboarded } from './repository-config.ts';
 import { changeRepositoryLabels } from './repository-labels.ts';
 
 const REPO = 'team/app';
-const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
+const AZURE = 'contoso/Fabrikam%20Fiber/api';
 
 /** A data folder listing `repo`, with `access` to manage its labels. */
 async function folder(t: TestContext, repo = REPO, access: OperationAccess = 'allowed') {
@@ -127,8 +127,8 @@ test('reading works and writing is refused when label management is refused', as
     expect(await tracker.labels.list()).toEqual([{ name: 'docs' }]);
 });
 
-const AZURE_SIBLING = 'Contoso/fabrikam%20fiber/lar-web';
-const AZURE_ELSEWHERE = 'contoso/Other/lar-api';
+const AZURE_SIBLING = 'Contoso/fabrikam%20fiber/web';
+const AZURE_ELSEWHERE = 'contoso/Other/api';
 
 const bugLabels = (dir: string, repo: string) =>
     readRepositorySetups(dir).find((s) => s.repo === repo)?.vocabulary.bug.labels;

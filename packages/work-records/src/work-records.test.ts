@@ -38,9 +38,9 @@ describe('work records', () => {
         const first = await openWorkRecords(path);
         const made = first.create({
             title: 'Work',
-            repository: 'maddec01/lar',
+            repository: 'acme/core',
             kind: 'bug',
-            ticket: 'maddec01/lar#12',
+            ticket: 'acme/core#12',
         });
 
         first.close();
@@ -56,15 +56,15 @@ describe('work records', () => {
         const captured = first.create({
             title: 'Add dark mode',
             context: 'The board is too bright.\n',
-            repository: 'maddec01/lar',
+            repository: 'acme/core',
             kind: 'feature',
         });
         const imported = first.importTicket({
             title: 'Fix login',
             context: '## Steps\n\nSign in.\n',
-            repository: 'maddec01/lar',
+            repository: 'acme/core',
             kind: 'bug',
-            ticket: 'maddec01/lar#41',
+            ticket: 'acme/core#41',
         });
 
         first.close();
@@ -77,22 +77,20 @@ describe('work records', () => {
         const edited = reopened.importTicket({
             title: 'Fix login (edited)',
             context: 'Edited.',
-            repository: 'maddec01/lar',
+            repository: 'acme/core',
             kind: 'bug',
-            ticket: 'maddec01/lar#41',
+            ticket: 'acme/core#41',
         });
 
         expect(edited).toEqual({ record: imported.record, created: false });
         expect(reopened.initialContext(imported.record.workId)).toBe('## Steps\n\nSign in.\n');
         expect(
             reopened.initialContext(
-                reopened.create({ title: 'No context', repository: 'maddec01/lar', kind: 'bug' }).workId,
+                reopened.create({ title: 'No context', repository: 'acme/core', kind: 'bug' }).workId,
             ),
         ).toBe('');
-        expect(() => reopened.create({ title: ' ', repository: 'maddec01/lar', kind: 'bug' })).toThrow(/title/);
-        expect(() => reopened.create({ title: 'Two\nlines', repository: 'maddec01/lar', kind: 'bug' })).toThrow(
-            /title/,
-        );
+        expect(() => reopened.create({ title: ' ', repository: 'acme/core', kind: 'bug' })).toThrow(/title/);
+        expect(() => reopened.create({ title: 'Two\nlines', repository: 'acme/core', kind: 'bug' })).toThrow(/title/);
     });
 
     it('brings an earlier database up to date, keeping its records with an empty title', async () => {
@@ -101,7 +99,7 @@ describe('work records', () => {
 
         old.db
             .prepare(`INSERT INTO work_records (work_id, repository, kind, status, revision, created_at, updated_at)
-      VALUES ('w-1', 'maddec01/lar', 'build', 'List', 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`)
+      VALUES ('w-1', 'acme/core', 'build', 'List', 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`)
             .run();
         old.close();
 
@@ -115,11 +113,11 @@ describe('work records', () => {
     it('refuses a ticket another record already holds', async () => {
         const records = await open();
 
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#3' });
+        records.create({ title: 'Work', repository: 'acme/core', kind: 'bug', ticket: 'acme/core#3' });
 
-        const other = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug' });
+        const other = records.create({ title: 'Work', repository: 'acme/core', kind: 'bug' });
 
-        expect(() => records.attachTicket(other.workId, 1, 'maddec01/lar#3')).toThrow(
+        expect(() => records.attachTicket(other.workId, 1, 'acme/core#3')).toThrow(
             expect.objectContaining({ code: 'ticket-taken' }),
         );
         expect(records.read(other.workId)).toEqual(other);
@@ -129,7 +127,7 @@ describe('work records', () => {
         const path = join(tempDir(), 'work-records.db');
         const board = await open(path);
         const thread = await open(path);
-        const made = board.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature' });
+        const made = board.create({ title: 'Work', repository: 'acme/core', kind: 'feature' });
 
         const shaped = board.update(made.workId, made.revision, { status: 'Shaping' });
 
@@ -145,7 +143,7 @@ describe('work records', () => {
         { timeout: 30_000 },
         async () => {
             const path = join(tempDir(), 'work-records.db');
-            const made = (await open(path)).create({ title: 'Work', repository: 'maddec01/lar', kind: 'build' });
+            const made = (await open(path)).create({ title: 'Work', repository: 'acme/core', kind: 'build' });
             // Each writer reads the record, waits until the other has read it too, then appends its name to the brief at
             // the revision it read. The loser rereads and tries once more.
             const writer = `import { existsSync, writeFileSync } from 'node:fs';
@@ -201,7 +199,7 @@ describe('work records', () => {
 
 describe('work-record structure', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
 
     it('puts decisions and builds under a concept and slices under a build', async () => {
         const records = await open();
@@ -261,7 +259,7 @@ describe('work-record structure', () => {
 
 describe('work-record content', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
 
     it('keeps a build brief, a decision text and a concept map across close and reopen', async () => {
         const path = join(tempDir(), 'work-records.db');
@@ -287,18 +285,18 @@ describe('work-record content', () => {
         const first = await openWorkRecords(path);
         const build = lar(first, 'build');
 
-        first.setPullRequest(build.workId, 1, 'maddec01/lar#88');
-        expect(first.setPullRequest(build.workId, 2, 'maddec01/lar#88')).toMatchObject({ revision: 2 });
-        first.setPullRequest(build.workId, 2, 'maddec01/lar#95');
+        first.setPullRequest(build.workId, 1, 'acme/core#88');
+        expect(first.setPullRequest(build.workId, 2, 'acme/core#88')).toMatchObject({ revision: 2 });
+        first.setPullRequest(build.workId, 2, 'acme/core#95');
         first.close();
 
         const reopened = await open(path);
 
-        expect(reopened.read(build.workId)).toMatchObject({ pullRequest: 'maddec01/lar#95', revision: 3 });
+        expect(reopened.read(build.workId)).toMatchObject({ pullRequest: 'acme/core#95', revision: 3 });
         expect(reopened.replacedPullRequests(build.workId)).toEqual([
-            { pullRequest: 'maddec01/lar#88', replacedAt: expect.any(String) },
+            { pullRequest: 'acme/core#88', replacedAt: expect.any(String) },
         ]);
-        expect(() => reopened.setPullRequest(build.workId, 2, 'maddec01/lar#96')).toThrow(
+        expect(() => reopened.setPullRequest(build.workId, 2, 'acme/core#96')).toThrow(
             expect.objectContaining({ code: 'stale-revision' }),
         );
         expect(reopened.replacedPullRequests(build.workId)).toHaveLength(1);
@@ -395,7 +393,7 @@ describe('work-record content', () => {
 describe('work-record threads and launch intents', () => {
     it('keeps failed shaping starts queued and preserves a status the agent already advanced', async () => {
         const records = await open();
-        let work = records.create({ title: 'Shape me', repository: 'maddec01/lar', kind: 'feature', status: 'Queued' });
+        let work = records.create({ title: 'Shape me', repository: 'acme/core', kind: 'feature', status: 'Queued' });
         let launching = records.recordLaunchIntent(work.workId, work.revision, 'shape');
 
         work = records.resolveLaunchIntent(work.workId, launching.record.revision, launching.intent.intentId, {
@@ -412,7 +410,7 @@ describe('work-record threads and launch intents', () => {
     });
 
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
 
     it('finds an unresolved launch intent after reopening and resolves it to a thread ID exactly once', async () => {
         const path = join(tempDir(), 'work-records.db');
@@ -467,12 +465,12 @@ describe('work-record threads and launch intents', () => {
 
 describe('work-record facts the board sets', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
 
     it('waits and resumes atomically, preserves causes and rejects stale or invalid writes', async () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);
-        const build = first.create({ title: 'Work', repository: 'maddec01/lar', kind: 'build', status: 'Queued' });
+        const build = first.create({ title: 'Work', repository: 'acme/core', kind: 'build', status: 'Queued' });
 
         first.setNeedsYouCauses(build.workId, 1, [{ type: 'pr-closed' }]);
         expect(() => first.waitForUser(build.workId, 2, ' ')).toThrow(/reason/);
@@ -577,12 +575,12 @@ describe('work-record facts the board sets', () => {
 
 describe('work-record provider observations', () => {
     const lar = (records: WorkRecords, kind: WorkKind, ticket?: string) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind, ticket });
+        records.create({ title: 'Work', repository: 'acme/core', kind, ticket });
 
     it("replaces the last observation of a ticket's state and assignee, and keeps it across reopen", async () => {
         const path = join(tempDir(), 'work-records.db');
         const first = await openWorkRecords(path);
-        const bug = lar(first, 'bug', 'maddec01/lar#7');
+        const bug = lar(first, 'bug', 'acme/core#7');
 
         first.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'user' });
         expect(first.observe(bug.workId, 2, { of: 'ticket', state: 'closed' })).toMatchObject({
@@ -596,7 +594,7 @@ describe('work-record provider observations', () => {
         expect(reopened.observations(bug.workId)).toEqual([
             {
                 of: 'ticket',
-                subject: 'maddec01/lar#7',
+                subject: 'acme/core#7',
                 state: 'closed',
                 assignee: null,
                 observedAt: expect.any(String),
@@ -615,25 +613,25 @@ describe('work-record provider observations', () => {
         const records = await open();
         const build = lar(records, 'build');
 
-        records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
+        records.setPullRequest(build.workId, 1, 'acme/core#90');
         records.observe(build.workId, 2, { of: 'pr', state: 'closed' });
         expect(records.observations(build.workId)).toMatchObject([
-            { of: 'pr', subject: 'maddec01/lar#90', state: 'closed' },
+            { of: 'pr', subject: 'acme/core#90', state: 'closed' },
         ]);
 
-        records.setPullRequest(build.workId, 3, 'maddec01/lar#91');
+        records.setPullRequest(build.workId, 3, 'acme/core#91');
         expect(records.observations(build.workId)).toEqual([]);
         expect(records.observe(build.workId, 4, { of: 'pr', state: 'merged' })).toMatchObject({
             finishedAt: expect.any(String),
             revision: 5,
         });
-        expect(records.observations(build.workId)).toMatchObject([{ subject: 'maddec01/lar#91', state: 'merged' }]);
+        expect(records.observations(build.workId)).toMatchObject([{ subject: 'acme/core#91', state: 'merged' }]);
     });
 });
 
 describe('work-record completion', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
     const at = (records: WorkRecords, workId: string) => records.read(workId).revision;
     /** Merges a new delivery PR for the build. */
     const merge = (records: WorkRecords, workId: string, pr: string) => {
@@ -687,11 +685,11 @@ describe('work-record completion', () => {
         const build = lar(records, 'build');
 
         expect(records.completion(build.workId)).toEqual({ complete: false, reasons: ['It has no recorded PR.'] });
-        records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
+        records.setPullRequest(build.workId, 1, 'acme/core#90');
         records.observe(build.workId, 2, { of: 'pr', state: 'open' });
         expect(records.completion(build.workId)).toEqual({
             complete: false,
-            reasons: ["Its PR maddec01/lar#90 isn't observed merged."],
+            reasons: ["Its PR acme/core#90 isn't observed merged."],
         });
         records.observe(build.workId, 3, { of: 'pr', state: 'closed' });
         expect(records.completion(build.workId).complete).toBe(false);
@@ -700,10 +698,10 @@ describe('work-record completion', () => {
 
         records.observe(build.workId, 5, { of: 'pr', state: 'merged' });
         expect(records.completion(build.workId)).toEqual({ complete: true, reasons: [] });
-        records.setPullRequest(build.workId, 6, 'maddec01/lar#91');
+        records.setPullRequest(build.workId, 6, 'acme/core#91');
         expect(records.completion(build.workId)).toEqual({
             complete: false,
-            reasons: ["Its PR maddec01/lar#91 isn't observed merged."],
+            reasons: ["Its PR acme/core#91 isn't observed merged."],
         });
     });
 
@@ -730,7 +728,7 @@ describe('work-record completion', () => {
 
         expect(records.setFogGone(concept.workId, at(records, concept.workId), true)).toMatchObject({ fogGone: true });
         settle(records, decision.workId, concept.workId);
-        merge(records, build.workId, 'maddec01/lar#90');
+        merge(records, build.workId, 'acme/core#90');
         records.close();
 
         const reopened = await open(path);
@@ -762,7 +760,7 @@ describe('work-record completion', () => {
         ]);
 
         settle(records, decision.workId, concept.workId);
-        merge(records, other.workId, 'maddec01/lar#90');
+        merge(records, other.workId, 'acme/core#90');
         expect(records.waitingOn(build.workId)).toEqual([]);
         expect(records.read(build.workId).ticket).toBeNull();
     });
@@ -770,7 +768,7 @@ describe('work-record completion', () => {
 
 describe('work-record retention', () => {
     const lar = (records: WorkRecords, kind: WorkKind) =>
-        records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+        records.create({ title: 'Work', repository: 'acme/core', kind });
     /** `n` days after now. */
     const later = (n: number) => new Date(Date.now() + n * 86_400_000);
     const KEEP = { hideAfterDays: 7, deleteAfterDays: null };
@@ -806,8 +804,8 @@ describe('work-record retention', () => {
         });
         records.addThread(build.workId, 3, 'thread-1', 'build');
         records.recordLaunchIntent(build.workId, 4, 'build');
-        records.setPullRequest(build.workId, 5, 'maddec01/lar#1');
-        records.setPullRequest(build.workId, 6, 'maddec01/lar#2');
+        records.setPullRequest(build.workId, 5, 'acme/core#1');
+        records.setPullRequest(build.workId, 6, 'acme/core#2');
         records.observe(build.workId, 7, { of: 'pr', state: 'merged' });
 
         const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
@@ -826,7 +824,7 @@ describe('work-record retention', () => {
     it('never deletes active or unfinished work, even in Done without a recorded finish', async () => {
         const records = await open();
         const made = (['List', 'Queued', 'In progress', 'Done'] as const).map((status) =>
-            records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status }),
+            records.create({ title: 'Work', repository: 'acme/core', kind: 'feature', status }),
         );
 
         expect(records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, later(10_000))).toEqual({
@@ -1144,7 +1142,7 @@ describe('launch moves and repeated Statuses', () => {
         const records = await open();
         const shaped = records.create({
             title: 'Shape',
-            repository: 'maddec01/lar',
+            repository: 'acme/core',
             kind: 'concept',
             status: 'Queued',
         });
@@ -1155,7 +1153,7 @@ describe('launch moves and repeated Statuses', () => {
                 .status,
         ).toBe('Shaping');
 
-        const built = records.create({ title: 'Build', repository: 'maddec01/lar', kind: 'build', status: 'Ready' });
+        const built = records.create({ title: 'Build', repository: 'acme/core', kind: 'build', status: 'Ready' });
         const { intent: build } = records.recordLaunchIntent(built.workId, built.revision, 'build');
 
         expect(

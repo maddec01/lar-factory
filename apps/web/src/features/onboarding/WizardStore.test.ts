@@ -5,7 +5,7 @@ import { detection, empty, posted, project, serve } from '@/test/OnboardingTest'
 import { fetchMock, sample, settle } from '@/test/PageTest';
 
 async function start(found: SetupDetection = detection()) {
-    serve(sample, [project('lar-web')], { error: null }, 200, {
+    serve(sample, [project('web')], { error: null }, 200, {
         '/api/onboarding/detect': { detection: found, error: null },
         '/api/onboarding/setup': { error: null },
     });
@@ -13,7 +13,7 @@ async function start(found: SetupDetection = detection()) {
     const { useWizardStore, stepReady } = await import('./WizardStore');
 
     await settle(() => useWizardStore.getState().start());
-    useWizardStore.getState().pick('lar-web');
+    useWizardStore.getState().pick('web');
     await settle(() => useWizardStore.getState().next());
     await settle(() => useWizardStore.getState().next());
 
@@ -35,8 +35,8 @@ test('onboarding chooses a source without importing individual tickets or changi
     await settle(() => wizard.getState().save());
     expect(wizard.getState().finish.state).toBe('done');
     expect(posted('/api/onboarding/setup')[0]).toMatchObject({
-        repo: 'maddec01/lar-web',
-        projectId: 'lar-web',
+        repo: 'acme/web',
+        projectId: 'web',
         role: '',
         itemSource: { kind: 'issues' },
         structureSync: true,
@@ -54,7 +54,7 @@ test('closing preserves choices for an explicit resume', async () => {
     wizard.getState().choose({ structureSync: false, role: 'API server' });
     await settle(() => wizard.getState().close());
     expect(posted('/api/onboarding/repositories')[0]).toMatchObject({
-        repo: 'maddec01/lar-web',
+        repo: 'acme/web',
         progress: { step: 'work', answers: { choices: { structureSync: false, role: 'API server' } } },
     });
     expect(wizard.getState().run).toBeNull();
@@ -80,16 +80,16 @@ test('a project changed while detection runs can’t receive its stale response'
 });
 
 test('old work progress resumes on its matching step with all answers', async () => {
-    const repo = 'maddec01/lar-web';
+    const repo = 'acme/web';
     const choices = { role: 'API', skills: ['frontend'], newLabels: { bug: ['triage'] } };
     const data = {
         ...empty,
         onboarding: [
-            { repo, progress: { step: 'work', done: ['project', 'work'], answers: { projectId: 'lar-web', choices } } },
+            { repo, progress: { step: 'work', done: ['project', 'work'], answers: { projectId: 'web', choices } } },
         ],
     };
 
-    serve(data, [project('lar-web', { onBoard: true })], {}, 200, {
+    serve(data, [project('web', { onBoard: true })], {}, 200, {
         '/api/onboarding/detect': { detection: detection() },
     });
 

@@ -696,7 +696,7 @@ async function heldBuild() {
     let dependency = records.addDependency(build.workId, {
         need: 'An endpoint',
         owner: 'server team',
-        ticket: 'maddec01/lar-server#40',
+        ticket: 'acme/api#40',
     });
 
     dependency = records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
@@ -716,7 +716,7 @@ function observe(
 ) {
     const before = records.dependency(dependencyId);
     const { revision } = records.observeDependency(dependencyId, before.revision, {
-        subject: 'maddec01/lar-server#40',
+        subject: 'acme/api#40',
         kind,
     });
 

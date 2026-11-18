@@ -11,10 +11,10 @@ import { azureRepo, repositoryProjectReads } from './repository-project.ts';
 import { liveProjects } from './t3-db.ts';
 
 const AZURE = [
-    'https://contoso@dev.azure.com/contoso/Fabrikam/_git/lar-api',
-    'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api',
-    'https://contoso.visualstudio.com/Fabrikam/_git/lar-api',
-    'contoso@vs-ssh.visualstudio.com:v3/contoso/Fabrikam/lar-api',
+    'https://contoso@dev.azure.com/contoso/Fabrikam/_git/api',
+    'git@ssh.dev.azure.com:v3/contoso/Fabrikam/api',
+    'https://contoso.visualstudio.com/Fabrikam/_git/api',
+    'contoso@vs-ssh.visualstudio.com:v3/contoso/Fabrikam/api',
 ];
 const GITHUB = [
     'https://github.com/maddec01/lar-factory.git',
@@ -38,11 +38,11 @@ function t3Home(t: TestContext, origins: Record<string, string>): NodeJS.Process
 }
 
 test('every Azure DevOps origin form names its organization, project and repository', () => {
-    for (const url of AZURE) assert.equal(azureRepo(url), 'contoso/Fabrikam/lar-api', url);
-    assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam/_git/lar-api'), 'contoso/Fabrikam/lar-api');
+    for (const url of AZURE) assert.equal(azureRepo(url), 'contoso/Fabrikam/api', url);
+    assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam/_git/api'), 'contoso/Fabrikam/api');
     assert.equal(
-        azureRepo('https://contoso.visualstudio.com/DefaultCollection/Fabrikam/_git/lar-api'),
-        'contoso/Fabrikam/lar-api',
+        azureRepo('https://contoso.visualstudio.com/DefaultCollection/Fabrikam/_git/api'),
+        'contoso/Fabrikam/api',
     );
     assert.equal(
         azureRepo('https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar%20api'),
@@ -55,21 +55,20 @@ test('every Azure DevOps origin form names its organization, project and reposit
 });
 
 test('Start finds the checkout of a GitHub or an Azure DevOps repository', async (t) => {
-    const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
+    const env = t3Home(t, { 'lar-factory': GITHUB[0]!, api: AZURE[0]! });
     const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });
 
     assert.deepEqual(
         (
             await repositoryProjectReads(
-                [repo('maddec01/lar-factory'), repo('contoso/fabrikam/lar-api'), repo('contoso/fabrikam/lar-web')],
+                [repo('maddec01/lar-factory'), repo('contoso/fabrikam/api'), repo('contoso/fabrikam/web')],
                 env,
             )
         ).repositoryProjects,
         {
             'maddec01/lar-factory': null,
-            'contoso/fabrikam/lar-api': null,
-            'contoso/fabrikam/lar-web':
-                'No T3 project is a checkout of contoso/fabrikam/lar-web; add the checkout in T3 Code',
+            'contoso/fabrikam/api': null,
+            'contoso/fabrikam/web': 'No T3 project is a checkout of contoso/fabrikam/web; add the checkout in T3 Code',
         },
     );
 });

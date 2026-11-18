@@ -11,7 +11,7 @@ import { REPO_URL, fakeAz, type FakePr, type WorkItem } from './fake-az.ts';
 const azureSprint = (repos: readonly string[], team: string, run: Az) =>
     azureItems(repos, team, (calls) => readSprint(team, calls), run);
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const TEAM = 'Fabrikam Team';
 
 const shown = (items: Item[]) => items.map((i) => [i.number, i.status, i.parent?.number ?? null]);
@@ -100,7 +100,7 @@ test('a sprint read lists requirement-level items with Task counts, a Completed 
 /** A source for another repository that lists one item. */
 const otherRepo: ItemSource = {
     read: async () => ({
-        title: 'maddec01/lar-apple',
+        title: 'acme/ios',
         items: [
             {
                 id: 'I_1',
@@ -114,7 +114,7 @@ const otherRepo: ItemSource = {
                 number: 1,
                 title: 'Apple',
                 url: null,
-                repo: 'maddec01/lar-apple',
+                repo: 'acme/ios',
                 labels: [],
                 state: 'open',
                 closedAs: null,
@@ -162,7 +162,7 @@ test("a logged-out az and a missing azure-devops extension each name their fix, 
     for (const [name, az] of Object.entries(failing)) {
         const source = mergeSources(
             new Map([
-                ['maddec01/lar-apple', otherRepo],
+                ['acme/ios', otherRepo],
                 [REPO, azureSprint([REPO], TEAM, az.run)],
             ]),
         );
@@ -170,7 +170,7 @@ test("a logged-out az and a missing azure-devops extension each name their fix, 
 
         assert.deepEqual(
             read.items.map((i) => i.repo),
-            ['maddec01/lar-apple'],
+            ['acme/ios'],
             name,
         );
         assert.deepEqual(read.problems, [expected[name as keyof typeof expected]], name);

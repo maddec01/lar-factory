@@ -5,7 +5,7 @@ import { test } from 'vite-plus/test';
 import { readAzureItemDetails, readAzureOlderComments } from './azure-details.ts';
 import { fakeAz, type FakeComment, type WorkItem } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const item = (number: number): Item =>
     ({
         id: `azure:contoso/${number}`,

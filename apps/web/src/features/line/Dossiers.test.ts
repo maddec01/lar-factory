@@ -34,7 +34,7 @@ const writable = (data: BoardData = sample): BoardData => ({
 });
 /** #140 with its blocker #202 closed, on a board whose writes are on. */
 const unblocked = () =>
-    writable(withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }] }));
+    writable(withItem('I_sample13', { blockers: [{ number: 202, repo: 'acme/api', state: 'closed' }] }));
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
@@ -58,7 +58,7 @@ const receive = (data: BoardData) =>
 const cleanPrs: Item['linkedPrs'] = [
     {
         number: 150,
-        url: 'https://github.com/maddec01/lar-server/pull/150',
+        url: 'https://github.com/acme/api/pull/150',
         state: 'open',
         isDraft: false,
         checks: { passed: 3, failed: 0, running: 0, total: 3, since: '2026-10-21T08:30:00Z' },
@@ -85,10 +85,10 @@ const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
 const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
 
 test('a grouped child reaches the desk with parent context when Projects shows its repository without its parent', async () => {
-    localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
+    localStorage.setItem('lar-board:scope', 'acme/ios');
 
     const data = withItem('I_sample13', {
-        repo: 'maddec01/lar-apple',
+        repo: 'acme/ios',
         status: 'Verify',
         linkedPrs: cleanPrs,
         threads: [],
@@ -97,7 +97,9 @@ test('a grouped child reaches the desk with parent context when Projects shows i
 
     await mountOpen(data);
     expect(step('I_sample13')).not.toBeNull();
-    expect(text($('.desk-row[data-item="I_sample13"]'))).toContain('in #200 lar cloud: sign-in and direct connections');
+    expect(text($('.desk-row[data-item="I_sample13"]'))).toContain(
+        'in #200 acme cloud: sign-in and direct connections',
+    );
     // A part that waits on you offers its thread, as the desk's row does; its row opens its details.
     expect(step('I_sample13').querySelector('.row-side [data-open-thread]')).not.toBeNull();
     expect(step('I_sample13').querySelector('[data-row-open]')).not.toBeNull();
@@ -127,9 +129,9 @@ test('live status changes keep linked work in its group with details, thread and
     }
     // The part's row opens its details; its action opens its thread, as the desk's row does.
     await press(step('I_sample13').querySelector('[data-row-open]')!);
-    expect(dialogTitle()).toContain('Owner accounts');
+    expect(dialogTitle()).toContain('Team accounts');
     expect($('[data-item-dialog] [data-open-thread]')).not.toBeNull();
-    expect($('[data-item-dialog] a[href="https://github.com/maddec01/lar-server/pull/150"]')).not.toBeNull();
+    expect($('[data-item-dialog] a[href="https://github.com/acme/api/pull/150"]')).not.toBeNull();
 });
 
 test('a part in a review round shows its reviewers’ count, which unfolds them, as a lane row does', async () => {
@@ -170,7 +172,7 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
     // Each part shows once, in the list with its own Start; nothing repeats it above the list.
     const ready = step('I_sample13');
 
-    expect(text(ready.querySelector('[data-row-open]'))).toContain('#140 Owner accounts');
+    expect(text(ready.querySelector('[data-row-open]'))).toContain('#140 Team accounts');
     expect(dossier().querySelector('[data-attention-row="ready"]'), 'no Ready to start row repeats it').toBeNull();
     expect(dossier().querySelector('[data-attention-row="waiting"]'), 'nothing waits').toBeNull();
     await pressMenu(ready.querySelector('[data-start-model]')!);
@@ -183,9 +185,9 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
 
 test('a Queued decision shows only Start after while a blocker is open, naming the last open one', async () => {
     const data = withDecision([
-        { number: 201, repo: 'maddec01/lar-server', state: 'open' },
-        { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
-        { number: 140, repo: 'maddec01/lar-server', state: 'open' },
+        { number: 201, repo: 'acme/api', state: 'open' },
+        { number: 203, repo: 'acme/api', state: 'closed' },
+        { number: 140, repo: 'acme/api', state: 'open' },
     ]);
 
     holdPosts(data);

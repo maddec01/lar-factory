@@ -5,7 +5,7 @@ import { test } from 'vite-plus/test';
 import { azureBoard } from './azure-board.ts';
 import { fakeAz } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 
 test('the Azure board combines backlog and sprint once, keeping sprint completion and Task counts', async () => {
     const az = fakeAz({

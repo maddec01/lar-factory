@@ -7,9 +7,9 @@ import { type DetectReads, detectSetup } from './detect-setup.ts';
 
 const WEB: Checkout = {
     id: 'web',
-    title: 'lar-web',
-    folder: '/Users/me/Developer/lar-web',
-    origin: 'git@github.com:maddec01/lar-web.git',
+    title: 'web',
+    folder: '/Users/me/Developer/web',
+    origin: 'git@github.com:acme/web.git',
 };
 const AZURE: Checkout = {
     id: 'shop',
@@ -40,7 +40,7 @@ const detect = async (
     parts?: Partial<DetectReads>,
     input: Record<string, unknown> = {},
 ) => {
-    const answer = await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web', ...input }, reads(files, parts));
+    const answer = await detectSetup({ repo: 'acme/web', projectId: 'web', ...input }, reads(files, parts));
 
     return (answer as { detection: SetupDetection }).detection;
 };
@@ -62,7 +62,7 @@ test('detection reads doc and skill paths without reading factory configuration 
         },
     });
 
-    const result = (await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web' }, found)) as {
+    const result = (await detectSetup({ repo: 'acme/web', projectId: 'web' }, found)) as {
         detection: SetupDetection;
     };
 

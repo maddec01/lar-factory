@@ -6,7 +6,7 @@ import { azureBoard } from './azure-board.ts';
 import { saveAzureDescription } from './azure-writes.ts';
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const TEAM = 'Fabrikam Team';
 
 const ITEMS: WorkItem[] = [

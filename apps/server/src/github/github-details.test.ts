@@ -35,15 +35,15 @@ const people = {
 const sub = (number: number, state: 'OPEN' | 'CLOSED') => ({
     number,
     title: `Slice ${number}`,
-    url: `https://github.com/maddec01/lar-server/issues/${number}`,
+    url: `https://github.com/acme/api/issues/${number}`,
     state,
-    repository: { nameWithOwner: 'maddec01/lar-server' },
+    repository: { nameWithOwner: 'acme/api' },
 });
 
 test('an issue answers its body, people, milestone, sub-tickets and comments, newest first', async () => {
     const gh = fakeGh({
         __typename: 'Issue',
-        body: '## Owner accounts',
+        body: '## Team accounts',
         ...people,
         milestone: { title: 'Cloud v0.1' },
         subIssues: { nodes: [sub(144, 'CLOSED'), sub(145, 'OPEN')] },
@@ -54,7 +54,7 @@ test('an issue answers its body, people, milestone, sub-tickets and comments, ne
     });
 
     assert.deepEqual(await readGithubItemDetails(item('I_1'), gh.run), {
-        body: '## Owner accounts',
+        body: '## Team accounts',
         format: 'markdown',
         author: 'maddec01',
         assignees: ['maddec01', 'claude-bot'],
@@ -64,15 +64,15 @@ test('an issue answers its body, people, milestone, sub-tickets and comments, ne
             {
                 number: 144,
                 title: 'Slice 144',
-                url: 'https://github.com/maddec01/lar-server/issues/144',
-                repo: 'maddec01/lar-server',
+                url: 'https://github.com/acme/api/issues/144',
+                repo: 'acme/api',
                 state: 'closed',
             },
             {
                 number: 145,
                 title: 'Slice 145',
-                url: 'https://github.com/maddec01/lar-server/issues/145',
-                repo: 'maddec01/lar-server',
+                url: 'https://github.com/acme/api/issues/145',
+                repo: 'acme/api',
                 state: 'open',
             },
         ],
@@ -150,7 +150,7 @@ test('details and older pages skip managed-only history to its end without expos
     }
 });
 
-const issue = (number: number): Item => ({ id: `I_${number}`, repo: 'maddec01/lar-server', number }) as Item;
+const issue = (number: number): Item => ({ id: `I_${number}`, repo: 'acme/api', number }) as Item;
 
 test('a saved description is the issue body, through gh issue edit --body-file', async () => {
     const calls: { args: string[]; body: string }[] = [];
@@ -163,7 +163,7 @@ test('a saved description is the issue body, through gh issue edit --body-file',
     assert.equal(await saveGithubDescription(issue(12), '- a\n- b', run), null);
     assert.deepEqual(
         calls.map((c) => [c.args.filter((a, i) => c.args[i - 1] !== '--body-file'), c.body]),
-        [[['issue', 'edit', '12', '-R', 'maddec01/lar-server', '--body-file'], '- a\n- b']],
+        [[['issue', 'edit', '12', '-R', 'acme/api', '--body-file'], '- a\n- b']],
     );
     assert.ok(!existsSync(calls[0]!.args.at(-1)!), 'the body file is removed after');
 });

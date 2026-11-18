@@ -41,10 +41,10 @@ vi.mock('./repository-project-discovery.ts', () => ({
 const home = mkdtempSync(join(tmpdir(), 'lar-project-icons-'));
 
 checkouts(home, {
-    factory: 'git@github.com:maddec01/lar-factory.git',
-    server: 'https://github.com/maddec01/lar-server',
-    'server-copy': 'https://github.com/maddec01/lar-server',
-    apple: 'https://github.com/maddec01/lar-apple',
+    factory: 'git@github.com:acme/factory.git',
+    server: 'https://github.com/acme/api',
+    'server-copy': 'https://github.com/acme/api',
+    apple: 'https://github.com/acme/ios',
 });
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
@@ -60,7 +60,7 @@ const listed = (...projects: ProjectFact[]): ProjectRead => ({
     availability: 'available',
     observation: { projects, observedAt: '2026-11-03T00:00:00Z' },
 });
-const repo = (name: string) => ({ repo: `maddec01/${name}` });
+const repo = (name: string) => ({ repo: `acme/${name}` });
 const boardOf = (...repos: string[]) => createBoardState({ repos: repos.map(repo), items: [] } as unknown as BoardData);
 
 /** What T3 answers per workspace: the asset fetch's response, or an RPC that fails or never answers. */
@@ -166,7 +166,7 @@ it('publishes a favicon outside the checkout and a checkout favicon with no T3 p
         apple: png('apple'),
     };
 
-    const board = boardOf('lar-factory', 'lar-apple');
+    const board = boardOf('factory', 'ios');
     const icons = createProjectIcons(board);
 
     await icons.refresh();
@@ -175,8 +175,8 @@ it('publishes a favicon outside the checkout and a checkout favicon with no T3 p
 
     // Each revision is the first 16 hex digits of the body's SHA-256, from shasum.
     expect(projectIcons).toEqual({
-        'maddec01/lar-factory': { kind: 'favicon', projectId: 'id-factory', revision: 'd4dc56669143034f' },
-        'maddec01/lar-apple': { kind: 'favicon', projectId: 'id-apple', revision: '3a7bd3e2360a3d29' },
+        'acme/factory': { kind: 'favicon', projectId: 'id-factory', revision: 'd4dc56669143034f' },
+        'acme/ios': { kind: 'favicon', projectId: 'id-apple', revision: '3a7bd3e2360a3d29' },
     });
     expect(requests).toEqual(
         expect.arrayContaining([
@@ -220,7 +220,7 @@ it('refuses a URL that leaves the T3 origin', async () => {
         );
     });
 
-    const board = boardOf('lar-factory');
+    const board = boardOf('factory');
 
     await createProjectIcons(board).refresh();
     send.mockRestore();

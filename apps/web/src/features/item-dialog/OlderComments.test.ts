@@ -8,7 +8,7 @@ import { expect, test } from 'vite-plus/test';
 
 import { $, $$, fetchMock, mountPage, settle, text } from '@/test/PageTest';
 
-/** The sample's older comments of Owner accounts, newest first: 14, so a page of 10 and a page of 4. */
+/** The sample's older comments of Team accounts, newest first: 14, so a page of 10 and a page of 4. */
 const OLDER = (sampleDetailsJson as unknown as { $older: Record<string, ItemComment[]> }).$older['I_sample13']!;
 
 const dialog = () => $('[data-item-dialog]')!;

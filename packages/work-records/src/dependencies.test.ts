@@ -29,8 +29,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const lar = (records: WorkRecords, kind: WorkKind) =>
-    records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'acme/core', kind });
 const at = (records: WorkRecords, workId: string) => records.read(workId).revision;
 const NEED = {
     need: 'A sign-in endpoint, so the board can log in.',
@@ -123,7 +122,7 @@ describe('Dependencies', () => {
         expect(records.observeDependency(id, 2, { subject: 'acme/auth#5', kind: 'closed' }).met).toBeNull();
         expect(records.observeDependency(id, 3, { subject: 'acme/auth#9', kind: 'merged' }).met).toBeNull();
         expect(records.waitingOn(build.workId)).toEqual(waiting);
-        records.setPullRequest(build.workId, at(records, build.workId), 'maddec01/lar#1');
+        records.setPullRequest(build.workId, at(records, build.workId), 'acme/core#1');
         records.observe(build.workId, at(records, build.workId), { of: 'pr', state: 'merged' });
         expect(records.completion(build.workId)).toEqual({
             complete: false,

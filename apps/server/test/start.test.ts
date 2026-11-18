@@ -46,12 +46,12 @@ async function boardIn(
 const PROJECTS = (dir: string): FixtureProject[] => [
     { id: 'project-lar', root: `${dir}/Developer/lar` },
     { id: 'project-factory', root: `${dir}/Developer/lar/lar-factory/` },
-    { id: 'project-server-old', root: `${dir}/Developer/lar/lar-server`, deletedAt: '2026-10-01T00:00:00Z' },
-    { id: 'project-server', root: '~/Developer/lar/lar-server' },
+    { id: 'project-server-old', root: `${dir}/Developer/lar/api`, deletedAt: '2026-10-01T00:00:00Z' },
+    { id: 'project-server', root: '~/Developer/lar/api' },
 ];
 const ORIGINS = {
     'lar-factory': 'git@github.com:maddec01/lar-factory.git',
-    'lar-server': 'https://github.com/MADDEC01/Lar-Server',
+    api: 'https://github.com/ACME/Api',
 };
 
 async function factoryBoard(t: TestContext, items: object[], options: object = {}) {
@@ -61,18 +61,18 @@ async function factoryBoard(t: TestContext, items: object[], options: object = {
 const start = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');
 
 test("Start begins one lar-shape thread in the card's repository project and leaves the Status alone", async (t) => {
-    const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
+    const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'acme/api')]);
     const response = await start(board, board.id(12));
 
     assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
     assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
-    assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
+    assert.equal((await start(board, board.id(30, 'acme/api'))).status, 200);
     assert.deepEqual(await board.t3Calls(), [
         ['launch', 'project-factory', await message(board), DEFAULT_SELECTION, { type: 'root' }, 'full-access'],
         [
             'launch',
             'project-server',
-            await shapePrompt(board, '#30 Issue 30', board.id(30, 'maddec01/lar-server')),
+            await shapePrompt(board, '#30 Issue 30', board.id(30, 'acme/api')),
             DEFAULT_SELECTION,
             { type: 'root' },
             'full-access',
@@ -87,7 +87,7 @@ test("Start refuses a folder that is another repository's checkout with a hint a
     const { board } = await boardIn(
         t,
         [boardIssue(12, 'Queued')],
-        { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
+        { 'lar-factory': 'https://github.com/acme/api.git' },
         (dir) => projectsDb(t, PROJECTS(dir)),
     );
     const response = await start(board, board.id(12));

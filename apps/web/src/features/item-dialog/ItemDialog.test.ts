@@ -94,7 +94,7 @@ const readyBuild: BoardData = {
     ...withThreads('I_sample13', undefined),
     capture: { session: 's1', enabled: true },
     items: sample.items.map((i) =>
-        i.id === 'I_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }] } : i,
+        i.id === 'I_sample13' ? { ...i, blockers: [{ number: 202, repo: 'acme/api', state: 'closed' }] } : i,
     ),
 };
 
@@ -106,7 +106,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     await press(button('start', 'I_sample13'));
     expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
 
-    const thread = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
+    const thread = { threadId: 'thread-1', title: 'Build acme/api#140' };
 
     await answer({ thread, error: null, board: { ...readyBuild, startedBuilds: { I_sample13: thread } } });
     expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
@@ -336,13 +336,13 @@ function dependencyBlocker(
         revision: 3,
         owner: 'server team',
         need: 'An export endpoint',
-        ticket: 'maddec01/lar-server#40',
-        named: [{ reference: 'maddec01/lar-server#40', url: 'https://github.com/maddec01/lar-server/issues/40' }],
+        ticket: 'acme/api#40',
+        named: [{ reference: 'acme/api#40', url: 'https://github.com/acme/api/issues/40' }],
         evidence: 'The endpoint answers in staging',
         met: null,
         needsReview: false,
         observation: {
-            subject: 'maddec01/lar-server#40',
+            subject: 'acme/api#40',
             kind,
             detail: null,
             observedAt: '2026-10-21T09:00:00Z',
@@ -353,7 +353,7 @@ function dependencyBlocker(
 
     return {
         number: 40,
-        repo: 'maddec01/lar-server',
+        repo: 'acme/api',
         state: hold.met ? 'closed' : 'open',
         title: hold.need,
         dependency: hold,
@@ -378,22 +378,20 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
         'Dependency on server team · not met',
     );
     expect(text(dependencyRow())).toContain('An export endpoint');
-    expect(text(dependencyRow().querySelector('[data-dependency-read]'))).toBe(
-        'maddec01/lar-server#40 closed, read 1h ago',
-    );
+    expect(text(dependencyRow().querySelector('[data-dependency-read]'))).toBe('acme/api#40 closed, read 1h ago');
 
     const ticket = dependencyRow().querySelector<HTMLAnchorElement>('[data-dependency-read] a')!;
 
     expect([text(ticket), ticket.href, ticket.target], 'its ticket opens in the browser').toEqual([
-        'maddec01/lar-server#40',
-        'https://github.com/maddec01/lar-server/issues/40',
+        'acme/api#40',
+        'https://github.com/acme/api/issues/40',
         '_blank',
     ]);
     expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe(
         'EvidenceThe endpoint answers in staging',
     );
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
-        'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.',
+        'Its ticket acme/api#40 is closed. Mark it met once the change is delivered.',
     );
     expect(footerControls()).toEqual(['Open thread', 'Start when unblocked']);
     expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe(
@@ -467,7 +465,7 @@ test('absent branch starts new once confirmed and receives the successful board'
 });
 
 test.each([
-    ['maddec01/lar-server', 'GitHub', 'GitHub label', 'https://github.com/maddec01/lar-server/issues/'],
+    ['acme/api', 'GitHub', 'GitHub label', 'https://github.com/acme/api/issues/'],
     [
         'contoso/Mobile%20App/mobile-app',
         'Azure DevOps',

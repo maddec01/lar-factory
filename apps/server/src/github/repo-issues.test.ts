@@ -4,7 +4,7 @@ import { test } from 'vite-plus/test';
 
 import { repoIssues } from './repo-issues.ts';
 
-const REPO = 'maddec01/lar-apple';
+const REPO = 'acme/ios';
 
 const item = (statuses: Status[]): Item => ({
     id: 'I_7',

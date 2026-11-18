@@ -6,7 +6,7 @@ import { test, type TestContext } from 'vite-plus/test';
 
 import { keepOnboarding } from './keep-onboarding.ts';
 
-const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
+const progress = { step: 'setup', done: ['project'], answers: { projectId: 'web' } };
 
 async function dataDir(t: TestContext): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'lar keep onboarding test '));
@@ -19,13 +19,12 @@ async function dataDir(t: TestContext): Promise<string> {
 test('keeping an onboarding returns the repositories still onboarding, the one it replaces gone', async (t) => {
     const dir = await dataDir(t);
 
-    assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-apple', progress }, dir), {
-        onboarding: [{ repo: 'maddec01/lar-apple', progress }],
+    assert.deepEqual(await keepOnboarding({ repo: 'acme/ios', progress }, dir), {
+        onboarding: [{ repo: 'acme/ios', progress }],
     });
-    assert.deepEqual(
-        await keepOnboarding({ repo: 'maddec01/lar-web', progress, replaces: 'maddec01/lar-apple' }, dir),
-        { onboarding: [{ repo: 'maddec01/lar-web', progress }] },
-    );
+    assert.deepEqual(await keepOnboarding({ repo: 'acme/web', progress, replaces: 'acme/ios' }, dir), {
+        onboarding: [{ repo: 'acme/web', progress }],
+    });
 });
 
 test("only the step, done steps and answers of the body's progress are saved", async (t) => {
@@ -33,9 +32,9 @@ test("only the step, done steps and answers of the body's progress are saved", a
 
     assert.deepEqual(
         await keepOnboarding(
-            { repo: 'maddec01/lar-web', progress: { ...progress, prUrl: 'https://evil.example/pull/1' } },
+            { repo: 'acme/web', progress: { ...progress, prUrl: 'https://evil.example/pull/1' } },
             dir,
         ),
-        { onboarding: [{ repo: 'maddec01/lar-web', progress }] },
+        { onboarding: [{ repo: 'acme/web', progress }] },
     );
 });

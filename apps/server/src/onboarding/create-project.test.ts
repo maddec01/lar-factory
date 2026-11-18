@@ -8,12 +8,12 @@ import type { TestContext } from 'vite-plus/test';
 
 import { createProject } from './create-project.ts';
 
-/** A home with an empty folder `lar-web` in it. */
+/** A home with an empty folder `web` in it. */
 function home(t: TestContext): string {
     const dir = mkdtempSync(join(tmpdir(), 'lar-create-home-'));
 
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-    mkdirSync(join(dir, 'lar-web'));
+    mkdirSync(join(dir, 'web'));
 
     return dir;
 }
@@ -23,7 +23,7 @@ const choice = (id: string, folder: string): ProjectChoice => ({
     name: id,
     folder,
     shownFolder: folder,
-    repo: `maddec01/${id}`,
+    repo: `acme/${id}`,
     provider: 'GitHub',
     blocked: null,
     onBoard: false,
@@ -33,9 +33,9 @@ const choice = (id: string, folder: string): ProjectChoice => ({
 test("adds the folder to T3 and answers with T3's projects and the new one's id", async (t) => {
     const dir = home(t);
     const added: string[] = [];
-    const projects = [choice('notes', '/elsewhere'), choice('lar-web', join(dir, 'lar-web'))];
+    const projects = [choice('notes', '/elsewhere'), choice('web', join(dir, 'web'))];
     const answer = await createProject(
-        { folder: '~/lar-web/' },
+        { folder: '~/web/' },
         async () => projects,
         { HOME: dir },
         async (folder) => {
@@ -45,6 +45,6 @@ test("adds the folder to T3 and answers with T3's projects and the new one's id"
         },
     );
 
-    assert.deepEqual(added, [join(dir, 'lar-web')]);
-    assert.deepEqual(answer, { projects, projectId: 'lar-web' });
+    assert.deepEqual(added, [join(dir, 'web')]);
+    assert.deepEqual(answer, { projects, projectId: 'web' });
 });

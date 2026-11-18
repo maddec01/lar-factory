@@ -54,7 +54,7 @@ export const SAMPLE_MODELS = {
 };
 
 /** The repositories a test board has onboarded unless its options name others. */
-const TEST_REPOSITORIES = ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory'];
+const TEST_REPOSITORIES = ['acme/api', 'acme/ios', 'maddec01/lar-factory'];
 
 /** Writes the board app's list of onboarded repositories under `home`. */
 export function writeRepositoryList(
@@ -182,7 +182,7 @@ export async function larWork(dataDir: string, ...args: string[]): Promise<{ wor
 }
 
 /** A repository no test board onboards, so the decisions blocking its work stay off the board. */
-const OFF_BOARD = 'maddec01/lar-docs';
+const OFF_BOARD = 'acme/docs';
 
 /** Runs `change` on the board's work records, then waits until the board shows `item` as `shown` says. */
 export async function changeRecords(

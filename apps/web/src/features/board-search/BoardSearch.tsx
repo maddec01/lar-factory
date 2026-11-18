@@ -1,4 +1,4 @@
-// The board search: a field in the title bar that looks like lar-server's CommandPaletteTrigger, and the dialog it opens,
+// The board search: a field in the title bar that looks like the reference app's CommandPaletteTrigger, and the dialog it opens,
 // by a click or ⌘K (Ctrl K off Apple platforms). Tokens in the closed field only say what the board is filtered by. The
 // field measures its own room and folds to fit (FieldFit.ts). In the dialog, choosing a filter keeps it open, and any
 // other choice closes it first, so a dialog that opens next returns the focus to the field.

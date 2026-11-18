@@ -77,7 +77,7 @@ export function Choice({
     );
 }
 
-/** lar-server's secondary button, disabled with `reason` as its tooltip when it doesn't work here. */
+/** The reference app's secondary button, disabled with `reason` as its tooltip when it doesn't work here. */
 export function SmallButton({
     children,
     reason,

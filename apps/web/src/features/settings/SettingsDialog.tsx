@@ -1,4 +1,4 @@
-// Settings, the design system's SettingsDialog as lar-server's: the title bar's Settings button opens it over the board
+// Settings, the design system's SettingsDialog as the reference app's: the title bar's Settings button opens it over the board
 // with the sections on the left, in groups, under a search (focused by /) that keeps the sections whose name or a row
 // matches, and the open section on the right under its breadcrumb and description; a search that finds nothing says so
 // with Clear search. A switch or a choice applies at once; a typed value is a draft the footer saves. A search that
@@ -104,7 +104,7 @@ function leaveSetup() {
     if (wizard.run && wizard.where === 'settings') wizard.close();
 }
 
-/** A project's page in place of Projects, the breadcrumb's third step ("Settings / Projects / lar-server"), its way
+/** A project's page in place of Projects, the breadcrumb's third step ("Settings / Projects / api"), its way
  *  back (to Projects) asking first about an unsaved draft, as changing section does. */
 function ProjectPane({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
     const requestClose = useModalClose();

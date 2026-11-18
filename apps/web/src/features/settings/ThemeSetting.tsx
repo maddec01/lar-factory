@@ -1,5 +1,5 @@
 // The board's light/dark preference in Settings › General › Preferences: the design system's Appearance row, the same
-// row, words and place as lar-server's, with its three segments (Follow system, Light, Dark). It applies at once and is
+// row, words and place as the reference app's, with its three segments (Follow system, Light, Dark). It applies at once and is
 // kept on this Mac.
 
 import { AppearanceSetting } from '@lar-works/design-system';

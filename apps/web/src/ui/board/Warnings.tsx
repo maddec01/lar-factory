@@ -18,7 +18,7 @@ interface BoardWarningsProps {
 }
 
 /** The board's warnings, above the desk on the board's 16px gutter: the design system's AttentionList, as
- *  lar-server's "Needs attention", folded under its header until opened (inline details that never open a
+ *  the reference app's "Needs attention", folded under its header until opened (inline details that never open a
  *  notification or a dialog). Its title, which can be a whole sentence, wraps (as every AttentionList's does). A lead
  *  warning, such as a lost board server, opens it in the danger tone. */
 export function BoardWarnings({ lead, leadTitle, summary, toggleLabel, children, action }: BoardWarningsProps) {

@@ -24,7 +24,7 @@ function refreshEvery(seconds: number): Control {
 }
 
 export const generalGroups = (data: SettingsData): Group[] => [
-    // The theme where lar-server keeps it: General › Preferences, the design system's Appearance row.
+    // The theme where the reference app keeps it: General › Preferences, the design system's Appearance row.
     {
         title: 'Preferences',
         rows: [

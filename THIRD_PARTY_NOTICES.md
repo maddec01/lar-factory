@@ -6,7 +6,7 @@ their licences; `developer-profile` is lar's own and needs none. Files under
 `skills/lar-build/references/` come from addyosmani/agent-skills.
 `apps/desktop` and `apps/web` port code from pingdotgg/t3code; each Port says so in
 its header. The board's components come from lar's own design system,
-`@lar-works/design-system` (lar-web), which needs no notice.
+`@lar-works/design-system`, which needs no notice.
 `.github/scripts/release-plan.cjs` and `.github/workflows/release.yml` adapt code
 from pingdotgg/t3code.
 

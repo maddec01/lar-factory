@@ -56,8 +56,8 @@ export function SliceBar({
 
 /** Work that runs with no slices to count, so a row at work always draws a bar. As a scan of unknown size does, a light
  *  travels along the ticks while the thread works, and the ticks stay still once it stops; `waiting`, its thread paused
- *  on you (a question, an approval), the light travels in amber, the colour of what waits on you, and keeps travelling
- *  however long the wait. `label` names what runs, such as "Planning". */
+ *  on you (a question, an approval), the ticks hold a dim amber, the colour of what waits on you, as a sweep does under
+ *  reduced motion: nothing runs while the wait lasts. `label` names what runs, such as "Planning". */
 export function WorkingBar({
     label,
     still = false,
@@ -71,7 +71,11 @@ export function WorkingBar({
         <div className="min-w-0" title={label} data-slice-bar data-waiting={waiting || undefined}>
             <TickMeter
                 label={label}
-                segments={[{ label, state: waiting ? 'waiting' : 'active', sweep: waiting || !still }]}
+                segments={[
+                    waiting
+                        ? { label, color: `color-mix(in srgb, ${statusStateColors.waiting} 40%, var(--color-track))` }
+                        : { label, state: 'active', sweep: !still },
+                ]}
             />
         </div>
     );

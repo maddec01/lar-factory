@@ -116,6 +116,10 @@ _Avoid_: thread archive, settling threads.
 Sending an item with a passing brief back to shaping, keeping the text and requiring a new gate.
 _Avoid_: reset, reopen.
 
+**Approve as is**:
+The user's board approval of an approved item's changed Spec without a new Doubt review, offered after a trusted tracker edit, before building starts, while the changed brief still matches its confirmed scope and is cited as a contract producer by no work that is not set aside.
+_Avoid_: force approve, skip review.
+
 **Kind**:
 What a piece of work is: Bug, Feature, Improvement or Concept. Single-flow shaping keeps Bug, Feature and Improvement alongside its internal build workflow. Builds with no saved Kind, decisions and tickets with no recognised kind show as having no kind on rows.
 _Avoid_: category, type, label.

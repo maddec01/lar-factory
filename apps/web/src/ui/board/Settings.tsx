@@ -6,7 +6,7 @@ import { TitleBarSettingsButton } from '@lar-works/design-system';
 import { ChevronRightIcon } from '@lar-works/design-system/icons';
 
 /** The title bar's last button, which opens Settings: the design system's TitleBarSettingsButton, the same as
- *  lar-server's. */
+ *  the reference app's. */
 export function OpenSettingsButton({
     label,
     onOpen,
@@ -26,7 +26,7 @@ export function SettingsRowOpen({
     label,
     onOpen,
 }: {
-    /** The button's accessible name, such as "Open lar-server". */
+    /** The button's accessible name, such as "Open api". */
     label: string;
     /** Called as the reader opens the page. */
     onOpen: () => void;

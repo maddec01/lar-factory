@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 /** A LabelChip drawn quiet, as the List's label column and an item's tracker tags show them: no fill, muted 400 words,
  *  its colour dot softened towards the text in light mode; `title` says where it comes from, such as "Azure DevOps tag:
- *  Blocked". (lar-web: a LabelChip `presentation="quiet"` would replace these descendant rules.) */
+ *  Blocked". (design system: a LabelChip `presentation="quiet"` would replace these descendant rules.) */
 export function QuietLabel({
     title,
     children,

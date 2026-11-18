@@ -1,7 +1,7 @@
 // The details the item dialog last fetched for each item, reused on reopen while the board's updatedAt for the item is
 // still the one they were read at. Checked on 2026-10-27: a new comment advances updatedAt on both providers, so both
-// cache. GitHub: in lar-server#203 the issue's updatedAt equals its last comment's createdAt, and no issue or pull
-// request of lar-factory or lar-server has an updatedAt before its last comment. Azure DevOps: a comment is a
+// cache. GitHub: in one observed issue the issue's updatedAt equals its last comment's createdAt, and no issue or pull
+// request in the repositories checked has an updatedAt before its last comment. Azure DevOps: a comment is a
 // revision of the work item (its text goes to System.History), and a revision sets System.ChangedDate.
 
 import type { ItemComment, ItemDetails } from '@lar-factory/shared';

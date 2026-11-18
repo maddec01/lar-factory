@@ -17,7 +17,7 @@ import { stepText } from './StepText';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { LoadingScreen as Screen } from '@/ui/board';
 
-/** The draw (lar-apple's LarLogoMark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
+/** The draw (the Lar logo mark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
 const DRAW_MS = 1750;
 const EXIT_MS = 600;
 const ROLL_MS = 380;

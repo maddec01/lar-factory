@@ -19,7 +19,7 @@
     /* A stage the work has already passed, on a stage track. */
     --color-board-past: color-mix(in srgb, var(--color-fg) 40%, transparent);
     /* The tile under a project's own image icon: ink in both themes, as projects' own tiles are, so a favicon drawn in
-       white on a clear ground (lar-platform's) reads as a tile like the rest rather than vanishing on a light page or
+       white on a clear ground (as some do) reads as a tile like the rest rather than vanishing on a light page or
        glaring on a dark one. */
     --color-board-icon-tile: var(--color-palette-ink);
 }

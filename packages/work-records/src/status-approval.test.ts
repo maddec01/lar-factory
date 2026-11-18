@@ -57,7 +57,7 @@ async function fixture() {
     records.recordDoubt(build, reviewed.packageDigest, 'Doubt', 'Product contracts checked.');
     records.recordGate(build, revision(build), {
         briefDigest: records.gate(build).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Approved.',
     });
     records.update(build, revision(build), { status: 'Ready' });
@@ -130,7 +130,7 @@ it('excludes explicit status/history sections but invalidates a changed chosen p
     records.recordDoubt(build, input.packageDigest, 'Doubt', 'Checked.');
     records.recordGate(build, records.read(build).revision, {
         briefDigest: records.gate(build).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes.',
     });
     write(

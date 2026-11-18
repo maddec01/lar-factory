@@ -66,12 +66,12 @@ test('a build proposes its own retro before merge and the board takes the choice
     expect(proposal).toMatchObject({ pr: 'owner/repo#1', suggestions, choice: null });
     expect(s.records.read(s.id).status).toBe('Ready to merge');
     expect(s.records.proposeRetro(s.id, s.at(), suggestions)).toEqual(proposal);
-    expect(() => s.records.chooseRetro(s.id, s.at() - 1, [], 'Pedro')).toThrow(/revision|changed/i);
+    expect(() => s.records.chooseRetro(s.id, s.at() - 1, [], 'User')).toThrow(/revision|changed/i);
     for (const invalid of [[-1], [1], [0, 0], ['0']])
-        expect(() => s.records.chooseRetro(s.id, s.at(), invalid as number[], 'Pedro')).toThrow(/listed/);
+        expect(() => s.records.chooseRetro(s.id, s.at(), invalid as number[], 'User')).toThrow(/listed/);
     expect(s.records.retro(s.id)?.choice).toBeNull();
-    s.records.chooseRetro(s.id, s.at(), [0], 'Pedro');
-    expect(() => s.records.chooseRetro(s.id, s.at(), [], 'Pedro')).toThrow(/awaiting/);
+    s.records.chooseRetro(s.id, s.at(), [0], 'User');
+    expect(() => s.records.chooseRetro(s.id, s.at(), [], 'User')).toThrow(/awaiting/);
     expect(() => s.records.proposeRetro(s.id, s.at(), [])).toThrow(/already recorded/);
 
     const captured = s.records.retro(s.id)!;
@@ -85,7 +85,7 @@ test('a build proposes its own retro before merge and the board takes the choice
         expect(reopened.retro(s.id)).toMatchObject({
             suggestions,
             captures: [{ ...proposal.captures[0], complete: true }],
-            choice: { selected: [0], by: 'Pedro' },
+            choice: { selected: [0], by: 'User' },
         });
     } finally {
         reopened.close();
@@ -97,7 +97,7 @@ test('Retro proposals and saved picks survive merge with revision and delivery g
 
     s.records.proposeRetro(s.id, s.at(), suggestions);
     s.merge();
-    expect(s.records.chooseRetro(s.id, s.at(), [0], 'Pedro').choice?.selected).toEqual([0]);
+    expect(s.records.chooseRetro(s.id, s.at(), [0], 'User').choice?.selected).toEqual([0]);
 
     const late = await setup();
 
@@ -116,7 +116,7 @@ test('Retro proposals and saved picks survive merge with revision and delivery g
     moved.records.setPullRequest(moved.id, moved.at(), 'owner/repo#2');
     moved.records.observe(moved.id, moved.at(), { of: 'pr', state: 'merged' });
     expect(moved.records.retro(moved.id)?.pr).toBe('owner/repo#1');
-    expect(moved.records.chooseRetro(moved.id, moved.at(), [], 'Pedro').choice?.selected).toEqual([]);
+    expect(moved.records.chooseRetro(moved.id, moved.at(), [], 'User').choice?.selected).toEqual([]);
 });
 
 test('a stored retro that still carries its thread delivery keeps parsing and takes a proposal', async () => {
@@ -156,7 +156,7 @@ test('retention preserves an unanswered Done pick until dismissed, without holdi
         kept: [{ workId: s.id, reason: expect.stringContaining('Retro') }],
     });
     expect(s.records.retro(s.id)?.choice).toBeNull();
-    s.records.chooseRetro(s.id, s.at(), [], 'Pedro');
+    s.records.chooseRetro(s.id, s.at(), [], 'User');
     expect(s.records.hidden(retention, later).map((record) => record.workId)).toEqual([s.id]);
     // The active dependent still keeps its blocker record. Once it is retired too, retention deletes both.
     s.records.setAside(dependent.workId, s.records.read(dependent.workId).revision);

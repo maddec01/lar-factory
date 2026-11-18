@@ -61,7 +61,7 @@ test('S05 R2-002: shared Dependency evidence preserves B/C approvals, while a ch
 
     const manifest = records.gateBatch([b.workId, c.workId]);
 
-    records.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Board fixture.');
+    records.recordGateBatch(manifest, manifest.digest, 'User', 'Board fixture.');
 
     const briefDigests = [b, c].map((r) => records.gate(r.workId).briefDigest);
 

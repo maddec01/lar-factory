@@ -30,7 +30,7 @@ async function fixture() {
         records.setBody(work.workId, rev(work.workId), 'brief', `Exact ${title}`);
         records.recordGate(work.workId, rev(work.workId), {
             briefDigest: records.gate(work.workId).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes',
         });
 
@@ -76,7 +76,7 @@ it('holds missing/stale gates, unmet blockers and a concept with an open pre-tas
     expect(() => records.prepareBuild(build, rev(build), capacity)).toThrow('Only Ready builds');
     records.recordGate(build, rev(build), {
         briefDigest: records.gate(build).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
     records.update(build, rev(build), { status: 'Ready' });
@@ -104,7 +104,7 @@ it('starts a build whose brief names the same files as another active item witho
     records.setBody(build, rev(build), 'brief', 'Files: `src/links.ts`');
     records.recordGate(build, rev(build), {
         briefDigest: records.gate(build).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
     records.update(build, rev(build), { status: 'Ready' });
@@ -120,7 +120,7 @@ it('starts a build sharing a Contracts name with another active build when neith
         records.setBody(id, rev(id), 'brief', text);
         records.recordGate(id, rev(id), {
             briefDigest: records.gate(id).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes',
         });
         records.update(id, rev(id), { status: 'Ready' });
@@ -139,7 +139,7 @@ it('refuses a Consumes line that resolves to no build and a consumer without a b
         records.setBody(build, rev(build), 'brief', text);
         records.recordGate(build, rev(build), {
             briefDigest: records.gate(build).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes',
         });
         records.update(build, rev(build), { status: 'Ready' });
@@ -154,7 +154,7 @@ it('refuses a Consumes line that resolves to no build and a consumer without a b
     expect(records.prepareBuild(build, rev(build), capacity).intent.workId).toBe(build);
 });
 
-it('S08 F01: Pedro waits retain the original slot across answers, amendments, handoff and reopen', async () => {
+it('S08 F01: user waits retain the original slot across answers, amendments, handoff and reopen', async () => {
     const { records, other, rev, ready } = await fixture();
     const a = ready('SA');
     const b = ready('S08 R02 GB — greeting build');
@@ -188,7 +188,7 @@ it('S08 F04: exact T3 wait observation survives a new connection and later scope
     expect(records.read(id).needsYou).toBe('New question still needs an answer');
 });
 
-it('Pedro manual starts record free claims and overrides; automatic claims wait until below the limit', async () => {
+it('User manual starts record free claims and overrides; automatic claims wait until below the limit', async () => {
     const { records, other, rev, ready } = await fixture();
     const a = ready('Manual first');
     const b = ready('Manual override');
@@ -267,11 +267,11 @@ it('S05-F2-001: board actions cannot create independent owner notices', async ()
     const at = () => records.read(id).revision;
 
     records.setReleasePlan(id, at(), {
-        steps: [{ id: 'approve-joint-activation', who: 'Pedro', what: 'Approve activation' }],
+        steps: [{ id: 'approve-joint-activation', who: 'User', what: 'Approve activation' }],
         outcomeCheck: 'Composition',
     });
     for (const reason of [
-        'Release step approve-joint-activation awaits Pedro in the board.',
+        'Release step approve-joint-activation awaits the user in the board.',
         'Please approve the brief gate in the board.',
     ]) {
         expect(() => records.setNeedsYou(id, at(), reason)).toThrow(/board|release step/i);
@@ -282,8 +282,8 @@ it('S05-F2-001: board actions cannot create independent owner notices', async ()
     records.waitForUser(id, at(), 'Which activation region should we use?');
     expect(records.read(id).needsYou).toContain('Which activation region');
     records.resumeFromUser(id, at(), 'Shaping');
-    records.completeReleaseStep(id, at(), 'approve-joint-activation', 'Pedro', 'Exact manifest approved.');
-    expect(() => records.waitForUser(id, at(), 'No Pedro activation receipt is recorded.')).toThrow(
+    records.completeReleaseStep(id, at(), 'approve-joint-activation', 'User', 'Exact manifest approved.');
+    expect(() => records.waitForUser(id, at(), 'No user activation receipt is recorded.')).toThrow(
         /release step approve-joint-activation/,
     );
 });

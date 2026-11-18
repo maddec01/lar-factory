@@ -35,7 +35,7 @@ test('a pending Verify head read stays loading, retries and enables results with
                               pr: `${item.repo}#8`,
                               revision: 5,
                               testSteps: 'Press Say hello.',
-                              by: 'Pedro',
+                              by: 'User',
                           },
                       }),
                   );

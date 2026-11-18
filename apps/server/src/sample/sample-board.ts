@@ -164,7 +164,7 @@ export async function createSampleBoard(board: BoardState, fixture: BoardData) {
         briefApprovalDeps: {
             refresh: (id) => refreshSpecs(records, { provider, dir, workId: id }),
             sync: () => syncSpecs(records, { provider, dir }),
-            identity: () => 'Sample Pedro',
+            identity: () => 'Sample user',
             send: verification.dependencies.send,
         },
         outcomeDeps: { send: verification.dependencies.send },

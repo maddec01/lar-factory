@@ -36,7 +36,7 @@ test('board approval settles only the duplicate T3 question and durably resumes 
         records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
         records.setReleasePlan(id, at(), {
             steps: [
-                { id: 'approve', who: 'Pedro', what: 'Approve activation of exact manifest' },
+                { id: 'approve', who: 'User', what: 'Approve activation of exact manifest' },
                 { id: 'activate', who: 'Agent', what: 'Activate approved manifest' },
             ],
             outcomeCheck: 'Actual composition',
@@ -78,7 +78,7 @@ test('board approval settles only the duplicate T3 question and durably resumes 
                 await create().completeReleaseStep(id, {
                     revision: at(),
                     stepId: 'approve',
-                    evidence: 'Pedro approved manifest SHA256 abc, exact A/B/C SHAs.',
+                    evidence: 'The user approved manifest SHA256 abc, exact A/B/C SHAs.',
                 })
             ).status,
         ).toBe(200);
@@ -93,7 +93,7 @@ test('board approval settles only the duplicate T3 question and durably resumes 
         expect(send.mock.calls[1]![0]).toMatchObject({
             type: 'runtime-request.respond',
             requestId: 'q2',
-            answers: { '0': expect.stringContaining('Pedro approved manifest SHA256 abc') },
+            answers: { '0': expect.stringContaining('The user approved manifest SHA256 abc') },
         });
         expect(send.mock.calls[2]![0]).toMatchObject({
             type: 'message.dispatch',

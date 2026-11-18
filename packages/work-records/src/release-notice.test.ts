@@ -37,7 +37,7 @@ test.each(['matching', 'mismatched manifest'])(
             records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
             records.setReleasePlan(id, at(), {
                 steps: [
-                    { id: 'approve-joint-activation', who: 'Pedro', what: 'Approve exact manifest' },
+                    { id: 'approve-joint-activation', who: 'User', what: 'Approve exact manifest' },
                     { id: 'activate', who: 'Agent', what: 'Activate approved manifest' },
                 ],
                 outcomeCheck: 'Composition',
@@ -46,7 +46,7 @@ test.each(['matching', 'mismatched manifest'])(
                 id,
                 at(),
                 'approve-joint-activation',
-                'Pedro',
+                'User',
                 fixture.recordedApproval.evidence,
             );
 

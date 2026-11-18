@@ -14,7 +14,7 @@ const ownerAtWork = (thread: ItemThread) =>
     thread.state !== 'needs you' &&
     (thread.state === 'running' || thread.currentRunning || thread.hasRunningChildren);
 
-/** Maintenance is progress only while a current owner is working; the checklist alone asks nothing of Pedro. */
+/** Maintenance is progress only while a current owner is working; the checklist alone asks nothing of the user. */
 export function groupProgress(parent: Item, all: readonly Item[], unavailable = false) {
     if (unavailable || parent.paused || parent.setAside || complete(parent)) return undefined;
 

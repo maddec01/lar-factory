@@ -48,7 +48,7 @@ async function fixture(amend = true) {
         path.includes('collaborators')
             ? { permission: 'write' }
             : path.includes('comments')
-              ? { html_url: url, user: { login: 'Pedro', type: 'User' }, body: 'Please support Enter too.' }
+              ? { html_url: url, user: { login: 'User', type: 'User' }, body: 'Please support Enter too.' }
               : { html_url: 'https://github.com/example/repo/pull/1', state: 'open', merged: false };
 
     return { records, id, display, url, read };
@@ -94,7 +94,7 @@ test('authorization precedes the correction, survives lifecycle progress, and re
     const f = await fixture(false);
 
     await beginPrAmendment(f.records, f.id, f.url, f.read);
-    expect(f.records.prLoop(f.id).amendment).toMatchObject({ source: f.url, by: 'Pedro' });
+    expect(f.records.prLoop(f.id).amendment).toMatchObject({ source: f.url, by: 'User' });
     f.records.setBody(f.id, f.records.read(f.id).revision, 'brief', completeBrief('Accept Enter too.'));
 
     const input = f.records.doubtPackage(f.id);
@@ -130,7 +130,7 @@ test('one producer comment amends a linked consumer without a PR and binds the p
     f.records.setBody(consumer, rev(consumer), 'brief', completeBrief('Click to greet.'));
     f.records.recordGate(consumer, rev(consumer), {
         briefDigest: f.records.gate(consumer).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Original approval',
     });
     await beginPrAmendment(f.records, f.id, f.url, f.read, [consumer]);

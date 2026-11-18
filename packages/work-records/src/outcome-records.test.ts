@@ -45,12 +45,12 @@ async function setup() {
 
     records.setPullRequest(part, at(part), 'sample/repo#1');
     records.setReleasePlan(group, at(), {
-        steps: [{ id: 'activate', who: 'Pedro', what: 'Activate' }],
+        steps: [{ id: 'activate', who: 'User', what: 'Activate' }],
         outcomeCheck: 'Check merged composition.',
     });
 
     const merge = () => records.observe(part, at(part), { of: 'pr', state: 'merged' });
-    const release = () => records.completeReleaseStep(group, at(), 'activate', 'Pedro', 'Activated receipt.');
+    const release = () => records.completeReleaseStep(group, at(), 'activate', 'User', 'Activated receipt.');
 
     return { records, group, part, at, path, merge, release };
 }

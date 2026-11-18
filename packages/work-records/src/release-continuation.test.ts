@@ -29,7 +29,7 @@ test('release receipt atomically queues its owner, survives reopen and ignores u
         records.setPullRequest(part.workId, part.revision, 'fake/app#1');
         records.setReleasePlan(id, at(), {
             steps: [
-                { id: 'approve', who: 'Pedro', what: 'Approve activation of manifest' },
+                { id: 'approve', who: 'User', what: 'Approve activation of manifest' },
                 { id: 'activate', who: 'Agent', what: 'Activate approved manifest' },
             ],
             outcomeCheck: 'Check actual composition',
@@ -37,7 +37,7 @@ test('release receipt atomically queues its owner, survives reopen and ignores u
         expect(records.prepareReleaseContinuation(id).run).toBeNull();
         records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
         expect(records.prepareReleaseContinuation(id).run).toBeNull();
-        records.completeReleaseStep(id, at(), 'approve', 'Pedro', 'Manifest SHA256 approved, exact merged SHAs.');
+        records.completeReleaseStep(id, at(), 'approve', 'User', 'Manifest SHA256 approved, exact merged SHAs.');
 
         const first = records.releaseContinuation(id).run!;
 

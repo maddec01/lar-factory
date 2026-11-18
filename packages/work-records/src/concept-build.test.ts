@@ -38,7 +38,7 @@ async function fixture() {
         records.update(build.workId, change(build.workId), { status: 'Ready' });
         records.recordGate(build.workId, change(build.workId), {
             briefDigest: records.gate(build.workId).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes',
         });
     };

@@ -376,10 +376,10 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
             },
         },
     );
-    dependency = records.markDependencyMet(dependency.dependencyId, dependency.revision, 'pedro');
+    dependency = records.markDependencyMet(dependency.dependencyId, dependency.revision, 'user');
     assert.deepEqual(
         shown().map((b) => [b.state, b.dependency!.met?.by]),
-        [['closed', 'pedro']],
+        [['closed', 'user']],
     );
     records.observeDependency(dependency.dependencyId, dependency.revision, {
         subject: 'maddec01/lar-server#40',
@@ -699,7 +699,7 @@ test('a stale gate at Ready explains the hold and asks for renewed board approva
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved brief.'));
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Changed brief.'));
@@ -724,7 +724,7 @@ test('S03 amended gate waits for Doubt on its current digest before advertising 
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Approved D1.'));
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
     work = records.setBuildBranch(work.workId, work.revision, 'build/same');
@@ -811,7 +811,7 @@ test('stale approval names the changed cited answer, contract or brief', async (
         records.recordDoubt(build, records.doubtPackage(build).packageDigest, 'Doubt', 'Checked.');
         records.recordGate(build, revision(build), {
             briefDigest: records.gate(build).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes.',
         });
     };
@@ -886,7 +886,7 @@ test.each(['bug', 'feature'] as const)(
         const records = await open();
         const r = records.create({ title: 'Greeting', repository: REPO, kind, status: 'Shaping', ticket: `${REPO}#7` });
 
-        records.confirmScope(r.workId, r.revision, singleScope, 'Pedro', 'Yes.');
+        records.confirmScope(r.workId, r.revision, singleScope, 'User', 'Yes.');
         assert.equal(records.chooseStructure(r.workId).structure, 'single');
 
         const reader = await openReader();
@@ -933,7 +933,7 @@ test.each([{ structure: 'linked', openDecisions: [], kind: 'build' }] as const)(
             r.workId,
             r.revision,
             { ...singleScope, repositories: [REPO, OTHER_REPO], openDecisions: choice.openDecisions },
-            'Pedro',
+            'User',
             'Yes.',
         );
         assert.equal(records.chooseStructure(r.workId).structure, choice.structure);
@@ -949,7 +949,7 @@ test('a linked PR amendment shows no duplicate gate before or after fresh Doubt,
     work = records.setBody(work.workId, work.revision, 'brief', completeBrief('Original scope.'));
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Approved.',
     });
 
@@ -962,7 +962,7 @@ test('a linked PR amendment shows no duplicate gate before or after fresh Doubt,
 
     state.amendment = {
         source: 'https://github.com/example/repo/pull/4#issuecomment-1',
-        by: 'Pedro',
+        by: 'User',
         evidence: 'Enter too.',
     };
     records.savePrLoop(id, state);
@@ -975,7 +975,7 @@ test('a linked PR amendment shows no duplicate gate before or after fresh Doubt,
     consumer = records.setBody(consumer.workId, consumer.revision, 'brief', completeBrief('Original scope.'));
     records.recordGate(consumer.workId, consumer.revision, {
         briefDigest: records.gate(consumer.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Approved.',
     });
     records.beginLinkedPrAmendment(id, state.amendment, [consumer.workId]);

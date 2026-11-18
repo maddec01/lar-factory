@@ -1,4 +1,4 @@
-import { isPedroReleaseStep } from '@lar-factory/shared';
+import { isUserReleaseStep } from '@lar-factory/shared';
 
 import { applyAgentWrite } from './agent-apply.ts';
 import { agentConceptWrites } from './agent-concept-writes.ts';
@@ -161,7 +161,7 @@ export function agentWrites(records: WorkRecords): WorkRecords {
         completeReleaseStep: (id, revision, stepId, by, evidence) => {
             const step = records.releasePlan(id)?.steps.find((step) => step.id === stepId);
 
-            if (step && isPedroReleaseStep(step)) requireHumanAction('Mark release step done');
+            if (step && isUserReleaseStep(step)) requireHumanAction('Mark release step done');
 
             return records.completeReleaseStep(id, revision, stepId, by, evidence);
         },

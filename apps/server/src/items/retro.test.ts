@@ -66,7 +66,7 @@ async function setup() {
             ],
         });
     };
-    const commands = createRetro({ board, records, reread, identity: () => 'Pedro' });
+    const commands = createRetro({ board, records, reread, identity: () => 'User' });
 
     reread();
 
@@ -95,7 +95,7 @@ test('before merge, one desk wait lists all suggestions, creates only picks, and
 
     expect(result.status).toBe(200);
     expect(s.records.list({ status: 'List' }).map((r) => r.title)).toEqual(['Document a retry']);
-    expect(s.records.retro(s.id)?.choice).toMatchObject({ selected: [1], by: 'Pedro' });
+    expect(s.records.retro(s.id)?.choice).toMatchObject({ selected: [1], by: 'User' });
     expect(deskWait(s.board.find(s.id)!).label).not.toBe('Choose follow-ups');
     expect((await s.commands.chooseRetro(s.id, { revision: s.at(), selected: [1] })).status).toBe(409);
     expect(s.records.list({ status: 'List' })).toHaveLength(1);

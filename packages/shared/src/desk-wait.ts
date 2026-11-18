@@ -4,7 +4,7 @@ import { nextAction } from './item-next-action.ts';
 import { deliveryPrStatus } from './presentation.ts';
 import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
 import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
-import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
+import { outcomeNeedsUser, pendingUserReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import {
     canResumeShaping,
@@ -14,7 +14,7 @@ import {
     stoppedRunThread,
 } from './thread-domain.ts';
 
-/** Closure alone is insufficient: evidence must be available for Pedro to inspect and accept. */
+/** Closure alone is insufficient: evidence must be available for the user to inspect and accept. */
 export const dependencyProofs = (item: Item) =>
     item.status === 'Done' || item.setAside
         ? []
@@ -56,7 +56,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
             action: { kind: 'details' as const, label: 'Accept dependency proof' },
         };
 
-    if (outcomeNeedsPedro(item, all) && item.releasePlan?.outcomeCheck.result === 'failed') {
+    if (outcomeNeedsUser(item, all) && item.releasePlan?.outcomeCheck.result === 'failed') {
         const fix = item.outcomeCheck?.run?.fixProposal;
 
         if (fix?.sent)
@@ -71,7 +71,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
         };
     }
 
-    if (outcomeNeedsPedro(item, all))
+    if (outcomeNeedsUser(item, all))
         return { label: 'Outcome check', action: { kind: 'details' as const, label: 'Record Outcome' } };
 
     if (pendingBriefBatch(item, all).length)
@@ -83,7 +83,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.briefApproval && !inBatch)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
 
-    if (pendingPedroReleaseStep(item.releasePlan))
+    if (pendingUserReleaseStep(item.releasePlan))
         return { label: 'Release step', action: { kind: 'details' as const, label: 'Mark release step done' } };
 
     const concept = unavailable ? undefined : questionOwnerParent(item, all);

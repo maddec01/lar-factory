@@ -130,9 +130,9 @@ describe('Dependencies', () => {
             reasons: [`Its Dependency ${id} on acme/auth isn't met.`],
         });
 
-        const met = records.markDependencyMet(id, 4, 'pedro');
+        const met = records.markDependencyMet(id, 4, 'user');
 
-        expect(met).toMatchObject({ met: { by: 'pedro', at: expect.any(String) }, needsReview: false, revision: 5 });
+        expect(met).toMatchObject({ met: { by: 'user', at: expect.any(String) }, needsReview: false, revision: 5 });
         expect(records.waitingOn(build.workId)).toEqual([]);
         expect(records.completion(build.workId).complete).toBe(true);
         expect(records.clearDependencyMet(id, 5).met).toBeNull();
@@ -144,17 +144,17 @@ describe('Dependencies', () => {
         const id = dependency.dependencyId;
 
         records.observeDependency(id, 2, { subject: 'acme/auth#9', kind: 'merged' });
-        records.markDependencyMet(id, 3, 'pedro');
+        records.markDependencyMet(id, 3, 'user');
         expect(records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'merged' }).needsReview).toBe(false);
 
         const changed = records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'reopened' });
 
-        expect(changed).toMatchObject({ met: { by: 'pedro' }, needsReview: true });
+        expect(changed).toMatchObject({ met: { by: 'user' }, needsReview: true });
         expect(changed.observations).toEqual([
             { subject: 'acme/auth#9', kind: 'reopened', detail: null, observedAt: expect.any(String), lastGood: null },
         ]);
         expect(records.waitingOn(build.workId)).toEqual([]);
-        expect(records.markDependencyMet(id, 6, 'pedro')).toMatchObject({ needsReview: false });
+        expect(records.markDependencyMet(id, 6, 'user')).toMatchObject({ needsReview: false });
     });
 
     it('swaps its blocker references on every dependent build for a named build in one transaction', async () => {
@@ -166,14 +166,14 @@ describe('Dependencies', () => {
         const id = dependency.dependencyId;
 
         records.addDependencyBlock(id, 2, second.workId);
-        records.markDependencyMet(id, 3, 'pedro');
+        records.markDependencyMet(id, 3, 'user');
 
         const replaced = records.replaceDependencyWithBuild(id, 4, replacement.workId);
 
         expect(replaced).toMatchObject({
             blocks: [],
             replacedBy: replacement.workId,
-            met: { by: 'pedro' },
+            met: { by: 'user' },
             handover: NEED.handover,
         });
         for (const dependent of [build, second]) {

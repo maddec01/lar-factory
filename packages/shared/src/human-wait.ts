@@ -2,8 +2,8 @@ import { dependencyProofs, deskWait } from './desk-wait.ts';
 import type { Item } from './item-domain.ts';
 import { deliveryPrStatus, prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
-import { releaseNeedsPedro, supersededReleaseQuestion } from './release-continuation.ts';
-import { outcomeNeedsPedro, pendingPedroReleaseStep } from './release-plan.ts';
+import { releaseNeedsUser, supersededReleaseQuestion } from './release-continuation.ts';
+import { outcomeNeedsUser, pendingUserReleaseStep } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-domain.ts';
 
@@ -31,7 +31,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         !item.briefApproval &&
         !item.needsYou &&
         !retroWaits(item.retro) &&
-        !pendingPedroReleaseStep(item.releasePlan) &&
+        !pendingUserReleaseStep(item.releasePlan) &&
         delegatedBriefApproval(item, all)
     )
         return null;
@@ -51,13 +51,13 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
             pr.mergeState === 'conflicts');
     const waiting =
         reviewWait ||
-        releaseNeedsPedro(item, all) ||
+        releaseNeedsUser(item, all) ||
         (item.status !== 'Done' &&
             Array.isArray(item.threads) &&
             item.threads.some((thread) => !thread.observedAt && supersededReleaseQuestion(item, thread))) ||
-        outcomeNeedsPedro(item, all) ||
+        outcomeNeedsUser(item, all) ||
         retroWaits(item.retro) ||
-        !!pendingPedroReleaseStep(item.releasePlan) ||
+        !!pendingUserReleaseStep(item.releasePlan) ||
         !!item.briefApproval ||
         item.status === 'Needs you' ||
         (item.status !== 'Done' && !!openQuestionThread(item)) ||

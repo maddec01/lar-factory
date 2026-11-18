@@ -24,7 +24,7 @@ const row = (workId: string, at?: string, blockers: string[] = []): OrderedWork 
                   sourceRevision: 1,
                   gateId: workId,
                   briefDigest: 'digest',
-                  approvedBy: 'Pedro',
+                  approvedBy: 'User',
                   evidence: 'yes',
                   recordedAt: at,
               }

@@ -20,7 +20,7 @@ export async function sampleBriefApproval(
     records.recordDoubt(id, records.doubtPackage(id).packageDigest, 'Sample Doubt', 'Fake approved brief reviewed.');
     records.recordGate(id, work.revision, {
         briefDigest: records.gate(id).briefDigest!,
-        approvedBy: 'Sample Pedro',
+        approvedBy: 'Sample user',
         evidence: 'Fake previous board approval.',
     });
     await syncSpecs(records, { ...specSync, workId: id });

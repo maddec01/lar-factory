@@ -90,7 +90,7 @@ test('S05-F4-001 refuses C’s constant-only acceptance at single and batch gate
         JSON.stringify({
             source,
             test: 'test/sim-891/view.test.mjs: renders supplied accepted text',
-            output: 'B returns a string; golden fixture Hello, Pedro!',
+            output: 'B returns a string; golden fixture Hello, world!',
             input: 'displayGreeting(element, acceptedText)',
         }) +
         '\n';

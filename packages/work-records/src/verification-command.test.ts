@@ -9,7 +9,7 @@ import { openWorkRecords } from './work-records.ts';
 
 const execute = promisify(execFile);
 
-test('CLI observes heads but refuses an agent-authored Verify result naming Pedro', { timeout: 15000 }, async () => {
+test('CLI observes heads but refuses an agent-authored Verify result naming the user', { timeout: 15000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-cli-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
 
@@ -37,14 +37,14 @@ test('CLI observes heads but refuses an agent-authored Verify result naming Pedr
                 pr: 'owner/repo#8',
                 head,
                 result: 'pass',
-                by: 'Pedro',
+                by: 'User',
                 note: null,
                 testSteps: '1. Test it.',
             }),
         );
         await expect(
             cli('record-verification', '--revision', String(records.read(work.workId).revision), '--file', file),
-        ).rejects.toMatchObject({ stderr: expect.stringContaining('requires Pedro') });
+        ).rejects.toMatchObject({ stderr: expect.stringContaining('requires the user') });
         expect(JSON.parse((await cli('verification')).stdout).latest).toBeNull();
         expect(records.read(work.workId).status).toBe('Verify');
     } finally {

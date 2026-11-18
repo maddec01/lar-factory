@@ -5,7 +5,7 @@ import { $, detailsRead, detailsReply, fetchMock, mountPage, sample, settle, tex
 
 const parent = sample.items.find((item) => item.kind === 'concept')!;
 const base = sample.items.find((item) => item.kind !== 'concept')!;
-const receipt = { by: 'Pedro', at: '2026-11-13T12:00:00Z', evidence: `Manifest SHA256 ${'a'.repeat(64)}` };
+const receipt = { by: 'User', at: '2026-11-13T12:00:00Z', evidence: `Manifest SHA256 ${'a'.repeat(64)}` };
 
 function group(kind: 'feature' | 'concept', done: boolean): BoardData {
     const root: Item = {
@@ -23,7 +23,7 @@ function group(kind: 'feature' | 'concept', done: boolean): BoardData {
         subIssues: { total: 2, completed: 2 },
         completion: { complete: done, reasons: done ? [] : ['Activation pending.'] },
         releasePlan: {
-            steps: [{ id: 'activate', who: 'Pedro', what: 'Activate the merged bundle', done: done ? receipt : null }],
+            steps: [{ id: 'activate', who: 'User', what: 'Activate the merged bundle', done: done ? receipt : null }],
             outcomeCheck: {
                 what: 'Check the delivered result',
                 result: done ? 'passed' : 'pending',

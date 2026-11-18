@@ -15,14 +15,14 @@ test('generated proof facts escape external text and stay outside retained Markd
                 owner: '<script>team</script>',
                 need: 'v1',
                 evidence: 'Verified <img src=x>',
-                met: { by: 'Pedro', at: 'now' },
+                met: { by: 'User', at: 'now' },
                 needsReview: true,
             },
         ]);
 
         expect(annotated).toContain('&lt;script&gt;');
         expect(annotated).not.toContain('<script>');
-        expect(annotated).toContain('Met by Pedro');
+        expect(annotated).toContain('Met by User');
         expect(readTicketSpec(annotated)).toEqual(readTicketSpec(body));
         expect(markDependencyStatus(annotated, [])).toBe(markSpecFreshness(body, true));
     }

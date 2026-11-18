@@ -3,9 +3,9 @@ Show the accepted greeting in a tiny static sandbox page.
 
 ## Done when
 ### Behaviour
-- Display the accepted "Hello, Pedro!" greeting in a tiny static sim-891.html fixture.
+- Display the accepted "Hello, world!" greeting in a tiny static sim-891.html fixture.
 ### Tests
-- test/sim-891/view.test.mjs: the accepted fixed greeting is displayed as exactly "Hello, Pedro!".
+- test/sim-891/view.test.mjs: the accepted fixed greeting is displayed as exactly "Hello, world!".
 - Preserve all existing greeting APIs/tests, Hello, friend! behavior, index.html and its keyboard behavior.
 
 ## Scope
@@ -20,10 +20,10 @@ Show the accepted greeting in a tiny static sandbox page.
 - Service, auth, internet calls, secrets, dependency changes, production deployment and follow-ups.
 
 ## Verify
-yes: sim-891.html visibly displays the accepted "Hello, Pedro!" greeting; index.html and its keyboard behavior remain unchanged.
+yes: sim-891.html visibly displays the accepted "Hello, world!" greeting; index.html and its keyboard behavior remain unchanged.
 
 ## Confirmed
-The fixed greeting contract and preservation constraints were confirmed by Pedro. This repository's part has no open product decisions.
+The fixed greeting contract and preservation constraints were confirmed by the user. This repository's part has no open product decisions.
 
 ## Notes for the builder
 Contracts: `accepted greeting text`

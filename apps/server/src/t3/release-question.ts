@@ -1,4 +1,4 @@
-import { isRecord, releaseApprovalStep, type ReleasePlan } from '@lar-factory/shared';
+import { isHumanRole, isRecord, releaseApprovalStep, type ReleasePlan } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 
 import { readExecutionProjection } from './execution-capabilities.ts';
@@ -41,7 +41,7 @@ export async function settleReleaseQuestion(
                 typeof question.question === 'string' ? question.question : undefined,
             );
 
-            if (typeof question.id !== 'string' || !step?.done || step.done.by !== 'Pedro')
+            if (typeof question.id !== 'string' || !step?.done || !isHumanRole(step.done.by))
                 throw new Error('The release owner has an independent question. Answer it in T3.');
 
             answers[question.id] =

@@ -95,7 +95,7 @@ it('counts builds against the build limit while they start, build or work again,
     ).toEqual(['starting', 'may', 'progress', 'review', 'again']);
 });
 
-it('S08 F01: every started build retains its slot throughout Pedro waits and handoffs', () => {
+it('S08 F01: every started build retains its slot throughout user waits and handoffs', () => {
     const items = ['Needs you', 'Shaping', 'Verify', 'Ready to merge'].map(
         (status, i) =>
             ({

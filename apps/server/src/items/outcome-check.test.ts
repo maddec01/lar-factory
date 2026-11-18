@@ -52,7 +52,7 @@ test('board Outcome receipt rejects stale/invalid input, fixes its actor and fin
                 expect((await submit({ evidence })).status).toBe(409);
             expect((await submit({ result: 'yes' })).status).toBe(409);
             expect((await submit({ by: 'Agent' })).status).toBe(200);
-            expect(records.releasePlan(id)?.outcomeCheck.evidence?.by).toBe('Pedro');
+            expect(records.releasePlan(id)?.outcomeCheck.evidence?.by).toBe('User');
             expect(records.read(id).status).toBe('Done');
             expect((await submit()).status).toBe(409);
         }

@@ -1,3 +1,4 @@
+import { HUMAN_ROLE } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
 import type { BoardState } from '../board/board-state.ts';
@@ -53,7 +54,7 @@ export function createOutcomeCheck({
                         threadId: run.threadId,
                         attachments: [],
                         dispatchMode: { type: 'queue_after_active' },
-                        text: `All active parts of group ${item.id} are Done and every release step is complete. Run its final Outcome check now, once, as this group's owner. Read lar-work release-plan ${item.id}, children, completion and the current map/answers. Browser checks use T3 browser preview only; serve local static output with a local static HTTP server on a free port, then stop it. Never launch another browser or import tools from other checkouts. Check the actual merged revisions together, using the recorded Outcome criterion: ${item.releasePlan.outcomeCheck.what}\nRecord the measured evidence, commands/results and exact merged SHAs with lar-work record-outcome-check ${item.id} --revision N --input-digest ${run.digest} --result passed|failed --identity "Outcome owner" --evidence "observed evidence". Read the current parent revision first. Do not infer success from merges alone. If the check needs Pedro, record failed with the reason; the board offers him the Outcome action. Gates, Verify, release steps, Outcome and merges use board controls. End the turn; never duplicate their recorded waits with a generic Needs you notice or a T3 question. Reconcile affected projections after the check. The board derives Done from passing evidence.`,
+                        text: `All active parts of group ${item.id} are Done and every release step is complete. Run its final Outcome check now, once, as this group's owner. Read lar-work release-plan ${item.id}, children, completion and the current map/answers. Browser checks use T3 browser preview only; serve local static output with a local static HTTP server on a free port, then stop it. Never launch another browser or import tools from other checkouts. Check the actual merged revisions together, using the recorded Outcome criterion: ${item.releasePlan.outcomeCheck.what}\nRecord the measured evidence, commands/results and exact merged SHAs with lar-work record-outcome-check ${item.id} --revision N --input-digest ${run.digest} --result passed|failed --identity "Outcome owner" --evidence "observed evidence". Read the current parent revision first. Do not infer success from merges alone. If the check needs the user, record failed with the reason; the board offers them the Outcome action. Gates, Verify, release steps, Outcome and merges use board controls. End the turn; never duplicate their recorded waits with a generic Needs you notice or a T3 question. Reconcile affected projections after the check. The board derives Done from passing evidence.`,
                     });
 
                     records.outcomeCheckDelivered(
@@ -98,7 +99,7 @@ export function createOutcomeCheck({
                         threadId: proposal.threadId,
                         attachments: [],
                         dispatchMode: { type: 'queue_after_active' },
-                        text: `Pedro requested a fix proposal for group ${id}. Outcome failed: ${plan.outcomeCheck.what}\nEvidence: ${plan.outcomeCheck.evidence?.evidence}\nRead the parent, children, current map and release plan. Preserve the failed evidence. Propose the smallest fix part using normal lar-work create-parts; reconcile briefs, blockers, map and release order. Amend the release plan to include the fix merged revision and fresh activation before a new Outcome check; preserve prior failed evidence in history. Run Doubt and present a batch gate for Pedro to approve on the board, then stop. Do not rebuild completed parts, retry Outcome, record a replacement pass or start any new build before its gate.`,
+                        text: `The user requested a fix proposal for group ${id}. Outcome failed: ${plan.outcomeCheck.what}\nEvidence: ${plan.outcomeCheck.evidence?.evidence}\nRead the parent, children, current map and release plan. Preserve the failed evidence. Propose the smallest fix part using normal lar-work create-parts; reconcile briefs, blockers, map and release order. Amend the release plan to include the fix merged revision and fresh activation before a new Outcome check; preserve prior failed evidence in history. Run Doubt and present a batch gate for the user to approve on the board, then stop. Do not rebuild completed parts, retry Outcome, record a replacement pass or start any new build before its gate.`,
                     });
 
                     records.outcomeFixDelivered(
@@ -138,7 +139,7 @@ export function createOutcomeCheck({
                     id,
                     input.revision as number,
                     input.result,
-                    'Pedro',
+                    HUMAN_ROLE,
                     input.evidence,
                     current.digest,
                 );

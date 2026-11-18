@@ -520,7 +520,7 @@ test('a build fixing a failed Verify says so in its state cell, with Verify’s 
                         pr: '#40',
                         head: 'b1',
                         result: 'fail',
-                        by: 'Pedro',
+                        by: 'User',
                         at: '',
                         note,
                         testSteps: '',

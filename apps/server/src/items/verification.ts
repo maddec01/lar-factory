@@ -115,7 +115,7 @@ export function createVerification({
             messageId: delivery.messageId,
             attachments: [],
             dispatchMode: { type: 'queue_after_active' },
-            text: `Verify failed for work ${id}, PR ${result.pr}, tested head ${result.head}.\n${result.by}: ${result.note}\nContinue this same build thread, branch/worktree and PR. Treat the reported failure as trusted human review feedback. If it changes scope, retain the original approved input and use stages/recovery.md to record the exact request as approval of the amendment and publish the corrected Spec; ask only for unresolved product choices. Fix the reported failure, run focused checks, select-reviewers for the new head using its returned base/head delta under the frozen build settings, and always run the approver reassessment, and return to Verify for the new head. Do not create another item or PR; do not record a pass for Pedro.`,
+            text: `Verify failed for work ${id}, PR ${result.pr}, tested head ${result.head}.\n${result.by}: ${result.note}\nContinue this same build thread, branch/worktree and PR. Treat the reported failure as trusted human review feedback. If it changes scope, retain the original approved input and use stages/recovery.md to record the exact request as approval of the amendment and publish the corrected Spec; ask only for unresolved product choices. Fix the reported failure, run focused checks, select-reviewers for the new head using its returned base/head delta under the frozen build settings, and always run the approver reassessment, and return to Verify for the new head. Do not create another item or PR; do not record a pass for the user.`,
         });
 
         records.verificationResume(

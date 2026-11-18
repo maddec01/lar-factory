@@ -181,7 +181,7 @@ export function createPrLoop(records: WorkRecords, options: PrLoopOptions) {
 
         if (selected.length) {
             key = `feedback:${JSON.stringify(selected.map((e) => e.id))}`;
-            text = `Pedro chose Address it for feedback on ${record.pullRequest}, head ${next.head.slice(0, 10)}:\n${selected.map((e) => `${e.url} (reviewed head ${(e.head ?? next.head).slice(0, 10)})\n${e.author}: ${JSON.stringify(e.body)}`).join('\n')}\n${resume}`;
+            text = `The user chose Address it for feedback on ${record.pullRequest}, head ${next.head.slice(0, 10)}:\n${selected.map((e) => `${e.url} (reviewed head ${(e.head ?? next.head).slice(0, 10)})\n${e.author}: ${JSON.stringify(e.body)}`).join('\n')}\n${resume}`;
         } else if (next.required === 'failed') {
             key = `checks:${next.head}:${JSON.stringify(next.failures)}`;
             text = `Required PR checks failed for ${record.pullRequest}, head ${next.head.slice(0, 10)}: ${next.failures.join('\n')}\n${resume}`;

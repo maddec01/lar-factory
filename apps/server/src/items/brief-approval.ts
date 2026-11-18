@@ -80,7 +80,7 @@ export function createBriefApproval({
                     threadId: delivery.threadId,
                     attachments: [],
                     dispatchMode: { type: 'queue_after_active' },
-                    text: `The board approved brief gate ${delivery.digest} for work ${owner.workId}. Read the recorded gates; continue this same owner, build branch/worktree and PR when active, and reconcile affected work. Approval is recorded; do not ask Pedro to approve it in chat or start another owner.`,
+                    text: `The board approved brief gate ${delivery.digest} for work ${owner.workId}. Read the recorded gates; continue this same owner, build branch/worktree and PR when active, and reconcile affected work. Approval is recorded; do not ask the user to approve it in chat or start another owner.`,
                 });
 
                 records!.gateResumeResult(

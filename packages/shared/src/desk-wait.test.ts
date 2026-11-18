@@ -140,7 +140,7 @@ test('S05 dependency acceptance waits require proof and delivery, and vanish whe
         { proofState: 'pending' as const },
         { proofState: 'insufficient' as const },
         { proofState: undefined },
-        { met: { by: 'Pedro', at: 'now' } },
+        { met: { by: 'User', at: 'now' } },
         { observation: { ...dependency.observation, kind: 'reopened' as const } },
     ]) {
         const cleared = { ...work, blockers: [{ ...work.blockers[0]!, dependency: { ...dependency, ...change } }] };
@@ -209,7 +209,7 @@ test('group reconciliation stays off the desk and waits for live part owners', (
 test('a pending release step at the last merge shows Release step, not Reconcile group', () => {
     const work = group([pending('map:part', ['brief'])], {
         releasePlan: {
-            steps: [{ id: 'activate', who: 'Pedro', what: 'Activate', shipsWith: [], done: null }],
+            steps: [{ id: 'activate', who: 'User', what: 'Activate', shipsWith: [], done: null }],
             outcomeCheck: { what: 'Check', result: 'pending', evidence: null },
         } as unknown as Item['releasePlan'],
     });

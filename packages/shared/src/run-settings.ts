@@ -152,7 +152,7 @@ export function roleTaskMatches(attempt: Pick<RoleRunInput, 'executionId' | 'tas
 export interface RoleRun extends RoleRunInput {
     /** Only reconciliation's inference may be replaced by the matching terminal T3 result. */
     inferredAbandonment?: boolean;
-    /** An agent/system wait, never a product question for Pedro. */
+    /** An agent/system wait, never a product question for the user. */
     reconciliationHold?: string;
     summary?: string;
     workId: string;

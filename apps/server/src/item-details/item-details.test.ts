@@ -223,7 +223,7 @@ test('a changed brief labels the ticket Spec outdated and retains the last appro
     work = records.setBody(work.workId, work.revision, 'brief', 'Approved D1.');
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
     await syncSpecs(records, specSync);

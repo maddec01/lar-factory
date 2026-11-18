@@ -39,7 +39,7 @@ async function setup() {
         pr: record.pullRequest!,
         head,
         result: 'pass' as 'pass' | 'fail',
-        by: 'Pedro',
+        by: 'User',
         note: null as string | null,
         testSteps: '1. Press the button.',
     };
@@ -52,7 +52,7 @@ test('a pass records the exact head, operator, time and Test steps and survives 
     const s = await setup();
     const state = s.save();
 
-    expect(state.latest).toMatchObject({ head, result: 'pass', by: 'Pedro', testSteps: s.input.testSteps });
+    expect(state.latest).toMatchObject({ head, result: 'pass', by: 'User', testSteps: s.input.testSteps });
     expect(Date.parse(state.latest!.at)).not.toBeNaN();
     expect(verificationPassed(state, head)).toBe(true);
     expect(s.records.read(s.id).status).toBe('Ready to merge');
@@ -193,7 +193,7 @@ test('schema 38 preserves the pre-upgrade latest result in history', async () =>
         pr: 'owner/repo#8',
         head,
         result: 'pass',
-        by: 'Pedro',
+        by: 'User',
         at: '2026-11-13T12:00:00Z',
         note: null,
         testSteps: 'Test it.',
@@ -227,7 +227,7 @@ test('S05 F3: an approved Verify controls the saved wait; recommendations cannot
 
         const display = s.records.displayGate(id);
 
-        s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
+        s.records.recordDisplayedGate(display, display.approvalDigest, 'User', 'Approved');
     };
 
     approve();
@@ -255,7 +255,7 @@ test('an approved scope can omit Verify no without retaining an older human wait
         verify: { required: false, visibleUi: null },
     };
 
-    s.records.confirmScope(id, rev(), scope, 'Pedro', 'Use the recorded checks.');
+    s.records.confirmScope(id, rev(), scope, 'User', 'Use the recorded checks.');
     s.records.setBody(id, rev(), 'brief', completeBrief(`## What\nFit greeting.\n${scopeMarkdown(scope)}`));
     expect(s.records.verification(id).required).toBe(true);
     expect(() => s.records.update(id, rev(), { status: 'Ready to merge' })).toThrow(/gate|approved/i);
@@ -266,7 +266,7 @@ test('an approved scope can omit Verify no without retaining an older human wait
 
     const display = s.records.displayGate(id);
 
-    s.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved');
+    s.records.recordDisplayedGate(display, display.approvalDigest, 'User', 'Approved');
     s.records.update(id, rev(), { status: 'Ready to merge' });
     expect(s.records.verification(id).required).toBe(false);
 });
@@ -299,7 +299,7 @@ test('S05 F3: upgrade replaces legacy recommendation waits only from exact appro
 
         old.db
             .prepare(
-                "INSERT INTO brief_gates(gate_id,work_id,source_revision,brief_digest,approved_by,evidence,recorded_at) VALUES(?,?,1,?,'Pedro','Approved','before')",
+                "INSERT INTO brief_gates(gate_id,work_id,source_revision,brief_digest,approved_by,evidence,recorded_at) VALUES(?,?,1,?,'User','Approved','before')",
             )
             .run(id, id, digest);
         old.db.prepare('UPDATE verification SET head=? WHERE work_id=?').run(head, id);

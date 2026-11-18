@@ -89,7 +89,7 @@ export function sampleRuntimeBatch(records: WorkRecords) {
             build = records.setBody(build.workId, build.revision, 'brief', brief);
             records.recordGate(build.workId, build.revision, {
                 briefDigest: records.gate(build.workId).briefDigest!,
-                approvedBy: 'Sample Pedro',
+                approvedBy: 'Sample user',
                 evidence: 'Fake board approval.',
             });
             build = records.setBuildBranch(build.workId, build.revision, 'sample/build-question');

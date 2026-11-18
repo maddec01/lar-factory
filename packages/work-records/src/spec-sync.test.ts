@@ -422,19 +422,19 @@ test('trusted queued ticket edits refresh starting context without approving a b
     expect(f.records.initialContext(contextId)).toBe('First tracker request.');
     expect(f.records.body(contextId, 'brief')).toBeNull();
     f.edit({
-        body: 'Pedro added reconnect acceptance criteria.',
+        body: 'The user added reconnect acceptance criteria.',
         title: 'Reconnect after address changes',
         version: '2',
     });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
-    expect(f.records.initialContext(contextId)).toBe('Pedro added reconnect acceptance criteria.');
+    expect(f.records.initialContext(contextId)).toBe('The user added reconnect acceptance criteria.');
     expect(f.records.read(contextId).title).toBe('Reconnect after address changes');
     expect(f.records.gate(contextId).evidence).toEqual([]);
     r = f.records.read(contextId);
     r = f.records.setBody(contextId, r.revision, 'brief', 'Approved reconnect brief.');
     f.records.recordGate(contextId, r.revision, {
         briefDigest: f.records.gate(contextId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
     r = f.records.update(contextId, r.revision, { status: 'Ready' });
@@ -443,7 +443,7 @@ test('trusted queued ticket edits refresh starting context without approving a b
 
     f.edit({ body: 'Changed while build runs.', version: '3' });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: contextId });
-    expect(frozen.context).toBe('Pedro added reconnect acceptance criteria.');
+    expect(frozen.context).toBe('The user added reconnect acceptance criteria.');
     expect(f.records.launchIntents({ workId: contextId })[0]!.buildInput).toEqual(frozen);
 });
 
@@ -462,7 +462,7 @@ test('unknown starting edits are held, explicitly accepted as context, and a rea
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: r.workId });
     expect(f.records.initialContext(r.workId)).toBe('Captured.');
     expect(f.records.specState(r.workId).held?.body).toBe('Untrusted request.');
-    await resolveSpecEdit(f.records, r.workId, f.records.specState(r.workId).generation, 'accept', 'Pedro', {
+    await resolveSpecEdit(f.records, r.workId, f.records.specState(r.workId).generation, 'accept', 'User', {
         provider: f.provider,
         setups: [setup],
     });
@@ -496,7 +496,7 @@ test('a changed brief marks the retained approved ticket Spec out of date, then 
     expect(f.writes).toHaveLength(count);
     f.records.recordGate(id, f.records.read(id).revision, {
         briefDigest: f.records.gate(id).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
     f.fail(true);
@@ -541,7 +541,7 @@ test('S05-F2-002: generated dependency status supersedes legacy prose without ch
     f.records.addDependencyBlock(dependency.dependencyId, dependency.revision, id);
     f.records.recordGate(id, f.records.read(id).revision, {
         briefDigest: f.records.gate(id).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Approved contract',
     });
 
@@ -561,9 +561,9 @@ test('S05-F2-002: generated dependency status supersedes legacy prose without ch
         evidence: 'Corrected proof verified: SHA256 exact-v1',
         handover: 'Inspected corrected proof and attached handover',
     });
-    f.records.markDependencyMet(d.dependencyId, f.records.dependency(d.dependencyId).revision, 'Pedro');
+    f.records.markDependencyMet(d.dependencyId, f.records.dependency(d.dependencyId).revision, 'User');
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
-    expect(f.remote().body).toContain('Met by Pedro');
+    expect(f.remote().body).toContain('Met by User');
     expect(f.remote().body).toContain('Corrected proof verified');
     expect(f.remote().body).toContain('superseded');
     expect(readTicketSpec(f.remote().body).spec).toBe(briefProse(brief));
@@ -588,7 +588,7 @@ test.each(['example/widget', 'example/Project/widget'])(
         f.records.setBody(id, f.records.read(id).revision, 'brief', brief);
         f.records.recordGate(id, f.records.read(id).revision, {
             briefDigest: f.records.gate(id).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes.',
         });
         await syncSpecs(f.records, { provider: f.provider, setups: [{ ...setup, repo: repository }] });
@@ -627,7 +627,7 @@ test('linked amendment holds every published Spec through Doubt and publishes al
     records.setBody(consumer, rev(consumer), 'brief', completeBrief('Click to greet.'));
     records.recordGate(consumer, rev(consumer), {
         briefDigest: records.gate(consumer).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Original approval.',
     });
 
@@ -666,7 +666,7 @@ test('linked amendment holds every published Spec through Doubt and publishes al
         path.includes('collaborators')
             ? { permission: 'write' }
             : path.includes('comments')
-              ? { html_url: url, user: { login: 'Pedro', type: 'User' }, body: 'Support Enter too.' }
+              ? { html_url: url, user: { login: 'User', type: 'User' }, body: 'Support Enter too.' }
               : { html_url: `https://github.com/${setup.repo}/pull/8`, state: 'open', merged: false };
 
     await beginPrAmendment(records, producer, url, read, [consumer]);

@@ -384,9 +384,9 @@ Verify evidence, local only
   verification-head <work-id> --pr owner/name#N --head SHA
                                     Record a fresh provider head; a push invalidates a pass.
   record-verification <work-id> --revision N --file F
-                                    Refused for agents: Pedro records Verify in the board.
+                                    Refused for agents: the user records Verify in the board.
                                     A board failure needs a note and resumes the same build
-                                    through the board. Agents never invent Pedro's result.
+                                    through the board. Agents never invent the user's result.
 
 Frozen build test runtime
   run-test ID --role ROLE [--record] [--live] [--reason WHY] -- COMMAND
@@ -401,14 +401,14 @@ Brief gate
                                     Bind Doubt to its package.
   gate-batch --file work-ids.json   Print complete briefs, Doubt results and the batch digest.
   record-gate-batch --file manifest.json --digest H --identity I --evidence E
-                                    Refused for agents: ask Pedro to Approve briefs in the board.
+                                    Refused for agents: ask the user to Approve briefs in the board.
   begin-pr-amendment <work-id> --feedback URL|verify:RESULT_ID [--affected work-ids.json]
                                     Verify and record the human decision before changing scope or brief.
   pr-amendment <work-id>            Display all corrected linked content and gates as one digest.
   approve-pr-amendment <work-id> --file display.json --digest H --feedback URL|verify:RESULT_ID
                                     Approve the exact scope correction requested by a write-access human.
   record-gate <work-id> --file display.json --digest H --identity I --evidence E
-                                    Refused for agents: ask Pedro to Approve brief in the board.
+                                    Refused for agents: ask the user to Approve brief in the board.
                                     Use its board wait; never save a generic Needs you duplicate.
   Spec writes preserve prior text as Original. A digest on GitHub or revision on
   Azure identifies tracker edits; an unchanged ticket keeps an unsent brief.
@@ -459,7 +459,7 @@ Dependencies
                                     ticket removes it. Observations of a ticket or
                                     PR it no longer names are dropped. proofState is
                                     pending (default), submitted (evidence awaiting
-                                    Pedro) or insufficient. Editing evidence resets
+                                    the user) or insufficient. Editing evidence resets
                                     it to pending unless explicitly submitted.
   add-dependency-block <dependency-id> --revision N --build B
                                     Record that the Dependency holds the build B.

@@ -37,7 +37,7 @@ export interface Dependency {
     contract: string;
     /** What will establish that the change was delivered; empty until agreed. */
     evidence: string;
-    /** Submitted proof awaits Pedro; notes and insufficient evidence never create a desk action. */
+    /** Submitted proof awaits the user; notes and insufficient evidence never create a desk action. */
     proofState: NonNullable<DependencyHold['proofState']>;
     ticket: string | null;
     pullRequests: string[];

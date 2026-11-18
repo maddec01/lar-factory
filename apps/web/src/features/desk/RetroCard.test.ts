@@ -81,7 +81,7 @@ test('a pick whose follow-up creation failed stops waiting and shows a toast nam
         'the pressed button spins while the pick saves',
     ).toEqual(['true', null]);
 
-    const chosen = { ...retro, choice: { selected: [4], by: 'Pedro', at: 'today' } };
+    const chosen = { ...retro, choice: { selected: [4], by: 'User', at: 'today' } };
 
     await answer(
         {
@@ -122,7 +122,7 @@ test('a Done pick survives on the desk, opens in details, and dismisses in one c
         error: null,
         board: fresh({
             ...sample,
-            items: [{ ...done, retro: { ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } } }],
+            items: [{ ...done, retro: { ...retro, choice: { selected: [], by: 'User', at: 'today' } } }],
         }),
     });
     expect($('.desk-row')).toBeNull();

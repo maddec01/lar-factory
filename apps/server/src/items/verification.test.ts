@@ -75,7 +75,7 @@ async function setup() {
     const merge = vi.fn(async () => {});
     const send = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'accepted' as const, sequence: 1 }));
     const provider = () => ({ read, merge });
-    const commands = createVerification({ board, records, reread, provider, send, identity: () => 'Pedro' });
+    const commands = createVerification({ board, records, reread, provider, send, identity: () => 'User' });
     const context = async () =>
         ((await commands.inspectVerification(item.id)).body as { verification: Record<string, unknown> }).verification;
 
@@ -103,7 +103,7 @@ test('desk pass binds the freshly read PR head and server operator, then allows 
     const result = await s.commands.recordVerification(s.item.id, { ...context, result: 'pass', by: 'forged' });
 
     expect(result.status).toBe(200);
-    expect(s.records.verification(s.item.id).latest).toMatchObject({ by: 'Pedro', head: s.pr.sourceRevision });
+    expect(s.records.verification(s.item.id).latest).toMatchObject({ by: 'User', head: s.pr.sourceRevision });
     expect((await s.merging.inspectMerge(s.item.id)).status).toBe(200);
     s.pr.sourceRevision = 'b'.repeat(40);
     expect((await s.merging.inspectMerge(s.item.id)).status).toBe(409);

@@ -1,4 +1,4 @@
-import { isRecord, pendingPedroReleaseStep, releaseApprovalStep } from '@lar-factory/shared';
+import { HUMAN_ROLE, isHumanRole, isRecord, pendingUserReleaseStep, releaseApprovalStep } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
 import type { BoardState } from '../board/board-state.ts';
@@ -81,7 +81,7 @@ export function createReleaseStep({
                     creationSource: 'web',
                     attachments: [],
                     dispatchMode: { type: 'queue_after_active' },
-                    text: `Continue release of group ${item.id} in this same owner. Read lar-work release-plan ${item.id}, children and completion. The board's recorded Pedro receipts are authoritative: ${JSON.stringify(plan.steps.filter((step) => step.done?.by === 'Pedro'))}. Next recorded step: ${JSON.stringify(plan.steps.find((step) => !step.done) ?? null)}. Run only unfinished Agent steps, in order, against the exact approved manifest/digests/merged SHAs; record actual evidence with complete-release-step. Re-read before each step. Never repeat a completed operation or expand the approval. When a Pedro step is next, leave it on the board and end the turn; never duplicate it with a generic Needs you notice or a T3 question. End the turn after the last release receipt; do not measure or record Outcome in this release continuation. The board captures the settled delivery and release input, then dispatches a separate Outcome check with its required --input-digest. Only that dispatched turn measures and records Outcome once. Merges alone prove neither activation nor Outcome.`,
+                    text: `Continue release of group ${item.id} in this same owner. Read lar-work release-plan ${item.id}, children and completion. The board's recorded user receipts are authoritative: ${JSON.stringify(plan.steps.filter((step) => isHumanRole(step.done?.by)))}. Next recorded step: ${JSON.stringify(plan.steps.find((step) => !step.done) ?? null)}. Run only unfinished Agent steps, in order, against the exact approved manifest/digests/merged SHAs; record actual evidence with complete-release-step. Re-read before each step. Never repeat a completed operation or expand the approval. When a user step is next, leave it on the board and end the turn; never duplicate it with a generic Needs you notice or a T3 question. End the turn after the last release receipt; do not measure or record Outcome in this release continuation. The board captures the settled delivery and release input, then dispatches a separate Outcome check with its required --input-digest. Only that dispatched turn measures and records Outcome once. Merges alone prove neither activation nor Outcome.`,
                 });
 
                 records.releaseContinuationDelivered(
@@ -121,7 +121,7 @@ export function createReleaseStep({
                 const continuation = records.prepareReleaseContinuation(id);
 
                 if (!continuation.ready) {
-                    const step = pendingPedroReleaseStep(records.releasePlan(id));
+                    const step = pendingUserReleaseStep(records.releasePlan(id));
 
                     throw new Error(
                         step
@@ -167,10 +167,10 @@ export function createReleaseStep({
                 if (!records || !board.find(id)) throw new Error('This parent is unavailable on the board.');
 
                 const record = records.read(id);
-                const step = pendingPedroReleaseStep(records.releasePlan(id));
+                const step = pendingUserReleaseStep(records.releasePlan(id));
 
                 if (record.setAside || record.finishedAt || !step || step.id !== input.stepId)
-                    throw new Error('This release step is no longer waiting on Pedro.');
+                    throw new Error('This release step is no longer waiting on the user.');
 
                 if (!Number.isSafeInteger(input.revision) || record.revision !== input.revision)
                     throw new Error('The parent changed. Read its release steps again.');
@@ -178,7 +178,7 @@ export function createReleaseStep({
                 if (typeof input.evidence !== 'string' || !input.evidence.trim() || input.evidence.length > 1000)
                     throw new Error('Add short release evidence (up to 1000 characters).');
 
-                records.completeReleaseStep(id, record.revision, step.id, 'Pedro', input.evidence);
+                records.completeReleaseStep(id, record.revision, step.id, HUMAN_ROLE, input.evidence);
                 reread();
                 await reconcileReleaseContinuations();
 

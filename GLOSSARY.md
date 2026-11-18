@@ -25,7 +25,7 @@ The work of settling a concept's open questions and recording the resulting unde
 _Avoid_: delivery completion.
 
 **Group reconciliation**:
-Keeping a group's map, answers, briefs and blockers coherent after changes. After a part merges, the board settles lifecycle changes and dispatches remaining judgement to one agent owner once the parent and part threads are idle. The board shows “Updating map” or “Reconciling” only while an owner is working; an outstanding checklist alone shows no maintenance warning. Only product questions or approvals wait on Pedro's desk.
+Keeping a group's map, answers, briefs and blockers coherent after changes. After a part merges, the board settles lifecycle changes and dispatches remaining judgement to one agent owner once the parent and part threads are idle. The board shows “Updating map” or “Reconciling” only while an owner is working; an outstanding checklist alone shows no maintenance warning. Only product questions or approvals wait on the user's desk.
 _Avoid_: a manual Reconcile group gate.
 
 **List**:
@@ -33,7 +33,7 @@ The place for work that has not been queued, shown in the List modal. Capitalise
 _Avoid_: inbox, backlog as a name for this place.
 
 **Your desk**:
-The board's row of all work waiting on Pedro: questions, tool approvals, brief gate approvals, PR review and failed starts or stopped runs needing a human retry, whatever its Kind or stage. Each card names its wait and action, Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
+The board's row of all work waiting on the user: questions, tool approvals, brief gate approvals, PR review and failed starts or stopped runs needing a human retry, whatever its Kind or stage. Each card names its wait and action, Project and concept or parent when present. The item also stays in its group or ordinary stage section. Agent work, blockers, running CI and unknown activity alone do not put work on the desk.
 _Avoid_: inbox, needs-you list.
 
 **Open question**:
@@ -60,7 +60,7 @@ _Avoid_: trash, deleted items.
 **Spec**:
 The refined brief as it appears as a ticket's main description after shaping. Its Confirmed section holds product decisions only and is omitted when empty. The final brief gate is its approval; settled work can take its scope from the submitted request, including each repository's named role in a linked outcome, without a separate confirmation question. Repository involvement left open by the request still needs an answer.
 Linked-work graph and consumption declarations remain in the local brief, outside the published prose.
-A human PR change request Pedro chooses to address can amend affected linked
+A human PR change request the user chooses to address can amend affected linked
 Specs, the parent map and Outcome together. The producer owns that amendment;
 consumers need no PR or repeated brief approval. Its receipt binds the corrected
 content and authorizing comment.
@@ -226,7 +226,7 @@ not retire feedback. Bots and recorded agent replies do
 not become human feedback.
 
 Whenever the build owner or its reviewers work on the PR again, including after
-Pedro starts work directly in T3, the row says Fixing review feedback and no PR
+the user starts work directly in T3, the row says Fixing review feedback and no PR
 desk card appears; an optional Retro card can remain with the working headline
 and Choose follow-ups (optional) as secondary text. Optional picks never outrank
 active owner work. Handback with
@@ -237,7 +237,7 @@ the board retries existing guarded branch/worktree cleanup once active work ends
 without waking the build owner. Closed unmerged PRs keep a clear notice and their
 unmerged work. Retro picks after Done are independent.
 
-A trusted PR request Pedro chooses to address can amend the Spec without a new
+A trusted PR request the user chooses to address can amend the Spec without a new
 human gate. Record begin-pr-amendment before scope or brief writes. While fresh
 Doubt and the correction are in hand, suppress the duplicate gate and retain the
 tracker's last published Spec. approve-pr-amendment records the exact corrected

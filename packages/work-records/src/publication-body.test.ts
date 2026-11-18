@@ -13,7 +13,7 @@ test('S05-F4-002 the PR description command generates canonical manual checks on
             out = join(dir, 'out.md');
 
         writeFileSync(body, '## Summary\nC displays the greeting.\n## Test\n1. Old check.\n## Checks\n11 passed.');
-        writeFileSync(steps, '1. Open sim-891.html; Hello, Pedro! is visible.');
+        writeFileSync(steps, '1. Open sim-891.html; Hello, world! is visible.');
 
         const run = (...args: string[]) =>
             spawnSync(process.execPath, ['src/cli.ts', 'pr-body', '--file', body, '--to', out, ...args], {
@@ -23,7 +23,7 @@ test('S05-F4-002 the PR description command generates canonical manual checks on
 
         expect(created.status).toBe(0);
         expect(readFileSync(out, 'utf8')).toBe(
-            '## Summary\nC displays the greeting.\n\n## Checks\n11 passed.\n\n## Test steps\n1. Open sim-891.html; Hello, Pedro! is visible.\n',
+            '## Summary\nC displays the greeting.\n\n## Checks\n11 passed.\n\n## Test steps\n1. Open sim-891.html; Hello, world! is visible.\n',
         );
         writeFileSync(body, readFileSync(out, 'utf8').replace('## Test steps', '## Manual checks'));
         expect(run().status).toBe(0);

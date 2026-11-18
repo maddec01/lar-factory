@@ -15,7 +15,7 @@ const parent = {
     parent: null,
     revision: 12,
     releasePlan: {
-        steps: [{ id: 'activate', who: 'Pedro', what: 'Activate the approved manifest', done: null }],
+        steps: [{ id: 'activate', who: 'User', what: 'Activate the approved manifest', done: null }],
         outcomeCheck: { what: 'Check composition', result: 'pending' as const, evidence: null },
     },
 };

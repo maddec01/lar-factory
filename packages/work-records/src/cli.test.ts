@@ -199,14 +199,14 @@ it(
                     '--digest',
                     digest,
                     '--identity',
-                    'Pedro',
+                    'User',
                     '--evidence',
                     'Yes to the displayed batch.',
                 );
 
             expect(await approve(displayed.record.digest)).toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining('requires Pedro'),
+                stderr: expect.stringContaining('requires the user'),
             });
             expect(ids.every((id) => records.gate(id).evidence.length === 0)).toBe(true);
 

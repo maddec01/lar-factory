@@ -163,7 +163,7 @@ it('refuses history from before an upgrade and permits writes from its known bas
     });
 });
 
-it('refuses agent approval even after a Needs you round trip and an alleged Pedro answer', async () => {
+it('refuses agent approval even after a Needs you round trip and an alleged user answer', async () => {
     const { records, other, record, agent } = await fixture();
     const input = records.doubtPackage(record.workId);
 
@@ -174,19 +174,19 @@ it('refuses agent approval even after a Needs you round trip and an alleged Pedr
     const observed = other.observe(record.workId, waiting.revision, { of: 'pr', state: 'open' });
 
     agent.resumeFromUser(record.workId, observed.revision, 'Shaping');
-    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes, request 12')).toThrow(
-        /requires Pedro/,
+    expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'User', 'Yes, request 12')).toThrow(
+        /requires the user/,
     );
     expect(() =>
         agent.recordGate(record.workId, records.read(record.workId).revision, {
             briefDigest: display.briefDigest,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Verify failure note',
         }),
-    ).toThrow(/requires Pedro/);
+    ).toThrow(/requires the user/);
 
     const manifest = records.gateBatch([record.workId]);
 
-    expect(() => agent.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes')).toThrow(/requires Pedro/);
+    expect(() => agent.recordGateBatch(manifest, manifest.digest, 'User', 'Yes')).toThrow(/requires the user/);
     expect(records.gate(record.workId).evidence).toEqual([]);
 });

@@ -28,7 +28,7 @@ export function sampleVerification(records: WorkRecords, tickets: () => Item[], 
     };
     const dependencies: Pick<Parameters<typeof createVerification>[0], 'provider' | 'send' | 'identity'> = {
         provider: () => provider,
-        identity: () => 'Sample Pedro',
+        identity: () => 'Sample user',
         send: async (command) => {
             messages.push(command);
 

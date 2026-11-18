@@ -99,7 +99,7 @@ test("Start build moves its concept's work record to In progress, writes nothing
 
             records.recordGate(work.workId, brief.revision, {
                 briefDigest: records.gate(work.workId).briefDigest!,
-                approvedBy: 'Pedro',
+                approvedBy: 'User',
                 evidence: 'Doubt clean; approved.',
             });
             records.update(work.workId, records.read(work.workId).revision, { status: 'Ready' });

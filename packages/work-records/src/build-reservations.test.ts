@@ -27,7 +27,7 @@ it('a started build holds a reservation until its PR opens', async () => {
         records.setBody(id, rev(id), 'brief', title);
         records.recordGate(id, rev(id), {
             briefDigest: records.gate(id).briefDigest!,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes',
         });
 

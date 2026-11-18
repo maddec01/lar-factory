@@ -37,7 +37,7 @@ const fixture = async (upgrade = false) => {
             INSERT INTO work_records(work_id,repository,kind,status,revision,created_at,updated_at,title,initial_context)
               VALUES('legacy','test/app','build','Shaping',1,'now','now','Legacy','');
             INSERT INTO brief_gates(gate_id,work_id,source_revision,brief_digest,approved_by,evidence,recorded_at,batch_digest)
-              VALUES('legacy-gate','legacy',1,'legacy-brief','Pedro','Yes.','now','legacy-batch');
+              VALUES('legacy-gate','legacy',1,'legacy-brief','User','Yes.','now','legacy-batch');
         `),
         );
         legacy.close();
@@ -65,7 +65,7 @@ it('upgrades main schema before capturing scope and recording a batch gate', asy
 
     expect(records.confirmedScope('legacy')).toBeNull();
     expect(records.gate('legacy').evidence).toContainEqual(expect.objectContaining({ batchDigest: 'legacy-batch' }));
-    agent.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
+    agent.confirmScope(work.workId, work.revision, scope, 'User', 'Yes.');
     records.setBody(work.workId, records.read(work.workId).revision, 'brief', scopeMarkdown(scope));
 
     const input = records.doubtPackage(work.workId);
@@ -75,7 +75,7 @@ it('upgrades main schema before capturing scope and recording a batch gate', asy
 
     const manifest = records.gateBatch([work.workId]);
 
-    records.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes.');
+    records.recordGateBatch(manifest, manifest.digest, 'User', 'Yes.');
     expect(records.gate(work.workId).passing?.batchDigest).toBe(manifest.digest);
     expect(() => records.writeRevision(work.workId, work.revision, ['confirmedScope'])).toThrow(/confirmedScope/);
 });
@@ -90,18 +90,18 @@ it('retries scope confirmation after unrelated progress, including a race during
 
         return strict(id, revision, input, by, response);
     });
-    expect(agent.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.').scope).toEqual(scope);
+    expect(agent.confirmScope(work.workId, work.revision, scope, 'User', 'Yes.').scope).toEqual(scope);
     expect(records.read(work.workId)).toMatchObject({ status: 'Shaping', needsYou: 'Keep this note.' });
 });
 
 it('refuses scope confirmation after a concurrent confirmedScope change', async () => {
     const { records, other, work, agent } = await fixture();
 
-    other.confirmScope(work.workId, work.revision, scope, 'Pedro', 'Yes.');
+    other.confirmScope(work.workId, work.revision, scope, 'User', 'Yes.');
 
     const before = records.read(work.workId);
 
-    expect(() => agent.confirmScope(work.workId, work.revision, { ...scope, size: 'Larger' }, 'Pedro', 'Yes.')).toThrow(
+    expect(() => agent.confirmScope(work.workId, work.revision, { ...scope, size: 'Larger' }, 'User', 'Yes.')).toThrow(
         /conflicting fields:.*confirmedScope/,
     );
     expect(records.read(work.workId)).toEqual(before);

@@ -159,7 +159,7 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                     const at = new Date().toISOString();
 
                     db.prepare(
-                        'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, source, brief_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     ).run(
                         randomUUID(),
                         workId,
@@ -169,6 +169,7 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                         change.evidence,
                         at,
                         change.source,
+                        change.text,
                     );
                     db.prepare(
                         'UPDATE work_records SET title = ?, revision = revision + 1, updated_at = ? WHERE work_id = ?',

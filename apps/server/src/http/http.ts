@@ -354,6 +354,16 @@ export function createBoardServer({
             what: 'the displayed brief approval',
             run: forItem('Name the brief to approve.', (id, input) => commands.approveBrief(id, input)),
         },
+        '/api/inspect-approve-as-is': {
+            sampleWrite: 'fake',
+            what: 'the changed brief to approve as is',
+            run: forItem('Name the brief.', (id) => commands.inspectApproveAsIs(id)),
+        },
+        '/api/approve-as-is': {
+            sampleWrite: 'fake',
+            what: 'the displayed changed brief',
+            run: forItem('Name the brief to approve as is.', (id, input) => commands.approveAsIs(id, input)),
+        },
         '/api/choose-retro': {
             sampleWrite: 'fake',
             what: 'the follow-up choice',
@@ -477,6 +487,12 @@ export function createBoardServer({
             what: 'the item to move back to the List',
             disabled: 'Moving items back to the List is disabled in sample mode.',
             run: forItem('Name the item to move back to the List.', (itemId) => commands.backToList(itemId)),
+        },
+        '/api/reshape': {
+            sampleWrite: 'refuse',
+            what: 'the item to reshape',
+            disabled: 'Reshaping is disabled in sample mode.',
+            run: forItem('Name the item to reshape.', (itemId, input) => commands.reshape(itemId, input.model)),
         },
         '/api/start': {
             sampleWrite: 'refuse',

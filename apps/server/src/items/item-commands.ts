@@ -13,6 +13,8 @@ import {
     buildBranch,
     buildMessage,
     frozenBuildInputMessage,
+    approvedMoveRefusal,
+    approvedUnbuilt,
     canAbandon,
     canResumeShaping,
     canRetryBuild,
@@ -123,6 +125,10 @@ export interface ItemCommands {
     requestBriefChanges(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     retryBriefChanges(itemId: string): Promise<Reply>;
     approveBrief(itemId: string, input: Record<string, unknown>): Promise<Reply>;
+    /** Displays the changed brief of work that offers Approve as is, with its digest and the passage that changed. */
+    inspectApproveAsIs(itemId: string): Promise<Reply>;
+    /** Approves the displayed changed brief with no new Doubt review, keeping its Status. */
+    approveAsIs(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     prFeedback(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     chooseRetro(itemId: string, input: Record<string, unknown>): Promise<Reply>;
     inspectVerification(itemId: string): Promise<Reply>;
@@ -137,6 +143,11 @@ export interface ItemCommands {
     reconcileStarts(items: Item[]): Promise<void>;
     queue(itemId: string): Promise<Reply>;
     backToList(itemId: string): Reply;
+    /**
+     * Sends approved Ready or Queued work that hasn't started building back to shaping: clears its approval, keeps its
+     * brief and messages its shaping thread, or starts a new one on `model` when none is left.
+     */
+    reshape(itemId: string, model: unknown): Promise<Reply>;
     /**
      * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded thread stopped or was
      * deleted. It writes a launch intent on the work record before it asks T3, and settles an unresolved one through T3
@@ -266,7 +277,7 @@ export interface ItemCommandsDeps {
     kindTracker?: (repo: string) => Pick<KindChangeDeps, 'labels' | 'kinds'>;
 }
 
-type Action = 'queue' | 'back to List' | 'start' | 'abandon';
+type Action = 'queue' | 'back to List' | 'start' | 'abandon' | 'reshape';
 
 /** A status change the board's buttons make: Queue moves List to Queued, Back to List the reverse. */
 interface Move {
@@ -620,6 +631,19 @@ export function createItemCommands({
 
         if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
 
+        const item = board.find(itemId);
+
+        const running = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId];
+
+        // Approved work that hasn't started building moves unless a Start runs, a thread works on it or its Spec
+        // publishes; its finished shaping thread alone never holds it.
+        if (item && action !== 'start' && action !== 'queue' && approvedUnbuilt(item)) {
+            if (running || records?.launchIntents({ workId: itemId, unresolved: true }).length)
+                return 'Start is running for this item. Wait for it to finish.';
+
+            return approvedMoveRefusal(item);
+        }
+
         if (
             ['List', 'Queued'].includes(board.find(itemId)?.status ?? '') &&
             recordedThreads(itemId).length > 0 &&
@@ -628,11 +652,7 @@ export function createItemCommands({
         )
             return null;
 
-        const started =
-            buildStarts.has(itemId) ||
-            starts.has(itemId) ||
-            !!board.snapshot().started?.[itemId] ||
-            recordedStart(itemId);
+        const started = running || recordedStart(itemId);
 
         if (started && action === 'back to List')
             return 'Start is running or has run for this item. Check its T3 thread before moving it back to the List.';
@@ -674,13 +694,16 @@ export function createItemCommands({
 
         if (item.status === to) return withBoard(200, { error: null });
 
-        if (item.status !== from) return reply(409, { error: refused(item.status) });
+        // Move to List takes approved Ready work too, and always clears an approval.
+        const approved = action === 'back to List' && approvedUnbuilt(item);
+
+        if (item.status !== from && !approved) return reply(409, { error: refused(item.status) });
 
         const busy = busyReason(itemId, action);
 
         if (busy) return withBoard(409, { error: busy });
 
-        const failed = setStatus(item, to);
+        const failed = approved ? clearApproval(item, to) : setStatus(item, to);
 
         if (!failed) {
             clearFailures(itemId);
@@ -688,6 +711,30 @@ export function createItemCommands({
         }
 
         return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
+    }
+
+    /** Clears the item's approval, keeping its brief, then moves it to `to`: the error to show, null once it moved. */
+    function clearApproval(item: Item, to: Status): { status: number; error: string } | null {
+        try {
+            const cleared = records!.invalidateGate(item.id, item.revision);
+
+            return setStatus({ ...item, revision: cleared.revision }, to);
+        } catch (err) {
+            reread();
+
+            return { status: 409, error: (err as Error).message };
+        }
+    }
+
+    /** The shaping thread that owns the item's shaping: its latest one T3 still shows, not deleted or archived. */
+    function shapingThreadOf(item: Item): string | null {
+        const shown = Array.isArray(item.threads) ? item.threads : [];
+        const owner = recordedThreads(item.id)
+            .filter((t) => t.purpose === PURPOSES.started && !t.deletedAt && !deleted.has(t.threadId))
+            .reverse()
+            .find((t) => shown.some((thread) => thread.id === t.threadId && !thread.archived));
+
+        return owner?.threadId ?? null;
     }
 
     /**
@@ -1890,6 +1937,53 @@ export function createItemCommands({
             }
         },
         backToList: (itemId) => move(itemId, BACK_TO_LIST),
+
+        async reshape(itemId, model) {
+            showObservations();
+
+            const item = board.find(itemId);
+
+            if (!item) return reply(404, { error: GONE });
+
+            if (!records) return withBoard(409, { error: 'The board has no work records to reshape.' });
+
+            if (!approvedUnbuilt(item))
+                return withBoard(409, {
+                    error: 'Only approved Ready or Queued work that has not started building can be reshaped.',
+                });
+
+            const busy = busyReason(itemId, 'reshape');
+
+            if (busy) return withBoard(409, { error: busy });
+
+            const owner = shapingThreadOf(item);
+            const failed = clearApproval(item, owner ? 'Shaping' : 'Queued');
+
+            if (failed) return withBoard(failed.status, { error: failed.error });
+
+            // With no shaping thread left, the item is Queued again and Start launches a new one.
+            if (!owner) return this.start(itemId, model);
+
+            const sent = await (reconcileDeps?.send ?? sendThreadCommand)({
+                type: 'message.dispatch',
+                commandId: randomUUID(),
+                messageId: randomUUID(),
+                threadId: owner,
+                createdBy: 'user',
+                creationSource: 'web',
+                attachments: [],
+                dispatchMode: { type: 'queue_after_active' },
+                text: `The user chose Reshape for work ${itemId} on the board. Its approval is cleared and its brief is kept. Continue shaping this same item: read its current brief, revise it with the user, run Doubt and present its gate for approval through board buttons.`,
+            });
+
+            return withBoard(sent.outcome === 'accepted' ? 200 : 502, {
+                error:
+                    sent.outcome === 'accepted'
+                        ? null
+                        : `The work is back in Shaping, but its thread didn't take the message: ${sent.reason} Open thread to continue.`,
+                thread: { threadId: owner, title: item.title },
+            });
+        },
 
         async changeKind(itemId, kind) {
             const refused = (status: number, error: string) => ({

@@ -13,6 +13,8 @@ export interface GateEvidence {
     reviewDigest?: string;
     doubtReviewId?: string;
     source?: 'gate' | 'tracker' | 'user' | 'conflict';
+    /** Reshape, Move to List or a deleted thread's recovery cleared this approval. */
+    invalidated?: true;
     gateId: string;
     workId: string;
     sourceRevision: number;

@@ -26,7 +26,13 @@ import type {
     SwapKind,
     TicketKindFacts,
 } from '@lar-factory/shared';
-import { WorkRecordError, type Dependency, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
+import {
+    approvableAsIs,
+    WorkRecordError,
+    type Dependency,
+    type WorkRecord,
+    type WorkRecords,
+} from '@lar-factory/work-records';
 
 import { prUrl } from '../config/pr-host.ts';
 import { itemReviewers } from '../item-details/reviewers.ts';
@@ -265,6 +271,20 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                   : undefined;
         const activeBuild = !!(record.buildBranch || record.buildPhase || record.pullRequest);
         const matchesScope = !records.confirmedScope(record.workId) || records.briefScopeCheck(record.workId).ok;
+        const lastApproval = gate.evidence.findLast(
+            (approval) => !approval.invalidated && (approval.source === 'gate' || approval.source === 'user'),
+        );
+        const approved = !!lastApproval;
+        const lastEdit = gate.evidence.at(-1);
+        // Approve as is accepts a trusted tracker edit to approved work.
+        const approveAsIs =
+            !gate.current &&
+            !!lastApproval &&
+            lastApproval.briefDigest !== gate.briefDigest &&
+            (lastEdit?.source === 'tracker' || lastEdit?.source === 'conflict') &&
+            lastEdit.briefDigest === gate.briefDigest &&
+            !savedSpec.held &&
+            approvableAsIs(records, record.workId);
         let briefApproval =
             !amending &&
             !changesRequested &&
@@ -291,7 +311,9 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             }
         }
 
+        // Approve as is answers the changed brief, so it isn't under review.
         const briefReviewing =
+            !approveAsIs &&
             !amending &&
             !changesRequested &&
             !group &&
@@ -366,6 +388,8 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
                 }),
             revision: record.revision,
             passingBrief: gate.current,
+            ...(approved && { approved: true as const }),
+            ...(approveAsIs && { approveAsIs: true as const }),
             ...(briefReviewing && { briefReviewing: true as const }),
             ...(doubtHold && { briefDoubtHold: doubtHold }),
             ...(staleGate && { staleGate }),

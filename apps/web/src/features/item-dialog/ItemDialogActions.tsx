@@ -2,6 +2,7 @@
 // Abandon and Move to List at its left. Stopped work the board can't restart asks to be resumed in T3, as its primary action.
 
 import {
+    approvedUnbuilt,
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
@@ -22,6 +23,7 @@ import {
     OpenThread,
     PrAction,
     QueueButton,
+    ReshapeButton,
     StartBuild,
     StartOrAfter,
     hasLiveThread,
@@ -140,8 +142,9 @@ export function StatusActions({
     );
 }
 
-/** Abandon, then Move to List, so Abandon keeps the footer's first slot whichever shows; a Start in flight, uncertain
- *  or done, or a thread at work on the item, takes them away. */
+/** Abandon, then Move to List and Reshape, so Abandon keeps the footer's first slot whichever shows; a Start in flight,
+ *  uncertain or done, or a thread at work on the item, takes them away, though a finished shaping thread leaves approved
+ *  work its moves. */
 export function MoveActions({ item, data }: { item: Item; data: BoardData }) {
     const moves = useMovesItem(item, data);
 
@@ -151,6 +154,7 @@ export function MoveActions({ item, data }: { item: Item; data: BoardData }) {
         <>
             <AbandonButton item={item} data={data} />
             {item.status !== 'List' && <BackToListButton item={item} data={data} />}
+            {approvedUnbuilt(item) && <ReshapeButton item={item} data={data} />}
         </>
     );
 }

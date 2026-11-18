@@ -11,7 +11,7 @@ export { useLastKnown } from './useLastKnown';
 export { useItemClock } from './useItemClock';
 export { Dependencies } from './Dependencies';
 export { dependenciesOf } from './ItemDependencies';
-export { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions';
+export { AbandonButton, ActionError, BackToListButton, QueueButton, ReshapeButton } from './ItemActions';
 export {
     Age,
     AzureFields,
@@ -37,7 +37,7 @@ export { SourceIcon } from './SourceIcon';
 export { StartAfterError, StartOrAfter } from './StartAfter';
 export { StartBuild } from './StartBuild';
 export { StartMessage } from './StartControl';
-export { useStartHolds } from './useShownStart';
+export { useShownStart, useStartHolds } from './useShownStart';
 export type { StartKind } from './StartStore';
 export { useItemStates } from './ItemState';
 export type { ItemState } from './ItemState';

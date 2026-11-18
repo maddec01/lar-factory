@@ -177,6 +177,9 @@ it('refuses agent approval even after a Needs you round trip and an alleged Pedr
     expect(() => agent.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Yes, request 12')).toThrow(
         /requires Pedro/,
     );
+    expect(() => agent.recordApprovedAsIs(display, display.approvalDigest, 'user', 'Yes, request 12')).toThrow(
+        /requires/,
+    );
     expect(() =>
         agent.recordGate(record.workId, records.read(record.workId).revision, {
             briefDigest: display.briefDigest,

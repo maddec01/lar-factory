@@ -136,6 +136,7 @@ export function RecordText({
         Boolean(reviewing) ||
         (!item.setAside && pendingBriefs.length > 0) ||
         approvable ||
+        Boolean(item.approveAsIs) ||
         Boolean(record.reviewers) ||
         Boolean(record.runSettings) ||
         Boolean(buildPhase) ||
@@ -187,7 +188,11 @@ export function RecordText({
             {!item.setAside && !reviewing && pendingBriefs.length > 0 && (
                 <ApproveBrief itemId={pendingBriefs[0]!} workIds={pendingBriefs} onApproved={refresh} />
             )}
-            {approvable ? <ApproveBrief itemId={item.id} body={recordBody} onApproved={refresh} /> : recordBody}
+            {approvable || (item.approveAsIs && !item.setAside) ? (
+                <ApproveBrief itemId={item.id} asIs={!approvable} body={recordBody} onApproved={refresh} />
+            ) : (
+                recordBody
+            )}
             {!spec && answer && body && (
                 <Disclosure label="Original question" presentation="section">
                     <MarkdownDiagrams text={body} />

@@ -42,6 +42,8 @@ const GUARDED = [
     '/api/repositories/labels',
     '/api/t3/reauthorize',
     '/api/recheck',
+    '/api/approve-as-is',
+    '/api/reshape',
 ];
 
 const post = (board: Board, path: string, headers: Record<string, string> = {}) =>

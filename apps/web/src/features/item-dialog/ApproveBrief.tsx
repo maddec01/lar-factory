@@ -17,16 +17,19 @@ interface Approval {
 /**
  * Requests approval as it opens and shows the brief the server returned, which its request ID and digest cover, so one
  * click approves the displayed text. A group shows its parts' briefs; a single item shows its brief in place of the
- * record body, given as `body` for while the request loads or after it fails.
+ * record body, given as `body` for while the request loads or after it fails. `asIs` approves an approved item's
+ * changed Spec with no new Doubt review; Reshape in the footer stands in for Request changes.
  */
 export function ApproveBrief({
     itemId,
     workIds,
+    asIs = false,
     body,
     onApproved,
 }: {
     itemId: string;
     workIds?: string[];
+    asIs?: boolean;
     body?: ReactNode;
     onApproved?: () => Promise<unknown>;
 }) {
@@ -47,10 +50,13 @@ export function ApproveBrief({
         setApproval(undefined);
         setLoadError(null);
 
-        const result = await postAction<{ approval: Approval }>('/api/inspect-brief', {
-            itemId,
-            ...(workIds && { workIds }),
-        });
+        const result = await postAction<{ approval: Approval }>(
+            asIs ? '/api/inspect-approve-as-is' : '/api/inspect-brief',
+            {
+                itemId,
+                ...(workIds && { workIds }),
+            },
+        );
 
         if (request !== latest.current) return;
 
@@ -119,13 +125,24 @@ export function ApproveBrief({
                     </Stack>
                 </Alert>
             )}
+            {asIs && (
+                <Text variant="caption" tone="muted">
+                    The Spec changed after approval. Approve as is accepts it without a new Doubt review.
+                </Text>
+            )}
             <Inline wrap>
-                <Button {...buttonKind('main')} disabled={!ready} onClick={() => void send('/api/approve-brief')}>
-                    {workIds && workIds.length > 1 ? 'Approve briefs' : 'Approve brief'}
+                <Button
+                    {...buttonKind('main')}
+                    disabled={!ready}
+                    onClick={() => void send(asIs ? '/api/approve-as-is' : '/api/approve-brief')}
+                >
+                    {asIs ? 'Approve as is' : workIds && workIds.length > 1 ? 'Approve briefs' : 'Approve brief'}
                 </Button>
-                <Button {...buttonKind('other')} disabled={!ready} onClick={() => setRequesting(!requesting)}>
-                    Request changes
-                </Button>
+                {!asIs && (
+                    <Button {...buttonKind('other')} disabled={!ready} onClick={() => setRequesting(!requesting)}>
+                        Request changes
+                    </Button>
+                )}
             </Inline>
             {requesting && (
                 <BriefChanges

@@ -1,4 +1,4 @@
-import type { WorkRecords } from '@lar-factory/work-records';
+import { approvableAsIs, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { randomUUID } from 'node:crypto';
 import { userInfo } from 'node:os';
@@ -27,7 +27,33 @@ export function createBriefApproval({
     identity = () => userInfo().username,
     send = sendThreadCommand,
 }: Dependencies) {
-    const requests = new Map<string, { at: number; manifest: ReturnType<WorkRecords['gateBatch']> }>();
+    // A displayed request: the gate batch Approve brief shows, or the one changed brief Approve as is shows.
+    type Shown =
+        | { manifest: ReturnType<WorkRecords['gateBatch']> }
+        | { display: ReturnType<WorkRecords['displayGate']> };
+
+    const requests = new Map<string, { at: number } & Shown>();
+    const remember = (shown: Shown) => {
+        const requestId = randomUUID();
+
+        for (const [key, request] of requests) if (Date.now() - request.at > 600000) requests.delete(key);
+        requests.set(requestId, { at: Date.now(), ...shown });
+
+        return requestId;
+    };
+    /** The unexpired request the input names, when its digest matches and it covers work `id`. */
+    const displayed = (input: Record<string, unknown>, id: string) => {
+        const request = typeof input.requestId === 'string' ? requests.get(input.requestId) : undefined;
+
+        if (!request || Date.now() - request.at > 600000) return undefined;
+
+        const [digest, ids] =
+            'manifest' in request
+                ? [request.manifest.digest, request.manifest.members.map(({ display }) => display.workId)]
+                : [request.display.approvalDigest, [request.display.workId]];
+
+        return digest === input.digest && ids.includes(id) ? request : undefined;
+    };
     const run = async (action: () => Promise<object>): Promise<Reply> => {
         try {
             if (!records) throw new Error('Work records are unavailable.');
@@ -158,8 +184,54 @@ export function createBriefApproval({
         }
     };
 
+    const offersAsIs = (id: string) => {
+        if (!board.find(id)?.approveAsIs) throw new Error('This brief no longer offers Approve as is. Check the item.');
+    };
+
     return {
         reconcileBriefApprovals,
+        inspectApproveAsIs: (id: string) =>
+            run(async () => {
+                offersAsIs(id);
+
+                const display = records!.displayGate(id);
+
+                return {
+                    approval: {
+                        requestId: remember({ display }),
+                        digest: display.approvalDigest,
+                        briefs: [{ ...display, title: records!.read(id).title }],
+                    },
+                };
+            }),
+        // The user read the change: the approval needs no Doubt review, sends no resume message and keeps the Status.
+        approveAsIs: (id: string, input: Record<string, unknown>) =>
+            run(async () => {
+                const request = displayed(input, id);
+
+                if (!request || !('display' in request))
+                    throw new Error('Display the exact changed brief and digest in the board before approving it.');
+
+                requests.delete(String(input.requestId));
+                offersAsIs(id);
+
+                // A build, work citing it or a brief past its scope may have appeared since the board last read it.
+                if (!approvableAsIs(records!, id))
+                    throw new Error('This brief now needs Reshape and a new Doubt review. Check the item.');
+
+                const approval = records!.recordApprovedAsIs(
+                    request.display,
+                    request.display.approvalDigest,
+                    identity(),
+                    `Board Approve as is action ${String(input.requestId)}`,
+                );
+
+                reread();
+                await sync();
+                reread();
+
+                return { approval };
+            }),
         retryBriefChanges: (id: string) =>
             run(async () => {
                 current([id]);
@@ -170,14 +242,9 @@ export function createBriefApproval({
             }),
         requestBriefChanges: (id: string, input: Record<string, unknown>) =>
             run(async () => {
-                const request = typeof input.requestId === 'string' ? requests.get(input.requestId) : undefined;
+                const request = displayed(input, id);
 
-                if (
-                    !request ||
-                    Date.now() - request.at > 600000 ||
-                    request.manifest.digest !== input.digest ||
-                    !request.manifest.members.some(({ display }) => display.workId === id)
-                )
+                if (!request || !('manifest' in request))
                     throw new Error('Display the current brief before requesting changes.');
 
                 const ids = request.manifest.members.map(({ display }) => display.workId);
@@ -227,14 +294,10 @@ export function createBriefApproval({
                 current(ids);
 
                 const manifest = records!.gateBatch(ids);
-                const requestId = randomUUID();
-
-                for (const [key, request] of requests) if (Date.now() - request.at > 600000) requests.delete(key);
-                requests.set(requestId, { at: Date.now(), manifest });
 
                 return {
                     approval: {
-                        requestId,
+                        requestId: remember({ manifest }),
                         digest: manifest.digest,
                         briefs: manifest.members.map(({ display }) => ({
                             ...display,
@@ -245,14 +308,9 @@ export function createBriefApproval({
             }),
         approveBrief: (id: string, input: Record<string, unknown>) =>
             run(async () => {
-                const request = typeof input.requestId === 'string' ? requests.get(input.requestId) : undefined;
+                const request = displayed(input, id);
 
-                if (
-                    !request ||
-                    Date.now() - request.at > 600000 ||
-                    request.manifest.digest !== input.digest ||
-                    !request.manifest.members.some(({ display }) => display.workId === id)
-                )
+                if (!request || !('manifest' in request))
                     throw new Error('Display the exact brief and digest in the board before approving.');
 
                 requests.delete(String(input.requestId));

@@ -44,7 +44,7 @@ export class WorkRecordError extends Error {
 
 export interface Database {
     readonly db: DatabaseSync;
-    /** Runs `change` in one write transaction: it commits whole or not at all. */
+    /** Runs `change` in one write transaction: it commits whole or not at all, and a change that wrote no row commits nothing. */
     write: <T>(change: () => T) => T;
     /** Runs `query` after checking the schema is still the one this process knows. */
     read: <T>(query: () => T) => T;
@@ -53,7 +53,7 @@ export interface Database {
      * meanwhile stay out of it. Only for a connection that writes nothing until it ends, as its write would join the read.
      */
     snapshot<T>(read: () => Promise<T>): Promise<T>;
-    /** A mark that moves whenever a connection, this one included, commits, so reads apart can tell whether they saw one state. */
+    /** A mark that moves whenever a connection, this one included, commits a change, so reads apart can tell whether they saw one state. */
     changes(): string;
     close(): void;
 }
@@ -270,6 +270,9 @@ export async function openDatabase(
     };
     // data_version moves only when another connection commits.
     const dataVersionRow = db.prepare('PRAGMA data_version');
+    // Counts rows written by this connection's statements and their triggers.
+    const totalChangesRow = db.prepare('SELECT total_changes() AS rows');
+    const rowsWritten = (): number => Number(totalChangesRow.get()?.rows ?? 0);
     let committed = 0;
 
     return {
@@ -277,6 +280,7 @@ export async function openDatabase(
         write: (change) => {
             try {
                 const outer = !db.isTransaction;
+                const rowsBefore = rowsWritten();
                 const result = transaction(db, () =>
                     checked(() => {
                         const result = change();
@@ -287,7 +291,7 @@ export async function openDatabase(
                     }),
                 );
 
-                if (outer) committed++;
+                if (outer && rowsWritten() !== rowsBefore) committed++;
 
                 return result;
             } catch (error) {

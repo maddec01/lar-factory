@@ -122,7 +122,10 @@ export function installWriteJournal(db: DatabaseSync): void {
     ]);
 }
 
-/** Called inside the write transaction, after all mutations and revision bumps. */
+/**
+ * Called inside the write transaction, after all mutations and revision bumps. A write that changed no row leaves the
+ * database untouched, so its commit writes nothing and other connections see no change.
+ */
 export function flushWriteJournal(db: DatabaseSync): void {
     for (const [entity, table, key] of [
         ['work', 'work_records', 'work_id'],
@@ -131,5 +134,6 @@ export function flushWriteJournal(db: DatabaseSync): void {
         db.exec(`INSERT INTO write_fields SELECT d.entity,d.id,d.field,r.revision FROM write_dirty d
       JOIN ${table} r ON r.${key}=d.id WHERE d.entity='${entity}'
       ON CONFLICT(entity,id,field) DO UPDATE SET revision=excluded.revision;`);
-    db.exec('DELETE FROM write_dirty');
+    // The WHERE keeps SQLite from truncating the table, which rewrites its page even when it is empty.
+    db.exec('DELETE FROM write_dirty WHERE true');
 }

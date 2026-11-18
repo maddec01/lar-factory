@@ -23,6 +23,9 @@ export function createOutcomeCheck({
         async reconcileOutcomeChecks() {
             if (!records) return;
 
+            // Each local refresh asks; with nothing written since, the board already shows the records.
+            const before = records.changes();
+
             for (const item of board.snapshot().items) {
                 if (
                     item.recorded === false ||
@@ -72,7 +75,8 @@ export function createOutcomeCheck({
                 records,
                 board.snapshot().repos.map((repo) => repo.repo),
             );
-            reread();
+
+            if (records.changes() !== before) reread();
         },
         async proposeOutcomeFix(this: void, id: string, input: Record<string, unknown>): Promise<Reply> {
             try {

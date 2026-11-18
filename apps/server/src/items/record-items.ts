@@ -534,12 +534,26 @@ function recordItemsInTurns(
     });
 }
 
+/** Each tickets array's JSON, which a provider read rebuilds with the same tickets when nothing changed on its provider. */
+const ticketsJson = new WeakMap<readonly Item[], string>();
+
+function ticketsKey(tickets: readonly Item[]): string {
+    let json = ticketsJson.get(tickets);
+
+    if (json === undefined) {
+        json = JSON.stringify(tickets);
+        ticketsJson.set(tickets, json);
+    }
+
+    return json;
+}
+
 /**
  * recordItemsInTurns on `records`, a connection of its own, which gives the last items again, in no turn, when no commit
- * landed since that read and it maps the same tickets and settings.
+ * landed since that read and it maps tickets that read the same and the same settings.
  */
 export function recordItemsReader(records: WorkRecords) {
-    let mapped: { from: unknown[]; items: Item[] } | null = null;
+    let mapped: { from: string[]; items: Item[] } | null = null;
 
     return async (
         tickets: readonly Item[],
@@ -550,7 +564,7 @@ export function recordItemsReader(records: WorkRecords) {
         turn: () => Promise<void>,
     ): Promise<Item[]> => {
         // Marked before the snapshot starts, so a commit during the read only makes the next read map again.
-        const from = [records.changes(), tickets, JSON.stringify([repos, unread, [...hidden], setups])];
+        const from = [records.changes(), ticketsKey(tickets), JSON.stringify([repos, unread, [...hidden], setups])];
 
         if (mapped?.from.every((input, i) => input === from[i])) return mapped.items;
 

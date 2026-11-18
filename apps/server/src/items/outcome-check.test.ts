@@ -102,10 +102,14 @@ test('lost Outcome dispatch responses retry after restart with exactly the same 
 
         await createOutcomeCheck({ board, records, reread: vi.fn(), send }).reconcileOutcomeChecks();
 
-        const restarted = createOutcomeCheck({ board, records, reread: vi.fn(), send });
+        const reread = vi.fn();
+        const restarted = createOutcomeCheck({ board, records, reread, send });
 
         await restarted.reconcileOutcomeChecks();
+        expect(reread).toHaveBeenCalledTimes(1);
+        // Each local refresh reconciles; one that writes nothing leaves the shown records as they are.
         await restarted.reconcileOutcomeChecks();
+        expect(reread).toHaveBeenCalledTimes(1);
         expect(send).toHaveBeenCalledTimes(2);
         expect(send.mock.calls[0]![0]).toMatchObject({ text: expect.stringContaining('local static HTTP server') });
         expect(send.mock.calls[1]![0]).toEqual(send.mock.calls[0]![0]);

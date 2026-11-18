@@ -1,9 +1,10 @@
 // Runtime discovery follows T3 apps/server/src/serverRuntimeState.ts.
 // Exercised 2026-10-31 on nightly 0.1.6-nightly.20261030.3917: eight projects.
 import { readJsonRecord } from '../json-file.ts';
-import { boardProjects, type BoardSessions } from './board-projects.ts';
-import type { ProjectProtocol, ProjectRead } from './project-protocol.ts';
+import { boardProjects } from './board-projects.ts';
+import type { ProjectRead } from './project-protocol.ts';
 import { subscribeProjects } from './project-subscription.ts';
+import type { ReadSession } from './read-session.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
 let pending: Promise<ProjectRead> | undefined;
@@ -14,12 +15,6 @@ let current:
     | undefined;
 const subscribers = new Set<() => void>();
 let announced: string | undefined;
-let sessions: BoardSessions | undefined;
-
-/** Has discovery read T3 with `own` instead of the board's Keychain session, from its next read. */
-export function setProjectSessions(own: BoardSessions): void {
-    sessions = own;
-}
 
 /** Calls `changed` when T3's project facts or availability differ from the last it announced, until the returned function is called. Thread updates never do. */
 export function subscribeRepositoryProjects(changed: () => void): () => void {
@@ -50,9 +45,9 @@ export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promis
 
 /** The T3 server discovery last reached and the session it holds, unless T3 has stopped since. */
 export function repositoryProjectAccess():
-    | { origin: URL; protocol: Pick<ProjectProtocol, 'subscriptionSession'> }
+    | { origin: URL; session: Pick<ReadSession, 'subscriptionSession'> }
     | undefined {
-    return current?.key ? { origin: new URL(current.origin), protocol: current.protocol } : undefined;
+    return current?.key ? { origin: new URL(current.origin), session: current.protocol.session } : undefined;
 }
 
 async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
@@ -94,7 +89,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
 
     try {
         const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
-        const protocol = boardProjects(runtime.origin, version, sessions);
+        const protocol = boardProjects(runtime.origin, version);
         const read = await protocol.readProjects();
         const state = {
             key,
@@ -108,7 +103,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
         announce(state.read);
         // The HTTP read can lack what the shell supplies, so the first shell data always counts as a change.
         announced = undefined;
-        state.stop = subscribeProjects(new URL(runtime.origin), version, protocol, (read) => {
+        state.stop = subscribeProjects(new URL(runtime.origin), version, protocol.session, (read) => {
             state.read = { ...read, observation: read.observation ?? state.read.observation };
             announce(state.read);
         });
@@ -133,7 +128,7 @@ export function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
 
         if (!state) throw new Error('T3 unavailable');
 
-        await state.protocol.reauthorize();
+        await state.protocol.session.reauthorize();
         state.stop();
         state.key = '';
 

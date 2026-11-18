@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
 import type { BoardSession } from './project-protocol.ts';
+import { setReadSessions } from './read-session.ts';
 import {
     reconnectRepositoryProjects,
     repositoryProjectAccess,
     repositoryProjects,
-    setProjectSessions,
 } from './repository-project-discovery.ts';
 
 const folder = mkdtempSync(join(tmpdir(), 'lar-t3-reconnect-'));
@@ -49,7 +49,7 @@ it('recovers automatically after a real server process restarts with a new port 
         expiresAt: '2099-01-01',
     }));
 
-    setProjectSessions({
+    setReadSessions({
         vault: {
             read: async () => stored,
             write: async (session) => {
@@ -77,9 +77,5 @@ it('recovers automatically after a real server process restarts with a new port 
     });
     expect(issue).toHaveBeenCalledTimes(2);
     expect(repositoryProjectAccess()?.origin.origin).toBe(runtime.origin);
-
-    const protocol = repositoryProjectAccess()?.protocol;
-
     expect((await reconnectRepositoryProjects(env)).availability).toBe('available');
-    expect(repositoryProjectAccess()?.protocol).not.toBe(protocol);
 }, 15_000);

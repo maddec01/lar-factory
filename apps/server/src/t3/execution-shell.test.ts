@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vite-plus/test';
 
 import { subscribeExecutionShell } from './execution-protocol.ts';
-import type { ProjectProtocol } from './project-protocol.ts';
+import type { ReadSession } from './read-session.ts';
 
 const fixture = vi.hoisted(() => ({ accept: (_value: unknown) => {}, tag: '', payload: {} as unknown }));
 
@@ -23,7 +23,7 @@ vi.mock('./project-subscription.ts', () => ({
 
 it('keeps projects and active/archived threads during metadata refresh and applies intervening removals', () => {
     const changed = vi.fn();
-    const stop = subscribeExecutionShell(new URL('http://127.0.0.1:3773'), 'any', {} as ProjectProtocol, changed);
+    const stop = subscribeExecutionShell(new URL('http://127.0.0.1:3773'), 'any', {} as ReadSession, changed);
     const projects = [{ id: 'factory' }, { id: 'other' }];
     const threads = [{ id: 'active' }];
     const archivedThreads = [{ id: 'archived' }];

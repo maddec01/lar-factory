@@ -1,8 +1,8 @@
 import { isRecord } from '@lar-factory/shared';
 import type { ExecutionModel } from '@lar-factory/shared/execution-target';
 
-import { boardSessionAuthority } from './board-session.ts';
 import { subscribeProjects } from './project-subscription.ts';
+import { boardReadSession } from './read-session.ts';
 import { serverRuntimeOrigin } from './t3-settings.ts';
 
 /** T3 nightly 2026-11-13: subscribeServerConfig snapshot, ServerProvider models/capabilities.optionDescriptors. */
@@ -68,56 +68,45 @@ export function executionModels(value: unknown): ExecutionModel[] {
     });
 }
 
-/** Read fresh capabilities through the existing local, read-only authorization boundary. */
-async function readExecutionValue(tag: string, payload: Record<string, unknown>): Promise<unknown> {
-    const authority = boardSessionAuthority();
-    const session = await authority.issue();
+/** Read fresh capabilities through the board's shared read session. */
+function readExecutionValue(tag: string, payload: Record<string, unknown>): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+        let stop: (() => void) | undefined;
+        let finished = false;
+        const finish = (value?: unknown, error?: Error) => {
+            if (finished) return;
 
-    try {
-        return await new Promise((resolve, reject) => {
-            let stop: (() => void) | undefined;
-            let finished = false;
-            const finish = (value?: unknown, error?: Error) => {
-                if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            stop?.();
 
-                finished = true;
-                clearTimeout(timer);
-                stop?.();
+            if (error) reject(error);
+            else resolve(value);
+        };
+        const timer = setTimeout(
+            () => finish(undefined, new Error('T3 model capabilities timed out. Retry when T3 is available.')),
+            10_000,
+        );
 
-                if (error) reject(error);
-                else resolve(value);
-            };
-            const timer = setTimeout(
-                () => finish(undefined, new Error('T3 model capabilities timed out. Retry when T3 is available.')),
-                10_000,
+        try {
+            stop = subscribeProjects(
+                new URL(serverRuntimeOrigin()),
+                '',
+                boardReadSession(),
+                () => finish(undefined, new Error('T3 model capabilities are unavailable.')),
+                {
+                    tag,
+                    payload,
+                    accept: (value) => finish(value),
+                    reject: () => finish(undefined, new Error('T3 refused the model capabilities request.')),
+                },
             );
 
-            try {
-                stop = subscribeProjects(
-                    new URL(serverRuntimeOrigin()),
-                    '',
-                    {
-                        subscriptionSession: async () => session,
-                        invalidateSession() {},
-                    },
-                    () => finish(undefined, new Error('T3 model capabilities are unavailable.')),
-                    {
-                        tag,
-                        payload,
-                        accept: (value) => finish(value),
-                        reject: () => finish(undefined, new Error('T3 refused the model capabilities request.')),
-                    },
-                );
-
-                if (finished) stop();
-            } catch {
-                finish(undefined, new Error('Invalid local T3 capabilities endpoint.'));
-            }
-        });
-    } finally {
-        // The value needs no revoked session, so it doesn't wait for the revoke.
-        void authority.revoke(session.sessionId).catch(() => {});
-    }
+            if (finished) stop();
+        } catch {
+            finish(undefined, new Error('Invalid local T3 capabilities endpoint.'));
+        }
+    });
 }
 
 export async function readExecutionModels(): Promise<ExecutionModel[]> {

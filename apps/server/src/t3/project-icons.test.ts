@@ -33,7 +33,7 @@ vi.mock('./repository-project-discovery.ts', () => ({
         t3.read.availability === 'available'
             ? {
                   origin: new URL('http://127.0.0.1:3773'),
-                  protocol: { subscriptionSession: t3.session, invalidateSession: t3.invalidate },
+                  session: { subscriptionSession: t3.session, invalidateSession: t3.invalidate },
               }
             : undefined,
 }));

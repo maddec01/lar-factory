@@ -9,6 +9,9 @@ registerHooks({
         if (specifier.endsWith('/execution-capabilities.ts'))
             return { url: new URL('./run-model-observations.ts', import.meta.url).href, shortCircuit: true };
 
+        if (specifier.endsWith('/read-session.ts') && !context.parentURL?.endsWith('/read-session-observations.ts'))
+            return { url: new URL('./read-session-observations.ts', import.meta.url).href, shortCircuit: true };
+
         if (specifier.endsWith('/launch-thread.ts'))
             return { url: new URL('./launch-observations.ts', import.meta.url).href, shortCircuit: true };
 

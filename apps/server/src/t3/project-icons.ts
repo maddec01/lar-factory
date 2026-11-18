@@ -64,7 +64,7 @@ function faviconUrl(access: Access, project: ProjectFact, signal: AbortSignal): 
 
         signal.addEventListener('abort', abort);
 
-        const protocol = { subscriptionSession: () => access.protocol.subscriptionSession(), invalidateSession() {} };
+        const protocol = { subscriptionSession: () => access.session.subscriptionSession(), invalidateSession() {} };
 
         try {
             stop = subscribeProjects(access.origin, '', protocol, () => finish(), {

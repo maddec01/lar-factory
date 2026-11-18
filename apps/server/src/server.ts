@@ -101,11 +101,8 @@ import {
 import { loadModelChoices } from './t3/model-choices.ts';
 import { createProjectIcons, type ProjectImage } from './t3/project-icons.ts';
 import { createProjectRefresh } from './t3/project-refresh.ts';
-import {
-    reconnectRepositoryProjects,
-    reauthorizeRepositoryProjects,
-    setProjectSessions,
-} from './t3/repository-project-discovery.ts';
+import { setReadSessions } from './t3/read-session.ts';
+import { reconnectRepositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 import { anyOnAzureDevOps } from './t3/repository-project.ts';
 import { sampleT3Session } from './t3/sample-t3-session.ts';
 import { readSettingsModels } from './t3/settings-models.ts';
@@ -134,10 +131,10 @@ if (settings.problem) log(`using the default settings: ${settings.problem}`);
 const stopMemorySampler = startMemorySampler();
 const fixture = process.env.BOARD_DATA_FILE;
 const sampleData = fixture ? sampleFixture() : null;
-/** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
+/** `pnpm run sample:t3`: the sample board also reads T3's projects, threads, models and availability, with a read session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
 
-if (sampleT3) setProjectSessions(sampleT3);
+if (sampleT3) setReadSessions(sampleT3);
 
 const capture = { session: randomUUID(), enabled: !fixture };
 const bundled = loopTrace.span('bundled skills', loadBundledSkills);

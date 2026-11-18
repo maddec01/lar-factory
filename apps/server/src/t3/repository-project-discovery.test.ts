@@ -21,7 +21,7 @@ vi.mock('./t3-settings.ts', () => ({
     t3Running: () => fixture.running(),
 }));
 vi.mock('./board-projects.ts', () => ({
-    boardProjects: () => ({ readProjects: async () => fixture.read, reauthorize: fixture.renew }),
+    boardProjects: () => ({ readProjects: async () => fixture.read, session: { reauthorize: fixture.renew } }),
 }));
 vi.mock('./project-subscription.ts', () => ({
     subscribeProjects: (_origin: URL, _version: string, _protocol: unknown, notify: typeof fixture.notify) => {

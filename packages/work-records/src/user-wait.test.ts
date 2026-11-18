@@ -70,3 +70,22 @@ it('clears a Needs you set after an earlier one while the question is open', asy
 
     expect(records.read(id)).toMatchObject({ needsYou: null, status: 'Shaping' });
 });
+
+it('commits nothing when there is no wait to reconcile, and a real change still commits', async () => {
+    const id = await shaping();
+    const reader = await openWorkRecords(join(dir, 'work.db'));
+
+    try {
+        const marks = () => [records.changes(), reader.changes()];
+        const before = marks();
+
+        // The board reconciles every shown owner thread on each local refresh.
+        records.reconcileUserWait(id, { threadId: 'owner' });
+        expect(marks()).toEqual(before);
+
+        records.waitForUser(id, records.read(id).revision, earlier);
+        expect(marks().map((mark, i) => mark !== before[i])).toEqual([true, true]);
+    } finally {
+        reader.close();
+    }
+});

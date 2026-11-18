@@ -6,7 +6,6 @@ import {
     deskItems,
     deskWait,
     normalizeItems,
-    type Item,
     type NeedsYouCause,
     type NeedsYouOffer,
     type RepositorySetup,
@@ -644,7 +643,7 @@ test('a read with no commit since the last and the same inputs gives its items a
 
     const read = recordItemsReader(await openReader());
     // The tickets an item source read last, which the board keeps until the next read.
-    const lastRead: Item[] = [];
+    const lastRead = tickets([12, 'List']);
     let turns = 0;
     const turn = async () => {
         turns++;
@@ -654,10 +653,12 @@ test('a read with no commit since the last and the same inputs gives its items a
     assert.equal(turns, 2);
     assert.equal(await read(lastRead, [REPO], [], new Set(), [], turn), first);
     assert.equal(turns, 2, 'no turn and no mapping');
+    assert.equal(await read(tickets([12, 'List']), [REPO], [], new Set(), [], turn), first);
+    assert.equal(turns, 2, 'a provider read that brought the same tickets maps nothing');
 
     const hidden = await read(lastRead, [REPO], [], new Set([first[0]!.id]), [], turn);
 
-    assert.equal(hidden.length, 59, 'other inputs map again');
+    assert.equal(hidden.length, 60, 'other inputs map again');
 
     const work = records.create({ title: 'New', repository: REPO, kind: 'bug' });
 

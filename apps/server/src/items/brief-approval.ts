@@ -54,6 +54,9 @@ export function createBriefApproval({
 
     const sending = new Set<string>();
     const reconcileBriefApprovals = async () => {
+        // Each local refresh asks; with nothing written since, the board already shows the records.
+        const before = records?.changes();
+
         for (const delivery of records?.pendingGateResumes() ?? []) {
             if (sending.has(delivery.commandId)) continue;
 
@@ -103,7 +106,8 @@ export function createBriefApproval({
                 sending.delete(delivery.commandId);
             }
         }
-        reread();
+
+        if (records?.changes() !== before) reread();
     };
 
     const sendingChanges = new Set<string>();

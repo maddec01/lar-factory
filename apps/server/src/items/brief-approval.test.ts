@@ -164,17 +164,21 @@ test('a recorded approval retries its same owner notification after an unconfirm
     opened.push({ dir, records });
 
     const retry = vi.fn<typeof sendThreadCommand>(async () => ({ outcome: 'accepted', sequence: 1 }));
+    const reread = vi.fn();
     const restarted = createBriefApproval({
         board,
         records,
-        reread: vi.fn(),
+        reread,
         refresh: s.refresh,
         sync: s.sync,
         send: retry,
     });
 
     await restarted.reconcileBriefApprovals();
+    expect(reread).toHaveBeenCalledTimes(1);
+    // Each local refresh reconciles; one that writes nothing leaves the shown records as they are.
     await restarted.reconcileBriefApprovals();
+    expect(reread).toHaveBeenCalledTimes(1);
     expect(retry).toHaveBeenCalledTimes(1);
     expect(retry.mock.calls[0]![0]).toMatchObject({ commandId: firstCommand.commandId, threadId: 'same-owner' });
     expect(records.pendingGateResumes()).toEqual([]);

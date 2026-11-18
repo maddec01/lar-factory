@@ -19,7 +19,7 @@ function listFile(home: string): { repositories: Record<string, unknown>[] } {
     };
 }
 
-const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
+const progress = { step: 'setup', done: ['project'], answers: { projectId: 'web' } };
 
 test('closing onboarding keeps its repository on the list as onboarding, which the board shows at once and after a restart', async (t) => {
     const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
@@ -27,27 +27,23 @@ test('closing onboarding keeps its repository on the list as onboarding, which t
     t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
 
     const board = await startBoard(t, { repositories: null }, false, false, { HOME: home });
-    const response = await board.post(
-        { repo: 'maddec01/lar-web', progress },
-        board.url,
-        '/api/onboarding/repositories',
-    );
+    const response = await board.post({ repo: 'acme/web', progress }, board.url, '/api/onboarding/repositories');
 
     assert.equal(response.status, 200);
     assert.deepEqual(((await response.json()) as { board: BoardData }).board.onboarding, [
-        { repo: 'maddec01/lar-web', progress },
+        { repo: 'acme/web', progress },
     ]);
-    assert.deepEqual(listFile(home), { repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] });
+    assert.deepEqual(listFile(home), { repositories: [{ repo: 'acme/web', onboarding: progress }] });
     await board.stop();
 
     const restarted = await startBoard(t, {}, false, false, { HOME: home });
 
-    assert.deepEqual(((await restarted.board()) as BoardData).onboarding, [{ repo: 'maddec01/lar-web', progress }]);
+    assert.deepEqual(((await restarted.board()) as BoardData).onboarding, [{ repo: 'acme/web', progress }]);
 });
 
 const ANSWERS = {
     structureSync: false,
-    projectId: 'lar-web',
+    projectId: 'web',
     role: 'Web client',
     itemSource: { kind: 'issues' },
     domainDocs: { kind: 'off' },
@@ -56,17 +52,13 @@ const ANSWERS = {
 
 test('a fine-grained read-only token permits local setup without enabling concept sync', async (t) => {
     const board = await startBoard(t, { repositories: [], oauthScopes: null });
-    const detected = await board.post(
-        { repo: 'maddec01/lar-web', projectId: 'lar-web' },
-        board.url,
-        '/api/onboarding/detect',
-    );
+    const detected = await board.post({ repo: 'acme/web', projectId: 'web' }, board.url, '/api/onboarding/detect');
     const { detection } = (await detected.json()) as { detection: SetupDetection };
 
     assert.ok(Object.values(detection.access).every((value) => value === 'unverified'));
 
     const saved = await board.post(
-        { repo: 'maddec01/lar-web', ...ANSWERS, structureSync: true },
+        { repo: 'acme/web', ...ANSWERS, structureSync: true },
         board.url,
         '/api/onboarding/setup',
     );

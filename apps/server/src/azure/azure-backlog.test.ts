@@ -9,7 +9,7 @@ import { TEAM_AREA, fakeAz, type WorkItem } from './fake-az.ts';
 const azureBacklog = (repos: readonly string[], team: string, run: Az) =>
     azureItems(repos, team, (calls) => readBacklog(team, calls), run);
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const TEAM = 'Fabrikam Team';
 
 const shown = (items: Item[]) => items.map((i) => [i.number, i.status, i.parent?.number ?? null]);

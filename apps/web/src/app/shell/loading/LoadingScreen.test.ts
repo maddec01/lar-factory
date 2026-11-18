@@ -32,7 +32,7 @@ test('a restarted server keeps the last complete board visible until fresh data 
     const { useBoardStore } = await import('@/services/board/board.hooks');
     const before = useBoardStore.getState().data.items;
 
-    await push({ ...unsettled(firstRead('items', ['lar-apple'])), items: [], repos: [] });
+    await push({ ...unsettled(firstRead('items', ['ios'])), items: [], repos: [] });
     expect(screen()).toBeNull();
     expect(covered()).toBe(false);
     expect(useBoardStore.getState().data.items).toEqual(before);
@@ -41,7 +41,7 @@ test('a restarted server keeps the last complete board visible until fresh data 
     const updated = { ...before[0]!, title: 'Updated during restart' };
     const added = { ...before[1]!, id: 'new-during-restart', title: 'Added during restart' };
     const partial = {
-        ...unsettled(firstRead('items', ['lar-apple'])),
+        ...unsettled(firstRead('items', ['ios'])),
         items: [updated, added],
         repos: sample.repos.slice(0, 1),
         capture: { enabled: true, session: 'new-server-session' },
@@ -70,9 +70,9 @@ test('restart snapshots honor completed-source removals while retaining unread s
     await mountPage(fresh());
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
-    const server = sample.items.filter((item) => item.repo === 'maddec01/lar-server');
-    const apple = sample.items.filter((item) => item.repo === 'maddec01/lar-apple');
-    const read = { ...firstRead('items', ['lar-apple']), waiting: ['maddec01/lar-apple'] };
+    const server = sample.items.filter((item) => item.repo === 'acme/api');
+    const apple = sample.items.filter((item) => item.repo === 'acme/ios');
+    const read = { ...firstRead('items', ['ios']), waiting: ['acme/ios'] };
 
     await push({ ...unsettled(read), items: server.slice(1) });
 
@@ -97,7 +97,7 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
     const { receive } = await import('@/services/board/board.service');
     const issue = sample.items.find((item) => item.status === 'List')!;
     const queued = { ...issue, id: 'new-work-record', status: 'Queued' as const };
-    const read = { ...firstRead('items', ['lar-apple']), waiting: sample.repos.map((repo) => repo.repo) };
+    const read = { ...firstRead('items', ['ios']), waiting: sample.repos.map((repo) => repo.repo) };
 
     await push({ ...unsettled(read), items: [queued] });
     expect(

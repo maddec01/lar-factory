@@ -204,7 +204,7 @@ export function CardQuestion({ children }: { children: string }) {
     );
 }
 
-/** What a card's work belongs to, such as its concept: "in #200 lar cloud…". */
+/** What a card's work belongs to, such as its concept: "in #200 acme cloud…". */
 export function CardPartOf({ name }: { name: string }) {
     return (
         <span title={name} data-part-of>

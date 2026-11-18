@@ -90,7 +90,7 @@ test('a fresh process cannot invoke providers or access sentinel application dat
         await source.readTicket(repo, from.number).then(() => { throw new Error('expected read refusal'); }, () => {});
         if ((await tracker.create(repo, draft)).item.id !== first.item.id) throw new Error('duplicate retry');
         let refused = false;
-        try { await tracker.create('maddec01/lar-server', draft); } catch { refused = true; }
+        try { await tracker.create('acme/api', draft); } catch { refused = true; }
         if (!refused) throw new Error('real repository accepted');
         await source.abandon(first.item);
         tracker.reset();

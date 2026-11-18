@@ -53,7 +53,7 @@ test('Azure progress reads work through the read-only command boundary', async (
         return fake.run(args);
     };
 
-    expect(await readObservedPr('contoso/Fabrikam%20Fiber/lar-api', 4, run)).toMatchObject({
+    expect(await readObservedPr('contoso/Fabrikam%20Fiber/api', 4, run)).toMatchObject({
         number: 4,
         state: 'open',
         sourceRevision: 'source-head',

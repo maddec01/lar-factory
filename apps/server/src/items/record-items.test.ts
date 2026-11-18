@@ -28,7 +28,7 @@ import { sampleReviewControls } from '../sample/sample-review-controls.ts';
 import { archivedItems, recordItems, recordItemsReader } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
-const OTHER_REPO = 'maddec01/lar-web';
+const OTHER_REPO = 'acme/web';
 const opened: { records: WorkRecords; dir: string }[] = [];
 
 test('S07 repeat 6 preserves all saved runtime notices and identifies the completed held Doubt packages', async () => {
@@ -144,7 +144,7 @@ test('recorded work keeps its progress and unpicked tracker issues appear fresh 
         ticket: `${REPO}#12`,
     }).record;
 
-    records.create({ title: 'Elsewhere', repository: 'maddec01/other', kind: 'bug' });
+    records.create({ title: 'Elsewhere', repository: 'acme/other', kind: 'bug' });
 
     const items = recordItems(records, tickets([12, 'List'], [13, 'Shaping']), [REPO]);
 
@@ -322,17 +322,17 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
         need: 'An export endpoint',
         owner: 'server team',
         evidence: 'It answers in staging',
-        ticket: 'maddec01/lar-server#40',
-        pullRequests: ['maddec01/lar-server#41'],
+        ticket: 'acme/api#40',
+        pullRequests: ['acme/api#41'],
     });
 
     dependency = records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
     dependency = records.observeDependency(dependency.dependencyId, dependency.revision, {
-        subject: 'maddec01/lar-server#41',
+        subject: 'acme/api#41',
         kind: 'open',
     });
     dependency = records.observeDependency(dependency.dependencyId, dependency.revision, {
-        subject: 'maddec01/lar-server#40',
+        subject: 'acme/api#40',
         kind: 'closed',
     });
 
@@ -349,7 +349,7 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
         },
         {
             number: 40,
-            repo: 'maddec01/lar-server',
+            repo: 'acme/api',
             state: 'open',
             title: 'An export endpoint',
             dependency: {
@@ -357,17 +357,17 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
                 revision: dependency.revision,
                 owner: 'server team',
                 need: 'An export endpoint',
-                ticket: 'maddec01/lar-server#40',
+                ticket: 'acme/api#40',
                 named: [
-                    { reference: 'maddec01/lar-server#40', url: 'https://github.com/maddec01/lar-server/issues/40' },
-                    { reference: 'maddec01/lar-server#41', url: 'https://github.com/maddec01/lar-server/pull/41' },
+                    { reference: 'acme/api#40', url: 'https://github.com/acme/api/issues/40' },
+                    { reference: 'acme/api#41', url: 'https://github.com/acme/api/pull/41' },
                 ],
                 evidence: 'It answers in staging',
                 proofState: 'pending',
                 met: null,
                 needsReview: false,
                 observation: {
-                    subject: 'maddec01/lar-server#40',
+                    subject: 'acme/api#40',
                     kind: 'closed',
                     detail: null,
                     observedAt: '',
@@ -382,7 +382,7 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
         [['closed', 'user']],
     );
     records.observeDependency(dependency.dependencyId, dependency.revision, {
-        subject: 'maddec01/lar-server#40',
+        subject: 'acme/api#40',
         kind: 'reopened',
     });
     assert.deepEqual(

@@ -88,8 +88,8 @@ test('a failed detail read can retry in place and recover without closing the it
     expect(retry.getAttribute('aria-busy')).toBe('true');
     await reply(held, 'I_sample13');
     expect(inDialog('[data-details-error]')).toBeNull();
-    expect(text(description())).toContain('Owner accounts');
-    expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
+    expect(text(description())).toContain('Team accounts');
+    expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Team accounts');
 });
 
 test('one read per open: live board data updates the board fields and leaves the fetched details as fetched', async () => {
@@ -110,7 +110,7 @@ test('one read per open: live board data updates the board fields and leaves the
     expect(reads()).toEqual(['I_sample13']);
 });
 
-/** The sample with Owner accounts updated at `updatedAt`, as the board pushes it after a comment. */
+/** The sample with Team accounts updated at `updatedAt`, as the board pushes it after a comment. */
 const updatedAt = (iso: string): BoardData => ({
     ...sample,
     items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, updatedAt: iso } : i)),
@@ -150,7 +150,7 @@ test('a reply for an item that is no longer open is ignored', async () => {
     await reply(held, 'I_sample13');
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain('Bump FFmpeg');
     expect(text(description())).toContain('Bumps FFmpeg');
-    expect(text(description())).not.toContain('Owner accounts');
+    expect(text(description())).not.toContain('Team accounts');
 });
 
 test('a merge refreshes an open item and a later completion announces Done once', async () => {

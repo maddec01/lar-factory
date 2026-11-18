@@ -70,7 +70,7 @@ test('a decision with no thread answers in its concept thread without inheriting
     expect(card('I_sample09')).not.toBeNull();
     expect(card('I_sample12')).not.toBeNull();
     expect(card('I_sample12').querySelector('[data-open-thread]')?.getAttribute('href')).toBe(action.href);
-    expect(text(card('I_sample12'))).toContain('in #200 lar cloud: sign-in and direct connections');
+    expect(text(card('I_sample12'))).toContain('in #200 acme cloud: sign-in and direct connections');
     expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
 

@@ -12,17 +12,17 @@ const firstRead = (board: Board) => until(board, (d) => d.fetchedAt !== null && 
 
 test("a dossier's map and every item's blockers reach the page; only the bodies of concepts and items with sub-issues on the board are read", async (t) => {
     const body = '## Destination\nThere.\n\n## End-to-end check\nTry it\n1. Step\n';
-    const concept = boardIssue(1, 'Shaping', 'maddec01/lar-server', ['concept']);
-    const feature = boardIssue(2, 'List', 'maddec01/lar-server', ['feature']);
-    const coupled = boardIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
-    const part = boardIssue(4, 'Ready', 'maddec01/lar-server', ['build']);
+    const concept = boardIssue(1, 'Shaping', 'acme/api', ['concept']);
+    const feature = boardIssue(2, 'List', 'acme/api', ['feature']);
+    const coupled = boardIssue(3, 'In progress', 'acme/api', ['feature']);
+    const part = boardIssue(4, 'Ready', 'acme/api', ['build']);
 
     Object.assign(concept.content!, { id: 'I_1', body });
     // A ticket's provider blocker never reaches the page; the record's blocker does.
     Object.assign(feature.content!, {
         id: 'I_2',
         body,
-        blockedBy: { nodes: [{ number: 3, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] },
+        blockedBy: { nodes: [{ number: 3, state: 'OPEN', repository: { nameWithOwner: 'acme/api' } }] },
     });
     Object.assign(coupled.content!, { id: 'I_3', body });
     Object.assign(part.content!, {
@@ -31,20 +31,20 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
         parent: {
             number: 3,
             title: 'Issue 3',
-            url: 'https://github.com/maddec01/lar-server/issues/3',
+            url: 'https://github.com/acme/api/issues/3',
             state: 'OPEN',
-            repository: { nameWithOwner: 'maddec01/lar-server' },
+            repository: { nameWithOwner: 'acme/api' },
         },
     });
 
     const board = await startBoard(t, {
-        repositories: ['maddec01/lar-server'],
+        repositories: ['acme/api'],
         items: [concept, feature, coupled, part],
     });
 
     await firstRead(board);
 
-    const [conceptId, featureId] = [board.id(1, 'maddec01/lar-server'), board.id(2, 'maddec01/lar-server')];
+    const [conceptId, featureId] = [board.id(1, 'acme/api'), board.id(2, 'acme/api')];
     const shown = await changeRecords(
         board,
         (records) => {
@@ -70,7 +70,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
     assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
     assert.deepEqual(map?.blockers, []);
     assert.deepEqual(plain?.blockers, [
-        { number: 1, repo: 'maddec01/lar-server', state: 'open', workId: conceptId, title: 'Issue 1' },
+        { number: 1, repo: 'acme/api', state: 'open', workId: conceptId, title: 'Issue 1' },
     ]);
     assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
     assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');

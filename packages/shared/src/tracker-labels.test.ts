@@ -44,7 +44,7 @@ test('GitHub adds and removes labels on a ticket one change at a time, never set
     ]);
 });
 
-const azureRepo = 'contoso/Fabrikam%20Fiber/lar-api';
+const azureRepo = 'contoso/Fabrikam%20Fiber/api';
 const noAz = (calls: string[][]) => ({
     gh: async () => {
         throw new Error('gh is not for an Azure repository');

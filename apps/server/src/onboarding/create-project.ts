@@ -32,7 +32,7 @@ export async function createProject(
     if (!named) return { status: 400, error: 'Name the folder to add.' };
 
     if (!isAbsolute(named) && named !== '~' && !named.startsWith('~/')) {
-        return { status: 400, error: "Give the folder's full path, such as ~/Developer/lar-web." };
+        return { status: 400, error: "Give the folder's full path, such as ~/Developer/web." };
     }
 
     const folder = resolve(expandHome(named, env.HOME ?? ''));

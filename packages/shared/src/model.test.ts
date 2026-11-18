@@ -32,8 +32,8 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
         content: 'ticket',
         number: 7,
         title: 't',
-        url: 'https://github.com/maddec01/lar-server/issues/7',
-        repo: 'maddec01/lar-server',
+        url: 'https://github.com/acme/api/issues/7',
+        repo: 'acme/api',
         labels,
         state: 'open',
         closedAs: null,
@@ -104,13 +104,13 @@ function dependency(kind: DependencyObservationKind, met = false, change: Partia
         revision: 2,
         owner: 'server team',
         need: 'An export endpoint',
-        ticket: 'maddec01/lar-server#40',
+        ticket: 'acme/api#40',
         named: [],
         evidence: 'The endpoint answers in staging',
         met: met ? { by: 'user', at: '2026-10-30T10:00:00Z' } : null,
         needsReview: false,
         observation: {
-            subject: 'maddec01/lar-server#40',
+            subject: 'acme/api#40',
             kind,
             detail: null,
             observedAt: '2026-10-30T09:00:00Z',
@@ -121,7 +121,7 @@ function dependency(kind: DependencyObservationKind, met = false, change: Partia
 
     return {
         number: 40,
-        repo: 'maddec01/lar-server',
+        repo: 'acme/api',
         state: met ? 'closed' : 'open',
         title: hold.need,
         dependency: hold,
@@ -137,9 +137,7 @@ test("an unmet Dependency holds the start whatever its ticket shows, and a met o
         'Blocked by the Dependency on server team until you mark it met',
     );
     assert.equal(
-        blockedText(
-            item('Ready', [], { blockers: [{ number: 3, repo: 'maddec01/lar-server', state: 'open' }, unmet] }),
-        ),
+        blockedText(item('Ready', [], { blockers: [{ number: 3, repo: 'acme/api', state: 'open' }, unmet] })),
         'Blocked by #3 until it completes, and by the Dependency on server team until you mark it met',
     );
     assert.equal(blockedText(item('Ready', [], { blockers: [dependency('open', true)] })), null);
@@ -193,12 +191,12 @@ test('the build message names the thread for the build, then the work ID and the
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
-    const repo = 'maddec01/lar-server';
+    const repo = 'acme/api';
     const under = (n: number) => ({
         number: n,
         title: 't',
         url: `https://github.com/${repo}/issues/${n}`,
-        repo: 'Maddec01/Lar-Server',
+        repo: 'Acme/Api',
         state: 'open' as const,
     });
     const parent = item('In progress', [], {
@@ -224,7 +222,7 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
     const other = item('Done', [], {
         id: 'o',
         number: 11,
-        repo: 'maddec01/lar-apple',
+        repo: 'acme/ios',
         parent: under(7),
         parentId: 'p',
         stats: { agentMs: 1, tokens: 1 },
@@ -281,38 +279,34 @@ test('canAbandon takes List and Queued issues, never other statuses', () => {
 
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
     assert.equal(sameRepo('Maddec01/Lar-Factory', 'maddec01/lar-factory'), true);
-    assert.equal(sameRepo('maddec01/lar-factory', 'maddec01/lar-server'), false);
+    assert.equal(sameRepo('maddec01/lar-factory', 'acme/api'), false);
 
     const repos = [
-        { repo: 'Maddec01/lar', role: 'app', labels: [] },
-        { repo: 'fabrikam/lar', role: 'app', labels: [] },
+        { repo: 'Acme/core', role: 'app', labels: [] },
+        { repo: 'fabrikam/core', role: 'app', labels: [] },
     ];
 
-    assert.equal(
-        repoName('maddec01/lar', repos),
-        'maddec01/lar',
-        'the same repository in another case is not a second one',
-    );
-    assert.equal(repoName('maddec01/lar', [{ repo: 'Maddec01/lar', role: 'app', labels: [] }]), 'lar');
+    assert.equal(repoName('acme/core', repos), 'acme/core', 'the same repository in another case is not a second one');
+    assert.equal(repoName('acme/core', [{ repo: 'Acme/core', role: 'app', labels: [] }]), 'core');
 
     const items = [
-        item('List', [], { id: 'a', repo: 'maddec01/lar' }),
-        item('List', [], { id: 'b', repo: 'fabrikam/lar' }),
+        item('List', [], { id: 'a', repo: 'acme/core' }),
+        item('List', [], { id: 'b', repo: 'fabrikam/core' }),
     ];
     const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
 
     assert.deepEqual(
         groups.map((g) => [g.repo, g.items.map((i) => i.id)]),
         [
-            ['Maddec01/lar', ['a']],
-            ['fabrikam/lar', ['b']],
+            ['Acme/core', ['a']],
+            ['fabrikam/core', ['b']],
         ],
     );
 });
 
 test('Add item keeps the title trimmed and the description as written, and nothing else the page sends', () => {
     const draft = {
-        repo: 'maddec01/lar-server',
+        repo: 'acme/api',
         kind: 'feature',
         title: ' Index files ',
         description: '## Why\nSearch.',
@@ -320,7 +314,7 @@ test('Add item keeps the title trimmed and the description as written, and nothi
     };
 
     assert.deepEqual(validateDraft(draft, sample.repos), {
-        repo: 'maddec01/lar-server',
+        repo: 'acme/api',
         kind: 'feature',
         title: 'Index files',
         description: '## Why\nSearch.',
@@ -328,7 +322,7 @@ test('Add item keeps the title trimmed and the description as written, and nothi
 });
 
 test('Add item refuses an unlisted repository, an unknown kind and a blank title', () => {
-    const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '' };
+    const draft = { repo: 'acme/api', kind: 'feature', title: 'Index files', description: '' };
 
     for (const input of [
         null,

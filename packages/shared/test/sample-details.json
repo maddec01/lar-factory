@@ -1,6 +1,6 @@
 {
     "I_sample13": {
-        "body": "## Owner accounts\n\nA household has one **owner**. This build adds the owner table, sign-in sessions and the settings page.\n\n- [x] Owner table and sign-up\n- [ ] Sign-in sessions\n- [ ] Owner settings page\n\n| Column | Type | Notes |\n| --- | --- | --- |\n| `id` | uuid | primary key |\n| `email` | text | unique, lower-cased before it is stored and compared by the database |\n| `created_at` | timestamptz | set by the server |\n\n```ts\nexport async function createOwner(email: string, passwordHash: string): Promise<Owner> {\n  return db.insert(owners).values({ email: email.toLowerCase(), passwordHash }).returning().then(([row]) => row!);\n}\n```\n\n<details><summary>Open questions</summary>\n\nShould an owner be able to invite a second owner? See [#200](https://github.com/maddec01/lar-server/issues/200).\n\n</details>\n\n![Sign-up flow](https://example.com/sign-up-flow.png)\n",
+        "body": "## Team accounts\n\nA workspace has one **owner**. This build adds the owner table, sign-in sessions and the settings page.\n\n- [x] Owner table and sign-up\n- [ ] Sign-in sessions\n- [ ] Owner settings page\n\n| Column | Type | Notes |\n| --- | --- | --- |\n| `id` | uuid | primary key |\n| `email` | text | unique, lower-cased before it is stored and compared by the database |\n| `created_at` | timestamptz | set by the server |\n\n```ts\nexport async function createOwner(email: string, passwordHash: string): Promise<Owner> {\n  return db.insert(owners).values({ email: email.toLowerCase(), passwordHash }).returning().then(([row]) => row!);\n}\n```\n\n<details><summary>Open questions</summary>\n\nShould an owner be able to invite a second owner? See [#200](https://github.com/acme/api/issues/200).\n\n</details>\n\n![Sign-up flow](https://example.com/sign-up-flow.png)\n",
         "format": "markdown",
         "author": "maddec01",
         "assignees": ["maddec01", "claude-bot"],
@@ -10,22 +10,22 @@
             {
                 "number": 144,
                 "title": "Owner table and sign-up",
-                "url": "https://github.com/maddec01/lar-server/issues/144",
-                "repo": "maddec01/lar-server",
+                "url": "https://github.com/acme/api/issues/144",
+                "repo": "acme/api",
                 "state": "closed"
             },
             {
                 "number": 145,
                 "title": "Sign-in sessions",
-                "url": "https://github.com/maddec01/lar-server/issues/145",
-                "repo": "maddec01/lar-server",
+                "url": "https://github.com/acme/api/issues/145",
+                "repo": "acme/api",
                 "state": "open"
             },
             {
                 "number": 146,
                 "title": "Owner settings page",
-                "url": "https://github.com/maddec01/lar-server/issues/146",
-                "repo": "maddec01/lar-server",
+                "url": "https://github.com/acme/api/issues/146",
+                "repo": "acme/api",
                 "state": "open"
             }
         ],
@@ -48,7 +48,7 @@
                 "id": "IC_sample13a",
                 "author": "reviewer-anne",
                 "createdAt": "2026-10-14T11:40:00Z",
-                "body": "Can a household have more than one owner?",
+                "body": "Can a workspace have more than one owner?",
                 "format": "markdown"
             }
         ],
@@ -76,7 +76,7 @@
         "olderCursor": null
     },
     "I_sample04": {
-        "body": "Keep one watch history per household, so a show started on the TV resumes on the phone.",
+        "body": "Keep one watch history per workspace, so a show started on the TV resumes on the phone.",
         "format": "markdown",
         "author": "maddec01",
         "assignees": [],
@@ -908,8 +908,8 @@
             {
                 "number": 108,
                 "title": "Upgrade FFmpeg on the deployed server",
-                "url": "https://github.com/maddec01/lar-apple/issues/108",
-                "repo": "maddec01/lar-apple",
+                "url": "https://github.com/acme/ios/issues/108",
+                "repo": "acme/ios",
                 "state": "closed"
             }
         ],
@@ -920,7 +920,7 @@
     "42a26ff6-44ae-5dcc-b615-e6a344637997": {
         "record": {
             "bodyKind": "map",
-            "body": "## Destination\n\nA family member opens one invitation link, installs the app if needed and joins the household's server. When every saved address of that server stops answering, the app finds its current addresses in the household registry on lar.works and reconnects to the same server identity, without the owner sending a new invitation.\n\n## Decisions\n\n- The registry accepts signed household records only from servers holding a valid server pass; only devices holding the household's share secret can read them.\n- Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.\n- A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the households the person belongs to.\n- Every invitation is one lar.works link that carries the whole invitation in the URL fragment, so lar.works never receives it.\n- When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.\n\n## Boundaries\n\n- Public server listings, media relay, billing changes and server backups.\n- Adding a device while the platform is down on clients other than Apple's.\n- Testing on an IPv6-only network.\n\n## Check\n\nReleased apps join, recover and sign in against the live platform and a household server.\n\n- A phone on cellular without the app joins through an emailed invitation link.\n- After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.\n- A device with no saved server signs in with Lar and connects at home and on cellular.\n",
+            "body": "## Destination\n\nA teammate opens one invitation link, installs the app if needed and joins the workspace's server. When every saved address of that server stops answering, the app finds its current addresses in the workspace registry on acme.example and reconnects to the same server identity, without the owner sending a new invitation.\n\n## Decisions\n\n- The registry accepts signed workspace records only from servers holding a valid server pass; only devices holding the workspace's share secret can read them.\n- Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.\n- A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the workspaces the person belongs to.\n- Every invitation is one acme.example link that carries the whole invitation in the URL fragment, so acme.example never receives it.\n- When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.\n\n## Boundaries\n\n- Public server listings, media relay, billing changes and server backups.\n- Adding a device while the platform is down on clients other than Apple's.\n- Testing on an IPv6-only network.\n\n## Check\n\nReleased apps join, recover and sign in against the live platform and a workspace server.\n\n- A phone on cellular without the app joins through an emailed invitation link.\n- After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.\n- A device with no saved server signs in with Lar and connects at home and on cellular.\n",
             "context": "",
             "buildPhase": null,
             "reviewRounds": []
@@ -938,7 +938,7 @@
     "79839d93-d1a7-59f1-b5c0-0973f550f344": {
         "record": {
             "bodyKind": "brief",
-            "body": "## Goal\n\nA device with no saved server signs in with a Lar account first, then lists and joins the household's servers.\n\n## Acceptance\n\n- The sign-in sheet opens once and returns to the app.\n- Each household shows its servers; picking one connects to it.\n- Apple TV shows a code instead.\n\n## Blockers\n\n- Look up a household's current servers in the registry when every saved address fails (lar-apple#139)\n",
+            "body": "## Goal\n\nA device with no saved server signs in with a Acme account first, then lists and joins the workspace's servers.\n\n## Acceptance\n\n- The sign-in sheet opens once and returns to the app.\n- Each workspace shows its servers; picking one connects to it.\n- Apple TV shows a code instead.\n\n## Blockers\n\n- Look up a workspace's current servers in the registry when every saved address fails (ios#139)\n",
             "context": "",
             "buildPhase": null,
             "reviewRounds": []

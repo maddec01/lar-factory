@@ -50,7 +50,7 @@ describe('install', () => {
         const workIds = agents.map(({ driver, home }) => {
             const created = runFrom(
                 LarWorkLauncher.launcherPath(appHome),
-                ['create', '--title', driver, '--repository', 'maddec01/lar', '--kind', 'build'],
+                ['create', '--title', driver, '--repository', 'acme/core', '--kind', 'build'],
                 { cwd: tempDir('worktree-'), home },
             );
 

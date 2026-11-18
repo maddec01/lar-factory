@@ -90,7 +90,7 @@ export function AddItemModes({
     description,
     children,
 }: {
-    /** What the shown pane does, such as "Record work in lar-server and add it to List." */
+    /** What the shown pane does, such as "Record work in api and add it to List." */
     description: ReactNode;
     /** The panes' switch. */
     children: ReactNode;

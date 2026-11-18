@@ -238,8 +238,8 @@ export const itemRepoNames = (item: Pick<Item, 'repo'>, repos: readonly RepoConf
     repoName(repoKey(item), repos);
 
 /**
- * A repository's key as the board shows it, each part decoded: `contoso/Fabrikam%20Fiber/lar-api` shows as
- * `contoso/Fabrikam Fiber/lar-api`. The key itself stays encoded, for matching and URLs.
+ * A repository's key as the board shows it, each part decoded: `contoso/Fabrikam%20Fiber/api` shows as
+ * `contoso/Fabrikam Fiber/api`. The key itself stays encoded, for matching and URLs.
  */
 export const shownRepo = (repo: string): string => repo.split('/').map(decodePart).join('/');
 

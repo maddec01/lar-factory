@@ -10,7 +10,7 @@ const button = (label: string) =>
     )!;
 const heading = () => text(dialog()!.querySelector('[data-slot="modal-header"] h2'));
 
-async function pick(name = 'lar-web', work = true) {
+async function pick(name = 'web', work = true) {
     await settle(() => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"] input[type="radio"]`)!.click());
     await settle(() => button('Next').click());
 

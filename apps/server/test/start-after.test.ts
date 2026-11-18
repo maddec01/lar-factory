@@ -21,7 +21,7 @@ import type { Board } from './server-support.ts';
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
 const build = rawIssue('I_12', 12, 'Ready', ['build']);
-const CLOSED_DEPENDENCY = { ticketObservations: { 'maddec01/lar-server#40': { state: 'CLOSED', assignees: [] } } };
+const CLOSED_DEPENDENCY = { ticketObservations: { 'acme/api#40': { state: 'CLOSED', assignees: [] } } };
 
 /** A board that can start lar-factory threads, offering the sample model choices, and its environment. */
 async function armableBoard(
@@ -141,12 +141,12 @@ async function recordClosedDependency(board: Board): Promise<string> {
             let dependency = records.addDependency(board.id(12), {
                 need: 'An export endpoint',
                 owner: 'server team',
-                ticket: 'maddec01/lar-server#40',
+                ticket: 'acme/api#40',
             });
 
             dependency = records.addDependencyBlock(dependency.dependencyId, dependency.revision, board.id(12));
             dependency = records.observeDependency(dependency.dependencyId, dependency.revision, {
-                subject: 'maddec01/lar-server#40',
+                subject: 'acme/api#40',
                 kind: 'closed',
             });
             dependencyId = dependency.dependencyId;

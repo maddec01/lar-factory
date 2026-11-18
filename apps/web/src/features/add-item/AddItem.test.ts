@@ -14,7 +14,7 @@ const withFactory: BoardData = {
     repos: [
         ...sample.repos.map(({ setup: _setup, ...repo }) => repo),
         { repo: 'maddec01/lar-factory', role: 'The factory', labels: [] },
-        { repo: 'maddec01/lar-empty', role: 'Empty', labels: [] },
+        { repo: 'acme/empty', role: 'Empty', labels: [] },
     ],
 };
 const addButton = () => $<HTMLButtonElement>('[data-add-item]')!;
@@ -85,7 +85,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
     expect(body.draft).toEqual({
         createIssue: false,
-        repo: 'maddec01/lar-server',
+        repo: 'acme/api',
         kind: 'bug',
         title: 'Playback stalls',
         description: 'After a seek.',
@@ -147,7 +147,7 @@ test('picking a new ticket closes the dialog and announces it, and one on the bo
     respond({ item, created: true, error: null, board: { ...sample, items: [...sample.items, item] } });
     await settle(() => ticketButton(8).click());
     await settle(() => vi.advanceTimersByTime(50));
-    expect(calls('/api/pick-ticket')).toEqual([['/api/pick-ticket', { repo: 'maddec01/lar-server', number: 8 }]]);
+    expect(calls('/api/pick-ticket')).toEqual([['/api/pick-ticket', { repo: 'acme/api', number: 8 }]]);
     expect(dialog()).toBeNull();
     expect(text($('[data-slot="toast"][role="status"] [data-toast]'))).toBe(
         'Added #8 Seek stalls to the List. View item Queue',

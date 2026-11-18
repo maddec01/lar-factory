@@ -7,8 +7,8 @@ import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, mountPage, sample, settle } from '@/test/PageTest';
 
 const SCOPE_KEY = 'lar-board:scope';
-const GONE = 'maddec01/lar-gone';
-const reading = { step: 'items', running: ['lar-gone'], waiting: [GONE], settled: false } as BoardData['firstRead'];
+const GONE = 'acme/gone';
+const reading = { step: 'items', running: ['gone'], waiting: [GONE], settled: false } as BoardData['firstRead'];
 const reader = { ...sample, firstRead: reading };
 
 /** The filters the board search field describes itself with; null with none. */

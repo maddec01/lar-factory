@@ -16,7 +16,7 @@ import { afterEach, expect, test } from 'vite-plus/test';
 
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const opened: { records: WorkRecords; dir: string }[] = [];
 
 afterEach(() => {

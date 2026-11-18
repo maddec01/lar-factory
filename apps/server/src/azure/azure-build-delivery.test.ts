@@ -10,7 +10,7 @@ import { observePullRequest } from '../items/observe-records.ts';
 import { AZURE_REPOS, prUrl } from './azure-repos.ts';
 import { fakeAzRepos, type FakePr } from './fake-az.ts';
 
-const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const REPO = 'contoso/Fabrikam%20Fiber/api';
 const BRANCH = 'feat/playback';
 const description = 'Add playback.\n\nValidation: targeted checks passed.\nLiteral text: $(never-executed).';
 
@@ -20,7 +20,7 @@ const createArgs = (base: string) => [
     'pr',
     'create',
     '--repository',
-    'lar-api',
+    'api',
     '--source-branch',
     BRANCH,
     '--target-branch',
@@ -61,7 +61,7 @@ test('an Azure build creates a PR against the actual base, records it locally, a
 
     record = records.setPullRequest(record.workId, record.revision, `${REPO}#${created.pullRequestId}`);
     expect(prUrl(REPO, created.pullRequestId)).toBe(
-        'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/100',
+        'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/api/pullrequest/100',
     );
     await observePullRequest(records, record.workId, () => observePr(REPO, created.pullRequestId, fake.run));
     expect(records.read(record.workId)).toMatchObject({

@@ -28,18 +28,18 @@ function tempHome(t: TestContext): string {
     return home;
 }
 
-/** A board on the sample data reading T3 at `home`, whose real settings list only lar-web. */
+/** A board on the sample data reading T3 at `home`, whose real settings list only web. */
 async function sampleT3(t: TestContext, home: string, env: Record<string, string> = {}) {
     checkouts(home, {
-        'lar-server': 'git@github.com:maddec01/lar-server.git',
-        'lar-web': 'git@github.com:maddec01/lar-web.git',
+        api: 'git@github.com:acme/api.git',
+        web: 'git@github.com:acme/web.git',
     });
 
-    if (!existsSync(join(home, 'Library'))) writeRepositoryList(home, ['maddec01/lar-web']);
+    if (!existsSync(join(home, 'Library'))) writeRepositoryList(home, ['acme/web']);
 
     const T3_STATE_DB = projectsDb(
         t,
-        ['lar-server', 'lar-web'].map((id) => ({ id, root: `${home}/Developer/lar/${id}` })),
+        ['api', 'web'].map((id) => ({ id, root: `${home}/Developer/lar/${id}` })),
     );
     const board = await startBoard(t, { recorded: false }, true, false, {
         HOME: home,
@@ -89,7 +89,7 @@ test('over its ticks it reads T3 and nothing else, and changes no file in the ap
 
     writeFileSync(az, `#!/bin/sh\necho "$*" >> '${azLog}'\n`);
     chmodSync(az, 0o755);
-    writeRepositoryList(home, ['maddec01/lar-web']);
+    writeRepositoryList(home, ['acme/web']);
 
     const dataDir = join(home, 'Library/Application Support/Lar Factory');
     const before = filesUnder(dataDir);

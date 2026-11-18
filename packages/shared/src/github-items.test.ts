@@ -31,25 +31,25 @@ test('normalizes an issue item from the GraphQL response', () => {
             id: 'I_61',
             number: 61,
             title: 'Arr instances',
-            url: 'https://github.com/maddec01/lar-server/issues/61',
+            url: 'https://github.com/acme/api/issues/61',
             state: 'OPEN',
             closedAt: null,
             updatedAt: '2026-10-21T08:10:00Z',
-            repository: { nameWithOwner: 'maddec01/lar-server' },
+            repository: { nameWithOwner: 'acme/api' },
             labels: { nodes: [{ name: 'feature' }, { name: 'status-needs-you' }] },
             parent: {
                 number: 60,
                 title: 'P',
                 url: 'u',
                 state: 'CLOSED',
-                repository: { nameWithOwner: 'maddec01/lar-server' },
+                repository: { nameWithOwner: 'acme/api' },
             },
             subIssuesSummary: { total: 3, completed: 1 },
             blockedBy: {
                 nodes: [
-                    { number: 7, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } },
-                    { number: 8, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-apple' } },
-                    { number: 5, state: 'CLOSED', repository: { nameWithOwner: 'maddec01/lar-server' } },
+                    { number: 7, state: 'OPEN', repository: { nameWithOwner: 'acme/api' } },
+                    { number: 8, state: 'OPEN', repository: { nameWithOwner: 'acme/ios' } },
+                    { number: 5, state: 'CLOSED', repository: { nameWithOwner: 'acme/api' } },
                 ],
             },
             closedByPullRequestsReferences: {
@@ -62,14 +62,14 @@ test('normalizes an issue item from the GraphQL response', () => {
     assert.equal(item?.id, 'I_61', "an item's id is the issue's node id");
     assert.equal(item?.status, 'Needs you');
     assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
-    assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'closed' });
+    assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'acme/api', state: 'closed' });
     assert.equal(item && 'blockedBy' in item, false, 'the open count comes from the blockers, not a field of its own');
     assert.deepEqual(
         item?.blockers,
         [
-            { number: 7, repo: 'maddec01/lar-server', state: 'open' },
-            { number: 8, repo: 'maddec01/lar-apple', state: 'open' },
-            { number: 5, repo: 'maddec01/lar-server', state: 'closed' },
+            { number: 7, repo: 'acme/api', state: 'open' },
+            { number: 8, repo: 'acme/ios', state: 'open' },
+            { number: 5, repo: 'acme/api', state: 'closed' },
         ],
         'the blocked-by issues come with their repo and state, closed ones too',
     );
@@ -259,7 +259,7 @@ test('sub-issues make an issue linked only when they span repositories', () => {
     const flow = (subIssues: RawIssueRef[]) => normalizeItem(issue900([], subIssues))!.flow;
 
     expect(flow([refIn('maddec01/lar-factory', 901, 'OPEN')])).toBe('single');
-    expect(flow([refIn('maddec01/lar-factory', 901, 'OPEN'), refIn('maddec01/lar-web', 902, 'OPEN')])).toBe('linked');
+    expect(flow([refIn('maddec01/lar-factory', 901, 'OPEN'), refIn('acme/web', 902, 'OPEN')])).toBe('linked');
 });
 
 test('a parent in another repository makes an issue linked', () => {
@@ -267,5 +267,5 @@ test('a parent in another repository makes an issue linked', () => {
         normalizeItem(rawIssue('I_x', 900, 'Queued', [], { parent: refIn(repo, 800, 'OPEN') }))!.flow;
 
     expect(flow('maddec01/lar-factory')).toBe('single');
-    expect(flow('maddec01/lar-web')).toBe('linked');
+    expect(flow('acme/web')).toBe('linked');
 });

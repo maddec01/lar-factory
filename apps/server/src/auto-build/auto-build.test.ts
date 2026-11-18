@@ -12,7 +12,7 @@ import { recordItems } from '../items/record-items.ts';
 import { createAutoBuild } from './auto-build.ts';
 
 const REPO = 'maddec01/lar-factory';
-const OTHER = 'maddec01/lar-other';
+const OTHER = 'acme/side';
 const OFFERED: ModelGroup[] = [
     { instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }] },
 ];

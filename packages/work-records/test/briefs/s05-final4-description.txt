@@ -1,4 +1,4 @@
-Deliver one compatible versioned greeting contract across three sandbox repositories: a producer change in maddec01/lar-factory-sim-891-s05-a (A), a consumer change in maddec01/lar-factory-sim-891-s05-b (B), and a visible UI change in maddec01/lar-factory-sim-891-s05-c (C).
+Deliver one compatible versioned greeting contract across three sandbox repositories: a producer change in acme/sim-891-s05-a (A), a consumer change in acme/sim-891-s05-b (B), and a visible UI change in acme/sim-891-s05-c (C).
 
 For the fixed fixture the contract is exactly {version: 1, message: "Hello, world!"}. Preserve existing greeting APIs/tests and legacy Hello, friend! behavior. A adds a pure message factory in src/sim-891/producer.mjs and test/sim-891/producer.test.mjs. B adds src/sim-891/consumer.mjs and test/sim-891/consumer.test.mjs to validate numeric version 1, return the supplied message and reject unsupported versions. C adds src/sim-891/view.mjs, test/sim-891/view.test.mjs and a tiny static sim-891.html fixture displaying the accepted greeting, leaving index.html and its keyboard behavior unchanged.
 

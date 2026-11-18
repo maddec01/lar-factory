@@ -1,13 +1,13 @@
 {
     "repos": [
         {
-            "repo": "maddec01/lar-server",
-            "path": "~/test/lar-server",
+            "repo": "acme/api",
+            "path": "~/test/api",
             "role": "Backend API server",
             "labels": ["area: server", "area: web"],
             "items": "issues",
             "setup": {
-                "repo": "maddec01/lar-server",
+                "repo": "acme/api",
                 "projectId": "sample-project-server",
                 "role": "Backend API server",
                 "itemSource": {
@@ -82,8 +82,8 @@
             }
         },
         {
-            "repo": "maddec01/lar-apple",
-            "path": "~/test/lar-apple",
+            "repo": "acme/ios",
+            "path": "~/test/ios",
             "role": "Apple client app",
             "labels": [
                 "app: music",
@@ -98,9 +98,9 @@
             "items": "issues"
         },
         {
-            "repo": "maddec01/lar-platform",
-            "path": "~/test/lar-platform",
-            "role": "Accounts, household registry and lar.works",
+            "repo": "acme/platform",
+            "path": "~/test/platform",
+            "role": "Accounts, workspace registry and acme.example",
             "labels": ["area: registry", "area: accounts"],
             "items": "issues"
         },
@@ -114,17 +114,17 @@
         }
     ],
     "projectIcons": {
-        "maddec01/lar-server": {
+        "acme/api": {
             "kind": "lucide",
             "name": "server",
             "color": "sky"
         },
-        "maddec01/lar-apple": {
+        "acme/ios": {
             "kind": "lucide",
             "name": "apple",
             "color": "gray"
         },
-        "maddec01/lar-platform": {
+        "acme/platform": {
             "kind": "lucide",
             "name": "globe",
             "color": "violet"
@@ -226,8 +226,8 @@
             "content": "ticket",
             "number": 61,
             "title": "Arr instances, catalog bindings and content requests",
-            "url": "https://github.com/maddec01/lar-server/issues/61",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/61",
+            "repo": "acme/api",
             "labels": ["feature", "area: server", "area: web"],
             "labelColors": {
                 "area: server": "#C2E0C6",
@@ -257,8 +257,8 @@
             "content": "ticket",
             "number": 114,
             "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
-            "url": "https://github.com/maddec01/lar-server/issues/114",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/114",
+            "repo": "acme/api",
             "labels": ["bug", "area: server"],
             "labelColors": {
                 "area: server": "#C2E0C6"
@@ -287,8 +287,8 @@
             "content": "ticket",
             "number": 12,
             "title": "Remember the last subtitle language per show",
-            "url": "https://github.com/maddec01/lar-apple/issues/12",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/12",
+            "repo": "acme/ios",
             "labels": ["feature", "app: music", "os: ios", "os: macos"],
             "labelColors": {
                 "app: music": "#E99695",
@@ -319,8 +319,8 @@
             "content": "ticket",
             "number": 113,
             "title": "Shared playback history across devices",
-            "url": "https://github.com/maddec01/lar-server/issues/113",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/113",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
@@ -346,8 +346,8 @@
             "content": "ticket",
             "number": 129,
             "title": "Run more than one 4K HDR to 1080p stream at a time",
-            "url": "https://github.com/maddec01/lar-server/issues/129",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/129",
+            "repo": "acme/api",
             "labels": ["improvement", "area: server", "needs-design"],
             "labelColors": {
                 "area: server": "#C2E0C6",
@@ -387,8 +387,8 @@
             "content": "ticket",
             "number": 20,
             "title": "Player controls stay visible after scrubbing on tvOS",
-            "url": "https://github.com/maddec01/lar-apple/issues/20",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/20",
+            "repo": "acme/ios",
             "labels": ["bug", "os: ios", "priority: high"],
             "labelColors": {
                 "os: ios": "#5319E7",
@@ -418,8 +418,8 @@
             "content": "ticket",
             "number": 127,
             "title": "Offline downloads on watchOS",
-            "url": "https://github.com/maddec01/lar-server/issues/127",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/127",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
@@ -445,8 +445,8 @@
             "content": "ticket",
             "number": 130,
             "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
-            "url": "https://github.com/maddec01/lar-server/issues/130",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/130",
+            "repo": "acme/api",
             "labels": ["bug"],
             "state": "open",
             "closedAs": null,
@@ -495,16 +495,16 @@
             "content": "ticket",
             "number": 22,
             "title": "Continue watching row on the home screen",
-            "url": "https://github.com/maddec01/lar-apple/issues/22",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/22",
+            "repo": "acme/ios",
             "labels": ["feature"],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 9,
                 "title": "Home screen refresh",
-                "url": "https://github.com/maddec01/lar-apple/issues/9",
-                "repo": "maddec01/lar-apple",
+                "url": "https://github.com/acme/ios/issues/9",
+                "repo": "acme/ios",
                 "state": "open"
             },
             "parentId": null,
@@ -550,9 +550,9 @@
             "kind": "concept",
             "content": "ticket",
             "number": 200,
-            "title": "lar cloud: sign-in and direct connections",
-            "url": "https://github.com/maddec01/lar-server/issues/200",
-            "repo": "maddec01/lar-server",
+            "title": "acme cloud: sign-in and direct connections",
+            "url": "https://github.com/acme/api/issues/200",
+            "repo": "acme/api",
             "labels": ["concept"],
             "state": "open",
             "closedAs": null,
@@ -570,7 +570,7 @@
             "map": {
                 "destination": "Anyone with a lar server signs in on lar.app and streams directly from their server while away, with automatic port mapping. The cloud handles sign-in and server discovery; media goes directly between server and player.",
                 "decisions": [
-                    "Owner accounts live in the cloud, not on each server (#203 research).",
+                    "Team accounts live in the cloud, not on each server (#203 research).",
                     "The cloud handles account and discovery requests; it never carries media (#203).",
                     "Sign-in uses passkeys first, email links as fallback."
                 ],
@@ -598,16 +598,16 @@
             "content": "ticket",
             "number": 201,
             "title": "Direct connections: automatic port mapping and fallback guidance",
-            "url": "https://github.com/maddec01/lar-server/issues/201",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/201",
+            "repo": "acme/api",
             "labels": ["decision-grill"],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: sign-in and direct connections",
-                "url": "https://github.com/maddec01/lar-server/issues/200",
-                "repo": "maddec01/lar-server",
+                "title": "acme cloud: sign-in and direct connections",
+                "url": "https://github.com/acme/api/issues/200",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample09",
@@ -618,7 +618,7 @@
             "blockers": [
                 {
                     "number": 203,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed"
                 }
             ],
@@ -660,16 +660,16 @@
             "content": "ticket",
             "number": 23,
             "title": "Faster library sync on large collections",
-            "url": "https://github.com/maddec01/lar-apple/issues/23",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/23",
+            "repo": "acme/ios",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 9,
                 "title": "Home screen refresh",
-                "url": "https://github.com/maddec01/lar-apple/issues/9",
-                "repo": "maddec01/lar-apple",
+                "url": "https://github.com/acme/ios/issues/9",
+                "repo": "acme/ios",
                 "state": "open"
             },
             "parentId": null,
@@ -709,16 +709,16 @@
             "content": "ticket",
             "number": 202,
             "title": "Sign-in screen",
-            "url": "https://github.com/maddec01/lar-server/issues/202",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/202",
+            "repo": "acme/api",
             "labels": ["decision-prototype"],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: sign-in and direct connections",
-                "url": "https://github.com/maddec01/lar-server/issues/200",
-                "repo": "maddec01/lar-server",
+                "title": "acme cloud: sign-in and direct connections",
+                "url": "https://github.com/acme/api/issues/200",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample09",
@@ -771,17 +771,17 @@
             "kind": "build",
             "content": "ticket",
             "number": 140,
-            "title": "Owner accounts",
-            "url": "https://github.com/maddec01/lar-server/issues/140",
-            "repo": "maddec01/lar-server",
+            "title": "Team accounts",
+            "url": "https://github.com/acme/api/issues/140",
+            "repo": "acme/api",
             "labels": ["build"],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 200,
-                "title": "lar cloud: sign-in and direct connections",
-                "url": "https://github.com/maddec01/lar-server/issues/200",
-                "repo": "maddec01/lar-server",
+                "title": "acme cloud: sign-in and direct connections",
+                "url": "https://github.com/acme/api/issues/200",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample09",
@@ -792,7 +792,7 @@
             "blockers": [
                 {
                     "number": 202,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "open"
                 }
             ],
@@ -803,24 +803,24 @@
                 {
                     "number": 144,
                     "title": "Owner table and sign-up",
-                    "url": "https://github.com/maddec01/lar-server/issues/144",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/144",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 145,
                     "title": "Sign-in sessions",
-                    "url": "https://github.com/maddec01/lar-server/issues/145",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/145",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "active"
                 },
                 {
                     "number": 146,
                     "title": "Owner settings page",
-                    "url": "https://github.com/maddec01/lar-server/issues/146",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/146",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 }
@@ -828,7 +828,7 @@
             "threads": [
                 {
                     "id": "sample-thread-140",
-                    "title": "Shape: owner accounts",
+                    "title": "Shape: team accounts",
                     "state": "done",
                     "updated": "2026-10-21T08:30:00.000Z"
                 }
@@ -851,8 +851,8 @@
             "content": "ticket",
             "number": 150,
             "title": "Direct streaming from away, with automatic port mapping",
-            "url": "https://github.com/maddec01/lar-server/issues/150",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/150",
+            "repo": "acme/api",
             "labels": ["feature", "build"],
             "state": "open",
             "closedAs": null,
@@ -870,112 +870,112 @@
                 {
                     "number": 160,
                     "title": "Direct connection negotiation",
-                    "url": "https://github.com/maddec01/lar-server/issues/160",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/160",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 161,
                     "title": "Direct connection authentication",
-                    "url": "https://github.com/maddec01/lar-server/issues/161",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/161",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 162,
                     "title": "Session keys rotation",
-                    "url": "https://github.com/maddec01/lar-server/issues/162",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/162",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 163,
                     "title": "Device pairing codes",
-                    "url": "https://github.com/maddec01/lar-server/issues/163",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/163",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 164,
                     "title": "Pairing screen on Apple TV",
-                    "url": "https://github.com/maddec01/lar-server/issues/164",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/164",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 165,
                     "title": "Direct connection health endpoint",
-                    "url": "https://github.com/maddec01/lar-server/issues/165",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/165",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "active"
                 },
                 {
                     "number": 166,
                     "title": "Reconnect with backoff",
-                    "url": "https://github.com/maddec01/lar-server/issues/166",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/166",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "active"
                 },
                 {
                     "number": 167,
                     "title": "Bandwidth probe before streaming",
-                    "url": "https://github.com/maddec01/lar-server/issues/167",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/167",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "blocked"
                 },
                 {
                     "number": 168,
                     "title": "Fallback to direct connection",
-                    "url": "https://github.com/maddec01/lar-server/issues/168",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/168",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 169,
                     "title": "Direct connection diagnostics",
-                    "url": "https://github.com/maddec01/lar-server/issues/169",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/169",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 170,
                     "title": "Rate limits per owner",
-                    "url": "https://github.com/maddec01/lar-server/issues/170",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/170",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 171,
                     "title": "Abuse report endpoint",
-                    "url": "https://github.com/maddec01/lar-server/issues/171",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/171",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 172,
                     "title": "Direct streaming load test",
-                    "url": "https://github.com/maddec01/lar-server/issues/172",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/172",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 173,
                     "title": "Docs for automatic port mapping",
-                    "url": "https://github.com/maddec01/lar-server/issues/173",
-                    "repo": "maddec01/lar-server",
+                    "url": "https://github.com/acme/api/issues/173",
+                    "repo": "acme/api",
                     "state": "open",
                     "progress": "waiting"
                 }
@@ -1035,8 +1035,8 @@
             "content": "ticket",
             "number": 30,
             "title": "Chapter markers in the scrubber",
-            "url": "https://github.com/maddec01/lar-apple/issues/30",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/30",
+            "repo": "acme/ios",
             "labels": ["feature", "os: macos", "good first issue", "linked-work"],
             "labelColors": {
                 "os: macos": "#BFDADC",
@@ -1056,7 +1056,7 @@
             "linkedPrs": [
                 {
                     "number": 33,
-                    "url": "https://github.com/maddec01/lar-apple/pull/33",
+                    "url": "https://github.com/acme/ios/pull/33",
                     "state": "open",
                     "isDraft": true,
                     "checks": {
@@ -1074,40 +1074,40 @@
                 {
                     "number": 36,
                     "title": "Read chapter lists from the server",
-                    "url": "https://github.com/maddec01/lar-apple/issues/36",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/36",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 37,
                     "title": "Chapter ticks on the scrubber track",
-                    "url": "https://github.com/maddec01/lar-apple/issues/37",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/37",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "progress": "done"
                 },
                 {
                     "number": 38,
                     "title": "Snap scrubbing to the nearest chapter",
-                    "url": "https://github.com/maddec01/lar-apple/issues/38",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/38",
+                    "repo": "acme/ios",
                     "state": "open",
                     "progress": "active"
                 },
                 {
                     "number": 39,
                     "title": "Chapter titles in the scrub preview",
-                    "url": "https://github.com/maddec01/lar-apple/issues/39",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/39",
+                    "repo": "acme/ios",
                     "state": "open",
                     "progress": "waiting"
                 },
                 {
                     "number": 42,
                     "title": "Chapter markers on tvOS",
-                    "url": "https://github.com/maddec01/lar-apple/issues/42",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/42",
+                    "repo": "acme/ios",
                     "state": "open",
                     "progress": "blocked"
                 }
@@ -1146,8 +1146,8 @@
             "content": "ticket",
             "number": 180,
             "title": "Resume playback across devices",
-            "url": "https://github.com/maddec01/lar-server/issues/180",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/180",
+            "repo": "acme/api",
             "labels": ["feature"],
             "state": "open",
             "closedAs": null,
@@ -1163,7 +1163,7 @@
             "linkedPrs": [
                 {
                     "number": 41,
-                    "url": "https://github.com/maddec01/lar-apple/pull/41",
+                    "url": "https://github.com/acme/ios/pull/41",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-20T14:00:00Z",
@@ -1221,8 +1221,8 @@
             "content": "ticket",
             "number": 141,
             "title": "Transcoder leaks a file handle on cancel",
-            "url": "https://github.com/maddec01/lar-server/issues/141",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/141",
+            "repo": "acme/api",
             "labels": ["bug"],
             "state": "open",
             "closedAs": null,
@@ -1238,7 +1238,7 @@
             "linkedPrs": [
                 {
                     "number": 190,
-                    "url": "https://github.com/maddec01/lar-server/pull/190",
+                    "url": "https://github.com/acme/api/pull/190",
                     "state": "open",
                     "isDraft": false,
                     "checks": {
@@ -1288,8 +1288,8 @@
             "content": "ticket",
             "number": 31,
             "title": "New artwork grid layout",
-            "url": "https://github.com/maddec01/lar-apple/issues/31",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/31",
+            "repo": "acme/ios",
             "labels": ["feature"],
             "state": "open",
             "closedAs": null,
@@ -1305,7 +1305,7 @@
             "linkedPrs": [
                 {
                     "number": 32,
-                    "url": "https://github.com/maddec01/lar-apple/pull/32",
+                    "url": "https://github.com/acme/ios/pull/32",
                     "state": "open",
                     "isDraft": false,
                     "checks": {
@@ -1338,8 +1338,8 @@
             "content": "ticket",
             "number": 149,
             "title": "Bump FFmpeg to 7.1",
-            "url": "https://github.com/maddec01/lar-server/issues/149",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/149",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
@@ -1355,7 +1355,7 @@
             "linkedPrs": [
                 {
                     "number": 210,
-                    "url": "https://github.com/maddec01/lar-server/pull/210",
+                    "url": "https://github.com/acme/api/pull/210",
                     "state": "open",
                     "isDraft": false,
                     "checks": {
@@ -1382,8 +1382,8 @@
             "content": "ticket",
             "number": 34,
             "title": "Swipe between episodes",
-            "url": "https://github.com/maddec01/lar-apple/issues/34",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/34",
+            "repo": "acme/ios",
             "labels": ["feature"],
             "state": "open",
             "closedAs": null,
@@ -1399,7 +1399,7 @@
             "linkedPrs": [
                 {
                     "number": 35,
-                    "url": "https://github.com/maddec01/lar-apple/pull/35",
+                    "url": "https://github.com/acme/ios/pull/35",
                     "state": "open",
                     "isDraft": false,
                     "checks": {
@@ -1426,8 +1426,8 @@
             "content": "ticket",
             "number": 147,
             "title": "Fall back to software transcoding when the GPU is busy",
-            "url": "https://github.com/maddec01/lar-server/issues/147",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/147",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
@@ -1443,7 +1443,7 @@
             "linkedPrs": [
                 {
                     "number": 148,
-                    "url": "https://github.com/maddec01/lar-server/pull/148",
+                    "url": "https://github.com/acme/api/pull/148",
                     "state": "open",
                     "isDraft": false,
                     "checks": null,
@@ -1464,8 +1464,8 @@
             "content": "ticket",
             "number": 142,
             "title": "Cache probe results between restarts",
-            "url": "https://github.com/maddec01/lar-server/issues/142",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/142",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "open",
             "closedAs": null,
@@ -1481,7 +1481,7 @@
             "linkedPrs": [
                 {
                     "number": 151,
-                    "url": "https://github.com/maddec01/lar-server/pull/151",
+                    "url": "https://github.com/acme/api/pull/151",
                     "state": "open",
                     "isDraft": false,
                     "checks": {
@@ -1513,16 +1513,16 @@
             "content": "ticket",
             "number": 203,
             "title": "Cost of account and discovery hosting",
-            "url": "https://github.com/maddec01/lar-server/issues/203",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/203",
+            "repo": "acme/api",
             "labels": ["decision-research"],
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 200,
-                "title": "lar cloud: sign-in and direct connections",
-                "url": "https://github.com/maddec01/lar-server/issues/200",
-                "repo": "maddec01/lar-server",
+                "title": "acme cloud: sign-in and direct connections",
+                "url": "https://github.com/acme/api/issues/200",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample09",
@@ -1560,8 +1560,8 @@
             "content": "ticket",
             "number": 5,
             "title": "Crash when a server goes offline mid-playback",
-            "url": "https://github.com/maddec01/lar-apple/issues/5",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/5",
+            "repo": "acme/ios",
             "labels": ["bug", "os: watchos"],
             "labelColors": {
                 "os: watchos": "#FBCA04"
@@ -1580,7 +1580,7 @@
             "linkedPrs": [
                 {
                     "number": 6,
-                    "url": "https://github.com/maddec01/lar-apple/pull/6",
+                    "url": "https://github.com/acme/ios/pull/6",
                     "state": "merged",
                     "isDraft": false,
                     "checks": {
@@ -1611,16 +1611,16 @@
             "content": "ticket",
             "number": 181,
             "title": "Store the playback position per device",
-            "url": "https://github.com/maddec01/lar-server/issues/181",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/181",
+            "repo": "acme/api",
             "labels": ["build"],
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 180,
                 "title": "Resume playback across devices",
-                "url": "https://github.com/maddec01/lar-server/issues/180",
-                "repo": "maddec01/lar-server",
+                "url": "https://github.com/acme/api/issues/180",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample23",
@@ -1634,7 +1634,7 @@
             "linkedPrs": [
                 {
                     "number": 182,
-                    "url": "https://github.com/maddec01/lar-server/pull/182",
+                    "url": "https://github.com/acme/api/pull/182",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-18T11:00:00Z",
@@ -1676,16 +1676,16 @@
             "content": "ticket",
             "number": 40,
             "title": "Resume from the stored position",
-            "url": "https://github.com/maddec01/lar-apple/issues/40",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/40",
+            "repo": "acme/ios",
             "labels": ["build"],
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 180,
                 "title": "Resume playback across devices",
-                "url": "https://github.com/maddec01/lar-server/issues/180",
-                "repo": "maddec01/lar-server",
+                "url": "https://github.com/acme/api/issues/180",
+                "repo": "acme/api",
                 "state": "open"
             },
             "parentId": "I_sample23",
@@ -1696,7 +1696,7 @@
             "blockers": [
                 {
                     "number": 181,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed"
                 }
             ],
@@ -1705,7 +1705,7 @@
             "linkedPrs": [
                 {
                     "number": 41,
-                    "url": "https://github.com/maddec01/lar-apple/pull/41",
+                    "url": "https://github.com/acme/ios/pull/41",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-20T14:00:00Z",
@@ -1747,8 +1747,8 @@
             "content": "ticket",
             "number": 100,
             "title": "Old cleanup task",
-            "url": "https://github.com/maddec01/lar-server/issues/100",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/100",
+            "repo": "acme/api",
             "labels": ["improvement"],
             "state": "closed",
             "closedAs": "done",
@@ -1827,7 +1827,7 @@
                         "kind": "blocker",
                         "key": "contract-blocker:262bdc5e-da4e-5667-a145-a38030d4de08:91eff929-b2fd-59b4-abb0-005639c0abe5",
                         "workId": "262bdc5e-da4e-5667-a145-a38030d4de08",
-                        "summary": "Consumer cites Send the household's display name when the server registers with the platform's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
+                        "summary": "Consumer cites Send the workspace's display name when the server registers with the platform's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
                         "changes": ["91eff929-b2fd-59b4-abb0-005639c0abe5"],
                         "requiresFix": true,
                         "digest": "2978702043d80f0634dd13e999ca5a93ef1331599821c9665d6bf77387a0a4ce"
@@ -1854,7 +1854,7 @@
                         "kind": "blocker",
                         "key": "contract-blocker:3e18a3bd-664d-50c4-ba66-bd4f60f245fc:6610b571-d798-5026-9d03-dfd848d01e50",
                         "workId": "3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
-                        "summary": "Consumer cites Publish and withdraw signed household records in the registry's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
+                        "summary": "Consumer cites Publish and withdraw signed workspace records in the registry's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
                         "changes": ["6610b571-d798-5026-9d03-dfd848d01e50"],
                         "requiresFix": true,
                         "digest": "939b2b613781102f5be338fa2849b0f1927ec687c945276836712efe0144e74a"
@@ -1872,7 +1872,7 @@
                         "kind": "blocker",
                         "key": "contract-blocker:886712d7-851d-5a60-bdd5-2fdca8349f37:c6504e1a-8c9e-521d-97dd-82fbb2451f05",
                         "workId": "886712d7-851d-5a60-bdd5-2fdca8349f37",
-                        "summary": "Consumer cites Serve invitation links from lar.works's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
+                        "summary": "Consumer cites Serve invitation links from acme.example's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
                         "changes": ["c6504e1a-8c9e-521d-97dd-82fbb2451f05"],
                         "requiresFix": true,
                         "digest": "ddeaad462840a4fa66f77672cc27a6c78defa0b9f3f44c56ac3849643d0d2d23"
@@ -1890,7 +1890,7 @@
                         "kind": "blocker",
                         "key": "contract-blocker:79839d93-d1a7-59f1-b5c0-0973f550f344:908f6812-4834-5405-a43b-8afcf5df1680",
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "summary": "Consumer cites Let apps sign in to a Lar account and list the person's households's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
+                        "summary": "Consumer cites Let apps sign in to a Acme account and list the person's workspaces's output without a blocker; run sync-blockers or record No ordering needed with a reason.",
                         "changes": ["908f6812-4834-5405-a43b-8afcf5df1680"],
                         "requiresFix": true,
                         "digest": "1029ef573036b5f9183fe89c8ca4500471b500c32a9e39a6b9e4ab51a4ad7be2"
@@ -2016,7 +2016,7 @@
                         "kind": "blocker",
                         "key": "redundant:3e18a3bd-664d-50c4-ba66-bd4f60f245fc:6610b571-d798-5026-9d03-dfd848d01e50",
                         "workId": "3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
-                        "summary": "Look up a household's current servers in the registry when every saved address fails: remove redundant blocker on Publish and withdraw signed household records in the registry; another recorded path already orders it.",
+                        "summary": "Look up a workspace's current servers in the registry when every saved address fails: remove redundant blocker on Publish and withdraw signed workspace records in the registry; another recorded path already orders it.",
                         "changes": ["6610b571-d798-5026-9d03-dfd848d01e50"],
                         "requiresFix": true,
                         "digest": "aa2c01e2632ce78ff76b037b3fa461d410de9d2316170d9d3979f27a50374269"
@@ -2025,7 +2025,7 @@
                         "kind": "blocker",
                         "key": "redundant:79839d93-d1a7-59f1-b5c0-0973f550f344:f9d21ec4-d798-56be-b110-bbacf230ea7b",
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "summary": "Sign in to a Lar account first, then join the household's servers: remove redundant blocker on Open invitation links and keep joining after the app installs; another recorded path already orders it.",
+                        "summary": "Sign in to a Acme account first, then join the workspace's servers: remove redundant blocker on Open invitation links and keep joining after the app installs; another recorded path already orders it.",
                         "changes": ["f9d21ec4-d798-56be-b110-bbacf230ea7b"],
                         "requiresFix": true,
                         "digest": "848ca7f821a55c1033360cf3ee4b198043acab588f609a95b8f17a1d66532e34"
@@ -2034,7 +2034,7 @@
                         "kind": "blocker",
                         "key": "redundant:9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c:6610b571-d798-5026-9d03-dfd848d01e50",
                         "workId": "9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c",
-                        "summary": "Sync every joined household through iCloud Keychain on all devices: remove redundant blocker on Publish and withdraw signed household records in the registry; another recorded path already orders it.",
+                        "summary": "Sync every joined workspace through iCloud Keychain on all devices: remove redundant blocker on Publish and withdraw signed workspace records in the registry; another recorded path already orders it.",
                         "changes": ["6610b571-d798-5026-9d03-dfd848d01e50"],
                         "requiresFix": true,
                         "digest": "4918139465d2f423d241d119c9356b167d042453af91432511ddc44cb174b56a"
@@ -2043,7 +2043,7 @@
                         "kind": "blocker",
                         "key": "redundant:908f6812-4834-5405-a43b-8afcf5df1680:262bdc5e-da4e-5667-a145-a38030d4de08",
                         "workId": "908f6812-4834-5405-a43b-8afcf5df1680",
-                        "summary": "Let apps sign in to a Lar account and list the person's households: remove redundant blocker on Prepare signed household records and share secrets for every server a household owns; another recorded path already orders it.",
+                        "summary": "Let apps sign in to a Acme account and list the person's workspaces: remove redundant blocker on Prepare signed workspace records and share secrets for every server a workspace owns; another recorded path already orders it.",
                         "changes": ["262bdc5e-da4e-5667-a145-a38030d4de08"],
                         "requiresFix": true,
                         "digest": "735eb65d1af1aa8688870cb264bbc0966e5e9a11f06eb61a23d3edbff4dff5a7"
@@ -2052,7 +2052,7 @@
                         "kind": "blocker",
                         "key": "redundant:ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e:a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                         "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                        "summary": "Follow a household server its owner set up again: remove redundant blocker on Tell invitation failures apart and show server trust as its own step; another recorded path already orders it.",
+                        "summary": "Follow a workspace server its owner set up again: remove redundant blocker on Tell invitation failures apart and show server trust as its own step; another recorded path already orders it.",
                         "changes": ["a5675b2d-1a35-55fd-a109-ad5cd473bba0"],
                         "requiresFix": true,
                         "digest": "a0325d36960585ff949c32386e2507fe12908120ec910d9bc4ecaf0beb5da97d"
@@ -2061,7 +2061,7 @@
                         "kind": "blocker",
                         "key": "redundant:91eff929-b2fd-59b4-abb0-005639c0abe5:886712d7-851d-5a60-bdd5-2fdca8349f37",
                         "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                        "summary": "Send the household's display name when the server registers with the platform: remove redundant blocker on Create invitation links and retire the old join page; another recorded path already orders it.",
+                        "summary": "Send the workspace's display name when the server registers with the platform: remove redundant blocker on Create invitation links and retire the old join page; another recorded path already orders it.",
                         "changes": ["886712d7-851d-5a60-bdd5-2fdca8349f37"],
                         "requiresFix": true,
                         "digest": "ebdc68b6c10b9a31dcea3ee98cd756b505aa68f0d7c2907e7ebe4420c6fe947b"
@@ -2079,7 +2079,7 @@
                         "kind": "dependency",
                         "key": "dependency:2625b3f9-1d9f-5997-9483-dfb8da886658",
                         "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                        "summary": "Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so lar-server can test its publisher against the real contract. Today they live only inside the registry's own API tests, and lar-server copies them by hand.",
+                        "summary": "Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so api can test its publisher against the real contract. Today they live only inside the registry's own API tests, and api copies them by hand.",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "d48b1b82c315b2ccca0abee2382af85df2bf333cc6e4899436f4859ba61076b4",
@@ -2087,8 +2087,8 @@
                         "after": {
                             "dependencyId": "2625b3f9-1d9f-5997-9483-dfb8da886658",
                             "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                            "need": "Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so lar-server can test its publisher against the real contract. Today they live only inside the registry's own API tests, and lar-server copies them by hand.",
-                            "owner": "maddec01/lar-platform",
+                            "need": "Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so api can test its publisher against the real contract. Today they live only inside the registry's own API tests, and api copies them by hand.",
+                            "owner": "acme/platform",
                             "contract": "21ccf744-1085-5576-b1ae-f79358500f5b",
                             "evidence": "",
                             "proofState": "missing",
@@ -2109,7 +2109,7 @@
                         "kind": "brief",
                         "key": "doubt:79839d93-d1a7-59f1-b5c0-0973f550f344",
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "summary": "Sign in to a Lar account first, then join the household's servers: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.",
+                        "summary": "Sign in to a Acme account first, then join the workspace's servers: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.",
                         "changes": ["203e9004d617edde91790eb543959ecbec713cf59d5aa58de8ab747d67797702"],
                         "requiresFix": true,
                         "digest": "7017a9979fd60dad21631bbd5faaab6ea896ea74e77d92e77186b1e5908f4610"
@@ -2118,7 +2118,7 @@
                         "kind": "gate",
                         "key": "gate:79839d93-d1a7-59f1-b5c0-0973f550f344",
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "summary": "Sign in to a Lar account first, then join the household's servers: approved gate is stale; rerun Doubt and request approval on the board.",
+                        "summary": "Sign in to a Acme account first, then join the workspace's servers: approved gate is stale; rerun Doubt and request approval on the board.",
                         "changes": [
                             "c3f60401eac5e4512d4d5c861bb2e5bd6371418701f80c216d20125baefad45c",
                             "203e9004d617edde91790eb543959ecbec713cf59d5aa58de8ab747d67797702"
@@ -2130,7 +2130,7 @@
                         "kind": "brief",
                         "key": "doubt:ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
                         "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                        "summary": "Follow a household server its owner set up again: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.",
+                        "summary": "Follow a workspace server its owner set up again: Brief changed; Doubt hasn't run for the current package. Finish the amendment through Gate: review current answers, siblings and removed contracts in Doubt.",
                         "changes": ["c72ee7b845627b612991d0f9deaa77245fc3d5cb2fcf553f0c2f7f02c0b5bae9"],
                         "requiresFix": true,
                         "digest": "362f32784c65f8c8f90f1aedbb013b46bd7c262f35e037a161541702462bea6d"
@@ -2139,7 +2139,7 @@
                         "kind": "gate",
                         "key": "gate:ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
                         "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                        "summary": "Follow a household server its owner set up again: approved gate is stale; rerun Doubt and request approval on the board.",
+                        "summary": "Follow a workspace server its owner set up again: approved gate is stale; rerun Doubt and request approval on the board.",
                         "changes": [
                             "3d722a7c194ed46603859c3d0a08eb40e5e54203a0ff1c339ec8818e768f16ad",
                             "c72ee7b845627b612991d0f9deaa77245fc3d5cb2fcf553f0c2f7f02c0b5bae9"
@@ -2151,9 +2151,9 @@
                         "kind": "ticket",
                         "key": "ticket:9e531090-f3dd-5a6b-bde3-488fd1941901",
                         "workId": "9e531090-f3dd-5a6b-bde3-488fd1941901",
-                        "summary": "Walk the owner through household sharing in one guided flow: Out-of-date Spec; retain it until the new gate is approved.",
+                        "summary": "Walk the owner through workspace sharing in one guided flow: Out-of-date Spec; retain it until the new gate is approved.",
                         "changes": [
-                            "{\"generation\": 8, \"ticket\": \"maddec01/lar-server#292\", \"active\": true, \"pending\": null}"
+                            "{\"generation\": 8, \"ticket\": \"acme/api#292\", \"active\": true, \"pending\": null}"
                         ],
                         "requiresFix": true,
                         "digest": "6d173b1306251adaaa190ee3b323beb08bd1d9219cfa66ba52b05d66d23922f5"
@@ -2162,13 +2162,13 @@
                         "kind": "map",
                         "key": "map:42a26ff6-44ae-5dcc-b615-e6a344637997",
                         "workId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
-                        "summary": "Household sharing: invite family, find moved servers and hand a server over: reconcile map and affected records (added).",
+                        "summary": "Workspace sharing: invite teammates, find moved servers and hand a server over: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "c953b47caa9ca0a2c6248fe944e348c7f6ac44a5a72b5f0fe06598672f582b66",
                         "before": null,
                         "after": {
-                            "title": "Household sharing: invite family, find moved servers and hand a server over",
+                            "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                             "kind": "concept",
                             "parentId": null,
                             "setAside": false,
@@ -2181,7 +2181,7 @@
                             "brief": null,
                             "answer": null,
                             "scope": null,
-                            "map": "## Destination\n\nA family member opens one invitation link, installs the app if needed and joins the household's server. When every saved address of that server stops answering, the app finds its current addresses in the household registry on lar.works and reconnects to the same server identity, without the owner sending a new invitation.\n\n## Decisions\n\n- The registry accepts signed household records only from servers holding a valid server pass; only devices holding the household's share secret can read them.\n- Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.\n- A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the households the person belongs to.\n- Every invitation is one lar.works link that carries the whole invitation in the URL fragment, so lar.works never receives it.\n- When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.\n\n## Boundaries\n\n- Public server listings, media relay, billing changes and server backups.\n- Adding a device while the platform is down on clients other than Apple's.\n- Testing on an IPv6-only network.\n\n## Check\n\nReleased apps join, recover and sign in against the live platform and a household server.\n\n- A phone on cellular without the app joins through an emailed invitation link.\n- After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.\n- A device with no saved server signs in with Lar and connects at home and on cellular.\n",
+                            "map": "## Destination\n\nA teammate opens one invitation link, installs the app if needed and joins the workspace's server. When every saved address of that server stops answering, the app finds its current addresses in the workspace registry on acme.example and reconnects to the same server identity, without the owner sending a new invitation.\n\n## Decisions\n\n- The registry accepts signed workspace records only from servers holding a valid server pass; only devices holding the workspace's share secret can read them.\n- Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.\n- A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the workspaces the person belongs to.\n- Every invitation is one acme.example link that carries the whole invitation in the URL fragment, so acme.example never receives it.\n- When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.\n\n## Boundaries\n\n- Public server listings, media relay, billing changes and server backups.\n- Adding a device while the platform is down on clients other than Apple's.\n- Testing on an IPv6-only network.\n\n## Check\n\nReleased apps join, recover and sign in against the live platform and a workspace server.\n\n- A phone on cellular without the app joins through an emailed invitation link.\n- After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.\n- A device with no saved server signs in with Lar and connects at home and on cellular.\n",
                             "ticket": null,
                             "ticketHeld": null
                         }
@@ -2190,13 +2190,13 @@
                         "kind": "map",
                         "key": "map:63eddaac-5a62-5233-a763-1048f5d6a7e6",
                         "workId": "63eddaac-5a62-5233-a763-1048f5d6a7e6",
-                        "summary": "Build the household registry: reconcile map and affected records (added).",
+                        "summary": "Build the workspace registry: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "9a52de7d34f358b149068cd40195b4e69185cbd1d2256df892f902599ce94a3e",
                         "before": null,
                         "after": {
-                            "title": "Build the household registry",
+                            "title": "Build the workspace registry",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2218,13 +2218,13 @@
                         "kind": "map",
                         "key": "map:91eff929-b2fd-59b4-abb0-005639c0abe5",
                         "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                        "summary": "Send the household's display name when the server registers with the platform: reconcile map and affected records (added).",
+                        "summary": "Send the workspace's display name when the server registers with the platform: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "b7cc255a0b058d31978a0823412f9d01ba1c9ba39256e2e8aee71abb0459c2cf",
                         "before": null,
                         "after": {
-                            "title": "Send the household's display name when the server registers with the platform",
+                            "title": "Send the workspace's display name when the server registers with the platform",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2246,13 +2246,13 @@
                         "kind": "map",
                         "key": "map:262bdc5e-da4e-5667-a145-a38030d4de08",
                         "workId": "262bdc5e-da4e-5667-a145-a38030d4de08",
-                        "summary": "Prepare signed household records and share secrets for every server a household owns: reconcile map and affected records (added).",
+                        "summary": "Prepare signed workspace records and share secrets for every server a workspace owns: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "c92603531054930cd1fbd8c10bc756ee0e340f149eb636c74373870fde8de60e",
                         "before": null,
                         "after": {
-                            "title": "Prepare signed household records and share secrets for every server a household owns",
+                            "title": "Prepare signed workspace records and share secrets for every server a workspace owns",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2274,13 +2274,13 @@
                         "kind": "map",
                         "key": "map:3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
                         "workId": "3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
-                        "summary": "Look up a household's current servers in the registry when every saved address fails: reconcile map and affected records (added).",
+                        "summary": "Look up a workspace's current servers in the registry when every saved address fails: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "94f20798a2b093fef599349846c9a9d10e735ce16b1f5366d21c08ec94be40c5",
                         "before": null,
                         "after": {
-                            "title": "Look up a household's current servers in the registry when every saved address fails",
+                            "title": "Look up a workspace's current servers in the registry when every saved address fails",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2330,13 +2330,13 @@
                         "kind": "map",
                         "key": "map:bbb1520c-036e-5e7b-81cb-90ead5ea46f6",
                         "workId": "bbb1520c-036e-5e7b-81cb-90ead5ea46f6",
-                        "summary": "Let a family member's new device find the household and sign in without being invited again: reconcile map and affected records (added).",
+                        "summary": "Let a teammate's new device find the workspace and sign in without being invited again: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "d3e28e3acf5a098c1519abdc8cd16a0ed76fee5fca47c289eae20a817d3e6f7d",
                         "before": null,
                         "after": {
-                            "title": "Let a family member's new device find the household and sign in without being invited again",
+                            "title": "Let a teammate's new device find the workspace and sign in without being invited again",
                             "kind": "decision",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2442,13 +2442,13 @@
                         "kind": "map",
                         "key": "map:9e531090-f3dd-5a6b-bde3-488fd1941901",
                         "workId": "9e531090-f3dd-5a6b-bde3-488fd1941901",
-                        "summary": "Walk the owner through household sharing in one guided flow: reconcile map and affected records (added).",
+                        "summary": "Walk the owner through workspace sharing in one guided flow: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "03fcd1c1b3519040b1f186084ffcb573e81155e7e0bd1bd5069fde018deca0b4",
                         "before": null,
                         "after": {
-                            "title": "Walk the owner through household sharing in one guided flow",
+                            "title": "Walk the owner through workspace sharing in one guided flow",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2470,13 +2470,13 @@
                         "kind": "map",
                         "key": "map:ac61795d-0d5b-51f8-b355-120fa6e3d11c",
                         "workId": "ac61795d-0d5b-51f8-b355-120fa6e3d11c",
-                        "summary": "Decide how someone without the app gets from an invitation link to a joined household: reconcile map and affected records (added).",
+                        "summary": "Decide how someone without the app gets from an invitation link to a joined workspace: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "0530c0e8fa7baf9f57263be57d7565152f761ef193816d188a28e736863b10f5",
                         "before": null,
                         "after": {
-                            "title": "Decide how someone without the app gets from an invitation link to a joined household",
+                            "title": "Decide how someone without the app gets from an invitation link to a joined workspace",
                             "kind": "decision",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2498,13 +2498,13 @@
                         "kind": "map",
                         "key": "map:6610b571-d798-5026-9d03-dfd848d01e50",
                         "workId": "6610b571-d798-5026-9d03-dfd848d01e50",
-                        "summary": "Publish and withdraw signed household records in the registry: reconcile map and affected records (added).",
+                        "summary": "Publish and withdraw signed workspace records in the registry: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "a07d02ecd995af76316eef5ed31b867741ca491584ec332fc32bdbbd9f0ffb39",
                         "before": null,
                         "after": {
-                            "title": "Publish and withdraw signed household records in the registry",
+                            "title": "Publish and withdraw signed workspace records in the registry",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2526,13 +2526,13 @@
                         "kind": "map",
                         "key": "map:79839d93-d1a7-59f1-b5c0-0973f550f344",
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "summary": "Sign in to a Lar account first, then join the household's servers: reconcile map and affected records (added).",
+                        "summary": "Sign in to a Acme account first, then join the workspace's servers: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "fc669eb4fd690f2f7515991f94cd4b877ac4c36cf7a2da3534a48f0694569ff0",
                         "before": null,
                         "after": {
-                            "title": "Sign in to a Lar account first, then join the household's servers",
+                            "title": "Sign in to a Acme account first, then join the workspace's servers",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2582,13 +2582,13 @@
                         "kind": "map",
                         "key": "map:c6504e1a-8c9e-521d-97dd-82fbb2451f05",
                         "workId": "c6504e1a-8c9e-521d-97dd-82fbb2451f05",
-                        "summary": "Serve invitation links from lar.works: reconcile map and affected records (added).",
+                        "summary": "Serve invitation links from acme.example: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "be7572c69c9e4a0a89e44aa745a90c804887daaea71477bd2cd3b5de279e2024",
                         "before": null,
                         "after": {
-                            "title": "Serve invitation links from lar.works",
+                            "title": "Serve invitation links from acme.example",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2638,13 +2638,13 @@
                         "kind": "map",
                         "key": "map:9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c",
                         "workId": "9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c",
-                        "summary": "Sync every joined household through iCloud Keychain on all devices: reconcile map and affected records (added).",
+                        "summary": "Sync every joined workspace through iCloud Keychain on all devices: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "bdfbdb4afc5a5c6c603bb444f1f70686b204538aae7a186b0cbbde9fc2b6ed16",
                         "before": null,
                         "after": {
-                            "title": "Sync every joined household through iCloud Keychain on all devices",
+                            "title": "Sync every joined workspace through iCloud Keychain on all devices",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2666,13 +2666,13 @@
                         "kind": "map",
                         "key": "map:908f6812-4834-5405-a43b-8afcf5df1680",
                         "workId": "908f6812-4834-5405-a43b-8afcf5df1680",
-                        "summary": "Let apps sign in to a Lar account and list the person's households: reconcile map and affected records (added).",
+                        "summary": "Let apps sign in to a Acme account and list the person's workspaces: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "6b167fba831e1445df6ade063ada24cf234f0535e20e8f1b4c8c6496105573c2",
                         "before": null,
                         "after": {
-                            "title": "Let apps sign in to a Lar account and list the person's households",
+                            "title": "Let apps sign in to a Acme account and list the person's workspaces",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2778,13 +2778,13 @@
                         "kind": "map",
                         "key": "map:ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
                         "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                        "summary": "Follow a household server its owner set up again: reconcile map and affected records (added).",
+                        "summary": "Follow a workspace server its owner set up again: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "3509517ee53e2104942a0c32463fcc0b49d66cc5b9d086987f32365f6ddf31fc",
                         "before": null,
                         "after": {
-                            "title": "Follow a household server its owner set up again",
+                            "title": "Follow a workspace server its owner set up again",
                             "kind": "build",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2806,13 +2806,13 @@
                         "kind": "map",
                         "key": "map:a1d1128e-2a50-591c-a7bf-9a2f1888ea97",
                         "workId": "a1d1128e-2a50-591c-a7bf-9a2f1888ea97",
-                        "summary": "Put the registry and invitation links live on lar.works: reconcile map and affected records (added).",
+                        "summary": "Put the registry and invitation links live on acme.example: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "fa2031cb85aa87ee1a6a1d500c490a269219b54bb33e2739841b22172774fe1e",
                         "before": null,
                         "after": {
-                            "title": "Put the registry and invitation links live on lar.works",
+                            "title": "Put the registry and invitation links live on acme.example",
                             "kind": "decision",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2834,13 +2834,13 @@
                         "kind": "map",
                         "key": "map:ee2d5cc6-435a-5ae2-a951-47f4ebbe246c",
                         "workId": "ee2d5cc6-435a-5ae2-a951-47f4ebbe246c",
-                        "summary": "Release the apps on TestFlight with the household invite link: reconcile map and affected records (added).",
+                        "summary": "Release the apps on TestFlight with the workspace invite link: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "f8eb5995522feef0169768d45ff5efe630b5672b26526e37a8b7d1fee1107af8",
                         "before": null,
                         "after": {
-                            "title": "Release the apps on TestFlight with the household invite link",
+                            "title": "Release the apps on TestFlight with the workspace invite link",
                             "kind": "decision",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -2862,13 +2862,13 @@
                         "kind": "map",
                         "key": "map:0551eadc-fad8-5400-ba53-a44877911e2c",
                         "workId": "0551eadc-fad8-5400-ba53-a44877911e2c",
-                        "summary": "Check the whole household journey on real devices: reconcile map and affected records (added).",
+                        "summary": "Check the whole workspace journey on real devices: reconcile map and affected records (added).",
                         "changes": ["added"],
                         "requiresFix": false,
                         "digest": "2be5e7f0bd909f7645f843b4a75c8d90f89912e975aac2120d18353d65a6ccb4",
                         "before": null,
                         "after": {
-                            "title": "Check the whole household journey on real devices",
+                            "title": "Check the whole workspace journey on real devices",
                             "kind": "decision",
                             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
                             "setAside": false,
@@ -3225,15 +3225,15 @@
                     "flow": "linked",
                     "number": 143,
                     "title": "Classify private and overlay invitation addresses correctly",
-                    "url": "https://github.com/maddec01/lar-apple/issues/143",
-                    "repo": "maddec01/lar-apple",
+                    "url": "https://github.com/acme/ios/issues/143",
+                    "repo": "acme/ios",
                     "state": "open",
                     "closedAs": null,
                     "parent": {
                         "number": 0,
-                        "title": "Household sharing: invite family, find moved servers and hand a server over",
+                        "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                         "url": "",
-                        "repo": "maddec01/lar-platform",
+                        "repo": "acme/platform",
                         "state": "open"
                     },
                     "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -3280,14 +3280,14 @@
                     "number": 0,
                     "title": "Advertise the server to devices on the same network",
                     "url": null,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "open",
                     "closedAs": null,
                     "parent": {
                         "number": 0,
-                        "title": "Household sharing: invite family, find moved servers and hand a server over",
+                        "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                         "url": "",
-                        "repo": "maddec01/lar-platform",
+                        "repo": "acme/platform",
                         "state": "open"
                     },
                     "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -3343,22 +3343,22 @@
                 "holds": [
                     {
                         "workId": "ee2d5cc6-435a-5ae2-a951-47f4ebbe246c",
-                        "reason": "Release the apps on TestFlight with the household invite link: Its confirmed answer isn't recorded. Its domain drafts aren't recorded."
+                        "reason": "Release the apps on TestFlight with the workspace invite link: Its confirmed answer isn't recorded. Its domain drafts aren't recorded."
                     },
                     {
                         "workId": "0551eadc-fad8-5400-ba53-a44877911e2c",
-                        "reason": "Check the whole household journey on real devices: Its confirmed answer isn't recorded. Its domain drafts aren't recorded."
+                        "reason": "Check the whole workspace journey on real devices: Its confirmed answer isn't recorded. Its domain drafts aren't recorded."
                     },
                     {
                         "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                        "reason": "Dependency on maddec01/lar-platform: Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so lar-server can test its publisher against the real contract. Today they live only inside the registry's own API tests, and lar-server copies them by hand."
+                        "reason": "Dependency on acme/platform: Export the registry's publisher fixtures (request and response vectors for accept, retry, expired pass, stale record, 429 and 503) so api can test its publisher against the real contract. Today they live only inside the registry's own API tests, and api copies them by hand."
                     }
                 ],
                 "members": [
                     {
                         "workId": "63eddaac-5a62-5233-a763-1048f5d6a7e6",
-                        "title": "Build the household registry",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Build the workspace registry",
+                        "repository": "acme/platform",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3366,8 +3366,8 @@
                     },
                     {
                         "workId": "91eff929-b2fd-59b4-abb0-005639c0abe5",
-                        "title": "Send the household's display name when the server registers with the platform",
-                        "repository": "maddec01/lar-server",
+                        "title": "Send the workspace's display name when the server registers with the platform",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3375,8 +3375,8 @@
                     },
                     {
                         "workId": "262bdc5e-da4e-5667-a145-a38030d4de08",
-                        "title": "Prepare signed household records and share secrets for every server a household owns",
-                        "repository": "maddec01/lar-server",
+                        "title": "Prepare signed workspace records and share secrets for every server a workspace owns",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3384,8 +3384,8 @@
                     },
                     {
                         "workId": "3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
-                        "title": "Look up a household's current servers in the registry when every saved address fails",
-                        "repository": "maddec01/lar-apple",
+                        "title": "Look up a workspace's current servers in the registry when every saved address fails",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Ready",
                         "waits": [],
@@ -3394,7 +3394,7 @@
                     {
                         "workId": "5574177c-362b-58a2-a1e1-533c8af24c82",
                         "title": "Check invitation flows on real home networks",
-                        "repository": "maddec01/lar-apple",
+                        "repository": "acme/ios",
                         "kind": "decision",
                         "status": "Done",
                         "waits": [],
@@ -3402,8 +3402,8 @@
                     },
                     {
                         "workId": "bbb1520c-036e-5e7b-81cb-90ead5ea46f6",
-                        "title": "Let a family member's new device find the household and sign in without being invited again",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Let a teammate's new device find the workspace and sign in without being invited again",
+                        "repository": "acme/platform",
                         "kind": "decision",
                         "status": "Done",
                         "waits": [],
@@ -3412,7 +3412,7 @@
                     {
                         "workId": "35179795-5ec3-57fb-84d1-49fef02e52b4",
                         "title": "Include every reachable address in an invitation, confirmed or not",
-                        "repository": "maddec01/lar-server",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3421,7 +3421,7 @@
                     {
                         "workId": "af6782cb-3a33-5d72-b855-138aaf1f8c1b",
                         "title": "Confirm overlay network addresses once a device connects through them",
-                        "repository": "maddec01/lar-server",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3430,7 +3430,7 @@
                     {
                         "workId": "a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                         "title": "Tell invitation failures apart and show server trust as its own step",
-                        "repository": "maddec01/lar-apple",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3438,8 +3438,8 @@
                     },
                     {
                         "workId": "9e531090-f3dd-5a6b-bde3-488fd1941901",
-                        "title": "Walk the owner through household sharing in one guided flow",
-                        "repository": "maddec01/lar-server",
+                        "title": "Walk the owner through workspace sharing in one guided flow",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3447,8 +3447,8 @@
                     },
                     {
                         "workId": "ac61795d-0d5b-51f8-b355-120fa6e3d11c",
-                        "title": "Decide how someone without the app gets from an invitation link to a joined household",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Decide how someone without the app gets from an invitation link to a joined workspace",
+                        "repository": "acme/platform",
                         "kind": "decision",
                         "status": "Done",
                         "waits": [],
@@ -3456,8 +3456,8 @@
                     },
                     {
                         "workId": "6610b571-d798-5026-9d03-dfd848d01e50",
-                        "title": "Publish and withdraw signed household records in the registry",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Publish and withdraw signed workspace records in the registry",
+                        "repository": "acme/platform",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3465,19 +3465,19 @@
                     },
                     {
                         "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                        "title": "Sign in to a Lar account first, then join the household's servers",
-                        "repository": "maddec01/lar-apple",
+                        "title": "Sign in to a Acme account first, then join the workspace's servers",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Ready",
                         "waits": [
-                            "Waits for Look up a household's current servers in the registry when every saved address fails: It has no recorded PR."
+                            "Waits for Look up a workspace's current servers in the registry when every saved address fails: It has no recorded PR."
                         ],
                         "complete": false
                     },
                     {
                         "workId": "f9d21ec4-d798-56be-b110-bbacf230ea7b",
                         "title": "Open invitation links and keep joining after the app installs",
-                        "repository": "maddec01/lar-apple",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3485,8 +3485,8 @@
                     },
                     {
                         "workId": "c6504e1a-8c9e-521d-97dd-82fbb2451f05",
-                        "title": "Serve invitation links from lar.works",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Serve invitation links from acme.example",
+                        "repository": "acme/platform",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3495,7 +3495,7 @@
                     {
                         "workId": "886712d7-851d-5a60-bdd5-2fdca8349f37",
                         "title": "Create invitation links and retire the old join page",
-                        "repository": "maddec01/lar-server",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3503,8 +3503,8 @@
                     },
                     {
                         "workId": "9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c",
-                        "title": "Sync every joined household through iCloud Keychain on all devices",
-                        "repository": "maddec01/lar-apple",
+                        "title": "Sync every joined workspace through iCloud Keychain on all devices",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3512,8 +3512,8 @@
                     },
                     {
                         "workId": "908f6812-4834-5405-a43b-8afcf5df1680",
-                        "title": "Let apps sign in to a Lar account and list the person's households",
-                        "repository": "maddec01/lar-server",
+                        "title": "Let apps sign in to a Acme account and list the person's workspaces",
+                        "repository": "acme/api",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3522,7 +3522,7 @@
                     {
                         "workId": "e544289a-d76c-5d6c-8b74-931097b5dc2e",
                         "title": "Report probe results after another address already answered",
-                        "repository": "maddec01/lar-apple",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3531,7 +3531,7 @@
                     {
                         "workId": "0b7eac32-f229-5618-b434-28902cf8dd53",
                         "title": "Let members keep their access when an owner sets the server up again",
-                        "repository": "maddec01/lar-platform",
+                        "repository": "acme/platform",
                         "kind": "decision",
                         "status": "Done",
                         "waits": [],
@@ -3540,7 +3540,7 @@
                     {
                         "workId": "98d1f54b-684c-5e98-851d-ad4baf35018a",
                         "title": "Tell apps which server replaced one that was set up again",
-                        "repository": "maddec01/lar-platform",
+                        "repository": "acme/platform",
                         "kind": "build",
                         "status": "Done",
                         "waits": [],
@@ -3548,19 +3548,19 @@
                     },
                     {
                         "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                        "title": "Follow a household server its owner set up again",
-                        "repository": "maddec01/lar-apple",
+                        "title": "Follow a workspace server its owner set up again",
+                        "repository": "acme/ios",
                         "kind": "build",
                         "status": "Ready",
                         "waits": [
-                            "Waits for Sign in to a Lar account first, then join the household's servers: It has no recorded PR."
+                            "Waits for Sign in to a Acme account first, then join the workspace's servers: It has no recorded PR."
                         ],
                         "complete": false
                     },
                     {
                         "workId": "a1d1128e-2a50-591c-a7bf-9a2f1888ea97",
-                        "title": "Put the registry and invitation links live on lar.works",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Put the registry and invitation links live on acme.example",
+                        "repository": "acme/platform",
                         "kind": "decision",
                         "status": "Done",
                         "waits": [],
@@ -3568,12 +3568,12 @@
                     },
                     {
                         "workId": "ee2d5cc6-435a-5ae2-a951-47f4ebbe246c",
-                        "title": "Release the apps on TestFlight with the household invite link",
-                        "repository": "maddec01/lar-apple",
+                        "title": "Release the apps on TestFlight with the workspace invite link",
+                        "repository": "acme/ios",
                         "kind": "decision",
                         "status": "Queued",
                         "waits": [
-                            "Waits for Follow a household server its owner set up again: It has no recorded PR.",
+                            "Waits for Follow a workspace server its owner set up again: It has no recorded PR.",
                             "Its confirmed answer isn't recorded.",
                             "Its domain drafts aren't recorded."
                         ],
@@ -3581,12 +3581,12 @@
                     },
                     {
                         "workId": "0551eadc-fad8-5400-ba53-a44877911e2c",
-                        "title": "Check the whole household journey on real devices",
-                        "repository": "maddec01/lar-platform",
+                        "title": "Check the whole workspace journey on real devices",
+                        "repository": "acme/platform",
                         "kind": "decision",
                         "status": "Queued",
                         "waits": [
-                            "Waits for Release the apps on TestFlight with the household invite link: Its confirmed answer isn't recorded. Its domain drafts aren't recorded.",
+                            "Waits for Release the apps on TestFlight with the workspace invite link: Its confirmed answer isn't recorded. Its domain drafts aren't recorded.",
                             "Its confirmed answer isn't recorded.",
                             "Its domain drafts aren't recorded."
                         ],
@@ -3602,9 +3602,9 @@
             "kind": "concept",
             "flow": "linked",
             "number": 0,
-            "title": "Household sharing: invite family, find moved servers and hand a server over",
+            "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "open",
             "closedAs": null,
             "parent": null,
@@ -3615,14 +3615,14 @@
             "closedAt": null,
             "slices": [],
             "map": {
-                "destination": "A family member opens one invitation link, installs the app if needed and joins the household's server. When every saved address of that server stops answering, the app finds its current addresses in the household registry on lar.works and reconnects to the same server identity, without the owner sending a new invitation.",
+                "destination": "A teammate opens one invitation link, installs the app if needed and joins the workspace's server. When every saved address of that server stops answering, the app finds its current addresses in the workspace registry on acme.example and reconnects to the same server identity, without the owner sending a new invitation.",
                 "decisions": [
-                    "The registry accepts signed household records only from servers holding a valid server pass; only devices holding the household's share secret can read them.",
+                    "The registry accepts signed workspace records only from servers holding a valid server pass; only devices holding the workspace's share secret can read them.",
                     "Invitation addresses are full URLs with ports, so a changed port is a changed address; overlay ranges and bracketed IPv6 addresses count as private.",
-                    "A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the households the person belongs to.",
-                    "Every invitation is one lar.works link that carries the whole invitation in the URL fragment, so lar.works never receives it.",
+                    "A new device's first sign-in goes through the platform: one browser sheet for Lar sign-in, then a list of the workspaces the person belongs to.",
+                    "Every invitation is one acme.example link that carries the whole invitation in the URL fragment, so acme.example never receives it.",
                     "When an owner sets a server up again, the registry keeps the server it replaced and names it, so apps can follow it once and say so.",
-                    "Gating settled the details: sessions last 90 days from last use and registry lookups are rate limited per household.",
+                    "Gating settled the details: sessions last 90 days from last use and registry lookups are rate limited per workspace.",
                     "Real-network checks narrowed the address rules: only addresses a device actually reached are marked confirmed.",
                     "Apple TV signs in with a code shown on screen; it never opens the browser sheet."
                 ],
@@ -3634,12 +3634,12 @@
                     "The App Store release and its Smart App Banner."
                 ],
                 "check": {
-                    "title": "Released apps join, recover and sign in against the live platform and a household server.",
+                    "title": "Released apps join, recover and sign in against the live platform and a workspace server.",
                     "steps": [
                         "A phone on cellular without the app joins through an emailed invitation link.",
                         "After the router's external port changes, a signed-in phone on cellular reconnects by itself within a minute.",
                         "A device with no saved server signs in with Lar and connects at home and on cellular; Apple TV signs in with a code.",
-                        "With lar.works blocked, saved and typed addresses still connect.",
+                        "With acme.example blocked, saved and typed addresses still connect.",
                         "A member follows a server that was set up again and sees the notice once."
                     ]
                 }
@@ -3653,8 +3653,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household",
-                    "title": "Shaping household sharing",
+                    "id": "sample-thread-workspace",
+                    "title": "Shaping workspace sharing",
                     "state": "done",
                     "updated": "2026-10-19T15:00:00.000Z",
                     "purpose": "shape"
@@ -3667,7 +3667,7 @@
             "linkedPrs": [
                 {
                     "number": 301,
-                    "url": "https://github.com/maddec01/lar-platform/pull/301",
+                    "url": "https://github.com/acme/platform/pull/301",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-14T08:40:00Z",
@@ -3710,16 +3710,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 4,
-            "title": "Build the household registry",
-            "url": "https://github.com/maddec01/lar-platform/issues/4",
-            "repo": "maddec01/lar-platform",
+            "title": "Build the workspace registry",
+            "url": "https://github.com/acme/platform/issues/4",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -3727,17 +3727,17 @@
             "blockers": [
                 {
                     "number": 141,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "5574177c-362b-58a2-a1e1-533c8af24c82",
                     "title": "Check invitation flows on real home networks"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "bbb1520c-036e-5e7b-81cb-90ead5ea46f6",
-                    "title": "Let a family member's new device find the household and sign in without being invited again"
+                    "title": "Let a teammate's new device find the workspace and sign in without being invited again"
                 }
             ],
             "updatedAt": "2026-10-14T09:15:00.000Z",
@@ -3754,8 +3754,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-1",
-                    "title": "Build Build the household registry",
+                    "id": "sample-thread-workspace-1",
+                    "title": "Build Build the workspace registry",
                     "state": "done",
                     "updated": "2026-10-14T09:15:00.000Z",
                     "purpose": "build"
@@ -3768,7 +3768,7 @@
             "linkedPrs": [
                 {
                     "number": 302,
-                    "url": "https://github.com/maddec01/lar-server/pull/302",
+                    "url": "https://github.com/acme/api/pull/302",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-15T09:40:00Z",
@@ -3811,16 +3811,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Send the household's display name when the server registers with the platform",
+            "title": "Send the workspace's display name when the server registers with the platform",
             "url": null,
-            "repo": "maddec01/lar-server",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -3828,21 +3828,21 @@
             "blockers": [
                 {
                     "number": 269,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "262bdc5e-da4e-5667-a145-a38030d4de08",
-                    "title": "Prepare signed household records and share secrets for every server a household owns"
+                    "title": "Prepare signed workspace records and share secrets for every server a workspace owns"
                 },
                 {
                     "number": 292,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "9e531090-f3dd-5a6b-bde3-488fd1941901",
-                    "title": "Walk the owner through household sharing in one guided flow"
+                    "title": "Walk the owner through workspace sharing in one guided flow"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "886712d7-851d-5a60-bdd5-2fdca8349f37",
                     "title": "Create invitation links and retire the old join page"
@@ -3861,8 +3861,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-2",
-                    "title": "Build Send the household's display name when the server registers with the platform",
+                    "id": "sample-thread-workspace-2",
+                    "title": "Build Send the workspace's display name when the server registers with the platform",
                     "state": "done",
                     "updated": "2026-10-15T10:15:00.000Z",
                     "purpose": "build"
@@ -3875,7 +3875,7 @@
             "linkedPrs": [
                 {
                     "number": 303,
-                    "url": "https://github.com/maddec01/lar-server/pull/303",
+                    "url": "https://github.com/acme/api/pull/303",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-13T10:40:00Z",
@@ -3918,16 +3918,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 269,
-            "title": "Prepare signed household records and share secrets for every server a household owns",
-            "url": "https://github.com/maddec01/lar-server/issues/269",
-            "repo": "maddec01/lar-server",
+            "title": "Prepare signed workspace records and share secrets for every server a workspace owns",
+            "url": "https://github.com/acme/api/issues/269",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -3935,17 +3935,17 @@
             "blockers": [
                 {
                     "number": 4,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "63eddaac-5a62-5233-a763-1048f5d6a7e6",
-                    "title": "Build the household registry"
+                    "title": "Build the workspace registry"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "c6504e1a-8c9e-521d-97dd-82fbb2451f05",
-                    "title": "Serve invitation links from lar.works"
+                    "title": "Serve invitation links from acme.example"
                 }
             ],
             "updatedAt": "2026-10-13T11:15:00.000Z",
@@ -3953,18 +3953,18 @@
             "slices": [
                 {
                     "number": 0,
-                    "title": "Store a share secret per household and rotate it on every owner change",
+                    "title": "Store a share secret per workspace and rotate it on every owner change",
                     "url": "",
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done",
                     "workId": "fafcb8a3-4061-5f82-8cc2-edc46dcfdbc0"
                 },
                 {
                     "number": 0,
-                    "title": "Sign household records with the server identity key",
+                    "title": "Sign workspace records with the server identity key",
                     "url": "",
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "progress": "done",
                     "workId": "420daa7e-7cd4-5651-add9-6d0716655d08"
@@ -3981,8 +3981,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-3",
-                    "title": "Build Prepare signed household records and share secrets for every server a household owns",
+                    "id": "sample-thread-workspace-3",
+                    "title": "Build Prepare signed workspace records and share secrets for every server a workspace owns",
                     "state": "done",
                     "updated": "2026-10-13T11:15:00.000Z",
                     "purpose": "build"
@@ -3995,7 +3995,7 @@
             "linkedPrs": [
                 {
                     "number": 26,
-                    "url": "https://github.com/maddec01/lar-apple/pull/26",
+                    "url": "https://github.com/acme/ios/pull/26",
                     "state": "open",
                     "isDraft": false,
                     "checks": { "passed": 3, "failed": 0, "running": 2, "total": 5, "since": null },
@@ -4031,16 +4031,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 139,
-            "title": "Look up a household's current servers in the registry when every saved address fails",
-            "url": "https://github.com/maddec01/lar-apple/issues/139",
-            "repo": "maddec01/lar-apple",
+            "title": "Look up a workspace's current servers in the registry when every saved address fails",
+            "url": "https://github.com/acme/ios/issues/139",
+            "repo": "acme/ios",
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4048,31 +4048,31 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "6610b571-d798-5026-9d03-dfd848d01e50",
-                    "title": "Publish and withdraw signed household records in the registry"
+                    "title": "Publish and withdraw signed workspace records in the registry"
                 },
                 {
                     "number": 144,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                     "title": "Tell invitation failures apart and show server trust as its own step"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "f9d21ec4-d798-56be-b110-bbacf230ea7b",
                     "title": "Open invitation links and keep joining after the app installs"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "9f66f4f7-74d2-5a7e-8e1f-5c622b65e12c",
-                    "title": "Sync every joined household through iCloud Keychain on all devices"
+                    "title": "Sync every joined workspace through iCloud Keychain on all devices"
                 }
             ],
             "updatedAt": "2026-10-21T09:40:00.000Z",
@@ -4080,9 +4080,9 @@
             "slices": [
                 {
                     "number": 0,
-                    "title": "Ask the registry for a household when every saved address fails",
+                    "title": "Ask the registry for a workspace when every saved address fails",
                     "url": "",
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "progress": "done",
                     "workId": "c1a4e8f2-6b3d-5e07-9a51-3f2d8c6b7e10"
@@ -4091,7 +4091,7 @@
                     "number": 0,
                     "title": "Reconnect to the same server identity at its new address",
                     "url": "",
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "progress": "done",
                     "workId": "d2b5f903-7c4e-5f18-8b62-4a3e9d7c8f21"
@@ -4100,7 +4100,7 @@
                     "number": 0,
                     "title": "Say when the app found a moved server",
                     "url": "",
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "progress": "done",
                     "workId": "e3c6a014-8d5f-5029-9c73-5b4fae8d9032"
@@ -4142,15 +4142,15 @@
             "decisionMethod": "task",
             "number": 141,
             "title": "Check invitation flows on real home networks",
-            "url": "https://github.com/maddec01/lar-apple/issues/141",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/141",
+            "repo": "acme/ios",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4168,7 +4168,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-5",
+                    "id": "sample-thread-workspace-5",
                     "title": "Shaping Check invitation flows on real home networks",
                     "state": "done",
                     "updated": "2026-10-16T13:15:00.000Z",
@@ -4209,16 +4209,16 @@
             "flow": "linked",
             "decisionMethod": "grill",
             "number": 0,
-            "title": "Let a family member's new device find the household and sign in without being invited again",
+            "title": "Let a teammate's new device find the workspace and sign in without being invited again",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4236,8 +4236,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-6",
-                    "title": "Shaping Let a family member's new device find the household and sign in without being invited again",
+                    "id": "sample-thread-workspace-6",
+                    "title": "Shaping Let a teammate's new device find the workspace and sign in without being invited again",
                     "state": "done",
                     "updated": "2026-10-14T14:15:00.000Z",
                     "purpose": "shape"
@@ -4250,7 +4250,7 @@
             "linkedPrs": [
                 {
                     "number": 304,
-                    "url": "https://github.com/maddec01/lar-server/pull/304",
+                    "url": "https://github.com/acme/api/pull/304",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-15T14:40:00Z",
@@ -4294,15 +4294,15 @@
             "flow": "linked",
             "number": 290,
             "title": "Include every reachable address in an invitation, confirmed or not",
-            "url": "https://github.com/maddec01/lar-server/issues/290",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/290",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4322,7 +4322,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-7",
+                    "id": "sample-thread-workspace-7",
                     "title": "Build Include every reachable address in an invitation, confirmed or not",
                     "state": "done",
                     "updated": "2026-10-15T15:15:00.000Z",
@@ -4336,7 +4336,7 @@
             "linkedPrs": [
                 {
                     "number": 305,
-                    "url": "https://github.com/maddec01/lar-server/pull/305",
+                    "url": "https://github.com/acme/api/pull/305",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-16T15:40:00Z",
@@ -4380,15 +4380,15 @@
             "flow": "linked",
             "number": 291,
             "title": "Confirm overlay network addresses once a device connects through them",
-            "url": "https://github.com/maddec01/lar-server/issues/291",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/291",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4408,7 +4408,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-8",
+                    "id": "sample-thread-workspace-8",
                     "title": "Build Confirm overlay network addresses once a device connects through them",
                     "state": "done",
                     "updated": "2026-10-16T16:15:00.000Z",
@@ -4422,7 +4422,7 @@
             "linkedPrs": [
                 {
                     "number": 306,
-                    "url": "https://github.com/maddec01/lar-apple/pull/306",
+                    "url": "https://github.com/acme/ios/pull/306",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-16T07:40:00Z",
@@ -4466,15 +4466,15 @@
             "flow": "linked",
             "number": 144,
             "title": "Tell invitation failures apart and show server trust as its own step",
-            "url": "https://github.com/maddec01/lar-apple/issues/144",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/144",
+            "repo": "acme/ios",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4494,7 +4494,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-10",
+                    "id": "sample-thread-workspace-10",
                     "title": "Build Tell invitation failures apart and show server trust as its own step",
                     "state": "done",
                     "updated": "2026-10-16T08:15:00.000Z",
@@ -4508,7 +4508,7 @@
             "linkedPrs": [
                 {
                     "number": 307,
-                    "url": "https://github.com/maddec01/lar-server/pull/307",
+                    "url": "https://github.com/acme/api/pull/307",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-17T08:40:00Z",
@@ -4551,16 +4551,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 292,
-            "title": "Walk the owner through household sharing in one guided flow",
-            "url": "https://github.com/maddec01/lar-server/issues/292",
-            "repo": "maddec01/lar-server",
+            "title": "Walk the owner through workspace sharing in one guided flow",
+            "url": "https://github.com/acme/api/issues/292",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4568,14 +4568,14 @@
             "blockers": [
                 {
                     "number": 290,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "35179795-5ec3-57fb-84d1-49fef02e52b4",
                     "title": "Include every reachable address in an invitation, confirmed or not"
                 },
                 {
                     "number": 291,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "af6782cb-3a33-5d72-b855-138aaf1f8c1b",
                     "title": "Confirm overlay network addresses once a device connects through them"
@@ -4595,8 +4595,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-11",
-                    "title": "Build Walk the owner through household sharing in one guided flow",
+                    "id": "sample-thread-workspace-11",
+                    "title": "Build Walk the owner through workspace sharing in one guided flow",
                     "state": "done",
                     "updated": "2026-10-17T09:15:00.000Z",
                     "purpose": "build"
@@ -4636,16 +4636,16 @@
             "flow": "linked",
             "decisionMethod": "grill",
             "number": 0,
-            "title": "Decide how someone without the app gets from an invitation link to a joined household",
+            "title": "Decide how someone without the app gets from an invitation link to a joined workspace",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4663,8 +4663,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-12",
-                    "title": "Shaping Decide how someone without the app gets from an invitation link to a joined household",
+                    "id": "sample-thread-workspace-12",
+                    "title": "Shaping Decide how someone without the app gets from an invitation link to a joined workspace",
                     "state": "done",
                     "updated": "2026-10-15T10:15:00.000Z",
                     "purpose": "shape"
@@ -4677,7 +4677,7 @@
             "linkedPrs": [
                 {
                     "number": 308,
-                    "url": "https://github.com/maddec01/lar-platform/pull/308",
+                    "url": "https://github.com/acme/platform/pull/308",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-17T10:40:00Z",
@@ -4720,16 +4720,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Publish and withdraw signed household records in the registry",
+            "title": "Publish and withdraw signed workspace records in the registry",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4737,10 +4737,10 @@
             "blockers": [
                 {
                     "number": 4,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "63eddaac-5a62-5233-a763-1048f5d6a7e6",
-                    "title": "Build the household registry"
+                    "title": "Build the workspace registry"
                 }
             ],
             "updatedAt": "2026-10-17T11:15:00.000Z",
@@ -4756,8 +4756,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-13",
-                    "title": "Build Publish and withdraw signed household records in the registry",
+                    "id": "sample-thread-workspace-13",
+                    "title": "Build Publish and withdraw signed workspace records in the registry",
                     "state": "done",
                     "updated": "2026-10-17T11:15:00.000Z",
                     "purpose": "build"
@@ -4796,16 +4796,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Sign in to a Lar account first, then join the household's servers",
+            "title": "Sign in to a Acme account first, then join the workspace's servers",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4813,21 +4813,21 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "908f6812-4834-5405-a43b-8afcf5df1680",
-                    "title": "Let apps sign in to a Lar account and list the person's households"
+                    "title": "Let apps sign in to a Acme account and list the person's workspaces"
                 },
                 {
                     "number": 139,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "open",
                     "workId": "3e18a3bd-664d-50c4-ba66-bd4f60f245fc",
-                    "title": "Look up a household's current servers in the registry when every saved address fails"
+                    "title": "Look up a workspace's current servers in the registry when every saved address fails"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "f9d21ec4-d798-56be-b110-bbacf230ea7b",
                     "title": "Open invitation links and keep joining after the app installs"
@@ -4843,7 +4843,7 @@
             "linkedPrs": [
                 {
                     "number": 309,
-                    "url": "https://github.com/maddec01/lar-apple/pull/309",
+                    "url": "https://github.com/acme/ios/pull/309",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-17T13:40:00Z",
@@ -4888,14 +4888,14 @@
             "number": 0,
             "title": "Open invitation links and keep joining after the app installs",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -4903,7 +4903,7 @@
             "blockers": [
                 {
                     "number": 144,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                     "title": "Tell invitation failures apart and show server trust as its own step"
@@ -4922,7 +4922,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-16",
+                    "id": "sample-thread-workspace-16",
                     "title": "Build Open invitation links and keep joining after the app installs",
                     "state": "done",
                     "updated": "2026-10-17T14:15:00.000Z",
@@ -4936,7 +4936,7 @@
             "linkedPrs": [
                 {
                     "number": 310,
-                    "url": "https://github.com/maddec01/lar-platform/pull/310",
+                    "url": "https://github.com/acme/platform/pull/310",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-19T14:40:00Z",
@@ -4979,16 +4979,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Serve invitation links from lar.works",
+            "title": "Serve invitation links from acme.example",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5007,8 +5007,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-17",
-                    "title": "Build Serve invitation links from lar.works",
+                    "id": "sample-thread-workspace-17",
+                    "title": "Build Serve invitation links from acme.example",
                     "state": "done",
                     "updated": "2026-10-19T15:15:00.000Z",
                     "purpose": "build"
@@ -5021,7 +5021,7 @@
             "linkedPrs": [
                 {
                     "number": 311,
-                    "url": "https://github.com/maddec01/lar-server/pull/311",
+                    "url": "https://github.com/acme/api/pull/311",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-17T15:40:00Z",
@@ -5066,14 +5066,14 @@
             "number": 0,
             "title": "Create invitation links and retire the old join page",
             "url": null,
-            "repo": "maddec01/lar-server",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5081,14 +5081,14 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "c6504e1a-8c9e-521d-97dd-82fbb2451f05",
-                    "title": "Serve invitation links from lar.works"
+                    "title": "Serve invitation links from acme.example"
                 },
                 {
                     "number": 290,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "35179795-5ec3-57fb-84d1-49fef02e52b4",
                     "title": "Include every reachable address in an invitation, confirmed or not"
@@ -5107,7 +5107,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-18",
+                    "id": "sample-thread-workspace-18",
                     "title": "Build Create invitation links and retire the old join page",
                     "state": "done",
                     "updated": "2026-10-17T16:15:00.000Z",
@@ -5121,7 +5121,7 @@
             "linkedPrs": [
                 {
                     "number": 312,
-                    "url": "https://github.com/maddec01/lar-apple/pull/312",
+                    "url": "https://github.com/acme/ios/pull/312",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-18T16:40:00Z",
@@ -5164,16 +5164,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Sync every joined household through iCloud Keychain on all devices",
+            "title": "Sync every joined workspace through iCloud Keychain on all devices",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5181,17 +5181,17 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "c6504e1a-8c9e-521d-97dd-82fbb2451f05",
-                    "title": "Serve invitation links from lar.works"
+                    "title": "Serve invitation links from acme.example"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "6610b571-d798-5026-9d03-dfd848d01e50",
-                    "title": "Publish and withdraw signed household records in the registry"
+                    "title": "Publish and withdraw signed workspace records in the registry"
                 }
             ],
             "updatedAt": "2026-10-18T17:15:00.000Z",
@@ -5207,8 +5207,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-19",
-                    "title": "Build Sync every joined household through iCloud Keychain on all devices",
+                    "id": "sample-thread-workspace-19",
+                    "title": "Build Sync every joined workspace through iCloud Keychain on all devices",
                     "state": "done",
                     "updated": "2026-10-18T17:15:00.000Z",
                     "purpose": "build"
@@ -5221,7 +5221,7 @@
             "linkedPrs": [
                 {
                     "number": 313,
-                    "url": "https://github.com/maddec01/lar-server/pull/313",
+                    "url": "https://github.com/acme/api/pull/313",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-19T07:40:00Z",
@@ -5264,16 +5264,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Let apps sign in to a Lar account and list the person's households",
+            "title": "Let apps sign in to a Acme account and list the person's workspaces",
             "url": null,
-            "repo": "maddec01/lar-server",
+            "repo": "acme/api",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5281,24 +5281,24 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "0b7eac32-f229-5618-b434-28902cf8dd53",
                     "title": "Let members keep their access when an owner sets the server up again"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "886712d7-851d-5a60-bdd5-2fdca8349f37",
                     "title": "Create invitation links and retire the old join page"
                 },
                 {
                     "number": 269,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "262bdc5e-da4e-5667-a145-a38030d4de08",
-                    "title": "Prepare signed household records and share secrets for every server a household owns"
+                    "title": "Prepare signed workspace records and share secrets for every server a workspace owns"
                 }
             ],
             "updatedAt": "2026-10-19T08:15:00.000Z",
@@ -5314,8 +5314,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-20",
-                    "title": "Build Let apps sign in to a Lar account and list the person's households",
+                    "id": "sample-thread-workspace-20",
+                    "title": "Build Let apps sign in to a Acme account and list the person's workspaces",
                     "state": "done",
                     "updated": "2026-10-19T08:15:00.000Z",
                     "purpose": "build"
@@ -5328,7 +5328,7 @@
             "linkedPrs": [
                 {
                     "number": 314,
-                    "url": "https://github.com/maddec01/lar-apple/pull/314",
+                    "url": "https://github.com/acme/ios/pull/314",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-18T08:40:00Z",
@@ -5373,14 +5373,14 @@
             "number": 0,
             "title": "Report probe results after another address already answered",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5388,7 +5388,7 @@
             "blockers": [
                 {
                     "number": 144,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                     "title": "Tell invitation failures apart and show server trust as its own step"
@@ -5407,7 +5407,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-21",
+                    "id": "sample-thread-workspace-21",
                     "title": "Build Report probe results after another address already answered",
                     "state": "done",
                     "updated": "2026-10-18T09:15:00.000Z",
@@ -5450,14 +5450,14 @@
             "number": 0,
             "title": "Let members keep their access when an owner sets the server up again",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5475,7 +5475,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-22",
+                    "id": "sample-thread-workspace-22",
                     "title": "Shaping Let members keep their access when an owner sets the server up again",
                     "state": "done",
                     "updated": "2026-10-19T10:15:00.000Z",
@@ -5489,7 +5489,7 @@
             "linkedPrs": [
                 {
                     "number": 315,
-                    "url": "https://github.com/maddec01/lar-platform/pull/315",
+                    "url": "https://github.com/acme/platform/pull/315",
                     "state": "merged",
                     "isDraft": false,
                     "mergedAt": "2026-10-20T10:40:00Z",
@@ -5534,14 +5534,14 @@
             "number": 0,
             "title": "Tell apps which server replaced one that was set up again",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5549,10 +5549,10 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-server",
+                    "repo": "acme/api",
                     "state": "closed",
                     "workId": "908f6812-4834-5405-a43b-8afcf5df1680",
-                    "title": "Let apps sign in to a Lar account and list the person's households"
+                    "title": "Let apps sign in to a Acme account and list the person's workspaces"
                 }
             ],
             "updatedAt": "2026-10-20T11:15:00.000Z",
@@ -5568,7 +5568,7 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-23",
+                    "id": "sample-thread-workspace-23",
                     "title": "Build Tell apps which server replaced one that was set up again",
                     "state": "done",
                     "updated": "2026-10-20T11:15:00.000Z",
@@ -5608,16 +5608,16 @@
             "kind": "build",
             "flow": "linked",
             "number": 0,
-            "title": "Follow a household server its owner set up again",
+            "title": "Follow a workspace server its owner set up again",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5625,24 +5625,24 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "98d1f54b-684c-5e98-851d-ad4baf35018a",
                     "title": "Tell apps which server replaced one that was set up again"
                 },
                 {
                     "number": 144,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed",
                     "workId": "a5675b2d-1a35-55fd-a109-ad5cd473bba0",
                     "title": "Tell invitation failures apart and show server trust as its own step"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "open",
                     "workId": "79839d93-d1a7-59f1-b5c0-0973f550f344",
-                    "title": "Sign in to a Lar account first, then join the household's servers"
+                    "title": "Sign in to a Acme account first, then join the workspace's servers"
                 }
             ],
             "updatedAt": "2026-10-20T12:15:00.000Z",
@@ -5682,16 +5682,16 @@
             "flow": "linked",
             "decisionMethod": "task",
             "number": 0,
-            "title": "Put the registry and invitation links live on lar.works",
+            "title": "Put the registry and invitation links live on acme.example",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "closed",
             "closedAs": "done",
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5709,8 +5709,8 @@
             "usageState": "current",
             "threads": [
                 {
-                    "id": "sample-thread-household-25",
-                    "title": "Shaping Put the registry and invitation links live on lar.works",
+                    "id": "sample-thread-workspace-25",
+                    "title": "Shaping Put the registry and invitation links live on acme.example",
                     "state": "done",
                     "updated": "2026-10-20T13:15:00.000Z",
                     "purpose": "shape"
@@ -5750,16 +5750,16 @@
             "flow": "linked",
             "decisionMethod": "task",
             "number": 0,
-            "title": "Release the apps on TestFlight with the household invite link",
+            "title": "Release the apps on TestFlight with the workspace invite link",
             "url": null,
-            "repo": "maddec01/lar-apple",
+            "repo": "acme/ios",
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5767,17 +5767,17 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "open",
                     "workId": "ee6e7cb6-b9f8-5932-9cd1-9d9ebffd249e",
-                    "title": "Follow a household server its owner set up again"
+                    "title": "Follow a workspace server its owner set up again"
                 },
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-platform",
+                    "repo": "acme/platform",
                     "state": "closed",
                     "workId": "a1d1128e-2a50-591c-a7bf-9a2f1888ea97",
-                    "title": "Put the registry and invitation links live on lar.works"
+                    "title": "Put the registry and invitation links live on acme.example"
                 }
             ],
             "updatedAt": "2026-10-20T14:15:00.000Z",
@@ -5817,16 +5817,16 @@
             "flow": "linked",
             "decisionMethod": "task",
             "number": 0,
-            "title": "Check the whole household journey on real devices",
+            "title": "Check the whole workspace journey on real devices",
             "url": null,
-            "repo": "maddec01/lar-platform",
+            "repo": "acme/platform",
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 0,
-                "title": "Household sharing: invite family, find moved servers and hand a server over",
+                "title": "Workspace sharing: invite teammates, find moved servers and hand a server over",
                 "url": "",
-                "repo": "maddec01/lar-platform",
+                "repo": "acme/platform",
                 "state": "open"
             },
             "parentId": "42a26ff6-44ae-5dcc-b615-e6a344637997",
@@ -5834,10 +5834,10 @@
             "blockers": [
                 {
                     "number": 0,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "open",
                     "workId": "ee2d5cc6-435a-5ae2-a951-47f4ebbe246c",
-                    "title": "Release the apps on TestFlight with the household invite link"
+                    "title": "Release the apps on TestFlight with the workspace invite link"
                 }
             ],
             "updatedAt": "2026-10-20T15:15:00.000Z",
@@ -5875,9 +5875,9 @@
             "kind": "feature",
             "flow": "single",
             "number": 12,
-            "title": "Build a private operations console where the platform team reviews households and registry records",
-            "url": "https://github.com/maddec01/lar-platform/issues/12",
-            "repo": "maddec01/lar-platform",
+            "title": "Build a private operations console where the platform team reviews workspaces and registry records",
+            "url": "https://github.com/acme/platform/issues/12",
+            "repo": "acme/platform",
             "state": "open",
             "closedAs": null,
             "parent": null,
@@ -5920,8 +5920,8 @@
             "flow": "single",
             "number": 214,
             "title": "Transcoding jobs that finish while the owner is signing out leave a half-written segment cache behind",
-            "url": "https://github.com/maddec01/lar-server/issues/214",
-            "repo": "maddec01/lar-server",
+            "url": "https://github.com/acme/api/issues/214",
+            "repo": "acme/api",
             "state": "open",
             "closedAs": null,
             "parent": null,
@@ -5964,8 +5964,8 @@
             "flow": "single",
             "number": 151,
             "title": "Keep the library grid scroll position when a sheet closes on iPad, even after the window was resized",
-            "url": "https://github.com/maddec01/lar-apple/issues/151",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/151",
+            "repo": "acme/ios",
             "state": "open",
             "closedAs": null,
             "parent": null,
@@ -5986,16 +5986,16 @@
             "content": "ticket",
             "number": 109,
             "title": "Check the upgraded HEVC playback on the deployed server and a physical iPhone",
-            "url": "https://github.com/maddec01/lar-apple/issues/109",
-            "repo": "maddec01/lar-apple",
+            "url": "https://github.com/acme/ios/issues/109",
+            "repo": "acme/ios",
             "labels": [],
             "state": "open",
             "closedAs": null,
             "parent": {
                 "number": 92,
                 "title": "Fix HEVC (2004) playback on iOS",
-                "url": "https://github.com/maddec01/lar-apple/issues/92",
-                "repo": "maddec01/lar-apple",
+                "url": "https://github.com/acme/ios/issues/92",
+                "repo": "acme/ios",
                 "state": "closed"
             },
             "parentId": null,
@@ -6003,7 +6003,7 @@
             "blockers": [
                 {
                     "number": 108,
-                    "repo": "maddec01/lar-apple",
+                    "repo": "acme/ios",
                     "state": "closed"
                 }
             ],

@@ -47,7 +47,7 @@ const unblocked = (data: BoardData = loose): BoardData =>
         'I_sample13',
         {
             status: 'Ready',
-            blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }],
+            blockers: [{ number: 202, repo: 'acme/api', state: 'closed' }],
         },
         {
             ...data,
@@ -152,7 +152,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
     ]);
     expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
 
-    const started = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
+    const started = { threadId: 'thread-1', title: 'Build acme/api#140' };
 
     await answer({ thread: started, error: null, board: { ...unblocked(), startedBuilds: { I_sample13: started } } });
 
@@ -174,7 +174,7 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
     await mountPage(data);
     await press(startBuild());
 
-    const started = { threadId: 'stopped-build', title: 'Build maddec01/lar-server#140' };
+    const started = { threadId: 'stopped-build', title: 'Build acme/api#140' };
 
     await answer({ thread: started, error: null });
 

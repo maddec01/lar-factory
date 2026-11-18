@@ -11,7 +11,7 @@ export const project = (name: string, parts: Partial<ProjectChoice> = {}): Proje
     name,
     folder: `/Users/me/Developer/${name}`,
     shownFolder: `~/Developer/${name}`,
-    repo: `maddec01/${name}`,
+    repo: `acme/${name}`,
     provider: 'GitHub',
     blocked: null,
     onBoard: false,
@@ -65,9 +65,9 @@ export const posted = (url: string) =>
 
 /** A GitHub repository the login owns, with no domain docs, factory files, shared config or project skills. */
 export const detection = (parts: Partial<SetupDetection> = {}): SetupDetection => ({
-    repo: 'maddec01/lar-web',
+    repo: 'acme/web',
     provider: 'GitHub',
-    checkout: { found: '/Users/me/Developer/lar-web' },
+    checkout: { found: '/Users/me/Developer/web' },
     itemSources: { found: [{ kind: 'issues' }] },
     access: {
         'push-branch': 'allowed',

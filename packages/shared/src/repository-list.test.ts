@@ -8,9 +8,9 @@ import { onTestFinished, test } from 'vite-plus/test';
 
 import { readConnections, saveConnections } from './repository-list.ts';
 
-const WEB = 'maddec01/lar-web';
-const API = 'maddec01/lar-api';
-const IOS = 'maddec01/lar-ios';
+const WEB = 'acme/web';
+const API = 'acme/api';
+const IOS = 'acme/ios';
 
 /** A data folder whose list names `repos`, each on the board. */
 function dataDir(repos: string[] = [WEB, API, IOS]): string {

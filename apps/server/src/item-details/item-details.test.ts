@@ -29,7 +29,7 @@ async function recordsOn(): Promise<{ records: WorkRecords; dir: string; exportF
     return { records, dir, exportFolder };
 }
 
-const WEB = 'maddec01/lar-web';
+const WEB = 'acme/web';
 /** The board item a record shows as: its work ID, and no ticket. */
 const boardItem = (workId: string) =>
     ({ id: workId, content: 'ticket', revision: 0, kind: 'build', parentId: null, repo: WEB, number: 0 }) as Item;
@@ -40,7 +40,7 @@ const workItem = {
     revision: 0,
     kind: 'issue',
     parentId: null,
-    repo: 'contoso/Fabrikam%20Fiber/lar-api',
+    repo: 'contoso/Fabrikam%20Fiber/api',
     number: 5,
 } as Item;
 
@@ -55,9 +55,9 @@ test('an Azure DevOps save without the field and revision its details gave is re
 
 test("a build's details hold its brief, initial context, build phase and review rounds from its record", async () => {
     const { records, exportFolder } = await recordsOn();
-    let build = records.create({ title: 'Owner accounts', context: 'Owners sign up.', repository: WEB, kind: 'build' });
+    let build = records.create({ title: 'Team accounts', context: 'Owners sign up.', repository: WEB, kind: 'build' });
 
-    build = records.setBody(build.workId, build.revision, 'brief', '# Owner accounts\n\nAdd an owner table.');
+    build = records.setBody(build.workId, build.revision, 'brief', '# Team accounts\n\nAdd an owner table.');
     build = records.setBuildPhase(build.workId, build.revision, 'review');
     records.recordReviewRound(build.workId, build.revision, {
         base: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
@@ -85,7 +85,7 @@ test("a build's details hold its brief, initial context, build phase and review 
         { ...(read as { record: object }).record, reviewRounds: [round] },
         {
             bodyKind: 'brief',
-            body: '# Owner accounts\n\nAdd an owner table.',
+            body: '# Team accounts\n\nAdd an owner table.',
             context: 'Owners sign up.',
             buildPhase: 'review',
             reviewRounds: [

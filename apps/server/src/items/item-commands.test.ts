@@ -22,6 +22,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { afterEach, test, vi } from 'vite-plus/test';
 
+import { completeBrief } from '../../test/complete-brief.ts';
 import { createBoardState } from '../board/board-state.ts';
 import { boardSessionAuthority } from '../t3/board-session.ts';
 import { launchThread, type LaunchContext } from '../t3/launch-thread.ts';
@@ -2735,3 +2736,179 @@ for (const [name, answer] of [
         assert.equal(board.progress()?.phase, 'failed');
         assert.equal(board.intents()[0]!.outcome, 'failed');
     });
+
+test('approved Ready work with only a finished shaping thread can be abandoned, moved to the List or reshaped', async () => {
+    const records = await openRecords();
+    let state: ItemThread['state'] = 'running';
+    const sent: { threadId: string; text: string }[] = [];
+    const ready = (title: string, thread?: string) => {
+        const work = records.create({ title, repository: WEB, kind: 'build', status: 'Shaping' });
+
+        if (thread) records.addThread(work.workId, records.read(work.workId).revision, thread, 'shape');
+
+        approveBuild(records, work.workId);
+
+        return work.workId;
+    };
+    const [abandoned, listed, reshaped, relaunched] = [
+        ready('Abandoned', 'shape-a'),
+        ready('Listed', 'shape-l'),
+        ready('Reshaped', 'shape-r'),
+        ready('Relaunched'),
+    ];
+    const { commands, started, reread } = recordedCommands(records, {
+        shown: (ids) => ids.map((id) => ({ id, title: 't', state, updated: '2026-10-31T00:00:00Z' })),
+        deps: {
+            reconcileDeps: {
+                send: async (command) => {
+                    if (command.type === 'message.dispatch')
+                        sent.push({ threadId: command.threadId, text: command.text });
+
+                    return { outcome: 'accepted' as const, sequence: 1 };
+                },
+            },
+        },
+    });
+
+    for (const refused of [
+        () => commands.abandon(abandoned!),
+        () => commands.backToList(listed!),
+        () => commands.reshape(reshaped!, undefined),
+    ])
+        assert.match(String(((await refused()).body as { error: string }).error), /thread is at work/);
+
+    state = 'done';
+    reread();
+
+    assert.equal((await commands.abandon(abandoned!)).status, 200);
+    assert.equal(records.read(abandoned!).setAside, true);
+
+    assert.equal(commands.backToList(listed!).status, 200);
+    assert.equal(records.read(listed!).status, 'List');
+    assert.equal(records.body(listed!, 'brief'), 'Exact test build.');
+    assert.equal(records.gate(listed!).current, false);
+
+    assert.equal((await commands.reshape(reshaped!, undefined)).status, 200);
+    assert.equal(records.read(reshaped!).status, 'Shaping');
+    assert.equal(records.gate(reshaped!).current, false);
+    assert.deepEqual(
+        sent.map((m) => m.threadId),
+        ['shape-r'],
+        'the existing shaping thread continues',
+    );
+    assert.equal(started.length, 0);
+
+    assert.equal((await commands.reshape(relaunched!, undefined)).status, 200);
+    assert.equal(started.length, 1, 'a new shaping thread starts only when none is held');
+    assert.equal(records.read(relaunched!).status, 'Shaping');
+    assert.equal(records.gate(relaunched!).current, false);
+});
+
+test('approved Ready work stays put while its build Start is in flight', async () => {
+    const records = await openRecords();
+    const work = records.create({ title: 'Building', repository: WEB, kind: 'build', status: 'Shaping' });
+
+    records.addThread(work.workId, records.read(work.workId).revision, 'shape-1', 'shape');
+    approveBuild(records, work.workId);
+    records.recordLaunchIntent(work.workId, records.read(work.workId).revision, 'build');
+
+    const { commands } = recordedCommands(records, { shown: idle });
+
+    for (const refused of [
+        () => commands.abandon(work.workId),
+        () => commands.backToList(work.workId),
+        () => commands.reshape(work.workId, undefined),
+    ])
+        assert.match(String(((await refused()).body as { error: string }).error), /Start is running/);
+
+    assert.equal(records.gate(work.workId).current, true);
+    assert.equal(records.read(work.workId).setAside, false);
+});
+
+/** Approved Ready work whose Spec a trusted tracker edit changed, with commands that record the messages they send. */
+async function changedApprovedSpec() {
+    const records = await openRecords();
+    const work = records.create({ title: 'Changed', repository: WEB, kind: 'build', status: 'Shaping' });
+    const sends: unknown[] = [];
+    const [before, after] = [completeBrief('Exact test build.'), completeBrief('Exact test build, clarified.')];
+
+    records.setBody(work.workId, work.revision, 'brief', before);
+    approveBuild(records, work.workId);
+
+    const state = records.specState(work.workId);
+
+    records.saveSpecState(work.workId, state.generation, state, {
+        text: after,
+        source: 'tracker',
+        identity: 'tracker',
+        evidence: 'A trusted tracker edit.',
+    });
+
+    const { commands, board } = recordedCommands(records, {
+        deps: {
+            briefApprovalDeps: {
+                refresh: async () => {},
+                sync: async () => {},
+                identity: () => 'user',
+                send: async (command) => {
+                    sends.push(command);
+
+                    return { outcome: 'accepted' as const, sequence: 1 };
+                },
+            },
+        },
+    });
+
+    return { records, work, sends, before, after, commands, board };
+}
+
+test('Approve as is approves the displayed changed Spec with no Doubt review or resume message and keeps its Status', async () => {
+    const { records, work, sends, before, after, commands, board } = await changedApprovedSpec();
+
+    assert.equal(board.find(work.workId)!.approveAsIs, true);
+
+    const shown = (await commands.inspectApproveAsIs(work.workId)).body as {
+        approval: { requestId: string; digest: string; briefs: { brief: string; previousBrief?: string }[] };
+    };
+
+    assert.equal(shown.approval.briefs[0]!.brief, after);
+    assert.equal(shown.approval.briefs[0]!.previousBrief, before, 'the changed passage shows');
+    assert.equal(
+        (await commands.approveAsIs(work.workId, { requestId: shown.approval.requestId, digest: 'other' })).status,
+        409,
+    );
+
+    const again = (await commands.inspectApproveAsIs(work.workId)).body as typeof shown;
+
+    assert.equal(
+        (
+            await commands.approveAsIs(work.workId, {
+                requestId: again.approval.requestId,
+                digest: again.approval.digest,
+            })
+        ).status,
+        200,
+    );
+    assert.equal(records.gate(work.workId).current, true);
+    assert.equal(records.gate(work.workId).passing!.reviewDigest, undefined, 'no Doubt review backs it');
+    assert.equal(records.read(work.workId).status, 'Ready');
+    assert.deepEqual(sends, [], 'no resume message');
+});
+
+test('Approve as is is refused when work citing the brief as a contract producer appears after it was displayed', async () => {
+    const { records, work, commands } = await changedApprovedSpec();
+    const shown = (await commands.inspectApproveAsIs(work.workId)).body as {
+        approval: { requestId: string; digest: string };
+    };
+    const consumer = records.create({ title: 'Consumer', repository: WEB, kind: 'build', status: 'Queued' });
+
+    records.setBody(
+        consumer.workId,
+        consumer.revision,
+        'brief',
+        completeBrief(`## What\nUses the output of ${work.workId}.\n`),
+    );
+
+    assert.equal((await commands.approveAsIs(work.workId, shown.approval)).status, 409);
+    assert.equal(records.gate(work.workId).current, false);
+});

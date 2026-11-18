@@ -1,6 +1,6 @@
 import type { BoardData, Item } from '@lar-factory/shared';
-// The item dialog's buttons that move an item: Queue on a List item, Move to List on a Queued one and Abandon on
-// both, each with its pending label.
+// The item dialog's buttons that move an item: Queue on a List item, Move to List on a Queued one, Abandon on both,
+// and Reshape on approved work that hasn't started building, each with its pending label.
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import { Button, Text } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
@@ -8,7 +8,7 @@ import { useId, useRef } from 'react';
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
 import { ICON } from './ButtonIcons';
-import { askAbandon, backToList, queueItem } from './CardActions';
+import { askAbandon, backToList, queueItem, reshape } from './CardActions';
 import { closeKeepingFocus } from '@/features/notices';
 import { ActionError as DesignActionError, useButtonKind } from '@/ui/board';
 
@@ -49,6 +49,26 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
             onClick={() => void backToList(item.id)}
         >
             {moving ? 'Moving to the List…' : 'Move to the List'}
+        </Button>
+    );
+}
+
+/** Reshape, a link in approved work's footer that clears its approval and sends it back to shaping. */
+export function ReshapeButton({ item, data }: { item: Item; data: BoardData }) {
+    const kindOf = useButtonKind();
+    const action = useItemAction(item.id);
+    const reshaping = action?.phase === 'pending' && action.kind === 'reshape';
+
+    return (
+        <Button
+            {...kindOf('other')}
+            pendingLook
+            data-reshape={item.id}
+            aria-label={`${reshaping ? 'Reshaping' : 'Reshape'} ${itemName(item)}`}
+            {...writeState(data, action)}
+            onClick={() => void reshape(item.id)}
+        >
+            {reshaping ? 'Reshaping…' : 'Reshape'}
         </Button>
     );
 }

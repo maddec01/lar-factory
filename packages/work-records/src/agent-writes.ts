@@ -152,6 +152,7 @@ export function agentWrites(records: WorkRecords): WorkRecords {
             ),
         setFogGone: (id, rev, gone) => apply(id, rev, [...active, 'fogGoneAt'], (r) => records.setFogGone(id, r, gone)),
         recordDisplayedGate: () => requireHumanAction('Approve brief'),
+        recordApprovedAsIs: () => requireHumanAction('Approve as is'),
         beginLinkedPrAmendment: () => requireHumanAction('Use begin-pr-amendment with verified human feedback'),
         recordLinkedPrAmendment: () => requireHumanAction('Use approve-pr-amendment with verified human feedback'),
         recordPrAmendmentGate: () => requireHumanAction('Use approve-pr-amendment with verified human feedback'),

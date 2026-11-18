@@ -1043,3 +1043,58 @@ test('work closed during shaping keeps its reason and identity in Archive even w
     records.setAside(work.workId, restored.revision);
     assert.equal(archivedItems(records, [], [REPO], new Set())[0]?.closeReason, undefined);
 });
+
+test("Approve as is is offered for an approved item's changed brief unless scope or a contract consumer needs reshaping", async () => {
+    const records = await open();
+    const brief = (behaviour: string) => completeBrief(`## Done when\n### Behaviour\n- ${behaviour}\n`);
+    const approved = (title: string) => {
+        const work = records.create({ title, repository: REPO, kind: 'build', status: 'Shaping' });
+
+        records.confirmScope(work.workId, work.revision, singleScope, 'user', 'Yes.');
+        records.setBody(work.workId, records.read(work.workId).revision, 'brief', brief('Greet the visitor.'));
+        records.recordGate(work.workId, records.read(work.workId).revision, {
+            briefDigest: records.gate(work.workId).briefDigest!,
+            approvedBy: 'user',
+            evidence: 'Approved.',
+        });
+        records.update(work.workId, records.read(work.workId).revision, { status: 'Ready' });
+
+        return work.workId;
+    };
+    const item = (id: string) => recordItems(records, [], [REPO]).find((i) => i.id === id)!;
+    // A trusted tracker edit saves the Spec text and keeps the Status, as Spec sync does.
+    const trackerEdit = (id: string, text: string) => {
+        const state = records.specState(id);
+
+        records.saveSpecState(id, state.generation, state, {
+            text,
+            source: 'tracker',
+            identity: 'tracker',
+            evidence: 'A trusted tracker edit.',
+        });
+    };
+    const [offered, outgrown, producer] = ['Offered', 'Outgrown', 'Producer'].map(approved);
+
+    assert.ok(item(offered!).approved);
+    assert.equal(item(offered!).approveAsIs, undefined, 'a current approval needs no Approve as is');
+
+    trackerEdit(offered!, `${brief('Greet the visitor.')}\nA clarified note.\n`);
+    trackerEdit(outgrown!, brief('Greet the visitor by name.'));
+    trackerEdit(producer!, `${brief('Greet the visitor.')}\nA clarified note.\n`);
+
+    const consumer = records.create({ title: 'Consumer', repository: REPO, kind: 'build', status: 'Queued' });
+
+    records.setBody(
+        consumer.workId,
+        consumer.revision,
+        'brief',
+        completeBrief(`## What\nUses the output of ${producer}.\n`),
+    );
+    assert.equal(item(offered!).status, 'Ready', 'the tracker edit keeps the Status');
+
+    assert.equal(item(offered!).approveAsIs, true);
+    assert.equal(item(offered!).briefReviewing, undefined, 'Approve as is answers the changed brief');
+    assert.equal(item(outgrown!).approveAsIs, undefined, 'a brief past its confirmed scope only reshapes');
+    assert.equal(item(producer!).approveAsIs, undefined, 'a cited contract producer keeps its fresh Doubt');
+    assert.ok(item(producer!).approved, 'Reshape, Abandon and Move to List still apply');
+});

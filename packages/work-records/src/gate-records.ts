@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { agentRevision } from './agent-revision.ts';
 import { requireCompleteBrief } from './brief-completeness.ts';
-import type { BriefReviewRecords, DoubtReview } from './brief-review.ts';
+import type { BriefReviewRecords } from './brief-review.ts';
 import { checkBriefScope } from './brief-scope.ts';
 import { WorkRecordError, type Database } from './database.ts';
 import {
@@ -39,6 +39,16 @@ export interface GateRecords {
         source: string,
     ): GateEvidence;
     recordGate(workId: string, revision: number, evidence: GateApproval): GateEvidence;
+    /**
+     * The user's Approve as is: approves the displayed, changed brief with no Doubt review and no resume message, leaving
+     * the Status as it is.
+     */
+    recordApprovedAsIs(
+        display: GateDisplay,
+        approvalDigest: string,
+        approvedBy: string,
+        evidence: string,
+    ): GateEvidence;
 }
 
 const invalid = (message: string): never => {
@@ -112,6 +122,7 @@ export function gateRecords(
                 evidence: String(row.evidence),
                 recordedAt: String(row.recorded_at),
                 source: row.source as GateEvidence['source'],
+                ...(row.invalidated ? { invalidated: true as const } : {}),
                 ...(row.batch_digest ? { batchDigest: String(row.batch_digest) } : {}),
                 ...(row.approval_digest ? { approvalDigest: String(row.approval_digest) } : {}),
                 ...(row.review_digest
@@ -138,7 +149,12 @@ export function gateRecords(
 
         return { briefDigest, current: passing !== null, passing, evidence };
     };
-    const saveGate = (workId: string, revision: number, value: GateApproval): GateEvidence => {
+    const saveGate = (
+        workId: string,
+        revision: number,
+        value: GateApproval,
+        { doubt = true }: { doubt?: boolean } = {},
+    ): GateEvidence => {
         const record = expected(workId, revision);
 
         delivery(workId);
@@ -153,7 +169,7 @@ export function gateRecords(
         if (!current.briefDigest || current.briefDigest !== value.briefDigest)
             invalid('The brief changed or is missing; inspect it before recording its gate.');
 
-        const review = reviews.currentDoubt(workId);
+        const review = doubt ? reviews.currentDoubt(workId) : null;
 
         if (value.reviewDigest !== undefined && value.reviewDigest !== review?.packageDigest)
             invalid('The affected-work package changed; rerun Doubt before approval.');
@@ -177,7 +193,7 @@ export function gateRecords(
         };
 
         db.prepare(
-            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest, review_digest, doubt_review_id, batch_digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, approval_digest, review_digest, doubt_review_id, batch_digest, brief_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         ).run(
             item.gateId,
             workId,
@@ -190,6 +206,7 @@ export function gateRecords(
             item.reviewDigest ?? null,
             item.doubtReviewId ?? null,
             item.batchDigest ?? null,
+            body(workId, 'brief')!,
         );
         db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
 
@@ -219,18 +236,15 @@ export function gateRecords(
 
         requireCompleteBrief(record.kind, brief!);
 
-        const prior = db
+        const previousBrief = db
             .prepare(
-                "SELECT g.brief_digest, d.content FROM brief_gates g LEFT JOIN doubt_reviews d ON d.review_id=g.doubt_review_id AND d.work_id=g.work_id WHERE g.work_id=? AND g.source IN ('gate','user') ORDER BY g.rowid DESC LIMIT 1",
+                "SELECT brief_text FROM brief_gates WHERE work_id=? AND source IN ('gate','user') ORDER BY rowid DESC LIMIT 1",
             )
-            .get(workId);
-        const previousBrief = prior?.content && (JSON.parse(String(prior.content)) as DoubtReview).productInputs?.brief;
+            .get(workId)?.brief_text as string | null | undefined;
 
         return {
             ...makeGateDisplay(workId, record.revision, brief!, reviews.doubtPackage(workId).packageDigest),
-            ...(previousBrief &&
-                digest(previousBrief) === prior?.brief_digest &&
-                previousBrief !== brief && { previousBrief }),
+            ...(previousBrief && previousBrief !== brief && { previousBrief }),
         };
     };
 
@@ -258,6 +272,24 @@ export function gateRecords(
             }),
         );
 
+    const verifiedDisplay = (display: GateDisplay, approvalDigest: string) => {
+        const revision = agentRevision(database, display.workId, display.sourceRevision, [
+            'kind',
+            'setAsideAt',
+            'finishedAt',
+            'body.brief',
+            'gate',
+            'ticket',
+            'confirmedScope',
+        ]);
+
+        verifyGateDisplay(display, approvalDigest, {
+            ...displayGate(display.workId),
+            sourceRevision: display.sourceRevision,
+        });
+
+        return revision;
+    };
     const api: GateRecords = {
         gate: (workId) => database.read(() => gate(workId)),
         // Hold one SQLite snapshot for every displayed member, just as approval does.
@@ -351,21 +383,18 @@ export function gateRecords(
             }),
         recordGate: (workId, revision, value) => database.write(() => saveGate(workId, revision, value)),
         displayGate: (workId) => database.read(() => displayGate(workId)),
+        recordApprovedAsIs: (display, approvalDigest, approvedBy, evidence) =>
+            database.write(() =>
+                saveGate(
+                    display.workId,
+                    verifiedDisplay(display, approvalDigest),
+                    { briefDigest: display.briefDigest, approvedBy, evidence, approvalDigest },
+                    { doubt: false },
+                ),
+            ),
         recordDisplayedGate: (display, approvalDigest, approvedBy, evidence) =>
             database.write(() => {
-                const revision = agentRevision(database, display.workId, display.sourceRevision, [
-                    'kind',
-                    'setAsideAt',
-                    'finishedAt',
-                    'body.brief',
-                    'gate',
-                    'ticket',
-                    'confirmedScope',
-                ]);
-                const current = displayGate(display.workId);
-
-                verifyGateDisplay(display, approvalDigest, { ...current, sourceRevision: display.sourceRevision });
-
+                const revision = verifiedDisplay(display, approvalDigest);
                 const review = reviews.currentDoubt(display.workId);
 
                 if (!review) invalid('Run Doubt on the current doubt-package and record-doubt before approval.');

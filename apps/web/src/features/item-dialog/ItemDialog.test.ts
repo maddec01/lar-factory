@@ -495,3 +495,28 @@ test.each([
     expect(inDialog<HTMLAnchorElement>('[data-item-parent] a')?.href).toBe(`${page}7`);
     expect(inDialog(`[title="${label}: ux"]`)).not.toBeNull();
 });
+
+test('an approved Ready item with only a finished shaping thread offers Abandon, Move to the List and Reshape', async () => {
+    holdPosts();
+
+    const shaped = {
+        ...sample,
+        items: sample.items.map((i) =>
+            i.id === 'I_sample13'
+                ? {
+                      ...i,
+                      approved: true as const,
+                      passingBrief: true,
+                      threads: [{ id: 'shape-13', title: 'Shaping', state: 'done' as const, updated: i.updatedAt }],
+                  }
+                : i,
+        ),
+    };
+
+    await mountPage(shaped);
+    await openItem('I_sample13');
+    expect(button('abandon', 'I_sample13')).toBeTruthy();
+    expect(button('back-to-list', 'I_sample13')).toBeTruthy();
+    await press(button('reshape', 'I_sample13'));
+    expect(posted()).toEqual([['/api/reshape', { itemId: 'I_sample13' }]]);
+});

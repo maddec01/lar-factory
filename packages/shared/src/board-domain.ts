@@ -3,7 +3,7 @@
 import { type Item, type Checks, type CheckState, type Pipeline, SLOW_CHECKS_MS } from './item-domain.ts';
 import type { RepositorySetup, OnboardingRepository, ProjectIcon } from './model-settings.ts';
 import type { ToolChecks, ToolProgress } from './model-tools.ts';
-import { type StartedThread, type StartPurpose, type StartProgress } from './thread-domain.ts';
+import { isLiveThread, type StartedThread, type StartPurpose, type StartProgress } from './thread-domain.ts';
 
 /** A model Start offers: T3's name for it, else its slug. */
 export interface ModelOption {
@@ -413,9 +413,29 @@ export const repoTag = (repo: string): string => `${REPO_TAG_PREFIX}${decodePart
 /** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
 export const isRepoTag = (tag: string): boolean => tag.trim().toLowerCase().startsWith(REPO_TAG_PREFIX);
 
-/** Abandon closes a List or Queued issue. */
+/** Approved Ready or Queued work with no build phase, branch or PR, which Abandon, Move to List and Reshape can move. */
+export function approvedUnbuilt(item: Item): boolean {
+    return (item.status === 'Ready' || item.status === 'Queued') && !!item.approved && !item.buildStarted;
+}
+
+/**
+ * Why approved work that hasn't started building can't move now: a thread runs, needs you or has running children, or
+ * its Spec is still publishing. A finished shaping thread alone never refuses. Null when it can move.
+ */
+export function approvedMoveRefusal(item: Item): string | null {
+    if (item.threads === 'unavailable') return "The board can't read this work's threads. Try again once T3 answers.";
+
+    if (item.threads?.some((thread) => isLiveThread(thread) || thread.hasRunningChildren))
+        return 'A thread is at work on this item. Wait for it to finish.';
+
+    if (item.specSync?.pending) return 'Its Spec is still publishing. Wait for it to finish.';
+
+    return null;
+}
+
+/** Abandon sets aside a List or Queued item, or approved Ready work that hasn't started building. */
 export function canAbandon(item: Item): boolean {
-    return item.status === 'List' || item.status === 'Queued';
+    return item.status === 'List' || item.status === 'Queued' || approvedUnbuilt(item);
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */

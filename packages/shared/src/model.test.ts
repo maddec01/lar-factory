@@ -8,6 +8,8 @@ import {
     blockedText,
     buildBranch,
     buildMessage,
+    approvedMoveRefusal,
+    approvedUnbuilt,
     canAbandon,
     canResumeShaping,
     itemTotal,
@@ -277,6 +279,18 @@ test('canAbandon takes List and Queued issues, never other statuses', () => {
         assert.ok(canAbandon(item(status)), `${status} issue`);
     }
     for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
+});
+
+test('approved Ready work moves until a thread works on it or its Spec publishes, but never once it starts building', () => {
+    const done = { id: 'shape', title: 'Shaping', state: 'done' as const, updated: '2026-11-18T00:00:00Z' };
+    const ready = item('Ready', [], { approved: true, threads: [done] });
+
+    assert.ok(canAbandon(ready) && approvedUnbuilt(ready), 'a finished shaping thread alone holds nothing');
+    assert.equal(approvedMoveRefusal(ready), null);
+    assert.ok(approvedMoveRefusal({ ...ready, threads: [{ ...done, state: 'running' }] }));
+    assert.ok(approvedMoveRefusal({ ...ready, specSync: { pending: true, error: null, warning: null } }));
+    assert.ok(!canAbandon({ ...ready, buildStarted: true }), 'a started build keeps its actions');
+    assert.ok(!canAbandon(item('Ready')), 'unapproved Ready work stays as it was');
 });
 
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {

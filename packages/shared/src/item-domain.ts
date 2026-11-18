@@ -361,6 +361,10 @@ export interface Item {
     /** Authoritative local reservation, shared with the atomic build claim; absent on provider-only items. */
     buildReserved?: boolean;
     briefApproval?: { reason: string; digest?: string };
+    /** A gate approval stands, current or made stale by a later change; Move to List and Reshape clear it. */
+    approved?: true;
+    /** A trusted tracker edit changed its approved brief, which Approve as is may accept without a new Doubt review. */
+    approveAsIs?: true;
     publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & {
         recoverable?: boolean;
     };

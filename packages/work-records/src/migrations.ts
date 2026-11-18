@@ -694,4 +694,33 @@ export const MIGRATIONS: readonly Migration[] = [
         work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,
         content TEXT NOT NULL
     ) STRICT`),
+    // Each approval keeps the brief text it approved, recovered for earlier ones from the brief or Doubt review they match.
+    (db) => {
+        db.exec('ALTER TABLE brief_gates ADD COLUMN brief_text TEXT');
+
+        const save = db.prepare('UPDATE brief_gates SET brief_text=? WHERE gate_id=? AND brief_text IS NULL');
+        const rows = db
+            .prepare(
+                "SELECT g.gate_id,g.brief_digest,b.markdown,d.content FROM brief_gates g LEFT JOIN bodies b ON b.work_id=g.work_id AND b.body='brief' LEFT JOIN doubt_reviews d ON d.review_id=g.doubt_review_id AND d.work_id=g.work_id",
+            )
+            .all();
+
+        for (const row of rows) {
+            let doubt: unknown;
+
+            try {
+                doubt = row.content ? JSON.parse(String(row.content)).productInputs?.brief : undefined;
+            } catch {
+                // A malformed Doubt review offers no brief text.
+            }
+
+            const brief = [row.markdown, doubt].find(
+                (text): text is string =>
+                    typeof text === 'string' &&
+                    createHash('sha256').update(JSON.stringify(text)).digest('hex') === row.brief_digest,
+            );
+
+            if (brief !== undefined) save.run(brief, String(row.gate_id));
+        }
+    },
 ];

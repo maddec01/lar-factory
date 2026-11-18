@@ -97,6 +97,21 @@ export async function backToList(itemId: string): Promise<void> {
     refocus([by(result.error ? 'data-back-to-list' : 'data-queue', itemId)]);
 }
 
+/** Sends approved work back to shaping: a failure is a toast, and the footer goes back to its links. */
+export async function reshape(itemId: string): Promise<void> {
+    const item = itemOf(itemId);
+
+    if (!ready(itemId, 'data-reshape') || !item) return;
+
+    await runAction(itemId, 'reshape', { itemId }, (result) => {
+        notify(
+            result.error
+                ? { verb: 'Failed', item, to: 'Shaping', message: result.error }
+                : { verb: 'Moved', item, to: 'Shaping' },
+        );
+    });
+}
+
 /** Opens Abandon's confirm dialog for the item. */
 export function askAbandon(itemId: string): void {
     const item = itemOf(itemId);

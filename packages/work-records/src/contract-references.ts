@@ -133,3 +133,36 @@ export function blockerPath(records: WorkRecords, from: string, to: string): boo
 
     return false;
 }
+
+/**
+ * Whether Approve as is may accept the work's changed brief: Ready or Queued with no build phase, branch or PR, still
+ * within its confirmed scope and cited as a contract producer by no build that isn't set aside, which keeps ADR 0001's
+ * fresh Doubt. The board offers it and its save checks it again.
+ */
+export function approvableAsIs(records: WorkRecords, workId: string): boolean {
+    const work = records.read(workId);
+
+    return (
+        ['Ready', 'Queued'].includes(work.status) &&
+        !work.buildBranch &&
+        !work.buildPhase &&
+        !work.pullRequest &&
+        (!records.confirmedScope(workId) || records.briefScopeCheck(workId).ok) &&
+        !citedAsProducer(records, workId)
+    );
+}
+
+/** Whether a build that isn't set aside cites `workId` as a contract producer, so a change to it needs fresh Doubt. */
+function citedAsProducer(records: WorkRecords, workId: string): boolean {
+    const producer = [{ workId, title: records.read(workId).title, brief: records.body(workId, 'brief') ?? '' }];
+
+    return records
+        .list({})
+        .some(
+            (r) =>
+                !r.setAside &&
+                r.kind === 'build' &&
+                r.workId !== workId &&
+                contractReferences(records.body(r.workId, 'brief') ?? '', producer).length > 0,
+        );
+}

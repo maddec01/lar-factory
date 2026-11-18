@@ -1,5 +1,5 @@
 /* The board's own sheets, after the design system's styles: its role tokens, base styles, the Refreshed ping, item
-   parts and rows. */
+   parts, rows and the stage sections' boxes. */
 @import './tokens.css';
 
 /* Board action hierarchy (ButtonKinds.ts): solid primary is the area's one next/submit action. A tinted Start
@@ -12,4 +12,5 @@
 @import './refreshed.css';
 @import './items.css';
 @import './rows.css';
+@import './stages.css';
 @import './factory-settings.css';

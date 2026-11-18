@@ -118,16 +118,29 @@ export function createAutoBuild({
         }
     }
 
-    /** Whether the board holds a build start that hasn't settled: one in flight, or one T3 may have made. */
-    const startPending = (item: Item) =>
-        records!.launchIntents({ workId: item.id, unresolved: true }).some((intent) => intent.purpose === 'build') ||
-        !!board.snapshot().startedBuilds?.[item.id];
+    /**
+     * What the records said to each question a pass asked, kept until a commit lands: a pass runs on every local refresh,
+     * and a concept's plan takes many reads.
+     */
+    let answers = { mark: '', byQuestion: new Map<string, unknown>() };
+
+    function fromRecords<T>(question: string, read: () => T): T {
+        const mark = records!.changes();
+
+        if (mark !== answers.mark) answers = { mark, byQuestion: new Map() };
+
+        if (!answers.byQuestion.has(question)) answers.byQuestion.set(question, read());
+
+        return answers.byQuestion.get(question) as T;
+    }
+
+    type Startable = { at: string } | 'refinement' | null;
 
     /**
      * Whether the board's item may start now: with the time of its passing gate, 'refinement' when it waits for its concept's
      * Refinement, or null. The board's own facts come first, as they need no read.
      */
-    function startable(itemId: string): { at: string } | 'refinement' | null {
+    function startable(itemId: string): Startable {
         const data = board.snapshot();
         const item = data.items.find((candidate) => candidate.id === itemId);
 
@@ -140,30 +153,15 @@ export function createAutoBuild({
             item.needsYou ||
             data.armed?.[item.id] ||
             pauses[item.id] ||
-            blockedText(item)
+            blockedText(item) ||
+            // A start in flight, or one T3 may have made.
+            data.startedBuilds?.[item.id]
         )
             return null;
 
+        // A read that throws is not cached, so the next pass retries it rather than holding the build until a commit.
         try {
-            const record = records!.read(item.id);
-
-            if (record.setAside || record.status !== 'Ready') return null;
-
-            const gate = passingGate(item.id);
-
-            if (!gate || records!.specState(item.id).held || records!.waitingOn(item.id).length || startPending(item))
-                return null;
-
-            if (record.parentId && records!.read(record.parentId).kind === 'concept') {
-                const plan = records!.conceptBuildPlan(record.parentId);
-
-                if (plan.run?.state === 'paused') return null;
-
-                if (!records!.refinement(record.parentId).complete || (!plan.run && plan.holds.length))
-                    return 'refinement';
-            }
-
-            return { at: gate.recordedAt };
+            return fromRecords(`startable ${item.id}`, () => recordStartable(item.id));
         } catch (err) {
             log(`Auto-build can't read ${item.id}: ${(err as Error).message}`);
 
@@ -171,12 +169,40 @@ export function createAutoBuild({
         }
     }
 
-    function conceptOf(item: Item): { id: string; explicit: boolean } | null {
-        const parent = records!.read(item.id).parentId;
+    function recordStartable(itemId: string): Startable {
+        const record = records!.read(itemId);
 
-        return parent && records!.read(parent).kind === 'concept'
-            ? { id: parent, explicit: records!.conceptBuildPlan(parent).run?.state === 'running' }
-            : null;
+        if (record.setAside || record.status !== 'Ready') return null;
+
+        const gate = passingGate(itemId);
+
+        if (
+            !gate ||
+            records!.specState(itemId).held ||
+            records!.waitingOn(itemId).length ||
+            records!.launchIntents({ workId: itemId, unresolved: true }).some((intent) => intent.purpose === 'build')
+        )
+            return null;
+
+        if (record.parentId && records!.read(record.parentId).kind === 'concept') {
+            const plan = records!.conceptBuildPlan(record.parentId);
+
+            if (plan.run?.state === 'paused') return null;
+
+            if (!records!.refinement(record.parentId).complete || (!plan.run && plan.holds.length)) return 'refinement';
+        }
+
+        return { at: gate.recordedAt };
+    }
+
+    function conceptOf(item: Item): { id: string; explicit: boolean } | null {
+        return fromRecords(`concept ${item.id}`, () => {
+            const parent = records!.read(item.id).parentId;
+
+            return parent && records!.read(parent).kind === 'concept'
+                ? { id: parent, explicit: records!.conceptBuildPlan(parent).run?.state === 'running' }
+                : null;
+        });
     }
 
     /** The Ready builds that may start now, oldest passing gate first and then by work ID, and those waiting for Refinement. */

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, test } from 'vite-plus/test';
+import { afterEach, test, vi } from 'vite-plus/test';
 
 import { createBoardState, type BoardState } from '../board/board-state.ts';
 import type { Reply } from '../items/item-commands.ts';
@@ -188,6 +188,35 @@ test('Auto-build starts only a Ready build with a current passing gate that noth
     s.reread();
     await s.pass();
     assert.deepEqual(s.started, [eligible, refining], 'its concept’s Refinement is complete');
+});
+
+test('a pass with no commit since the last reads no records, and a commit reads them again', async () => {
+    const s = await setUp();
+    const { records } = s;
+    const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept', status: 'Shaping' });
+    const refining = ready(records, 'Under a concept still refining');
+
+    records.setParent(refining, at(records, refining), concept.workId);
+    ready(records, 'Eligible');
+    s.auto = { on: false };
+    s.reread();
+    await s.pass();
+
+    const reads = (['read', 'gate', 'conceptBuildPlan', 'refinement', 'launchIntents'] as const).map((name) =>
+        vi.spyOn(records, name),
+    );
+    const calls = () => reads.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+
+    // A local refresh asks for a pass each time, mostly with nothing new.
+    await s.pass();
+    assert.equal(calls(), 0);
+    assert.deepEqual(pass(s), { wouldStart: 1, paused: {}, waitsForRefinement: [refining] });
+
+    records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map\n\nSettled.');
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    await s.pass();
+    assert.ok(calls() > 0);
+    assert.deepEqual(pass(s), { wouldStart: 2, paused: {}, waitsForRefinement: [] });
 });
 
 test('Auto-build starts the oldest passing gate first, up to the build limit, and starts the next once a build finishes', async () => {

@@ -1012,12 +1012,17 @@ export async function observeIssue(
         throw refusalOf(err);
     }
 
+    return issueObservation(issue);
+}
+
+/** What an issue's state and assignees, as gh or the REST API return them, show a work record. */
+export function issueObservation(issue: { state: string; assignees: { login: string }[] }): TicketObservation {
     const assignee = issue.assignees
         .map((a) => a.login)
         .sort()
         .join(', ');
 
-    return { state: issue.state === 'OPEN' ? 'open' : 'closed', ...(assignee && { assignee }) };
+    return { state: issue.state.toUpperCase() === 'OPEN' ? 'open' : 'closed', ...(assignee && { assignee }) };
 }
 
 /** Finds an open PR whose head is exactly branch. Provider failures propagate. */

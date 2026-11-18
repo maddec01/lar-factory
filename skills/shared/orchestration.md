@@ -28,9 +28,9 @@ needs its original result recovered before another launch.
 Repair command inputs and missing evidence through supported commands, then
 retry launch or finish and continue. Clear only a Needs you notice saved for
 that repaired failure with `clear-needs-you` and the saved resume Status. A
-bookkeeping mismatch requires no product decision or Pedro repair. If recovery
+bookkeeping mismatch requires no product decision or user repair. If recovery
 remains blocked, report the concrete runtime failure and missing evidence;
-ask Pedro only for a real product choice or access only he can supply.
+ask the user only for a real product choice or access only they can supply.
 
 ## Delegating work
 

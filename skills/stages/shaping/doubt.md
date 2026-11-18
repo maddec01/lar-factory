@@ -62,7 +62,7 @@ assumptions against code in every affected repo. Check every category:
 
 Tie findings to the supplied package revisions; write no drafts. End each with
 `Fix:` when shaping can settle it from the brief, code or Confirmed, otherwise
-`Decision:` with a question and recommended answer for Pedro.
+`Decision:` with a question and recommended answer for the user.
 
 ```
 earlier:

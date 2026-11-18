@@ -25,7 +25,7 @@ and the approved correction distinct in the handoff.
 
 ## Human PR scope amendments
 
-On trusted human review feedback Pedro chose to address on the board or asked
+On trusted human review feedback the user chose to address on the board or asked
 you to address in the thread, distinguish a defect in the approved scope
 from an explicit Spec amendment. A write-access human's PR request is the Spec
 decision for that exact change, even when it contradicts the starting input.
@@ -76,4 +76,4 @@ PR replies and the PR body describe the changed behaviour, validation and any
 remaining delivery dependency (for example, the display ships in the consumer's
 build). Keep CLI commands, gate receipts, authorization and recovery mechanics
 in the owner thread. Preserve the branch, PR, frozen settings and original input.
-Legacy failed-Verify dispatch follows this same rule for Pedro's exact note.
+Legacy failed-Verify dispatch follows this same rule for the user's exact note.

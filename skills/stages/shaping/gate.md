@@ -46,16 +46,16 @@ gates, Reshape and unresolved choices still follow the board approval below.
    Changed consumer content needs board approval; the request shows the changed passage.
    Otherwise save its `display`
    object as `display.json`. Show its complete `brief` and `approvalDigest`
-   verbatim. Explain approval's Auto-build behavior as below; ask Pedro to use
+   verbatim. Explain approval's Auto-build behavior as below; ask the user to use
    Approve brief in the board, then stop.
    The gate generates its wait; never save a Needs you duplicate. Feedback
    returns to Shaping and Doubt. Reshape always requires renewed approval. Keep approval in gate evidence, never Confirmed.
    For grouped work, inspect `lar-work gate-batch --file ids.json`: complete briefs,
    source revisions, approval/batch digests and current immutable Doubt results.
-   Only Pedro's **Approve brief** action in the board records approval. For a group,
+   Only the user's **Approve brief** action in the board records approval. For a group,
    **Approve briefs** holds only parts needing approval and approves that batch atomically; any
    stale text, revision or Doubt result rejects the whole batch. Agent
-   `record-gate` and `record-gate-batch` calls refuse: ask Pedro to approve
+   `record-gate` and `record-gate-batch` calls refuse: ask the user to approve
    in the board, then stop. A Verify note,
    an approver name or agent-written response reference never grants approval.
    If this gate supersedes an answer, run `lar-work supersede-answer` per
@@ -68,7 +68,7 @@ gates, Reshape and unresolved choices still follow the board approval below.
    approved builds as capacity and blockers allow (and after group refinement);
    **off** means they wait for a board start unless their group is already
    authorized to run. If the setting is absent or may have changed, direct
-   Pedro to the board's displayed Auto-build setting rather than
+   the user to the board's displayed Auto-build setting rather than
    guessing. Apply this to single and grouped approval and resumed Ready work.
    Never say approval requires a separate Build action when Auto-build is on.
    The board owns every launch per [Start build](start-build.md).

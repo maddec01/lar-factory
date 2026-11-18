@@ -40,7 +40,7 @@ import { createAutoBuild } from './auto-build/auto-build.ts';
 import { createBoardState } from './board/board-state.ts';
 import { coalesced } from './board/coalesced.ts';
 import { createLocalWork } from './board/local-work.ts';
-import { oneAtATime } from './board/one-at-a-time.ts';
+import { oneAtATime, oneRunAndOneMore } from './board/one-at-a-time.ts';
 import { showInTurns } from './board/show-in-turns.ts';
 import { observePr } from './config/pr-host.ts';
 import {
@@ -800,6 +800,12 @@ async function checkQuota(): Promise<void> {
     quotaLow = low;
 }
 
+/** A local refresh asked for while one runs, by a tick or a record write, runs once after it instead of beside it. */
+const localRefresh = oneRunAndOneMore(
+    (recordsChanged: boolean) => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)),
+    (a, b) => a || b,
+);
+
 /**
  * Shows the work records as they are now, which threads may have changed, with T3's threads and every LOCAL_STATS_MS
  * its stats, pushing only when they changed, and starts the armed parts a record's change unblocked. Before the first
@@ -807,7 +813,7 @@ async function checkQuota(): Promise<void> {
  * already copied into its snapshot, even while a provider read runs.
  */
 function refreshLocal(recordsChanged = false): void {
-    runLocal('local refresh', () => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
+    runLocal('local refresh', () => localRefresh(recordsChanged));
 }
 
 function showT3Availability(): void {

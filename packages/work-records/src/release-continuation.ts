@@ -1,4 +1,4 @@
-import { releaseApprovalStep, type OutcomeCheckRun } from '@lar-factory/shared';
+import { isHumanRole, releaseApprovalStep, type OutcomeCheckRun } from '@lar-factory/shared';
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { Database } from './database.ts';
@@ -20,12 +20,13 @@ export function releaseContinuationRecords(database: Database, get: () => WorkRe
             !!plan &&
             !record.setAside &&
             !record.finishedAt &&
-            (!next || next.who.trim().toLowerCase() !== 'pedro') &&
+            (!next || !isHumanRole(next.who)) &&
             (record.needsYou === null || !!releaseApprovalStep(plan, record.needsYou)) &&
             !record.needsYouCauses.length &&
             parts.some((part) => part.kind === 'build') &&
             parts.every((part) => records.completion(part.workId).complete) &&
-            (next !== undefined || (plan.steps.at(-1)?.done?.by === 'Pedro' && plan.outcomeCheck.result === 'pending'));
+            (next !== undefined ||
+                (isHumanRole(plan.steps.at(-1)?.done?.by) && plan.outcomeCheck.result === 'pending'));
         const digest = createHash('sha256')
             .update(
                 JSON.stringify({

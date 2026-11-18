@@ -208,7 +208,7 @@ it.each([false, true])(
                 result: 'fail',
                 note: 'Clarify documentation.',
                 testSteps: 'Press greeting.',
-                by: 'Pedro',
+                by: 'User',
             });
         }
 

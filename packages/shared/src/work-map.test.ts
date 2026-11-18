@@ -64,12 +64,12 @@ test('recorded Dependencies have their own nodes and edges, even when their tick
         {
             ...b,
             blockers: [
-                { ...b.blockers[0]!, state: 'closed', dependency: { ...hold, met: { by: 'Pedro', at: '2026-11-13' } } },
+                { ...b.blockers[0]!, state: 'closed', dependency: { ...hold, met: { by: 'User', at: '2026-11-13' } } },
             ],
         },
     ]);
 
-    expect(accepted.prerequisites[0]?.blocker.dependency?.met).toEqual({ by: 'Pedro', at: '2026-11-13' });
+    expect(accepted.prerequisites[0]?.blocker.dependency?.met).toEqual({ by: 'User', at: '2026-11-13' });
     expect(accepted.nodes[1]?.waits).toEqual([]);
     expect(projectWorkMap([a, { ...b, blockers: [] }]).prerequisites).toEqual([]);
 });

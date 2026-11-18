@@ -10,7 +10,7 @@ export interface BuildPreparation {
     expectedGateId?: string;
     conceptId?: string;
     automatic?: boolean;
-    /** Set only by Pedro's item-level board action; never by a scheduler. */
+    /** Set only by the user's item-level board action; never by a scheduler. */
     manual?: boolean;
     recovery?: boolean;
 }

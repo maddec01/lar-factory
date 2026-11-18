@@ -47,7 +47,7 @@ it('hides and deletes a merged Done build after its pick even if follow-up captu
         record = records.observe(id, records.read(id).revision, { of: 'pr', state: 'merged' });
         records.update(id, record.revision, { status: 'Done' });
 
-        records.chooseRetro(id, records.read(id).revision, [0], 'Pedro');
+        records.chooseRetro(id, records.read(id).revision, [0], 'User');
         expect(records.hidden(retention, later).map((r) => r.workId)).toEqual([id]);
         expect(records.deleteExpired(retention, later)).toMatchObject({ deleted: [id], kept: [] });
     } finally {

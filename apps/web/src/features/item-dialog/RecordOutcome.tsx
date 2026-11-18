@@ -1,4 +1,4 @@
-import { outcomeNeedsPedro, type Item } from '@lar-factory/shared';
+import { outcomeNeedsUser, type Item } from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
@@ -9,7 +9,7 @@ export function RecordOutcome({ item, items }: { item: Item; items: Item[] }) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>();
 
-    if (!outcomeNeedsPedro(item, items) && !item.outcomeCheck?.run?.fixProposal?.sent) return null;
+    if (!outcomeNeedsUser(item, items) && !item.outcomeCheck?.run?.fixProposal?.sent) return null;
 
     const record = async (result: 'passed' | 'failed') => {
         setPending(true);

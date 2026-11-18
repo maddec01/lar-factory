@@ -101,7 +101,7 @@ function proposal(records: WorkRecords, workId: string): import('@lar-factory/sh
 function approve(records: WorkRecords, workId: string, input = proposal(records, workId)) {
     const plan = records.proposePublication(workId, records.read(workId).revision, input);
 
-    return records.approvePublication(workId, plan.planId, plan.revision, plan.digest, 'pedro');
+    return records.approvePublication(workId, plan.planId, plan.revision, plan.digest, 'user');
 }
 
 it('persists approval, successful text, uncertainty and the next operation across reopening', async () => {
@@ -163,7 +163,7 @@ it('persists approval, successful text, uncertainty and the next operation acros
         plan.planId,
         second.plan.revision,
         'update-note',
-        'pedro',
+        'user',
         {
             status: 'successful',
             evidence: 'Found the comment during reconciliation.',
@@ -180,7 +180,7 @@ it('persists approval, successful text, uncertainty and the next operation acros
         { operationId: 'create-build', evidence: expect.stringContaining('Claimed') },
         { operationId: 'create-build', evidence: expect.stringContaining('successful') },
         { operationId: 'update-note', evidence: expect.stringContaining('Claimed') },
-        { operationId: 'update-note', evidence: expect.stringContaining('Resolved by pedro') },
+        { operationId: 'update-note', evidence: expect.stringContaining('Resolved by user') },
     ]);
 });
 
@@ -308,7 +308,7 @@ it('requires fresh approval for content changes and preserves success through fa
         replacement.planId,
         replacement.revision,
         replacement.digest,
-        'pedro',
+        'user',
     );
 
     work = records.setBody(work.workId, work.revision, 'brief', 'Find a different search.');
@@ -355,7 +355,7 @@ it('allows one claim across connections and keeps a simulated provider write unc
 
     let saved = records.publication(work.workId, plan.planId);
 
-    saved = records.resolvePublicationOutcome(work.workId, plan.planId, saved.revision, 'create-build', 'pedro', {
+    saved = records.resolvePublicationOutcome(work.workId, plan.planId, saved.revision, 'create-build', 'user', {
         status: 'failed',
         evidence: 'Neither worker dispatched to the provider.',
     });
@@ -364,7 +364,7 @@ it('allows one claim across connections and keeps a simulated provider write unc
         ...proposal(records, work.workId),
         replaces: saved.planId,
     });
-    const approved = records.approvePublication(work.workId, next.planId, next.revision, next.digest, 'pedro');
+    const approved = records.approvePublication(work.workId, next.planId, next.revision, next.digest, 'user');
     const crashing = await openWorkRecords(path);
     const claimed = crashing.publication(work.workId, approved.planId);
 
@@ -403,7 +403,7 @@ it('allows one claim across connections and keeps a simulated provider write unc
         approved.planId,
         uncertain.revision,
         'create-build',
-        'pedro',
+        'user',
         {
             status: 'successful',
             evidence: 'Found the controlled provider ticket.',

@@ -29,12 +29,12 @@ test('a retro before merge has one desk wait even with no T3 pending request or 
     expect(deskItems({ items: [item] }, false)).toEqual([item]);
     expect(deskItems({ items: [item] }, true)).toEqual([item]);
     expect(retroWaits({ ...retro, suggestions: [] })).toBe(false);
-    expect(retroWaits({ ...retro, choice: { selected: [], by: 'Pedro', at: 'today' } })).toBe(false);
-    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } })).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [], by: 'User', at: 'today' } })).toBe(false);
+    expect(retroWaits({ ...retro, choice: { selected: [0], by: 'User', at: 'today' } })).toBe(false);
 });
 
 test('a pick whose follow-up creation failed no longer waits', () => {
-    const failed = { ...item, retro: { ...retro, choice: { selected: [0], by: 'Pedro', at: 'today' } } } as Item;
+    const failed = { ...item, retro: { ...retro, choice: { selected: [0], by: 'User', at: 'today' } } } as Item;
 
     expect(deskWait(failed).label).not.toBe('Choose follow-ups');
     expect(humanWait(failed, true)?.action).not.toEqual({ kind: 'details', label: 'Choose follow-ups' });

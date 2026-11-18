@@ -45,7 +45,7 @@ function fakeGh(reply: (args: string[]) => string = () => '{}') {
 
 test('a ticket observation reads its state and assignees, and a confirmed not-found, but throws on any other failure', async () => {
     const answers: Record<string, () => string> = {
-        7: () => JSON.stringify({ state: 'OPEN', assignees: [{ login: 'pedro' }, { login: 'ana' }] }),
+        7: () => JSON.stringify({ state: 'OPEN', assignees: [{ login: 'user' }, { login: 'ana' }] }),
         8: () => JSON.stringify({ state: 'CLOSED', assignees: [] }),
         9: () => {
             throw new Error(
@@ -59,7 +59,7 @@ test('a ticket observation reads its state and assignees, and a confirmed not-fo
     const gh = fakeGh((args) => answers[args[2]!]!());
     const issues = repoIssues(REPO, gh.run);
 
-    assert.deepEqual(await issues.observeTicket(REPO, 7), { state: 'open', assignee: 'ana, pedro' });
+    assert.deepEqual(await issues.observeTicket(REPO, 7), { state: 'open', assignee: 'ana, user' });
     assert.deepEqual(gh.calls[0], ['issue', 'view', '7', '-R', REPO, '--json', 'state,assignees']);
     assert.deepEqual(await issues.observeTicket(REPO, 8), { state: 'closed' });
     assert.deepEqual(await issues.observeTicket(REPO, 9), { state: 'not-found' });

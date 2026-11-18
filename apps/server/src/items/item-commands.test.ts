@@ -182,7 +182,7 @@ test('a failed fetch refuses Start build with its error and writes nothing, then
 
     records.recordGate(build.workId, brief.revision, {
         briefDigest: records.gate(build.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Doubt clean; approved.',
     });
     refineConcept(records, concept.workId);
@@ -514,7 +514,7 @@ test('Start again refuses while the board has not yet read a thread the record n
     assert.deepEqual(started, []);
 });
 
-/** An In progress feature on ticket WEB#7, read open and assigned to pedro, then read as `change`, with its observer and commands. */
+/** An In progress feature on ticket WEB#7, read open and assigned to user, then read as `change`, with its observer and commands. */
 async function observedTicketWork(change: { state: 'open' | 'closed'; assignee?: string }) {
     const records = await openRecords();
     const work = records.importTicket({
@@ -525,7 +525,7 @@ async function observedTicketWork(change: { state: 'open' | 'closed'; assignee?:
         ticket: `${WEB}#7`,
     }).record;
 
-    records.observe(work.workId, work.revision, { of: 'ticket', state: 'open', assignee: 'pedro' });
+    records.observe(work.workId, work.revision, { of: 'ticket', state: 'open', assignee: 'user' });
 
     const { commands, log, reread, board } = commandsOn([], undefined, records);
     const read = (next: { state: 'open' | 'closed'; assignee?: string }) =>
@@ -537,7 +537,7 @@ async function observedTicketWork(change: { state: 'open' | 'closed'; assignee?:
     return { records, workId: work.workId, commands, log, read, board };
 }
 
-/** In progress work on ticket WEB#7 and closed PR WEB#40, read open and assigned to pedro, set aside with the Needs you `causes`. */
+/** In progress work on ticket WEB#7 and closed PR WEB#40, read open and assigned to user, set aside with the Needs you `causes`. */
 async function archivedWork(causes: NeedsYouCause[], provider: Parameters<typeof commandsOn>[6]) {
     const records = await openRecords();
     const { record: work } = records.importTicket({
@@ -557,7 +557,7 @@ async function archivedWork(causes: NeedsYouCause[], provider: Parameters<typeof
             : causes.some((cause) => cause.type === 'ticket-missing')
               ? 'not-found'
               : 'open',
-        assignee: causes.some((cause) => cause.type === 'assignee-changed') ? 'sam' : 'pedro',
+        assignee: causes.some((cause) => cause.type === 'assignee-changed') ? 'sam' : 'user',
     });
     record = records.setNeedsYouCauses(work.workId, record.revision, causes);
     records.setAside(work.workId, record.revision);
@@ -572,7 +572,7 @@ for (const [what, causes, provider] of [
     [
         'ticket reopened',
         [TICKET_CLOSED],
-        { ticket: async () => ({ state: 'open', assignee: 'pedro' }), pr: async () => 'open' },
+        { ticket: async () => ({ state: 'open', assignee: 'user' }), pr: async () => 'open' },
     ],
 ] as [string, NeedsYouCause[], Parameters<typeof commandsOn>[6]][])
     test(`work whose ${what} while in Archive comes back with no notice`, async () => {
@@ -597,7 +597,7 @@ test('a failed read during Restore still restores, with the notice as last saved
     await observeRecords(
         records,
         [WEB],
-        { ticket: async () => ({ state: 'open', assignee: 'pedro' }), pr: async () => 'open' },
+        { ticket: async () => ({ state: 'open', assignee: 'user' }), pr: async () => 'open' },
         new Set(),
         reread,
     );
@@ -607,7 +607,7 @@ test('a failed read during Restore still restores, with the notice as last saved
 test('Keep working on a closed ticket removes the notice, keeps the Status and the closed read, and the same read raises nothing', async () => {
     const { records, workId, commands, log, read, board } = await observedTicketWork({
         state: 'closed',
-        assignee: 'pedro',
+        assignee: 'user',
     });
 
     assert.deepEqual(board.find(workId)?.needsYou?.offers, ['keep-working', 'set-aside']);
@@ -615,7 +615,7 @@ test('Keep working on a closed ticket removes the notice, keeps the Status and t
     assert.equal(board.find(workId)?.needsYou, undefined);
     assert.deepEqual([records.read(workId).status, records.read(workId).ticket, log], ['In progress', `${WEB}#7`, []]);
     assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
-    await read({ state: 'closed', assignee: 'pedro' });
+    await read({ state: 'closed', assignee: 'user' });
     assert.deepEqual(records.read(workId).needsYouCauses, []);
 });
 
@@ -1580,7 +1580,7 @@ test('decision-authored drafts cannot launch through a forged Ready status', asy
 
     records.recordGate(build.workId, fixed.revision, {
         briefDigest: records.gate(build.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Code checked, Doubt clean; yes.',
     });
     records.update(build.workId, records.read(build.workId).revision, { status: 'Ready' });
@@ -1609,7 +1609,7 @@ test('concept run action refuses all holds and stale revisions, then saves start
     records.update(build.workId, rev(build.workId), { status: 'Ready' });
     records.recordGate(build.workId, rev(build.workId), {
         briefDigest: records.gate(build.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
     assert.equal(commands.setConceptBuildRun(group.workId, 1, 'running').status, 409);

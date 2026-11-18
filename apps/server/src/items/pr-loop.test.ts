@@ -22,7 +22,7 @@ const event = (id: string, state = 'COMMENTED', body = 'Looks good, merge it') =
     id,
     state,
     body,
-    author: 'pedro',
+    author: 'user',
     at: '2026-11-17T10:01:00Z',
     url: `${url}#issuecomment-${id}`,
 });
@@ -42,7 +42,7 @@ async function fixture() {
     records.setBody(id, rev(), 'brief', 'Deliver feature');
     records.recordGate(id, rev(), {
         briefDigest: records.gate(id).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Approved',
     });
     records.prepareBuild(id, rev(), { limit: 1 });

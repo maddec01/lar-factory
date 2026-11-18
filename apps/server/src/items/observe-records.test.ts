@@ -123,7 +123,7 @@ test('a ticket closing elsewhere sets Needs you without moving the Status', asyn
 test('a reopened PR, a reopened ticket and an assignee changed back each remove their cause, and the notice goes with the last', async () => {
     const records = await open();
     const { workId } = build(records);
-    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'pedro' } });
+    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'user' } });
 
     await observeRecords(records, [REPO], reads);
     answers.pr = 'closed';
@@ -135,22 +135,22 @@ test('a reopened PR, a reopened ticket and an assignee changed back each remove 
     assert.deepEqual(causes(), [
         { type: 'pr-closed' },
         { type: 'ticket-closed' },
-        { type: 'assignee-changed', from: 'pedro', to: 'ana' },
+        { type: 'assignee-changed', from: 'user', to: 'ana' },
     ]);
     answers.pr = 'open';
     await observeRecords(records, [REPO], reads);
-    assert.deepEqual(causes(), [{ type: 'ticket-closed' }, { type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+    assert.deepEqual(causes(), [{ type: 'ticket-closed' }, { type: 'assignee-changed', from: 'user', to: 'ana' }]);
     answers.ticket = { state: 'open', assignee: 'ana' };
     await observeRecords(records, [REPO], reads);
-    assert.deepEqual(causes(), [{ type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+    assert.deepEqual(causes(), [{ type: 'assignee-changed', from: 'user', to: 'ana' }]);
     answers.ticket = { state: 'open', assignee: 'bo' };
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(
         causes(),
-        [{ type: 'assignee-changed', from: 'pedro', to: 'bo' }],
+        [{ type: 'assignee-changed', from: 'user', to: 'bo' }],
         'a second move keeps who owned it first',
     );
-    answers.ticket = { state: 'open', assignee: 'pedro' };
+    answers.ticket = { state: 'open', assignee: 'user' };
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(causes(), []);
     assert.equal(recordItems(records, [], [REPO])[0]!.needsYou, undefined);
@@ -235,7 +235,7 @@ test('a confirmed not-found sets the work aside, and the record can be restored'
 test('a temporary provider error keeps the last observation and changes nothing else', async () => {
     const records = await open();
     const { workId } = build(records);
-    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'pedro' } });
+    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'user' } });
 
     await observeRecords(records, [REPO], reads);
 
@@ -254,7 +254,7 @@ test('a temporary provider error keeps the last observation and changes nothing 
     assert.deepEqual(
         records.observations(workId).map((o) => [o.of, o.state, o.assignee, o.failure]),
         [
-            ['ticket', 'open', 'pedro', 'HTTP 502'],
+            ['ticket', 'open', 'user', 'HTTP 502'],
             ['pr', 'open', null, 'HTTP 502'],
         ],
     );
@@ -383,14 +383,14 @@ test('a read never changes the met mark: an outage leaves it unflagged, and a re
     const { reads } = ghAnswering(answers);
 
     await observeRecords(records, [REPO], reads);
-    records.markDependencyMet(id, records.dependency(id).revision, 'pedro');
+    records.markDependencyMet(id, records.dependency(id).revision, 'user');
 
     Object.assign(answers, { ticket: fails('HTTP 502: Bad Gateway'), pr: fails('HTTP 502: Bad Gateway') });
     await observeRecords(records, [REPO], reads);
 
     const outage = records.dependency(id);
 
-    assert.deepEqual([outage.met?.by, outage.needsReview, outage.handover], ['pedro', false, '# Handover']);
+    assert.deepEqual([outage.met?.by, outage.needsReview, outage.handover], ['user', false, '# Handover']);
     assert.deepEqual(
         outage.observations.map((o) => [o.kind, o.lastGood?.kind]),
         [
@@ -406,7 +406,7 @@ test('a read never changes the met mark: an outage leaves it unflagged, and a re
 
     assert.deepEqual(
         [reopened.met?.by, reopened.needsReview, kinds(records, id)],
-        ['pedro', true, ['reopened', 'merged']],
+        ['user', true, ['reopened', 'merged']],
     );
 });
 

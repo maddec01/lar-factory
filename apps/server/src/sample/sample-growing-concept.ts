@@ -89,7 +89,7 @@ export function sampleGrowingConcept(records: WorkRecords) {
                 steps: [
                     {
                         id: 'approve-manifest',
-                        who: 'Pedro',
+                        who: 'User',
                         what: 'Approve the exact greeting manifest before activation',
                     },
                 ],

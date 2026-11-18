@@ -524,7 +524,7 @@ describe('work-record facts the board sets', () => {
 
         expect(build.needsYouCauses).toEqual([]);
 
-        const moved = { type: 'assignee-changed', from: 'pedro', to: null } as const;
+        const moved = { type: 'assignee-changed', from: 'user', to: null } as const;
 
         first.setNeedsYou(build.workId, 1, 'The implementer could not finish it.');
         first.setNeedsYouCauses(build.workId, 2, [{ type: 'pr-closed' }, moved]);
@@ -584,7 +584,7 @@ describe('work-record provider observations', () => {
         const first = await openWorkRecords(path);
         const bug = lar(first, 'bug', 'maddec01/lar#7');
 
-        first.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'pedro' });
+        first.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'user' });
         expect(first.observe(bug.workId, 2, { of: 'ticket', state: 'closed' })).toMatchObject({
             revision: 3,
             finishedAt: null,

@@ -29,7 +29,7 @@ const context = {
     head,
     testSteps: '1. Press Say hello.\n2. Check the greeting.',
     revision: 5,
-    by: 'Pedro',
+    by: 'User',
 };
 const card = () => $('.desk-row')!;
 const dialog = () => $('[data-item-dialog]')!;

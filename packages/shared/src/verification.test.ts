@@ -12,7 +12,7 @@ test('only a pass on the current head permits required Verify', () => {
             pr: 'owner/repo#8',
             head: 'head',
             result: 'pass',
-            by: 'Pedro',
+            by: 'User',
             at: 'now',
             note: null,
             testSteps: 'Test it.',

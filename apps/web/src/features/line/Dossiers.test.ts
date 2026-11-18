@@ -369,7 +369,7 @@ test.each(['list'])(
                 review: {
                     required: 'green',
                     comments: [
-                        { id: 'inline:1', author: 'Pedro', body: 'Use two letters.', url: `${pr.url}#discussion_r1` },
+                        { id: 'inline:1', author: 'User', body: 'Use two letters.', url: `${pr.url}#discussion_r1` },
                     ],
                 },
             })),

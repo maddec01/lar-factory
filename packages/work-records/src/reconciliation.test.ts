@@ -143,7 +143,7 @@ test('superseded endpoint, sibling contract removal and scope changes reopen Dou
 
     records.recordGate(consumer.workId, records.read(consumer.workId).revision, {
         briefDigest: records.gate(consumer.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approved.',
     });
     clean();
@@ -193,7 +193,7 @@ test('superseded endpoint, sibling contract removal and scope changes reopen Dou
     expect(records.gate(consumer.workId).current).toBe(false);
 }, 20000);
 
-/** A linked group of two builds with PRs and a Pedro release step, reconciled clean. */
+/** A linked group of two builds with PRs and a user release step, reconciled clean. */
 async function linked(release: 'step' | 'ships-with' | 'none' = 'none') {
     const dir = mkdtempSync(join(tmpdir(), 'reconcile-merge-'));
     const records = await openWorkRecords(join(dir, 'records.db'));
@@ -231,7 +231,7 @@ async function linked(release: 'step' | 'ships-with' | 'none' = 'none') {
         records.setReleasePlan(group, at(), {
             steps:
                 release === 'step'
-                    ? [{ id: 'activate', who: 'Pedro', what: 'Activate' }]
+                    ? [{ id: 'activate', who: 'User', what: 'Activate' }]
                     : [{ id: 'ship', who: 'Agent', what: 'Ship together', shipsWith: [first, second] }],
             outcomeCheck: 'Check the merged parts together.',
         });
@@ -311,7 +311,7 @@ test('recording release evidence or the Outcome check after the last merge leave
     merge(first);
     merge(second);
     records.reconcileAfterMerge(group);
-    records.completeReleaseStep(group, at(), 'activate', 'Pedro', 'Activated.');
+    records.completeReleaseStep(group, at(), 'activate', 'User', 'Activated.');
     records.reconcile(group);
     expect(records.reconciliation(group).pending).toContainEqual(
         expect.objectContaining({ key: 'release:activate', changes: ['evidence'] }),

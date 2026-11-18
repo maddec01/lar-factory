@@ -42,7 +42,7 @@ async function fixture() {
 
         const manifest = records.gateBatch([id]);
 
-        records.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Board action fixture.');
+        records.recordGateBatch(manifest, manifest.digest, 'User', 'Board action fixture.');
     };
 
     return { records, dir, g, part, approve };
@@ -68,7 +68,7 @@ test('S06: adding D1 and editing another build Notes preserve b01 approval and n
 
     expect(batch.members).toHaveLength(19);
     expect(batch.members.some((m) => m.display.workId === b01.workId)).toBe(false);
-    records.recordGateBatch(batch, batch.digest, 'Pedro', 'One nineteen-member board action.');
+    records.recordGateBatch(batch, batch.digest, 'User', 'One nineteen-member board action.');
 
     const last = builds.at(-1)!;
 
@@ -276,12 +276,12 @@ test('S06: an amended scope across repositories turns single work into a linked 
         verify: { required: false, visibleUi: null },
     };
 
-    records.confirmScope(bug.workId, bug.revision, scope, 'Pedro', 'Yes.');
+    records.confirmScope(bug.workId, bug.revision, scope, 'User', 'Yes.');
     expect(records.chooseStructure(bug.workId).structure).toBe('single');
 
     const amended = { ...scope, repositories: ['fake/a', 'fake/b'] };
 
-    records.confirmScope(bug.workId, records.read(bug.workId).revision, amended, 'Pedro', 'The API sums too.');
+    records.confirmScope(bug.workId, records.read(bug.workId).revision, amended, 'User', 'The API sums too.');
     expect(records.chooseStructure(bug.workId).structure).toBe('linked');
 
     const parent = records.read(bug.workId);

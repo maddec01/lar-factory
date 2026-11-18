@@ -163,7 +163,7 @@ export async function roleCommand(command: string, args: string[]): Promise<numb
 
             if (finish.failure)
                 throw new Error(
-                    `Agent hold: ${finish.failure} Resolve the role evidence and retry; do not ask Pedro to repair bookkeeping.`,
+                    `Agent hold: ${finish.failure} Resolve the role evidence and retry; do not ask the user to repair bookkeeping.`,
                 );
 
             await refreshBoards(workId, values['data-dir']);

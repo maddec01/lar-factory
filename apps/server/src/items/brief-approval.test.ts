@@ -50,7 +50,7 @@ async function setup() {
     } as never);
     const refresh = vi.fn(async () => {});
     const sync = vi.fn(async () => {});
-    const commands = createBriefApproval({ board, records, reread: vi.fn(), refresh, sync, identity: () => 'Pedro' });
+    const commands = createBriefApproval({ board, records, reread: vi.fn(), refresh, sync, identity: () => 'User' });
     const inspect = async (workIds = [ids[0]!]) => {
         const result = await commands.inspectBrief(ids[0]!, { workIds });
 
@@ -71,7 +71,7 @@ test('board approval requires a displayed one-use request and supplies its own o
         (
             await s.commands.approveBrief(id, {
                 digest: s.records.displayGate(id).approvalDigest,
-                by: 'Pedro',
+                by: 'User',
                 evidence: 'Yes',
             })
         ).status,
@@ -87,7 +87,7 @@ test('board approval requires a displayed one-use request and supplies its own o
         200,
     );
     expect(s.records.gate(id).passing).toMatchObject({
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         batchDigest: preview.digest,
         evidence: `Board Approve brief action ${preview.requestId}`,
     });
@@ -112,7 +112,7 @@ test('board batch approval is atomic and a stale brief refuses every member', as
 
     expect((await s.commands.approveBrief(s.ids[0]!, renewed)).status).toBe(200);
     for (const id of s.ids)
-        expect(s.records.gate(id).passing).toMatchObject({ approvedBy: 'Pedro', batchDigest: renewed.digest });
+        expect(s.records.gate(id).passing).toMatchObject({ approvedBy: 'User', batchDigest: renewed.digest });
 });
 
 test('a changed build resumes Build after board approval and never requeues a second build', async () => {
@@ -147,7 +147,7 @@ test('a recorded approval retries its same owner notification after an unconfirm
         reread: vi.fn(),
         refresh: s.refresh,
         sync: s.sync,
-        identity: () => 'Pedro',
+        identity: () => 'User',
         send,
     });
     const inspected = await commands.inspectBrief(id, {});
@@ -185,7 +185,7 @@ test('a recorded approval retries its same owner notification after an unconfirm
     expect(records.gate(id).evidence).toHaveLength(1);
 });
 
-test('Request changes saves Pedro’s note for every displayed member, keeps gates and resumes the shaping owners', async () => {
+test('Request changes saves the user’s note for every displayed member, keeps gates and resumes the shaping owners', async () => {
     const s = await setup();
     const send = vi.fn<typeof import('../t3/thread-commands.ts').sendThreadCommand>(async () => ({
         outcome: 'accepted' as const,
@@ -209,7 +209,7 @@ test('Request changes saves Pedro’s note for every displayed member, keeps gat
         reread: vi.fn(),
         refresh: s.refresh,
         sync: s.sync,
-        identity: () => 'Pedro',
+        identity: () => 'User',
         send,
     });
     const displayed = await commands.inspectBrief(s.ids[0]!, { workIds: s.ids });
@@ -227,7 +227,7 @@ test('Request changes saves Pedro’s note for every displayed member, keeps gat
         });
         expect(recordItems(s.records, [], ['fake/app']).find((item) => item.id === id)?.briefApproval).toBeUndefined();
         expect(s.records.briefChangeRequests(id)[0]).toMatchObject({
-            by: 'Pedro',
+            by: 'User',
             note: 'Name the failing test.',
             delivery: { sent: true },
         });

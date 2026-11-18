@@ -134,7 +134,7 @@ export function sampleDelivery(records: WorkRecords) {
             );
             records.recordGate(work.workId, work.revision, {
                 briefDigest: records.gate(work.workId).briefDigest!,
-                approvedBy: 'Sample Pedro',
+                approvedBy: 'Sample user',
                 evidence: 'Fake board approval.',
             });
 
@@ -220,7 +220,7 @@ export function sampleDelivery(records: WorkRecords) {
                 );
                 records.recordGate(work.workId, work.revision, {
                     briefDigest: records.gate(work.workId).briefDigest!,
-                    approvedBy: 'Sample Pedro',
+                    approvedBy: 'Sample user',
                     evidence: 'Fake board approval.',
                 });
 
@@ -272,7 +272,7 @@ export function sampleDelivery(records: WorkRecords) {
             );
             records.recordGate(stale.workId, stale.revision, {
                 briefDigest: records.gate(stale.workId).briefDigest!,
-                approvedBy: 'Sample Pedro',
+                approvedBy: 'Sample user',
                 evidence: 'Fake board approval.',
             });
             records.setBody(

@@ -13,7 +13,7 @@ const stores: WorkRecords[] = [];
 const plan = {
     steps: [
         { id: 'stage', who: 'Agent', what: 'stage the exact merged bundle' },
-        { id: 'activate', who: 'Pedro', what: 'activate the approved manifest' },
+        { id: 'activate', who: 'User', what: 'activate the approved manifest' },
     ],
     outcomeCheck: 'Check composition, rejection and legacy behaviour.',
 };
@@ -56,9 +56,9 @@ const fixture = async () => {
     };
     const set = () => records.setReleasePlan(id, revision(), plan);
     const step = (stepId: string) =>
-        records.completeReleaseStep(id, revision(), stepId, 'Pedro', `${stepId} receipt SHA256`);
+        records.completeReleaseStep(id, revision(), stepId, 'User', `${stepId} receipt SHA256`);
     const outcome = (result: 'passed' | 'failed') =>
-        records.recordOutcomeCheck(id, revision(), result, 'Pedro', 'Actual post-activation checks.');
+        records.recordOutcomeCheck(id, revision(), result, 'User', 'Actual post-activation checks.');
 
     return { records, id, revision, set, step, outcome, merge, dir, path };
 };
@@ -196,9 +196,9 @@ it('round trips parent release commands in an isolated data folder', async () =>
             '--step',
             'activate',
             '--identity',
-            'Pedro',
+            'User',
             '--evidence',
-            'Agent pretending to be Pedro.',
+            'Agent pretending to be the user.',
         ),
     ).rejects.toThrow(/board/i);
     expect(f.records.releasePlan(f.id)?.steps[1]?.done).toBeNull();
@@ -217,7 +217,7 @@ it('round trips parent release commands in an isolated data folder', async () =>
             '--result',
             'passed',
             '--identity',
-            'Pedro',
+            'User',
             '--evidence',
             'Checks passed.',
         ),

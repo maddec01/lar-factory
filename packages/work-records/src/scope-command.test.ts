@@ -64,7 +64,7 @@ const fixture = async () => {
             '--file',
             file,
             '--identity',
-            'Pedro',
+            'User',
             '--evidence',
             'Yes, that exact scope.',
         );
@@ -87,7 +87,7 @@ it('captures understanding once, persists across CLI runs and renders without re
         sourceRevision: 1,
         title: 'CLI greeting',
         context: 'Only cli.js and test/cli.test.js. Small.',
-        confirmedBy: 'Pedro',
+        confirmedBy: 'User',
         response: 'Yes, that exact scope.',
     });
     expect(f.records.read(f.id).revision).toBe(2);
@@ -153,7 +153,7 @@ it('takes settled scope from the submitted request through completeness, scope c
     const display = JSON.parse((await f.cli('gate', f.id)).stdout).display;
 
     expect(display.brief).not.toContain('## Confirmed');
-    f.records.recordDisplayedGate(display, display.approvalDigest, 'Pedro', 'Approved brief in board.');
+    f.records.recordDisplayedGate(display, display.approvalDigest, 'User', 'Approved brief in board.');
     expect(f.records.gate(f.id).current).toBe(true);
 
     writeFileSync(f.file, JSON.stringify({ ...submitted, behaviour: ['Expand the greeting API.'] }));
@@ -183,7 +183,7 @@ it('requires real answers for unresolved scope and refuses invented replies on s
             'record a user-response',
         );
     }
-    expect(() => f.records.confirmScope(f.id, 1, settled, 'Pedro', 'Confirmed', 'submitted-request')).toThrow(
+    expect(() => f.records.confirmScope(f.id, 1, settled, 'User', 'Confirmed', 'submitted-request')).toThrow(
         'no confirmation identity or reply',
     );
     expect(() => f.records.confirmScope(f.id, 1, settled)).toThrow('explicit understanding response');
@@ -222,7 +222,7 @@ it('fails closed without confirmation and reports missing/extra scope with a fai
     const gate = f.records.gate(f.id);
 
     expect(() =>
-        f.records.recordGate(f.id, 3, { briefDigest: gate.briefDigest!, approvedBy: 'Pedro', evidence: 'yes' }),
+        f.records.recordGate(f.id, 3, { briefDigest: gate.briefDigest!, approvedBy: 'User', evidence: 'yes' }),
     ).toThrow('brief differs from confirmed scope');
     expect(f.records.gate(f.id).evidence).toEqual([]);
     f.records.setBody(f.id, 3, 'brief', scopeMarkdown(scope));
@@ -256,14 +256,14 @@ it('fails closed without confirmation and reports missing/extra scope with a fai
                 '--digest',
                 displayed.approvalDigest,
                 '--identity',
-                'Pedro',
+                'User',
                 '--evidence',
                 'Approved corrected scope.',
             )
         ).code,
     ).toBe(1);
     expect(f.records.gate(f.id).current).toBe(false);
-    f.records.recordDisplayedGate(displayed, displayed.approvalDigest, 'Pedro', 'Board approval.');
+    f.records.recordDisplayedGate(displayed, displayed.approvalDigest, 'User', 'Board approval.');
     expect(f.records.gate(f.id).current).toBe(true);
 }, 15000);
 
@@ -274,7 +274,7 @@ it('keeps amended scope history, invalidates old approval and refuses stale or i
     f.records.setBody(f.id, 2, 'brief', scopeMarkdown(scope));
     f.records.recordGate(f.id, 3, {
         briefDigest: f.records.gate(f.id).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'yes',
     });
     expect(f.records.gate(f.id).current).toBe(true);

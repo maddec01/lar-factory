@@ -109,7 +109,7 @@ function dependency(kind: DependencyObservationKind, met = false, change: Partia
         ticket: 'maddec01/lar-server#40',
         named: [],
         evidence: 'The endpoint answers in staging',
-        met: met ? { by: 'pedro', at: '2026-10-30T10:00:00Z' } : null,
+        met: met ? { by: 'user', at: '2026-10-30T10:00:00Z' } : null,
         needsReview: false,
         observation: {
             subject: 'maddec01/lar-server#40',

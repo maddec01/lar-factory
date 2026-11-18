@@ -1,5 +1,5 @@
 import type { Item } from './item-domain.ts';
-import { isPedroReleaseStep, pendingPedroReleaseStep, type ReleasePlan } from './release-plan.ts';
+import { isUserReleaseStep, pendingUserReleaseStep, type ReleasePlan } from './release-plan.ts';
 import type { ItemThread } from './thread-domain.ts';
 
 /** Recognize an approval of a recorded release operation, never a scope question or tool permission. */
@@ -16,7 +16,7 @@ export function releaseApprovalStep(plan: ReleasePlan | null | undefined, questi
     return asksApproval
         ? plan?.steps.find(
               (step) =>
-                  isPedroReleaseStep(step) &&
+                  isUserReleaseStep(step) &&
                   (!step.done ||
                       (question.match(/\b[a-f0-9]{40,64}\b/gi) ?? []).every((pin) =>
                           step.done!.evidence.toLowerCase().includes(pin.toLowerCase()),
@@ -53,13 +53,13 @@ export function releaseRecoveryAvailable(item: Item, all: readonly Item[]): bool
     );
 }
 
-/** Automatic continuation still waits for any board-only Pedro step. */
+/** Automatic continuation still waits for any board-only user step. */
 export function releaseContinuationReady(item: Item, all: readonly Item[]): boolean {
-    return releaseRecoveryAvailable(item, all) && !pendingPedroReleaseStep(item.releasePlan);
+    return releaseRecoveryAvailable(item, all) && !pendingUserReleaseStep(item.releasePlan);
 }
 
 /** Failed delivery or an owner ending without its next receipt needs a board retry. */
-export function releaseNeedsPedro(item: Item, all: readonly Item[]): boolean {
+export function releaseNeedsUser(item: Item, all: readonly Item[]): boolean {
     if (!item.releaseContinuation?.ready) return false;
 
     const run = item.releaseContinuation.run;

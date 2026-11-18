@@ -50,7 +50,7 @@ async function fixture(captured = false) {
         );
 
         if (captured) {
-            records.confirmScope(work.workId, records.read(work.workId).revision, scopeFor(i), 'Pedro', 'Yes.');
+            records.confirmScope(work.workId, records.read(work.workId).revision, scopeFor(i), 'User', 'Yes.');
             records.setBody(
                 work.workId,
                 records.read(work.workId).revision,
@@ -78,7 +78,7 @@ async function fixture(captured = false) {
     review();
 
     const approve = (manifest = records.gateBatch(ids)) =>
-        records.recordGateBatch(manifest, manifest.digest, 'Pedro', 'Yes to this displayed batch, response 42.');
+        records.recordGateBatch(manifest, manifest.digest, 'User', 'Yes to this displayed batch, response 42.');
     const empty = () => {
         for (const id of ids) {
             expect(records.gate(id).evidence).toEqual([]);
@@ -109,7 +109,7 @@ it('approves eight complete briefs with one manifest digest and one response', a
     for (const id of ids) {
         expect(records.gate(id).passing).toMatchObject({
             batchDigest: manifest.digest,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Yes to this displayed batch, response 42.',
         });
         expect(records.specState(id).pending).toBe(records.body(id, 'brief'));
@@ -170,7 +170,7 @@ it('checks captured scope for a batch member before display and approval', async
     const id = ids.at(-1)!;
     const amended = { ...scopeFor(7), excluded: ['No README examples.'] };
 
-    records.confirmScope(id, records.read(id).revision, amended, 'Pedro', 'Exclude README examples.');
+    records.confirmScope(id, records.read(id).revision, amended, 'User', 'Exclude README examples.');
     review();
     expect(() => records.gateBatch(ids)).toThrow(/brief differs from confirmed scope/);
     expect(() => approve(manifest)).toThrow(/conflicting fields:.*confirmedScope/);

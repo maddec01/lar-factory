@@ -14,9 +14,9 @@ const parent = (done: boolean) =>
             steps: [
                 {
                     id: 'approve',
-                    who: 'Pedro',
+                    who: 'User',
                     what: 'Approve activation of exact manifest',
-                    done: done ? { by: 'Pedro', at: '2026-11-14T12:00:00Z', evidence: 'Approved manifest abc.' } : null,
+                    done: done ? { by: 'User', at: '2026-11-14T12:00:00Z', evidence: 'Approved manifest abc.' } : null,
                 },
                 { id: 'activate', who: 'Agent', what: 'Activate', done: null },
             ],

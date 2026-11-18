@@ -131,12 +131,12 @@ it('keeps the gate of a brief approved before the upgrade with ordering reasons 
     const brief =
         '## What\nCall the Links API.\n\n## Done when\n### Behaviour\n- Call the Links API.\n### Tests\n\n\n## Scope\n### Files\n- src/links.ts\n### Size\n\n### Excluded\n\n\n## Verify\nno\n';
 
-    records.confirmScope(client, records.read(client).revision, scope, 'Pedro', 'Yes.');
+    records.confirmScope(client, records.read(client).revision, scope, 'User', 'Yes.');
     records.setBody(client, records.read(client).revision, 'brief', brief);
     records.recordDoubt(client, records.doubtPackage(client).packageDigest, 'Doubt', 'Clean.');
     records.recordGate(client, records.read(client).revision, {
         briefDigest: records.gate(client).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
 
@@ -207,7 +207,7 @@ it('marks a stale review from before version 4 checked, keeping it and its gate 
     records.recordDoubt(client.workId, records.doubtPackage(client.workId).packageDigest, 'Doubt', 'Clean.');
     records.recordGate(client.workId, records.read(client.workId).revision, {
         briefDigest: records.gate(client.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
 
@@ -277,14 +277,14 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
     records.recordDoubt(api.workId, reviewed.packageDigest, 'Doubt', 'Compatible.');
     records.recordGate(api.workId, records.read(api.workId).revision, {
         briefDigest: records.gate(api.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes',
     });
 
     const approvedSpec = records.specState(api.workId).pending;
 
     expect(records.gate(api.workId).current).toBe(true);
-    records.markDependencyMet(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, 'Pedro');
+    records.markDependencyMet(dependency.dependencyId, records.dependency(dependency.dependencyId).revision, 'User');
     expect(records.currentDoubt(api.workId)).not.toBeNull();
     // Ready/status changes are execution metadata and must preserve sibling reviews.
     records.update(client.workId, records.read(client.workId).revision, { status: 'Ready' });
@@ -310,7 +310,7 @@ it('invalidates Doubt and an earlier gate after a cited sibling contract changes
         records.recordGate(api.workId, records.read(api.workId).revision, {
             briefDigest: records.gate(api.workId).briefDigest!,
             reviewDigest: reviewed.packageDigest,
-            approvedBy: 'Pedro',
+            approvedBy: 'User',
             evidence: 'Old approval',
         }),
     ).toThrow(/package changed/);
@@ -331,7 +331,7 @@ it('retains unchanged consumer approval only after fresh compatibility review, a
 
     const approval = records.recordGate(id, records.read(id).revision, {
         briefDigest: records.gate(id).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board approval.',
     });
 
@@ -377,7 +377,7 @@ it('requires renewed approval when the consumer Dependency contract changes desp
     records.recordDoubt(client.workId, records.doubtPackage(client.workId).packageDigest, 'Doubt', 'Compatible.');
     records.recordGate(client.workId, records.read(client.workId).revision, {
         briefDigest: records.gate(client.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Yes.',
     });
 

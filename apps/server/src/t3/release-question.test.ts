@@ -7,9 +7,9 @@ const plan: ReleasePlan = {
     steps: [
         {
             id: 'approve',
-            who: 'Pedro',
+            who: 'User',
             what: 'Approve activation of manifest',
-            done: { by: 'Pedro', at: '2026-11-14T12:00:00Z', evidence: `Approved manifest ${'a'.repeat(64)}.` },
+            done: { by: 'User', at: '2026-11-14T12:00:00Z', evidence: `Approved manifest ${'a'.repeat(64)}.` },
         },
     ],
     outcomeCheck: { what: 'Check composition', result: 'pending', evidence: null },

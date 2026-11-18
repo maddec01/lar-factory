@@ -8,7 +8,7 @@ const plan: ReleasePlan = {
     steps: [
         {
             id: 'approve-joint-activation',
-            who: 'Pedro',
+            who: 'User',
             what: 'Approve exact manifest',
             done: fixture.recordedApproval,
         },
@@ -19,7 +19,7 @@ const plan: ReleasePlan = {
 test('S05 legacy notice identifies one explicit step; mentions and independent questions do not', () => {
     expect(legacyReleaseNoticeStep(plan, fixture.savedNotice)?.id).toBe('approve-joint-activation');
     for (const notice of [
-        'No Pedro activation receipt is recorded.',
+        'No user activation receipt is recorded.',
         fixture.savedNotice + ' Which region should we use?',
         'Please consider: ' + fixture.savedNotice,
         fixture.savedNotice.replace('approve-joint-activation', 'another-step'),

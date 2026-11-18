@@ -46,10 +46,10 @@ test('delivered build parent resumes release without starting another shaping ow
                     steps: [
                         {
                             id: 'approve',
-                            who: 'Pedro',
+                            who: 'User',
                             what: 'Approve activation of exact manifest',
                             done: {
-                                by: 'Pedro',
+                                by: 'User',
                                 at: '2026-11-14T11:00:00Z',
                                 evidence: 'Approved exact manifest abc.',
                             },

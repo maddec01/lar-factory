@@ -54,7 +54,7 @@ test('S05 R2-002: a mismatched brief stays held until its replacement has curren
     records.setBody(work.workId, work.revision, 'brief', 'Read v1.');
     records.recordGate(work.workId, records.read(work.workId).revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
-        approvedBy: 'Pedro',
+        approvedBy: 'User',
         evidence: 'Board fixture.',
     });
     records.confirmScope(
@@ -67,7 +67,7 @@ test('S05 R2-002: a mismatched brief stays held until its replacement has curren
             size: 'Small',
             verify: { required: false, visibleUi: null },
         },
-        'Pedro',
+        'User',
         'Use v2.',
     );
 

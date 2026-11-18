@@ -1,4 +1,4 @@
-import { releaseApprovalStep } from '@lar-factory/shared';
+import { HUMAN_ROLE_TEXT, isHumanRole, releaseApprovalStep } from '@lar-factory/shared';
 
 import { WorkRecordError } from './database.ts';
 import type { WorkRecords } from './work-records.ts';
@@ -16,12 +16,17 @@ export function requireProductQuestion(records: WorkRecords, workId: string, rea
         );
 
     const plan = records.releasePlan(workId);
-    const pedroSteps = plan?.steps.filter((step) => step.who.trim().toLowerCase() === 'pedro');
-    const represented = pedroSteps?.find((step) => !step.done) ?? pedroSteps?.at(-1);
+    const userSteps = plan?.steps.filter((step) => isHumanRole(step.who));
+    const represented = userSteps?.find((step) => !step.done) ?? userSteps?.at(-1);
     const step =
-        plan?.steps.find((step) => reason.startsWith(`Release step ${step.id} awaits Pedro in the board.`)) ??
+        plan?.steps.find((step) => step.id === awaitedStepId(reason)) ??
         releaseApprovalStep(plan, reason) ??
-        (/^No Pedro (?:activation|release|deployment) receipt is recorded\.$/i.test(reason) ? represented : undefined);
+        (new RegExp(
+            String.raw`^No ${HUMAN_ROLE_TEXT} (?:activation|release|deployment) receipt is recorded\.$`,
+            'i',
+        ).test(reason)
+            ? represented
+            : undefined);
 
     if (step)
         throw new WorkRecordError(
@@ -35,7 +40,7 @@ export function requireProductQuestion(records: WorkRecords, workId: string, rea
         /\b(?:in|on|through|via|using) (?:the )?board\b|\bboard(?:-only)? (?:button|control|action)\b/i.test(reason);
     const boardAction =
         namesBoardAction &&
-        /(?:^|[.!?]\s+)(?:please\s+)?(?:approve (?:the |this )?(?:(?:revised|amended|current|final|exact|proposed|updated) )?(?:briefs?|gate|batch)|merge (?:the |this )?PR|(?:wait(?:ing)? (?:for|on)|awaiting|pending) (?:Pedro(?:'s)? (?:to )?)?(?:brief approval|brief gate|gate approval|Verify|Outcome|merge|release approval|release step|activation approval)|(?:mark|record|complete) (?:the |this )?(?:Verify|Outcome|release step)|Verify (?:this|the) head|(?:(?:revised|amended|current|final) )?brief (?:needs|awaits|requires) approval)\b/i.test(
+        /(?:^|[.!?]\s+)(?:please\s+)?(?:approve (?:the |this )?(?:(?:revised|amended|current|final|exact|proposed|updated) )?(?:briefs?|gate|batch)|merge (?:the |this )?PR|(?:wait(?:ing)? (?:for|on)|awaiting|pending) (?:the user(?:'s)? (?:to )?)?(?:brief approval|brief gate|gate approval|Verify|Outcome|merge|release approval|release step|activation approval)|(?:mark|record|complete) (?:the |this )?(?:Verify|Outcome|release step)|Verify (?:this|the) head|(?:(?:revised|amended|current|final) )?brief (?:needs|awaits|requires) approval)\b/i.test(
             reason,
         );
 
@@ -78,3 +83,7 @@ export function requireProductQuestion(records: WorkRecords, workId: string, rea
             'Waiting on another work item is an agent wait. Use add-blocker (or sync-blockers from brief declarations), then waiting-on; do not set Needs you.',
         );
 }
+
+/** The step a saved "Release step <id> awaits the user in the board." notice names, before or after the rename. */
+const awaitedStepId = (reason: string) =>
+    new RegExp(String.raw`^Release step (\S+) awaits ${HUMAN_ROLE_TEXT} in the board\.`).exec(reason)?.[1];

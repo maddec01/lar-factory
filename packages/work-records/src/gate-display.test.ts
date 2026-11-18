@@ -21,7 +21,7 @@ it('binds approval to the displayed product through unrelated lifecycle progress
 
         const display = records.displayGate(work.workId);
         const approve = (copy = display, digest = display.approvalDigest) =>
-            records.recordDisplayedGate(copy, digest, 'Pedro', 'Yes, response 12; Doubt clean.');
+            records.recordDisplayedGate(copy, digest, 'User', 'Yes, response 12; Doubt clean.');
 
         expect(() => approve({ ...display, brief: 'Find shared searches.' })).toThrow(/displayed brief/);
         expect(() => approve(display, display.briefDigest)).toThrow(/approval digest/);

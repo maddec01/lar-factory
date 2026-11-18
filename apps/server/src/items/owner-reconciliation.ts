@@ -4,6 +4,9 @@ import type { WorkRecords } from '@lar-factory/work-records';
 import { readExecutionProjection } from '../t3/execution-capabilities.ts';
 import { readRoleResult } from '../t3/role-result.ts';
 
+/** The owner state each inferred abandonment was last read at, so an unchanged owner is not reread every tick. */
+const abandonedReads = new WeakMap<WorkRecords, Map<string, string>>();
+
 /** Resolve the question before publishing its request-free thread, so no stale desk card appears between reads. */
 export function reconcileOwnerQuestion(records: WorkRecords, item: Item): Item {
     const current = ownerThreads(item)[0];
@@ -51,6 +54,8 @@ export async function reconcileOwnerActivity(
     );
 
     // Capture candidates before the async read, so a later launch cannot be abandoned by an older observation.
+    // An inferred abandonment stays a candidate so a result that lands later in T3 is recovered, but it is
+    // reread only after its owner's T3 state changes; other ended attempts are never reread.
     const { roleRuns, runs } = records.runSettings(item.id);
     const candidates = roleRuns.filter(
         (run) =>
@@ -60,11 +65,19 @@ export async function reconcileOwnerActivity(
 
     if (!candidates.length) return;
 
+    const seen = abandonedReads.get(records) ?? new Map<string, string>();
+
+    abandonedReads.set(records, seen);
+
+    // A mark lasts only while its attempt is still a candidate.
+    for (const run of roleRuns) if (!candidates.includes(run)) seen.delete(run.executionId);
+
     const threadHistory = records.threads(item.id);
     const launches = records.launchIntents({ workId: item.id });
     const projections = new Map<string, unknown>();
     const holds: Record<string, string> = {};
     const absent: string[] = [];
+    let readAny = candidates.some((run) => run.result === 'running');
 
     for (const attempt of candidates) {
         const kind = runs.find((run) => run.runId === attempt.runId)?.kind;
@@ -86,6 +99,16 @@ export async function reconcileOwnerActivity(
 
         if (!owner || owner.observedAt) continue;
 
+        const ended = attempt.result !== 'running';
+        const stamp = `${owner.updated}|${owner.state}`;
+
+        if (ended && seen.get(attempt.executionId) === stamp) continue;
+
+        readAny = true;
+
+        // Marked only once a read settles the attempt, so a failed read or a hold is read again next pass.
+        const settled = () => seen.set(attempt.executionId, stamp);
+
         try {
             if (!projections.has(owner.id)) projections.set(owner.id, await read(owner.id));
 
@@ -96,20 +119,25 @@ export async function reconcileOwnerActivity(
 
             const result = await readRoleResult(attempt, projection, read);
 
-            if (result.finish) records.finishRoleRun(item.id, records.read(item.id).revision, result.finish);
-            else if (
+            if (result.finish) {
+                records.finishRoleRun(item.id, records.read(item.id).revision, result.finish);
+                settled();
+            } else if (
                 result.absent &&
                 ownerEnded &&
                 Array.isArray(projection.runs) &&
                 !projection.runs.some((run) => isRecord(run) && ['running', 'queued'].includes(String(run.status)))
-            )
+            ) {
                 absent.push(attempt.executionId);
-            else holds[attempt.executionId] = result.hold ?? 'Owner continuation is active; wait for role evidence.';
+                settled();
+            } else holds[attempt.executionId] = result.hold ?? 'Owner continuation is active; wait for role evidence.';
         } catch {
             // A continuation can finish the same attempt while a read is in flight. Genuine terminal records stay immutable.
             holds[attempt.executionId] =
                 'T3 role evidence is unavailable or changed; the system will retry, or the owner can run role-finish.';
         }
     }
-    records.reconcileRoleRuns(item.id, { ownerEnded, executionIds: absent, holds });
+
+    // With no running attempt and every ended one unchanged since its settled read, there is nothing to reconcile.
+    if (readAny) records.reconcileRoleRuns(item.id, { ownerEnded, executionIds: absent, holds });
 }

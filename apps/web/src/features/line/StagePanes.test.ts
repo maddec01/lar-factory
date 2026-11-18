@@ -67,6 +67,22 @@ beforeEach(() => localStorage.clear());
 const inPane = (pane: string) => $$(`[data-stage="${pane}"] li[data-item]`).map((r) => numberOf(r.dataset.item!));
 const readyRows = () => $$('[data-stage="ready"] li[data-item]').map((r) => numberOf(r.dataset.item!));
 
+test('each stage section sits in its own box, and empty ones keep their empty marker in stage order', async () => {
+    const ready = unblocked();
+
+    await mountPage({ ...ready, items: ready.items.filter((i) => i.id === 'I_sample13') });
+
+    const sections = $$('[aria-label="Work by stage"] [data-stage]');
+
+    expect(sections.map((s) => s.dataset.stage)).toEqual(['queue', 'shaping', 'ready', 'build']);
+    expect(sections.every((s) => s.classList.contains('stage-box'))).toBe(true);
+    expect(sections.filter((s) => s.hasAttribute('data-empty')).map((s) => s.dataset.stage)).toEqual([
+        'queue',
+        'shaping',
+        'build',
+    ]);
+});
+
 test('a live board push moves a row between sections with no reload', async () => {
     await mountPage(withItem('I_sample13', { blockers: [], parentId: null, flow: 'single' }));
     expect(readyRows()).toContain(140);

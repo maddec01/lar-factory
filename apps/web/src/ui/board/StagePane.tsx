@@ -1,7 +1,7 @@
-// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): its
-// header line, then its rows as one list of rounded rows, straight on the page with no card around them, so the board
-// reads as one calm surface. It follows the design system's Panel header and heading. A lane with no rows collapses to
-// its header line, which says why it's empty, so the page scrolls past it in one line.
+// A section of Lar Factory's board's work by stage (Queue, Shaping, Ready to build, Build, Concepts and linked work): a
+// quiet box (stages.css) holding its header line, then its rows as one list of rounded rows. It follows the design
+// system's Panel header and heading. A lane with no rows collapses to its header line, which says why it's empty, and
+// empty lanes one after another share one box, so the page scrolls past them in a few lines.
 
 import { SectionTitle } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
@@ -51,10 +51,9 @@ export function StagePane({
             data-stage={id}
             data-empty={collapsed || undefined}
             aria-labelledby={headingId}
-            // Collapsed lanes one after another sit closer, as header lines in a list, keeping their controls.
-            className={`min-w-0 ${collapsed ? '[[data-empty]+&]:-mt-2' : ''}`}
+            className="stage-box min-w-0"
         >
-            <header className="flex min-h-9 items-center py-1 pr-3 pl-4">
+            <header className="flex min-h-9 items-center py-1 pr-2 pl-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <SectionTitle id={headingId} level="h3" title={title} icon={glyph} count={count} />
                     {(right || collapsed) && (
@@ -163,7 +162,7 @@ export function StageSections({
     children: ReactNode;
 }) {
     return (
-        <section className="stages flex flex-col gap-3" aria-label={label}>
+        <section className="stages flex flex-col" aria-label={label}>
             {children}
         </section>
     );

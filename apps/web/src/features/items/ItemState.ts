@@ -32,8 +32,8 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useStartStore } from './StartStore';
+import { useItemClock } from './useItemClock';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { useClock } from '@/shared/time/useClock';
 
 /**
  * What the item's thread is doing now, whatever its recorded stage: a start in flight, at work (quiet when it has taken
@@ -410,8 +410,8 @@ export function useItemState(item: Item): ItemState {
     const all = useBoardStore((state) => state.data.items);
     const starts = useBoardStore((state) => state.data.startProgress);
     const full = useBoardStore(capacityFull);
-    const line = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
-    const lost = useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
+    const line = useItemClock(item, (now) => itemActivityLine(item, now, disconnected)?.state);
+    const lost = useItemClock(item, (now) => activityLost(itemActivityThread(item)?.activity, now));
 
     return useMemo(
         () => itemState(item, { unavailable, line, lost, starting, all, starts, capacityFull: full }),

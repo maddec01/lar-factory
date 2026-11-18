@@ -14,14 +14,15 @@ import type { Item } from '@lar-factory/shared';
 import { itemState, useItemState } from './ItemState';
 import type { ItemState } from './ItemState';
 import { PURPOSE, useStart } from './StartStore';
+import { useItemClock } from './useItemClock';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { useClock } from '@/shared/time/useClock';
 
 export const useActivityUnavailable = () =>
     useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
 
 /** Whether T3's answer for `item`'s thread is lost, which a read going old changes with no new data. */
-const useActivityLost = (item: Item) => useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
+const useActivityLost = (item: Item) =>
+    useItemClock(item, (now) => activityLost(itemActivityThread(item)?.activity, now));
 
 export function useActivityFeedback(item: Item) {
     const data = useBoardStore((state) => state.data);
@@ -30,7 +31,7 @@ export function useActivityFeedback(item: Item) {
     const pressed = useStart(item.id, kind)?.phase === 'pending';
     const unavailable = useActivityUnavailable();
     const disconnected = useBoardStore((state) => !!state.clientError);
-    const lineState = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
+    const lineState = useItemClock(item, (now) => itemActivityLine(item, now, disconnected)?.state);
     // An error from another read, such as GitHub's, leaves T3's activity readable, and the row's phase with it.
     const readable = !!lineState && lineState !== 'unavailable';
     const lost = useActivityLost(item);

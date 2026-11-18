@@ -3,6 +3,7 @@ import { expect, test } from 'vite-plus/test';
 import type { Item, ItemThread } from './model.ts';
 import {
     itemActivityAgents,
+    itemActivityChangesIn,
     itemActivityThread,
     itemActivityLine,
     threadActivityLine,
@@ -108,4 +109,20 @@ test('an idle build thread in Checks shows as idle, not unavailable', () => {
         itemActivityLine(item([{ ...idle, activity: { available: false } }], { buildPhase: 'Checks' }), NOW)?.state,
         'a failed read',
     ).toBe('unavailable');
+});
+
+test('a row changes with the time alone only at its shown age, its quiet and its stale deadlines', () => {
+    const working = (over: Partial<Extract<ThreadActivity, { available: true }>>) =>
+        itemActivityChangesIn(item([thread({ activity: activity(over) })]), NOW);
+
+    expect(itemActivityChangesIn(item([thread({ state: 'done' })], { status: 'Done' }), NOW), 'idle').toBeUndefined();
+    // The earliest deadline wins: here the read going stale comes before the shown age next changes.
+    expect(working({ actionAt: ago(2), readAt: new Date(NOW - 20_000).toISOString() }), 'read going old').toBe(10_001);
+    expect(
+        itemActivityChangesIn(
+            item([thread({ state: 'needs you', updated: new Date(NOW - 90_000).toISOString() })]),
+            NOW,
+        ),
+        'a wait on you shows minutes',
+    ).toBe(30_000);
 });

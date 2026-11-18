@@ -1,3 +1,4 @@
+import { untilShortAgeChanges } from './format.ts';
 import { isLiveThread, type BoardData, type Item, type ItemThread } from './model.ts';
 import { rebaseSampleTimes } from './sample-clock.ts';
 import { ownerThreads } from './thread-domain.ts';
@@ -75,6 +76,18 @@ const activityAction = (action: string | undefined) =>
 
 const ageOf = (at: string, now: number): number => Math.max(0, now - Date.parse(at));
 
+type ReadActivity = Extract<ThreadActivity, { available: true }>;
+
+/** The newest action of `thread` or its agents, timed by when it happened, or by the thread's update with no time. */
+function newestAction(thread: ItemThread, activity: ReadActivity) {
+    return [
+        { action: activity.action, actionDetail: activity.actionDetail, actionAt: activity.actionAt ?? thread.updated },
+        ...activity.agents.flatMap(({ action, actionDetail, actionAt }) =>
+            actionAt ? [{ action, actionDetail, actionAt }] : [],
+        ),
+    ].reduce((best, next) => (Date.parse(next.actionAt) > Date.parse(best.actionAt) ? next : best));
+}
+
 /** What a row shows for `thread` at `now`; undefined for a thread that finished with nothing at work. */
 export function threadActivityLine(thread: ItemThread, now: number): ThreadActivityLine | undefined {
     const { activity } = thread;
@@ -114,12 +127,7 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
     if (thread.queued && !agents.length)
         return { state: 'working', action: 'Queued', ageMs: ageOf(thread.updated, now), agents: 0 };
 
-    const newest = [
-        { action: activity.action, actionDetail: activity.actionDetail, actionAt: activity.actionAt ?? thread.updated },
-        ...agents.flatMap(({ action, actionDetail, actionAt }) =>
-            actionAt ? [{ action, actionDetail, actionAt }] : [],
-        ),
-    ].reduce((best, next) => (Date.parse(next.actionAt) > Date.parse(best.actionAt) ? next : best));
+    const newest = newestAction(thread, activity);
     const ageMs = ageOf(newest.actionAt, now);
 
     if (ageMs >= QUIET_MS && !activity.toolRunning)
@@ -214,6 +222,35 @@ export function itemActivityAgents(
     return listed.length
         ? listed.map((agent) => (agent.action ? { ...agent, action: activityAction(agent.action)! } : agent))
         : undefined;
+}
+
+/**
+ * How long from `now` until what `item` shows of its thread can change with the time alone: the age it shows moving to
+ * its next unit, the thread going quiet, or its read going old. Undefined when only new data can change it, as with no
+ * thread to follow.
+ */
+export function itemActivityChangesIn(item: Item, now: number): number | undefined {
+    const thread = itemActivityThread(item);
+    const activity = thread?.activity;
+
+    if (!thread) return undefined;
+
+    const line = itemActivityLine(item, now);
+    const read = activity?.available ? Date.parse(activity.readAt) : undefined;
+    const deadlines = [
+        // activityLost turns once a read is older than ACTIVITY_STALE_MS, and a retained one at ACTIVITY_RETAIN_MS.
+        read === undefined ? undefined : read + ACTIVITY_STALE_MS + 1,
+        read === undefined || !thread.observedAt ? undefined : read + ACTIVITY_RETAIN_MS,
+        activity?.available && !activity.toolRunning
+            ? Date.parse(newestAction(thread, activity).actionAt) + QUIET_MS
+            : undefined,
+        line?.ageMs === undefined
+            ? undefined
+            : now +
+              (line.state === 'quiet' ? 60_000 - (line.ageMs % 60_000) : untilShortAgeChanges(now - line.ageMs, now)),
+    ].filter((at): at is number => at !== undefined && at > now);
+
+    return deadlines.length ? Math.min(...deadlines) - now : undefined;
 }
 
 /** Whether `item`'s row stops animating at `now`: its thread waits, stopped or can't be read. */

@@ -104,6 +104,14 @@ export function shortAge(ms: number): string {
     return h < 48 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
+/** How long from `now` until `shortAge` of the time since `at` (epoch milliseconds) next changes. */
+export function untilShortAgeChanges(at: number, now: number): number {
+    const age = Math.max(0, now - at);
+    const unit = age < 60_000 ? 1_000 : age < 3_600_000 ? 60_000 : age < 48 * 3_600_000 ? 3_600_000 : 86_400_000;
+
+    return unit - (age % unit);
+}
+
 /** An age in its largest whole unit, rounded down: `12s ago`, `3m ago`, `2h ago`, `2d ago`; under a second, or a time
  *  ahead of `now`, `just now`. */
 export const shortAgo = (iso: string, now: number): string => {

@@ -66,6 +66,10 @@ consumers need no PR or repeated brief approval. Its receipt binds the corrected
 content and authorizing comment.
 _Avoid_: refined ticket.
 
+**Doubt**:
+An independent review that tries to disprove a brief against the code before the gate, reporting only what would make the build wrong or leave a product decision open.
+_Avoid_: audit.
+
 **Original**:
 The authored text a ticket had before its first Spec, kept collapsed in the ticket when nonempty. Temporary creation metadata is excluded.
 _Avoid_: initial ticket.

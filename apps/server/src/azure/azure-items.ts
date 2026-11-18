@@ -6,6 +6,7 @@
 
 import {
     STATUSES,
+    azureTicketUrl,
     decodePart,
     readTrackerStructure,
     trackerKind,
@@ -190,9 +191,6 @@ export function azureWorkItem(raw: RawWorkItem): AzureWorkItem {
     };
 }
 
-/** A work item's page, in the organization and the project as its repository's name encodes it. */
-export const workItemUrl = (organization: string, encodedProject: string, id: number) =>
-    `https://dev.azure.com/${organization}/${encodedProject}/_workitems/edit/${id}`;
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
 export const linked = (raw: RawWorkItem, rel: string) =>
     (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
@@ -332,7 +330,7 @@ export function azureItems(
 
         return typeStates.get(type)!();
     };
-    const url = (id: number) => workItemUrl(organization, encoded, id);
+    const url = (id: number) => azureTicketUrl(repos[0]!, id);
     const itemId = (id: number) => `azure:${organization.toLowerCase()}/${id}`;
     const labelsOf = (raw: RawWorkItem) => tagsOf(raw).filter((t) => !STATUS_TAGS.has(t) && !isRepoTag(t));
 

@@ -165,7 +165,7 @@ export function StageRow({ row: { item }, data, n }: { row: Row; data: BoardData
                     )}
                     <RowTitleCell>
                         {/* Where it lives (source and project), then what it is: its kind, number and title. */}
-                        <RowSource item={item} always />
+                        <RowSource item={item} />
                         <RowKindMark item={item} />
                         <RowTitle name={itemName(item)}>
                             <ItemTitle item={item} />

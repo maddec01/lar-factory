@@ -5,7 +5,14 @@
 // and a plan kept on this Mac says so on a quiet line under the properties (and on the source mark's tooltip). The meta
 // area says when it was updated.
 
-import { blockedText, staleGateReason, itemName, onAzure, openBlockers, retiredPartLabel } from '@lar-factory/shared';
+import {
+    blockedText,
+    staleGateReason,
+    itemName,
+    openBlockers,
+    retiredPartLabel,
+    trackerCapabilities,
+} from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
 import { AttachTicket } from './AttachTicket';
@@ -39,6 +46,7 @@ export function ItemSummary({ item, openPart }: { item: Item; openPart?: ((itemI
     const syncFailed = item.sync?.state === 'error' || item.sync?.state === 'conflict';
     // Keep the presenter's live delivery progress: a group's stored stage may still be Shaping.
     const word = shown.word === 'List' ? 'On the List' : shown.word;
+    const tracker = trackerCapabilities(item.repo);
 
     return (
         <Summary
@@ -79,8 +87,8 @@ export function ItemSummary({ item, openPart }: { item: Item; openPart?: ((itemI
                     {item.url && (
                         <TrackerLink
                             href={item.url}
-                            icon={item.repo && onAzure(item.repo) ? ICON.azure : ICON.github}
-                            name={item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
+                            icon={ICON[tracker.icon]}
+                            name={tracker.name}
                             note={unsaved ? 'Planning is saved on this Mac.' : undefined}
                         />
                     )}

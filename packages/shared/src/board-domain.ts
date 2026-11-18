@@ -394,8 +394,7 @@ export const readingScope = (data: Pick<BoardData, 'firstRead'>, repo?: string):
 export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>
     sameRepo(repoKey(item), repo) || Boolean(item.untaggedFor?.some((r) => sameRepo(r, repo)));
 
-/** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
-export const onAzure = (repo: string): boolean => repo.split('/').length === 3;
+export { onAzure } from './ticket-url.ts';
 
 /** A part of a repository's key as people read it: an Azure DevOps origin's `Fabrikam%20Fiber` is `Fabrikam Fiber`. */
 export const decodePart = (part: string): string => {

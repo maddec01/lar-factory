@@ -1,6 +1,6 @@
 // Settings' Projects page: each Project with its provider and work source.
 
-import { itemSource, shownRepo, type OnboardingProgress } from '@lar-factory/shared';
+import { itemSource, shownRepo, trackerCapabilities, type OnboardingProgress } from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
 
 import { custom, type Group, type Row, type SettingsData } from './SettingsModel';
@@ -25,11 +25,7 @@ export function repositoryGroup(data: SettingsData): Group {
         id: `repo-${r.repo}`,
         title: shownRepo(r.repo),
         icon: <ProjectIcon repo={r.repo} size="md" />,
-        description: (
-            <MetaLine
-                parts={[itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub', sourceName(itemSource(r), r.team)]}
-            />
-        ),
+        description: <MetaLine parts={[trackerCapabilities(r.repo).name, sourceName(itemSource(r), r.team)]} />,
         // The whole row opens the project's page.
         control: custom(() =>
             r.setup ? (

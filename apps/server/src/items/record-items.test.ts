@@ -159,6 +159,41 @@ test('recorded work keeps its progress and unpicked tracker issues appear fresh 
     assert.equal(items[0]!.url, `https://github.com/${REPO}/issues/12`);
 });
 
+test.each([
+    [REPO, `https://github.com/${REPO}/issues/`],
+    ['contoso/Mobile%20App/web', 'https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/'],
+])(
+    "a %s ticket missing from its tracker's read still links the item and its parent to their pages",
+    async (repository, page) => {
+        const records = await open();
+        let parent = records.importTicket({
+            title: 'Parent',
+            repository,
+            kind: 'concept',
+            ticket: `${repository}#7`,
+        }).record;
+        const child = records.importTicket({
+            title: 'Child',
+            repository,
+            kind: 'build',
+            ticket: `${repository}#8`,
+        }).record;
+        let local = records.create({ title: 'Local', repository, kind: 'build' });
+
+        records.setParent(child.workId, child.revision, parent.workId);
+        parent = records.create({ title: 'Local parent', repository, kind: 'concept' });
+        local = records.setParent(local.workId, local.revision, parent.workId);
+
+        const items = recordItems(records, [], [repository]);
+        const shown = (title: string) => items.find((i) => i.title === title)!;
+
+        assert.deepEqual(
+            [shown('Child').url, shown('Child').parent?.url, shown('Local').url, shown('Local').parent?.url],
+            [`${page}8`, `${page}7`, null, ''],
+        );
+    },
+);
+
 test("a ticket edit never changes the record's Status, kind or title", async () => {
     const records = await open();
 

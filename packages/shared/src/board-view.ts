@@ -8,7 +8,6 @@ import {
     activityUnavailable,
     inRepo,
     isRecentlyDone,
-    onAzure,
     itemName,
     openQuestionThread,
     repoKey,
@@ -16,6 +15,7 @@ import {
     sameRepo,
 } from './model.ts';
 import type { BoardData, Item, LinkedPr, NeedsYouOffer, StartProgress, StartPurpose, Status } from './model.ts';
+import { trackerCapabilities } from './tracker-capabilities.ts';
 
 export function byFlowOrder(a: Item, b: Item): number {
     return (
@@ -323,16 +323,14 @@ export function closeTicketPrompt(item: Item): {
     keep: string;
     done: string;
 } {
-    const azure = onAzure(item.repo ?? '');
+    const { close } = trackerCapabilities(item.repo ?? '');
 
     return {
         question: `Close the ticket of ${itemName(item)} too?`,
         keep: 'Keep it open',
-        confirm: azure ? 'Move to Removed' : 'Close issue',
-        detail: azure
-            ? 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.'
-            : 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
-        done: azure ? `Moved ${itemName(item)} to Removed.` : `Closed ${itemName(item)} as "not planned".`,
+        confirm: close.confirm,
+        detail: close.detail,
+        done: close.done(itemName(item)),
     };
 }
 

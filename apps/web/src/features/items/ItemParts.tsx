@@ -1,7 +1,15 @@
 import type { AzureWorkItem, Item, Kind } from '@lar-factory/shared';
 // The bits every view draws for an item: its numbered title, title link, repository, kind badge and label chips. Slices,
 // pull requests, agent work and activity have files of their own.
-import { visibleKind, decisionMethodName, itemRepoNames, onAzure, ref, repoKey, shortAgo } from '@lar-factory/shared';
+import {
+    visibleKind,
+    decisionMethodName,
+    itemRepoNames,
+    ref,
+    repoKey,
+    shortAgo,
+    trackerCapabilities,
+} from '@lar-factory/shared';
 import { Inline, LabelChip, Text } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
@@ -71,7 +79,8 @@ export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode
 /** The item's shown labels as quiet outlined chips with their tracker's colour dots, each named in its tooltip as its
  *  tracker's ("Azure DevOps tag: Blocked"), so a tag never reads as a board state. */
 export function LabelChips({ item }: { item: LabelledItem }) {
-    const tracker = item.repo && onAzure(item.repo) ? 'Azure DevOps tag' : 'GitHub label';
+    const { name, noun } = trackerCapabilities(item.repo);
+    const tracker = `${name} ${noun}`;
 
     return (
         <>

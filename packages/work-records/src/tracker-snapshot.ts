@@ -1,5 +1,5 @@
 // Validate untrusted tracker bytes before they can choose any authenticated context read or cache write.
-import { isRecord, trackerPullRequestReference, trackerReference, trackerIssueUrl } from '@lar-factory/shared';
+import { isRecord, trackerPullRequestReference, trackerReference, ticketUrl } from '@lar-factory/shared';
 
 import { WorkRecordError } from './database.ts';
 import type { TrackerSnapshot } from './tracker-cache.ts';
@@ -154,10 +154,8 @@ export function validateTrackerSnapshot(input: unknown): TrackerSnapshot {
                 !value.nodes.some(
                     (node) =>
                         node.ticket &&
-                        trackerIssueUrl(
-                            node.repository,
-                            Number(node.ticket.slice(node.ticket.lastIndexOf('#') + 1)),
-                        ) === dependency.ticket,
+                        ticketUrl(node.repository, Number(node.ticket.slice(node.ticket.lastIndexOf('#') + 1))) ===
+                            dependency.ticket,
                 )
             )
                 invalid('The saved structure has a missing dependency-ticket member.');

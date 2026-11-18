@@ -61,10 +61,6 @@ export const MAX_TRACKER_STRUCTURE = 262_144;
 const text = (value: unknown, limit = 16_384): value is string => typeof value === 'string' && value.length <= limit;
 
 /** Typed tracker URLs keep an Azure work item distinct from a repository PR. */
-export const trackerIssueUrl = (repository: string, number: number): string =>
-    repository.split('/').length === 2
-        ? `https://github.com/${repository}/issues/${number}`
-        : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_workitems/edit/${number}`;
 export const trackerPullRequestUrl = (repository: string, number: number): string =>
     repository.split('/').length === 2
         ? `https://github.com/${repository}/pull/${number}`

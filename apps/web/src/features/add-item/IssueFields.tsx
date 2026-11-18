@@ -1,6 +1,5 @@
 import {
     effectiveIssueSettings,
-    onAzure,
     trackerCapabilities,
     writeAccessProblem,
     type RepoConfig,
@@ -160,6 +159,7 @@ export function CreateIssueBox({
     const error = useEditStore((state) => state.errors[repo.repo]);
     const creation = createIssueState(repo, choice);
     const reason = sampleReason ?? creation.reason;
+    const tracker = trackerCapabilities(repo.repo);
     const checked = !reason && creation.checked;
 
     return (
@@ -168,7 +168,7 @@ export function CreateIssueBox({
                 <Checkbox
                     id="item-create-issue"
                     name="createIssue"
-                    label={`Create ${onAzure(repo.repo) ? 'Azure DevOps work item' : 'GitHub issue'}`}
+                    label={`Create ${tracker.name} ${tracker.ticket}`}
                     checked={checked}
                     disabled={disabled || !!reason}
                     aria-describedby={reason ? 'item-create-reason' : undefined}

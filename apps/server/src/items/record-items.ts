@@ -8,11 +8,11 @@ import {
     linkedFlow,
     settleFlows,
     staleGateReason,
-    onAzure,
     parseConceptMap,
     refKey,
     sameRepo,
     ticketKindOf,
+    trackerCapabilities,
 } from '@lar-factory/shared';
 import type {
     Blocker,
@@ -28,7 +28,6 @@ import type {
 } from '@lar-factory/shared';
 import { WorkRecordError, type Dependency, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 
-import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
 import { itemReviewers } from '../item-details/reviewers.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
@@ -51,11 +50,7 @@ function referenceUrl(reference: string, pr: boolean): string {
     const repo = reference.slice(0, reference.lastIndexOf('#'));
     const number = ticketNumber(reference);
 
-    if (pr) return prUrl(repo, number);
-
-    const [organization, project] = repo.split('/');
-
-    return onAzure(repo) ? workItemUrl(organization!, project!, number) : `https://github.com/${repo}/issues/${number}`;
+    return pr ? prUrl(repo, number) : trackerCapabilities(repo).ticketUrl(repo, number);
 }
 
 /** A Dependency as the blocker it is for each build it holds: open until the user marks it met, which no observation decides. */
@@ -190,6 +185,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
         return completion;
     };
     const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
+    /** The page of the record's ticket: the listed ticket's, else the saved publication's, else one built from its reference. */
+    const ticketPage = (record: WorkRecord): string | null =>
+        ticketOf(record)?.url ??
+        records.publicationAttachment(record.workId)?.url ??
+        (record.ticket ? referenceUrl(record.ticket, false) : null);
     const ref = (record: WorkRecord): IssueRef => ({
         number: ticketNumber(record.ticket),
         title: record.title,
@@ -199,7 +199,6 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     });
     const toItem = (record: WorkRecord): Item => {
         const ticket = ticketOf(record);
-        const attachment = records.publicationAttachment(record.workId);
         const parent = record.parentId
             ? records.read(record.parentId)
             : ticket?.parent
@@ -401,11 +400,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             ...(record.kind === 'decision' ? { decisionMethod: record.decisionMethod ?? null } : {}),
             number: ticketNumber(record.ticket),
             title: record.title || ticket?.title || '',
-            url: ticket?.url ?? attachment?.url ?? null,
+            url: ticketPage(record),
             repo: record.repository,
             state: done ? 'closed' : group ? 'open' : state(record),
             closedAs: done ? 'done' : null,
-            parent: parent ? ref(parent) : (ticket?.parent ?? null),
+            parent: parent ? { ...ref(parent), url: ticketPage(parent) ?? '' } : (ticket?.parent ?? null),
             parentId: parent?.workId ?? null,
             subIssues: { total: work.length, completed: work.filter((child) => completionOf(child).complete).length },
             blockers,

@@ -166,7 +166,7 @@ export function ItemCard({
                 .filter(Boolean)
                 .join(' · ')}
             // Where its ticket is saved and, outside a concept, its project; its kind before its title.
-            head={<RowSource item={item} always project={!inConcept} />}
+            head={<RowSource item={item} project={!inConcept} />}
             kind={<RowKindMark item={item} />}
             track={
                 checks ? (

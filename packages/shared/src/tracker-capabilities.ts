@@ -1,11 +1,37 @@
-// What a tracker's labels can do, so the UI reads this instead of checking a provider's name.
+// What a tracker is called, how it names and links its tickets and what its labels can do, so screens read this entry
+// instead of checking a provider's name, and a new tracker adds one entry.
 import { customLabelProblem, customTagProblem, tagSeparatorProblem } from './custom-labels.ts';
 import { isKindName, isManagedLabel, shownLabels } from './managed-labels.ts';
-import { decodePart, isRepoTag, onAzure, sameRepo } from './model.ts';
+import { decodePart, isRepoTag, sameRepo } from './model.ts';
 import type { Item, RepoConfig } from './model.ts';
+import { azureTicketUrl, githubTicketUrl, onAzure } from './ticket-url.ts';
 import { STRUCTURE_LABEL } from './tracker-structure.ts';
 
+/** The icon the web draws for a tracker; the design system has one for each key. */
+export type TrackerIcon = 'github' | 'azure';
+
 export interface TrackerCapabilities {
+    /** The tracker's name, such as "GitHub". */
+    name: string;
+    /** Which of the design system's tracker icons is this tracker's. */
+    icon: TrackerIcon;
+    /** What the tracker calls a ticket, in a sentence: "issue". */
+    ticket: string;
+    /** The ticket word with its article: "an issue". */
+    aTicket: string;
+    /** The tracker's name after the preposition a sentence uses for a ticket kept there: "on GitHub". */
+    place: string;
+    /** What closing a ticket from Archive does there, as its prompt says it. */
+    close: {
+        /** The confirm button: "Close issue". */
+        confirm: string;
+        /** What the close does and how to undo it. */
+        detail: string;
+        /** What happened, once it closed the ticket of the work named `name`. */
+        done: (name: string) => string;
+    };
+    /** The page of ticket `number` in `repo`, a repository key. */
+    ticketUrl: (repo: string, number: number) => string;
     /** What the tracker calls a label, in a sentence. */
     noun: string;
     /** What the tracker calls its labels, as a heading. */
@@ -73,6 +99,17 @@ export interface LabelChange {
 const azureProject = (repo: string) => repo.split('/').slice(0, 2).map(decodePart).join('/');
 
 const GITHUB: TrackerCapabilities = {
+    name: 'GitHub',
+    icon: 'github',
+    ticket: 'issue',
+    aTicket: 'an issue',
+    place: 'on GitHub',
+    close: {
+        confirm: 'Close issue',
+        detail: 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
+        done: (name) => `Closed ${name} as "not planned".`,
+    },
+    ticketUrl: githubTicketUrl,
     noun: 'label',
     heading: 'Labels',
     color: true,
@@ -88,6 +125,17 @@ const GITHUB: TrackerCapabilities = {
 };
 
 const AZURE_DEVOPS: TrackerCapabilities = {
+    name: 'Azure DevOps',
+    icon: 'azure',
+    ticket: 'work item',
+    aTicket: 'a work item',
+    place: 'in Azure DevOps',
+    close: {
+        confirm: 'Move to Removed',
+        detail: 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.',
+        done: (name) => `Moved ${name} to Removed.`,
+    },
+    ticketUrl: azureTicketUrl,
     noun: 'tag',
     heading: 'Tags',
     color: false,

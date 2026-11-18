@@ -1,4 +1,4 @@
-import { onAzure, writeAccessProblem, type Item } from '@lar-factory/shared';
+import { trackerCapabilities, writeAccessProblem, type Item } from '@lar-factory/shared';
 import { Button, FormFieldset, Inline, Loading, Stack, Text } from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react';
@@ -27,6 +27,7 @@ export function CreateTicket({ item }: { item: Item }) {
         recheckAction: true,
     });
     const locked = !!attempt && attempt.phase !== 'failed';
+    const tracker = trackerCapabilities(item.repo);
 
     const restoreFocus = useEffectEvent(() => trigger.current?.focus());
 
@@ -65,9 +66,7 @@ export function CreateTicket({ item }: { item: Item }) {
                 // A quiet control, as the sidebar's other properties are values, not calls to act.
                 {...buttonKind('control')}
                 data-create-ticket={item.id}
-                title={
-                    item.repo && onAzure(item.repo) ? 'Create a work item in Azure DevOps' : 'Create an issue on GitHub'
-                }
+                title={`Create ${tracker.aTicket} ${tracker.place}`}
                 onClick={() => {
                     setRead(null);
                     setOpen(true);

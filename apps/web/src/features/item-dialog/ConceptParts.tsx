@@ -2,7 +2,7 @@
 // each as its row on the board reads with every agent figure, and what its refinement and delivery still need, in
 // words. Parts off the board aren't listed; the count above says how many and why.
 
-import { duration, formatTokens, formatUsd, onAzure, plural } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, plural, trackerCapabilities } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Text } from '@lar-works/design-system';
 
@@ -159,7 +159,7 @@ export function ConceptParts({
     // below gives way to Try again.
     const loading = tracked && read?.state === 'loading';
     const waited = useDetailsWait(item.id, loading);
-    const tracker = item.repo && onAzure(item.repo) ? 'in Azure DevOps' : 'on GitHub';
+    const tracker = trackerCapabilities(item.repo).place;
 
     return (
         <MainSection

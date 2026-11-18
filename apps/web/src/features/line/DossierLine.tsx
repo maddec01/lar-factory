@@ -157,7 +157,7 @@ export function DossierLine({
                     {lead}
                     <DossierTitleCell>
                         {/* Source and project, then kind and title, as on a lane row. */}
-                        <RowSource item={parent} always others={repos} />
+                        <RowSource item={parent} others={repos} />
                         <RowKindMark item={parent} />
                         <DossierTitle name={parent.title} onOpen={() => open(parent)}>
                             <ItemTitle item={parent} />

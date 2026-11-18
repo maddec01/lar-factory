@@ -1,5 +1,5 @@
 import type { Item, Kind, TrackerDependency } from '@lar-factory/shared';
-import { trackerPullRequestReference, trackerIssueUrl, trackerPullRequestUrl } from '@lar-factory/shared';
+import { trackerPullRequestReference, ticketUrl, trackerPullRequestUrl } from '@lar-factory/shared';
 // Structural snapshots exclude queue order, Status, briefs, decision answers, slices and thread progress.
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -214,7 +214,7 @@ export function trackerCache(database: Database): TrackerCache {
             const repo = reference.slice(0, split);
             const number = Number(reference.slice(split + 1));
 
-            return pr ? trackerPullRequestUrl(repo, number) : trackerIssueUrl(repo, number);
+            return pr ? trackerPullRequestUrl(repo, number) : ticketUrl(repo, number);
         };
         const dependencies = graph.dependencies
             .filter((row) => ids.has(String(row.work_id)))
@@ -502,10 +502,8 @@ export function trackerCache(database: Database): TrackerCache {
                     const node = value.nodes.find(
                         (node) =>
                             node.ticket &&
-                            trackerIssueUrl(
-                                node.repository,
-                                Number(node.ticket.slice(node.ticket.lastIndexOf('#') + 1)),
-                            ) === url,
+                            ticketUrl(node.repository, Number(node.ticket.slice(node.ticket.lastIndexOf('#') + 1))) ===
+                                url,
                     )!;
 
                     return node.ticket!;

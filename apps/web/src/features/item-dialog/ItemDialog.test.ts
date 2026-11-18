@@ -465,3 +465,33 @@ test('absent branch starts new once confirmed and receives the successful board'
     });
     expect(inDialog('[data-needs-you-reason]')).toBeNull();
 });
+
+test.each([
+    ['maddec01/lar-server', 'GitHub', 'GitHub label', 'https://github.com/maddec01/lar-server/issues/'],
+    [
+        'contoso/Mobile%20App/mobile-app',
+        'Azure DevOps',
+        'Azure DevOps tag',
+        'https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/',
+    ],
+])('a %s item names its tracker and links its ticket and its parent ticket', async (repo, name, label, page) => {
+    const item: Item = {
+        ...sample.items[0]!,
+        id: 'tracked',
+        repo,
+        number: 8,
+        url: `${page}8`,
+        labels: ['ux'],
+        parent: { number: 7, title: 'Parent', url: `${page}7`, repo, state: 'open' },
+        parentId: null,
+    };
+
+    await mountPage({ ...sample, items: [item] });
+    await openItem(item.id);
+
+    const link = inDialog<HTMLAnchorElement>('[data-item-summary] [data-ticket-link]')!;
+
+    expect([link.title, link.href]).toEqual([`Open in ${name}`, `${page}8`]);
+    expect(inDialog<HTMLAnchorElement>('[data-item-parent] a')?.href).toBe(`${page}7`);
+    expect(inDialog(`[title="${label}: ux"]`)).not.toBeNull();
+});

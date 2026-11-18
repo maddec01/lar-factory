@@ -1,7 +1,7 @@
 // Ticket description, Spec sync notice and description editor.
 
 import type { TextFormat } from '@lar-factory/shared';
-import { briefProse, onAzure } from '@lar-factory/shared';
+import { briefProse, trackerCapabilities } from '@lar-factory/shared';
 import { Button, Disclosure, MarkdownEditor, RichText } from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
@@ -32,7 +32,7 @@ function useSource(itemId: string) {
     const repo = item?.repo;
 
     return {
-        source: repo && onAzure(repo) ? 'Azure DevOps' : repo ? 'GitHub' : 'its ticket',
+        source: repo ? trackerCapabilities(repo).name : 'its ticket',
         url: item?.url ?? undefined,
     };
 }

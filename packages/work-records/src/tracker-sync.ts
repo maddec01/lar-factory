@@ -8,6 +8,7 @@ import {
     trackerKind,
     readTrackerStructure,
     sameRepo,
+    ticketUrl,
     trackerReference,
     writeTrackerStructure,
     type Kind,
@@ -66,11 +67,6 @@ const fail = (error: unknown) => (error instanceof Error ? error.message : Strin
 const numberOf = (reference: string) => Number(reference.slice(reference.lastIndexOf('#') + 1));
 /** A text field of a GitHub or Azure DevOps reply; anything but text reads as empty. */
 const textField = (value: unknown): string => (typeof value === 'string' ? value : '');
-
-export const structureIssueUrl = (repository: string, number: number) =>
-    repository.split('/').length === 2
-        ? `https://github.com/${repository}/issues/${number}`
-        : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_workitems/edit/${number}`;
 
 const repoFromUrl = (url: string, setups: readonly RepositorySetup[], hint?: string) => {
     const reference = trackerReference(url);
@@ -131,7 +127,7 @@ export function structureProvider(): StructureProvider {
         return comments;
     };
     const latestMetadata = async (repository: string, number: number, count: number, original: string) => {
-        const ownUrl = structureIssueUrl(repository, number);
+        const ownUrl = ticketUrl(repository, number);
         const managed: TrackerStructure[] = [];
 
         for (let page = Math.max(1, Math.ceil(count / 100)); page >= 1; page--) {
@@ -657,7 +653,7 @@ export async function readStructureSnapshot(
             : await provider.read(rootRef.repository, rootRef.number);
     const manifest = readTrackerStructure(root.body)?.snapshot;
 
-    if (!manifest || manifest.root !== structureIssueUrl(root.repository, root.number))
+    if (!manifest || manifest.root !== ticketUrl(root.repository, root.number))
         throw Error('The concept has no committed structure manifest.');
 
     if (!manifest.chunks.length) throw Error('The saved concept structure has no chunks.');

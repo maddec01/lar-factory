@@ -1533,6 +1533,8 @@ export function createItemCommands({
      * Only a group whose refreshed checklist shows an unseen merge-shaped part with a merged PR is read again.
      */
     const reconcilingGroups = new Set<string>();
+    /** The groups whose continuation had nothing to send, with the records' mark then: until a commit, it still has none. */
+    const nothingToSend = new Map<string, string>();
 
     async function reconcileMergedGroups(start: ItemCommands['start']) {
         if (!records) return;
@@ -1591,9 +1593,14 @@ export function createItemCommands({
                 )
                     continue;
 
+                if (nothingToSend.get(item.id) === records.changes()) continue;
+
                 let { ready, run } = records.prepareReconcileContinuation(item.id);
 
-                if (!ready || run?.sent || run?.rejected) continue;
+                if (!ready || run?.sent || run?.rejected) {
+                    nothingToSend.set(item.id, records.changes());
+                    continue;
+                }
 
                 if (!run) {
                     // A group with no retained owner uses the ordinary durable launch-intent path.

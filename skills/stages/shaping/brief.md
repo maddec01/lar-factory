@@ -45,7 +45,7 @@ the final brief approval covers, not product answers for Confirmed. Keep them
 short and add no unrequested notices or warnings. Leave other mechanics the
 code shows to the builder.
 
-Set `verify.required` only when acceptance needs Pedro's own judgment or access
+Set `verify.required` only when acceptance needs the user's own judgment or access
 the agent lacks; name that need in `visibleUi` (the stored field name). An ordinary
 UI change that the agent can exercise and check uses `{required:false,visibleUi:null}`.
 

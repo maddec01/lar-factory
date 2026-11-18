@@ -42,6 +42,6 @@ approve, make the build as above and run
 
 Keep proof/status in Dependency records, never briefs. `update-dependency --file F`
 saves `evidence` and `proofState`: `pending`, `insufficient`, or `submitted` only
-for actual proof awaiting Pedro. Closure notes are not proof; evidence edits reset
+for actual proof awaiting the user. Closure notes are not proof; evidence edits reset
 submission unless explicitly resubmitted.
 After changes, [Reconcile group](../reconcile-group.md).

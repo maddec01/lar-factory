@@ -18,7 +18,7 @@ destination cannot be established from the available evidence, omit that candida
 and report why; never pause delivery to ask for routing.
 
 The desk's optional **Choose follow-ups** card stays available after the delivery
-PR merges, until Pedro picks or dismisses it. It makes chosen List records/tickets
+PR merges, until the user picks or dismisses it. It makes chosen List records/tickets
 under each destination's retro setting and verified Access. Neither an unanswered
 pick nor follow-up creation holds delivery or a build slot. A failed
 creation shows as a board toast and is never retried; never create those

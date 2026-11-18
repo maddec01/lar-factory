@@ -21,7 +21,7 @@ Route suggestions per
 `lar-work propose-retro <work ID> --revision N --file F`, which creates the
 Retro record. Save `[]` if none. Return to CI: the board's **Choose follow-ups**
 card collects the optional selection independently of delivery, including after Done, and creates chosen
-List records/tickets. It stays until Pedro chooses or dismisses it. Never ask
+List records/tickets. It stays until the user chooses or dismisses it. Never ask
 for picks in chat or create them.
 
 Retro is optional follow-up capture, never a delivery gate. Return to CI without

@@ -1,12 +1,5 @@
-import { boardSessionAuthority } from './board-session.ts';
-import { keychainSessionVault } from './keychain-session.ts';
-import { ProjectProtocol, type SessionAuthority, type SessionVault } from './project-protocol.ts';
-
-/** Where a board's T3 session is kept and who issues it. */
-export interface BoardSessions {
-    vault: SessionVault;
-    authority: SessionAuthority;
-}
+import { ProjectProtocol } from './project-protocol.ts';
+import { boardReadSession, type ReadSession } from './read-session.ts';
 
 /**
  * Server-only API for #700. Supply origin and release metadata from T3 runtime discovery.
@@ -21,7 +14,11 @@ export interface BoardSessions {
  * eight projects returned. Rejection and renewal failures use controlled fixtures.
  * Existing consumer migration belongs to #706.
  */
-export function boardProjects(baseUrl: string, version: string, sessions?: BoardSessions): ProjectProtocol {
+export function boardProjects(
+    baseUrl: string,
+    version: string,
+    session: ReadSession = boardReadSession(),
+): ProjectProtocol {
     const url = new URL(baseUrl);
 
     if (
@@ -33,8 +30,7 @@ export function boardProjects(baseUrl: string, version: string, sessions?: Board
         throw new Error('Expected local T3 server');
 
     return new ProjectProtocol(
-        sessions?.vault ?? keychainSessionVault(),
-        sessions?.authority ?? boardSessionAuthority(),
+        session,
         (token) =>
             fetch(new URL('/api/projects', url), {
                 headers: { Authorization: `Bearer ${token}` },

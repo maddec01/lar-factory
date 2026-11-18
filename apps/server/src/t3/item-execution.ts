@@ -3,7 +3,6 @@ import type { ItemThread, StartedThread } from '@lar-factory/shared';
 
 import { readJsonRecord } from '../json-file.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
-import { boardProjects } from './board-projects.ts';
 import {
     readArchivedShells,
     readExecution,
@@ -14,6 +13,7 @@ import {
 } from './execution-protocol.ts';
 import { executionStats, statsProjection } from './execution-stats.ts';
 import { pendingRequest, type PendingRequest } from './pending-request.ts';
+import { boardReadSession } from './read-session.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 import { titledFrom } from './t3.ts';
 import type { ActivityFamily } from './thread-activity.ts';
@@ -342,7 +342,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
         try {
             const origin = new URL(runtime.origin);
             const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
-            const protocol = boardProjects(runtime.origin, version);
+            const session = boardReadSession();
             const entries = new Map<string, ExecutionRead>();
             const requests = new Map<string, PendingRequest>();
             const fingerprints = new Map<string, string>();
@@ -370,7 +370,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
 
                     const startedEpoch = epoch;
 
-                    void readExecution(origin, version, protocol, id)
+                    void readExecution(origin, version, session, id)
                         .catch((): ExecutionRead => ({ availability: 'unavailable' }))
                         .then((result) => {
                             if (current !== state || epoch !== startedEpoch) return;
@@ -463,7 +463,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
 
                 const startedEpoch = archivedEpoch;
 
-                void readArchivedShells(origin, version, protocol)
+                void readArchivedShells(origin, version, session)
                     .catch((): ThreadFamilyRead => ({ availability: 'unavailable' }))
                     .then((read) => {
                         if (current !== state) return;
@@ -495,7 +495,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
             };
             state.reads = entries;
             state.fingerprints = fingerprints;
-            state.stop = subscribeExecutionShell(origin, version, protocol, (read) => {
+            state.stop = subscribeExecutionShell(origin, version, session, (read) => {
                 if (read.availability !== 'available') {
                     epoch++;
                     fingerprints.clear();

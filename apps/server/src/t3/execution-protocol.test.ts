@@ -1,19 +1,17 @@
 import { expect, it, vi } from 'vite-plus/test';
 
 import { subscribeExecution } from './execution-protocol.ts';
-import { ProjectProtocol } from './project-protocol.ts';
+import { ReadSession } from './read-session.ts';
 
-const protocol = new ProjectProtocol(
-    { read: async () => undefined, write: async () => {} },
-    {
+const protocol = new ReadSession({
+    vault: { read: async () => undefined, write: async () => {} },
+    authority: {
         issue: async () => {
             throw Error();
         },
         revoke: async () => {},
     },
-    async () => new Response(),
-    'unknown',
-);
+});
 
 it('refuses external origins before obtaining a session', () => {
     expect(() => subscribeExecution(new URL('http://example.com'), 'unknown', protocol, 'thread', () => {})).toThrow(
@@ -72,12 +70,10 @@ it('retains execution on disconnect and rejects stale reconnect snapshots', asyn
     vi.stubGlobal('fetch', async () => Response.json({ ticket: 'fixture' }));
 
     const session = { token: 'fixture', sessionId: 'fixture', expiresAt: '2099-01-01' };
-    const authenticated = new ProjectProtocol(
-        { read: async () => session, write: async () => {} },
-        { issue: async () => session, revoke: async () => {} },
-        async () => new Response(),
-        'unused',
-    );
+    const authenticated = new ReadSession({
+        vault: { read: async () => session, write: async () => {} },
+        authority: { issue: async () => session, revoke: async () => {} },
+    });
     const changed = vi.fn();
     const stop = subscribeExecution(
         new URL('http://127.0.0.1:3773'),

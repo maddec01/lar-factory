@@ -1,5 +1,7 @@
 import { isRecord, PROJECT_ICON_COLORS, type ChosenProjectIcon } from '@lar-factory/shared';
 
+import type { ReadSession } from './read-session.ts';
+
 export interface BoardSession {
     token: string;
     sessionId: string;
@@ -87,107 +89,18 @@ export function projectIconFields(
 export class ProjectProtocol {
     private observation?: ProjectObservation;
     private snapshotTime = -Infinity;
-    private session?: BoardSession;
-    private generation = 0;
-    private forceRenewal = false;
-    private pending?: Promise<BoardSession>;
-    private readonly vault: SessionVault;
-    private readonly authority: SessionAuthority;
+    readonly session: ReadSession;
     private readonly request: (token: string) => Promise<Response>;
     private readonly now: () => number;
     constructor(
-        vault: SessionVault,
-        authority: SessionAuthority,
+        session: ReadSession,
         request: (token: string) => Promise<Response>,
         _serverVersion: string,
         now: () => number = Date.now,
     ) {
-        this.vault = vault;
-        this.authority = authority;
+        this.session = session;
         this.request = request;
         this.now = now;
-    }
-
-    /** Ignore late failures from consumers of an already replaced session. */
-    invalidateSession(session: BoardSession): void {
-        if (this.session !== session) return;
-
-        this.session = undefined;
-        this.generation++;
-        this.forceRenewal = true;
-    }
-
-    async reauthorize(): Promise<void> {
-        this.session = undefined;
-        this.generation++;
-        this.forceRenewal = true;
-
-        try {
-            await this.pending;
-        } catch {
-            /* A failed acquisition can be retried. */
-        }
-
-        await this.subscriptionSession();
-    }
-
-    subscriptionSession(): Promise<BoardSession> {
-        if (this.pending) return this.pending;
-
-        if (this.session && Date.parse(this.session.expiresAt) > this.now() + 60_000)
-            return Promise.resolve(this.session);
-
-        const generation = this.generation;
-        const acquisition = (async () => {
-            const previous = this.session ?? (await this.vault.read());
-
-            if (generation !== this.generation) throw new Error('Session invalidated');
-
-            if (
-                !this.forceRenewal &&
-                previous?.token &&
-                previous.sessionId &&
-                Date.parse(previous.expiresAt) > this.now() + 60_000
-            ) {
-                this.session = previous;
-
-                return previous;
-            }
-
-            this.session = undefined;
-            this.forceRenewal = true;
-
-            const session = await this.authority.issue();
-
-            if (!session.token || !session.sessionId || !(Date.parse(session.expiresAt) > this.now() + 60_000))
-                throw new Error('Invalid session');
-
-            try {
-                if (generation !== this.generation) throw new Error('Session invalidated');
-
-                await this.vault.write(session);
-
-                if (generation !== this.generation) throw new Error('Session invalidated');
-
-                if (previous) await this.authority.revoke(previous.sessionId);
-
-                if (generation !== this.generation) throw new Error('Session invalidated');
-            } catch {
-                await this.authority.revoke(session.sessionId);
-                throw new Error('Session renewal failed');
-            }
-
-            this.session = session;
-            this.forceRenewal = false;
-
-            return session;
-        })().finally(() => {
-            if (this.pending === acquisition) this.pending = undefined;
-        });
-
-        this.pending = acquisition;
-
-        return acquisition;
     }
 
     async readProjects(): Promise<ProjectRead> {
@@ -198,7 +111,7 @@ export class ProjectProtocol {
         let session: BoardSession;
 
         try {
-            session = await this.subscriptionSession();
+            session = await this.session.subscriptionSession();
         } catch {
             return result('renewal-required');
         }
@@ -207,7 +120,7 @@ export class ProjectProtocol {
             const response = await this.request(session.token);
 
             if (response.status === 401 || response.status === 403) {
-                this.invalidateSession(session);
+                this.session.invalidateSession(session);
 
                 return result('renewal-required');
             }

@@ -1,11 +1,9 @@
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
-import { boardSessionAuthority } from './board-session.ts';
 import { executionModels, readExecutionModels } from './execution-capabilities.ts';
 import { subscribeProjects } from './project-subscription.ts';
 import { serverRuntimeOrigin } from './t3-settings.ts';
 
-vi.mock('./board-session.ts');
 vi.mock('./project-subscription.ts');
 vi.mock('./t3-settings.ts');
 afterEach(() => {
@@ -63,13 +61,8 @@ it('reads model-specific options and only exports the execution allowlist', () =
 it('reads live capabilities and closes the subscription after the snapshot', async () => {
     vi.mocked(serverRuntimeOrigin).mockReturnValue('http://localhost:3773');
 
-    const revoke = vi.fn(async () => {});
     const stop = vi.fn();
 
-    vi.mocked(boardSessionAuthority).mockReturnValue({
-        issue: async () => ({ sessionId: 's', token: 'secret', expiresAt: '2099-01-01' }),
-        revoke,
-    });
     vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, request) => {
         request!.accept(snapshot);
 
@@ -78,5 +71,4 @@ it('reads live capabilities and closes the subscription after the snapshot', asy
     expect(await readExecutionModels()).toEqual(executionModels(snapshot));
     expect(vi.mocked(subscribeProjects).mock.calls[0]![4]!.tag).toBe('subscribeServerConfig');
     expect(stop).toHaveBeenCalledOnce();
-    expect(revoke).toHaveBeenCalledWith('s');
 });

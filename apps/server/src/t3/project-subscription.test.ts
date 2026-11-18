@@ -1,16 +1,14 @@
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
-import { ProjectProtocol } from './project-protocol.ts';
 import { subscribeProjects } from './project-subscription.ts';
+import { ReadSession } from './read-session.ts';
 
 const session = { token: 'fixture', sessionId: 'fixture', expiresAt: '2099-01-01' };
 const protocol = () =>
-    new ProjectProtocol(
-        { read: async () => session, write: async () => {} },
-        { issue: async () => session, revoke: async () => {} },
-        async () => new Response(),
-        'fixture-release',
-    );
+    new ReadSession({
+        vault: { read: async () => session, write: async () => {} },
+        authority: { issue: async () => session, revoke: async () => {} },
+    });
 
 afterEach(() => {
     vi.unstubAllGlobals();

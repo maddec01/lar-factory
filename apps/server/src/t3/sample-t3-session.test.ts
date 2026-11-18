@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, test, vi } from 'vite-plus/test';
 
 import { boardProjects } from './board-projects.ts';
+import { setReadSessions } from './read-session.ts';
 import { sampleT3Session } from './sample-t3-session.ts';
 
 vi.mock('./keychain-session.ts', () => ({
@@ -45,7 +46,9 @@ test("it issues a read-scope session named apart from the board's, and reads wit
         vi.unstubAllGlobals();
     });
 
-    const read = await boardProjects('http://127.0.0.1:3773', '', sampleT3Session(cli)).readProjects();
+    setReadSessions(sampleT3Session(cli));
+
+    const read = await boardProjects('http://127.0.0.1:3773', '').readProjects();
 
     expect(read.availability).toBe('available');
     expect(issued(calls())).toHaveLength(1);

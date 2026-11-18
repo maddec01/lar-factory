@@ -1,7 +1,8 @@
 import { isRecord } from '@lar-factory/shared';
 
 import { loopTrace } from '../startup/loop-trace.ts';
-import { type BoardSession, type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
+import { type BoardSession, type ProjectRead } from './project-protocol.ts';
+import type { ReadSession } from './read-session.ts';
 import { ShellRecovery } from './shell-recovery.ts';
 
 /** T3 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52:
@@ -14,7 +15,7 @@ import { ShellRecovery } from './shell-recovery.ts';
 export function subscribeProjects(
     origin: URL,
     _serverVersion: string,
-    protocol: Pick<ProjectProtocol, 'subscriptionSession' | 'invalidateSession'>,
+    protocol: Pick<ReadSession, 'subscriptionSession' | 'invalidateSession'>,
     onChange: (read: ProjectRead) => void,
     execution?: {
         tag: string;

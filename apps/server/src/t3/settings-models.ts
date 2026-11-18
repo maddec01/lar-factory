@@ -45,7 +45,7 @@ export async function readSettingsModels(groups: ModelGroup[]): Promise<FactoryM
                 access.origin,
                 '',
                 {
-                    subscriptionSession: () => access.protocol.subscriptionSession(),
+                    subscriptionSession: () => access.session.subscriptionSession(),
                     invalidateSession() {},
                 },
                 () => {},

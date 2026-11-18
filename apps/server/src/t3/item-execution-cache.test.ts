@@ -19,7 +19,6 @@ vi.mock('../json-file.ts', () => ({
     },
 }));
 vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture', t3Running: fixture.running }));
-vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({}) }));
 vi.mock('./execution-protocol.ts', () => ({
     subscribeExecutionShell: (
         _origin: unknown,

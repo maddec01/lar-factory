@@ -1,6 +1,6 @@
-import type { BoardSessions } from './board-projects.ts';
 import { boardSessionAuthority } from './board-session.ts';
 import type { BoardSession } from './project-protocol.ts';
+import type { BoardSessions } from './read-session.ts';
 
 /**
  * The session of a sample board that reads T3: its own, held only in memory, so it never reads, writes or revokes the

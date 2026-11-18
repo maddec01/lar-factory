@@ -1,7 +1,6 @@
 import type { ChosenProjectIcon } from '@lar-factory/shared';
 import { appendFileSync } from 'node:fs';
 
-import type { BoardSessions } from '../src/t3/board-projects.ts';
 import type { ProjectRead } from '../src/t3/project-protocol.ts';
 import { liveProjects } from '../src/t3/t3-db.ts';
 import { statsDbPath } from '../src/t3/t3-settings.ts';
@@ -35,11 +34,6 @@ export const repositoryProjectAccess = () => undefined;
 export const subscribeRepositoryProjects =
     (_changed: () => void): (() => void) =>
     () => {};
-
-/** Spawned boards issue no session, so a sample board holds this one to revoke when it stops. */
-export const setProjectSessions = ({ vault }: BoardSessions): void => {
-    void vault.write({ token: 'fake-token', sessionId: 'fake-session', expiresAt: '2099-01-01T00:00:00Z' });
-};
 
 export async function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
     return repositoryProjects();

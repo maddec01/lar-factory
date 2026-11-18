@@ -1,8 +1,9 @@
 import { isRecord } from '@lar-factory/shared';
 
 import { ExecutionRecovery } from './execution-recovery.ts';
-import { type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
+import { type ProjectRead } from './project-protocol.ts';
 import { subscribeProjects } from './project-subscription.ts';
+import type { ReadSession } from './read-session.ts';
 import { projectMetadataSnapshot } from './shell-recovery.ts';
 
 export interface ExecutionRead {
@@ -17,7 +18,7 @@ export interface ExecutionRead {
 export function subscribeExecution(
     origin: URL,
     version: string,
-    protocol: ProjectProtocol,
+    protocol: ReadSession,
     threadId: string,
     onChange: (read: ExecutionRead) => void,
 ): () => void {
@@ -45,7 +46,7 @@ export function subscribeExecution(
 export function readExecution(
     origin: URL,
     version: string,
-    protocol: ProjectProtocol,
+    protocol: ReadSession,
     threadId: string,
 ): Promise<ExecutionRead> {
     return new Promise((resolve) => {
@@ -74,7 +75,7 @@ export interface ThreadFamilyRead {
 function readThreadShells(
     origin: URL,
     version: string,
-    protocol: ProjectProtocol,
+    protocol: ReadSession,
     tag: string,
     payload: Record<string, unknown>,
 ): Promise<ThreadFamilyRead> {
@@ -120,7 +121,7 @@ function readThreadShells(
 }
 
 /** Source contract orchestrationV2.ts:3572 and 4122. The shell subscription always sends `archivedThreads: []`, so only this reads them. */
-export function readArchivedShells(origin: URL, version: string, protocol: ProjectProtocol): Promise<ThreadFamilyRead> {
+export function readArchivedShells(origin: URL, version: string, protocol: ReadSession): Promise<ThreadFamilyRead> {
     return readThreadShells(origin, version, protocol, 'orchestration.getArchivedShellSnapshot', {});
 }
 
@@ -135,7 +136,7 @@ export interface ShellRead {
 export function subscribeExecutionShell(
     origin: URL,
     version: string,
-    protocol: ProjectProtocol,
+    protocol: ReadSession,
     onChange: (read: ShellRead) => void,
 ): () => void {
     let observation: ShellRead['observation'];

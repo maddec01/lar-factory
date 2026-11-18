@@ -1,12 +1,16 @@
 import { expect, it } from 'vite-plus/test';
 
-import { ProjectProtocol, type BoardSession } from './project-protocol.ts';
+import { ProjectProtocol, type BoardSession, type SessionAuthority, type SessionVault } from './project-protocol.ts';
+import { ReadSession } from './read-session.ts';
+
+const adapterOf = (vault: SessionVault, authority: SessionAuthority, request: (token: string) => Promise<Response>) =>
+    new ProjectProtocol(new ReadSession({ vault, authority }), request, 'fixture-release');
 
 it('retains the observation after rejection and reports renewal failure', async () => {
     let session: BoardSession | undefined;
     let rejected = false;
     let fail = false;
-    const adapter = new ProjectProtocol(
+    const adapter = adapterOf(
         {
             read: async () => session,
             write: async (value) => {
@@ -23,7 +27,6 @@ it('retains the observation after rejection and reports renewal failure', async 
         },
         async () =>
             rejected ? new Response('', { status: 401 }) : Response.json({ projects: [], updatedAt: '2026-01-01' }),
-        'fixture-release',
     );
     const first = await adapter.readProjects();
 
@@ -36,7 +39,7 @@ it('retains the observation after rejection and reports renewal failure', async 
 });
 
 it('reads compatible projects on T3 0.1.6-nightly.20261031.3977', async () => {
-    const adapter = new ProjectProtocol(
+    const adapter = adapterOf(
         {
             read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
             write: async () => {},
@@ -53,7 +56,6 @@ it('reads compatible projects on T3 0.1.6-nightly.20261031.3977', async () => {
                 updatedAt: '2026-01-01',
                 futureField: true,
             }),
-        '0.1.6-nightly.20261031.3977',
     );
 
     expect((await adapter.readProjects()).observation?.projects).toEqual([
@@ -67,99 +69,8 @@ it('rejects remote endpoints before sending credentials', async () => {
     expect(() => boardProjects('https://example.com', 'fixture-release')).toThrow('Expected local T3 server');
 });
 
-it('revokes a newly issued session if Keychain storage fails', async () => {
-    const revoked: string[] = [];
-    const adapter = new ProjectProtocol(
-        {
-            read: async () => undefined,
-            write: async () => {
-                throw Error('locked');
-            },
-        },
-        {
-            issue: async () => ({ token: 'fixture', sessionId: 'new', expiresAt: '2099-01-01' }),
-            revoke: async (id) => {
-                revoked.push(id);
-            },
-        },
-        async () => {
-            throw Error('must not request');
-        },
-        'fixture-release',
-    );
-
-    expect((await adapter.readProjects()).availability).toBe('renewal-required');
-    expect(revoked).toEqual(['new']);
-});
-
-it('renews before expiry, persists the replacement, and revokes the old session', async () => {
-    const events: string[] = [];
-    const adapter = new ProjectProtocol(
-        {
-            read: async () => ({ token: 'old-fixture', sessionId: 'old', expiresAt: new Date(30_000).toISOString() }),
-            write: async (session) => {
-                events.push(`stored:${session.sessionId}`);
-            },
-        },
-        {
-            issue: async () => ({
-                token: 'new-fixture',
-                sessionId: 'new',
-                expiresAt: new Date(3_600_000).toISOString(),
-            }),
-            revoke: async (id) => {
-                events.push(`revoked:${id}`);
-            },
-        },
-        async (token) => {
-            expect(token).toBe('new-fixture');
-
-            return Response.json({ projects: [], updatedAt: '2026-01-01' });
-        },
-        'fixture-release',
-        () => 0,
-    );
-
-    expect((await adapter.readProjects()).availability).toBe('available');
-    expect(events).toEqual(['stored:new', 'revoked:old']);
-});
-
-it('reauthorization prevents a late vault read from restoring credentials', async () => {
-    let release!: (session: BoardSession) => void;
-    let reads = 0;
-    const stored = { token: 'fixture', sessionId: 'old', expiresAt: '2099-01-01' };
-    const adapter = new ProjectProtocol(
-        {
-            read: async () =>
-                ++reads === 1
-                    ? new Promise<BoardSession>((resolve) => {
-                          release = resolve;
-                      })
-                    : stored,
-            write: async () => {},
-        },
-        {
-            issue: async () => ({ ...stored, sessionId: 'new' }),
-            revoke: async () => {},
-        },
-        async () => {
-            throw Error();
-        },
-        '',
-    );
-    const pending = adapter.subscriptionSession();
-    // oxlint-disable-next-line vitest/valid-expect -- awaited below, once the release settles it
-    const rejected = expect(pending).rejects.toThrow('Session invalidated');
-    const renewal = adapter.reauthorize();
-
-    release(stored);
-    await rejected;
-    await renewal;
-    expect((await adapter.subscriptionSession()).sessionId).toBe('new');
-});
-
 const projectsWith = async (fields: object) => {
-    const adapter = new ProjectProtocol(
+    const adapter = adapterOf(
         {
             read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }),
             write: async () => {},
@@ -175,7 +86,6 @@ const projectsWith = async (fields: object) => {
                 projects: [{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', ...fields }],
                 updatedAt: '2026-01-01',
             }),
-        'fixture-release',
     );
     const read = await adapter.readProjects();
 

@@ -1,7 +1,6 @@
-import { clock, failedCheck, isStale, noneOnboarded, shortAgo } from '@lar-factory/shared';
+import { clock, failedCheck, isStale, noneOnboarded, shortAgo, untilShortAgeChanges } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { ToolbarStatusGroup } from '@lar-works/design-system';
-import { useEffect, useState } from 'react';
 
 import { Counters } from './Counters';
 import { useWideBar } from './useWideBar';
@@ -12,49 +11,39 @@ import { ListButton } from '@/features/list';
 import { SettingsButton } from '@/features/settings';
 import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { useClock } from '@/shared/time/useClock';
 import { BoardTitleBar, type RefreshHealth, RefreshIndicator, scrollBoardToTop } from '@/ui/board';
 
 function Refreshed({ data }: { data: BoardData }) {
     const { fetchedAt } = data;
     const clientError = useBoardStore((state) => state.clientError);
-    const [now, setNow] = useState(Date.now);
-
-    useEffect(() => {
-        let timer: ReturnType<typeof setInterval> | undefined;
-        const followVisibility = () => {
-            clearInterval(timer);
-
-            if (document.hidden) return;
-
-            setNow(Date.now());
-            timer = setInterval(() => setNow(Date.now()), 1_000);
-        };
-
-        document.addEventListener('visibilitychange', followVisibility);
-        followVisibility();
-
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener('visibilitychange', followVisibility);
-        };
-    }, [fetchedAt]);
-
+    // While live the bar shows no time, so the clock wakes only when the read goes stale; once a time shows, it wakes
+    // when the unit it shows changes.
+    const staleAt = fetchedAt ? Date.parse(fetchedAt) + data.refreshSeconds * 3 * 1000 : undefined;
+    const stale = useClock(
+        (now) => isStale(data, now),
+        (now) => (staleAt !== undefined && now <= staleAt ? staleAt - now + 1 : undefined),
+    );
     const reading = data.firstRead.waiting ?? [];
     const health: RefreshHealth = clientError
         ? 'disconnected'
         : reading.length
           ? 'waiting'
-          : isStale(data, now) || data.itemSourceProblems?.length
+          : stale || data.itemSourceProblems?.length
             ? 'stale'
             : fetchedAt
               ? 'live'
               : 'waiting';
-    const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
+    const shown = health !== 'live' && !(health === 'waiting' && reading.length > 0);
+    const ago = useClock(
+        (now) => (fetchedAt ? shortAgo(fetchedAt, now) : null),
+        (now) => (shown && fetchedAt ? untilShortAgeChanges(Date.parse(fetchedAt), now) : undefined),
+    );
 
     return (
         <RefreshIndicator
             health={health}
-            hidden={health === 'waiting' && reading.length > 0}
+            hidden={!shown}
             label={
                 health === 'disconnected' ? (
                     fetchedAt ? (
@@ -70,7 +59,7 @@ function Refreshed({ data }: { data: BoardData }) {
                     <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>
                 )
             }
-            detail={fetchedAt ? `Updated ${shortAgo(fetchedAt, now)} · ${clock(fetchedAt, undefined)}` : 'Not read yet'}
+            detail={fetchedAt ? `Updated ${ago} · ${clock(fetchedAt, undefined)}` : 'Not read yet'}
             secondaryDetail={
                 clientError
                     ? `Board disconnected: ${clientError}`

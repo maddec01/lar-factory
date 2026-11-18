@@ -8,6 +8,7 @@ export { AgentWork, AgentWorkNote, INCOMPLETE_TOTAL } from './AgentWork';
 export { useBuilds, BUILD_LIMIT_NOTE } from './BuildLimitText';
 export { hasFigures, usageLoading, usageUnreadable } from './UsageFigures';
 export { useLastKnown } from './useLastKnown';
+export { useItemClock } from './useItemClock';
 export { Dependencies } from './Dependencies';
 export { dependenciesOf } from './ItemDependencies';
 export { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions';

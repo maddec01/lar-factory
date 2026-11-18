@@ -4,10 +4,17 @@
 // item dialog list the agents at work with one component.
 
 import type { Item, ThreadAgent } from '@lar-factory/shared';
-import { itemActivityAgents, itemActivityLine, plural, shortAge, modelDisplayName } from '@lar-factory/shared';
+import {
+    itemActivityAgents,
+    itemActivityLine,
+    plural,
+    shortAge,
+    modelDisplayName,
+    untilShortAgeChanges,
+} from '@lar-factory/shared';
 import { Alert, Disclosure, Text } from '@lar-works/design-system';
 
-import { useShownStatus } from '@/features/items';
+import { useItemClock, useShownStatus } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useClock } from '@/shared/time/useClock';
 import {
@@ -20,9 +27,18 @@ import {
     WorkingAgents,
 } from '@/ui/board';
 
-/** An action's age on the second's clock, so a tick renders nothing around it. */
+/** An action's age, read again when the unit it shows changes, so a tick renders nothing around it. */
 function LiveAge({ at }: { at: string }) {
-    return <AgentAge>{useClock((now) => shortAge(now - Date.parse(at)))}</AgentAge>;
+    const since = Date.parse(at);
+
+    return (
+        <AgentAge>
+            {useClock(
+                (now) => shortAge(now - since),
+                (now) => untilShortAgeChanges(since, now),
+            )}
+        </AgentAge>
+    );
 }
 
 /** The agents at work and what each does. `details` adds each one's model and action age. */
@@ -52,7 +68,7 @@ export function ItemAgents({ item }: { item: Item }) {
     const disconnected = useBoardStore((state) => !!state.clientError);
 
     // Renders when the list goes unavailable; the ages in it move with their own clock.
-    useClock((now) => itemActivityAgents(item, now, disconnected) === 'unavailable');
+    useItemClock(item, (now) => itemActivityAgents(item, now, disconnected) === 'unavailable');
 
     // oxlint-disable-next-line react/purity -- the useClock above renders this again when the time changes the answer
     const agents = itemActivityAgents(item, Date.now(), disconnected);
@@ -103,8 +119,9 @@ export function ActivityLine({
 }) {
     const disconnected = useBoardStore((state) => !!state.clientError);
 
-    // Keep checking every second, including the quiet/stale deadlines, but render only when the shown words change.
-    useClock((now) => {
+    // Check every second while the item has a thread to follow, including the quiet and stale deadlines, but render
+    // only when the shown words change.
+    useItemClock(item, (now) => {
         const line = itemActivityLine(item, now, disconnected);
 
         return (

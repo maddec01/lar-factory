@@ -34,6 +34,7 @@ export function sampleRepositories(tracker: Tracker, dir: string): () => RepoCon
                 'manage-labels': 'allowed',
                 'type-ticket': 'allowed',
                 'relate-ticket': 'allowed',
+                ...(!onAzure(config.repo) && { 'push-branch': 'allowed', 'open-pr': 'allowed' }),
             },
             dir,
         );

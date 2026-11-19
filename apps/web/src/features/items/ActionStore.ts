@@ -1,11 +1,19 @@
-// What this page is doing for an item: a Queue, Move to List, Abandon or Needs you choice in flight, or the error
+// What this page is doing for an item: a Queue, Move to List, Back to Queue, Abandon or Needs you choice in flight, or the error
 // it left. Keyed by item id.
 
 import { create } from 'zustand';
 
 export interface ItemAction {
     phase: 'pending' | 'error';
-    kind: 'queue' | 'back-to-list' | 'reshape' | 'abandon' | 'needs-you' | 'dependency-met' | 'merge-pr';
+    kind:
+        | 'queue'
+        | 'back-to-list'
+        | 'back-to-queue'
+        | 'reshape'
+        | 'abandon'
+        | 'needs-you'
+        | 'dependency-met'
+        | 'merge-pr';
     message?: string;
 }
 

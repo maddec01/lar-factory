@@ -3,6 +3,7 @@
 
 import {
     approvedUnbuilt,
+    canMoveStoppedShaping,
     canResumeShaping,
     canRetryBuild,
     currentBuildThread,
@@ -20,6 +21,8 @@ import { useMovesItem } from './useMovesItem';
 import {
     AbandonButton,
     BackToListButton,
+    BackToQueueButton,
+    NeedsYouChoices,
     OpenThread,
     PrAction,
     QueueButton,
@@ -27,6 +30,7 @@ import {
     StartBuild,
     StartOrAfter,
     hasLiveThread,
+    offersChoices,
     ResumeRelease,
     useShownStatus,
 } from '@/features/items';
@@ -49,6 +53,9 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
         return { control: <ResumeRelease item={item} data={data} /> };
 
     if (item.conceptBuild && ['Ready', 'In progress', 'Review'].includes(item.status)) return { control: null };
+
+    // A Needs you notice's own answer, such as Start again for work whose thread is gone, is the footer's Main action.
+    if (offersChoices(item, 'main')) return { control: <NeedsYouChoices item={item} data={data} side="main" /> };
 
     if (resume) return { opens: itemActivityThread(item)?.id, label: 'Resume in T3', primary: true };
 
@@ -100,16 +107,7 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
 }
 
 /** The status's action, with Open thread on the latest thread beside it unless the action already opens that thread. */
-export function StatusActions({
-    item,
-    data,
-    besideOnly = false,
-}: {
-    item: Item;
-    data: BoardData;
-    /** Only the latest thread's Open thread, when the dialog's notice carries the status's own action. */
-    besideOnly?: boolean;
-}) {
+export function StatusActions({ item, data }: { item: Item; data: BoardData }) {
     const shown = useShownStatus(item);
 
     const action = statusAction(item, data, shown);
@@ -125,19 +123,17 @@ export function StatusActions({
     return (
         <>
             {item.kind !== 'concept' && beside && <OpenThread item={item} data={data} />}
-            {besideOnly
-                ? null
-                : opensThread
-                  ? item.kind !== 'concept' && (
-                        <OpenThread
-                            item={item}
-                            data={data}
-                            threadId={action.opens}
-                            label={action.label}
-                            primary={needsAnswer(item) || Boolean(action.primary)}
-                        />
-                    )
-                  : action.control}
+            {opensThread
+                ? item.kind !== 'concept' && (
+                      <OpenThread
+                          item={item}
+                          data={data}
+                          threadId={action.opens}
+                          label={action.label}
+                          primary={needsAnswer(item) || Boolean(action.primary)}
+                      />
+                  )
+                : action.control}
         </>
     );
 }
@@ -153,6 +149,7 @@ export function MoveActions({ item, data }: { item: Item; data: BoardData }) {
     return (
         <>
             <AbandonButton item={item} data={data} />
+            {canMoveStoppedShaping(item) && <BackToQueueButton item={item} data={data} />}
             {item.status !== 'List' && <BackToListButton item={item} data={data} />}
             {approvedUnbuilt(item) && <ReshapeButton item={item} data={data} />}
         </>

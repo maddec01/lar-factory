@@ -8,6 +8,8 @@ Terms are in `GLOSSARY.md`, decisions in `docs/adr/`.
   list it in the Copy's "Overridden in" column.
 - Apps import packages, never each other. Browser code never imports `packages/work-records`.
 - Design-system tokens, primitives and generic components change in the design-system repository, not here.
+- Board buttons: every action on a yellow card (work that waits on you) is the plain outline, never the tint, everywhere
+  it shows; in the item dialog every action sits in the footer bar, never in a notice. `ButtonKinds.ts` holds the rule.
 - The factory never reads, writes or offers repository configuration or guidance files; settings live in
   the local app data folder. This repo is public: nothing secret, and no screenshots of real project names
   or folders (`pnpm run sample:t3` shows them).

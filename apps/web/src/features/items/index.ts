@@ -11,7 +11,14 @@ export { useLastKnown } from './useLastKnown';
 export { useItemClock } from './useItemClock';
 export { Dependencies } from './Dependencies';
 export { dependenciesOf } from './ItemDependencies';
-export { AbandonButton, ActionError, BackToListButton, QueueButton, ReshapeButton } from './ItemActions';
+export {
+    AbandonButton,
+    ActionError,
+    BackToListButton,
+    BackToQueueButton,
+    QueueButton,
+    ReshapeButton,
+} from './ItemActions';
 export {
     Age,
     AzureFields,
@@ -25,7 +32,7 @@ export {
 } from './ItemParts';
 export { KIND_BADGES } from './KindBadges';
 export { useShownLabels } from './useShownLabels';
-export { NeedsYou, useNoticeTakesAction } from './NeedsYou';
+export { NeedsYou, NeedsYouChoices, offersChoices } from './NeedsYou';
 export { EarlierThreads, OpenThread } from './OpenThread';
 export { hasLiveThread } from './ItemThreads';
 export { VerifyBuild } from './VerifyBuild';

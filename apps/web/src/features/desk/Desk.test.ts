@@ -91,10 +91,10 @@ test('shaping questions target the older question and leave the desk on a board 
     );
     await settle(() => open('I_sample12'));
 
-    // The notice answers the question; the newer thread stays in reach elsewhere in the dialog.
+    // The footer answers the question as its Main action; the newer thread stays in reach beside it.
     const links = [...dialog()!.querySelectorAll('a[href^="t3code:"]')].map((a) => [text(a), a.getAttribute('href')]);
 
-    expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in T3');
+    expect(text(dialog()!.querySelector('[data-slot="modal-footer"] [data-kind="main"]'))).toBe('Answer in T3');
     expect(links).toContainEqual(['Answer in T3', 't3code://threads/sample-environment/question']);
     expect(
         links.map(([, href]) => href),

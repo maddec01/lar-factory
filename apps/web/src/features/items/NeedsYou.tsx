@@ -7,12 +7,12 @@ import {
     questionWaitReason,
     supersededReleaseQuestion,
 } from '@lar-factory/shared';
-// Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
-// offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
+// Why the work waits on the user, from its work record, in the item dialog: the reason in its notice, and the choices
+// the board offers for it in the dialog's footer. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
 import { Button } from '@lar-works/design-system';
 import { ArrowRightIcon } from '@lar-works/design-system/icons';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
@@ -20,8 +20,7 @@ import { askAbandon } from './CardActions';
 import { NeedsYouDialog } from './NeedsYouDialog';
 import { useActivityUnavailable } from './useActivityFeedback';
 import { useItemDialogStore } from '@/features/item-dialog';
-import { useBoardStore } from '@/services/board/board.hooks';
-import { buttonKind, NeedsYouNotice, NeedsYouResult } from '@/ui/board';
+import { NeedsYouNotice, NeedsYouResult, useButtonKind } from '@/ui/board';
 
 const LABELS: Record<NeedsYouOffer, string> = {
     'start-again': 'Start again',
@@ -43,32 +42,11 @@ const REVIEW_ASKS: Record<string, string> = {
     'Checks failed': 'A check failed on the pull request: look at it before going on.',
 };
 
-/** Whether the dialog's notice carries its main action: a pull request or a question that waits on you, with no cleanup
- *  to report, so the dialog's footer leaves that action to the notice. */
-export function useNoticeTakesAction(item: Item): boolean {
-    const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
-    const items = useBoardStore((state) => state.data.items);
-    const wait = deskWait(item, useActivityUnavailable(), items);
-    const { action } = wait;
-
-    if (cleanupResult || item.needsYou) return false;
-
-    // An action that only opens this item (approving a brief, recording an outcome, a required verification) is done
-    // in the dialog's own sections, so the notice leaves it to them and the footer keeps its status actions.
-    if (action?.kind === 'details' || (wait.label === 'Verify build' && item.verification?.required)) return false;
-
-    if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
-        return false;
-
-    const review = needsAnswer(item) ? null : prReadiness(item);
-
-    return needsAnswer(item) || Boolean(review && (review.state === 'waiting' || review.state === 'failed'));
-}
-
-/** `primary` is the dialog's main action, which a question's or a pull request's notice carries beside its words. */
-export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData; primary?: ReactNode }) {
+/** Why the work waits on you, in words only: the dialog's footer carries every action that answers it. */
+export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
     const unavailable = useActivityUnavailable();
+    const kindOf = useButtonKind();
 
     if (Array.isArray(item.threads) && item.threads.some((thread) => supersededReleaseQuestion(item, thread)))
         return <NeedsYouNotice reason={questionWaitReason(item)} />;
@@ -90,7 +68,7 @@ export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData;
                     reason={parts.length === 1 ? `${what}.` : `${parts.length} parts wait on you. First, ${what}.`}
                     actions={
                         <Button
-                            {...buttonKind('open')}
+                            {...kindOf('open')}
                             leftIcon={<ArrowRightIcon />}
                             onClick={() => useItemDialogStore.getState().open(first!.id)}
                         >
@@ -105,10 +83,10 @@ export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData;
         const review = needsAnswer(item) ? null : prReadiness(item);
 
         if (review && (review.state === 'waiting' || review.state === 'failed') && !cleanupResult)
-            return <NeedsYouNotice reason={REVIEW_ASKS[review.word] ?? `${review.word}.`} actions={primary} />;
+            return <NeedsYouNotice reason={REVIEW_ASKS[review.word] ?? `${review.word}.`} />;
 
         return needsAnswer(item) ? (
-            <NeedsYouNotice reason={questionWaitReason(item)} actions={primary}>
+            <NeedsYouNotice reason={questionWaitReason(item)}>
                 {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
             </NeedsYouNotice>
         ) : cleanupResult ? (
@@ -116,42 +94,49 @@ export function NeedsYou({ item, data, primary }: { item: Item; data: BoardData;
         ) : null;
     }
 
-    return <Notice item={item} notice={item.needsYou} data={data} cleanupResult={cleanupResult} />;
+    return <Notice notice={item.needsYou} cleanupResult={cleanupResult} />;
 }
 
-function Notice({
-    item,
-    notice,
-    data,
-    cleanupResult,
-}: {
-    item: Item;
-    notice: NonNullable<Item['needsYou']>;
-    data: BoardData;
-    cleanupResult?: string;
-}) {
+function Notice({ notice, cleanupResult }: { notice: NonNullable<Item['needsYou']>; cleanupResult?: string }) {
+    return (
+        <NeedsYouNotice reason={notice.reason}>
+            {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
+        </NeedsYouNotice>
+    );
+}
+
+/** The choices that move work back or set it aside, which sit at the left of the dialog's footer with its other moves. */
+const MOVES: readonly NeedsYouOffer[] = ['set-aside', 'back-to-queue', 'back-to-list'];
+
+/** Whether the notice offers a choice for the footer's `side`: its moves at the left, or its own action at the right. */
+export const offersChoices = (item: Item, side: 'moves' | 'main') =>
+    !item.setAside && !!item.needsYou?.offers.some((offer) => MOVES.includes(offer) === (side === 'moves'));
+
+/**
+ * A Needs you notice's choices in the dialog's footer, as every status's actions sit there: `moves` gives Abandon, Back to
+ * Queue and Move to the List at the left, `main` the action that answers the notice at the right, the first as the
+ * footer's Main button. Each asks in its confirmation first.
+ */
+export function NeedsYouChoices({ item, data, side }: { item: Item; data: BoardData; side: 'moves' | 'main' }) {
     const [asking, setAsking] = useState<NeedsYouAction | null>(null);
-    const state = writeState(data, useItemAction(item.id));
+    const offers = (item.needsYou?.offers ?? []).filter((offer) => MOVES.includes(offer) === (side === 'moves'));
+    const ordered = side === 'moves' ? MOVES.filter((offer) => offers.includes(offer)) : offers;
+
+    if (item.setAside || !ordered.length) return null;
 
     return (
-        <NeedsYouNotice
-            reason={notice.reason}
-            actions={notice.offers.map((offer) => (
-                <Button
-                    {...buttonKind('other', offer === 'set-aside' ? 'danger' : undefined)}
+        <>
+            {ordered.map((offer, index) => (
+                <OfferButton
                     key={offer}
-                    {...state}
-                    aria-label={`${LABELS[offer]}: ${itemName(item)}`}
-                    {...(offer === 'set-aside'
-                        ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
-                        : { 'data-needs-you': item.id, onClick: () => setAsking(offer) })}
-                >
-                    {LABELS[offer]}
-                </Button>
+                    item={item}
+                    data={data}
+                    offer={offer}
+                    main={side === 'main' && index === 0}
+                    ask={setAsking}
+                />
             ))}
-        >
-            {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
-            {asking && notice.offers.includes(asking) && (
+            {asking && ordered.includes(asking) && (
                 <NeedsYouDialog
                     item={item}
                     data={data}
@@ -160,20 +145,52 @@ function Notice({
                     onClose={() => setAsking(null)}
                 />
             )}
-        </NeedsYouNotice>
+        </>
     );
 }
 
-/** The desk uses the same confirmed recovery as the notice in item details. */
+/** One of a notice's choices: the footer's Main button, an Other, or Abandon in the quiet-destructive recipe. */
+function OfferButton({
+    item,
+    data,
+    offer,
+    main,
+    ask,
+}: {
+    item: Item;
+    data: BoardData;
+    offer: NeedsYouOffer;
+    main: boolean;
+    ask: (offer: NeedsYouAction) => void;
+}) {
+    const state = writeState(data, useItemAction(item.id));
+    const kindOf = useButtonKind();
+
+    return (
+        <Button
+            {...(offer === 'set-aside' ? kindOf('other', 'danger') : kindOf(main ? 'main' : 'other'))}
+            {...state}
+            aria-label={`${LABELS[offer]}: ${itemName(item)}`}
+            {...(offer === 'set-aside'
+                ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
+                : { 'data-needs-you': item.id, onClick: () => ask(offer as NeedsYouAction) })}
+        >
+            {LABELS[offer]}
+        </Button>
+    );
+}
+
+/** The desk uses the same confirmed recovery as the footer in item details, outlined as a yellow card's action is. */
 export function StartAgain({ item, data }: { item: Item; data: BoardData }) {
     const [open, setOpen] = useState(false);
     const state = writeState(data, useItemAction(item.id));
+    const kindOf = useButtonKind();
 
     if (!item.needsYou?.offers.includes('start-again')) return null;
 
     return (
         <>
-            <Button {...buttonKind('next')} {...state} onClick={() => setOpen(true)}>
+            <Button {...kindOf('other')} {...state} data-start-again={item.id} onClick={() => setOpen(true)}>
                 Start again
             </Button>
             {open && (

@@ -6,9 +6,12 @@ import type { ButtonProps } from '@lar-works/design-system';
  * hover, so a board's only colour at rest is still amber. GitHub and Open thread stay Open unless they perform the next action
  * (Answer in T3, Verify build or Merge PR). Completed work has no next action and needs no Main button.
  * Lar Factory's five kinds of button. A Main action, at most one per area, is filled; a Start is tinted, with the play
- * icon: it launches agent work (Shape, Start build, Start after), and its split half chooses the model/options; a desk
- * card's next step (Answer in T3, Verify build, Review failed checks) is a Next, tinted too, as the thing you can do
- * now.
+ * icon: it launches agent work (Shape, Start build, Start after), and its split half chooses the model/options; a Next
+ * is tinted too, as the thing you can do now.
+ * Yellow cards: on a card that waits on you (Your desk's cards and line, a waiting map card or row), every action keeps
+ * its plain outline, never the tint, whatever it is (Answer in T3, Verify build, Start again): HumanWaitAction sets
+ * TintedActions aside, and a danger choice keeps its recipe. The item dialog's actions all sit in its footer bar; its
+ * notices carry only words.
  * Tint never means selected or running. An Open is outlined, with the thread or pull request icon; an App control
  * has no border and an icon (also used for quiet icon-only thread links in concept parts lists); any Other
  * button is outlined, with no icon. A dialog or a form is an area of its own, so its submit is its Main action. Every

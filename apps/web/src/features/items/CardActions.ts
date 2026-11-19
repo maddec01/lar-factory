@@ -97,6 +97,23 @@ export async function backToList(itemId: string): Promise<void> {
     refocus([by(result.error ? 'data-back-to-list' : 'data-queue', itemId)]);
 }
 
+/** Moves stopped shaping back to the Queue: a failure is a toast, and focus goes to its Start. */
+export async function backToQueue(itemId: string): Promise<void> {
+    const item = itemOf(itemId);
+
+    if (!ready(itemId, 'data-back-to-queue') || !item) return;
+
+    const result = await runAction(itemId, 'back-to-queue', { itemId }, (result) => {
+        notify(
+            result.error
+                ? { verb: 'Failed', item, to: 'Queued', message: result.error }
+                : { verb: 'Moved', item, to: 'Queued' },
+        );
+    });
+
+    refocus([by(result.error ? 'data-back-to-queue' : 'data-start', itemId)]);
+}
+
 /** Sends approved work back to shaping: a failure is a toast, and the footer goes back to its links. */
 export async function reshape(itemId: string): Promise<void> {
     const item = itemOf(itemId);

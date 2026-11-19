@@ -107,6 +107,23 @@ export function canResumeShaping(item: Item): boolean {
     return current?.state === 'stopped' || current?.state === 'done';
 }
 
+/**
+ * Whether shaping work can move back to the Queue or the List: a Shaping item with no parts, no notice and no gate,
+ * whose threads T3 shows have all stopped or finished. Its next Start opens a new thread.
+ */
+export function canMoveStoppedShaping(item: Item): boolean {
+    return (
+        item.status === 'Shaping' &&
+        item.kind !== 'concept' &&
+        !item.setAside &&
+        !item.needsYou &&
+        !item.subIssues?.total &&
+        Array.isArray(item.threads) &&
+        item.threads.length > 0 &&
+        !item.threads.some((thread) => thread.observedAt || isLiveThread(thread))
+    );
+}
+
 /** Whether work a build delegated still runs, a slice's thread or a running child of its build thread, even after that thread's own run ended. */
 export function delegatedWorkRunning(item: Item): boolean {
     return (

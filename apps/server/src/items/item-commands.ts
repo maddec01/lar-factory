@@ -16,6 +16,7 @@ import {
     approvedMoveRefusal,
     approvedUnbuilt,
     canAbandon,
+    canMoveStoppedShaping,
     canResumeShaping,
     canRetryBuild,
     earlierBuildMessage,
@@ -142,7 +143,10 @@ export interface ItemCommands {
      */
     reconcileStarts(items: Item[]): Promise<void>;
     queue(itemId: string): Promise<Reply>;
+    /** Moves a Queued item, or stopped shaping (see `canMoveStoppedShaping`), back to the List. */
     backToList(itemId: string): Reply;
+    /** Moves stopped shaping back to the Queue, so its next Start opens a new thread. */
+    backToQueue(itemId: string): Reply;
     /**
      * Sends approved Ready or Queued work that hasn't started building back to shaping: clears its approval, keeps its
      * brief and messages its shaping thread, or starts a new one on `model` when none is left.
@@ -652,6 +656,9 @@ export function createItemCommands({
         )
             return null;
 
+        // Stopped shaping moved back to the Queue moves on to the List too.
+        if (item && action === 'back to List' && item.status === 'Queued' && threadsAtRest(item)) return null;
+
         const started = running || recordedStart(itemId);
 
         if (started && action === 'back to List')
@@ -706,6 +713,65 @@ export function createItemCommands({
         const failed = approved ? clearApproval(item, to) : setStatus(item, to);
 
         if (!failed) {
+            clearFailures(itemId);
+            pushStarts();
+        }
+
+        return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
+    }
+
+    /**
+     * Whether every thread the item recorded has stopped, finished or been deleted, as T3 shows it, and no start runs.
+     * A recorded thread T3 doesn't show may be one the board hasn't read yet, so it holds the item.
+     */
+    function threadsAtRest(item: Item): boolean {
+        if (
+            !Array.isArray(item.threads) ||
+            running.shape.has(item.id) ||
+            running.build.has(item.id) ||
+            records?.launchIntents({ workId: item.id, unresolved: true }).length
+        )
+            return false;
+
+        const shown = item.threads;
+
+        if (shown.some((thread) => thread.observedAt || isLiveThread(thread))) return false;
+
+        return recordedThreads(item.id).every(
+            (thread) => thread.deletedAt || deleted.has(thread.threadId) || shown.some((s) => s.id === thread.threadId),
+        );
+    }
+
+    /** Moves stopped shaping to `to`, forgetting this board run's start, so the next Start opens a new thread. */
+    function moveStoppedShaping(itemId: string, to: 'Queued' | 'List'): Reply {
+        showObservations();
+
+        const item = board.find(itemId);
+
+        if (!item) return reply(404, { error: GONE });
+
+        if (item.status === to) return withBoard(200, { error: null });
+
+        if (!canMoveStoppedShaping(item))
+            return withBoard(409, {
+                error:
+                    item.status === 'Shaping'
+                        ? 'A thread is still at work on this item. Stop it, then move it back.'
+                        : `Only stopped shaping moves back this way; this item is in ${item.status}.`,
+            });
+
+        if (merging.mergePending(itemId) || abandoning.has(itemId) || combined.has(itemId))
+            return withBoard(409, { error: 'Another action is running. Wait for it to finish.' });
+
+        if (!threadsAtRest(item))
+            return withBoard(409, {
+                error: "A start is running, or T3 doesn't show this item's thread yet. Try again in a moment.",
+            });
+
+        const failed = setStatus(item, to);
+
+        if (!failed) {
+            starts.delete(itemId);
             clearFailures(itemId);
             pushStarts();
         }
@@ -1848,7 +1914,12 @@ export function createItemCommands({
                 ...missing.map(async ({ item, threadId, record, shown }) => {
                     const id = item.id;
 
-                    if (shown) return clearWarning(id);
+                    // A shown thread forgets an earlier check's answer, so once it leaves T3's list the board asks again.
+                    if (shown) {
+                        checks.delete(threadId);
+
+                        return clearWarning(id);
+                    }
 
                     const previous = checks.get(threadId);
 
@@ -1936,7 +2007,9 @@ export function createItemCommands({
                 return withBoard(502, { error: (error as Error).message });
             }
         },
-        backToList: (itemId) => move(itemId, BACK_TO_LIST),
+        backToList: (itemId) =>
+            board.find(itemId)?.status === 'Shaping' ? moveStoppedShaping(itemId, 'List') : move(itemId, BACK_TO_LIST),
+        backToQueue: (itemId) => moveStoppedShaping(itemId, 'Queued'),
 
         async reshape(itemId, model) {
             showObservations();

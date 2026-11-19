@@ -11,6 +11,7 @@ import {
     approvedMoveRefusal,
     approvedUnbuilt,
     canAbandon,
+    canMoveStoppedShaping,
     canResumeShaping,
     itemTotal,
     kindLabel,
@@ -80,6 +81,29 @@ test('only the latest stopped shaping session can resume, with fresh evidence th
     );
     assert.equal(canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, hasLiveChildren: true }] })), false);
     assert.equal(canResumeShaping(item('Shaping', [], { threads: 'unavailable' })), false);
+});
+
+test('stopped shaping can move back once every thread T3 shows for it has stopped or finished', () => {
+    const stopped = {
+        id: 'old',
+        title: 'Shape',
+        state: 'stopped' as const,
+        updated: '2026-11-19T00:00:00Z',
+        purpose: 'shape',
+    };
+
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: [stopped] })), true);
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: [{ ...stopped, state: 'done' }] })), true);
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: [{ ...stopped, state: 'running' }] })), false);
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: [{ ...stopped, queued: true }] })), false);
+    assert.equal(
+        canMoveStoppedShaping(item('Shaping', [], { threads: [{ ...stopped, observedAt: stopped.updated }] })),
+        false,
+    );
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: [] })), false);
+    assert.equal(canMoveStoppedShaping(item('Shaping', [], { threads: 'unavailable' })), false);
+    assert.equal(canMoveStoppedShaping(item('Queued', [], { threads: [stopped] })), false);
+    assert.equal(canMoveStoppedShaping(item('Shaping', ['concept'], { threads: [stopped] })), false);
 });
 
 test("a ticket's labels give its kind", () => {

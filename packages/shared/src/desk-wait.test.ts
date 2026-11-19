@@ -60,6 +60,7 @@ test('a failed launch reaches the desk and keeps its place', () => {
 
     expect(placementOf(work, { all: [work], unavailable: false }).sections).toEqual(['desk', 'shaping']);
     expect(deskWait(work)).toEqual({ label: 'Start failed', action: { kind: 'start-again', label: 'Start again' } });
+    expect(deskWait({ ...work, needsYou: { ...work.needsYou!, deletedThread: true } }).label).toBe('Thread deleted');
 });
 
 test('an unstarted linked child routes its gate to the exact request owner on its parent', () => {

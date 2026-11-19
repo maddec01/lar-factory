@@ -1,6 +1,6 @@
-/* The stages' column, its gap shared with joined empty sections, and a stage section's box (StagePane): the design
-   system's quiet well, `surface-sunken` (T3 Code's sidebar step on either page), a `line-panel` hairline and
-   `radius-xl`, one step rounder than its rows. The header sits inside with the rows' inset. */
+/* The stages' column, its gap shared with joined empty sections, and a stage section's box (StagePane):
+   `surface-sunken` at half strength in dark mode, a `line-panel` hairline and `radius-xl`, one step rounder than its
+   rows. The header sits inside with the rows' inset. */
 .stages {
     --stage-gap: --spacing(3);
     row-gap: var(--stage-gap);
@@ -10,18 +10,25 @@
     border: 1px solid var(--color-line-panel);
     border-radius: var(--radius-xl);
     background: var(--color-surface-sunken);
+
+    @variant dark {
+        background: color-mix(in srgb, var(--color-surface-sunken) 50%, transparent);
+    }
 }
 .stage-box[data-empty] {
     padding-bottom: --spacing(0.5);
 }
-/* Empty sections one after another join into one box of header lines, split by a hairline: each pulls up over the
-   stages' gap so its top border lies on the previous one's bottom border. */
+/* Adjacent empty sections share an outline, with a little space between headers. */
 .stage-box[data-empty]:has(+ .stage-box[data-empty]) {
+    padding-bottom: --spacing(1);
+    border-bottom-width: 0;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
 .stage-box[data-empty] + .stage-box[data-empty] {
-    margin-top: calc(var(--stage-gap) * -1 - 1px);
+    margin-top: calc(var(--stage-gap) * -1);
+    padding-top: --spacing(1);
+    border-top-width: 0;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
 }

@@ -488,6 +488,12 @@ export function createBoardServer({
             disabled: 'Moving items back to the List is disabled in sample mode.',
             run: forItem('Name the item to move back to the List.', (itemId) => commands.backToList(itemId)),
         },
+        '/api/back-to-queue': {
+            sampleWrite: 'refuse',
+            what: 'the item to move back to the Queue',
+            disabled: 'Moving items back to the Queue is disabled in sample mode.',
+            run: forItem('Name the item to move back to the Queue.', (itemId) => commands.backToQueue(itemId)),
+        },
         '/api/reshape': {
             sampleWrite: 'refuse',
             what: 'the item to reshape',

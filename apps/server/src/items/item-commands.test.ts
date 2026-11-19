@@ -893,6 +893,82 @@ test('Start writes a launch intent before it asks T3, and records the thread T3 
     );
 });
 
+test('a thread T3 answered live before it showed is checked again once it leaves the list', async () => {
+    const records = await openRecords();
+    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+
+    records.addThread(work.workId, work.revision, 'shaper', 'shape');
+
+    let listed = false;
+    let answer: 'live' | 'deleted' = 'live';
+    const s = recordedCommands(records, {
+        shown: (ids) =>
+            listed ? ids.map((id) => ({ id, title: 't', state: 'running', updated: '2026-11-19T00:00:00Z' })) : [],
+        lookup: async () => answer,
+    });
+
+    // The thread starts before T3's list shows it, so the board asks T3, which answers live.
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+    listed = true;
+    s.reread();
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+
+    // Then the person deletes it in T3.
+    listed = false;
+    answer = 'deleted';
+    s.reread();
+    await s.commands.reconcileStarts(s.board.snapshot().items);
+
+    assert.ok(records.threads(work.workId).find((t) => t.threadId === 'shaper')?.deletedAt);
+});
+
+test('stopped shaping moves back to the Queue, and its next Start opens a new thread', async () => {
+    const records = await openRecords();
+    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+    let state: 'running' | 'stopped' = 'running';
+    const s = recordedCommands(records, {
+        shown: (ids) => ids.map((id) => ({ id, title: 't', state, updated: '2026-11-19T00:00:00Z' })),
+    });
+
+    assert.equal((await s.commands.start(work.workId, undefined)).status, 200);
+    assert.equal(records.read(work.workId).status, 'Shaping');
+
+    const refused = s.commands.backToQueue(work.workId);
+
+    assert.equal(refused.status, 409);
+    assert.match((refused.body as { error: string }).error, /still at work/);
+
+    state = 'stopped';
+    s.reread();
+    assert.deepEqual(s.commands.backToQueue(work.workId).body, { error: null, board: s.board.snapshot() });
+    assert.equal(records.read(work.workId).status, 'Queued');
+
+    assert.equal((await s.commands.start(work.workId, undefined)).status, 200);
+    assert.deepEqual(
+        records.threads(work.workId).map((t) => t.threadId),
+        ['thread-1', 'thread-2'],
+    );
+});
+
+test('stopped shaping moves back to the List, from Shaping or after Back to Queue', async () => {
+    const records = await openRecords();
+    const first = records.create({ title: 'First', repository: WEB, kind: 'feature', status: 'Queued' });
+    const second = records.create({ title: 'Second', repository: WEB, kind: 'feature', status: 'Queued' });
+    const s = recordedCommands(records, {
+        shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'stopped', updated: '2026-11-19T00:00:00Z' })),
+    });
+
+    await s.commands.start(first.workId, undefined);
+    await s.commands.start(second.workId, undefined);
+
+    assert.equal(s.commands.backToList(first.workId).status, 200);
+    assert.equal(records.read(first.workId).status, 'List');
+
+    assert.equal(s.commands.backToQueue(second.workId).status, 200);
+    assert.equal(s.commands.backToList(second.workId).status, 200);
+    assert.equal(records.read(second.workId).status, 'List');
+});
+
 test('after a restart, an unresolved start records the thread T3 shows for it and starts no second one', async () => {
     const records = await openRecords();
     const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });

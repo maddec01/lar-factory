@@ -116,7 +116,10 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
         };
 
     if (item.needsYou?.offers.includes('start-again'))
-        return { label: 'Start failed', action: { kind: 'start-again' as const, label: 'Start again' } };
+        return {
+            label: item.needsYou.deletedThread ? 'Thread deleted' : 'Start failed',
+            action: { kind: 'start-again' as const, label: 'Start again' },
+        };
 
     const pr = item.linkedPrs?.[0];
 

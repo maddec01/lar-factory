@@ -10,12 +10,33 @@
 .start-group {
     flex: 0 1 auto;
     max-width: 100%;
-    flex-wrap: wrap;
+    min-width: 0;
     margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: --spacing(1.25);
     position: relative;
+}
+.start-group > [data-start-split] {
+    flex-shrink: 0;
+}
+
+/* Shape and Build share an outline with their model menu. Each half keeps its own hover and focus. */
+[data-start-split] > [data-start] {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+    border-inline-end-width: 0;
+}
+[data-start-split] > [data-start-model] {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    border-inline-start-color: var(--color-line);
+}
+[data-start-split] > :is([data-start], [data-start-model]):active {
+    scale: none;
+}
+[data-start-split] > [data-start-model][data-kind='main'][data-state='open'] {
+    background-color: var(--color-primary-fill-hover);
 }
 
 .desk {

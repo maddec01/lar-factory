@@ -7,7 +7,7 @@ import type { ReactNode, Ref } from 'react';
 import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
 
-/** Start and what goes with it, at the right of its row, wrapping. */
+/** Start and what goes with it, side by side at the right of its row. */
 export function StartGroup({
     children,
 }: {
@@ -17,33 +17,14 @@ export function StartGroup({
     return <span className="start-group">{children}</span>;
 }
 
-/** A sentence on a line of its own in StartGroup, such as "Run finished.". */
-export function StartNote({ children }: { children: ReactNode }) {
-    return <span className="basis-full">{children}</span>;
-}
-
-/** A disabled start's visible, accessible reason: on a row, a line of its own under the start (narrow rows give it a
- *  separate line); as a `caption`, where a dialog's footer sets it, a quiet muted line beside the buttons, before them,
- *  wrapping rather than widening the footer. */
-export function StartHold({
-    id,
-    caption = false,
-    children,
-}: {
-    id: string;
-    /** Sets it as a quiet caption before the buttons, as the dialog's footer does. */
-    caption?: boolean;
-    children: ReactNode;
-}) {
+/** A quiet caption before the actions, with an ID when the button uses it as its description. */
+export function StartNote({ id, children }: { id?: string; children: string }) {
     return (
         <span
             id={id}
-            data-start-hold
-            className={
-                caption
-                    ? 'text-fg-muted order-first max-w-sm min-w-0 flex-[1_1_12rem] text-right text-xs text-pretty'
-                    : 'basis-full'
-            }
+            data-start-note
+            title={children}
+            className="text-fg-muted line-clamp-2 max-w-xs min-w-0 text-end text-xs leading-3.5"
         >
             {children}
         </span>

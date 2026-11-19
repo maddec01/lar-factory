@@ -3,7 +3,7 @@ import type { Item } from './item-domain.ts';
 import { deliveryPrStatus, prReadiness } from './presentation.ts';
 import { delegatedBriefApproval, pendingBriefBatch } from './question-thread.ts';
 import { releaseNeedsUser, supersededReleaseQuestion } from './release-continuation.ts';
-import { outcomeNeedsUser, pendingUserReleaseStep } from './release-plan.ts';
+import { dueUserReleaseStep, outcomeNeedsUser } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import { openQuestionThread, stoppedRunThread, workingAgain } from './thread-domain.ts';
 
@@ -31,7 +31,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
         !item.briefApproval &&
         !item.needsYou &&
         !retroWaits(item.retro) &&
-        !pendingUserReleaseStep(item.releasePlan) &&
+        !dueUserReleaseStep(item, all) &&
         delegatedBriefApproval(item, all)
     )
         return null;
@@ -57,7 +57,7 @@ export function humanWait(item: Item, unavailable = false, all: readonly Item[] 
             item.threads.some((thread) => !thread.observedAt && supersededReleaseQuestion(item, thread))) ||
         outcomeNeedsUser(item, all) ||
         retroWaits(item.retro) ||
-        !!pendingUserReleaseStep(item.releasePlan) ||
+        !!dueUserReleaseStep(item, all) ||
         !!item.briefApproval ||
         item.status === 'Needs you' ||
         (item.status !== 'Done' && !!openQuestionThread(item)) ||

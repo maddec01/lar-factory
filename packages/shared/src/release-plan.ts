@@ -50,6 +50,15 @@ export function pendingUserReleaseStep(plan: ReleasePlan | null | undefined) {
     return step && isUserReleaseStep(step) ? step : undefined;
 }
 
+/** A group's user release step waits on the user only once none of its parts is still being built. */
+export function dueUserReleaseStep(item: Item, all: readonly Item[]) {
+    const building = all.some(
+        (part) => part.parentId === item.id && !part.setAside && part.status !== 'Done' && !part.completion?.complete,
+    );
+
+    return building ? undefined : pendingUserReleaseStep(item.releasePlan);
+}
+
 /** Stored before dispatch; retries after a lost response reuse both T3 identities. */
 export interface OutcomeCheckRun {
     digest: string;

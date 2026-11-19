@@ -72,6 +72,83 @@ it('lists all preflight holds and saves nothing when a decision, pre-task, gate 
     expect(records.completion(decision.workId).complete).toBe(false);
 });
 
+it('starts the available part of a concept and keeps downstream gates, decisions, Fog and Dependencies in sequence', async () => {
+    const { records, group, build, change, prepare } = await fixture();
+    const addPart = (title: string, kind: 'build' | 'decision', blockerId: string) =>
+        records.createPart({
+            parentId: group,
+            parentRevision: change(group),
+            title,
+            repository: 'example/b',
+            kind,
+            body: 'Saved scope',
+            blockerIds: [blockerId],
+        }).workId;
+    const laterBuild = addPart('Later build', 'build', build);
+    const decision = addPart('Release', 'decision', laterBuild);
+    const check = addPart('Check', 'decision', decision);
+    const dependency = records.addDependency(group, { need: 'External fixture', owner: 'Other team' });
+
+    records.addDependencyBlock(dependency.dependencyId, dependency.revision, laterBuild);
+    prepare();
+
+    const map = `## Destination\nApproved destination\n\n## Fog\n- [decision: ${check}] Check the delivery.`;
+
+    records.setBody(group, change(group), 'map', `${map}\n- Unrouted question.`);
+    expect(() => records.buildReadiness(build, { limit: 1, manual: true })).toThrow('Fog');
+    records.setBody(group, change(group), 'map', map);
+
+    const plan = records.conceptBuildPlan(group);
+
+    expect(records.refinement(group).complete).toBe(false);
+    expect(plan.holds).toEqual([]);
+    expect(plan.members.find((member) => member.workId === check)).toMatchObject({ complete: false });
+    expect(records.waitingOn(check)).toMatchObject([{ workId: decision }]);
+    expect(records.buildReadiness(build, { limit: 1, manual: true }).gate).toBeDefined();
+    expect(records.buildReadiness(build, { limit: 1, automatic: true }).gate).toBeDefined();
+    expect(records.setConceptBuildRun(group, change(group), 'running').run?.state).toBe('running');
+    expect(records.buildReadiness(build, { limit: 1, conceptId: group }).gate).toBeDefined();
+
+    records.setPullRequest(build, change(build), 'example/b#1');
+    records.observe(build, change(build), { of: 'pr', state: 'merged' });
+
+    expect(records.conceptBuildPlan(group).holds.map((hold) => hold.workId)).toEqual([
+        laterBuild,
+        laterBuild,
+        laterBuild,
+    ]);
+    expect(records.waitingOn(laterBuild)).toMatchObject([{ dependencyId: dependency.dependencyId }]);
+    expect(records.waitingOn(decision)).toMatchObject([{ workId: laterBuild }]);
+});
+
+it('follows blockers across groups and still holds starts for an independent unfinished decision', async () => {
+    const { records, group, build, change, prepare } = await fixture();
+    const linkedBuild = records.create({ title: 'External build', repository: 'example/c', kind: 'issue' }).workId;
+    const decision = (title: string, blockerIds: string[]) =>
+        records.createPart({
+            parentId: group,
+            parentRevision: change(group),
+            title,
+            repository: 'example/a',
+            kind: 'decision',
+            body: 'Decision to settle',
+            blockerIds,
+        }).workId;
+    const downstream = decision('After delivery', [linkedBuild]);
+    const prerequisite = decision('Before delivery', []);
+
+    records.addBlocker(linkedBuild, change(linkedBuild), build);
+    records.addBlocker(build, change(build), prerequisite);
+    prepare();
+
+    expect(records.conceptBuildPlan(group).holds.map((hold) => hold.workId)).toEqual([prerequisite]);
+    expect(() => records.buildReadiness(build, { limit: 1, manual: true })).toThrow('recorded blockers');
+    expect(() => records.setConceptBuildRun(group, change(group), 'running')).toThrow('Before delivery');
+    records.removeBlocker(build, change(build), prerequisite);
+    expect(() => records.buildReadiness(build, { limit: 1, manual: true })).toThrow('Before delivery');
+    expect(records.completion(downstream).complete).toBe(false);
+});
+
 it('saves prepared revisions, rejects stale starts and preserves active work through pause and reopen', async () => {
     const { records, path, group, build, change, prepare } = await fixture();
 

@@ -110,7 +110,7 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
         limit: () => s.limit,
         offerModelChoices: () => s.choices,
         commands: {
-            async startBuild(itemId, model, quiet) {
+            async startBuild(itemId, model, quiet, source) {
                 assert.equal(quiet, true);
                 assert.deepEqual(model, s.auto.model);
                 s.started.push(itemId);
@@ -118,6 +118,8 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
                 const answer = s.answers.get(itemId) ?? OK;
 
                 if (answer === OK) {
+                    if (source?.conceptId) records.buildReadiness(itemId, { limit: s.limit, ...source });
+
                     records.addThread(itemId, at(records, itemId), `build-${itemId}`, 'build');
                     records.update(itemId, at(records, itemId), { status: 'In progress' });
                 }
@@ -190,6 +192,50 @@ test('Auto-build starts only a Ready build with a current passing gate that noth
     assert.deepEqual(s.started, [eligible, refining], 'its concept’s Refinement is complete');
 });
 
+for (const explicit of [false, true]) {
+    test(`${explicit ? 'An authorized concept run' : 'Auto-build'} starts the first build before a downstream decision`, async () => {
+        const s = await setUp();
+        const { records } = s;
+        const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept' }).workId;
+        const first = ready(records, 'First build');
+        const second = ready(records, 'Second build');
+
+        records.setParent(first, at(records, first), concept);
+        records.setParent(second, at(records, second), concept);
+        records.addBlocker(second, at(records, second), first);
+
+        const decision = records.createPart({
+            parentId: concept,
+            parentRevision: at(records, concept),
+            title: 'Check the result',
+            repository: REPO,
+            kind: 'decision',
+            body: 'Check the result after the builds.',
+            blockerIds: [second],
+        }).workId;
+
+        records.setBody(concept, at(records, concept), 'map', 'Settled destination.');
+        records.setFogGone(concept, at(records, concept), true);
+
+        if (explicit) records.setConceptBuildRun(concept, at(records, concept), 'running');
+
+        s.auto = { on: !explicit };
+        s.reread();
+
+        await s.pass();
+        assert.deepEqual(s.started, [first]);
+        assert.deepEqual(pass(s)?.waitsForRefinement, []);
+        assert.equal(records.completion(decision).complete, false);
+
+        records.setPullRequest(first, at(records, first), `${REPO}#10`);
+        records.observe(first, at(records, first), { of: 'pr', state: 'merged' });
+        s.reread();
+
+        await s.pass();
+        assert.deepEqual(s.started, [first, second]);
+    });
+}
+
 test('a pass with no commit since the last reads no records, and a commit reads them again', async () => {
     const s = await setUp();
     const { records } = s;
@@ -202,7 +248,7 @@ test('a pass with no commit since the last reads no records, and a commit reads 
     s.reread();
     await s.pass();
 
-    const reads = (['read', 'gate', 'conceptBuildPlan', 'refinement', 'launchIntents'] as const).map((name) =>
+    const reads = (['read', 'gate', 'conceptBuildPlan', 'launchIntents'] as const).map((name) =>
         vi.spyOn(records, name),
     );
     const calls = () => reads.reduce((sum, spy) => sum + spy.mock.calls.length, 0);

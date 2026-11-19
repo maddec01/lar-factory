@@ -620,10 +620,11 @@ export interface WorkRecords
     /** Records that the work is finished. A merged observation of the delivery PR finishes the work too; a ticket closing
      * or a thread ending never does. A finish is final. */
     recordFinished(workId: string, revision: number): WorkRecord;
-    /** The finished and set-aside records `retention` hides at `now`, in the order they were made. */
+    /** The finished and set-aside records `retention` hides at `now`, in the order they were made. A part stays shown
+     * while its parent does, so an open concept or build keeps its finished parts on the board. */
     hidden(retention: Retention, now?: Date): WorkRecord[];
     /** Deletes the finished and set-aside records `retention` deletes at `now`, with their bodies, review rounds, threads,
-     * launch intents, replaced PRs, observations and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
+     * launch intents, replaced PRs, observations and blocker edges, in one transaction. A due record stays while it owns a kept record, belongs to one, or a kept
      * record waits on it, while it holds a Dependency or one blocks it, or while a Retro pick is unanswered; the kept parent and blockers of a deleted record are bumped. */
     deleteExpired(retention: Retention, now?: Date): Expired;
     /** The records it owns, in the order they were made. */
@@ -2634,11 +2635,25 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         hidden: (retention, now = new Date()) => {
             const days = checkDays(retention?.hideAfterDays, 'days before hiding');
 
-            return database.read(() =>
-                dueRows(retiredRows.all() as unknown as Row[], days, now)
-                    .filter((row) => !retroWaits(records.retro(row.work_id)))
-                    .map(fromRow),
-            );
+            return database.read(() => {
+                const due = dueRows(retiredRows.all() as unknown as Row[], days, now).filter(
+                    (row) => !retroWaits(records.retro(row.work_id)),
+                );
+                const hiding = new Set(due.map((row) => row.work_id));
+
+                // A part stays on the board while its parent does, so an open group keeps its whole history and totals.
+                for (let changed = true; changed;) {
+                    changed = false;
+                    for (const row of due) {
+                        if (!hiding.has(row.work_id) || !row.parent_id || hiding.has(row.parent_id)) continue;
+
+                        hiding.delete(row.work_id);
+                        changed = true;
+                    }
+                }
+
+                return due.filter((row) => hiding.has(row.work_id)).map(fromRow);
+            });
         },
         deleteExpired: (retention, now = new Date()) => {
             if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
@@ -2675,9 +2690,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     changed = false;
                     for (const [workId] of due) {
                         const child = (childRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
-                        const waiting = child
-                            ? undefined
-                            : (dependentRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
+                        const parent = due.get(workId)!.parent_id;
+                        const owner = parent && !due.has(parent) ? parent : null;
+                        const waiting =
+                            child || owner
+                                ? undefined
+                                : (dependentRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
                         const journal = journals.find((plan) => {
                             const members = [
                                 String(plan.work_id),
@@ -2694,7 +2712,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         const dependency = retentionReason(workId, (id) => due.has(id));
                         const retro = retroWaits(records.retro(workId));
 
-                        if (!child && !waiting && !journal && !dependency && !retro) continue;
+                        if (!child && !owner && !waiting && !journal && !dependency && !retro) continue;
 
                         due.delete(workId);
                         kept.push({
@@ -2706,7 +2724,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                                     ? `Its publication journal still needs recovery evidence or a kept source.`
                                     : child
                                       ? `It owns the ${child.kind} ${child.work_id}, which is kept.`
-                                      : `The ${waiting!.kind} ${waiting!.work_id}, which is kept, waits on it.`),
+                                      : owner
+                                        ? `It is part of ${owner}, which is kept.`
+                                        : `The ${waiting!.kind} ${waiting!.work_id}, which is kept, waits on it.`),
                         });
                         changed = true;
                     }

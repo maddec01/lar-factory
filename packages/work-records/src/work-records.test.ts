@@ -846,11 +846,39 @@ describe('work-record retention', () => {
         const result = records.deleteExpired({ hideAfterDays: 7, deleteAfterDays: 30 }, later(31));
 
         expect(result).toEqual({
-            deleted: [done.workId],
-            kept: [{ workId: build.workId, reason: `It owns the slice ${open_.workId}, which is kept.` }],
+            deleted: [],
+            kept: [
+                { workId: build.workId, reason: `It owns the slice ${open_.workId}, which is kept.` },
+                { workId: done.workId, reason: `It is part of ${build.workId}, which is kept.` },
+            ],
         });
-        expect(records.children(build.workId)).toMatchObject([{ workId: open_.workId }]);
-        expect(records.read(build.workId).revision).toBe(5);
+        expect(ids(records.children(build.workId))).toEqual([done.workId, open_.workId]);
+    });
+
+    it('keeps the finished parts of an open concept on the board and saved until the concept goes', async () => {
+        const records = await open();
+        const [concept, part, later_] = [lar(records, 'concept'), lar(records, 'build'), lar(records, 'build')];
+        const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
+
+        records.setParent(part.workId, 1, concept.workId);
+        records.setParent(later_.workId, 1, concept.workId);
+        records.addBlocker(later_.workId, 2, part.workId);
+        records.recordFinished(part.workId, records.read(part.workId).revision);
+
+        expect(records.hidden(setting, later(8))).toEqual([]);
+        expect(records.deleteExpired(setting, later(31))).toEqual({
+            deleted: [],
+            kept: [{ workId: part.workId, reason: `It is part of ${concept.workId}, which is kept.` }],
+        });
+
+        records.recordFinished(later_.workId, records.read(later_.workId).revision);
+        records.recordFinished(concept.workId, records.read(concept.workId).revision);
+
+        expect(records.hidden(setting, later(6))).toEqual([]);
+        expect(ids(records.hidden(setting, later(8)))).toEqual([concept.workId, part.workId, later_.workId]);
+        expect(records.deleteExpired(setting, later(31)).deleted.toSorted()).toEqual(
+            [concept.workId, part.workId, later_.workId].toSorted(),
+        );
     });
 
     it('keeps a finished record another kept record waits on, and deletes both once neither is needed', async () => {

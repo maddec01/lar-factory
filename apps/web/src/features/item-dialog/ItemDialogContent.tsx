@@ -169,7 +169,13 @@ export function ItemDialogContent({
                                 remaining={item.completion?.reasons}
                                 name={(id) => data.items.find((part) => part.id === id)?.title ?? id}
                             />
-                            {!item.setAside && <CompleteReleaseStep key={`${item.id}-${item.revision}`} item={item} />}
+                            {!item.setAside && (
+                                <CompleteReleaseStep
+                                    key={`${item.id}-${item.revision}`}
+                                    item={item}
+                                    items={data.items}
+                                />
+                            )}
                             {group && !reviewFirst && groupRecord}
                             {record && !group && (
                                 <RecordText

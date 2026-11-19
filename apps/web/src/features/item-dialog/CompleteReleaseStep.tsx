@@ -1,12 +1,12 @@
-import { pendingUserReleaseStep, type Item } from '@lar-factory/shared';
+import { dueUserReleaseStep, type Item } from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
 import { ReleaseStepForm } from '@/ui/board';
 
-/** Only the first pending human step can be completed, with evidence on its current parent revision. */
-export function CompleteReleaseStep({ item }: { item: Item }) {
-    const step = pendingUserReleaseStep(item.releasePlan);
+/** Only the first pending human step, once every part is built, can be completed with evidence on its current parent revision. */
+export function CompleteReleaseStep({ item, items }: { item: Item; items: readonly Item[] }) {
+    const step = dueUserReleaseStep(item, items);
     const [evidence, setEvidence] = useState('');
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>();

@@ -170,3 +170,54 @@ test('board approval settles only the duplicate T3 question and durably resumes 
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('a user release step waits until every part is built', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'release-parts-'));
+    const records = await openWorkRecords(join(dir, 'work.db'));
+
+    try {
+        const id = records.create({ title: 'Ties', repository: 'fake/app', kind: 'concept' }).workId;
+        const at = () => records.read(id).revision;
+
+        records.setFogGone(id, at(), true);
+
+        const part = records.createPart({
+            parentId: id,
+            parentRevision: at(),
+            title: 'Part',
+            repository: 'fake/app',
+            kind: 'build',
+            body: 'Part',
+            blockerIds: [],
+        });
+
+        records.setReleasePlan(id, at(), {
+            steps: [{ id: 'deploy', who: 'User', what: 'Deploy the service' }],
+            outcomeCheck: 'Ties are broken',
+        });
+
+        const board = createBoardState({
+            items: recordItems(records, [], ['fake/app']),
+            repos: [{ repo: 'fake/app' }],
+        } as never);
+        const reread = () => board.update({ items: recordItems(records, [], ['fake/app']) });
+        const release = createReleaseStep({ board, records, reread, send: vi.fn(), readProjection: vi.fn() });
+        const complete = () => release.completeReleaseStep(id, { revision: at(), stepId: 'deploy', evidence: 'Done.' });
+
+        expect(deskWait(board.find(id)!, false, board.snapshot().items).label).not.toBe('Release step');
+        expect(await complete()).toMatchObject({
+            status: 409,
+            body: { error: expect.stringMatching(/every part is built/) },
+        });
+
+        records.setPullRequest(part.workId, part.revision, 'fake/app#1');
+        records.observe(part.workId, records.read(part.workId).revision, { of: 'pr', state: 'merged' });
+        reread();
+
+        expect(deskWait(board.find(id)!, false, board.snapshot().items).label).toBe('Release step');
+        expect((await complete()).status).toBe(200);
+    } finally {
+        records.close();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

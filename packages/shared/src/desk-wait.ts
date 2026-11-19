@@ -4,7 +4,7 @@ import { nextAction } from './item-next-action.ts';
 import { deliveryPrStatus } from './presentation.ts';
 import { pendingBriefBatch, questionOwnerParent, questionThreadAction } from './question-thread.ts';
 import { releaseContinuationReady, supersededReleaseQuestion } from './release-continuation.ts';
-import { outcomeNeedsUser, pendingUserReleaseStep } from './release-plan.ts';
+import { dueUserReleaseStep, outcomeNeedsUser } from './release-plan.ts';
 import { retroWaits } from './retro.ts';
 import {
     canResumeShaping,
@@ -83,7 +83,7 @@ export function deskWait(item: Item, unavailable = false, all: readonly Item[] =
     if (item.briefApproval && !inBatch)
         return { label: 'Approve brief', action: { kind: 'details' as const, label: 'Approve brief' } };
 
-    if (pendingUserReleaseStep(item.releasePlan))
+    if (dueUserReleaseStep(item, all))
         return { label: 'Release step', action: { kind: 'details' as const, label: 'Mark release step done' } };
 
     const concept = unavailable ? undefined : questionOwnerParent(item, all);

@@ -172,6 +172,16 @@ export function createReleaseStep({
                 if (record.setAside || record.finishedAt || !step || step.id !== input.stepId)
                     throw new Error('This release step is no longer waiting on the user.');
 
+                if (
+                    records
+                        .children(id)
+                        .some(
+                            (part) =>
+                                !part.setAside && part.kind !== 'slice' && !records.completion(part.workId).complete,
+                        )
+                )
+                    throw new Error('Wait until every part is built before marking this release step done.');
+
                 if (!Number.isSafeInteger(input.revision) || record.revision !== input.revision)
                     throw new Error('The parent changed. Read its release steps again.');
 

@@ -31,7 +31,7 @@ import type { StartKind } from './StartStore';
 import { closeKeepingFocus, notify, refocus } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ActionError, StartAfterButton, StartLine, StartHold, useButtonKind } from '@/ui/board';
+import { ActionError, StartAfterButton, StartGroup, StartLine, StartNote, useButtonKind } from '@/ui/board';
 
 /** The open blocker Start after waits for in full, the last one when several are open; null once none is. */
 const startsAfter = (item: Item): string | null => openBlockerRefs(item).at(-1) ?? null;
@@ -169,14 +169,11 @@ export function StartOrAfter({
     data,
     kind = 'refine',
     linkedBeside,
-    captionReason = false,
 }: {
     item: Item;
     data: BoardData;
     kind?: StartKind;
     linkedBeside?: string | undefined;
-    /** Sets a hold's reason as a quiet caption beside it, as the dialog's footer does, not on a line under it. */
-    captionReason?: boolean;
 }) {
     const kindOf = useButtonKind();
     const onRow = useOnRow();
@@ -193,16 +190,15 @@ export function StartOrAfter({
     if (hold && openBlockers(item).length)
         return (
             <HeldStartAfter item={item} data={data} kind={kind} reason={hold}>
-                <StartHold id={reasonId} caption={captionReason}>
-                    {hold}
-                </StartHold>
+                <StartNote id={reasonId}>{hold}</StartNote>
             </HeldStartAfter>
         );
 
     if (!hold) return <StartControl item={item} data={data} kind={kind} linkedBeside={linkedBeside} />;
 
     return (
-        <>
+        <StartGroup>
+            <StartNote id={reasonId}>{hold}</StartNote>
             <Button
                 {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
@@ -213,10 +209,7 @@ export function StartOrAfter({
             >
                 {label}
             </Button>
-            <StartHold id={reasonId} caption={captionReason}>
-                {hold}
-            </StartHold>
-        </>
+        </StartGroup>
     );
 }
 
@@ -246,7 +239,8 @@ export function HeldStartAfter({
     const { label } = startActionChoice(item, kind, { prerequisite: startAfterRef(item, data.items), armed: false });
 
     return (
-        <>
+        <StartGroup>
+            {children}
             <StartAfterButton
                 {...kindOf(onRow ? 'start' : 'main')}
                 leftIcon={ICON.play}
@@ -258,8 +252,7 @@ export function HeldStartAfter({
             >
                 {label}
             </StartAfterButton>
-            {children}
-        </>
+        </StartGroup>
     );
 }
 

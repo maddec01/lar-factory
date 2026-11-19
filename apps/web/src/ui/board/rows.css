@@ -299,11 +299,14 @@ li.desk-row:has([data-row-open]:focus-visible) {
 /* A row's action takes no room at rest, so every row's facts end on the row's edge. On hover or focus it stands at that
    same edge, always in the same place, and whatever the row shows under it fades out into it: the row's content is
    masked from a short fade before the action to nothing under it, so the action never needs to know, or replace, what
-   is beneath it. It is as wide as its label up to 11rem. A phone keeps the action under the title (Pane's narrow
+   is beneath it. It is as wide as its label up to 11rem, with more room for a caption. A phone keeps the action under the title (Pane's narrow
    rules). */
 .row-first,
 [data-part] > div {
     --row-action: 11rem;
+}
+.row-first:has(> .row-side [data-start-note]) {
+    --row-action: min(--spacing(80), 50%);
 }
 [data-stage] li[data-item] .row-first,
 :is([data-dossier], [data-parts-frame]) .row-first {

@@ -101,7 +101,7 @@ export {
     StageRowItem,
     UsageFigures,
 } from './StageRow';
-export { ActionError, StartGroup, StartHold, StartLine, StartNote, StartTag } from './StartControls';
+export { ActionError, StartGroup, StartLine, StartNote, StartTag } from './StartControls';
 export { boardColor, statusColor } from './StatusColors';
 export { StatusGlyph, StatusGlyphSlot } from './StatusGlyph';
 export { EarlierThread, EarlierThreadList } from './Threads';

@@ -1,5 +1,5 @@
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-// Start uses the remembered model, or Project default in T3. The adjacent chevron opens the model
+// Start uses the remembered model, or Project default in T3. Its split button's chevron opens the model
 // menu on that choice; picking an entry starts with it, while Escape, Tab or a click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 import {
@@ -15,7 +15,7 @@ import {
 } from '@lar-factory/shared';
 import { Button, DropdownMenu, Inline } from '@lar-works/design-system';
 import { ChevronDownIcon } from '@lar-works/design-system/icons';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { writeState } from './ActionAvailability';
@@ -58,6 +58,8 @@ export function StartControl({
     const shown = useShownStart(item, data, kind);
     const { uncertain, error } = shown;
     const pending = shown.pending || !!afterSlot?.pending;
+    const slotNote = afterSlot && !pending;
+    const slotNoteId = useId();
     const closed = useStart(item.id, kind)?.phase === 'closed';
     const action = useItemAction(item.id);
     const lastChoice = useStartStore((state) => state.lastChoice);
@@ -152,6 +154,7 @@ export function StartControl({
 
     return (
         <StartGroup>
+            {slotNote && <StartNote id={slotNoteId}>Start after a slot frees.</StartNote>}
             {retry
                 ? currentBuildThread(item)?.id !== linkedBeside && (
                       <OpenThread item={item} data={data} iconOnly threadId={currentBuildThread(item)?.id} />
@@ -167,7 +170,8 @@ export function StartControl({
                 as="span"
                 inline
                 align="center"
-                space="tight"
+                space="none"
+                data-start-split
                 role="group"
                 aria-label={`${label} ${itemName(item)}`}
             >
@@ -178,6 +182,7 @@ export function StartControl({
                     leftIcon={!retry && ICON.play}
                     data-start={item.id}
                     aria-label={`${verb} ${itemName(item)}`}
+                    aria-describedby={slotNote ? slotNoteId : undefined}
                     title={afterSlot ? 'Start after a slot frees' : undefined}
                     {...state}
                     onClick={() => pick(highlightedChoice(data.modelChoices, lastChoice))}
@@ -219,7 +224,6 @@ export function StartControl({
                     </DropdownMenu.Content>
                 </DropdownMenu>
             </Inline>
-            {afterSlot && !pending && <StartNote>Start after a slot frees.</StartNote>}
         </StartGroup>
     );
 }

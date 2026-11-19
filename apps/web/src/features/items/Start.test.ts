@@ -76,6 +76,7 @@ beforeEach(() => {
 
 test.each([
     { verb: 'Shape', remembered: { instanceId: 'codex', model: 'gpt-5.5' } },
+    { verb: 'Build', remembered: { instanceId: 'codex', model: 'gpt-5.5' } },
     { verb: 'Decide', remembered: { instanceId: 'removed', model: 'old-model' } },
 ])(
     '$verb starts immediately with the remembered model or project default, and only submits once',
@@ -109,7 +110,7 @@ test.each([
         expect(posted()).toEqual([
             [
                 verb === 'Build' ? '/api/start-build' : '/api/start',
-                { session: 's1', itemId: 'I_sample05', ...(verb === 'Shape' ? { model: remembered } : {}) },
+                { session: 's1', itemId: 'I_sample05', ...(verb !== 'Decide' ? { model: remembered } : {}) },
             ],
         ]);
         expect(document.activeElement).toBe(start());
@@ -251,7 +252,12 @@ test.each(['main', 'override'])(
         holdPosts(data);
         await mountItem(data, 'I_sample13');
         expect(start('I_sample13').disabled).toBe(false);
-        expect(text(card())).toContain('Start after a slot frees.');
+
+        const button = start('I_sample13');
+        const note = document.getElementById(button.getAttribute('aria-describedby')!);
+
+        expect(text(note!)).toBe('Start after a slot frees.');
+        expect(note?.nextElementSibling).toBe(button.closest('[data-start-split]'));
 
         if (route === 'main') {
             start('I_sample13').focus();

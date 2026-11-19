@@ -20,7 +20,7 @@ import { hasLiveThread } from './ItemThreads';
 import { OpenThread } from './OpenThread';
 import { useOnRow } from './RowContext';
 import { HeldStartAfter, StartOrAfter } from './StartAfter';
-import { StartHold, useButtonKind } from '@/ui/board';
+import { StartGroup, StartNote, useButtonKind } from '@/ui/board';
 
 /** The shared action choice names the build on every surface. */
 export function StartBuild({
@@ -50,12 +50,7 @@ export function StartBuild({
     const problem = setup && buildAccessProblem(setup.access);
 
     // In the dialog's footer the reason it's disabled shows beside it as a quiet caption; elsewhere its title says.
-    const reason =
-        problem && captionReason ? (
-            <StartHold id={reasonId} caption>
-                {problem}
-            </StartHold>
-        ) : undefined;
+    const reason = problem && captionReason ? <StartNote id={reasonId}>{problem}</StartNote> : undefined;
 
     // Blocked work says what it starts after, as every blocked start does, never a disabled Build: disabled while builds
     // lack access, its title saying why. One armed before access lapsed still shows, so it can be disarmed.
@@ -68,7 +63,8 @@ export function StartBuild({
 
     if (problem)
         return (
-            <>
+            <StartGroup>
+                {reason}
                 <Button
                     {...kindOf(onRow ? 'start' : 'main')}
                     leftIcon={ICON.play}
@@ -79,11 +75,8 @@ export function StartBuild({
                 >
                     {label}
                 </Button>
-                {reason}
-            </>
+            </StartGroup>
         );
 
-    return (
-        <StartOrAfter item={item} data={data} kind="build" linkedBeside={linkedBeside} captionReason={captionReason} />
-    );
+    return <StartOrAfter item={item} data={data} kind="build" linkedBeside={linkedBeside} />;
 }

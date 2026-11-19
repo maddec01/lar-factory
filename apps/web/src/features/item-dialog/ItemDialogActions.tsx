@@ -76,7 +76,7 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
             if (hasLiveThread(item)) return LATEST_THREAD;
 
             return {
-                control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} captionReason />,
+                control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} />,
             };
         case 'Ready':
             return hasLiveThread(item)
@@ -85,7 +85,7 @@ function statusAction(item: Item, data: BoardData, { working, resume }: ItemStat
         case 'Shaping':
             return canResumeShaping(item)
                 ? {
-                      control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} captionReason />,
+                      control: <StartOrAfter item={item} data={data} linkedBeside={linkedBeside} />,
                   }
                 : LATEST_THREAD;
         case 'In progress':

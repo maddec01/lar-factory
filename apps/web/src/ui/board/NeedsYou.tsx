@@ -5,7 +5,7 @@ import { Children, type ReactNode } from 'react';
 
 /** The reason a piece of work needs you, on the desk card's attention bar (the design system's attention recipe: an
  *  amber edge, a 3px amber bar down its leading edge and a faint wash), then the `actions` that answer it, if any, and
- *  any `result`. Abandon among the actions is the quiet-destructive Button (`variant="destructive-quiet"`), and asks
+ *  any `result`. The item dialog's notice says only why; its footer carries the choices. Abandon among actions is the quiet-destructive Button (`variant="destructive-quiet"`), and asks
  *  in its confirmation first. */
 export function NeedsYouNotice({
     reason,
@@ -32,7 +32,7 @@ export function NeedsYouNotice({
                     <span className="min-w-0 wrap-anywhere">{reason}</span>
                 </p>
                 {Children.toArray(actions).length ? (
-                    <span className="wait-actions ml-auto flex flex-wrap gap-1.5">{actions}</span>
+                    <span className="notice-actions ml-auto flex flex-wrap gap-1.5">{actions}</span>
                 ) : null}
             </div>
             {children}

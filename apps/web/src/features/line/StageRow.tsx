@@ -2,16 +2,8 @@
 // whole board, one button that opens the item's details with the row's action beside it. Its state cell is a mark and a
 // short word, never wrapping, with the detail in its tooltip; its progress cell a tick meter and a count, which unfolds
 // its slices, or its reviewers while a review round runs, under the row.
-import type { BoardData, Item, Status } from '@lar-factory/shared';
-import {
-    blockedText,
-    canRetryBuild,
-    currentBuildThread,
-    humanWait,
-    itemActivityThread,
-    itemName,
-    openBlockers,
-} from '@lar-factory/shared';
+import type { BoardData, Status } from '@lar-factory/shared';
+import { blockedText, humanWait, itemName } from '@lar-factory/shared';
 import { useState } from 'react';
 
 import { ActivityLine } from './ActivityLine';
@@ -21,8 +13,9 @@ import { ChecksProgress } from './RowChecks';
 import { figuresOf, opensItem, sliceCounts, sliceNote } from './RowDetails';
 import { RowKindMark, RowSource } from './RowIdentity';
 import { ReviewerList, ReviewersProgress } from './RowReviewers';
+import { Side } from './RowSide';
 import type { StageRow as Row } from './StageRows';
-import { YOURS, failedVerifyNote, reviewing, stateMark, threadText } from './StageStatus';
+import { failedVerifyNote, reviewing, stateMark, threadText } from './StageStatus';
 import { useActivityAction, useActivityState, useActivityStill } from './useActivityState';
 import { workLabel } from './WorkLabel';
 import { useItemDialogStore } from '@/features/item-dialog';
@@ -31,15 +24,11 @@ import {
     ItemStatusGlyph,
     ItemTitle,
     SLOT_WAIT,
-    OpenThread,
     SliceBar,
     WorkingBar,
     SliceList,
     StartAfterError,
-    StartBuild,
     StartMessage,
-    StartOrAfter,
-    hasLiveThread,
     useActivityUnavailable,
     useShownStatus,
     prChecks,
@@ -66,40 +55,6 @@ import {
     WaitWord,
     RowCount,
 } from '@/ui/board';
-
-/** The one thing a status asks next, or where to act on an item that waits on you. */
-function Side({ item, data }: { item: Item; data: BoardData }) {
-    const { working, resume } = useShownStatus(item);
-
-    if (resume)
-        // Tinted like the other starts: resuming is the thing you can do now.
-        return <OpenThread item={item} data={data} threadId={itemActivityThread(item)?.id} label="Resume in T3" next />;
-
-    if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
-
-    if (YOURS.includes(item.status)) return null;
-
-    switch (item.status) {
-        case 'Queued':
-            return hasLiveThread(item) ? (
-                <OpenThread item={item} data={data} />
-            ) : (
-                <StartOrAfter item={item} data={data} />
-            );
-        case 'Ready':
-            // A held build starts on its own once what holds it lands; the row says what that is, with nothing to press.
-            return openBlockers(item).length ? null : <StartBuild item={item} data={data} />;
-        case 'In progress':
-            if (canRetryBuild(item)) return <StartBuild item={item} data={data} />;
-
-            return <OpenThread item={item} data={data} />;
-        case 'Shaping':
-        case 'Review':
-            return <OpenThread item={item} data={data} />;
-        default:
-            return null;
-    }
-}
 
 /** The stages a board section is named for: Shaping, Ready to build and Build. */
 const NAMED_BY_SECTION: readonly Status[] = ['Shaping', 'Ready', 'In progress'];

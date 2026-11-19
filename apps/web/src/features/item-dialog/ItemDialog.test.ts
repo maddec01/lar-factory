@@ -46,6 +46,10 @@ async function openItem(itemId: string): Promise<void> {
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
+/** The footer's button named `name`. */
+const footerButton = (name: string) =>
+    [...footer().querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b).trim() === name)!;
+
 /** The footer's buttons and links, left to right, as their text, with " (disabled: <title>)" on a disabled one. */
 const footerControls = () =>
     [...footer().querySelectorAll<HTMLElement>('button, a')].map(
@@ -294,12 +298,11 @@ test('work that needs you shows why, confirms each choice before posting it, off
     });
     await openItem(id);
     expect(text(inDialog('[data-needs-you-reason]'))).toContain(reason);
-    expect($$('[data-needs-you-reason] button').map(text)).toEqual([
-        'Reopen PR',
-        'Start a replacement build',
-        'Abandon',
-    ]);
-    await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[0]!);
+    // The notice says why; its choices sit in the footer, Abandon at the left and the first answer as Main.
+    expect(inDialog('[data-needs-you-reason]')!.querySelectorAll('button')).toHaveLength(0);
+    expect(footerControls()).toEqual(expect.arrayContaining(['Abandon', 'Reopen PR', 'Start a replacement build']));
+    expect(text(footer().querySelector('[data-kind="main"]'))).toBe('Reopen PR');
+    await press(footerButton('Reopen PR'));
     expect(posted(), 'pressing a choice writes nothing').toEqual([]);
     expect(confirmation()!.getAttribute('role')).toBe('alertdialog');
     expect(text($('#needs-you-detail'))).toContain('Its ticket stays closed.');
@@ -317,12 +320,12 @@ test('work that needs you shows why, confirms each choice before posting it, off
     expect(posted()).toHaveLength(2);
     await answer({ error: null });
     expect(confirmation()).toBeNull();
-    await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[1]!);
+    await press(footerButton('Start a replacement build'));
     expect(text($('#needs-you-dialog h2'))).toMatch(/^Start a replacement build for #129 /);
     await confirmPress('Start a replacement build');
     expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'replace-pr' }]);
     await answer({ error: null });
-    await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[2]!);
+    await press(footerButton('Abandon'));
     expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #129 /);
 });
 
@@ -444,7 +447,7 @@ async function recoveryItem(
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
-    await press(button('needs-you', id));
+    await press(footerButton('Start again'));
 
     return id;
 }
@@ -517,4 +520,82 @@ test('an approved Ready item with only a finished shaping thread offers Abandon,
     expect(button('back-to-list', 'I_sample13')).toBeTruthy();
     await press(button('reshape', 'I_sample13'));
     expect(posted()).toEqual([['/api/reshape', { itemId: 'I_sample13' }]]);
+});
+
+/** The sample with `itemId` in Shaping, its thread deleted, as the board shows it then. */
+const deletedShaping = (itemId: string): BoardData => ({
+    ...sample,
+    capture: { enabled: true, session: 's1' },
+    items: sample.items.map((i) =>
+        i.id === itemId
+            ? {
+                  ...i,
+                  status: 'Shaping',
+                  threads: [],
+                  needsYou: {
+                      reason: 'The latest work thread was deleted.',
+                      deletedThread: true,
+                      startAgainPurpose: 'shape',
+                      causes: [],
+                      ticketOpen: true,
+                      offers: ['start-again', 'back-to-queue', 'back-to-list'],
+                  },
+              }
+            : i,
+    ),
+});
+
+test('work whose thread was deleted offers every way back in the footer, and outlines its yellow cards', async () => {
+    const id = 'I_sample05';
+
+    await mountPage(deletedShaping(id));
+    await openItem(id);
+
+    // The notice says only why; the footer carries the choices, Start again as its Main action at the right.
+    expect(inDialog('[data-needs-you-reason]')!.querySelectorAll('button')).toHaveLength(0);
+    expect(footerControls()).toEqual(['Back to Queue', 'Move to the List', 'Start again']);
+    expect(footer().querySelector<HTMLElement>('[data-kind="main"]')!.textContent).toBe('Start again');
+
+    // The row and the desk card offer the same Start again, outlined as every yellow card's action is.
+    const starts = $$<HTMLButtonElement>(`[data-start-again="${id}"]`).filter((b) => !dialog()!.contains(b));
+
+    expect(starts.length).toBeGreaterThanOrEqual(2);
+    for (const start of starts) {
+        expect(start.className).toContain('border-line-control');
+        expect(start.className).not.toContain('bg-primary-surface');
+    }
+});
+
+test('stopped shaping offers Back to Queue and Move to the List in the footer', async () => {
+    const id = 'I_sample05';
+    const data: BoardData = {
+        ...sample,
+        capture: { enabled: true, session: 's1' },
+        items: sample.items.map((i) =>
+            i.id === id
+                ? {
+                      ...i,
+                      status: 'Shaping',
+                      needsYou: undefined,
+                      threads: [
+                          {
+                              id: 'shaper',
+                              title: 'Shape',
+                              state: 'stopped',
+                              updated: '2026-11-19T00:00:00Z',
+                              purpose: 'shape',
+                          },
+                      ],
+                  }
+                : i,
+        ),
+    };
+
+    await mountPage(data);
+    holdPosts(data);
+    await openItem(id);
+    expect(footerControls()).toEqual(expect.arrayContaining(['Back to Queue', 'Move to the List']));
+
+    await press(button('back-to-queue', id));
+    expect(posted().at(-1)).toEqual(['/api/back-to-queue', { itemId: id }]);
 });

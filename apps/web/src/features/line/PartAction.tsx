@@ -17,7 +17,7 @@ export function PartAction({ part, data }: { part: Part; data: BoardData }) {
 
     if (isDone(item)) return null;
 
-    if (humanWait(item, unavailable, data.items)) return <HumanWaitAction item={item} data={data} quiet />;
+    if (humanWait(item, unavailable, data.items)) return <HumanWaitAction item={item} data={data} />;
 
     if (item.status === 'Ready' || item.status === 'Queued') return <PartStart part={part} data={data} />;
 

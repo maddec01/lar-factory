@@ -31,8 +31,8 @@ import {
     AgentWorkNote,
     EarlierThreads,
     NeedsYou,
-    HumanWaitAction,
-    useNoticeTakesAction,
+    NeedsYouChoices,
+    offersChoices,
     VerifyBuild,
     StartAfterError,
     StartMessage,
@@ -93,8 +93,6 @@ export function ItemDialogContent({
     // The open editor in an expanded dialog takes the height the rest leaves.
     const fill = expanded && edit.editing;
     const moves = useMovesItem(item, data);
-    // A question's or pull request's notice carries the main action beside its words, so the footer doesn't repeat it.
-    const noticeActs = useNoticeTakesAction(item) && !item.setAside;
     // A concept's own figures say whose they are only beside its total with its parts.
     const total = useConceptTotal(item);
 
@@ -138,12 +136,8 @@ export function ItemDialogContent({
                             {!group && !item.setAside && <ItemProgress item={item} />}
                             {/* Then what waits on you, before the rest. */}
                             {!item.setAside && (
-                                <NeedsYou
-                                    item={item}
-                                    data={data}
-                                    // The same action, in the same kind, as the item's desk card shows.
-                                    primary={noticeActs && <HumanWaitAction item={item} data={data} quiet />}
-                                />
+                                // Only why it waits on you: every action that answers it sits in the footer.
+                                <NeedsYou item={item} data={data} />
                             )}
                             {!item.setAside && <RetroFollowups item={item} />}
                             {/* What its agents do now, before the ticket's own facts. */}
@@ -235,18 +229,19 @@ export function ItemDialogContent({
             </Modal.Body>
             <Modal.Footer
                 leading={
-                    (moves || canStopShaping(item)) && (
+                    (moves || canStopShaping(item) || offersChoices(item, 'moves')) && (
                         <DialogActions presentation="leading">
                             {/* Abandon first, so it keeps one place whatever else shows. */}
                             <MoveActions item={item} data={data} />
+                            <NeedsYouChoices item={item} data={data} side="moves" />
                             <StopShaping item={item} />
                         </DialogActions>
                     )
                 }
             >
-                {/* The notice carries the status's action; the footer still reaches the latest thread when it is another. */}
+                {/* Every action the item's state asks for, with Open thread on its latest thread beside it. */}
                 <DialogActions>
-                    <StatusActions item={item} data={data} besideOnly={noticeActs} />
+                    <StatusActions item={item} data={data} />
                 </DialogActions>
             </Modal.Footer>
         </Modal.Content>

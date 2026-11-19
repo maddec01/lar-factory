@@ -43,6 +43,7 @@ export function DeskDrawer({
             <h2 id="desk-h" className="sr-only">
                 Your desk
             </h2>
+            {/* Every card here is yellow, so its actions keep their outline (ButtonKinds' rule). */}
             <TintedActions tinted={false}>
                 <div id={cardsId} className="desk-cards" inert={!open}>
                     <ol ref={setList} aria-label="Your desk" className={`desk-grid m-0 list-none ${fade}`}>

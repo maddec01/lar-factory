@@ -1,6 +1,6 @@
 import type { BoardData, Item } from '@lar-factory/shared';
 // The item dialog's buttons that move an item: Queue on a List item, Move to List on a Queued one, Abandon on both,
-// and Reshape on approved work that hasn't started building, each with its pending label.
+// Back to Queue and Move to List on stopped shaping, and Reshape on approved work that hasn't started building, each with its pending label.
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import { Button, Text } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
@@ -8,7 +8,7 @@ import { useId, useRef } from 'react';
 import { writeState } from './ActionAvailability';
 import { useActionStore, useItemAction } from './ActionStore';
 import { ICON } from './ButtonIcons';
-import { askAbandon, backToList, queueItem, reshape } from './CardActions';
+import { askAbandon, backToList, backToQueue, queueItem, reshape } from './CardActions';
 import { closeKeepingFocus } from '@/features/notices';
 import { ActionError as DesignActionError, useButtonKind } from '@/ui/board';
 
@@ -49,6 +49,26 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
             onClick={() => void backToList(item.id)}
         >
             {moving ? 'Moving to the List…' : 'Move to the List'}
+        </Button>
+    );
+}
+
+/** The muted link-style button in stopped shaping's footer that moves it back to the Queue. */
+export function BackToQueueButton({ item, data }: { item: Item; data: BoardData }) {
+    const kindOf = useButtonKind();
+    const action = useItemAction(item.id);
+    const moving = action?.phase === 'pending' && action.kind === 'back-to-queue';
+
+    return (
+        <Button
+            {...kindOf('other')}
+            pendingLook
+            data-back-to-queue={item.id}
+            aria-label={`${moving ? 'Moving' : 'Move back to the Queue'} ${itemName(item)}`}
+            {...writeState(data, action)}
+            onClick={() => void backToQueue(item.id)}
+        >
+            {moving ? 'Moving to the Queue…' : 'Back to Queue'}
         </Button>
     );
 }

@@ -42,7 +42,7 @@ function latestOf(items: Item[], data: BoardData, unavailable: boolean): DeskLat
         ]
             .filter(Boolean)
             .join(' · '),
-        action: <HumanWaitAction item={item} data={data} quiet />,
+        action: <HumanWaitAction item={item} data={data} />,
         onOpen: () => useItemDialogStore.getState().open(item.id),
     };
 }

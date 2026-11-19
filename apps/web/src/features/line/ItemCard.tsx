@@ -148,11 +148,7 @@ export function ItemCard({
               : atWork
                 ? [atWork, count].filter(Boolean).join(' · ')
                 : [idle?.status, reviewers && count].filter(Boolean).join(' · ');
-    const action = asks ? (
-        <HumanWaitAction item={item} data={data} quiet />
-    ) : (
-        part && <PartAction part={part} data={data} />
-    );
+    const action = asks ? <HumanWaitAction item={item} data={data} /> : part && <PartAction part={part} data={data} />;
 
     return (
         <BoardCard

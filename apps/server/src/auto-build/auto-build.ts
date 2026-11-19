@@ -7,6 +7,7 @@
 import {
     blockedText,
     buildsAtWork,
+    conceptPartStartHolds,
     isRecord,
     ref,
     sameRepo,
@@ -189,7 +190,7 @@ export function createAutoBuild({
 
             if (plan.run?.state === 'paused') return null;
 
-            if (!records!.refinement(record.parentId).complete || (!plan.run && plan.holds.length)) return 'refinement';
+            if ((plan.run ? conceptPartStartHolds(plan) : plan.holds).length) return 'refinement';
         }
 
         return { at: gate.recordedAt };

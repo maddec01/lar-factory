@@ -1,4 +1,4 @@
-import type { GateEvidence } from '@lar-factory/shared';
+import { conceptPartStartHolds, type GateEvidence } from '@lar-factory/shared';
 
 import { groupMembers } from './blocker-declarations.ts';
 import { blockerPath, groupContractReferences } from './contract-references.ts';
@@ -74,12 +74,7 @@ export function prepareBuildClaim(records: WorkRecords, workId: string, input: B
     if (work.parentId && records.read(work.parentId).kind === 'concept') {
         const parent = records.read(work.parentId);
         const plan = records.conceptBuildPlan(parent.workId);
-        const holds =
-            input.automatic && !plan.run
-                ? plan.holds
-                : plan.holds.filter(
-                      (hold) => hold.workId === parent.workId || records.read(hold.workId).kind !== 'build',
-                  );
+        const holds = input.automatic && !plan.run ? plan.holds : conceptPartStartHolds(plan);
 
         if (holds.length) refuse(holds.map((hold) => hold.reason).join(' '));
 

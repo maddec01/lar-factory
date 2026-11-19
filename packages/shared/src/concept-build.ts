@@ -21,6 +21,13 @@ export interface ConceptBuildPlan {
     }[];
 }
 
+/** An individual build still needs concept-level prerequisites. Other builds' gates belong to the whole run. */
+export function conceptPartStartHolds(plan: ConceptBuildPlan): ConceptBuildPlan['holds'] {
+    const builds = new Set(plan.members.filter((member) => member.kind === 'build').map((member) => member.workId));
+
+    return plan.holds.filter((hold) => !builds.has(hold.workId));
+}
+
 const DEPENDENCY = /^Dependency on (?:[^/:\s]+\/)?([^:\s]+):/;
 
 /**

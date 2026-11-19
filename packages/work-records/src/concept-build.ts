@@ -1,10 +1,10 @@
-import { parseConceptMap, type ConceptBuildPlan, type ConceptBuildRun } from '@lar-factory/shared';
+import { conceptFog, parseConceptMap, type ConceptBuildPlan, type ConceptBuildRun } from '@lar-factory/shared';
 import { createHash } from 'node:crypto';
 
 import { WorkRecordError, type Database } from './database.ts';
 import { productContent } from './product-content.ts';
 import { contractText } from './review-dependencies.ts';
-import { workOrder } from './work-order.ts';
+import { workOrder, type OrderedWork } from './work-order.ts';
 import type { WorkRecords } from './work-records.ts';
 
 export interface ConceptRunRecords {
@@ -18,6 +18,39 @@ interface SavedRun extends ConceptBuildRun {
     signatureVersion?: 2;
 }
 
+/** A part waiting for delivery cannot be a prerequisite for starting that delivery. Follow recorded blockers across groups. */
+function partsWaitingOnDelivery(work: WorkRecords, rows: readonly OrderedWork[]): Set<string> {
+    const completion = new Map(rows.map((row) => [row.workId, row.complete]));
+    const waiting = new Map<string, boolean>();
+
+    const waits = (id: string): boolean => {
+        const cached = waiting.get(id);
+
+        if (cached !== undefined) return cached;
+
+        // Blocker writes reject cycles. Mark visited before descending so saved data cannot recurse into itself.
+        waiting.set(id, false);
+
+        const result = work.blockers(id).some((blocker) => {
+            if (blocker.setAside) return false;
+
+            const complete = completion.get(blocker.workId) ?? work.completion(blocker.workId).complete;
+
+            completion.set(blocker.workId, complete);
+
+            if (complete) return false;
+
+            return blocker.kind !== 'decision' || waits(blocker.workId);
+        });
+
+        waiting.set(id, result);
+
+        return result;
+    };
+
+    return new Set(rows.filter((row) => !row.complete && waits(row.workId)).map((row) => row.workId));
+}
+
 export function conceptRunRecords(database: Database, records: () => WorkRecords): ConceptRunRecords {
     const { db } = database;
     const inspect = (workId: string, legacy = false) => {
@@ -27,10 +60,35 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
         if (group.kind !== 'concept') throw new WorkRecordError('invalid', 'Only a concept has a concept build run.');
 
         const rows = workOrder(work, workId).filter((row) => !row.setAside);
-        const holds: ConceptBuildPlan['holds'] = work
-            .refinement(workId)
-            .reasons.filter((reason) => !reason.startsWith('Its decision '))
-            .map((reason) => ({ workId, reason }));
+        const waitingForDelivery = partsWaitingOnDelivery(work, rows);
+        const preflight = rows.filter((row) => !waitingForDelivery.has(row.workId));
+        const savedMap = work.body(workId, 'map');
+        const map = savedMap ?? '';
+        const fog = parseConceptMap(map).fog;
+        const laterFog =
+            fog.length > 0 &&
+            conceptFog(
+                fog,
+                rows
+                    .filter((row) => waitingForDelivery.has(row.workId))
+                    .map((row) => {
+                        const record = work.read(row.workId);
+
+                        return {
+                            id: row.workId,
+                            kind: row.kind,
+                            complete: row.complete,
+                            decisionMethod: record.decisionMethod ?? undefined,
+                            active: row.status === 'Shaping' && !record.needsYou,
+                            question: Boolean(record.needsYou),
+                        };
+                    }),
+            ).every((entry) => entry.routed);
+        const holds: ConceptBuildPlan['holds'] = [];
+
+        if (!group.fogGone && !laterFog) holds.push({ workId, reason: "Its Fog isn't gone." });
+
+        if (!map.trim()) holds.push({ workId, reason: 'Its map is empty.' });
 
         if (group.setAside) holds.push({ workId, reason: 'The concept is set aside.' });
 
@@ -39,7 +97,7 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
         if (!rows.some((row) => row.kind === 'build'))
             holds.push({ workId, reason: 'No remaining builds are planned.' });
 
-        for (const row of rows) {
+        for (const row of preflight) {
             const record = work.read(row.workId);
 
             if (row.kind !== 'build') {
@@ -67,9 +125,10 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
                     holds.push({ workId: row.workId, reason: `${row.title}: resolve the changed ticket Spec.` });
             }
         }
-        for (const id of [workId, ...rows.map((row) => row.workId)]) {
+        for (const id of [workId, ...preflight.map((row) => row.workId)]) {
             for (const dependency of work.dependencies(id)) {
-                if (!dependency.met && !dependency.replacedBy)
+                // With assigned builds, the Dependency is a hold on those builds, regardless of where it was recorded.
+                if (!dependency.blocks.length && !dependency.met && !dependency.replacedBy)
                     holds.push({ workId: id, reason: `Dependency on ${dependency.owner}: ${dependency.need}` });
             }
             for (const dependency of work.unmetDependencies(id))
@@ -79,13 +138,11 @@ export function conceptRunRecords(database: Database, records: () => WorkRecords
         const signature = createHash('sha256')
             .update(
                 JSON.stringify({
-                    map: /^##\s/m.test(work.body(workId, 'map') ?? '')
-                        ? parseConceptMap(
-                              legacy ? work.body(workId, 'map')! : productContent(work.body(workId, 'map')!),
-                          )
+                    map: /^##\s/m.test(map)
+                        ? parseConceptMap(legacy ? map : productContent(map))
                         : legacy
-                          ? work.body(workId, 'map')?.trim()
-                          : productContent(work.body(workId, 'map') ?? ''),
+                          ? savedMap?.trim()
+                          : productContent(map),
                     scope: work.confirmedScope(workId)?.scope,
                     fog: group.fogGone,
                     setAside: group.setAside,

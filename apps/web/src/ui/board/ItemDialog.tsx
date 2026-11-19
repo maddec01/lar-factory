@@ -2,6 +2,7 @@
 // sidebar beside it, its notes, and the footer's groups of actions.
 
 import { Alert, Link, Text } from '@lar-works/design-system';
+import { TicketIcon } from '@lar-works/design-system/icons';
 import { linkRecipe } from '@lar-works/design-system/primitives';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -10,13 +11,14 @@ import type { DataAttributes } from './DataAttributes';
 import { StateWord } from './StateWord';
 import { GroupTitle } from './TextParts';
 
-/** Draws a row's first quiet button back by the design system Button's own 11px inline padding, so its word starts on
- *  the values' column rather than its edge. */
-const FIRST_BUTTON_ON_COLUMN = '[&>[data-slot=button]:first-child]:-ml-2.75';
+/** Draws a row's first quiet button back by the design system Button's own 11px inline padding, so its word starts where
+ *  the values above it do. */
+const FIRST_BUTTON_ON_VALUES = '[&>[data-slot=button]:first-child]:-ml-2.75';
 
 /**
- * The item's properties at the top of the dialog's sidebar, a label beside each value, each on one line: its status,
- * where its ticket lives, its kind and its parent, then a quiet `note` and its ticket `actions` on a Ticket row.
+ * The item's properties at the top of the dialog's sidebar, each a value that says what it is on one line, led by its own
+ * mark rather than a label: its status, where its ticket lives, its kind and its parent, then a quiet `note` and its
+ * ticket `actions` after a ticket mark.
  */
 export function ItemSummary({
     status,
@@ -47,18 +49,18 @@ export function ItemSummary({
             <AsideProp label="Kind">{kind}</AsideProp>
             {parent && <AsideProp label="Part of">{parent}</AsideProp>}
             {note && <span className="text-fg-muted min-w-0 truncate text-xs leading-5 empty:hidden">{note}</span>}
-            {/* A property row of its own, label and buttons on the columns above; an opened panel takes the full width.
-                It shows only while it holds a button or a panel. */}
+            {/* A row of its own, the ticket's mark then its buttons, their words where the values above start; an opened
+                panel takes the full width. It shows only while it holds a button or a panel. */}
             <div
-                className="grid min-w-0 grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 pt-1 text-xs has-[section]:grid-cols-[minmax(0,1fr)] [&:has(section)>[data-label]]:hidden [&:not(:has(button,section))]:hidden"
+                className="flex min-w-0 items-center gap-2 text-xs has-[section]:block [&:has(section)>[data-label]]:hidden [&:not(:has(button,section))]:hidden"
                 data-ticket-actions
             >
-                <span className="text-fg-muted leading-7" data-label>
-                    Ticket
+                <span className="text-fg-muted grid size-4 shrink-0 place-items-center" data-label>
+                    <TicketIcon aria-hidden className="size-3.5" />
+                    <span className="sr-only">Ticket</span>
                 </span>
-                {/* Quiet buttons, the first one's word on the values' column, as the properties above read. */}
                 <span
-                    className={`flex min-w-0 flex-wrap items-center gap-1 ${FIRST_BUTTON_ON_COLUMN} [&>section]:basis-full`}
+                    className={`flex min-w-0 flex-wrap items-center gap-1 ${FIRST_BUTTON_ON_VALUES} [&>section]:basis-full`}
                 >
                     {actions}
                 </span>
@@ -67,23 +69,21 @@ export function ItemSummary({
     );
 }
 
-/** One property in the dialog's sidebar: its muted label in a fixed column, its value beside it, the label on the value's
- *  first line when the value runs longer. */
+/** One property in the dialog's sidebar: its value alone, which leads with its own mark and says what it is, the
+ *  property's name kept for screen readers. */
 function AsideProp({
     label,
     children,
 }: {
-    /** What the property is, such as "Status". */
+    /** What the property is, such as "Status", read before its value. */
     label: string;
-    /** Its value. */
+    /** Its value, led by its mark. */
     children: ReactNode;
 }) {
     return (
-        <div className="grid min-h-6 grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 text-xs">
-            <span className="text-fg-muted leading-6">{label}</span>
-            <span className="text-fg flex min-h-6 min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">
-                {children}
-            </span>
+        <div className="text-fg flex min-h-7 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs wrap-anywhere">
+            <span className="sr-only">{label}</span>
+            {children}
         </div>
     );
 }
@@ -226,7 +226,7 @@ export function ItemDialogColumns({
 
     return (
         <div
-            className={`grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-5 ${aside ? '@split:grid-cols-[minmax(0,1fr)_18rem]' : ''} ${rows}`}
+            className={`grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-5 ${aside ? '@split:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}
         >
             {children}
         </div>
@@ -258,7 +258,8 @@ export function ItemMainColumn({
 
 /** The sidebar beside the main column, once there is room: a softly filled card with a hairline edge, so it reads as its own
  *  panel on any screen, its groups (properties, figures, people and dates, threads) split by full-width dividers. While
- *  it fits the dialog's scroll area it stays in view as a long record scrolls beside it. */
+ *  it fits the dialog's scroll area it stays in view as a long record scrolls beside it, held where it starts (the
+ *  body's own 8px top padding, ItemDialogBody) so it never shifts before it sticks. */
 export function ItemDialogAside({
     children,
 }: {
@@ -270,7 +271,7 @@ export function ItemDialogAside({
     return (
         <aside
             ref={ref}
-            className="@split:col-start-2 @split:row-start-1 @split:data-fits:sticky @split:data-fits:top-0 bg-fill-muted border-line divide-line grid min-w-0 grid-cols-[minmax(0,1fr)] content-start divide-y self-start rounded-xl border shadow-(--shadow-raised) [&>*]:px-4 [&>*]:py-3"
+            className="@split:col-start-2 @split:row-start-1 @split:data-fits:sticky @split:data-fits:top-2 bg-fill-muted border-line divide-line grid min-w-0 grid-cols-[minmax(0,1fr)] content-start divide-y self-start rounded-xl border shadow-(--shadow-raised) [&>*]:px-4 [&>*]:py-3"
             data-item-aside
             data-fits={fits || undefined}
         >
@@ -318,18 +319,18 @@ export function AsideFigures({
     return <div className="grid min-w-0 gap-3 empty:hidden [&_[data-agent-work]]:leading-5">{children}</div>;
 }
 
-/** The item's agent figures as sidebar properties, one labelled row each in the same grid as Status and Project, under
- *  any `heading` that says whose they are ("This concept", "Including parts"), with any `note` (such as that they are
- *  the last known) muted under them; `title` gives them in full. */
+/** The item's agent figures in the sidebar, each saying what it is: the cost on its own line in the text colour, then
+ *  the rest on a muted line, such as "2h 10m agent time · 14.9M tokens", under any `heading` that says whose they are ("This concept", "Including
+ *  parts"), with any `note` (such as that they are the last known) muted under them; `title` gives them in full. */
 export function FigureRows({
-    rows,
+    figures,
     title,
     heading,
     note,
     ...data
 }: {
-    /** The figures, each its label and value, such as "Agent time" and "2h 29m". */
-    rows: { label: string; value: string }[];
+    /** The figures, each saying what it is, such as "2h 10m agent time"; the first leads in the text colour. */
+    figures: string[];
     /** The figures in full, as their tooltip. */
     title?: string | undefined;
     /** Whose figures they are, over them, such as "This concept". */
@@ -337,14 +338,13 @@ export function FigureRows({
     /** A word on the figures, such as "Last known". */
     note?: string | undefined;
 } & DataAttributes) {
+    const [lead, ...rest] = figures;
+
     return (
-        <div className="grid min-w-0 gap-1 tabular-nums" title={title || undefined} data-agent-work {...data}>
-            {heading && <GroupTitle>{heading}</GroupTitle>}
-            {rows.map((row) => (
-                <AsideProp key={row.label} label={row.label}>
-                    {row.value}
-                </AsideProp>
-            ))}
+        <div className="grid min-w-0 gap-0.5 text-xs tabular-nums" title={title || undefined} data-agent-work {...data}>
+            {heading && <span className="text-fg-muted">{heading}</span>}
+            {lead && <span className="text-fg leading-5">{lead}</span>}
+            {rest.length > 0 && <span className="text-fg-muted leading-5">{rest.join(' · ')}</span>}
             {note && (
                 <Text as="span" variant="caption" tone="muted">
                     {note}

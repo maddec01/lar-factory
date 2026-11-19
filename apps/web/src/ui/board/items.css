@@ -327,17 +327,29 @@ aside[data-item-aside]:empty {
     display: grid;
     gap: --spacing(1);
 }
+/* In the sidebar a fact reads as one phrase led by its mark, its muted word then its value, such as "Created 25d ago",
+   its value on the column every row's value starts on. */
 [data-item-aside] [data-meta-facts] > div {
-    grid-template-columns: 5.5rem minmax(0, 1fr);
-    align-items: start;
-    column-gap: --spacing(3);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: --spacing(1.5);
     font-size: var(--text-xs);
 }
-[data-item-aside] [data-meta-facts] > div > :first-child {
+[data-item-aside] [data-meta-facts] > div > [data-fact-mark] {
+    margin-right: --spacing(0.5);
+}
+[data-item-aside] [data-meta-facts] > div > :not([data-fact-mark]):first-of-type,
+[data-item-aside] [data-meta-facts] > div > [data-fact-mark] + * {
     line-height: --spacing(6);
 }
 [data-item-aside] [data-meta-facts] > div > :last-child {
     min-height: --spacing(6);
+}
+
+/* A project in the sidebar keeps its name on the values' column, as the rows under it do. */
+[data-item-aside] [data-item-summary] [data-repo-cell] {
+    column-gap: --spacing(2);
 }
 
 @keyframes desk-flash {
@@ -373,10 +385,15 @@ aside[data-item-aside]:empty {
     font-size: var(--text-xs);
     font-weight: 400;
 }
+/* The kind's mark sits on the sidebar's 16px mark column and its word on the values' column, as every row's does. */
 [data-item-aside] [data-kind-control] [data-slot='trigger'] > span:first-child > span {
-    gap: --spacing(1.5);
+    gap: --spacing(2);
 }
 [data-item-aside] [data-kind-control] [data-slot='trigger'] > span:first-child [aria-hidden] {
+    display: grid;
+    place-items: center;
+}
+[data-item-aside] [data-kind-control] [data-slot='trigger'] > span:first-child [aria-hidden] > svg {
     width: 0.875rem;
     height: 0.875rem;
 }

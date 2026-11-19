@@ -66,6 +66,7 @@ export { NeedsYouNotice, NeedsYouResult } from './NeedsYou';
 export { PartKindIcon, PartsFrame, ShowDoneToggle } from './PartsList';
 export {
     ChecksState,
+    NoPullRequest,
     PullRequestList,
     PullRequestReadiness,
     PullRequestRef,

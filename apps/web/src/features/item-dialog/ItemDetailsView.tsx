@@ -8,6 +8,18 @@
 import { onAzure, shortAgo } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
 import { Inline, Person } from '@lar-works/design-system';
+import {
+    CalendarIcon,
+    CircleDotIcon,
+    ClockIcon,
+    FlagIcon,
+    FolderTreeIcon,
+    LayersIcon,
+    ListChecksIcon,
+    RepeatIcon,
+    UserIcon,
+    UsersIcon,
+} from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { ConceptState } from './ConceptParts';
@@ -23,17 +35,25 @@ import { DetailFact as Fact, MetaArea } from '@/ui/board';
 function FromDetails({
     read,
     label,
+    icon,
+    labelHidden,
     show,
 }: {
     read: ItemDetailsRead;
     label: string;
+    icon: ReactNode;
+    labelHidden?: boolean;
     show: (d: ItemDetails) => ReactNode;
 }) {
     if (read.state !== 'loaded') return null;
 
     const shown = show(read.details);
 
-    return shown ? <Fact label={label}>{shown}</Fact> : null;
+    return shown ? (
+        <Fact label={label} icon={icon} labelHidden={labelHidden}>
+            {shown}
+        </Fact>
+    ) : null;
 }
 
 /**
@@ -58,14 +78,24 @@ export function ItemMeta({
         <MetaArea data-meta notice={<KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />}>
             {item.azure && (
                 <>
-                    <Fact label="Azure type">{item.azure.type}</Fact>
-                    <Fact label="Azure state">{item.azure.state}</Fact>
+                    <Fact label="Azure type" icon={<LayersIcon />}>
+                        {item.azure.type}
+                    </Fact>
+                    <Fact label="Azure state" icon={<CircleDotIcon />}>
+                        {item.azure.state}
+                    </Fact>
                 </>
             )}
-            <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
             <FromDetails
                 read={read}
-                label="Assignees"
+                label="Opened by"
+                icon={<UserIcon />}
+                show={(d) => d.author && <Person name={d.author} />}
+            />
+            <FromDetails
+                read={read}
+                label="Assigned to"
+                icon={<UsersIcon />}
                 show={(d) =>
                     d.assignees.length > 0 && (
                         <Inline as="span" wrap space="related">
@@ -80,15 +110,22 @@ export function ItemMeta({
             <ItemLabels key={`labels-${item.id}`} item={item} />
             {azure ? (
                 <>
-                    <FromDetails read={read} label="Iteration" show={(d) => d.iteration} />
-                    <FromDetails read={read} label="Area" show={(d) => d.area} />
+                    <FromDetails
+                        read={read}
+                        label="Iteration"
+                        icon={<RepeatIcon />}
+                        labelHidden
+                        show={(d) => d.iteration}
+                    />
+                    <FromDetails read={read} label="Area" icon={<FolderTreeIcon />} labelHidden show={(d) => d.area} />
                 </>
             ) : (
-                <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />
+                <FromDetails read={read} label="Milestone" icon={<FlagIcon />} labelHidden show={(d) => d.milestone} />
             )}
             <FromDetails
                 read={read}
                 label="Created"
+                icon={<CalendarIcon />}
                 show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />}
             />
             {/* Updated says something only once it is later than Created. */}
@@ -98,7 +135,7 @@ export function ItemMeta({
                 (Date.parse(item.updatedAt) <= Date.parse(read.details.createdAt) ||
                     shortAgo(item.updatedAt, now) === shortAgo(read.details.createdAt, now))
             ) && (
-                <Fact label="Updated">
+                <Fact label="Updated" icon={<ClockIcon />}>
                     <When iso={item.updatedAt} now={now} />
                 </Fact>
             )}
@@ -108,7 +145,7 @@ export function ItemMeta({
                 !item.releasePlan &&
                 item.refinement &&
                 !item.completion && (
-                    <Fact label="Decisions">
+                    <Fact label="Decisions" icon={<ListChecksIcon />}>
                         <ConceptState state={item.refinement} />
                     </Fact>
                 )}

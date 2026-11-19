@@ -14,8 +14,8 @@ export function PullRequestList({
     return <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-1 p-0">{children}</ul>;
 }
 
-/** A pull request: its icon and label linking to it in a new tab, then its `checks` and `readiness`, and any `details`
- *  at the card's foot, so what belongs to the pull request stays inside its card. */
+/** A pull request as the sidebar lists it: its icon, then "Pull request #42" linking to it in a new tab, and under that
+ *  its `checks` and `readiness` in muted text, then any `details`, all on the column the sidebar's values start on. */
 export function PullRequestRow({
     href,
     label,
@@ -38,22 +38,33 @@ export function PullRequestRow({
     details?: ReactNode;
 }) {
     return (
-        <li className="border-line bg-surface-raised flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-2">
-            <GitPullRequestIcon className="stroke-board-done size-4 shrink-0" />
+        <li className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-2 text-xs">
+            <GitPullRequestIcon className="stroke-board-done size-3.5 shrink-0 justify-self-center" />
             <a
                 href={href}
                 target="_blank"
                 rel="noopener"
                 title={title}
-                className="mr-auto shrink-0 font-medium hover:underline"
+                className="text-fg min-w-0 leading-7 hover:underline"
             >
-                <span className="sr-only">Pull request </span>
-                {label}
+                Pull request {label}
             </a>
-            {checks}
-            {readiness}
-            {details && <div className="min-w-0 basis-full">{details}</div>}
+            <span className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {checks}
+                {readiness}
+            </span>
+            {details && <div className="col-start-2 min-w-0 pt-1">{details}</div>}
         </li>
+    );
+}
+
+/** A piece of work with no pull request yet, as the sidebar says it: the pull request mark, muted, then its words. */
+export function NoPullRequest() {
+    return (
+        <span className="flex items-center gap-2 text-xs">
+            <GitPullRequestIcon aria-hidden className="grid size-4 shrink-0 place-items-center p-px" />
+            No pull request yet.
+        </span>
     );
 }
 

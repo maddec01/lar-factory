@@ -34,12 +34,19 @@ export function MetaArea({
  */
 export function DetailFact({
     label,
+    icon,
+    labelHidden = false,
     presentation = 'meta',
     children,
     ...data
 }: {
     /** The fact's label. */
     label: ReactNode;
+    /** A mark that leads the fact in the sidebar, where it reads as one phrase, such as a calendar before "Created 25d
+     *  ago". */
+    icon?: ReactNode;
+    /** The value says what it is beside its `icon`, such as label chips, so the label is only read aloud. */
+    labelHidden?: boolean;
     /** `meta` sets the label over the value in the meta area; `record` beside it in the record. */
     presentation?: 'meta' | 'record';
     /** The fact's value, or the control that edits it. */
@@ -55,7 +62,16 @@ export function DetailFact({
 
     return (
         <div {...data} className="grid max-w-full min-w-0 content-start text-sm">
-            <span className="text-fg-muted text-xs leading-4">{label}</span>
+            {icon && (
+                <span
+                    aria-hidden
+                    className="text-fg-muted grid size-4 shrink-0 place-items-center [&>svg]:size-3.5"
+                    data-fact-mark
+                >
+                    {icon}
+                </span>
+            )}
+            <span className={labelHidden ? 'sr-only' : 'text-fg-muted text-xs leading-4'}>{label}</span>
             <span className="flex min-h-7 min-w-0 flex-wrap items-center gap-1.5 wrap-anywhere">{children}</span>
         </div>
     );

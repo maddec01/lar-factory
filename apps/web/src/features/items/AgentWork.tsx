@@ -14,7 +14,7 @@ export const INCOMPLETE_TOTAL = 'Some agent usage is not available yet.';
 
 /**
  * Agent time, tokens and cost: as one short muted figure after any `label`, the cost (or the agent time with no cost),
- * with every figure named in its tooltip; or as `rows`, one per figure under `label` as their heading, with the wall
+ * with every figure named in its tooltip; or as `rows`, one phrase naming each figure under `label` as their heading, with the wall
  * time while the work runs (a still item's "elapsed" would read as a clock still going). Nothing when no thread worked
  * on the item or T3's database can't be read. While T3 can't be read, the board keeps the figures it last saw, and the tooltip says so. `stats` shows other
  * figures than the item's own; `only` shows it only in a narrow or a wide container.
@@ -33,7 +33,7 @@ export function AgentWork({
     only?: 'narrow' | 'wide';
     /** Inside a line of text or a button, where a paragraph can't go. */
     inline?: boolean;
-    /** One labelled row per figure, as the dialog's sidebar lists properties. */
+    /** One phrase naming each figure, as the dialog's sidebar lists them. */
     rows?: boolean;
 }) {
     const lastKnown = useLastKnown(item);
@@ -60,10 +60,18 @@ export function AgentWork({
         return (
             <FigureRows
                 title={title}
-                rows={shown.map(([name, v]) => ({
-                    label: name === 'Wall time' ? 'Since start' : name,
-                    value: `${v}${name === 'Cost' && s.incomplete ? '+' : ''}`,
-                }))}
+                figures={[
+                    ...shown.filter(([name]) => name === 'Cost').map(([, v]) => `${v}${s.incomplete ? '+' : ''}`),
+                    ...shown.flatMap(([name, v]) =>
+                        name === 'Agent time'
+                            ? [`${v} agent time`]
+                            : name === 'Tokens'
+                              ? [`${v} tokens`]
+                              : name === 'Wall time'
+                                ? [`${v} since start`]
+                                : [],
+                    ),
+                ]}
                 heading={label}
                 note={[old && 'Last known', s.incomplete && 'Incomplete'].filter(Boolean).join(' · ') || undefined}
             />

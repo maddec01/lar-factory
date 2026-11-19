@@ -104,7 +104,7 @@ function ConceptReasons({ state }: { state: { complete: boolean; reasons: string
 }
 
 /** The concept's total with its parts in the sidebar, after the concept's own figures: under "Including parts", one
- *  labelled row each for agent time, tokens and cost, as the concept's own are; with none of its own, a "This concept"
+ *  phrase naming its cost, agent time and tokens, as the concept's own are; with none of its own, a "This concept"
  *  heading says so first, so each set of figures names its scope. The tooltip names every figure and says when they
  *  are the last known. */
 export function ConceptWork({ item }: { item: Item }) {
@@ -115,19 +115,17 @@ export function ConceptWork({ item }: { item: Item }) {
 
     const own = item.stats && item.stats !== 'unavailable' && hasFigures(item.stats);
     const cost = total.costUsd === undefined ? null : `${formatUsd(total.costUsd)}${total.incomplete ? '+' : ''}`;
-    const rows = [
-        { label: 'Agent time', value: duration(total.agentMs) },
-        { label: 'Tokens', value: formatTokens(total.tokens) },
-        ...(cost ? [{ label: 'Cost', value: cost }] : []),
-    ];
-    const title = rows.map((row) => `${row.label} ${row.value}`).join(' · ');
+    const time = duration(total.agentMs);
+    const tokens = formatTokens(total.tokens);
+    const figures = [...(cost ? [cost] : []), `${time} agent time`, `${tokens} tokens`];
+    const title = [`Agent time ${time}`, `Tokens ${tokens}`, cost && `Cost ${cost}`].filter(Boolean).join(' · ');
 
     return (
         <>
-            {!own && <FigureRows heading="This concept" rows={[]} note="No agent work of its own." />}
+            {!own && <FigureRows heading="This concept" figures={[]} note="No agent work of its own." />}
             <FigureRows
                 heading="Including parts"
-                rows={rows}
+                figures={figures}
                 title={[title, !total.frozen && lastKnown, total.incomplete && INCOMPLETE_TOTAL]
                     .filter(Boolean)
                     .join('. ')}
@@ -208,17 +206,10 @@ export function ConceptParts({
                         )}
                 </Text>
             )}
-            {/* The board's own part rows, what's still to do first, done and set-aside parts folded under one toggle; each
-                says every agent figure, as the dialog has room for. */}
+            {/* The board's own part rows, what's still to do first, done and set-aside parts folded under one toggle, one
+                line each: a summary of what the board says in full. */}
             {parts.length > 0 && (
-                <PartsList
-                    parts={parts}
-                    data={data}
-                    home={item.repo}
-                    openFirst
-                    onOpen={(part) => openPart(part.id)}
-                    full
-                />
+                <PartsList parts={parts} data={data} home={item.repo} openFirst onOpen={(part) => openPart(part.id)} />
             )}
             {subTickets.length > 0 && <TicketLinks tickets={subTickets} row />}
             {loading && waited !== 'too long' && item.subIssues.total > 0 && (

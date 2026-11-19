@@ -278,22 +278,18 @@ export function RowProgress({
 }
 
 /** The last of a row's facts, flush with the row's end: its cost, then how long it has sat there, each on a fixed
- *  track so they line up down every list. A `full` end says every agent figure, and its track takes their width
- *  (rows.css). */
+ *  track so they line up down every list. */
 export function RowMetaEnd({
-    full = false,
     cost,
     age,
 }: {
-    /** It holds every agent figure, not the cost alone. */
-    full?: boolean;
     /** The agent figures, a Figures. */
     cost?: ReactNode;
     /** How long it has sat there, an Age. */
     age?: ReactNode;
 }) {
     return (
-        <span data-meta-end data-full={full || undefined} className="row-meta-end">
+        <span data-meta-end className="row-meta-end">
             <span data-cost>{cost}</span>
             <span data-age>{age}</span>
         </span>

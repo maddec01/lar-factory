@@ -1,5 +1,6 @@
 import type { Retro } from '@lar-factory/shared';
-import { Button, Checkbox, Inline, Stack, Text } from '@lar-works/design-system';
+import { Button, Checkbox, Inline, Stack } from '@lar-works/design-system';
+import { FolderGit2Icon } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
 import { buttonKind } from './ButtonKinds';
@@ -26,41 +27,52 @@ export function RetroChoices({
     };
 
     return (
-        <Stack space="tight" onClick={(event) => event.stopPropagation()}>
-            <Text variant="caption" tone="muted">
-                Optional. Choose after merge if you like, or dismiss these follow-ups.
-            </Text>
-            {retro.suggestions?.map((suggestion, index) => (
-                <Stack space="tight" key={index}>
-                    <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                            checked={selected.includes(index)}
-                            disabled={pending}
-                            onChange={() => onToggle(index)}
-                        />
-                        <span className="min-w-0 font-medium break-words">{suggestion.title}</span>
-                    </label>
-                    <Text variant="caption" breaks>
-                        {suggestion.description}
-                    </Text>
-                    <Text variant="caption" tone="muted" breaks>
-                        {suggestion.repository}
-                    </Text>
-                </Stack>
-            ))}
-            <Inline wrap>
-                <Button
-                    {...buttonKind('next')}
-                    busy={pending && !none}
-                    disabled={pending || !selected.length}
-                    onClick={() => choose(selected)}
-                >
-                    Create chosen follow-ups
-                </Button>
-                <Button {...buttonKind('other')} busy={pending && none} disabled={pending} onClick={() => choose([])}>
-                    No follow-ups
-                </Button>
-            </Inline>
+        <Stack space="related" onClick={(event) => event.stopPropagation()}>
+            <ul className="grid gap-2">
+                {retro.suggestions?.map((suggestion, index) => (
+                    <li key={index}>
+                        <label className="border-line hover:bg-fill-hover has-checked:border-primary grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border px-3 py-2.5 text-sm has-disabled:cursor-default">
+                            <span className="grid h-5 place-items-center">
+                                <Checkbox
+                                    checked={selected.includes(index)}
+                                    disabled={pending}
+                                    onChange={() => onToggle(index)}
+                                />
+                            </span>
+                            <span className="text-fg min-w-0 leading-5 font-medium break-words">
+                                {suggestion.title}
+                            </span>
+                            <span className="text-fg-muted col-start-2 min-w-0 text-xs leading-5 break-words whitespace-pre-line">
+                                {suggestion.description}
+                            </span>
+                            <span className="text-fg-muted col-start-2 flex min-w-0 items-center gap-1.5 pt-0.5 text-xs">
+                                <FolderGit2Icon aria-hidden className="size-3.5 shrink-0" />
+                                <span className="min-w-0 truncate">{suggestion.repository}</span>
+                            </span>
+                        </label>
+                    </li>
+                ))}
+            </ul>
+            <div className="pt-1">
+                <Inline wrap>
+                    <Button
+                        {...buttonKind('next')}
+                        busy={pending && !none}
+                        disabled={pending || !selected.length}
+                        onClick={() => choose(selected)}
+                    >
+                        Create chosen follow-ups
+                    </Button>
+                    <Button
+                        {...buttonKind('other')}
+                        busy={pending && none}
+                        disabled={pending}
+                        onClick={() => choose([])}
+                    >
+                        No follow-ups
+                    </Button>
+                </Inline>
+            </div>
         </Stack>
     );
 }

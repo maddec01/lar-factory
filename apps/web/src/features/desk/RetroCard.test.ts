@@ -60,7 +60,6 @@ test('a compact card before merge opens the full choice in details and creates o
     expect(text(card())).not.toContain('Full description');
     expect(card().querySelectorAll('[data-col="side"] button')).toHaveLength(2);
     await openChoice();
-    expect(text(details())).toContain('Optional. Choose after merge if you like, or dismiss these follow-ups.');
     expect(text(details())).not.toContain('Choose follow-ups before the pull request can merge.');
     expect(details().querySelectorAll('input[type=checkbox]')).toHaveLength(6);
     for (let i = 1; i <= 6; i++) expect(text(details())).toContain(`Full description ${i}.`);

@@ -1,4 +1,4 @@
-// The item dialog's content: its summary and progress, then the work record and ticket description with the sidebar,
+// The item dialog's content: its progress first, then its summary, then the work record and ticket description with the sidebar,
 // followed by access, metadata, earlier threads and comments. Actions stay in its footer.
 
 import { groupProgress, itemName, sameRepo, writeAccessProblem } from '@lar-factory/shared';
@@ -134,7 +134,9 @@ export function ItemDialogContent({
                 <ItemDialogBody fill={fill} data-item-body>
                     <ItemDialogColumns aside fill={fill}>
                         <ItemMainColumn fill={fill}>
-                            {/* What waits on you leads the body, before where the work stands. */}
+                            {/* Where the work stands leads every ticket, in the same place whatever else shows. */}
+                            {!group && !item.setAside && <ItemProgress item={item} />}
+                            {/* Then what waits on you, before the rest. */}
                             {!item.setAside && (
                                 <NeedsYou
                                     item={item}
@@ -144,8 +146,7 @@ export function ItemDialogContent({
                                 />
                             )}
                             {!item.setAside && <RetroFollowups item={item} />}
-                            {!group && !item.setAside && <ItemProgress item={item} />}
-                            {/* What its agents do now, right after where the work stands, before the ticket's own facts. */}
+                            {/* What its agents do now, before the ticket's own facts. */}
                             <ItemAgents item={item} />
                             {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                             {item.shapingCleanupProblem && (

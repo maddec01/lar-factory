@@ -57,15 +57,12 @@ export function PartRow({
     data,
     home,
     onOpen,
-    full = false,
 }: {
     part: Part;
     data: BoardData;
     home: string | undefined;
     /** Opens the part in place of the item dialog's own open, as the concept's dialog does. */
     onOpen?: (() => void) | undefined;
-    /** Every agent figure at its end, "2h 29m · 64.8M tokens · $29.12", as the concept's dialog has room for. */
-    full?: boolean;
 }) {
     const { item } = part;
     const openPart = onOpen ?? (() => open(item));
@@ -156,11 +153,7 @@ export function PartRow({
                             />
                         )
                     )}
-                    <RowMetaEnd
-                        full={full}
-                        cost={<Figures s={figures} item={item} full={full} />}
-                        age={!done && <Age at={item.updatedAt} />}
-                    />
+                    <RowMetaEnd cost={<Figures s={figures} item={item} />} age={!done && <Age at={item.updatedAt} />} />
                 </RowMeta>
                 <RowSide>
                     {/* The same action as its Work map card, so switching views never changes what a part offers. */}

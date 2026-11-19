@@ -3,7 +3,7 @@
 import { STRUCTURE_LABEL, kindLabels, sameRepo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { Button, Inline, LabelChip, Loading, Text } from '@lar-works/design-system';
-import { Pencil } from '@lar-works/design-system/icons';
+import { Pencil, TagIcon } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
 import { useLabelEdit } from './useLabelEdit';
@@ -43,7 +43,7 @@ export function ItemLabels({ item }: { item: Item }) {
     };
 
     return (
-        <Fact label={heading}>
+        <Fact label={heading} icon={<TagIcon />} labelHidden>
             {attempted && problem && (
                 <Text variant="caption" tone="muted" role="status">
                     Ticket labels are read-only. {problem.replace(/ Recheck access in Settings\.$/, '')}

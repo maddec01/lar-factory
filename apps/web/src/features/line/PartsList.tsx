@@ -11,15 +11,13 @@ import { RowActions } from '@/features/items';
 import { PartsFrame, ShowDoneToggle, StageList } from '@/ui/board';
 
 /** The parts list: one row per part, the done ones folded into a count. `openFirst` lists the open parts before the done
- *  ones it unfolds, as the concept's dialog does; `onOpen` opens a part in place of the item dialog's own open, and
- *  `full` gives each part every agent figure. */
+ *  ones it unfolds, as the concept's dialog does; `onOpen` opens a part in place of the item dialog's own open. */
 export function PartsList({
     parts,
     data,
     home,
     openFirst = false,
     onOpen,
-    full = false,
 }: {
     parts: Part[];
     data: BoardData;
@@ -27,7 +25,6 @@ export function PartsList({
     home: string | undefined;
     openFirst?: boolean;
     onOpen?: ((item: Item) => void) | undefined;
-    full?: boolean;
 }) {
     const [showDone, setShowDone] = useState(false);
     const open = parts.filter((p) => !isDone(p.item));
@@ -54,7 +51,6 @@ export function PartsList({
                             data={data}
                             home={home}
                             onOpen={onOpen && (() => onOpen(p.item))}
-                            full={full}
                         />
                     ))}
                 </StageList>

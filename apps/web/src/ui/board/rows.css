@@ -291,12 +291,6 @@ li.desk-row:has([data-row-open]:focus-visible) {
     min-width: 0;
 }
 
-/* A row that says every agent figure at its end (RowMetaEnd full, a concept dialog's part) gives its end track their
-   width; every part in that list is full, so its columns still line up. */
-.row-meta:has(> .row-meta-end[data-full]) {
-    --row-end: 16rem;
-}
-
 /* In a row's end, a held reason reads a step above its age or cost. */
 .row-meta-end [data-state]:not(.queue-age) {
     color: var(--color-fg-soft);
@@ -374,6 +368,28 @@ li.desk-row:has([data-row-open]:focus-visible) {
                 transparent var(--row-fade-end)
             );
         }
+    }
+}
+
+/* A concept dialog's parts are a quick overview beside its sidebar, so each keeps to one line and drops what the board
+   already says: its tracker's mark, its progress and how long it has waited. What is left is its project, title, state
+   and cost, on narrower tracks than a lane's, the title taking the rest. Its action stands over the row's end on hover,
+   as on the board. */
+[data-concept-parts] [data-parts-list] [data-part] > div > .row-first {
+    --row-source: 5rem;
+
+    > .row-cols [data-row-identity] > [role='img'],
+    > .row-meta > [data-col='progress'],
+    > .row-meta > .row-meta-end > [data-age] {
+        display: none;
+    }
+    > .row-meta {
+        grid-template-columns: 8rem 3.5rem;
+        column-gap: --spacing(3);
+    }
+    > .row-meta > .row-meta-end {
+        grid-column: 2;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

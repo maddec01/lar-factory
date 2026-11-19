@@ -12,7 +12,7 @@ import { showsPullRequests, subTicketsInParts, waitsOn } from './Relations';
 import { Dependencies, PrList, dependenciesOf } from '@/features/items';
 import { partRef } from '@/features/line';
 import type { ItemDetailsRead } from '@/services/items/items.hooks';
-import { DetailsSection, ItemDialogAside, WaitsOnList } from '@/ui/board';
+import { DetailsSection, ItemDialogAside, NoPullRequest, WaitsOnList } from '@/ui/board';
 
 /** The work the item waits on: what is still open, under "Waits on", and the done prerequisites as one quiet count. */
 function WaitsOn({
@@ -101,10 +101,7 @@ export function ItemAside({
                 />
             )}
             {relations && showsPullRequests(item, isGroupParent(item, data.items)) && (
-                <DetailsSection
-                    heading="Pull requests"
-                    empty={item.linkedPrs.length ? undefined : 'No pull request yet.'}
-                >
+                <DetailsSection empty={item.linkedPrs.length ? undefined : <NoPullRequest />}>
                     {item.linkedPrs.length > 0 && (
                         <PrList
                             item={item}

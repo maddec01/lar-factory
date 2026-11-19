@@ -1,6 +1,7 @@
 // A piece of work's earlier T3 threads, in the item dialog.
 
 import { Link } from '@lar-works/design-system';
+import { MessagesSquareIcon } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
 import { MetaDot } from './TextParts';
@@ -12,13 +13,13 @@ export function EarlierThreadList({
     /** The threads, one EarlierThread each. */
     children: ReactNode;
 }) {
-    // A property of the item as the sidebar lists them: "Threads" in the label column, each thread beside it.
+    // A property of the item as the sidebar lists them: a thread mark leads, each thread beside it on the values' column.
     return (
-        <div
-            className="grid grid-cols-[var(--fact-label)_minmax(0,1fr)] items-start gap-x-3 text-xs"
-            data-earlier-threads
-        >
-            <span className="text-fg-muted leading-7">Threads</span>
+        <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-2 text-xs" data-earlier-threads>
+            <span className="text-fg-muted grid h-7 place-items-center">
+                <MessagesSquareIcon aria-hidden className="size-3.5" />
+                <span className="sr-only">Threads</span>
+            </span>
             <ul className="m-0 grid list-none p-0">{children}</ul>
         </div>
     );
